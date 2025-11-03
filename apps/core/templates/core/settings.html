@@ -1,0 +1,217 @@
+{% extends "core/app_base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}CPOS Hub - {% trans "Settings" %}{% endblock %}
+{% block page_title %}{% trans "Settings" %}{% endblock %}
+
+{% block content %}
+<div style="padding: 24px;" x-data="settingsApp()">
+    <!-- Hub Configuration -->
+    <ion-card>
+        <ion-card-header>
+            <ion-card-title>{% trans "Hub Configuration" %}</ion-card-title>
+            <ion-card-subtitle>{% trans "General hub settings and information" %}</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+            <div style="display: grid; gap: 16px;">
+                <div>
+                    <ion-label position="stacked">{% trans "Hub ID" %}</ion-label>
+                    <ion-input
+                        readonly
+                        value="{{ hub_config.hub_id|default:'Not configured' }}"
+                        style="margin-top: 8px;">
+                    </ion-input>
+                </div>
+
+                <div>
+                    <ion-label position="stacked">{% trans "System Language" %}</ion-label>
+                    <ion-select
+                        value="{{ hub_config.os_language }}"
+                        style="margin-top: 8px;"
+                        x-model="language">
+                        <ion-select-option value="en">English</ion-select-option>
+                        <ion-select-option value="es">Español</ion-select-option>
+                    </ion-select>
+                </div>
+
+                <div>
+                    <ion-label position="stacked">{% trans "Hub Status" %}</ion-label>
+                    <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                        <ion-badge color="{% if hub_config.is_configured %}success{% else %}warning{% endif %}">
+                            {% if hub_config.is_configured %}
+                                {% trans "Configured" %}
+                            {% else %}
+                                {% trans "Not Configured" %}
+                            {% endif %}
+                        </ion-badge>
+                    </div>
+                </div>
+
+                <div>
+                    <ion-label position="stacked">{% trans "Tunnel Port" %}</ion-label>
+                    <ion-input
+                        readonly
+                        value="{{ hub_config.tunnel_port|default:'Not assigned' }}"
+                        style="margin-top: 8px;">
+                    </ion-input>
+                </div>
+            </div>
+        </ion-card-content>
+    </ion-card>
+
+    <!-- Display Settings -->
+    <ion-card style="margin-top: 16px;">
+        <ion-card-header>
+            <ion-card-title>{% trans "Display Settings" %}</ion-card-title>
+            <ion-card-subtitle>{% trans "Customize the appearance" %}</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+            <div style="display: grid; gap: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <ion-label>{% trans "Dark Mode" %}</ion-label>
+                        <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
+                            {% trans "Enable dark theme" %}
+                        </p>
+                    </div>
+                    <ion-toggle
+                        x-model="darkMode"
+                        @ionChange="toggleDarkMode()">
+                    </ion-toggle>
+                </div>
+            </div>
+        </ion-card-content>
+    </ion-card>
+
+    <!-- Receipt Settings -->
+    <ion-card style="margin-top: 16px;">
+        <ion-card-header>
+            <ion-card-title>{% trans "Receipt Settings" %}</ion-card-title>
+            <ion-card-subtitle>{% trans "Configure receipt printing" %}</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+            <div style="display: grid; gap: 16px;">
+                <div>
+                    <ion-label position="stacked">{% trans "Business Name" %}</ion-label>
+                    <ion-input
+                        placeholder="{% trans 'Enter business name' %}"
+                        x-model="businessName"
+                        style="margin-top: 8px;">
+                    </ion-input>
+                </div>
+
+                <div>
+                    <ion-label position="stacked">{% trans "Business Address" %}</ion-label>
+                    <ion-textarea
+                        placeholder="{% trans 'Enter business address' %}"
+                        rows="3"
+                        x-model="businessAddress"
+                        style="margin-top: 8px;">
+                    </ion-textarea>
+                </div>
+
+                <div>
+                    <ion-label position="stacked">{% trans "Tax ID" %}</ion-label>
+                    <ion-input
+                        placeholder="{% trans 'Enter tax ID' %}"
+                        x-model="taxId"
+                        style="margin-top: 8px;">
+                    </ion-input>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <ion-label>{% trans "Auto-print Receipts" %}</ion-label>
+                        <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
+                            {% trans "Automatically print after each sale" %}
+                        </p>
+                    </div>
+                    <ion-toggle x-model="autoPrint"></ion-toggle>
+                </div>
+            </div>
+        </ion-card-content>
+    </ion-card>
+
+    <!-- Actions -->
+    <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end;">
+        <ion-button color="medium" @click="resetSettings()">
+            {% trans "Reset" %}
+        </ion-button>
+        <ion-button @click="saveSettings()">
+            <ion-icon slot="start" name="save-outline"></ion-icon>
+            {% trans "Save Settings" %}
+        </ion-button>
+    </div>
+</div>
+
+<script>
+function settingsApp() {
+    return {
+        language: '{{ hub_config.os_language }}',
+        darkMode: false,
+        businessName: '',
+        businessAddress: '',
+        taxId: '',
+        autoPrint: false,
+
+        init() {
+            // Check if dark mode is enabled
+            this.darkMode = document.body.classList.contains('dark');
+            // Load saved settings from localStorage
+            this.loadSettings();
+        },
+
+        loadSettings() {
+            const saved = localStorage.getItem('hubSettings');
+            if (saved) {
+                const settings = JSON.parse(saved);
+                this.businessName = settings.businessName || '';
+                this.businessAddress = settings.businessAddress || '';
+                this.taxId = settings.taxId || '';
+                this.autoPrint = settings.autoPrint || false;
+            }
+        },
+
+        toggleDarkMode() {
+            document.body.classList.toggle('dark', this.darkMode);
+            localStorage.setItem('darkMode', this.darkMode);
+        },
+
+        saveSettings() {
+            const settings = {
+                language: this.language,
+                businessName: this.businessName,
+                businessAddress: this.businessAddress,
+                taxId: this.taxId,
+                autoPrint: this.autoPrint
+            };
+
+            localStorage.setItem('hubSettings', JSON.stringify(settings));
+
+            // Show success toast
+            const toast = document.createElement('ion-toast');
+            toast.message = '{% trans "Settings saved successfully" %}';
+            toast.duration = 2000;
+            toast.color = 'success';
+            document.body.appendChild(toast);
+            toast.present();
+        },
+
+        resetSettings() {
+            if (confirm('{% trans "Are you sure you want to reset all settings?" %}')) {
+                localStorage.removeItem('hubSettings');
+                this.loadSettings();
+
+                const toast = document.createElement('ion-toast');
+                toast.message = '{% trans "Settings reset successfully" %}';
+                toast.duration = 2000;
+                toast.color = 'warning';
+                document.body.appendChild(toast);
+                toast.present();
+            }
+        }
+    }
+}
+</script>
+{% endblock %}
