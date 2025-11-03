@@ -1,0 +1,20 @@
+{% extends "core/app_base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}CPOS Hub - {% trans "Point of Sale" %}{% endblock %}
+{% block page_title %}{% trans "Point of Sale" %}{% endblock %}
+
+{% block content %}
+<div style="padding: 24px;">
+    <ion-card>
+        <ion-card-header>
+            <ion-card-title>{% trans "Point of Sale" %}</ion-card-title>
+            <ion-card-subtitle>{% trans "Coming soon..." %}</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+            <p>{% trans "The POS interface will be implemented here." %}</p>
+        </ion-card-content>
+    </ion-card>
+</div>
+{% endblock %}
