@@ -1,0 +1,236 @@
+{% load static %}
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block title %}CPOS Hub{% endblock %}</title>
+
+    <!-- Ionic Core -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"></script>
+    <script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="{% static 'css/ionic-theme.css' %}">
+
+    <style>
+        :root {
+            --sidebar-width: 240px;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--ion-color-light);
+            border-right: 1px solid var(--ion-color-light-shade);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--ion-color-light-shade);
+        }
+
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .sidebar-menu {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 0;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: var(--ion-color-dark);
+            text-decoration: none;
+            transition: background-color 0.2s;
+        }
+
+        .menu-item:hover {
+            background-color: var(--ion-color-light-tint);
+        }
+
+        .menu-item.active {
+            background-color: var(--ion-color-primary);
+            color: white;
+        }
+
+        .menu-item ion-icon {
+            font-size: 24px;
+            margin-right: 12px;
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid var(--ion-color-light-shade);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .top-bar {
+            background: var(--ion-color-primary);
+            color: white;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: white;
+            color: var(--ion-color-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--ion-background-color);
+        }
+
+        /* Dark mode styles */
+        @media (prefers-color-scheme: dark) {
+            .sidebar {
+                background: var(--ion-color-step-50);
+                border-right-color: var(--ion-color-step-150);
+            }
+
+            .sidebar-header,
+            .sidebar-footer {
+                border-color: var(--ion-color-step-150);
+            }
+
+            .menu-item {
+                color: var(--ion-color-light);
+            }
+
+            .menu-item:hover {
+                background-color: var(--ion-color-step-100);
+            }
+        }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <ion-app>
+        <div class="app-container">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2>CPOS</h2>
+                    <small>{% trans "Point of Sale" %}</small>
+                </div>
+
+                <div class="sidebar-menu">
+                    <a href="{% url 'core:dashboard' %}" class="menu-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                        <ion-icon name="home-outline"></ion-icon>
+                        <span>{% trans "Dashboard" %}</span>
+                    </a>
+
+                    <a href="{% url 'core:pos' %}" class="menu-item {% if request.resolver_match.url_name == 'pos' %}active{% endif %}">
+                        <ion-icon name="cart-outline"></ion-icon>
+                        <span>{% trans "Point of Sale" %}</span>
+                    </a>
+
+                    <a href="#" class="menu-item">
+                        <ion-icon name="cube-outline"></ion-icon>
+                        <span>{% trans "Products" %}</span>
+                    </a>
+
+                    <a href="#" class="menu-item">
+                        <ion-icon name="receipt-outline"></ion-icon>
+                        <span>{% trans "Sales" %}</span>
+                    </a>
+
+                    <a href="#" class="menu-item">
+                        <ion-icon name="bar-chart-outline"></ion-icon>
+                        <span>{% trans "Reports" %}</span>
+                    </a>
+
+                    <hr style="margin: 10px 0; border: none; border-top: 1px solid var(--ion-color-light-shade);">
+
+                    <a href="{% url 'core:employees' %}" class="menu-item {% if request.resolver_match.url_name == 'employees' %}active{% endif %}">
+                        <ion-icon name="people-outline"></ion-icon>
+                        <span>{% trans "Employees" %}</span>
+                    </a>
+
+                    <a href="{% url 'core:settings' %}" class="menu-item {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
+                        <ion-icon name="settings-outline"></ion-icon>
+                        <span>{% trans "Settings" %}</span>
+                    </a>
+                </div>
+
+                <div class="sidebar-footer">
+                    <ion-button expand="block" color="danger" href="{% url 'core:logout' %}">
+                        <ion-icon slot="start" name="log-out-outline"></ion-icon>
+                        {% trans "Logout" %}
+                    </ion-button>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Top Bar -->
+                <div class="top-bar">
+                    <div>
+                        <h1 style="margin: 0; font-size: 1.25rem;">{% block page_title %}{% trans "Dashboard" %}{% endblock %}</h1>
+                    </div>
+
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            {{ request.session.user_name|first|upper }}
+                        </div>
+                        <div>
+                            <div style="font-weight: 600;">{{ request.session.user_name }}</div>
+                            <div style="font-size: 0.875rem; opacity: 0.9;">{{ request.session.user_role|title }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Area -->
+                <div class="content-area">
+                    {% block content %}{% endblock %}
+                </div>
+            </div>
+        </div>
+    </ion-app>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
