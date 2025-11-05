@@ -146,3 +146,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Cloud API Configuration
 # URL of the Cloud server for authentication and hub registration
 CLOUD_API_URL = config('CLOUD_API_URL', default='http://localhost:8000')
+
+
+# Hub Version
+HUB_VERSION = "1.0.0"
