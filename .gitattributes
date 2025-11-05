@@ -1,0 +1,4 @@
+# Archivos gestionados por semantic-release
+# Siempre usar la versión de la rama actual en merge
+pyproject.toml merge=ours
+CHANGELOG.md merge=union
