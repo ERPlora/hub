@@ -13,14 +13,18 @@ Sistema de empaquetado multi-plataforma para CPOS Hub usando PyInstaller.
 ## 📦 Estructura
 
 ```
-build/
-├── main.py              # Entry point (cross-platform)
-├── main.spec            # PyInstaller spec (cross-platform)
-├── app_icon.ico         # Icono para Windows
-├── app_icon.icns        # Icono para macOS
-├── logo.png             # Logo fuente
-├── convertir_iconos.py  # Script para generar iconos
-└── README.md            # Este archivo
+hub/
+├── main.py              # Entry point (cross-platform) - root del proyecto
+├── main.spec            # PyInstaller spec (cross-platform) - root del proyecto
+├── assets/              # Assets de la aplicación
+│   ├── app_icon.ico     # Icono para Windows
+│   ├── app_icon.icns    # Icono para macOS
+│   └── logo.png         # Logo fuente
+├── pyi_hooks/           # Hooks personalizados de PyInstaller
+│   └── hook-django.py   # Hook Django personalizado (previene errores)
+├── pyproject.toml       # Dependencias y config (fuente única de verdad)
+└── docs/
+    └── BUILDING.md      # Este archivo
 ```
 
 ## 🚀 Build Local
@@ -35,13 +39,11 @@ build/
 ```bash
 # 1. Instalar dependencias
 cd hub
-uv venv
-source venv/bin/activate  # En Windows: venv\Scripts\activate
-uv pip install -r requirements.txt
-uv pip install pyinstaller
+uv venv  # Crea .venv automáticamente
+source .venv/bin/activate  # En Windows: .venv\Scripts\activate
+uv pip install -e .  # Instala desde pyproject.toml
 
 # 2. Build
-cd build
 pyinstaller main.spec --clean
 
 # 3. Resultado
