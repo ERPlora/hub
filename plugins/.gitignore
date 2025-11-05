@@ -1,0 +1,6 @@
+# Ignore all plugin directories except example
+*
+!.gitignore
+!.gitkeep
+!README.md
+!_example-plugin/
