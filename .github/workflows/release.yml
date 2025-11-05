@@ -3,9 +3,8 @@ name: Release
 on:
   push:
     branches:
-      - main      # Production (PROD)
-      - staging   # Pre-production (PRE)
-      - develop   # Integration (INT)
+      - main      # Production (PROD) - Stable releases
+      - staging   # Pre-production (PRE) - Release candidates
 
 permissions:
   contents: write
@@ -16,7 +15,6 @@ jobs:
   release:
     name: Semantic Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
     outputs:
       released: ${{ steps.release.outputs.released }}
       tag: ${{ steps.release.outputs.tag }}
@@ -58,11 +56,12 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.release.outputs.tag }}
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
 
   build:
     name: Build on ${{ matrix.os }}
     needs: release
-    if: needs.release.outputs.released == 'true' && github.ref == 'refs/heads/main'
+    if: needs.release.outputs.released == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -134,6 +133,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.release.outputs.tag }}
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
           files: |
             CPOS-Hub-*.zip
             CPOS-Hub-*.tar.gz

@@ -57,11 +57,6 @@ match = "staging"
 prerelease = true
 prerelease_token = "rc"
 
-[tool.semantic_release.branches.develop]
-match = "develop"
-prerelease = true
-prerelease_token = "dev"
-
 [tool.semantic_release.changelog]
 changelog_file = "CHANGELOG.md"
 exclude_commit_patterns = [
