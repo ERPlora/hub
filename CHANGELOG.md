@@ -10,6 +10,17 @@
 * feat: build action ([`c040b1e`](https://github.com/cpos-app/hub/commit/c040b1ec6b7450530245812a4ffcf42f726bbdb6))
 
 * feat: build action ([`ca9a05f`](https://github.com/cpos-app/hub/commit/ca9a05ff3fd1a57b1a6af5ef2f76125a7fa09333))
+## v0.3.0 (2025-11-05)
+
+
+## v0.1.0-dev.4 (2025-11-05)
+
+### Features
+
+* feat: build action ([`9f9d0d7`](https://github.com/cpos-app/hub/commit/9f9d0d79104681f7a03bd307b3a896f3b99a0137))
+
+
+## v0.2.0 (2025-11-05)
 
 
 ## v0.1.0 (2025-11-05)
