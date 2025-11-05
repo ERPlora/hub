@@ -25,6 +25,11 @@ class PluginRuntimeManager:
         self.plugins_dir = Path(settings.BASE_DIR) / 'plugins'
         self.plugins_dir.mkdir(exist_ok=True)
 
+        # Create cross-platform temp directory for plugin uploads
+        # Uses system temp dir (works on Windows, macOS, Linux)
+        self.temp_dir = Path(tempfile.gettempdir()) / 'cpos_hub_plugins'
+        self.temp_dir.mkdir(exist_ok=True)
+
     def install_plugin_from_zip(self, zip_path: str) -> Dict:
         """
         Install a plugin from a ZIP file.
@@ -47,6 +52,7 @@ class PluginRuntimeManager:
             'errors': []
         }
 
+        zip_path_obj = None
         try:
             # Step 1: Extract ZIP
             result['messages'].append('Extracting plugin ZIP...')
@@ -60,6 +66,12 @@ class PluginRuntimeManager:
             plugin_path = self.plugins_dir / plugin_id
             result['plugin_id'] = plugin_id
             result['messages'].append(f'Plugin extracted: {plugin_id}')
+
+            # Delete ZIP file immediately after extraction
+            zip_path_obj = Path(zip_path)
+            if zip_path_obj.exists():
+                zip_path_obj.unlink()
+                result['messages'].append('Cleaned up temporary ZIP file')
 
             # Step 1.5: Validate database conflicts
             result['messages'].append('Validating database conflicts...')
@@ -540,6 +552,18 @@ class PluginRuntimeManager:
             result['messages'].append('Skipping database conflict validation due to error')
 
         return result
+
+    def get_temp_file_path(self, filename: str) -> Path:
+        """
+        Get a temporary file path for plugin operations.
+
+        Args:
+            filename: Name of the temporary file
+
+        Returns:
+            Path object pointing to temp file location
+        """
+        return self.temp_dir / filename
 
 
 # Global instance
