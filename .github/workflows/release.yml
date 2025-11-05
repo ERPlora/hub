@@ -98,7 +98,12 @@ jobs:
       - name: Build with PyInstaller
         run: |
           source .venv/bin/activate || .venv\Scripts\activate
-          pyinstaller build.spec
+          if [ -f build.spec ]; then
+            pyinstaller build.spec
+          else
+            python build.py
+          fi
+        shell: bash
 
       - name: Get version from tag
         id: get_version
