@@ -521,25 +521,20 @@ def api_plugin_install(request):
         if not plugin_file.name.endswith('.zip'):
             return JsonResponse({'success': False, 'error': 'File must be a ZIP archive'})
 
-        # Save uploaded file to temp directory
-        import tempfile
-        import os
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
-            for chunk in plugin_file.chunks():
-                tmp_file.write(chunk)
-            tmp_file_path = tmp_file.name
-
-        # Install plugin using runtime manager
+        # Save uploaded file to temp directory (cross-platform)
         from .runtime_manager import plugin_runtime_manager
 
-        result = plugin_runtime_manager.install_plugin_from_zip(tmp_file_path)
+        # Use runtime manager's temp directory (works on Windows, macOS, Linux)
+        tmp_file_path = plugin_runtime_manager.get_temp_file_path(plugin_file.name)
 
-        # Clean up temp file
-        try:
-            os.unlink(tmp_file_path)
-        except:
-            pass
+        # Write uploaded file to temp location
+        with open(tmp_file_path, 'wb') as tmp_file:
+            for chunk in plugin_file.chunks():
+                tmp_file.write(chunk)
+
+        # Install plugin using runtime manager
+        # Note: The ZIP file is automatically deleted after extraction
+        result = plugin_runtime_manager.install_plugin_from_zip(str(tmp_file_path))
 
         return JsonResponse(result)
 
