@@ -17,6 +17,10 @@ jobs:
     name: Semantic Release
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
 
     steps:
       - name: Checkout code
