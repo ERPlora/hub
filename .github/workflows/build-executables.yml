@@ -41,35 +41,33 @@ jobs:
 
       - name: Install dependencies with uv
         run: |
-          uv venv
-          source venv/bin/activate || venv\Scripts\activate
-          uv pip install -r requirements.txt
-          uv pip install pyinstaller
+          uv venv  # Crea .venv automáticamente
+          source .venv/bin/activate || .venv\Scripts\activate
+          uv pip install -e .  # Instala desde pyproject.toml
 
       - name: Build executable
         run: |
-          source venv/bin/activate || venv\Scripts\activate
-          cd build
+          source .venv/bin/activate || .venv\Scripts\activate
           pyinstaller main.spec --clean
 
       - name: Package Linux (tar.gz)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          cd build/dist/main
-          tar -czf ../../../${{ matrix.asset_name }} *
+          cd dist/main
+          tar -czf ../../${{ matrix.asset_name }} *
 
       - name: Package Windows (zip)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          cd build/dist/main
-          Compress-Archive -Path * -DestinationPath ../../../${{ matrix.asset_name }}
+          cd dist/main
+          Compress-Archive -Path * -DestinationPath ../../${{ matrix.asset_name }}
 
       - name: Package macOS (DMG)
         if: matrix.os == 'macos-latest'
         run: |
           brew install create-dmg
-          cd build/dist
+          cd dist
           create-dmg \
             --volname "CPOS Hub" \
             --window-pos 200 120 \
@@ -78,7 +76,7 @@ jobs:
             --icon "CPOS Hub.app" 175 120 \
             --hide-extension "CPOS Hub.app" \
             --app-drop-link 425 120 \
-            "../../${{ matrix.asset_name }}" \
+            "../${{ matrix.asset_name }}" \
             "CPOS Hub.app"
 
       - name: Upload artifact
