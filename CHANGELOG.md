@@ -16,9 +16,25 @@
 
 ## v0.3.0 (2025-11-05)
 
+### Features
 
-## v0.2.0 (2025-11-05)
+* feat: build action ([`034824e`](https://github.com/cpos-app/hub/commit/034824e7c886d6233b7e63e1ebef4ca0ba88f50e))
 
+
+## v0.4.0-dev.3 (2025-11-05)
+
+### Features
+
+* feat: build action ([`0dcd00a`](https://github.com/cpos-app/hub/commit/0dcd00a2eb7a755412227586c99cd5dc322a761a))
+
+
+## v0.4.0-dev.1 (2025-11-05)
+
+### Features
+
+* feat: build action ([`4e87524`](https://github.com/cpos-app/hub/commit/4e8752464aaa9e98cfd3fa86bad3d869fb1feeb9))
+
+* feat: build action ([`c040b1e`](https://github.com/cpos-app/hub/commit/c040b1ec6b7450530245812a4ffcf42f726bbdb6))
 
 ## v0.4.0-dev.2 (2025-11-05)
 
