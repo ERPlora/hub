@@ -2,7 +2,7 @@
 name = "cpos-hub"
 version = "0.1.0"
 description = "CPOS Hub - Aplicación POS local con Django y PyInstaller"
-readme = "README.md"
+readme = "docs/README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
 authors = [
