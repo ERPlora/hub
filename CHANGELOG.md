@@ -1,6 +1,13 @@
 # CHANGELOG
 
 
+## v0.7.0 (2025-11-05)
+
+### Features
+
+* feat: build action ([`fd7ce5a`](https://github.com/cpos-app/hub/commit/fd7ce5a7f2d1c7545091ab52f4f646d0033ce8c4))
+
+
 ## v0.6.0 (2025-11-05)
 
 
