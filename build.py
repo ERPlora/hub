@@ -9,7 +9,16 @@ import platform
 import subprocess
 import shutil
 from pathlib import Path
-from version import __version__, get_full_version
+
+try:
+    from importlib.metadata import version
+    __version__ = version("cpos-hub")
+except Exception:
+    __version__ = "0.0.0.dev"
+
+def get_full_version():
+    """Get full version string"""
+    return __version__
 
 # Colors for terminal output
 class Colors:
