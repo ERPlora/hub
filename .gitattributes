@@ -1,4 +1,8 @@
 # Archivos gestionados por semantic-release
-# Siempre usar la versión de la rama actual en merge
+# Usar estrategia de merge apropiada para evitar conflictos
+
+# pyproject.toml: Usar versión de la rama actual
 pyproject.toml merge=ours
+
+# CHANGELOG.md: Combinar ambas versiones
 CHANGELOG.md merge=union
