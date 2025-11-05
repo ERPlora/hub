@@ -63,7 +63,10 @@ hub/
 │
 ├── pytest.ini                # Configuración pytest
 ├── conftest.py               # Fixtures globales de pytest
-├── TESTING.md                # Guía de testing
+├── docs/                      # Documentación
+│   ├── TESTING.md            # Guía de testing
+│   ├── CHANGELOG.md          # Historial de cambios
+│   └── CLOUD.md              # Documentación de Cloud
 │
 └── venv/                     # Virtual environment
 ```
@@ -335,7 +338,7 @@ apps/hardware/tests/ - 2 tests (placeholders)
 apps/sync/tests/ - 2 tests (placeholders)
 ```
 
-Ver [TESTING.md](TESTING.md) para guía completa.
+Ver [docs/TESTING.md](docs/TESTING.md) para guía completa.
 
 ---
 
@@ -409,7 +412,9 @@ pytest -vv --tb=long
 
 ## 📚 Documentación adicional
 
-- [TESTING.md](TESTING.md) - Guía completa de testing
+- [docs/TESTING.md](docs/TESTING.md) - Guía completa de testing
+- [docs/CHANGELOG.md](docs/CHANGELOG.md) - Historial de cambios
+- [docs/CLOUD.md](docs/CLOUD.md) - Documentación de Cloud
 - [../CLAUDE.md](../CLAUDE.md) - Arquitectura del proyecto
 - [../TODO.md](../TODO.md) - Roadmap y tareas
 - [../docs/](../docs/) - Documentación técnica
