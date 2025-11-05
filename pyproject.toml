@@ -1,6 +1,6 @@
 [project]
 name = "cpos-hub"
-version = "0.1.0-dev.2"
+version = "0.1.0-dev.3"
 description = "CPOS Hub - Aplicación POS local con Django y PyInstaller"
 readme = "README.md"
 requires-python = ">=3.11"
