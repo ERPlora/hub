@@ -1,6 +1,6 @@
 [project]
 name = "cpos-hub"
-version = "1.0.0"
+version = "0.1.0-dev.3"
 description = "CPOS Hub - Aplicación POS local con Django y PyInstaller"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -45,7 +45,6 @@ only-packages = false
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
-build_command = "python build.py"
 branch = "main"
 upload_to_vcs_release = true
 commit_message = "chore(release): {version} [skip ci]"
@@ -53,6 +52,11 @@ commit_message = "chore(release): {version} [skip ci]"
 [tool.semantic_release.branches.main]
 match = "main"
 prerelease = false
+
+[tool.semantic_release.branches.staging]
+match = "staging"
+prerelease = true
+prerelease_token = "rc"
 
 [tool.semantic_release.branches.develop]
 match = "develop"
