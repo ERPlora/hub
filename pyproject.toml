@@ -1,7 +1,6 @@
 [project]
 name = "cpos-hub"
-version = "0.4.0-dev.1"
-version = "0.3.0"
+version = "0.4.0-dev.2"
 description = "CPOS Hub - Aplicación POS local con Django y PyInstaller"
 readme = "docs/README.md"
 requires-python = ">=3.11"
@@ -46,9 +45,8 @@ only-packages = false
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
-branch = "main"
 upload_to_vcs_release = true
-commit_message = "chore(release): {version} [skip ci]"
+build_command = ""
 
 [tool.semantic_release.branches.main]
 match = "main"
@@ -65,7 +63,6 @@ prerelease = true
 prerelease_token = "dev"
 
 [tool.semantic_release.changelog]
-template_dir = "templates"
 changelog_file = "CHANGELOG.md"
 exclude_commit_patterns = [
     "^Merge",
@@ -74,31 +71,15 @@ exclude_commit_patterns = [
     "^chore\\(release\\):",
 ]
 
-[tool.semantic_release.changelog.environment]
-block_start_string = "{%"
-block_end_string = "%}"
-variable_start_string = "{{"
-variable_end_string = "}}"
-
 [tool.semantic_release.commit_parser_options]
 allowed_tags = [
     "feat",
     "fix",
     "perf",
     "refactor",
-    "style",
-    "test",
-    "build",
-    "ci",
-    "docs",
-    "chore",
 ]
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf", "refactor"]
-
-[tool.semantic_release.remote]
-type = "github"
-ignore_token_for_push = false
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"

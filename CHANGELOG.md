@@ -1,6 +1,13 @@
 # CHANGELOG
 
 
+## v0.4.0-dev.2 (2025-11-05)
+
+### Features
+
+* feat: build action ([`0dcd00a`](https://github.com/cpos-app/hub/commit/0dcd00a2eb7a755412227586c99cd5dc322a761a))
+
+
 ## v0.4.0-dev.1 (2025-11-05)
 
 ### Features
