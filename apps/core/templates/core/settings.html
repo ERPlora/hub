@@ -7,6 +7,20 @@
 
 {% block content %}
 <div style="padding: 24px;" x-data="settingsApp()">
+    {% if settings_message %}
+    <ion-toast-controller></ion-toast-controller>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const toast = document.createElement('ion-toast');
+            toast.message = '{{ settings_message }}';
+            toast.duration = 3000;
+            toast.color = 'success';
+            toast.position = 'top';
+            document.body.appendChild(toast);
+            await toast.present();
+        });
+    </script>
+    {% endif %}
     <!-- Hub Configuration -->
     <ion-card>
         <ion-card-header>
@@ -60,11 +74,164 @@
         </ion-card-content>
     </ion-card>
 
+    <!-- Store Configuration -->
+    <ion-card style="margin-top: 16px;">
+        <ion-card-header>
+            <ion-card-title>{% trans "Store Configuration" %}</ion-card-title>
+            <ion-card-subtitle>{% trans "Business information for receipts and invoices" %}</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_store">
+                <div style="display: grid; gap: 16px;">
+                    <div>
+                        <ion-label position="stacked">{% trans "Business Name" %} *</ion-label>
+                        <ion-input
+                            name="business_name"
+                            value="{{ store_config.business_name }}"
+                            placeholder="{% trans 'Enter business name' %}"
+                            required
+                            style="margin-top: 8px;">
+                        </ion-input>
+                    </div>
+
+                    <div>
+                        <ion-label position="stacked">{% trans "Business Address" %} *</ion-label>
+                        <ion-textarea
+                            name="business_address"
+                            placeholder="{% trans 'Enter complete address' %}"
+                            rows="3"
+                            required
+                            style="margin-top: 8px;">{{ store_config.business_address }}</ion-textarea>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <ion-label position="stacked">{% trans "VAT/Tax ID" %} *</ion-label>
+                            <ion-input
+                                name="vat_number"
+                                value="{{ store_config.vat_number }}"
+                                placeholder="{% trans 'VAT or Tax ID' %}"
+                                required
+                                style="margin-top: 8px;">
+                            </ion-input>
+                        </div>
+
+                        <div>
+                            <ion-label position="stacked">{% trans "Phone" %}</ion-label>
+                            <ion-input
+                                name="phone"
+                                type="tel"
+                                value="{{ store_config.phone }}"
+                                placeholder="{% trans 'Phone number' %}"
+                                style="margin-top: 8px;">
+                            </ion-input>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <ion-label position="stacked">{% trans "Email" %}</ion-label>
+                            <ion-input
+                                name="email"
+                                type="email"
+                                value="{{ store_config.email }}"
+                                placeholder="{% trans 'Business email' %}"
+                                style="margin-top: 8px;">
+                            </ion-input>
+                        </div>
+
+                        <div>
+                            <ion-label position="stacked">{% trans "Website" %}</ion-label>
+                            <ion-input
+                                name="website"
+                                type="url"
+                                value="{{ store_config.website }}"
+                                placeholder="{% trans 'Website URL' %}"
+                                style="margin-top: 8px;">
+                            </ion-input>
+                        </div>
+                    </div>
+
+                    <div>
+                        <ion-label position="stacked">{% trans "Tax Rate" %} (%)</ion-label>
+                        <ion-input
+                            name="tax_rate"
+                            type="number"
+                            step="0.01"
+                            value="{{ store_config.tax_rate }}"
+                            placeholder="21.00"
+                            style="margin-top: 8px;">
+                        </ion-input>
+                        <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
+                            {% trans "Tax rate in percentage (e.g., 21.00 for 21%)" %}
+                        </p>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <ion-label>{% trans "Tax Included in Prices" %}</ion-label>
+                            <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
+                                {% trans "Prices include tax" %}
+                            </p>
+                        </div>
+                        <ion-toggle name="tax_included" {% if store_config.tax_included %}checked{% endif %}></ion-toggle>
+                    </div>
+
+                    <div>
+                        <ion-label position="stacked">{% trans "Business Logo" %}</ion-label>
+                        {% if store_config.logo %}
+                        <div style="margin-top: 8px; margin-bottom: 8px;">
+                            <img src="{{ store_config.logo.url }}" alt="Logo" style="max-width: 200px; max-height: 100px; object-fit: contain;">
+                        </div>
+                        {% endif %}
+                        <input type="file" name="logo" accept="image/*" style="margin-top: 8px;">
+                        <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
+                            {% trans "Logo will be displayed on receipts (optional)" %}
+                        </p>
+                    </div>
+
+                    <div>
+                        <ion-label position="stacked">{% trans "Receipt Header" %}</ion-label>
+                        <ion-textarea
+                            name="receipt_header"
+                            placeholder="{% trans 'Additional text for receipt header (optional)' %}"
+                            rows="2"
+                            style="margin-top: 8px;">{{ store_config.receipt_header }}</ion-textarea>
+                        <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
+                            {% trans "Text displayed at the top of receipts" %}
+                        </p>
+                    </div>
+
+                    <div>
+                        <ion-label position="stacked">{% trans "Receipt Footer" %}</ion-label>
+                        <ion-textarea
+                            name="receipt_footer"
+                            placeholder="{% trans 'Additional text for receipt footer (optional)' %}"
+                            rows="2"
+                            style="margin-top: 8px;">{{ store_config.receipt_footer }}</ion-textarea>
+                        <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
+                            {% trans "Text displayed at the bottom of receipts (e.g., thank you message)" %}
+                        </p>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
+                        <ion-button type="submit" color="primary">
+                            <ion-icon slot="start" name="save-outline"></ion-icon>
+                            {% trans "Save Store Config" %}
+                        </ion-button>
+                    </div>
+                </div>
+            </form>
+        </ion-card-content>
+    </ion-card>
+
     <!-- Display Settings -->
     <ion-card style="margin-top: 16px;">
         <ion-card-header>
             <ion-card-title>{% trans "Display Settings" %}</ion-card-title>
-            <ion-card-subtitle>{% trans "Customize the appearance" %}</ion-card-subtitle>
+            <ion-card-subtitle>{% trans "Customize the appearance and printing" %}</ion-card-subtitle>
         </ion-card-header>
         <ion-card-content>
             <div style="display: grid; gap: 16px;">
@@ -80,45 +247,6 @@
                         @ionChange="toggleDarkMode()">
                     </ion-toggle>
                 </div>
-            </div>
-        </ion-card-content>
-    </ion-card>
-
-    <!-- Receipt Settings -->
-    <ion-card style="margin-top: 16px;">
-        <ion-card-header>
-            <ion-card-title>{% trans "Receipt Settings" %}</ion-card-title>
-            <ion-card-subtitle>{% trans "Configure receipt printing" %}</ion-card-subtitle>
-        </ion-card-header>
-        <ion-card-content>
-            <div style="display: grid; gap: 16px;">
-                <div>
-                    <ion-label position="stacked">{% trans "Business Name" %}</ion-label>
-                    <ion-input
-                        placeholder="{% trans 'Enter business name' %}"
-                        x-model="businessName"
-                        style="margin-top: 8px;">
-                    </ion-input>
-                </div>
-
-                <div>
-                    <ion-label position="stacked">{% trans "Business Address" %}</ion-label>
-                    <ion-textarea
-                        placeholder="{% trans 'Enter business address' %}"
-                        rows="3"
-                        x-model="businessAddress"
-                        style="margin-top: 8px;">
-                    </ion-textarea>
-                </div>
-
-                <div>
-                    <ion-label position="stacked">{% trans "Tax ID" %}</ion-label>
-                    <ion-input
-                        placeholder="{% trans 'Enter tax ID' %}"
-                        x-model="taxId"
-                        style="margin-top: 8px;">
-                    </ion-input>
-                </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
@@ -127,22 +255,15 @@
                             {% trans "Automatically print after each sale" %}
                         </p>
                     </div>
-                    <ion-toggle x-model="autoPrint"></ion-toggle>
+                    <ion-toggle
+                        :color="autoPrint ? 'success' : ''"
+                        x-model="autoPrint"
+                        @ionChange="toggleAutoPrint()">
+                    </ion-toggle>
                 </div>
             </div>
         </ion-card-content>
     </ion-card>
-
-    <!-- Actions -->
-    <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end;">
-        <ion-button color="medium" @click="resetSettings()">
-            {% trans "Reset" %}
-        </ion-button>
-        <ion-button @click="saveSettings()">
-            <ion-icon slot="start" name="save-outline"></ion-icon>
-            {% trans "Save Settings" %}
-        </ion-button>
-    </div>
 </div>
 
 <script>
@@ -150,27 +271,14 @@ function settingsApp() {
     return {
         language: '{{ hub_config.os_language }}',
         darkMode: false,
-        businessName: '',
-        businessAddress: '',
-        taxId: '',
         autoPrint: false,
 
         init() {
             // Check if dark mode is enabled
             this.darkMode = document.body.classList.contains('dark');
-            // Load saved settings from localStorage
-            this.loadSettings();
-        },
-
-        loadSettings() {
-            const saved = localStorage.getItem('hubSettings');
-            if (saved) {
-                const settings = JSON.parse(saved);
-                this.businessName = settings.businessName || '';
-                this.businessAddress = settings.businessAddress || '';
-                this.taxId = settings.taxId || '';
-                this.autoPrint = settings.autoPrint || false;
-            }
+            // Load auto-print setting from localStorage
+            const autoPrintSaved = localStorage.getItem('autoPrint');
+            this.autoPrint = autoPrintSaved === 'true';
         },
 
         toggleDarkMode() {
@@ -178,38 +286,20 @@ function settingsApp() {
             localStorage.setItem('darkMode', this.darkMode);
         },
 
-        saveSettings() {
-            const settings = {
-                language: this.language,
-                businessName: this.businessName,
-                businessAddress: this.businessAddress,
-                taxId: this.taxId,
-                autoPrint: this.autoPrint
-            };
-
-            localStorage.setItem('hubSettings', JSON.stringify(settings));
+        async toggleAutoPrint() {
+            // Save to localStorage automatically
+            localStorage.setItem('autoPrint', this.autoPrint);
 
             // Show success toast
             const toast = document.createElement('ion-toast');
-            toast.message = '{% trans "Settings saved successfully" %}';
+            toast.message = this.autoPrint
+                ? '{% trans "Auto-print enabled" %}'
+                : '{% trans "Auto-print disabled" %}';
             toast.duration = 2000;
             toast.color = 'success';
+            toast.position = 'top';
             document.body.appendChild(toast);
-            toast.present();
-        },
-
-        resetSettings() {
-            if (confirm('{% trans "Are you sure you want to reset all settings?" %}')) {
-                localStorage.removeItem('hubSettings');
-                this.loadSettings();
-
-                const toast = document.createElement('ion-toast');
-                toast.message = '{% trans "Settings reset successfully" %}';
-                toast.duration = 2000;
-                toast.color = 'warning';
-                document.body.appendChild(toast);
-                toast.present();
-            }
+            await toast.present();
         }
     }
 }
