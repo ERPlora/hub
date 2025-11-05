@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-03 08:15+0000\n"
+"POT-Creation-Date: 2025-11-03 11:55+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,8 +19,8 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
 "1 : 2;\n"
 
-#: apps/core/templates/core/app_base.html:157
-#: apps/core/templates/core/app_base.html:168
+#: apps/core/templates/core/app_base.html:118
+#: apps/core/templates/core/app_base.html:153
 #: apps/core/templates/core/pos.html:5 apps/core/templates/core/pos.html:6
 #: apps/core/templates/core/pos.html:12
 #, fuzzy
@@ -28,41 +28,53 @@ msgstr ""
 msgid "Point of Sale"
 msgstr "Sistema de Punto de Venta"
 
-#: apps/core/templates/core/app_base.html:163
-#: apps/core/templates/core/app_base.html:212
+#: apps/core/templates/core/app_base.html:147
 #: apps/core/templates/core/dashboard.html:5
 #: apps/core/templates/core/dashboard.html:6
 msgid "Dashboard"
 msgstr "Panel"
 
-#: apps/core/templates/core/app_base.html:173
+#: apps/core/templates/core/app_base.html:159
 #: apps/core/templates/core/dashboard.html:54
 msgid "Products"
 msgstr ""
 
-#: apps/core/templates/core/app_base.html:178
+#: apps/core/templates/core/app_base.html:165
 msgid "Sales"
 msgstr ""
 
-#: apps/core/templates/core/app_base.html:183
+#: apps/core/templates/core/app_base.html:171
 msgid "Reports"
 msgstr ""
 
-#: apps/core/templates/core/app_base.html:190
+#: apps/core/templates/core/app_base.html:180
+#: apps/core/templates/core/app_base.html:294
 #: apps/core/templates/core/employees.html:5
 #: apps/core/templates/core/employees.html:6
 msgid "Employees"
-msgstr ""
+msgstr "Empleados"
 
-#: apps/core/templates/core/app_base.html:195
+#: apps/core/templates/core/app_base.html:186
+#: apps/core/templates/core/app_base.html:287
 #: apps/core/templates/core/settings.html:5
 #: apps/core/templates/core/settings.html:6
 msgid "Settings"
-msgstr ""
+msgstr "Configuración"
 
-#: apps/core/templates/core/app_base.html:202
-msgid "Logout"
-msgstr ""
+#: apps/core/templates/core/app_base.html:195
+#: apps/core/templates/core/app_base.html:301
+msgid "Sign Out"
+msgstr "Cerrar Sesión"
+
+#: apps/core/templates/core/app_base.html:205
+msgid "Go to CPOS Cloud"
+msgstr "Ir a CPOS Cloud"
+
+#: apps/core/templates/core/app_base.html:309
+#: apps/core/templates/core/employees.html:148
+#: apps/core/templates/core/employees.html:189
+msgid "Cancel"
+msgstr "Cancelar"
 
 #: apps/core/templates/core/dashboard.html:13
 #: apps/core/templates/core/login.html:273
@@ -80,6 +92,7 @@ msgstr "¡Hub configurado y listo!"
 #: apps/core/templates/core/dashboard.html:17
 #: apps/core/templates/core/employees.html:105
 #: apps/core/templates/core/login.html:229
+#: apps/core/templates/core/settings.html:135
 msgid "Email"
 msgstr "Correo"
 
@@ -180,11 +193,6 @@ msgstr ""
 
 #: apps/core/templates/core/employees.html:140
 msgid "This will be the employee's login PIN"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:148
-#: apps/core/templates/core/employees.html:189
-msgid "Cancel"
 msgstr ""
 
 #: apps/core/templates/core/employees.html:152
@@ -316,119 +324,174 @@ msgstr "Iniciando sesión..."
 msgid "The POS interface will be implemented here."
 msgstr ""
 
-#: apps/core/templates/core/settings.html:13
+#: apps/core/templates/core/settings.html:27
 msgid "Hub Configuration"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:14
+#: apps/core/templates/core/settings.html:28
 msgid "General hub settings and information"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:19
+#: apps/core/templates/core/settings.html:33
 msgid "Hub ID"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:28
+#: apps/core/templates/core/settings.html:42
 msgid "System Language"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:39
+#: apps/core/templates/core/settings.html:53
 msgid "Hub Status"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:43
+#: apps/core/templates/core/settings.html:57
 msgid "Configured"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:45
+#: apps/core/templates/core/settings.html:59
 msgid "Not Configured"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:52
+#: apps/core/templates/core/settings.html:66
 msgid "Tunnel Port"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:66
-msgid "Display Settings"
+#: apps/core/templates/core/settings.html:80
+msgid "Store Configuration"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:67
-msgid "Customize the appearance"
+#: apps/core/templates/core/settings.html:81
+msgid "Business information for receipts and invoices"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:73
-msgid "Dark Mode"
-msgstr ""
-
-#: apps/core/templates/core/settings.html:75
-msgid "Enable dark theme"
-msgstr ""
-
-#: apps/core/templates/core/settings.html:90
-msgid "Receipt Settings"
-msgstr ""
-
-#: apps/core/templates/core/settings.html:91
-msgid "Configure receipt printing"
-msgstr ""
-
-#: apps/core/templates/core/settings.html:96
+#: apps/core/templates/core/settings.html:89
 msgid "Business Name"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:98
+#: apps/core/templates/core/settings.html:93
 msgid "Enter business name"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:105
+#: apps/core/templates/core/settings.html:100
 msgid "Business Address"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:107
-msgid "Enter business address"
+#: apps/core/templates/core/settings.html:103
+msgid "Enter complete address"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:111
+msgid "VAT/Tax ID"
 msgstr ""
 
 #: apps/core/templates/core/settings.html:115
-msgid "Tax ID"
+msgid "VAT or Tax ID"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:117
-#, fuzzy
-#| msgid "Enter your PIN"
-msgid "Enter tax ID"
-msgstr "Ingresa tu PIN"
-
-#: apps/core/templates/core/settings.html:125
-msgid "Auto-print Receipts"
+#: apps/core/templates/core/settings.html:122
+msgid "Phone"
 msgstr ""
 
 #: apps/core/templates/core/settings.html:127
+msgid "Phone number"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:140
+msgid "Business email"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:146
+msgid "Website"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:151
+msgid "Website URL"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:158
+msgid "Tax Rate"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:168
+#, python-format
+msgid "Tax rate in percentage (e.g., 21.00 for 21%%)"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:174
+msgid "Tax Included in Prices"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:176
+msgid "Prices include tax"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:183
+msgid "Business Logo"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:191
+msgid "Logo will be displayed on receipts (optional)"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:196
+msgid "Receipt Header"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:199
+msgid "Additional text for receipt header (optional)"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:203
+msgid "Text displayed at the top of receipts"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:208
+msgid "Receipt Footer"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:211
+msgid "Additional text for receipt footer (optional)"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:215
+msgid "Text displayed at the bottom of receipts (e.g., thank you message)"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:222
+msgid "Save Store Config"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:233
+msgid "Display Settings"
+msgstr "Configuración de Pantalla"
+
+#: apps/core/templates/core/settings.html:234
+msgid "Customize the appearance and printing"
+msgstr "Personalizar apariencia e impresión"
+
+#: apps/core/templates/core/settings.html:240
+msgid "Dark Mode"
+msgstr "Modo Oscuro"
+
+#: apps/core/templates/core/settings.html:242
+msgid "Enable dark theme"
+msgstr "Activar tema oscuro"
+
+#: apps/core/templates/core/settings.html:253
+msgid "Auto-print Receipts"
+msgstr "Auto-imprimir Recibos"
+
+#: apps/core/templates/core/settings.html:255
 msgid "Automatically print after each sale"
-msgstr ""
+msgstr "Imprimir automáticamente después de cada venta"
 
-#: apps/core/templates/core/settings.html:139
-msgid "Reset"
-msgstr ""
+#: apps/core/templates/core/settings.html:296
+msgid "Auto-print enabled"
+msgstr "Auto-impresión activada"
 
-#: apps/core/templates/core/settings.html:143
-msgid "Save Settings"
-msgstr ""
-
-#: apps/core/templates/core/settings.html:194
-#, fuzzy
-#| msgid "PIN configured successfully!"
-msgid "Settings saved successfully"
-msgstr "¡PIN configurado correctamente!"
-
-#: apps/core/templates/core/settings.html:202
-msgid "Are you sure you want to reset all settings?"
-msgstr ""
-
-#: apps/core/templates/core/settings.html:207
-#, fuzzy
-#| msgid "PIN configured successfully!"
-msgid "Settings reset successfully"
-msgstr "¡PIN configurado correctamente!"
+#: apps/core/templates/core/settings.html:297
+msgid "Auto-print disabled"
+msgstr "Auto-impresión desactivada"
 
 #: venv/lib/python3.14/site-packages/django/contrib/messages/apps.py:16
 msgid "Messages"
@@ -1653,3 +1716,18 @@ msgstr ""
 #: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:236
 msgid "Connect, get help, or contribute"
 msgstr ""
+
+#, fuzzy
+#~| msgid "Enter your PIN"
+#~ msgid "Enter tax ID"
+#~ msgstr "Ingresa tu PIN"
+
+#, fuzzy
+#~| msgid "PIN configured successfully!"
+#~ msgid "Settings saved successfully"
+#~ msgstr "¡PIN configurado correctamente!"
+
+#, fuzzy
+#~| msgid "PIN configured successfully!"
+#~ msgid "Settings reset successfully"
+#~ msgstr "¡PIN configurado correctamente!"

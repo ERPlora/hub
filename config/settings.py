@@ -51,6 +51,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.core.middleware.StoreConfigCheckMiddleware',  # Check if store is configured after login
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -68,6 +69,8 @@ TEMPLATES = [
                 'django.template.context_processors.static',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.core.context_processors.cloud_url',
+                'apps.core.context_processors.plugin_menu_items',
             ],
         },
     },

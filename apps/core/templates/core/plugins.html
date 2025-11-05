@@ -1,0 +1,424 @@
+{% extends "core/app_base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}CPOS Hub - {% trans "Plugins" %}{% endblock %}
+{% block page_title %}{% trans "Plugins" %}{% endblock %}
+
+{% block content %}
+<div style="padding: 24px;" x-data="pluginsApp()">
+    <!-- Header with Install Button -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h2 style="margin: 0;">{% trans "Plugin Management" %}</h2>
+            <p style="color: var(--ion-color-medium); margin-top: 4px;">
+                {% trans "Extend your POS with plugins" %}
+            </p>
+        </div>
+        <ion-button @click="openInstallModal()">
+            <ion-icon slot="start" name="cloud-download-outline"></ion-icon>
+            {% trans "Install Plugin" %}
+        </ion-button>
+    </div>
+
+    <!-- Stats -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <ion-card>
+            <ion-card-content style="text-align: center; padding: 20px;">
+                <div style="font-size: 2rem; font-weight: 700; color: var(--ion-color-primary);">
+                    {{ installed_plugins.count }}
+                </div>
+                <div style="color: var(--ion-color-medium); margin-top: 4px;">
+                    {% trans "Installed" %}
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+            <ion-card-content style="text-align: center; padding: 20px;">
+                <div style="font-size: 2rem; font-weight: 700; color: var(--ion-color-success);">
+                    <span x-text="activeCount"></span>
+                </div>
+                <div style="color: var(--ion-color-medium); margin-top: 4px;">
+                    {% trans "Active" %}
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+            <ion-card-content style="text-align: center; padding: 20px;">
+                <div style="font-size: 2rem; font-weight: 700; color: var(--ion-color-tertiary);">
+                    {{ discovered_count }}
+                </div>
+                <div style="color: var(--ion-color-medium); margin-top: 4px;">
+                    {% trans "Discovered" %}
+                </div>
+            </ion-card-content>
+        </ion-card>
+    </div>
+
+    <!-- Plugins Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 16px;">
+        {% for plugin in installed_plugins %}
+        <ion-card>
+            <ion-card-content>
+                <div style="display: flex; align-items: start; gap: 16px;">
+                    <!-- Icon -->
+                    <div style="width: 56px; height: 56px; border-radius: 12px; background: var(--ion-color-light); color: var(--ion-color-primary); display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0;">
+                        <ion-icon name="{{ plugin.icon }}"></ion-icon>
+                    </div>
+
+                    <!-- Info -->
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 4px;">
+                            {{ plugin.name }}
+                        </div>
+                        <div style="color: var(--ion-color-medium); font-size: 0.875rem; margin-bottom: 8px;">
+                            {{ plugin.description|truncatewords:15 }}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <ion-badge color="{% if plugin.is_active %}success{% else %}medium{% endif %}">
+                                {% if plugin.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}
+                            </ion-badge>
+                            <span style="color: var(--ion-color-medium); font-size: 0.75rem;">
+                                v{{ plugin.version }}
+                            </span>
+                            {% if plugin.author %}
+                            <span style="color: var(--ion-color-medium); font-size: 0.75rem;">
+                                • {{ plugin.author }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ion-color-light-shade);">
+                    {% if plugin.is_active %}
+                    <ion-button size="small" fill="outline" color="medium" @click="deactivatePlugin('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
+                        <ion-icon slot="start" name="pause-outline"></ion-icon>
+                        {% trans "Deactivate" %}
+                    </ion-button>
+                    {% else %}
+                    <ion-button size="small" fill="outline" color="success" @click="activatePlugin('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
+                        <ion-icon slot="start" name="play-outline"></ion-icon>
+                        {% trans "Activate" %}
+                    </ion-button>
+                    {% endif %}
+
+                    {% if plugin.main_url %}
+                    <ion-button size="small" fill="outline" href="{{ plugin.main_url }}">
+                        <ion-icon slot="start" name="open-outline"></ion-icon>
+                        {% trans "Open" %}
+                    </ion-button>
+                    {% endif %}
+
+                    <ion-button size="small" fill="outline" color="danger" @click="uninstallPlugin('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
+                        <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+                    </ion-button>
+                </div>
+            </ion-card-content>
+        </ion-card>
+        {% empty %}
+        <ion-card>
+            <ion-card-content style="text-align: center; padding: 40px;">
+                <ion-icon name="cube-outline" style="font-size: 64px; color: var(--ion-color-medium);"></ion-icon>
+                <p style="color: var(--ion-color-medium); margin-top: 16px;">
+                    {% trans "No plugins installed" %}
+                </p>
+                <ion-button @click="openInstallModal()" style="margin-top: 16px;">
+                    {% trans "Install Your First Plugin" %}
+                </ion-button>
+            </ion-card-content>
+        </ion-card>
+        {% endfor %}
+    </div>
+
+    <!-- Install Plugin Modal -->
+    <ion-modal :is-open="showInstallModal" @didDismiss="closeInstallModal()">
+        <ion-header>
+            <ion-toolbar>
+                <ion-title>{% trans "Install Plugin" %}</ion-title>
+                <ion-buttons slot="end">
+                    <ion-button @click="closeInstallModal()">
+                        <ion-icon name="close"></ion-icon>
+                    </ion-button>
+                </ion-buttons>
+            </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+            <form @submit.prevent="installPlugin()">
+                <div style="display: grid; gap: 16px;">
+                    <!-- File Upload -->
+                    <div>
+                        <ion-label position="stacked">{% trans "Plugin ZIP File" %} *</ion-label>
+                        <input
+                            type="file"
+                            accept=".zip"
+                            @change="handleFileSelect($event)"
+                            required
+                            style="margin-top: 8px; width: 100%; padding: 12px; border: 2px dashed var(--ion-color-medium); border-radius: 8px; cursor: pointer;">
+                        <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 8px;">
+                            {% trans "Select a .zip file containing the plugin" %}
+                        </p>
+                    </div>
+
+                    <!-- Progress Bar (shown during installation) -->
+                    <template x-if="installing">
+                        <div>
+                            <ion-progress-bar type="indeterminate"></ion-progress-bar>
+                            <p style="text-align: center; color: var(--ion-color-medium); margin-top: 8px;">
+                                <span x-text="installProgress"></span>
+                            </p>
+                        </div>
+                    </template>
+
+                    <!-- Messages Log -->
+                    <template x-if="installMessages.length > 0">
+                        <div style="background: var(--ion-color-light); padding: 16px; border-radius: 8px; max-height: 300px; overflow-y: auto;">
+                            <template x-for="message in installMessages" :key="message">
+                                <div style="font-family: monospace; font-size: 0.875rem; margin-bottom: 4px;">
+                                    <span x-text="message"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Error Display -->
+                    <template x-if="installError">
+                        <ion-card color="danger">
+                            <ion-card-content>
+                                <div style="display: flex; align-items: start; gap: 12px;">
+                                    <ion-icon name="alert-circle-outline" style="font-size: 24px; flex-shrink: 0;"></ion-icon>
+                                    <div>
+                                        <div style="font-weight: 600; margin-bottom: 4px;">{% trans "Installation Failed" %}</div>
+                                        <div style="font-size: 0.875rem;" x-text="installError"></div>
+                                    </div>
+                                </div>
+                            </ion-card-content>
+                        </ion-card>
+                    </template>
+
+                    <!-- Success Display -->
+                    <template x-if="installSuccess">
+                        <ion-card color="success">
+                            <ion-card-content>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <ion-icon name="checkmark-circle-outline" style="font-size: 24px; flex-shrink: 0;"></ion-icon>
+                                    <div>
+                                        <div style="font-weight: 600;">{% trans "Installation Successful" %}</div>
+                                        <div style="font-size: 0.875rem;">{% trans "Plugin has been installed and activated" %}</div>
+                                    </div>
+                                </div>
+                            </ion-card-content>
+                        </ion-card>
+                    </template>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 24px; justify-content: flex-end;">
+                    <ion-button color="medium" @click="closeInstallModal()" type="button" :disabled="installing">
+                        {% trans "Cancel" %}
+                    </ion-button>
+                    <ion-button type="submit" :disabled="!selectedFile || installing || installSuccess">
+                        <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
+                        <span x-text="installing ? '{% trans "Installing..." %}' : '{% trans "Install" %}'"></span>
+                    </ion-button>
+                </div>
+            </form>
+        </ion-content>
+    </ion-modal>
+</div>
+
+<script>
+function pluginsApp() {
+    return {
+        showInstallModal: false,
+        selectedFile: null,
+        installing: false,
+        installProgress: '',
+        installMessages: [],
+        installError: null,
+        installSuccess: false,
+        activeCount: {{ installed_plugins|length }},
+
+        init() {
+            this.calculateActiveCount();
+        },
+
+        calculateActiveCount() {
+            fetch('/api/plugins/list/')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        this.activeCount = data.plugins.filter(p => p.is_active).length;
+                    }
+                });
+        },
+
+        openInstallModal() {
+            this.showInstallModal = true;
+            this.resetInstallState();
+        },
+
+        closeInstallModal() {
+            this.showInstallModal = false;
+            if (this.installSuccess) {
+                window.location.reload();
+            }
+        },
+
+        resetInstallState() {
+            this.selectedFile = null;
+            this.installing = false;
+            this.installProgress = '';
+            this.installMessages = [];
+            this.installError = null;
+            this.installSuccess = false;
+        },
+
+        handleFileSelect(event) {
+            this.selectedFile = event.target.files[0];
+            this.installError = null;
+        },
+
+        async installPlugin() {
+            if (!this.selectedFile) return;
+
+            this.installing = true;
+            this.installProgress = '{% trans "Uploading plugin..." %}';
+            this.installMessages = [];
+            this.installError = null;
+
+            const formData = new FormData();
+            formData.append('plugin_zip', this.selectedFile);
+
+            try {
+                const response = await fetch('/api/plugins/install/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': this.getCookie('csrftoken')
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    this.installSuccess = true;
+                    this.installMessages = result.messages || [];
+                    this.installProgress = '{% trans "Installation complete!" %}';
+                } else {
+                    this.installError = result.error || '{% trans "Unknown error occurred" %}';
+                    this.installMessages = result.messages || [];
+                    if (result.errors && result.errors.length > 0) {
+                        this.installError += ': ' + result.errors.join(', ');
+                    }
+                }
+            } catch (error) {
+                this.installError = '{% trans "Network error: " %}' + error.message;
+            } finally {
+                this.installing = false;
+            }
+        },
+
+        async activatePlugin(pluginId, pluginName) {
+            if (!confirm(`{% trans "Activate" %} ${pluginName}?`)) return;
+
+            try {
+                const response = await fetch('/api/plugins/activate/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        plugin_id: pluginId,
+                        activate: true
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    alert('{% trans "Error: " %}' + result.error);
+                }
+            } catch (error) {
+                alert('{% trans "Network error: " %}' + error.message);
+            }
+        },
+
+        async deactivatePlugin(pluginId, pluginName) {
+            if (!confirm(`{% trans "Deactivate" %} ${pluginName}?`)) return;
+
+            try {
+                const response = await fetch('/api/plugins/activate/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        plugin_id: pluginId,
+                        activate: false
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    alert('{% trans "Error: " %}' + result.error);
+                }
+            } catch (error) {
+                alert('{% trans "Network error: " %}' + error.message);
+            }
+        },
+
+        async uninstallPlugin(pluginId, pluginName) {
+            if (!confirm(`{% trans "Uninstall" %} ${pluginName}? {% trans "This will remove all plugin files." %}`)) return;
+
+            try {
+                const response = await fetch('/api/plugins/uninstall/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        plugin_id: pluginId
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    alert('{% trans "Error: " %}' + result.error);
+                }
+            } catch (error) {
+                alert('{% trans "Network error: " %}' + error.message);
+            }
+        },
+
+        getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    }
+}
+</script>
+{% endblock %}
