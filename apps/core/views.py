@@ -6,7 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.conf import settings
-from .models import HubConfig, LocalUser
+from .models import HubConfig, LocalUser, StoreConfig
 
 
 def login(request):
@@ -241,7 +241,10 @@ def dashboard(request):
     if 'local_user_id' not in request.session:
         return redirect('core:login')
 
-    return render(request, 'core/dashboard.html')
+    context = {
+        'current_view': 'dashboard'
+    }
+    return render(request, 'core/dashboard.html', context)
 
 
 def logout(request):
@@ -260,7 +263,10 @@ def pos(request):
     if 'local_user_id' not in request.session:
         return redirect('core:login')
 
-    return render(request, 'core/pos.html')
+    context = {
+        'current_view': 'pos'
+    }
+    return render(request, 'core/pos.html', context)
 
 
 def settings(request):
@@ -272,8 +278,56 @@ def settings(request):
         return redirect('core:login')
 
     hub_config = HubConfig.get_config()
+    store_config = StoreConfig.get_config()
+
+    # Handle POST request for store configuration update
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'update_store':
+            # Update store configuration
+            store_config.business_name = request.POST.get('business_name', '').strip()
+            store_config.business_address = request.POST.get('business_address', '').strip()
+            store_config.vat_number = request.POST.get('vat_number', '').strip()
+            store_config.phone = request.POST.get('phone', '').strip()
+            store_config.email = request.POST.get('email', '').strip()
+            store_config.website = request.POST.get('website', '').strip()
+
+            # Tax configuration
+            tax_rate = request.POST.get('tax_rate', '0.00')
+            try:
+                store_config.tax_rate = float(tax_rate) if tax_rate else 0.00
+            except ValueError:
+                store_config.tax_rate = 0.00
+
+            store_config.tax_included = request.POST.get('tax_included') == 'on'
+
+            # Handle logo upload
+            if 'logo' in request.FILES:
+                store_config.logo = request.FILES['logo']
+
+            # Receipt configuration
+            store_config.receipt_header = request.POST.get('receipt_header', '').strip()
+            store_config.receipt_footer = request.POST.get('receipt_footer', '').strip()
+
+            # Check if store is now complete
+            store_config.is_configured = store_config.is_complete()
+
+            store_config.save()
+
+            # Store success message in session
+            request.session['settings_message'] = 'Store configuration saved successfully'
+
+            return redirect('core:settings')
+
+    # Get success message if any
+    settings_message = request.session.pop('settings_message', None)
+
     context = {
-        'hub_config': hub_config
+        'hub_config': hub_config,
+        'store_config': store_config,
+        'settings_message': settings_message,
+        'current_view': 'settings'
     }
     return render(request, 'core/settings.html', context)
 
@@ -288,7 +342,8 @@ def employees(request):
 
     local_users = LocalUser.objects.filter(is_active=True).order_by('name')
     context = {
-        'local_users': local_users
+        'local_users': local_users,
+        'current_view': 'employees'
     }
     return render(request, 'core/employees.html', context)
 
@@ -416,5 +471,176 @@ def api_employee_reset_pin(request):
 
     except LocalUser.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'User not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+# ============================================================================
+# Plugin Management Views
+# ============================================================================
+
+def plugins(request):
+    """
+    Plugins management view - list installed and available plugins
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return redirect('core:login')
+
+    from .plugin_loader import plugin_loader
+    from .models import Plugin
+
+    # Get all installed plugins
+    installed_plugins = Plugin.objects.filter(is_installed=True).order_by('name')
+
+    # Get discovered plugins (from filesystem)
+    discovered = plugin_loader.discover_plugins()
+
+    context = {
+        'installed_plugins': installed_plugins,
+        'discovered_count': len(discovered),
+        'current_view': 'plugins'
+    }
+    return render(request, 'core/plugins.html', context)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_plugin_install(request):
+    """
+    API: Install plugin from uploaded ZIP file
+    """
+    try:
+        # Check if file was uploaded
+        if 'plugin_zip' not in request.FILES:
+            return JsonResponse({'success': False, 'error': 'No file uploaded'})
+
+        plugin_file = request.FILES['plugin_zip']
+
+        # Validate file extension
+        if not plugin_file.name.endswith('.zip'):
+            return JsonResponse({'success': False, 'error': 'File must be a ZIP archive'})
+
+        # Save uploaded file to temp directory
+        import tempfile
+        import os
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
+            for chunk in plugin_file.chunks():
+                tmp_file.write(chunk)
+            tmp_file_path = tmp_file.name
+
+        # Install plugin using runtime manager
+        from .runtime_manager import plugin_runtime_manager
+
+        result = plugin_runtime_manager.install_plugin_from_zip(tmp_file_path)
+
+        # Clean up temp file
+        try:
+            os.unlink(tmp_file_path)
+        except:
+            pass
+
+        return JsonResponse(result)
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_plugin_activate(request):
+    """
+    API: Activate/deactivate a plugin
+    """
+    try:
+        data = json.loads(request.body)
+        plugin_id = data.get('plugin_id')
+        activate = data.get('activate', True)
+
+        if not plugin_id:
+            return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
+
+        from .models import Plugin
+        from .plugin_loader import plugin_loader
+
+        plugin = Plugin.objects.get(plugin_id=plugin_id)
+
+        if activate:
+            # Activate and load plugin
+            plugin.is_active = True
+            plugin.save()
+
+            if plugin_loader.load_plugin(plugin_id):
+                return JsonResponse({'success': True, 'message': f'Plugin {plugin_id} activated'})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to load plugin'})
+        else:
+            # Deactivate plugin
+            if plugin_loader.unload_plugin(plugin_id):
+                return JsonResponse({'success': True, 'message': f'Plugin {plugin_id} deactivated'})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to deactivate plugin'})
+
+    except Plugin.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Plugin not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_plugin_uninstall(request):
+    """
+    API: Uninstall a plugin
+    """
+    try:
+        data = json.loads(request.body)
+        plugin_id = data.get('plugin_id')
+
+        if not plugin_id:
+            return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
+
+        from .runtime_manager import plugin_runtime_manager
+
+        result = plugin_runtime_manager.uninstall_plugin(plugin_id)
+
+        return JsonResponse(result)
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_plugins_list(request):
+    """
+    API: List all plugins with their status
+    """
+    try:
+        from .models import Plugin
+
+        plugins = Plugin.objects.all().order_by('name')
+        plugins_data = []
+
+        for plugin in plugins:
+            plugins_data.append({
+                'plugin_id': plugin.plugin_id,
+                'name': plugin.name,
+                'description': plugin.description,
+                'version': plugin.version,
+                'author': plugin.author,
+                'icon': plugin.icon,
+                'category': plugin.category,
+                'is_installed': plugin.is_installed,
+                'is_active': plugin.is_active,
+                'show_in_menu': plugin.show_in_menu,
+                'menu_label': plugin.menu_label,
+                'menu_icon': plugin.menu_icon,
+                'menu_order': plugin.menu_order,
+            })
+
+        return JsonResponse({'success': True, 'plugins': plugins_data})
+
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
