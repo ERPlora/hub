@@ -2,7 +2,7 @@ name: Build Executables
 
 on:
   push:
-    branches: [main, staging, develop]
+    branches: [develop]  # Solo develop (staging y main usan release.yml)
     tags:
       - 'v*'
   pull_request:
@@ -117,10 +117,5 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.asset_name }}
 
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ matrix.asset_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Nota: Este workflow solo se usa para develop y tags manuales
+      # Los releases de main/staging son manejados por release.yml (semantic-release)
