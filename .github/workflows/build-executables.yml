@@ -45,6 +45,12 @@ jobs:
           source .venv/bin/activate || .venv\Scripts\activate
           uv pip install -e .  # Instala desde pyproject.toml
 
+      - name: Create database (migrations)
+        run: |
+          source .venv/bin/activate || .venv\Scripts\activate
+          python manage.py migrate --noinput
+          echo "✅ Base de datos SQLite creada"
+
       - name: Build executable
         run: |
           source .venv/bin/activate || .venv\Scripts\activate
