@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v0.8.0-rc.1 (2025-11-06)
+
+### Features
+
+* feat: build wip ([`8964bcc`](https://github.com/cpos-app/hub/commit/8964bcc7042367b246230ce7049a77523781428a))
+
+* feat: build wip ([`c20364f`](https://github.com/cpos-app/hub/commit/c20364f8c298df99c7e3d1eec14f55e94e5af7fa))
+
+* feat: build wip ([`7aefb0a`](https://github.com/cpos-app/hub/commit/7aefb0ad9a802e003a253840ebcb348ee66c0133))
+
+* feat: add 25 library to app ([`b2ce44b`](https://github.com/cpos-app/hub/commit/b2ce44b5f141b286c578399b688a426254e180e2))
+
+* feat: build local ok ([`f32a560`](https://github.com/cpos-app/hub/commit/f32a5604795df38be9c0be9fb3749bb7c8916349))
+
+* feat: build local ok ([`a389c1a`](https://github.com/cpos-app/hub/commit/a389c1a11e561f894f17fb521a44aea852ea2c61))
+
+* feat: build local ok ([`18da96f`](https://github.com/cpos-app/hub/commit/18da96fdd0ad2934107d65d9ccee4a1aa744cb7b))
+
+* feat: build action ([`238c888`](https://github.com/cpos-app/hub/commit/238c888be753dbad31f0335cbad33a4ccd0f2d95))
+
+* feat: build action ([`fd7ce5a`](https://github.com/cpos-app/hub/commit/fd7ce5a7f2d1c7545091ab52f4f646d0033ce8c4))
+
+
 ## v0.6.0 (2025-11-05)
 
 
