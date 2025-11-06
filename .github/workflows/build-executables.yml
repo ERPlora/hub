@@ -2,7 +2,7 @@ name: Build Executables
 
 on:
   push:
-    branches: [main, staging, develop]
+    branches: [develop]  # Solo develop (staging y main usan release.yml)
     tags:
       - 'v*'
   pull_request:
@@ -117,58 +117,5 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.asset_name }}
 
-      - name: Create Release (Tags)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ matrix.asset_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get version from pyproject.toml
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        id: get_version
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-          else
-            VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "📦 Version detectada: $VERSION"
-        shell: bash
-
-      - name: Create Release (main branch)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ matrix.asset_name }}
-          tag_name: v${{ steps.get_version.outputs.version }}
-          name: "CPOS Hub v${{ steps.get_version.outputs.version }}"
-          body: |
-            ## 🚀 CPOS Hub - Ejecutables Listos para Instalar
-
-            **Versión:** ${{ steps.get_version.outputs.version }}
-            **Commit:** ${{ github.sha }}
-            **Fecha:** ${{ github.event.head_commit.timestamp }}
-
-            ### 📥 Descargas por Plataforma
-
-            - **Windows:** `CPOS-Hub-Windows-x64.zip` - Descomprimir y ejecutar `main.exe`
-            - **macOS:** `CPOS-Hub-macOS-arm64.dmg` - Montar DMG e instalar
-            - **Linux:** `CPOS-Hub-Linux-x64.tar.gz` - Extraer y ejecutar `./main`
-
-            ### ✨ Características
-            - ✅ 25 librerías pre-empaquetadas para plugins
-            - ✅ Base de datos SQLite incluida
-            - ✅ Django 5.2.7 embebido
-            - ✅ Listo para usar sin instalación adicional
-
-            ---
-
-            ${{ github.event.head_commit.message }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Nota: Este workflow solo se usa para develop y tags manuales
+      # Los releases de main/staging son manejados por release.yml (semantic-release)
