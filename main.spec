@@ -14,9 +14,9 @@ sys.path.insert(0, str(hub_root))
 try:
     from config.plugin_allowed_deps import get_pyinstaller_imports, TOTAL_DEPENDENCIES
     plugin_imports = get_pyinstaller_imports()
-    print(f"📦 Cargadas {TOTAL_DEPENDENCIES} librerías para plugins")
+    print(f"[INFO] Cargadas {TOTAL_DEPENDENCIES} librerias para plugins")
 except ImportError as e:
-    print(f"⚠️  No se pudo cargar plugin_allowed_deps: {e}")
+    print(f"[WARNING] No se pudo cargar plugin_allowed_deps: {e}")
     plugin_imports = []
 
 # Leer dependencias del pyproject.toml automáticamente
@@ -50,7 +50,7 @@ def get_dependencies_from_pyproject():
 
 # Obtener paquetes del pyproject.toml
 pyproject_packages = get_dependencies_from_pyproject()
-print(f"📦 Dependencias encontradas en pyproject.toml: {pyproject_packages}")
+print(f"[INFO] Dependencias encontradas en pyproject.toml: {pyproject_packages}")
 
 # Incluir todo el proyecto Django como data files
 datas = [
