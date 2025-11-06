@@ -1,6 +1,13 @@
 # CHANGELOG
 
 
+## v0.8.0-rc.4 (2025-11-06)
+
+### Features
+
+* feat: build wip ([`a3a57c3`](https://github.com/cpos-app/hub/commit/a3a57c3a93b7f3b18068140ba2d66e4636274748))
+
+
 ## v0.8.0-rc.3 (2025-11-06)
 
 ### Features
