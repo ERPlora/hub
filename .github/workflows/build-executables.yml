@@ -1,0 +1,126 @@
+name: Build Executables
+
+on:
+  push:
+    branches: [main, staging, develop]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, staging]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: CPOS-Hub-Linux
+            asset_name: CPOS-Hub-Linux-x64.tar.gz
+          - os: windows-latest
+            artifact_name: CPOS-Hub-Windows
+            asset_name: CPOS-Hub-Windows-x64.zip
+          - os: macos-latest
+            artifact_name: CPOS-Hub-macOS
+            asset_name: CPOS-Hub-macOS-arm64.dmg
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'  # Python 3.11 es más compatible que 3.14
+
+      - name: Install uv (fast package manager)
+        run: pip install uv
+
+      - name: Install dependencies with uv (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv pip install -e .
+
+      - name: Install dependencies with uv (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          uv venv
+          & .venv\Scripts\Activate.ps1
+          uv pip install -e .
+
+      - name: Create database (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          source .venv/bin/activate
+          python manage.py migrate --noinput
+          echo "✅ Base de datos SQLite creada"
+
+      - name: Create database (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & .venv\Scripts\Activate.ps1
+          python manage.py migrate --noinput
+          Write-Host "✅ Base de datos SQLite creada"
+
+      - name: Build executable (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          source .venv/bin/activate
+          pyinstaller main.spec --clean
+
+      - name: Build executable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & .venv\Scripts\Activate.ps1
+          pyinstaller main.spec --clean
+
+      - name: Package Linux (tar.gz)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd dist/main
+          tar -czf ../../${{ matrix.asset_name }} *
+
+      - name: Package Windows (zip)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          cd dist/main
+          Compress-Archive -Path * -DestinationPath ../../${{ matrix.asset_name }}
+
+      - name: Package macOS (DMG)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install create-dmg
+          cd dist
+          create-dmg \
+            --volname "CPOS Hub" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "CPOS Hub.app" 175 120 \
+            --hide-extension "CPOS Hub.app" \
+            --app-drop-link 425 120 \
+            "../${{ matrix.asset_name }}" \
+            "CPOS Hub.app"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.asset_name }}
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ matrix.asset_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
