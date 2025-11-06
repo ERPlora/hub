@@ -43,14 +43,19 @@ uv venv  # Crea .venv automáticamente
 source .venv/bin/activate  # En Windows: .venv\Scripts\activate
 uv pip install -e .  # Instala desde pyproject.toml
 
-# 2. Build
+# 2. Crear base de datos (REQUERIDO antes del build)
+python manage.py migrate --noinput
+
+# 3. Build
 pyinstaller main.spec --clean
 
-# 3. Resultado
+# 4. Resultado
 # macOS: dist/CPOS Hub.app
 # Windows: dist/main/main.exe
 # Linux: dist/main/main
 ```
+
+**IMPORTANTE:** La base de datos SQLite (`db.sqlite3`) debe existir antes del build y se empaqueta con la aplicación. El workflow de GitHub Actions la crea automáticamente.
 
 ## 🤖 Build Automático (GitHub Actions)
 
