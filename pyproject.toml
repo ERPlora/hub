@@ -1,6 +1,6 @@
 [project]
 name = "cpos-hub"
-version = "0.6.0"
+version = "0.8.0-rc.1"
 description = "CPOS Hub - Aplicación POS local con Django y PyInstaller"
 readme = "docs/README.md"
 requires-python = ">=3.11"
@@ -19,10 +19,63 @@ classifiers = [
 ]
 
 dependencies = [
+    # === CORE HUB ===
     "Django>=5.2.7",
     "python-decouple>=3.8",
     "pywebview>=5.0.0",
     "pyinstaller>=6.0.0",
+
+    # === LIBRERÍAS PARA PLUGINS (25 pre-empaquetadas) ===
+    # Ver: config/plugin_allowed_deps.py para casos de uso
+
+    # Imágenes & Media
+    "Pillow>=10.0.0",
+    "qrcode>=7.4.0",
+    "python-barcode>=0.15.0",
+
+    # Office & Reports
+    "openpyxl>=3.1.0",
+    "reportlab>=4.0.0",
+    "PyPDF2>=3.0.0",
+
+    # Impresión
+    "python-escpos>=3.0",
+
+    # XML & Facturación Electrónica
+    "lxml>=5.0.0",
+    "xmltodict>=0.13.0",
+    "signxml>=3.2.0",
+    "cryptography>=42.0.0",
+    "zeep>=4.2.0",
+
+    # Network
+    "requests>=2.31.0",
+    "websockets>=12.0",
+
+    # Fechas & Localización
+    "python-dateutil>=2.8.2",
+    "pytz>=2024.1",
+    "phonenumbers>=8.13.0",
+
+    # Pagos
+    "stripe>=7.0.0",
+
+    # Data & Analysis
+    "pandas>=2.1.0",
+    "numpy>=1.26.0",
+
+    # Hardware
+    "pyserial>=3.5",
+
+    # Email & Validation
+    "email-validator>=2.1.0",
+
+    # Utils
+    "python-slugify>=8.0.0",
+    "pydantic>=2.5.0",
+
+    # Scraping
+    "beautifulsoup4>=4.12.0",
 ]
 
 [project.optional-dependencies]
