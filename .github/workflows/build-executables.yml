@@ -39,15 +39,47 @@ jobs:
       - name: Install uv (fast package manager)
         run: pip install uv
 
-      - name: Install dependencies with uv
+      - name: Install dependencies with uv (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
-          uv venv  # Crea .venv automáticamente
-          source .venv/bin/activate || .venv\Scripts\activate
-          uv pip install -e .  # Instala desde pyproject.toml
+          uv venv
+          source .venv/bin/activate
+          uv pip install -e .
 
-      - name: Build executable
+      - name: Install dependencies with uv (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          source .venv/bin/activate || .venv\Scripts\activate
+          uv venv
+          & .venv\Scripts\Activate.ps1
+          uv pip install -e .
+
+      - name: Create database (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          source .venv/bin/activate
+          python manage.py migrate --noinput
+          echo "✅ Base de datos SQLite creada"
+
+      - name: Create database (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & .venv\Scripts\Activate.ps1
+          python manage.py migrate --noinput
+          Write-Host "✅ Base de datos SQLite creada"
+
+      - name: Build executable (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          source .venv/bin/activate
+          pyinstaller main.spec --clean
+
+      - name: Build executable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & .venv\Scripts\Activate.ps1
           pyinstaller main.spec --clean
 
       - name: Package Linux (tar.gz)
