@@ -89,33 +89,60 @@ jobs:
         with:
           version: "latest"
 
-      - name: Install dependencies with uv
+      - name: Install dependencies with uv (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
           uv venv
-          uv pip install -e ".[dev]"
+          source .venv/bin/activate
+          uv pip install -e .
 
-      - name: Build with PyInstaller
+      - name: Install dependencies with uv (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          source .venv/bin/activate || .venv\Scripts\activate
-          if [ -f build.spec ]; then
-            pyinstaller build.spec
-          else
-            python build.py
-          fi
-        shell: bash
+          uv venv
+          & .venv\Scripts\Activate.ps1
+          uv pip install -e .
 
-      - name: Get version from tag
+      - name: Create database (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          source .venv/bin/activate
+          python manage.py migrate --noinput
+
+      - name: Create database (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & .venv\Scripts\Activate.ps1
+          python manage.py migrate --noinput
+
+      - name: Build with PyInstaller (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          source .venv/bin/activate
+          pyinstaller main.spec --clean
+
+      - name: Build with PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & .venv\Scripts\Activate.ps1
+          pyinstaller main.spec --clean
+
+      - name: Get version from release
         id: get_version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION="${{ needs.release.outputs.version }}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Create archive (Windows)
         if: matrix.platform == 'windows'
+        shell: pwsh
         run: |
-          cd dist
-          7z a -tzip ../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-windows.zip CPOS-Hub/
+          cd dist/main
+          Compress-Archive -Path * -DestinationPath ../../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-windows.zip
 
       - name: Create archive (macOS)
         if: matrix.platform == 'macos'
@@ -126,8 +153,8 @@ jobs:
       - name: Create archive (Linux)
         if: matrix.platform == 'linux'
         run: |
-          cd dist
-          tar -czf ../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-linux.tar.gz CPOS-Hub/
+          cd dist/main
+          tar -czf ../../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-linux.tar.gz *
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
