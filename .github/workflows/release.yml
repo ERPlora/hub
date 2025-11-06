@@ -130,10 +130,10 @@ jobs:
           & .venv\Scripts\Activate.ps1
           pyinstaller main.spec --clean
 
-      - name: Get version from tag
+      - name: Get version from release
         id: get_version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION="${{ needs.release.outputs.version }}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         shell: bash
 
