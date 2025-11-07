@@ -19,10 +19,10 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_name: CPOS-Hub-Linux
-            asset_name: CPOS-Hub-Linux-x64.AppImage
+            asset_name: CPOS-Hub-Linux-x64.tar.gz
           - os: windows-latest
             artifact_name: CPOS-Hub-Windows
-            asset_name: CPOS-Hub-Windows-x64-Setup.exe
+            asset_name: CPOS-Hub-Windows-x64.zip
           - os: macos-latest
             artifact_name: CPOS-Hub-macOS
             asset_name: CPOS-Hub-macOS-arm64.dmg
@@ -82,95 +82,40 @@ jobs:
           & .venv\Scripts\Activate.ps1
           pyinstaller main.spec --clean
 
-      # ========================================
-      # INSTALADORES NATIVOS (en lugar de archivos simples)
-      # ========================================
+      - name: Package Linux (tar.gz)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd dist/main
+          tar -czf ../../${{ matrix.asset_name }} *
 
-      - name: Install Inno Setup (Windows)
+      - name: Package Windows (zip)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          choco install innosetup -y
+          cd dist/main
+          Compress-Archive -Path * -DestinationPath ../../${{ matrix.asset_name }}
 
-      - name: Create Windows Installer
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          # Obtener versión desde pyproject.toml
-          $Version = (Get-Content pyproject.toml | Select-String -Pattern 'version = "(.*)"').Matches[0].Groups[1].Value
-
-          # Actualizar versión en setup.iss
-          $Content = Get-Content installers/windows/setup.iss -Raw
-          $Content = $Content -replace '#define MyAppVersion ".*"', "#define MyAppVersion `"$Version`""
-          $Content | Set-Content installers/windows/setup.iss -NoNewline
-
-          # Compilar instalador
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installers/windows/setup.iss
-
-          # Mover instalador a raíz
-          Move-Item "dist/CPOS-Hub-$Version-Setup.exe" "./${{ matrix.asset_name }}"
-
-      - name: Install AppImage dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fuse libfuse2
-
-      - name: Create AppImage (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          # Obtener versión desde pyproject.toml
-          VERSION=$(grep -oP 'version = "\K[^"]+' pyproject.toml)
-
-          cd installers/linux
-          chmod +x create-appimage.sh
-          ./create-appimage.sh "$VERSION"
-          mv "CPOS-Hub-$VERSION-$(uname -m).AppImage" "../../${{ matrix.asset_name }}"
-
-      - name: Create macOS DMG
+      - name: Package macOS (DMG)
         if: matrix.os == 'macos-latest'
         run: |
-          # Obtener versión desde pyproject.toml
-          VERSION=$(grep -oE 'version = "[^"]+"' pyproject.toml | cut -d'"' -f2)
-
-          cd installers/macos
-          chmod +x sign-and-package.sh
-          ./sign-and-package.sh "$VERSION"
-          mv "CPOS-Hub-$VERSION-macos.dmg" "../../${{ matrix.asset_name }}"
-
-      # ========================================
-      # FIRMA GPG DE INSTALADORES
-      # ========================================
-
-      - name: Import GPG key
-        if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/')
-        run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-          echo "[OK] GPG key imported"
-        shell: bash
-
-      - name: Sign installer with GPG
-        if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/')
-        env:
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-        run: |
-          if [ -f "${{ matrix.asset_name }}" ]; then
-            echo "[INFO] Signing ${{ matrix.asset_name }}..."
-            gpg --batch --yes --detach-sign --armor --local-user "$GPG_KEY_ID" "${{ matrix.asset_name }}"
-            echo "[OK] Signature created: ${{ matrix.asset_name }}.asc"
-          else
-            echo "[WARNING] File not found: ${{ matrix.asset_name }}"
-            exit 1
-          fi
-        shell: bash
+          brew install create-dmg
+          cd dist
+          create-dmg \
+            --volname "CPOS Hub" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "CPOS Hub.app" 175 120 \
+            --hide-extension "CPOS Hub.app" \
+            --app-drop-link 425 120 \
+            "../${{ matrix.asset_name }}" \
+            "CPOS Hub.app"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: |
-            ${{ matrix.asset_name }}
-            ${{ matrix.asset_name }}.asc
+          path: ${{ matrix.asset_name }}
 
       # Nota: Este workflow solo se usa para develop y tags manuales
       # Los releases de main/staging son manejados por release.yml (semantic-release)
