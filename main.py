@@ -117,7 +117,7 @@ for i in range(15):  # Intentar por 15 segundos
 
     if result == 0:
         django_ready = True
-        print(f"✓ Django started successfully (took {i+1} seconds)")
+        print(f"[OK] Django started successfully (took {i+1} seconds)")
         break
     else:
         print(f"  Waiting... ({i+1}/15)")
@@ -139,7 +139,7 @@ try:
         fullscreen=False
     )
 
-    print("✓ App is running. Close the window to exit.")
+    print("[OK] App is running. Close the window to exit.")
 
     # Iniciar webview (esto bloquea hasta que se cierra la ventana)
     webview.start()
