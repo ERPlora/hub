@@ -478,10 +478,26 @@ Ver [docs/BUILDING.md](BUILDING.md) para información completa sobre:
 
 ## 🔒 Seguridad
 
+### Firmas GPG
+
+Todos los archivos de release están firmados con GPG para garantizar autenticidad e integridad:
+
+- ✅ **Cada release incluye**: Archivo + Firma GPG (`.asc`)
+- ✅ **Clave pública**: [GPG-PUBLIC-KEY.asc](../GPG-PUBLIC-KEY.asc)
+- ✅ **Verificación**: Ver [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md)
+
+```bash
+# Ejemplo: Verificar descarga
+gpg --verify CPOS-Hub-0.8.0-windows.zip.asc CPOS-Hub-0.8.0-windows.zip
+```
+
+### Seguridad General
+
 - **Credenciales del Hub**: `tunnel_token` guardado en SQLite
 - **Base de datos local**: SQLite con permisos restrictivos
 - **Modo offline**: Funciona sin conexión, sincroniza cuando vuelve online
 - **Tokens JWT de usuario**: NO se guardan (son temporales)
+- **Licencia BUSL-1.1**: Protege contra clones maliciosos
 
 ---
 
@@ -560,12 +576,16 @@ Después del **2030-01-07** (5 años), la licencia se convierte automáticamente
 
 ## 📚 Documentación adicional
 
-- [docs/TESTING.md](docs/TESTING.md) - Guía completa de testing
-- [docs/CHANGELOG.md](docs/CHANGELOG.md) - Historial de cambios
-- [docs/CLOUD.md](docs/CLOUD.md) - Documentación de Cloud
+- [BUILDING.md](BUILDING.md) - Guía de build y CI/CD
+- [TESTING.md](TESTING.md) - Guía completa de testing
+- [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md) - Verificación de firmas GPG
+- [GPG_SETUP.md](GPG_SETUP.md) - Configuración de firma GPG (desarrollo)
+- [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md) - Arquitectura de plugins
+- [PLUGIN_LIBRARIES_COMPLETE.md](PLUGIN_LIBRARIES_COMPLETE.md) - Catálogo de 25 librerías
+- [CHANGELOG.md](CHANGELOG.md) - Historial de cambios
+- [CLOUD.md](CLOUD.md) - Documentación de Cloud
 - [../CLAUDE.md](../CLAUDE.md) - Arquitectura del proyecto
 - [../TODO.md](../TODO.md) - Roadmap y tareas
-- [../docs/](../docs/) - Documentación técnica
 
 ---
 
