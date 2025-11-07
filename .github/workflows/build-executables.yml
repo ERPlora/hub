@@ -2,12 +2,33 @@ name: Build Executables
 
 on:
   push:
-    branches: [develop]  # Solo develop (staging y main usan release.yml)
+    branches: [develop]
     tags:
       - 'v*'
+    paths-ignore:
+      - '**.md'           # Ignorar cambios en Markdown
+      - 'docs/**'         # Ignorar cambios en documentación
+      - '.github/**'      # Ignorar cambios en workflows (excepto este mismo)
+      - '!.github/workflows/build-executables.yml'  # Excepto este workflow
+      - 'LICENSE'
+      - '.gitignore'
+      - 'CLAUDE.md'
   pull_request:
     branches: [main, staging]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/**'
+      - '!.github/workflows/build-executables.yml'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'CLAUDE.md'
   workflow_dispatch:  # Allow manual trigger
+
+# Cancelar builds duplicados (si haces push múltiples veces seguidas)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -15,7 +36,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Solo Linux y Windows en develop (macOS es 10x más caro)
+        # macOS solo en releases finales (build-release.yml)
+        os: [ubuntu-latest, windows-latest]
         include:
           - os: ubuntu-latest
             artifact_name: CPOS-Hub-Linux
@@ -23,9 +46,6 @@ jobs:
           - os: windows-latest
             artifact_name: CPOS-Hub-Windows
             asset_name: CPOS-Hub-Windows-x64.zip
-          - os: macos-latest
-            artifact_name: CPOS-Hub-macOS
-            asset_name: CPOS-Hub-macOS-arm64.dmg
 
     steps:
       - name: Checkout code
@@ -34,10 +54,21 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'  # Python 3.11 es más compatible que 3.14
+          python-version: '3.11'
+          cache: 'pip'  # Caché automático de pip
 
       - name: Install uv (fast package manager)
         run: pip install uv
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
 
       - name: Install dependencies with uv (Linux/macOS)
         if: runner.os != 'Windows'
@@ -94,22 +125,6 @@ jobs:
         run: |
           cd dist/main
           Compress-Archive -Path * -DestinationPath ../../${{ matrix.asset_name }}
-
-      - name: Package macOS (DMG)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install create-dmg
-          cd dist
-          create-dmg \
-            --volname "CPOS Hub" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --icon "CPOS Hub.app" 175 120 \
-            --hide-extension "CPOS Hub.app" \
-            --app-drop-link 425 120 \
-            "../${{ matrix.asset_name }}" \
-            "CPOS Hub.app"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
