@@ -490,9 +490,17 @@ Todos los archivos de release están firmados con GPG para garantizar autenticid
 - ✅ **Setup GPG**: [GPG_SETUP.md](GPG_SETUP.md) (desarrolladores)
 
 ```bash
-# Ejemplo: Verificar descarga
+# Descargar clave pública desde API
+curl -sL https://cpos.app/api/gpg/public-key/ | gpg --import
+
+# Verificar descarga
 gpg --verify CPOS-Hub-0.8.0-windows.zip.asc CPOS-Hub-0.8.0-windows.zip
 ```
+
+**Endpoints de API**:
+- `GET https://cpos.app/api/gpg/public-key/` - Descargar clave pública
+- `GET https://cpos.app/api/gpg/public-key/info/` - Información de la clave (JSON)
+- `GET https://cpos.app/api/gpg/public-key/text/` - Clave en texto plano
 
 **Documentación adicional**:
 - Para usuarios que descargan releases: [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md)
