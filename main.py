@@ -75,6 +75,88 @@ sys.path.insert(0, str(hub_dir))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
 
+def initialize_data_directories():
+    """
+    Inicializa los directorios de datos de usuario en ubicaciones externas.
+
+    Crea directorios según la plataforma:
+    - Windows: C:\\Users\\<user>\\AppData\\Local\\CPOSHub\\
+    - macOS: ~/Library/Application Support/CPOSHub/
+    - Linux: ~/.cpos-hub/
+
+    También migra datos legacy si existen en el directorio de la app.
+    """
+    print("\n[INFO] Initializing data directories...")
+
+    try:
+        from config.paths import get_data_paths
+        import shutil
+
+        paths = get_data_paths()
+
+        # Mostrar ubicaciones
+        print(f"[INFO] Platform: {sys.platform}")
+        print(f"[INFO] Base data directory: {paths.base_dir}")
+        print(f"[INFO] Database: {paths.database_path}")
+        print(f"[INFO] Media: {paths.media_dir}")
+        print(f"[INFO] Plugins: {paths.plugins_dir}")
+        print(f"[INFO] Reports: {paths.reports_dir}")
+        print(f"[INFO] Logs: {paths.logs_dir}")
+        print(f"[INFO] Backups: {paths.backups_dir}")
+
+        # Los directorios ya se crean automáticamente en paths.py
+        # Aquí solo verificamos y migramos datos legacy si existen
+
+        # Migrar base de datos legacy si existe
+        legacy_db = hub_dir / 'db.sqlite3'
+        if legacy_db.exists() and not paths.database_path.exists():
+            print(f"\n[INFO] Migrating legacy database from {legacy_db}")
+            shutil.copy2(legacy_db, paths.database_path)
+            print(f"[OK] Database migrated to {paths.database_path}")
+
+            # Crear backup del legacy
+            backup_path = hub_dir / 'db.sqlite3.legacy'
+            shutil.move(legacy_db, backup_path)
+            print(f"[OK] Legacy database backed up to {backup_path}")
+
+        # Migrar media legacy si existe
+        legacy_media = hub_dir / 'media'
+        if legacy_media.exists() and legacy_media.is_dir():
+            print(f"\n[INFO] Migrating legacy media from {legacy_media}")
+            for item in legacy_media.rglob('*'):
+                if item.is_file():
+                    rel_path = item.relative_to(legacy_media)
+                    dest = paths.media_dir / rel_path
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    if not dest.exists():
+                        shutil.copy2(item, dest)
+            print(f"[OK] Media migrated to {paths.media_dir}")
+
+        # Migrar plugins legacy si existe
+        legacy_plugins = hub_dir / 'plugins'
+        if legacy_plugins.exists() and legacy_plugins.is_dir():
+            print(f"\n[INFO] Migrating legacy plugins from {legacy_plugins}")
+            for item in legacy_plugins.rglob('*'):
+                if item.is_file():
+                    rel_path = item.relative_to(legacy_plugins)
+                    dest = paths.plugins_dir / rel_path
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    if not dest.exists():
+                        shutil.copy2(item, dest)
+            print(f"[OK] Plugins migrated to {paths.plugins_dir}")
+
+        print("\n[OK] Data directories initialized successfully")
+
+    except Exception as e:
+        print(f"\n[ERROR] Failed to initialize data directories: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+# Inicializar directorios de datos
+initialize_data_directories()
+
+
 def run_django_server():
     """Ejecuta el servidor Django en un thread separado"""
     print("Starting Django server thread...")
