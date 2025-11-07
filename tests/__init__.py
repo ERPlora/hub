@@ -1,0 +1,3 @@
+"""
+CPOS Hub Tests Package
+"""
