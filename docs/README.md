@@ -17,11 +17,12 @@ CPOS Hub es una aplicación Django local que funciona como punto de venta (POS).
 - 📦 Empaquetado como ejecutable standalone (PyInstaller)
 
 **Stack tecnológico:**
-- Django 5.2
+- Django 5.2.7
 - SQLite
-- Ionic 8 (Web Components) + HTMX para UI
-- PyInstaller para empaquetado
-- pywebview para navegador embebido
+- Ionic 8 (Web Components) + Alpine.js + HTMX para UI
+- PyInstaller 6.16.0 para empaquetado
+- pywebview 6.1 para navegador embebido
+- Python 3.11+
 
 ---
 
@@ -56,59 +57,96 @@ hub/
 ├── db.sqlite3                # Base de datos local (generado)
 │
 ├── main.py                   # Entry point para PyInstaller
+├── main.spec                 # PyInstaller spec file
 │
 ├── manage.py                 # Django management
 │
-├── requirements.txt          # Dependencias Python
+├── pyproject.toml            # Dependencias Python (uv)
 │
 ├── pytest.ini                # Configuración pytest
 ├── conftest.py               # Fixtures globales de pytest
 ├── docs/                      # Documentación
+│   ├── README.md             # Este archivo
+│   ├── BUILDING.md           # Guía de build
 │   ├── TESTING.md            # Guía de testing
 │   ├── CHANGELOG.md          # Historial de cambios
-│   └── CLOUD.md              # Documentación de Cloud
+│   ├── CLOUD.md              # Documentación de Cloud
+│   ├── PLUGIN_DEPENDENCIES.md       # Arquitectura de plugins
+│   └── PLUGIN_LIBRARIES_COMPLETE.md # Catálogo de 25 librerías
 │
-└── venv/                     # Virtual environment
+├── config/                    # Configuración adicional
+│   └── plugin_allowed_deps.py # Whitelist de librerías de plugins
+│
+├── pyi_hooks/                 # Hooks personalizados PyInstaller
+│   └── hook-django.py         # Hook Django
+│
+└── .venv/                     # Virtual environment (uv)
 ```
 
 ---
 
 ## 🚀 Setup Local (Desarrollo)
 
-### 1. Activar virtual environment
+### Requisitos
+
+- Python 3.11+
+- uv (package manager)
+
+### Instalación de uv
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### 1. Crear virtual environment e instalar dependencias
 
 ```bash
 cd hub
-source venv/bin/activate  # Linux/macOS
+uv venv                    # Crea .venv automáticamente
+source .venv/bin/activate  # Linux/macOS
 # o
-venv\Scripts\activate  # Windows
+.venv\Scripts\activate     # Windows
+
+uv pip install -e .        # Instala desde pyproject.toml (incluye las 25 librerías)
 ```
 
-### 2. Instalar dependencias
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configurar base de datos
+### 2. Configurar base de datos
 
 ```bash
 python manage.py migrate
 ```
 
-### 4. Crear superuser local (opcional)
+### 3. Crear superuser local (opcional)
 
 ```bash
 python manage.py createsuperuser
 ```
 
-### 5. Ejecutar servidor de desarrollo
+### 4. Ejecutar servidor de desarrollo
 
 ```bash
 python manage.py runserver 8001
 ```
 
 Acceder a: http://127.0.0.1:8001
+
+### Gestión de Dependencias
+
+Las dependencias están definidas en `pyproject.toml`:
+- **Core Hub**: Django, pywebview, pyinstaller, etc.
+- **25 librerías de plugins**: Pillow, qrcode, reportlab, etc. (pre-empaquetadas)
+
+```bash
+# Actualizar dependencias
+uv pip install -e .
+
+# Ver dependencias instaladas
+uv pip list
+```
 
 ---
 
@@ -234,14 +272,61 @@ class HubConfig(models.Model):
 
 ## 🔌 Sistema de Plugins
 
-Los plugins son Django apps que se cargan dinámicamente.
+Los plugins son Django apps que se cargan dinámicamente. El Hub viene con **25 librerías Python pre-empaquetadas** que los plugins pueden usar sin necesidad de instalación adicional.
+
+### Librerías Pre-empaquetadas (25)
+
+El Hub incluye estas librerías para que los plugins las usen:
+
+**Imágenes & Media:**
+- `Pillow` - Procesamiento de imágenes
+- `qrcode` - Generación de códigos QR
+- `python-barcode` - Códigos de barras (EAN, UPC, Code128)
+
+**Office & Reportes:**
+- `openpyxl` - Export/import Excel
+- `reportlab` - Generación de PDFs
+- `PyPDF2` - Manipulación de PDFs
+
+**Facturación Electrónica:**
+- `lxml` - Procesamiento XML
+- `xmltodict` - Parsing XML a diccionarios
+- `signxml` - Firmas digitales XML
+- `cryptography` - Cifrado y certificados
+- `zeep` - Cliente SOAP (APIs Hacienda/SAT/AFIP)
+
+**Hardware:**
+- `python-escpos` - Impresoras térmicas ESC/POS
+- `pyserial` - Comunicación serial (básculas, cajones, displays)
+
+**Network:**
+- `requests` - HTTP requests
+- `websockets` - Cliente WebSocket
+
+**Pagos:**
+- `stripe` - Integración con Stripe
+
+**Data & Analysis:**
+- `pandas` - Análisis de datos
+- `numpy` - Computación numérica
+
+**Utils:**
+- `python-dateutil` - Manejo de fechas
+- `pytz` - Zonas horarias
+- `phonenumbers` - Validación de teléfonos
+- `email-validator` - Validación de emails
+- `python-slugify` - Generación de slugs
+- `pydantic` - Validación de datos
+- `beautifulsoup4` - Parsing HTML
+
+Ver documentación completa: [PLUGIN_LIBRARIES_COMPLETE.md](PLUGIN_LIBRARIES_COMPLETE.md)
 
 ### Estructura de un plugin
 
 ```
 plugins/
 └── mi-plugin/
-    ├── plugin.json           # Metadata
+    ├── plugin.json           # Metadata + dependencias
     ├── __init__.py
     ├── models.py
     ├── views.py
@@ -250,14 +335,37 @@ plugins/
     └── migrations/
 ```
 
+### plugin.json
+
+```json
+{
+  "plugin_id": "products",
+  "name": "Products Manager",
+  "version": "1.0.0",
+  "dependencies": {
+    "python": [
+      "Pillow>=10.0.0",
+      "openpyxl>=3.1.0"
+    ]
+  }
+}
+```
+
 ### Instalación de plugin
 
 1. Usuario descarga plugin desde Hub UI
 2. Hub descarga ZIP desde Cloud API
-3. Extrae en `plugins/`
-4. Runtime carga automáticamente
-5. Aplica migraciones
-6. Plugin disponible en menú
+3. **Valida dependencias** (solo permite las 25 librerías whitelisted)
+4. Extrae en `plugins/`
+5. Runtime carga automáticamente (librerías ya están empaquetadas)
+6. Aplica migraciones
+7. Plugin disponible en menú
+
+**Ventajas**:
+- ✅ Instalación instantánea (sin pip install)
+- ✅ Seguridad (solo librerías permitidas)
+- ✅ Offline-first (librerías ya incluidas)
+- ✅ No requiere compilación
 
 ---
 
@@ -344,15 +452,27 @@ Ver [docs/TESTING.md](docs/TESTING.md) para guía completa.
 
 ## 📦 Build (PyInstaller)
 
+### Build Local
+
 ```bash
-# Generar ejecutable
-python build.py
+# 1. Crear base de datos (REQUERIDO)
+python manage.py migrate --noinput
+
+# 2. Generar ejecutable
+pyinstaller main.spec --clean
 
 # Output:
-# - dist/cpos-hub.exe (Windows)
-# - dist/cpos-hub.app (macOS)
-# - dist/cpos-hub (Linux)
+# - dist/main/main.exe (Windows)
+# - dist/CPOS Hub.app (macOS)
+# - dist/main/main (Linux)
 ```
+
+### Build Automático (GitHub Actions)
+
+Ver [docs/BUILDING.md](BUILDING.md) para información completa sobre:
+- Prereleases automáticas en staging (`v0.8.0-rc.1`)
+- Releases finales manuales en main (`v0.8.0`)
+- Workflow de desarrollo en develop
 
 ---
 
@@ -434,6 +554,7 @@ Este es un proyecto con **TDD obligatorio**:
 
 ---
 
-**Última actualización**: 2025-01-28
-**Versión Django**: 5.2
-**Python**: 3.14+
+**Última actualización**: 2025-01-07
+**Versión Django**: 5.2.7
+**Python**: 3.11+
+**PyInstaller**: 6.16.0
