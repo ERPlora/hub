@@ -39,7 +39,7 @@ class DataPaths:
 
     @property
     def base_dir(self) -> Path:
-        """
+        r"""
         Directorio base de datos de usuario según la plataforma.
 
         Returns:
