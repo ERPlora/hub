@@ -1,6 +1,83 @@
 # CHANGELOG
 
 
+## v0.12.0 (2025-11-07)
+
+### Features
+
+* feat: move user data to external platform-specific locations
+
+Data now persists outside the app for clean updates:
+
+Platform-specific locations:
+- Windows: C:\Users\<user>\AppData\Local\CPOSHub\
+- macOS: ~/Library/Application Support/CPOSHub/ (hidden)
+- Linux: ~/.cpos-hub/ (hidden)
+
+Features:
+- Database (SQLite) external
+- Media files (uploads) external
+- Plugins and their data external
+- Reports (PDF/Excel) external
+- Logs with rotation external
+- Automatic backups external
+- Automatic legacy migration on first run
+
+Benefits:
+- Data survives app updates/reinstalls
+- Easier backups (one folder)
+- Follows platform conventions
+- Separates code from data
+
+Documentation: docs/DATA_LOCATIONS.md ([`fe5d513`](https://github.com/cpos-app/hub/commit/fe5d513e64e29d70f05306e4ab474b073d91f7ae))
+
+
+## v0.11.0 (2025-11-07)
+
+### Features
+
+* feat: add native installers for all platforms
+
+- Windows: InnoSetup installer (.exe) with autostart option
+- macOS: Signed DMG with drag & drop (no autostart)
+- Linux: AppImage with automatic autostart configuration
+
+Installers:
+- Windows: Program Files installation + Start Menu + autostart
+- macOS: DMG with code signing (Developer ID)
+- Linux: Portable AppImage + ~/.config/autostart
+
+CI/CD: Updated GitHub Actions workflow to build native installers ([`3f3d05e`](https://github.com/cpos-app/hub/commit/3f3d05e08b02d95e989c8a314f778fa1787b7b5d))
+
+### Unknown
+
+* chore: add GPG public key for release verification ([`24f58ce`](https://github.com/cpos-app/hub/commit/24f58ceaae2eff1fef9fe72d21ccd5af4dfb1db6))
+
+
+## v0.10.0 (2025-11-07)
+
+### Features
+
+* feat: add GPG signing for release artifacts
+
+- Add script to generate GPG key (scripts/generate-gpg-key.sh)
+- Add script to sign releases (scripts/sign-release.sh)
+- Update build-release.yml to sign all artifacts
+- Add comprehensive verification guide (SIGNATURE_VERIFICATION.md)
+- Add GPG setup guide for developers (GPG_SETUP.md)
+- Update README with security section for GPG signatures
+- All releases now include .asc signature files
+- Supports Windows, macOS, and Linux artifacts ([`73e7038`](https://github.com/cpos-app/hub/commit/73e70387edaa101558a7e8b5bbf317d20a955737))
+
+### Unknown
+
+* chore: update BUSL license period from 4 to 5 years
+
+- Change Date: 2030-01-07 (5 years)
+- Provides longer competitive advantage protection
+- Each version protected for 5 years before converting to Apache 2.0 ([`ad209f7`](https://github.com/cpos-app/hub/commit/ad209f779b1ccd9ec9a02bb589a32444acd10d12))
+
+
 ## v0.9.0 (2025-11-07)
 
 ### Features

@@ -60,7 +60,10 @@ datas = [
     (str(hub_root / 'apps'), 'hub/apps'),
     (str(hub_root / 'static'), 'hub/static'),
     (str(hub_root / 'locale'), 'hub/locale'),
-    (str(hub_root / 'db.sqlite3'), 'hub'),  # Base de datos SQLite (REQUERIDA)
+    # NOTA: db.sqlite3 YA NO se incluye - ahora está en ubicación externa
+    # - Windows: C:\Users\<user>\AppData\Local\CPOSHub\db\
+    # - macOS: ~/Library/Application Support/CPOSHub/db/
+    # - Linux: ~/.cpos-hub/db/
 ]
 
 a = Analysis(
