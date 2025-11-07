@@ -12,9 +12,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from decouple import config
+from config.paths import get_data_paths
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# User data paths (outside the app for persistence across updates)
+DATA_PATHS = get_data_paths()
 
 
 # Quick-start development settings - unsuitable for production
@@ -85,7 +89,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': DATA_PATHS.database_path,  # External location for persistence
     }
 }
 
@@ -137,6 +141,12 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Media files (user uploads)
+# https://docs.djangoproject.com/en/5.2/ref/settings/#media-root
+
+MEDIA_URL = 'media/'
+MEDIA_ROOT = DATA_PATHS.media_dir  # External location for user uploads
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -150,3 +160,73 @@ CLOUD_API_URL = config('CLOUD_API_URL', default='http://localhost:8000')
 
 # Hub Version
 HUB_VERSION = "1.0.0"
+
+
+# ===========================
+# CPOS Hub Data Directories
+# ===========================
+# All user data stored outside the app for persistence across updates
+
+# Plugins directory (external)
+PLUGINS_DIR = DATA_PATHS.plugins_dir
+
+# Reports directory (external)
+REPORTS_DIR = DATA_PATHS.reports_dir
+
+# Logs directory (external)
+LOGS_DIR = DATA_PATHS.logs_dir
+
+# Backups directory (external)
+BACKUPS_DIR = DATA_PATHS.backups_dir
+
+# Temp directory (external)
+TEMP_DIR = DATA_PATHS.temp_dir
+
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {module} {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'simple': {
+            'format': '[{levelname}] {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'cpos-hub.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+}

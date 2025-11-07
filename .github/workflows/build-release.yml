@@ -85,32 +85,94 @@ jobs:
           & .venv\Scripts\Activate.ps1
           pyinstaller main.spec --clean
 
-      - name: Create archive (Windows)
+      - name: Install Inno Setup (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          cd dist/main
-          Compress-Archive -Path * -DestinationPath ../../CPOS-Hub-${{ inputs.version }}-windows.zip
+          choco install innosetup -y
 
-      - name: Create archive (macOS)
+      - name: Create Windows Installer
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          # Actualizar versión en setup.iss
+          $Content = Get-Content installers/windows/setup.iss -Raw
+          $Content = $Content -replace '#define MyAppVersion ".*"', "#define MyAppVersion `"${{ inputs.version }}`""
+          $Content | Set-Content installers/windows/setup.iss -NoNewline
+
+          # Compilar instalador
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installers/windows/setup.iss
+
+          # Mover instalador a raíz
+          Move-Item dist/CPOS-Hub-${{ inputs.version }}-Setup.exe ./CPOS-Hub-${{ inputs.version }}-windows-installer.exe
+
+      - name: Create macOS DMG
         if: matrix.platform == 'macos'
         run: |
-          cd dist
-          zip -r ../CPOS-Hub-${{ inputs.version }}-macos.zip "CPOS Hub.app"
+          cd installers/macos
+          chmod +x sign-and-package.sh
+          ./sign-and-package.sh ${{ inputs.version }}
+          mv CPOS-Hub-${{ inputs.version }}-macos.dmg ../../
 
-      - name: Create archive (Linux)
+      - name: Install AppImage dependencies (Linux)
         if: matrix.platform == 'linux'
         run: |
-          cd dist/main
-          tar -czf ../../CPOS-Hub-${{ inputs.version }}-linux.tar.gz *
+          sudo apt-get update
+          sudo apt-get install -y fuse libfuse2
+
+      - name: Create AppImage (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          cd installers/linux
+          chmod +x create-appimage.sh
+          ./create-appimage.sh ${{ inputs.version }}
+          mv CPOS-Hub-${{ inputs.version }}-$(uname -m).AppImage ../../
+
+      - name: Import GPG key
+        if: inputs.create_release
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "[OK] GPG key imported"
+
+      - name: Sign release artifacts
+        if: inputs.create_release
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          # Firmar instalador Windows
+          if [ -f "CPOS-Hub-${{ inputs.version }}-windows-installer.exe" ]; then
+            echo "[INFO] Signing Windows installer..."
+            gpg --batch --yes --detach-sign --armor --local-user "$GPG_KEY_ID" "CPOS-Hub-${{ inputs.version }}-windows-installer.exe"
+          fi
+
+          # Firmar DMG macOS
+          if [ -f "CPOS-Hub-${{ inputs.version }}-macos.dmg" ]; then
+            echo "[INFO] Signing macOS DMG..."
+            gpg --batch --yes --detach-sign --armor --local-user "$GPG_KEY_ID" "CPOS-Hub-${{ inputs.version }}-macos.dmg"
+          fi
+
+          # Firmar AppImage Linux
+          if [ -f "CPOS-Hub-${{ inputs.version }}-"*".AppImage" ]; then
+            for appimage in CPOS-Hub-${{ inputs.version }}-*.AppImage; do
+              echo "[INFO] Signing Linux AppImage: $appimage"
+              gpg --batch --yes --detach-sign --armor --local-user "$GPG_KEY_ID" "$appimage"
+            done
+          fi
+
+          echo "[OK] All artifacts signed"
+        shell: bash
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: CPOS-Hub-${{ inputs.version }}-${{ matrix.platform }}
           path: |
-            CPOS-Hub-*.zip
-            CPOS-Hub-*.tar.gz
+            CPOS-Hub-*.exe
+            CPOS-Hub-*.exe.asc
+            CPOS-Hub-*.dmg
+            CPOS-Hub-*.dmg.asc
+            CPOS-Hub-*.AppImage
+            CPOS-Hub-*.AppImage.asc
           retention-days: 30
 
       - name: Upload to Release
@@ -122,8 +184,12 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            CPOS-Hub-*.zip
-            CPOS-Hub-*.tar.gz
+            CPOS-Hub-*.exe
+            CPOS-Hub-*.exe.asc
+            CPOS-Hub-*.dmg
+            CPOS-Hub-*.dmg.asc
+            CPOS-Hub-*.AppImage
+            CPOS-Hub-*.AppImage.asc
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

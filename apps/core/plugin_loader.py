@@ -1,6 +1,13 @@
 """
 Plugin Loader for CPOS Hub
-Dynamically loads and manages plugins
+Dynamically loads and manages plugins from external data directory
+
+Plugins are stored in platform-specific locations:
+- Windows: C:\\Users\\<user>\\AppData\\Local\\CPOSHub\\plugins\\
+- macOS: ~/Library/Application Support/CPOSHub/plugins/
+- Linux: ~/.cpos-hub/plugins/
+
+This allows plugins to persist across app updates and reinstalls.
 """
 import os
 import sys
@@ -15,12 +22,27 @@ from django.core.management import call_command
 
 class PluginLoader:
     """
-    Loads and manages plugins dynamically
+    Loads and manages plugins dynamically from external data directory.
+
+    Plugins are Django apps that live outside the main application bundle
+    to ensure persistence across updates.
     """
 
     def __init__(self):
-        self.plugins_dir = Path(settings.BASE_DIR) / 'plugins'
+        # Use external plugins directory from settings
+        self.plugins_dir = Path(settings.PLUGINS_DIR)
         self.loaded_plugins = {}
+
+        # Ensure plugins directory exists
+        self.plugins_dir.mkdir(parents=True, exist_ok=True)
+
+        # Add plugins directory to Python path for dynamic imports
+        plugins_parent = str(self.plugins_dir.parent)
+        if plugins_parent not in sys.path:
+            sys.path.insert(0, plugins_parent)
+
+        print(f"[INFO] Plugin loader initialized")
+        print(f"[INFO] Plugins directory: {self.plugins_dir}")
 
     def discover_plugins(self) -> List[Dict]:
         """
@@ -59,7 +81,15 @@ class PluginLoader:
 
     def load_plugin(self, plugin_id: str) -> bool:
         """
-        Load a plugin into Django INSTALLED_APPS
+        Load a plugin into Django INSTALLED_APPS from external directory.
+
+        Plugins are Django apps stored in the external plugins directory.
+        This method:
+        1. Adds the plugin directory to PYTHONPATH
+        2. Imports the plugin module
+        3. Adds it to INSTALLED_APPS
+        4. Runs migrations
+
         Returns True if successful
         """
         from apps.core.models import Plugin
@@ -69,34 +99,42 @@ class PluginLoader:
             plugin = Plugin.objects.get(plugin_id=plugin_id, is_active=True)
 
             if not plugin.install_path:
+                print(f"[ERROR] Plugin {plugin_id} has no install path")
                 return False
 
             plugin_path = Path(plugin.install_path)
 
             # Check if plugin directory exists
             if not plugin_path.exists():
+                print(f"[ERROR] Plugin directory not found: {plugin_path}")
                 return False
 
-            # Add plugin directory to Python path if not already there
+            # Ensure parent directory (plugins/) is in Python path
             plugin_parent = str(plugin_path.parent)
             if plugin_parent not in sys.path:
                 sys.path.insert(0, plugin_parent)
+                print(f"[INFO] Added to PYTHONPATH: {plugin_parent}")
 
-            # Import plugin module
+            # Import plugin module using relative import from plugins directory
             plugin_module_name = plugin_path.name
 
             # Check if already loaded
             if plugin_module_name in self.loaded_plugins:
+                print(f"[INFO] Plugin {plugin_id} already loaded")
                 return True
 
             try:
                 # Import the plugin module
+                # Since plugins/ is in sys.path, we can import directly
+                print(f"[INFO] Importing plugin module: {plugin_module_name}")
                 plugin_module = importlib.import_module(plugin_module_name)
 
                 # Add to Django INSTALLED_APPS if not already there
-                app_label = f'plugins.{plugin_module_name}'
+                # Use just the module name since it's importable from plugins/
+                app_label = plugin_module_name
                 if app_label not in settings.INSTALLED_APPS:
                     settings.INSTALLED_APPS = list(settings.INSTALLED_APPS) + [app_label]
+                    print(f"[OK] Added {app_label} to INSTALLED_APPS")
 
                 # Store in loaded plugins
                 self.loaded_plugins[plugin_id] = {
@@ -107,20 +145,28 @@ class PluginLoader:
 
                 # Apply migrations if any
                 try:
+                    print(f"[INFO] Running migrations for {plugin_module_name}...")
                     call_command('migrate', plugin_module_name, '--noinput')
+                    print(f"[OK] Migrations applied for {plugin_module_name}")
                 except Exception as e:
-                    print(f"Migration warning for {plugin_id}: {e}")
+                    print(f"[WARNING] Migration warning for {plugin_id}: {e}")
 
+                print(f"[OK] Plugin {plugin_id} loaded successfully")
                 return True
 
             except ImportError as e:
-                print(f"Error importing plugin {plugin_id}: {e}")
+                print(f"[ERROR] Failed to import plugin {plugin_id}: {e}")
+                import traceback
+                traceback.print_exc()
                 return False
 
         except Plugin.DoesNotExist:
+            print(f"[ERROR] Plugin {plugin_id} not found in database")
             return False
         except Exception as e:
-            print(f"Error loading plugin {plugin_id}: {e}")
+            print(f"[ERROR] Failed to load plugin {plugin_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def load_all_active_plugins(self) -> int:
