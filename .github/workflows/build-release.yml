@@ -1,74 +1,24 @@
-name: Release
+name: Build Release Executables
 
 on:
-  push:
-    branches:
-      - main      # Production (PROD) - Stable releases
-      - staging   # Pre-production (PRE) - Release candidates
   workflow_dispatch:
     inputs:
-      force_release:
-        description: 'Force a release even if no new commits'
+      version:
+        description: 'Version to build (e.g., 0.8.0)'
+        required: true
+        type: string
+      create_release:
+        description: 'Create GitHub Release'
         required: false
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
 
 jobs:
-  release:
-    name: Semantic Release
-    runs-on: ubuntu-latest
-    outputs:
-      released: ${{ steps.release.outputs.released }}
-      tag: ${{ steps.release.outputs.tag }}
-      version: ${{ steps.release.outputs.version }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
-      - name: Install dependencies with uv
-        run: |
-          uv venv
-          uv pip install python-semantic-release
-
-      - name: Python Semantic Release
-        id: release
-        uses: python-semantic-release/python-semantic-release@v9.12.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          git_committer_name: "github-actions[bot]"
-          git_committer_email: "github-actions[bot]@users.noreply.github.com"
-
-      - name: Publish to GitHub Releases
-        if: steps.release.outputs.released == 'true'
-        uses: python-semantic-release/publish-action@v9.12.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.release.outputs.tag }}
-          prerelease: ${{ github.ref != 'refs/heads/main' }}
-
   build:
     name: Build on ${{ matrix.os }}
-    needs: release
-    if: needs.release.outputs.released == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -83,8 +33,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.release.outputs.tag }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -137,39 +85,45 @@ jobs:
           & .venv\Scripts\Activate.ps1
           pyinstaller main.spec --clean
 
-      - name: Get version from release
-        id: get_version
-        run: |
-          VERSION="${{ needs.release.outputs.version }}"
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-        shell: bash
-
       - name: Create archive (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
           cd dist/main
-          Compress-Archive -Path * -DestinationPath ../../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-windows.zip
+          Compress-Archive -Path * -DestinationPath ../../CPOS-Hub-${{ inputs.version }}-windows.zip
 
       - name: Create archive (macOS)
         if: matrix.platform == 'macos'
         run: |
           cd dist
-          zip -r ../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-macos.zip "CPOS Hub.app"
+          zip -r ../CPOS-Hub-${{ inputs.version }}-macos.zip "CPOS Hub.app"
 
       - name: Create archive (Linux)
         if: matrix.platform == 'linux'
         run: |
           cd dist/main
-          tar -czf ../../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-linux.tar.gz *
+          tar -czf ../../CPOS-Hub-${{ inputs.version }}-linux.tar.gz *
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: CPOS-Hub-${{ inputs.version }}-${{ matrix.platform }}
+          path: |
+            CPOS-Hub-*.zip
+            CPOS-Hub-*.tar.gz
+          retention-days: 30
 
       - name: Upload to Release
+        if: inputs.create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ needs.release.outputs.tag }}
-          prerelease: ${{ github.ref != 'refs/heads/main' }}
+          tag_name: v${{ inputs.version }}
+          name: Release v${{ inputs.version }}
+          draft: false
+          prerelease: false
           files: |
             CPOS-Hub-*.zip
             CPOS-Hub-*.tar.gz
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

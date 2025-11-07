@@ -161,7 +161,7 @@ class PluginValidator:
                 # Extraer nombre del paquete para mensaje de error
                 pkg_name = dep.split('>=')[0].split('==')[0].strip()
                 self.errors.append(
-                    f"❌ Dependencia NO permitida: '{pkg_name}'\n"
+                    f"[ERROR] Dependencia NO permitida: '{pkg_name}'\n"
                     f"   Dependencias permitidas: {', '.join(list(PLUGIN_ALLOWED_DEPENDENCIES.keys())[:5])}...\n"
                     f"   Ver lista completa en: config/plugin_allowed_deps.py"
                 )
@@ -207,7 +207,7 @@ class PluginValidator:
                 for forbidden in ['subprocess', 'os.system', 'eval(', 'exec(']:
                     if forbidden in content:
                         self.warnings.append(
-                            f"⚠️  Código potencialmente peligroso en {py_file.name}: '{forbidden}'"
+                            f"[WARNING] Código potencialmente peligroso en {py_file.name}: '{forbidden}'"
                         )
 
             except Exception as e:
@@ -251,8 +251,8 @@ def get_allowed_dependencies_help() -> str:
     """
     deps = get_allowed_dependencies_list()
     return (
-        "📦 Dependencias permitidas para plugins:\n\n"
-        + "\n".join(f"  ✅ {dep}" for dep in deps)
+        "[INFO] Dependencias permitidas para plugins:\n\n"
+        + "\n".join(f"  [OK] {dep}" for dep in deps)
         + f"\n\nTotal: {len(deps)} librerías disponibles"
     )
 
@@ -270,22 +270,22 @@ if __name__ == '__main__':
     plugin_path = Path(sys.argv[1])
     is_valid, errors, warnings = validate_plugin(plugin_path)
 
-    print(f"📦 Validando plugin: {plugin_path}")
+    print(f"[INFO] Validando plugin: {plugin_path}")
     print()
 
     if warnings:
-        print("⚠️  Warnings:")
+        print("[WARNING] Warnings:")
         for warning in warnings:
             print(f"  - {warning}")
         print()
 
     if errors:
-        print("❌ Errores:")
+        print("[ERROR] Errores:")
         for error in errors:
             print(f"  - {error}")
         print()
-        print("❌ Plugin inválido")
+        print("[ERROR] Plugin invalido")
         sys.exit(1)
     else:
-        print("✅ Plugin válido")
+        print("[OK] Plugin valido")
         sys.exit(0)
