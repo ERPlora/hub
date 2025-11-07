@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.11.0 (2025-11-07)
+
+### Features
+
+* feat: add native installers for all platforms
+
+- Windows: InnoSetup installer (.exe) with autostart option
+- macOS: Signed DMG with drag & drop (no autostart)
+- Linux: AppImage with automatic autostart configuration
+
+Installers:
+- Windows: Program Files installation + Start Menu + autostart
+- macOS: DMG with code signing (Developer ID)
+- Linux: Portable AppImage + ~/.config/autostart
+
+CI/CD: Updated GitHub Actions workflow to build native installers ([`3f3d05e`](https://github.com/cpos-app/hub/commit/3f3d05e08b02d95e989c8a314f778fa1787b7b5d))
+
+### Unknown
+
+* chore: add GPG public key for release verification ([`24f58ce`](https://github.com/cpos-app/hub/commit/24f58ceaae2eff1fef9fe72d21ccd5af4dfb1db6))
+
+
 ## v0.10.0 (2025-11-07)
 
 ### Features
