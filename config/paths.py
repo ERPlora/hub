@@ -1,4 +1,4 @@
-"""
+r"""
 Path Management for CPOS Hub
 
 Maneja las rutas de datos de usuario según la plataforma (Windows, macOS, Linux).
