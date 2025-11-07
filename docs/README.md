@@ -10,11 +10,17 @@ CPOS Hub es una aplicación Django local que funciona como punto de venta (POS).
 
 **Características principales:**
 - 💾 Base de datos local SQLite (funciona offline)
-- 🔌 Sistema de plugins extensible  
+- 📁 Datos externos persistentes (sobreviven actualizaciones)
+- 🔌 Sistema de plugins extensible
 - 🖨️ Soporte para hardware POS (impresora, scanner, cajón)
 - 🔄 Sincronización automática con Cloud cuando hay conexión
 - 🌐 Acceso remoto vía túnel FRP
-- 📦 Empaquetado como ejecutable standalone (PyInstaller)
+- 📦 Instaladores nativos con autostart (Windows/Linux)
+
+**Formatos de distribución:**
+- 🪟 **Windows**: Instalador `.exe` (InnoSetup) con autostart
+- 🍎 **macOS**: DMG firmado (drag & drop)
+- 🐧 **Linux**: AppImage portable con autostart
 
 **Stack tecnológico:**
 - Django 5.2.7
@@ -54,7 +60,7 @@ hub/
 │
 ├── static/                    # Archivos estáticos
 │
-├── db.sqlite3                # Base de datos local (generado)
+├── db.sqlite3                # Base de datos (LEGACY - migrada a ubicación externa)
 │
 ├── main.py                   # Entry point para PyInstaller
 ├── main.spec                 # PyInstaller spec file
@@ -82,6 +88,30 @@ hub/
 │
 └── .venv/                     # Virtual environment (uv)
 ```
+
+---
+
+## 📂 Ubicaciones de Datos de Usuario
+
+**IMPORTANTE**: Todos los datos de usuario se almacenan **fuera de la aplicación** para persistencia entre actualizaciones.
+
+| Plataforma | Ubicación Base |
+|------------|----------------|
+| **Windows** | `C:\Users\<usuario>\AppData\Local\CPOSHub\` |
+| **macOS** | `~/Library/Application Support/CPOSHub/` (oculto) |
+| **Linux** | `~/.cpos-hub/` (oculto) |
+
+**Subdirectorios**:
+- `db/` - Base de datos SQLite
+- `media/` - Archivos subidos (imágenes, documentos)
+- `plugins/` - Plugins instalados y sus datos
+- `reports/` - Reportes generados (PDF, Excel)
+- `logs/` - Logs de la aplicación
+- `backups/` - Backups automáticos de la DB
+
+**Migración automática**: La primera ejecución migra datos legacy automáticamente.
+
+**Documentación completa**: [DATA_LOCATIONS.md](DATA_LOCATIONS.md)
 
 ---
 
@@ -450,9 +480,9 @@ Ver [docs/TESTING.md](docs/TESTING.md) para guía completa.
 
 ---
 
-## 📦 Build (PyInstaller)
+## 📦 Build y Distribución
 
-### Build Local
+### Build Local con PyInstaller
 
 ```bash
 # 1. Crear base de datos (REQUERIDO)
@@ -467,7 +497,63 @@ pyinstaller main.spec --clean
 # - dist/main/main (Linux)
 ```
 
+### Crear Instaladores Nativos
+
+**Windows - Instalador InnoSetup (.exe)**
+```powershell
+# Requiere: Inno Setup 6+ o Chocolatey
+cd installers/windows
+.\build-installer.ps1 -Version "0.8.0"
+
+# Output: dist/CPOS-Hub-0.8.0-windows-installer.exe
+# Características:
+#   - Instala en C:\Program Files\CPOS Hub
+#   - Opción de autostart con Windows
+#   - Acceso directo en Menú Inicio + Escritorio
+#   - Desinstalador incluido
+```
+
+**macOS - DMG Firmado**
+```bash
+# Requiere: Xcode Command Line Tools
+cd installers/macos
+./sign-and-package.sh 0.8.0
+
+# Output: CPOS-Hub-0.8.0-macos.dmg
+# Características:
+#   - Drag & Drop a /Applications
+#   - Firma con Developer ID (si disponible)
+#   - Sin autostart (manual en System Settings)
+```
+
+**Linux - AppImage Portable**
+```bash
+# Requiere: fuse, libfuse2
+cd installers/linux
+./create-appimage.sh 0.8.0
+
+# Output: CPOS-Hub-0.8.0-x86_64.AppImage
+# Características:
+#   - Portable (no requiere instalación)
+#   - Autostart automático en ~/.config/autostart
+#   - Compatible con GNOME, KDE, XFCE, etc.
+```
+
+**Ver documentación completa**: [installers/README.md](../installers/README.md)
+
 ### Build Automático (GitHub Actions)
+
+Los instaladores se crean automáticamente en GitHub Actions:
+
+1. **GitHub Actions** → **Build Release Executables**
+2. **Run workflow** → Ingresar versión (ej: `0.8.0`)
+3. **Esperar** ~15-20 minutos
+4. **Descargar** desde [Releases](https://github.com/cpos-app/hub/releases)
+
+**Archivos generados**:
+- `CPOS-Hub-0.8.0-windows-installer.exe` + `.asc` (firma GPG)
+- `CPOS-Hub-0.8.0-macos.dmg` + `.asc`
+- `CPOS-Hub-0.8.0-x86_64.AppImage` + `.asc`
 
 Ver [docs/BUILDING.md](BUILDING.md) para información completa sobre:
 - Prereleases automáticas en staging (`v0.8.0-rc.1`)
@@ -478,10 +564,42 @@ Ver [docs/BUILDING.md](BUILDING.md) para información completa sobre:
 
 ## 🔒 Seguridad
 
+### Firmas GPG
+
+Todos los archivos de release están firmados con GPG para garantizar autenticidad e integridad:
+
+- ✅ **Cada release incluye**: Archivo + Firma GPG (`.asc`)
+- ✅ **Clave pública**: [GPG-PUBLIC-KEY.asc](../GPG-PUBLIC-KEY.asc)
+- ✅ **Key ID**: `998A98EF7BE1D222837D30EBC27E75F06D413478`
+- ✅ **Verificación de firmas**: [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md)
+- ✅ **Almacenamiento de claves**: [GPG_KEY_STORAGE.md](GPG_KEY_STORAGE.md) (desarrolladores)
+- ✅ **Setup GPG**: [GPG_SETUP.md](GPG_SETUP.md) (desarrolladores)
+
+```bash
+# Descargar clave pública desde API
+curl -sL https://cpos.app/api/gpg/public-key/ | gpg --import
+
+# Verificar descarga
+gpg --verify CPOS-Hub-0.8.0-windows.zip.asc CPOS-Hub-0.8.0-windows.zip
+```
+
+**Endpoints de API**:
+- `GET https://cpos.app/api/gpg/public-key/` - Descargar clave pública
+- `GET https://cpos.app/api/gpg/public-key/info/` - Información de la clave (JSON)
+- `GET https://cpos.app/api/gpg/public-key/text/` - Clave en texto plano
+
+**Documentación adicional**:
+- Para usuarios que descargan releases: [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md)
+- Para desarrolladores con acceso a claves: [GPG_KEY_STORAGE.md](GPG_KEY_STORAGE.md)
+- Para setup inicial de GPG: [GPG_SETUP.md](GPG_SETUP.md)
+
+### Seguridad General
+
 - **Credenciales del Hub**: `tunnel_token` guardado en SQLite
 - **Base de datos local**: SQLite con permisos restrictivos
 - **Modo offline**: Funciona sin conexión, sincroniza cuando vuelve online
 - **Tokens JWT de usuario**: NO se guardan (son temporales)
+- **Licencia BUSL-1.1**: Protege contra clones maliciosos
 
 ---
 
@@ -560,12 +678,16 @@ Después del **2030-01-07** (5 años), la licencia se convierte automáticamente
 
 ## 📚 Documentación adicional
 
-- [docs/TESTING.md](docs/TESTING.md) - Guía completa de testing
-- [docs/CHANGELOG.md](docs/CHANGELOG.md) - Historial de cambios
-- [docs/CLOUD.md](docs/CLOUD.md) - Documentación de Cloud
+- [BUILDING.md](BUILDING.md) - Guía de build y CI/CD
+- [TESTING.md](TESTING.md) - Guía completa de testing
+- [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md) - Verificación de firmas GPG
+- [GPG_SETUP.md](GPG_SETUP.md) - Configuración de firma GPG (desarrollo)
+- [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md) - Arquitectura de plugins
+- [PLUGIN_LIBRARIES_COMPLETE.md](PLUGIN_LIBRARIES_COMPLETE.md) - Catálogo de 25 librerías
+- [CHANGELOG.md](CHANGELOG.md) - Historial de cambios
+- [CLOUD.md](CLOUD.md) - Documentación de Cloud
 - [../CLAUDE.md](../CLAUDE.md) - Arquitectura del proyecto
 - [../TODO.md](../TODO.md) - Roadmap y tareas
-- [../docs/](../docs/) - Documentación técnica
 
 ---
 
