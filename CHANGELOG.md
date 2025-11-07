@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.8.2-rc.1 (2025-11-07)
+
+### Bug Fixes
+
+* fix: remove emojis for Windows cp1252 compatibility ([`17dc46d`](https://github.com/cpos-app/hub/commit/17dc46d7d7b7346f4177da0caece192f0b616c8e))
+
+
+## v0.8.0 (2025-11-07)
+
+### Bug Fixes
+
+* fix: finalize release 0.8.0 ([`62a0053`](https://github.com/cpos-app/hub/commit/62a0053e3676e408d8791e71b7b0a4ac2bec46be))
+
+### Unknown
+
+* chore: trigger release 0.8.0 ([`a63e399`](https://github.com/cpos-app/hub/commit/a63e399b36fb84b6cd9f0a06ada75141b8a69021))
+
+
 ## v0.8.0-rc.4 (2025-11-06)
 
 ### Features
