@@ -171,26 +171,26 @@ ESTIMATED_BUNDLE_SIZE_MB = 245
 
 
 if __name__ == '__main__':
-    print(f"📦 CPOS Hub - Plugin Allowed Dependencies")
-    print(f"Total: {TOTAL_DEPENDENCIES} librerías")
+    print(f"[INFO] CPOS Hub - Plugin Allowed Dependencies")
+    print(f"Total: {TOTAL_DEPENDENCIES} librerias")
     print(f"Bundle estimado: ~{ESTIMATED_BUNDLE_SIZE_MB}MB")
     print()
 
-    print("🔴 CRÍTICAS (13):")
+    print("[CRITICAL] CRITICAS (13):")
     for pkg, version in CRITICAL_DEPENDENCIES.items():
         print(f"  - {pkg}{version}")
 
     print()
-    print("🟡 IMPORTANTES (10):")
+    print("[IMPORTANT] IMPORTANTES (10):")
     for pkg, version in IMPORTANT_DEPENDENCIES.items():
         print(f"  - {pkg}{version}")
 
     print()
-    print("🟢 ÚTILES (2):")
+    print("[USEFUL] UTILES (2):")
     for pkg, version in USEFUL_DEPENDENCIES.items():
         print(f"  - {pkg}{version}")
 
     print()
-    print("📋 PyInstaller imports:")
+    print("[INFO] PyInstaller imports:")
     for module in get_pyinstaller_imports():
         print(f"  - {module}")
