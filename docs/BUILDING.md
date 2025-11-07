@@ -59,30 +59,78 @@ pyinstaller main.spec --clean
 
 ## 🤖 Build Automático (GitHub Actions)
 
-El workflow `.github/workflows/build-executables.yml` construye automáticamente para las 3 plataformas:
+### Workflow 1: Prereleases Automáticas (staging)
 
-### Triggers
+**Archivo**: `.github/workflows/release.yml`
 
-- Push a `main`, `staging`, `develop`
-- Tags `v*` (releases)
-- Pull requests a `main`, `staging`
-- Manual (`workflow_dispatch`)
+**Triggers**: Push a `staging`
 
-### Artifacts
+**Proceso**:
+1. Semantic-release analiza commits convencionales
+2. Crea versión con sufijo `-rc.X` (ej: `0.8.0-rc.1`)
+3. Actualiza `pyproject.toml` y `CHANGELOG.md`
+4. Crea tag `v0.8.0-rc.1`
+5. Construye ejecutables para Windows, macOS y Linux en paralelo
+6. Publica GitHub Release marcada como prerelease
 
-- **Linux**: `CPOS-Hub-Linux-x64.tar.gz`
-- **Windows**: `CPOS-Hub-Windows-x64.zip`
-- **macOS**: `CPOS-Hub-macOS-arm64.dmg`
+**Artifacts**:
+- **Linux**: `CPOS-Hub-0.8.0-rc.1-linux.tar.gz`
+- **Windows**: `CPOS-Hub-0.8.0-rc.1-windows.zip`
+- **macOS**: `CPOS-Hub-0.8.0-rc.1-macos.zip`
 
-### Releases
+### Workflow 2: Releases Finales (main) - MANUAL
 
-Cuando se crea un tag `v*`, se genera automáticamente un release en GitHub con los 3 binarios.
+**Archivo**: `.github/workflows/build-release.yml`
 
-```bash
-# Crear release
-git tag v1.0.0
-git push origin v1.0.0
-```
+**Triggers**: Manual (`workflow_dispatch`)
+
+**Por qué es manual**: Cuando se hace merge de `staging → main`, semantic-release en main no crea automáticamente una nueva versión porque detecta que los commits ya fueron versionados en staging como prerelease. Python-semantic-release v9 no tiene feature de "promoción de prerelease a estable".
+
+**Proceso**:
+
+1. **Merge staging a main**:
+   ```bash
+   git checkout main
+   git merge staging
+   git push origin main
+   ```
+
+2. **Actualizar versión manualmente**:
+   ```bash
+   # Editar pyproject.toml
+   # De: version = "0.8.0-rc.4"
+   # A:  version = "0.8.0"
+
+   git add pyproject.toml
+   git commit -m "chore(release): bump to 0.8.0"
+   git push origin main
+
+   git tag v0.8.0
+   git push origin v0.8.0
+   ```
+
+3. **Ejecutar workflow manual**:
+   - Ir a: https://github.com/cpos-app/hub/actions/workflows/build-release.yml
+   - Click "Run workflow"
+   - Ingresar versión: `0.8.0` (sin `v`)
+   - Marcar "Create GitHub Release": ✅
+   - Click "Run workflow"
+   - Esperar ~15 minutos
+
+4. **Resultado**:
+   - Release en: `https://github.com/cpos-app/hub/releases/tag/v0.8.0`
+   - Con binarios:
+     - `CPOS-Hub-0.8.0-windows.zip`
+     - `CPOS-Hub-0.8.0-macos.zip`
+     - `CPOS-Hub-0.8.0-linux.tar.gz`
+
+### Workflow 3: Builds de Desarrollo (develop)
+
+**Archivo**: `.github/workflows/build-executables.yml`
+
+**Triggers**: Push a `develop`
+
+**Proceso**: Solo construye ejecutables sin crear releases (para testing de CI/CD)
 
 ## 🔧 Configuración
 
