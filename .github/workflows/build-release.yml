@@ -104,13 +104,47 @@ jobs:
           cd dist/main
           tar -czf ../../CPOS-Hub-${{ inputs.version }}-linux.tar.gz *
 
+      - name: Import GPG key
+        if: inputs.create_release
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "[OK] GPG key imported"
+
+      - name: Sign release artifacts
+        if: inputs.create_release
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          # Firmar archivo Windows
+          if [ -f "CPOS-Hub-${{ inputs.version }}-windows.zip" ]; then
+            echo "[INFO] Signing Windows archive..."
+            gpg --batch --yes --detach-sign --armor --local-user "$GPG_KEY_ID" "CPOS-Hub-${{ inputs.version }}-windows.zip"
+          fi
+
+          # Firmar archivo macOS
+          if [ -f "CPOS-Hub-${{ inputs.version }}-macos.zip" ]; then
+            echo "[INFO] Signing macOS archive..."
+            gpg --batch --yes --detach-sign --armor --local-user "$GPG_KEY_ID" "CPOS-Hub-${{ inputs.version }}-macos.zip"
+          fi
+
+          # Firmar archivo Linux
+          if [ -f "CPOS-Hub-${{ inputs.version }}-linux.tar.gz" ]; then
+            echo "[INFO] Signing Linux archive..."
+            gpg --batch --yes --detach-sign --armor --local-user "$GPG_KEY_ID" "CPOS-Hub-${{ inputs.version }}-linux.tar.gz"
+          fi
+
+          echo "[OK] All artifacts signed"
+        shell: bash
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: CPOS-Hub-${{ inputs.version }}-${{ matrix.platform }}
           path: |
             CPOS-Hub-*.zip
+            CPOS-Hub-*.zip.asc
             CPOS-Hub-*.tar.gz
+            CPOS-Hub-*.tar.gz.asc
           retention-days: 30
 
       - name: Upload to Release
@@ -123,7 +157,9 @@ jobs:
           prerelease: false
           files: |
             CPOS-Hub-*.zip
+            CPOS-Hub-*.zip.asc
             CPOS-Hub-*.tar.gz
+            CPOS-Hub-*.tar.gz.asc
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
