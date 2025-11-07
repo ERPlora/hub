@@ -18,7 +18,18 @@ La verificación de firmas GPG te asegura que:
 
 Antes de verificar, necesitas importar la clave pública de CPOS Team:
 
-### Opción 1: Desde el repositorio
+### Opción 1: Desde la API de CPOS (Recomendado)
+
+```bash
+# Descargar e importar directamente desde la API
+curl -sL https://cpos.app/api/gpg/public-key/ | gpg --import
+
+# O descargar y guardar
+curl -sL https://cpos.app/api/gpg/public-key/ -o cpos-hub-public-key.asc
+gpg --import cpos-hub-public-key.asc
+```
+
+### Opción 2: Desde el repositorio GitHub
 
 ```bash
 # Descargar clave pública
@@ -28,11 +39,11 @@ curl -O https://raw.githubusercontent.com/cpos-app/hub/main/GPG-PUBLIC-KEY.asc
 gpg --import GPG-PUBLIC-KEY.asc
 ```
 
-### Opción 2: Desde servidor de claves
+### Opción 3: Obtener información de la clave
 
 ```bash
-# Importar desde servidor de claves
-gpg --keyserver keys.openpgp.org --recv-keys <KEY_ID>
+# Ver información detallada en JSON
+curl -s https://cpos.app/api/gpg/public-key/info/ | jq
 ```
 
 ### Información de la Clave
@@ -42,8 +53,9 @@ Name:        CPOS Team
 Email:       releases@cpos.app
 Comment:     CPOS Hub Release Signing Key
 Key Type:    RSA 4096-bit
-Fingerprint: (ver en GPG-PUBLIC-KEY.asc)
-Expiration:  2030-01-07 (5 years)
+Key ID:      998A98EF7BE1D222837D30EBC27E75F06D413478
+Fingerprint: 998A 98EF 7BE1 D222 837D  30EB C27E 75F0 6D41 3478
+Expiration:  2030-11-06 (5 years)
 ```
 
 ---
