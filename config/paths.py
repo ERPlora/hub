@@ -39,15 +39,11 @@ class DataPaths:
 
     @property
     def base_dir(self) -> Path:
-        r"""
-        Directorio base de datos de usuario según la plataforma.
-
-        Returns:
-            Path: Directorio base
-                - Windows: C:\Users\<user>\AppData\Local\CPOSHub
-                - macOS: /Users/<user>/Library/Application Support/CPOSHub
-                - Linux: /home/<user>/.cpos-hub
-        """
+        # Directorio base de datos de usuario según la plataforma
+        # Returns Path: Directorio base
+        #   - Windows: C:\Users\<user>\AppData\Local\CPOSHub
+        #   - macOS: /Users/<user>/Library/Application Support/CPOSHub
+        #   - Linux: /home/<user>/.cpos-hub
         if self._base_dir is None:
             if self.platform == "win32":
                 # Windows: AppData\Local
