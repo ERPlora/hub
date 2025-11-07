@@ -484,12 +484,20 @@ Todos los archivos de release están firmados con GPG para garantizar autenticid
 
 - ✅ **Cada release incluye**: Archivo + Firma GPG (`.asc`)
 - ✅ **Clave pública**: [GPG-PUBLIC-KEY.asc](../GPG-PUBLIC-KEY.asc)
-- ✅ **Verificación**: Ver [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md)
+- ✅ **Key ID**: `998A98EF7BE1D222837D30EBC27E75F06D413478`
+- ✅ **Verificación de firmas**: [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md)
+- ✅ **Almacenamiento de claves**: [GPG_KEY_STORAGE.md](GPG_KEY_STORAGE.md) (desarrolladores)
+- ✅ **Setup GPG**: [GPG_SETUP.md](GPG_SETUP.md) (desarrolladores)
 
 ```bash
 # Ejemplo: Verificar descarga
 gpg --verify CPOS-Hub-0.8.0-windows.zip.asc CPOS-Hub-0.8.0-windows.zip
 ```
+
+**Documentación adicional**:
+- Para usuarios que descargan releases: [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md)
+- Para desarrolladores con acceso a claves: [GPG_KEY_STORAGE.md](GPG_KEY_STORAGE.md)
+- Para setup inicial de GPG: [GPG_SETUP.md](GPG_SETUP.md)
 
 ### Seguridad General
 
