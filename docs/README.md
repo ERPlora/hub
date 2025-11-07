@@ -552,7 +552,7 @@ CPOS Hub está licenciado bajo **Business Source License 1.1 (BUSL-1.1)**.
 
 ### 🔄 Conversión a Open Source
 
-Después del **2029-01-07** (4 años), la licencia se convierte automáticamente en **Apache License 2.0**, convirtiéndose en completamente Open Source.
+Después del **2030-01-07** (5 años), la licencia se convierte automáticamente en **Apache License 2.0**, convirtiéndose en completamente Open Source.
 
 **Ver licencia completa**: [LICENSE](../LICENSE)
 
