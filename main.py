@@ -2,6 +2,10 @@
 """
 CPOS Hub - Launcher para macOS
 Este script inicia Django embebido y abre pywebview con la interfaz
+
+Copyright (c) 2025 CPOS Team
+Licensed under the Business Source License 1.1 (BUSL-1.1)
+See LICENSE file for details.
 """
 import threading
 import time
