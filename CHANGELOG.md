@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v0.9.0 (2025-11-07)
+
+### Features
+
+* feat: add BUSL-1.1 license to protect against competitive clones
+
+- Add Business Source License 1.1
+- Allows free use for businesses and individuals
+- Prohibits creating competing POS services
+- Converts to Apache 2.0 in 2029
+- Update pyproject.toml with license info
+- Add license documentation to README ([`9a2463f`](https://github.com/cpos-app/hub/commit/9a2463f1ec8dfebd2ea262f9c8604ef408234206))
+
+
 ## v0.8.1 (2025-11-07)
 
 ### Bug Fixes
