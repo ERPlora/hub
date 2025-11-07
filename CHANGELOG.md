@@ -1,6 +1,37 @@
 # CHANGELOG
 
 
+## v0.12.0 (2025-11-07)
+
+### Features
+
+* feat: move user data to external platform-specific locations
+
+Data now persists outside the app for clean updates:
+
+Platform-specific locations:
+- Windows: C:\Users\<user>\AppData\Local\CPOSHub\
+- macOS: ~/Library/Application Support/CPOSHub/ (hidden)
+- Linux: ~/.cpos-hub/ (hidden)
+
+Features:
+- Database (SQLite) external
+- Media files (uploads) external
+- Plugins and their data external
+- Reports (PDF/Excel) external
+- Logs with rotation external
+- Automatic backups external
+- Automatic legacy migration on first run
+
+Benefits:
+- Data survives app updates/reinstalls
+- Easier backups (one folder)
+- Follows platform conventions
+- Separates code from data
+
+Documentation: docs/DATA_LOCATIONS.md ([`fe5d513`](https://github.com/cpos-app/hub/commit/fe5d513e64e29d70f05306e4ab474b073d91f7ae))
+
+
 ## v0.11.0 (2025-11-07)
 
 ### Features
