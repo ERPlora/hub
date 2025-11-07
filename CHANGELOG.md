@@ -1,7 +1,128 @@
 # CHANGELOG
 
 
-## v0.8.2-rc.1 (2025-11-07)
+## v0.12.1 (2025-11-07)
+
+### Bug Fixes
+
+* fix: update plugin loader for external directory with dynamic PYTHONPATH
+
+Plugins are Django apps that now live in external data directory.
+This update ensures they can be loaded dynamically:
+
+Changes:
+- Plugin directory uses settings.PLUGINS_DIR (external location)
+- Automatically adds plugins/ to sys.path for imports
+- Plugins persist across app updates/reinstalls
+- Enhanced logging for plugin loading process
+- Updated documentation with plugin loading details
+
+How it works:
+1. Plugins stored in external dir (e.g., ~/Library/Application Support/CPOSHub/plugins/)
+2. PluginLoader adds this dir to PYTHONPATH on init
+3. Django can import plugins as regular Python modules
+4. Plugins added to INSTALLED_APPS dynamically
+5. Migrations run automatically
+
+Benefits:
+- Plugins survive app updates
+- No need to reinstall plugins on update
+- Plugin data persists (config, media, cache)
+- Follows Django app conventions ([`0c54c5f`](https://github.com/cpos-app/hub/commit/0c54c5f70d68bf3f4996079b3b08113ce2c5cc43))
+
+
+## v0.12.0 (2025-11-07)
+
+### Features
+
+* feat: move user data to external platform-specific locations
+
+Data now persists outside the app for clean updates:
+
+Platform-specific locations:
+- Windows: C:\Users\<user>\AppData\Local\CPOSHub\
+- macOS: ~/Library/Application Support/CPOSHub/ (hidden)
+- Linux: ~/.cpos-hub/ (hidden)
+
+Features:
+- Database (SQLite) external
+- Media files (uploads) external
+- Plugins and their data external
+- Reports (PDF/Excel) external
+- Logs with rotation external
+- Automatic backups external
+- Automatic legacy migration on first run
+
+Benefits:
+- Data survives app updates/reinstalls
+- Easier backups (one folder)
+- Follows platform conventions
+- Separates code from data
+
+Documentation: docs/DATA_LOCATIONS.md ([`fe5d513`](https://github.com/cpos-app/hub/commit/fe5d513e64e29d70f05306e4ab474b073d91f7ae))
+
+
+## v0.11.0 (2025-11-07)
+
+### Features
+
+* feat: add native installers for all platforms
+
+- Windows: InnoSetup installer (.exe) with autostart option
+- macOS: Signed DMG with drag & drop (no autostart)
+- Linux: AppImage with automatic autostart configuration
+
+Installers:
+- Windows: Program Files installation + Start Menu + autostart
+- macOS: DMG with code signing (Developer ID)
+- Linux: Portable AppImage + ~/.config/autostart
+
+CI/CD: Updated GitHub Actions workflow to build native installers ([`3f3d05e`](https://github.com/cpos-app/hub/commit/3f3d05e08b02d95e989c8a314f778fa1787b7b5d))
+
+### Unknown
+
+* chore: add GPG public key for release verification ([`24f58ce`](https://github.com/cpos-app/hub/commit/24f58ceaae2eff1fef9fe72d21ccd5af4dfb1db6))
+
+
+## v0.10.0 (2025-11-07)
+
+### Features
+
+* feat: add GPG signing for release artifacts
+
+- Add script to generate GPG key (scripts/generate-gpg-key.sh)
+- Add script to sign releases (scripts/sign-release.sh)
+- Update build-release.yml to sign all artifacts
+- Add comprehensive verification guide (SIGNATURE_VERIFICATION.md)
+- Add GPG setup guide for developers (GPG_SETUP.md)
+- Update README with security section for GPG signatures
+- All releases now include .asc signature files
+- Supports Windows, macOS, and Linux artifacts ([`73e7038`](https://github.com/cpos-app/hub/commit/73e70387edaa101558a7e8b5bbf317d20a955737))
+
+### Unknown
+
+* chore: update BUSL license period from 4 to 5 years
+
+- Change Date: 2030-01-07 (5 years)
+- Provides longer competitive advantage protection
+- Each version protected for 5 years before converting to Apache 2.0 ([`ad209f7`](https://github.com/cpos-app/hub/commit/ad209f779b1ccd9ec9a02bb589a32444acd10d12))
+
+
+## v0.9.0 (2025-11-07)
+
+### Features
+
+* feat: add BUSL-1.1 license to protect against competitive clones
+
+- Add Business Source License 1.1
+- Allows free use for businesses and individuals
+- Prohibits creating competing POS services
+- Converts to Apache 2.0 in 2029
+- Update pyproject.toml with license info
+- Add license documentation to README ([`9a2463f`](https://github.com/cpos-app/hub/commit/9a2463f1ec8dfebd2ea262f9c8604ef408234206))
+
+
+## v0.8.1 (2025-11-07)
 
 ### Bug Fixes
 

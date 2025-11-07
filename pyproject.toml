@@ -1,10 +1,10 @@
 [project]
 name = "cpos-hub"
-version = "0.8.2-rc.1"
+version = "0.12.1"
 description = "CPOS Hub - Aplicación POS local con Django y PyInstaller"
 readme = "docs/README.md"
 requires-python = ">=3.11"
-license = { text = "Proprietary" }
+license = { text = "BUSL-1.1" }
 authors = [
     { name = "CPOS Team", email = "dev@cpos.app" }
 ]
@@ -13,6 +13,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: Django :: 5.2",
     "Intended Audience :: End Users/Desktop",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
