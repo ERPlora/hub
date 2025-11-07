@@ -1,6 +1,36 @@
 # CHANGELOG
 
 
+## v0.12.1 (2025-11-07)
+
+### Bug Fixes
+
+* fix: update plugin loader for external directory with dynamic PYTHONPATH
+
+Plugins are Django apps that now live in external data directory.
+This update ensures they can be loaded dynamically:
+
+Changes:
+- Plugin directory uses settings.PLUGINS_DIR (external location)
+- Automatically adds plugins/ to sys.path for imports
+- Plugins persist across app updates/reinstalls
+- Enhanced logging for plugin loading process
+- Updated documentation with plugin loading details
+
+How it works:
+1. Plugins stored in external dir (e.g., ~/Library/Application Support/CPOSHub/plugins/)
+2. PluginLoader adds this dir to PYTHONPATH on init
+3. Django can import plugins as regular Python modules
+4. Plugins added to INSTALLED_APPS dynamically
+5. Migrations run automatically
+
+Benefits:
+- Plugins survive app updates
+- No need to reinstall plugins on update
+- Plugin data persists (config, media, cache)
+- Follows Django app conventions ([`0c54c5f`](https://github.com/cpos-app/hub/commit/0c54c5f70d68bf3f4996079b3b08113ce2c5cc43))
+
+
 ## v0.12.0 (2025-11-07)
 
 ### Features
