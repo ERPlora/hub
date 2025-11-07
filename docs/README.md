@@ -10,11 +10,16 @@ CPOS Hub es una aplicación Django local que funciona como punto de venta (POS).
 
 **Características principales:**
 - 💾 Base de datos local SQLite (funciona offline)
-- 🔌 Sistema de plugins extensible  
+- 🔌 Sistema de plugins extensible
 - 🖨️ Soporte para hardware POS (impresora, scanner, cajón)
 - 🔄 Sincronización automática con Cloud cuando hay conexión
 - 🌐 Acceso remoto vía túnel FRP
-- 📦 Empaquetado como ejecutable standalone (PyInstaller)
+- 📦 Instaladores nativos con autostart (Windows/Linux)
+
+**Formatos de distribución:**
+- 🪟 **Windows**: Instalador `.exe` (InnoSetup) con autostart
+- 🍎 **macOS**: DMG firmado (drag & drop)
+- 🐧 **Linux**: AppImage portable con autostart
 
 **Stack tecnológico:**
 - Django 5.2.7
@@ -450,9 +455,9 @@ Ver [docs/TESTING.md](docs/TESTING.md) para guía completa.
 
 ---
 
-## 📦 Build (PyInstaller)
+## 📦 Build y Distribución
 
-### Build Local
+### Build Local con PyInstaller
 
 ```bash
 # 1. Crear base de datos (REQUERIDO)
@@ -467,7 +472,63 @@ pyinstaller main.spec --clean
 # - dist/main/main (Linux)
 ```
 
+### Crear Instaladores Nativos
+
+**Windows - Instalador InnoSetup (.exe)**
+```powershell
+# Requiere: Inno Setup 6+ o Chocolatey
+cd installers/windows
+.\build-installer.ps1 -Version "0.8.0"
+
+# Output: dist/CPOS-Hub-0.8.0-windows-installer.exe
+# Características:
+#   - Instala en C:\Program Files\CPOS Hub
+#   - Opción de autostart con Windows
+#   - Acceso directo en Menú Inicio + Escritorio
+#   - Desinstalador incluido
+```
+
+**macOS - DMG Firmado**
+```bash
+# Requiere: Xcode Command Line Tools
+cd installers/macos
+./sign-and-package.sh 0.8.0
+
+# Output: CPOS-Hub-0.8.0-macos.dmg
+# Características:
+#   - Drag & Drop a /Applications
+#   - Firma con Developer ID (si disponible)
+#   - Sin autostart (manual en System Settings)
+```
+
+**Linux - AppImage Portable**
+```bash
+# Requiere: fuse, libfuse2
+cd installers/linux
+./create-appimage.sh 0.8.0
+
+# Output: CPOS-Hub-0.8.0-x86_64.AppImage
+# Características:
+#   - Portable (no requiere instalación)
+#   - Autostart automático en ~/.config/autostart
+#   - Compatible con GNOME, KDE, XFCE, etc.
+```
+
+**Ver documentación completa**: [installers/README.md](../installers/README.md)
+
 ### Build Automático (GitHub Actions)
+
+Los instaladores se crean automáticamente en GitHub Actions:
+
+1. **GitHub Actions** → **Build Release Executables**
+2. **Run workflow** → Ingresar versión (ej: `0.8.0`)
+3. **Esperar** ~15-20 minutos
+4. **Descargar** desde [Releases](https://github.com/cpos-app/hub/releases)
+
+**Archivos generados**:
+- `CPOS-Hub-0.8.0-windows-installer.exe` + `.asc` (firma GPG)
+- `CPOS-Hub-0.8.0-macos.dmg` + `.asc`
+- `CPOS-Hub-0.8.0-x86_64.AppImage` + `.asc`
 
 Ver [docs/BUILDING.md](BUILDING.md) para información completa sobre:
 - Prereleases automáticas en staging (`v0.8.0-rc.1`)
