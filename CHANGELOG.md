@@ -1,6 +1,30 @@
 # CHANGELOG
 
 
+## v0.10.0 (2025-11-07)
+
+### Features
+
+* feat: add GPG signing for release artifacts
+
+- Add script to generate GPG key (scripts/generate-gpg-key.sh)
+- Add script to sign releases (scripts/sign-release.sh)
+- Update build-release.yml to sign all artifacts
+- Add comprehensive verification guide (SIGNATURE_VERIFICATION.md)
+- Add GPG setup guide for developers (GPG_SETUP.md)
+- Update README with security section for GPG signatures
+- All releases now include .asc signature files
+- Supports Windows, macOS, and Linux artifacts ([`73e7038`](https://github.com/cpos-app/hub/commit/73e70387edaa101558a7e8b5bbf317d20a955737))
+
+### Unknown
+
+* chore: update BUSL license period from 4 to 5 years
+
+- Change Date: 2030-01-07 (5 years)
+- Provides longer competitive advantage protection
+- Each version protected for 5 years before converting to Apache 2.0 ([`ad209f7`](https://github.com/cpos-app/hub/commit/ad209f779b1ccd9ec9a02bb589a32444acd10d12))
+
+
 ## v0.9.0 (2025-11-07)
 
 ### Features
