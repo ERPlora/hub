@@ -530,6 +530,34 @@ pytest -vv --tb=long
 
 ---
 
+## 📄 Licencia
+
+CPOS Hub está licenciado bajo **Business Source License 1.1 (BUSL-1.1)**.
+
+### ✅ Usos Permitidos (GRATIS)
+
+- ✅ Uso interno en negocios (retail, restaurantes, etc.)
+- ✅ Uso personal
+- ✅ Uso educativo e investigación
+- ✅ Crear plugins para el ecosistema CPOS
+- ✅ Servicios de consultoría e implementación usando CPOS
+- ✅ Ver y modificar el código fuente
+
+### ❌ Usos Prohibidos
+
+- ❌ Ofrecer CPOS Hub como servicio (SaaS/PaaS)
+- ❌ Crear una plataforma POS competidora
+- ❌ Revender o sublicenciar CPOS Hub
+- ❌ Crear productos derivados que compitan con CPOS
+
+### 🔄 Conversión a Open Source
+
+Después del **2029-01-07** (4 años), la licencia se convierte automáticamente en **Apache License 2.0**, convirtiéndose en completamente Open Source.
+
+**Ver licencia completa**: [LICENSE](../LICENSE)
+
+---
+
 ## 📚 Documentación adicional
 
 - [docs/TESTING.md](docs/TESTING.md) - Guía completa de testing
