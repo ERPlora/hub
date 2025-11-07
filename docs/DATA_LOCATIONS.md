@@ -152,6 +152,121 @@ La primera vez que ejecutes CPOS Hub después de actualizar:
 
 ---
 
+## 🔌 Plugins y Carga Dinámica
+
+### ¿Cómo funcionan los plugins desde ubicación externa?
+
+Los plugins son **Django apps** que se instalan en el directorio externo de plugins. CPOS Hub los carga dinámicamente en tiempo de ejecución.
+
+### Estructura de un Plugin
+
+```
+plugins/
+└── mi-plugin/                  # ID del plugin
+    ├── __init__.py            # Marca como paquete Python
+    ├── apps.py                # Configuración Django app
+    ├── models.py              # Modelos de base de datos
+    ├── views.py               # Vistas
+    ├── urls.py                # URLs
+    ├── templates/             # Templates del plugin
+    ├── static/                # Archivos estáticos del plugin
+    ├── migrations/            # Migraciones de base de datos
+    ├── plugin.json            # Metadata del plugin
+    └── data/                  # Datos específicos del plugin
+```
+
+### Proceso de Carga
+
+1. **Descubrimiento**: CPOS Hub escanea el directorio `plugins/`
+2. **Lectura de metadata**: Lee `plugin.json` de cada plugin
+3. **Registro en DB**: Crea/actualiza entrada en modelo `Plugin`
+4. **Añade a PYTHONPATH**: Añade `plugins/` al `sys.path`
+5. **Import dinámico**: Importa el plugin como módulo Python
+6. **Registra en Django**: Añade a `INSTALLED_APPS`
+7. **Migraciones**: Ejecuta migraciones del plugin
+
+### PYTHONPATH Automático
+
+El `PluginLoader` añade automáticamente el directorio de plugins al PYTHONPATH:
+
+```python
+# En apps/core/plugin_loader.py
+def __init__(self):
+    self.plugins_dir = Path(settings.PLUGINS_DIR)  # Ubicación externa
+
+    # Add plugins directory to Python path for dynamic imports
+    plugins_parent = str(self.plugins_dir.parent)
+    if plugins_parent not in sys.path:
+        sys.path.insert(0, plugins_parent)
+```
+
+Esto permite que Django importe los plugins como si estuvieran en el directorio de la aplicación.
+
+### Ejemplo de Carga
+
+```
+[INFO] Plugin loader initialized
+[INFO] Plugins directory: /Users/user/Library/Application Support/CPOSHub/plugins
+[INFO] Added to PYTHONPATH: /Users/user/Library/Application Support/CPOSHub
+[INFO] Importing plugin module: products
+[OK] Added products to INSTALLED_APPS
+[INFO] Running migrations for products...
+[OK] Migrations applied for products
+[OK] Plugin products loaded successfully
+```
+
+### Persistencia de Plugins
+
+**Ventajas de ubicación externa**:
+- ✅ Plugins sobreviven actualizaciones de CPOS Hub
+- ✅ No necesitas reinstalar plugins al actualizar la app
+- ✅ Datos del plugin persisten (configuración, cache, etc.)
+- ✅ Media del plugin persiste (imágenes, documentos)
+
+**Ejemplo de actualización**:
+```bash
+# Situación inicial
+plugins/
+└── products/  # Plugin instalado
+
+# Usuario actualiza CPOS Hub de 0.8.0 a 0.9.0
+# 1. Desinstala/actualiza la aplicación
+# 2. Plugins quedan intactos en ubicación externa
+# 3. Nueva versión detecta plugins existentes
+# 4. Plugins se cargan automáticamente
+
+# Resultado: Plugins funcionan sin reinstalar
+```
+
+### Media de Plugins
+
+Los plugins pueden almacenar archivos media en dos ubicaciones:
+
+1. **Media compartido**: `media/plugins/<plugin-id>/`
+   - Accesible vía URL: `/media/plugins/<plugin-id>/`
+   - Para archivos servidos por Django
+
+2. **Datos internos**: `plugins/<plugin-id>/data/`
+   - Para datos que no se sirven vía HTTP
+   - Caches, configuración, etc.
+
+```python
+# En el código del plugin
+from config.paths import get_data_paths
+
+paths = get_data_paths()
+
+# Media servido por Django
+media_dir = paths.get_plugin_media_dir('products')
+# -> media/plugins/products/
+
+# Datos internos del plugin
+data_dir = paths.get_plugin_data_dir('products')
+# -> plugins/products/data/
+```
+
+---
+
 ## 📊 Tamaños Esperados
 
 | Directorio | Tamaño Típico | Descripción |
