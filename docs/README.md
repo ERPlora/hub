@@ -10,6 +10,7 @@ CPOS Hub es una aplicación Django local que funciona como punto de venta (POS).
 
 **Características principales:**
 - 💾 Base de datos local SQLite (funciona offline)
+- 📁 Datos externos persistentes (sobreviven actualizaciones)
 - 🔌 Sistema de plugins extensible
 - 🖨️ Soporte para hardware POS (impresora, scanner, cajón)
 - 🔄 Sincronización automática con Cloud cuando hay conexión
@@ -59,7 +60,7 @@ hub/
 │
 ├── static/                    # Archivos estáticos
 │
-├── db.sqlite3                # Base de datos local (generado)
+├── db.sqlite3                # Base de datos (LEGACY - migrada a ubicación externa)
 │
 ├── main.py                   # Entry point para PyInstaller
 ├── main.spec                 # PyInstaller spec file
@@ -87,6 +88,30 @@ hub/
 │
 └── .venv/                     # Virtual environment (uv)
 ```
+
+---
+
+## 📂 Ubicaciones de Datos de Usuario
+
+**IMPORTANTE**: Todos los datos de usuario se almacenan **fuera de la aplicación** para persistencia entre actualizaciones.
+
+| Plataforma | Ubicación Base |
+|------------|----------------|
+| **Windows** | `C:\Users\<usuario>\AppData\Local\CPOSHub\` |
+| **macOS** | `~/Library/Application Support/CPOSHub/` (oculto) |
+| **Linux** | `~/.cpos-hub/` (oculto) |
+
+**Subdirectorios**:
+- `db/` - Base de datos SQLite
+- `media/` - Archivos subidos (imágenes, documentos)
+- `plugins/` - Plugins instalados y sus datos
+- `reports/` - Reportes generados (PDF, Excel)
+- `logs/` - Logs de la aplicación
+- `backups/` - Backups automáticos de la DB
+
+**Migración automática**: La primera ejecución migra datos legacy automáticamente.
+
+**Documentación completa**: [DATA_LOCATIONS.md](DATA_LOCATIONS.md)
 
 ---
 
