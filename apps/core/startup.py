@@ -3,6 +3,7 @@ Hub startup tasks.
 
 Runs initialization tasks when the Hub starts, including:
 - Version checking
+- FRP tunnel connection
 - System health checks
 - Plugin loading
 - WebSocket connection
@@ -11,6 +12,7 @@ Runs initialization tasks when the Hub starts, including:
 import logging
 from threading import Thread
 from .update_manager import update_manager
+from .frp_client import get_frp_client, FRPClientError
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,38 @@ def check_for_updates_async():
         logger.exception(f"Error in background update check: {e}")
 
 
+def start_frp_client_async():
+    """
+    Start FRP client in a background thread to avoid blocking startup.
+
+    The FRP client establishes the tunnel connection to Cloud for remote access.
+    """
+    try:
+        logger.info("Starting FRP client in background...")
+
+        # Get FRP client instance
+        frp_client = get_frp_client()
+
+        # Start tunnel
+        frp_client.start()
+
+        logger.info("✅ FRP client started successfully")
+
+        # Log connection details
+        status = frp_client.get_status()
+        logger.info(f"   Hub ID: {status['hub_id']}")
+        logger.info(f"   Server: {status['server']}")
+        logger.info(f"   Remote Port: {status['tunnel_port']}")
+        logger.info(f"   Local Port: {status['local_port']}")
+
+    except FRPClientError as e:
+        logger.error(f"Failed to start FRP client: {e}")
+        logger.info("Hub will run in local-only mode (no remote access)")
+
+    except Exception as e:
+        logger.exception(f"Unexpected error starting FRP client: {e}")
+
+
 def run_startup_tasks():
     """
     Execute all startup tasks.
@@ -57,6 +91,10 @@ def run_startup_tasks():
     # Check for updates in background thread
     update_thread = Thread(target=check_for_updates_async, daemon=True)
     update_thread.start()
+
+    # Start FRP client in background thread
+    frp_thread = Thread(target=start_frp_client_async, daemon=True)
+    frp_thread.start()
 
     # TODO: Add other startup tasks:
     # - Check WebSocket connection to Cloud
