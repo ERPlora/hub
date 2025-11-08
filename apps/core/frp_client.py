@@ -63,12 +63,13 @@ class FRPClient:
         self.tunnel_port = self.config.tunnel_port
         self.tunnel_token = self.config.tunnel_token
 
-        # FRP server settings (from Django settings or defaults)
-        self.server_addr = getattr(settings, 'FRP_SERVER_ADDR', 'cpos.app')
-        self.server_port = getattr(settings, 'FRP_SERVER_PORT', 7000)
+        # FRP server settings (from Django settings)
+        self.server_addr = getattr(settings, 'FRP_SERVER_ADDR', 'localhost')
+        self.server_port = getattr(settings, 'FRP_SERVER_PORT', 7100)
+        self.auth_token = getattr(settings, 'FRP_AUTH_TOKEN', 'cpos-local-dev-token')
 
-        # Local Hub Django server
-        self.local_port = 8001  # Hub runs on port 8001
+        # Local Hub Django server (from Django settings)
+        self.local_port = getattr(settings, 'HUB_LOCAL_PORT', 8001)
 
         # Paths
         self.hub_dir = Path(__file__).parent.parent.parent
@@ -139,7 +140,7 @@ class FRPClient:
 server_addr = "{self.server_addr}"
 server_port = {self.server_port}
 authentication_method = "token"
-token = "{self.tunnel_token}"
+token = "{self.auth_token}"
 authenticate_new_work_conns = false
 
 # Hub tunnel
