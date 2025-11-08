@@ -9,7 +9,7 @@ token = "cpos-local-dev-token"
 authenticate_new_work_conns = false
 
 # Hub tunnel
-[63f05512-09a8-4ae1-8931-5c695e54040a]
+[4aa5a11c-b9be-4e21-afb6-37adc2b7b1ff]
 type = "tcp"
 local_ip = "127.0.0.1"
 local_port = 8001
