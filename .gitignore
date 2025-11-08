@@ -210,3 +210,8 @@ Temporary Items
 
 **/jwt_key*
 venv
+# Test artifacts - ignore accidental directory creation from mocking
+C:/
+C:\
+/home/testuser/
+/Users/testuser/
