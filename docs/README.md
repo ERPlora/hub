@@ -693,14 +693,9 @@ Después del **2030-01-07** (5 años), la licencia se convierte automáticamente
 
 ## 🤝 Contribuir
 
-Este es un proyecto con **TDD obligatorio**:
+Este es un proyecto con **TDD**:
 
-1. Escribir tests PRIMERO
-2. Ejecutar tests (deben fallar - RED)
-3. Implementar código mínimo
-4. Ejecutar tests (deben pasar - GREEN)
-5. Refactorizar
-6. Coverage mínimo: 80%
+1. Coverage mínimo: 80%
 
 ---
 
