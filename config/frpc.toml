@@ -1,0 +1,16 @@
+# CPOS Hub - FRP Client Configuration
+# Auto-generated - DO NOT EDIT MANUALLY
+
+[common]
+server_addr = "localhost"
+server_port = 7100
+authentication_method = "token"
+token = "cpos-local-dev-token"
+authenticate_new_work_conns = false
+
+# Hub tunnel
+[63f05512-09a8-4ae1-8931-5c695e54040a]
+type = "tcp"
+local_ip = "127.0.0.1"
+local_port = 8001
+remote_port = 7101
