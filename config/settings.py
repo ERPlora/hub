@@ -158,6 +158,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CLOUD_API_URL = config('CLOUD_API_URL', default='http://localhost:8000')
 
 
+# FRP Server Configuration
+# Server address and port for FRP tunnel connection
+FRP_SERVER_ADDR = config('FRP_SERVER_ADDR', default='localhost')
+FRP_SERVER_PORT = config('FRP_SERVER_PORT', default=7100, cast=int)
+
+
 # Hub Version
 HUB_VERSION = "1.0.0"
 
