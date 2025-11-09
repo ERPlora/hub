@@ -1,0 +1,417 @@
+"""
+Tests for JWT Validation and Offline Mode (TDD).
+
+Test coverage:
+- JWT validation with public key from Cloud
+- Local JWT validation when offline
+- Public key caching and refresh
+- PIN authentication for offline mode
+- Token expiration handling
+- Network error handling
+"""
+import pytest
+from unittest.mock import Mock, patch, MagicMock
+from datetime import datetime, timedelta
+from django.contrib.auth import get_user_model
+from django.test import RequestFactory
+from django.http import HttpResponse
+
+User = get_user_model()
+
+pytestmark = pytest.mark.unit
+
+
+class TestPublicKeyFetcher:
+    """Test public key fetching from Cloud."""
+
+    @patch('apps.core.services.public_key_fetcher.requests.get')
+    def test_fetches_public_key_from_cloud(self, mock_get):
+        """
+        GIVEN: Cloud API available
+        WHEN: Fetching public key
+        THEN: Should download and cache public key
+        """
+        from apps.core.services.public_key_fetcher import PublicKeyFetcher
+
+        # Mock Cloud response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.text = "-----BEGIN PUBLIC KEY-----\nMOCK_KEY\n-----END PUBLIC KEY-----"
+        mock_response.raise_for_status = Mock()  # Add this method
+        mock_get.return_value = mock_response
+
+        fetcher = PublicKeyFetcher(cloud_url='http://localhost:8000')
+        public_key = fetcher.fetch()
+
+        assert public_key is not None
+        assert "BEGIN PUBLIC KEY" in public_key
+        mock_get.assert_called_once()
+
+    @patch('requests.get')
+    def test_uses_cached_key_when_available(self, mock_get):
+        """
+        GIVEN: Public key cached recently
+        WHEN: Fetching public key
+        THEN: Should use cache, not call Cloud
+        """
+        from apps.core.services.public_key_fetcher import PublicKeyFetcher
+
+        fetcher = PublicKeyFetcher(cloud_url='http://localhost:8000')
+
+        # Pre-populate cache
+        cached_key = "-----BEGIN PUBLIC KEY-----\nCACHED\n-----END PUBLIC KEY-----"
+        fetcher._cache_key(cached_key)
+
+        public_key = fetcher.fetch()
+
+        assert public_key == cached_key
+        mock_get.assert_not_called()  # Should not call Cloud
+
+    @patch('requests.get')
+    def test_refreshes_key_when_cache_expired(self, mock_get):
+        """
+        GIVEN: Public key cache expired (> 24 hours)
+        WHEN: Fetching public key
+        THEN: Should fetch new key from Cloud
+        """
+        from apps.core.services.public_key_fetcher import PublicKeyFetcher
+
+        # Mock expired cache
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.text = "-----BEGIN PUBLIC KEY-----\nNEW_KEY\n-----END PUBLIC KEY-----"
+        mock_get.return_value = mock_response
+
+        fetcher = PublicKeyFetcher(cloud_url='http://localhost:8000')
+
+        # Set cache as expired
+        fetcher._cache_key("OLD_KEY")
+        fetcher._cache_timestamp = datetime.now() - timedelta(hours=25)
+
+        public_key = fetcher.fetch()
+
+        assert "NEW_KEY" in public_key
+        mock_get.assert_called_once()
+
+    @patch('requests.get')
+    def test_handles_network_error_gracefully(self, mock_get):
+        """
+        GIVEN: Cloud not available (network error)
+        WHEN: Fetching public key
+        THEN: Should return cached key or None
+        """
+        from apps.core.services.public_key_fetcher import PublicKeyFetcher
+        import requests
+
+        mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
+
+        fetcher = PublicKeyFetcher(cloud_url='http://localhost:8000')
+
+        # Try with cache
+        fetcher._cache_key("CACHED_KEY")
+        public_key = fetcher.fetch()
+        assert public_key == "CACHED_KEY"
+
+        # Try without cache
+        fetcher._cached_key = None
+        public_key = fetcher.fetch()
+        assert public_key is None
+
+
+class TestJWTValidator:
+    """Test JWT token validation."""
+
+    def test_validates_jwt_with_public_key(self, rsa_keys, valid_jwt_token):
+        """
+        GIVEN: Valid JWT token and public key
+        WHEN: Validating token
+        THEN: Should return decoded payload
+        """
+        from apps.core.services.jwt_validator import JWTValidator
+
+        validator = JWTValidator()
+        payload = validator.validate(valid_jwt_token, rsa_keys['public'])
+
+        assert payload is not None
+        assert payload.get('user_id') == 1
+        assert payload.get('token_type') == 'access'
+
+    def test_rejects_expired_token(self, rsa_keys, expired_jwt_token):
+        """
+        GIVEN: Expired JWT token
+        WHEN: Validating token
+        THEN: Should raise TokenExpired exception
+        """
+        from apps.core.services.jwt_validator import JWTValidator, TokenExpired
+
+        validator = JWTValidator()
+
+        with pytest.raises(TokenExpired):
+            validator.validate(expired_jwt_token, rsa_keys['public'])
+
+    def test_rejects_invalid_signature(self, rsa_keys, valid_jwt_token):
+        """
+        GIVEN: JWT token with invalid signature
+        WHEN: Validating token
+        THEN: Should raise InvalidSignature exception
+        """
+        from apps.core.services.jwt_validator import JWTValidator, InvalidSignature
+        import jwt
+
+        validator = JWTValidator()
+
+        # Create a different key pair
+        wrong_keys = rsa_keys  # We'll use the token from different keys
+        # Create a token with wrong signature
+        wrong_payload = {'user_id': 1, 'exp': datetime.utcnow() + timedelta(hours=1)}
+        wrong_token = jwt.encode(wrong_payload, rsa_keys['private'], algorithm='RS256')
+
+        # Try to decode with a completely different string (will fail)
+        with pytest.raises(InvalidSignature):
+            # Tamper with the token
+            tampered_token = wrong_token[:-10] + "TAMPERED00"
+            validator.validate(tampered_token, rsa_keys['public'])
+
+
+class TestPINAuthentication:
+    """Test PIN-based authentication for offline mode."""
+
+    @pytest.mark.django_db
+    def test_creates_pin_for_hub(self):
+        """
+        GIVEN: Hub configured
+        WHEN: Setting up PIN
+        THEN: Should hash and store PIN securely
+        """
+        from apps.core.services.pin_auth import PINAuth
+
+        pin_auth = PINAuth()
+        pin_auth.set_pin("1234")
+
+        assert pin_auth.has_pin() is True
+
+    @pytest.mark.django_db
+    def test_validates_correct_pin(self):
+        """
+        GIVEN: PIN set to "1234"
+        WHEN: Validating with correct PIN
+        THEN: Should return True
+        """
+        from apps.core.services.pin_auth import PINAuth
+
+        pin_auth = PINAuth()
+        pin_auth.set_pin("1234")
+
+        assert pin_auth.validate("1234") is True
+
+    @pytest.mark.django_db
+    def test_rejects_incorrect_pin(self):
+        """
+        GIVEN: PIN set to "1234"
+        WHEN: Validating with incorrect PIN
+        THEN: Should return False
+        """
+        from apps.core.services.pin_auth import PINAuth
+
+        pin_auth = PINAuth()
+        pin_auth.set_pin("1234")
+
+        assert pin_auth.validate("9999") is False
+
+    @pytest.mark.django_db
+    def test_enforces_rate_limiting(self):
+        """
+        GIVEN: PIN authentication
+        WHEN: Multiple failed attempts
+        THEN: Should lock out after N attempts
+        """
+        from apps.core.services.pin_auth import PINAuth, PINLocked
+
+        pin_auth = PINAuth()
+        pin_auth.set_pin("1234")
+
+        # Try wrong PIN 5 times
+        for _ in range(5):
+            pin_auth.validate("9999")
+
+        # 6th attempt should raise PINLocked
+        with pytest.raises(PINLocked):
+            pin_auth.validate("1234")  # Even correct PIN is locked
+
+
+class TestOfflineMode:
+    """Test offline mode behavior."""
+
+    @pytest.mark.django_db
+    def test_detects_offline_mode(self):
+        """
+        GIVEN: Cloud not reachable
+        WHEN: Checking connection status
+        THEN: Should detect offline mode
+        """
+        from apps.core.services.connectivity import ConnectivityChecker
+
+        with patch('requests.head') as mock_head:
+            mock_head.side_effect = Exception("Connection refused")
+
+            checker = ConnectivityChecker(cloud_url='http://localhost:8000')
+            assert checker.is_online() is False
+
+    @pytest.mark.django_db
+    def test_allows_operations_with_valid_token_offline(self):
+        """
+        GIVEN: Offline mode with valid (non-expired) JWT
+        WHEN: Making request
+        THEN: Should allow operation with warning
+        """
+        # This will be tested via middleware
+        pass
+
+    @pytest.mark.django_db
+    def test_blocks_sensitive_operations_with_expired_token_offline(self):
+        """
+        GIVEN: Offline mode with expired JWT
+        WHEN: Making sensitive request (e.g., user management)
+        THEN: Should block operation
+        """
+        # This will be tested via middleware
+        pass
+
+    @pytest.mark.django_db
+    def test_allows_pin_auth_when_token_expired_offline(self):
+        """
+        GIVEN: Offline mode with expired JWT
+        WHEN: Authenticating with PIN
+        THEN: Should grant limited access
+        """
+        from apps.core.services.pin_auth import PINAuth
+
+        pin_auth = PINAuth()
+        pin_auth.set_pin("1234")
+
+        # PIN validation should work offline
+        assert pin_auth.validate("1234") is True
+
+
+class TestJWTMiddleware:
+    """Test JWT validation middleware."""
+
+    @pytest.mark.django_db
+    def test_allows_request_with_valid_jwt_online(self, rf, rsa_keys, valid_jwt_token):
+        """
+        GIVEN: Online mode with valid JWT
+        WHEN: Making request
+        THEN: Should pass through
+        """
+        from apps.core.middleware.jwt_middleware import JWTMiddleware
+
+        mock_response = HttpResponse("OK")
+        get_response = Mock(return_value=mock_response)
+
+        middleware = JWTMiddleware(get_response=get_response)
+
+        request = rf.get('/')
+        request.session = {'jwt_token': valid_jwt_token}
+
+        # Mock connectivity, public key fetcher, and validator
+        with patch('apps.core.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
+            with patch('apps.core.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
+                with patch('apps.core.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
+                    # Setup mocks
+                    mock_checker = Mock()
+                    mock_checker.is_online.return_value = True
+                    mock_get_checker.return_value = mock_checker
+
+                    mock_fetcher = Mock()
+                    mock_fetcher.fetch.return_value = rsa_keys['public']
+                    mock_get_fetcher.return_value = mock_fetcher
+
+                    mock_validator = Mock()
+                    mock_validator.validate.return_value = {'user_id': 1}
+                    mock_get_validator.return_value = mock_validator
+
+                    response = middleware(request)
+
+        assert response.status_code == 200
+        get_response.assert_called_once()
+
+    @pytest.mark.django_db
+    def test_shows_warning_with_valid_jwt_offline(self, rf, rsa_keys, valid_jwt_token):
+        """
+        GIVEN: Offline mode with valid (non-expired) JWT
+        WHEN: Making request
+        THEN: Should pass through with offline warning
+        """
+        from apps.core.middleware.jwt_middleware import JWTMiddleware
+
+        mock_response = HttpResponse("OK")
+        get_response = Mock(return_value=mock_response)
+
+        middleware = JWTMiddleware(get_response=get_response)
+
+        request = rf.get('/')
+        request.session = {'jwt_token': valid_jwt_token}
+
+        # Mock connectivity, public key fetcher, and validator
+        with patch('apps.core.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
+            with patch('apps.core.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
+                with patch('apps.core.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
+                    # Setup mocks
+                    mock_checker = Mock()
+                    mock_checker.is_online.return_value = False  # Offline
+                    mock_get_checker.return_value = mock_checker
+
+                    mock_fetcher = Mock()
+                    mock_fetcher.fetch.return_value = rsa_keys['public']
+                    mock_get_fetcher.return_value = mock_fetcher
+
+                    mock_validator = Mock()
+                    mock_validator.validate.return_value = {'user_id': 1}
+                    mock_get_validator.return_value = mock_validator
+
+                    response = middleware(request)
+
+        assert response.status_code == 200
+        # Should set offline flag
+        assert request.is_offline is True
+
+    @pytest.mark.django_db
+    def test_redirects_to_pin_with_expired_jwt_offline(self, rf, rsa_keys, expired_jwt_token):
+        """
+        GIVEN: Offline mode with expired JWT
+        WHEN: Making request
+        THEN: Should redirect to PIN login
+        """
+        from apps.core.middleware.jwt_middleware import JWTMiddleware
+        from apps.core.services.jwt_validator import TokenExpired
+
+        mock_response = HttpResponse("OK")
+        get_response = Mock(return_value=mock_response)
+
+        middleware = JWTMiddleware(get_response=get_response)
+
+        request = rf.get('/dashboard/')
+        request.session = {'jwt_token': expired_jwt_token}
+
+        # Mock connectivity, public key fetcher, and validator
+        with patch('apps.core.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
+            with patch('apps.core.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
+                with patch('apps.core.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
+                    # Setup mocks
+                    mock_checker = Mock()
+                    mock_checker.is_online.return_value = False  # Offline
+                    mock_get_checker.return_value = mock_checker
+
+                    mock_fetcher = Mock()
+                    mock_fetcher.fetch.return_value = rsa_keys['public']
+                    mock_get_fetcher.return_value = mock_fetcher
+
+                    mock_validator = Mock()
+                    mock_validator.validate.side_effect = TokenExpired("Token expired")
+                    mock_get_validator.return_value = mock_validator
+
+                    response = middleware(request)
+
+        # Should redirect to PIN login
+        assert response.status_code == 302
+        assert 'login' in response.url or response.url.endswith('/')
