@@ -260,6 +260,10 @@ ion-toolbar {
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
+.action-sheet-button .ion-activatable .ion-focusable .sc-ion-action-sheet-md {
+  color: var(--ion-text-color)
+}
+
 /* Rounded corners for cards */
 ion-card {
   border-radius: var(--radius);
