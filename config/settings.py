@@ -305,8 +305,9 @@ PLUGIN_ALLOWED_DEPENDENCIES = [
     'Pillow', 'qrcode', 'python-barcode', 'openpyxl', 'reportlab',
     'python-escpos', 'lxml', 'xmltodict', 'signxml', 'cryptography',
     'zeep', 'requests', 'websockets', 'python-dateutil', 'pytz',
-    'phonenumbers', 'stripe', 'pandas', 'numpy', 'pyserial',
-    'email-validator', 'python-slugify', 'pydantic', 'beautifulsoup4', 'PyPDF2'
+    'phonenumbers', 'stripe', 'pandas', 'numpy', 'pyserial', 'pyusb',
+    'evdev', 'pywinusb', 'email-validator', 'python-slugify', 'pydantic',
+    'beautifulsoup4', 'PyPDF2'
 ]
 
 # Tamaño máximo de plugin (MB)
