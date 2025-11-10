@@ -176,7 +176,7 @@
                                 {% trans "Prices include tax" %}
                             </p>
                         </div>
-                        <ion-toggle name="tax_included" {% if store_config.tax_included %}checked{% endif %}></ion-toggle>
+                        <ion-toggle name="tax_included" {% if store_config.tax_included %}checked{% endif %} color="success"></ion-toggle>
                     </div>
 
                     <div>
@@ -243,6 +243,7 @@
                         </p>
                     </div>
                     <ion-toggle
+                        color="success"
                         x-model="darkMode"
                         @ionChange="toggleDarkMode()">
                     </ion-toggle>
@@ -256,7 +257,7 @@
                         </p>
                     </div>
                     <ion-toggle
-                        :color="autoPrint ? 'success' : ''"
+                        color="success"
                         x-model="autoPrint"
                         @ionChange="toggleAutoPrint()">
                     </ion-toggle>
