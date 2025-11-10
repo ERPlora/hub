@@ -64,6 +64,9 @@ datas = [
     # - Windows: C:\Users\<user>\AppData\Local\CPOSHub\db\
     # - macOS: ~/Library/Application Support/CPOSHub/db/
     # - Linux: ~/.cpos-hub/db/
+    # NOTA: plugins/ NO se incluye - se cargan desde ubicaciones externas:
+    # - Development: ./plugins/ (repo local)
+    # - Production: ~/.cpos-hub/plugins/ (instalados por usuario)
 ]
 
 a = Analysis(
