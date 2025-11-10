@@ -243,3 +243,75 @@ LOGGING = {
         },
     },
 }
+
+
+# ==============================================================================
+# PLUGIN SYSTEM CONFIGURATION
+# ==============================================================================
+
+import sys
+
+# Detectar modo de ejecución
+DEVELOPMENT_MODE = not getattr(sys, 'frozen', False) and config('CPOS_DEV_MODE', default='true') == 'true'
+
+if DEVELOPMENT_MODE:
+    # ========== MODO DESARROLLO ==========
+    # Busca plugins en ./plugins/ (desarrollo) y ~/.cpos-hub/plugins/ (instalados)
+    PLUGIN_DISCOVERY_PATHS = [
+        BASE_DIR / 'plugins',              # Plugins en desarrollo (repo local)
+        DATA_PATHS.plugins_dir,            # Plugins instalados (usuario)
+    ]
+
+    # Permitir plugins sin firmar en desarrollo
+    REQUIRE_PLUGIN_SIGNATURE = False
+
+    # Hot reload de plugins (detecta cambios automáticamente)
+    PLUGIN_AUTO_RELOAD = config('PLUGIN_AUTO_RELOAD', default='true', cast=bool)
+
+    # Validación relajada en desarrollo
+    PLUGIN_STRICT_VALIDATION = False
+
+    print(f"[DEV MODE] Plugin development mode enabled")
+    print(f"[DEV MODE] Plugin paths: {[str(p) for p in PLUGIN_DISCOVERY_PATHS]}")
+
+else:
+    # ========== MODO PRODUCCIÓN ==========
+    # Solo busca en ~/.cpos-hub/plugins/ (plugins instalados)
+    PLUGIN_DISCOVERY_PATHS = [
+        DATA_PATHS.plugins_dir,
+    ]
+
+    # Requerir firma digital en producción
+    REQUIRE_PLUGIN_SIGNATURE = config('REQUIRE_PLUGIN_SIGNATURE', default='true', cast=bool)
+
+    # Sin hot reload en producción
+    PLUGIN_AUTO_RELOAD = False
+
+    # Validación estricta en producción
+    PLUGIN_STRICT_VALIDATION = True
+
+# Directorio de datos para plugins (almacenamiento persistente)
+# Los plugins deben usar este path para guardar datos/archivos
+PLUGIN_DATA_ROOT = DATA_PATHS.plugins_dir / 'data'
+PLUGIN_MEDIA_ROOT = DATA_PATHS.media_dir / 'plugins'
+
+# Crear directorios si no existen
+PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# Lista blanca de dependencias permitidas para plugins
+# (Ver config/plugin_allowed_deps.py para la lista completa)
+PLUGIN_ALLOWED_DEPENDENCIES = [
+    'Pillow', 'qrcode', 'python-barcode', 'openpyxl', 'reportlab',
+    'python-escpos', 'lxml', 'xmltodict', 'signxml', 'cryptography',
+    'zeep', 'requests', 'websockets', 'python-dateutil', 'pytz',
+    'phonenumbers', 'stripe', 'pandas', 'numpy', 'pyserial',
+    'email-validator', 'python-slugify', 'pydantic', 'beautifulsoup4', 'PyPDF2'
+]
+
+# Tamaño máximo de plugin (MB)
+PLUGIN_MAX_SIZE_MB = 50
+
+# Configuración de firma digital de plugins
+PLUGIN_SIGNATURE_ALGORITHM = 'RSA-SHA256'
+PLUGIN_SIGNATURE_KEY_SIZE = 4096
