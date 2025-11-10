@@ -98,13 +98,25 @@
             --padding-start: 0;
             --padding-end: 0;
         }
+
+        .custom-action-sheet {
+            --background: var(--ion-color-step-850,#262626);
+            --backdrop-opacity: 0.6;
+            --button-background-selected: var(--ion-action-sheet-button-background-selected);
+            --button-color: var(--ion-action-sheet-button-color);
+            /* role: "destructive" button iOS styling override */
+            --ion-color-danger: var(--ion-color-danger);
+        }
+       .action-sheet-title,.action-sheet-has-sub-title {
+            color: red
+        }
     </style>
 
     {% block extra_head %}{% endblock %}
 </head>
 
 <body x-data="hubApp()" :class="isDark ? 'dark' : ''">
-    <ion-app>
+    <ion-app :mode="ionicMode">
         <!-- Menu (Sidebar) -->
         <ion-menu content-id="main-content" menu-id="main-menu" type="reveal">
             <ion-header>
@@ -233,6 +245,11 @@
                             <ion-icon slot="icon-only" :name="isFullscreen ? 'contract-outline' : 'expand-outline'"></ion-icon>
                         </ion-button>
 
+                        <!-- Platform Mode Toggle (iOS/Android) -->
+                        <ion-button @click="togglePlatformMode()" :title="ionicMode === 'ios' ? 'iOS Mode' : 'Material Design'">
+                            <ion-icon slot="icon-only" :name="ionicMode === 'ios' ? 'logo-apple' : 'logo-android'"></ion-icon>
+                        </ion-button>
+
                         <!-- Theme Toggle -->
                         <ion-button @click="toggleTheme()">
                             <ion-icon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
@@ -252,6 +269,11 @@
                 {% endblock %}
             </ion-content>
         </div>
+
+        <ion-action-sheet
+            trigger="open-action-sheet"
+            class="custom-action-sheet text-justify"
+        ></ion-action-sheet>
     </ion-app>
 
     <script>
@@ -259,6 +281,7 @@
             return {
                 isDark: false,
                 isFullscreen: false,
+                ionicMode: 'ios', // 'ios' or 'md' (Material Design)
                 currentView: '{{ current_view|default:"dashboard" }}',
 
                 toggleMenu() {
@@ -273,19 +296,56 @@
                 },
 
                 toggleFullscreen() {
-                    if (!document.fullscreenElement) {
-                        document.documentElement.requestFullscreen();
-                        this.isFullscreen = true;
+                    // Verificar si estamos en pywebview (app empaquetada)
+                    if (window.pywebview && window.pywebview.api) {
+                        // Llamar a la API de Python
+                        window.pywebview.api.toggle_fullscreen().then(response => {
+                            if (response.error) {
+                                console.error('Fullscreen error:', response.error);
+                                this.showToast('Fullscreen not available');
+                            } else {
+                                console.log('Fullscreen toggled:', response);
+                                this.isFullscreen = response.fullscreen;
+                            }
+                        }).catch(err => {
+                            console.error('Failed to toggle fullscreen:', err);
+                            this.showToast('Fullscreen error');
+                        });
                     } else {
-                        if (document.exitFullscreen) {
-                            document.exitFullscreen();
-                            this.isFullscreen = false;
+                        // Fallback para navegador web (desarrollo)
+                        if (!document.fullscreenElement) {
+                            document.documentElement.requestFullscreen();
+                            this.isFullscreen = true;
+                        } else {
+                            if (document.exitFullscreen) {
+                                document.exitFullscreen();
+                                this.isFullscreen = false;
+                            }
                         }
                     }
                 },
 
+                togglePlatformMode() {
+                    this.ionicMode = this.ionicMode === 'ios' ? 'md' : 'ios';
+                    localStorage.setItem('ionicMode', this.ionicMode);
+
+                    // Show feedback toast
+                    this.showToast(`Switched to ${this.ionicMode === 'ios' ? 'iOS' : 'Android'} mode`);
+                },
+
+                async showToast(message) {
+                    const toast = document.createElement('ion-toast');
+                    toast.message = message;
+                    toast.duration = 1500;
+                    toast.position = 'bottom';
+                    toast.color = 'primary';
+                    document.body.appendChild(toast);
+                    await toast.present();
+                },
+
                 async handleUserMenu() {
-                    const actionSheet = document.createElement('ion-action-sheet');
+                    // const actionSheet = document.createElement('ion-action-sheet');
+                    var actionSheet = document.querySelector('ion-action-sheet');
                     actionSheet.header = '{{ request.session.user_name }}';
                     actionSheet.subHeader = '{{ request.session.user_email }}';
                     actionSheet.buttons = [
@@ -308,10 +368,13 @@
                                 window.location.href = "{% url 'core:logout' %}";
                             }
                         },
-                        {
-                            text: '{% trans "Cancel" %}',
-                            role: 'cancel'
-                        }
+                         {
+      text: '{% trans "Cancel" %}',
+      role: 'cancel',
+      data: {
+        action: 'cancel',
+      },
+    },
                     ];
 
                     document.body.appendChild(actionSheet);
@@ -341,6 +404,16 @@
                     if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                         this.isDark = true;
                         document.body.classList.add('dark');
+                    }
+
+                    // Initialize platform mode from localStorage
+                    const savedMode = localStorage.getItem('ionicMode');
+                    if (savedMode) {
+                        this.ionicMode = savedMode;
+                    } else {
+                        // Default: iOS mode
+                        this.ionicMode = 'ios';
+                        localStorage.setItem('ionicMode', 'ios');
                     }
 
                     // Listen to fullscreen changes
