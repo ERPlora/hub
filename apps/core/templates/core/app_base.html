@@ -6,7 +6,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}CPOS Hub - POS System{% endblock %}</title>
+    <title>{% block title %}ERPlora Hub - POS System{% endblock %}</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
 
     <!-- Ionic CSS (offline) -->
     <link rel="stylesheet" href="{% static 'css/ionic.bundle.css' %}" />
@@ -152,12 +155,10 @@
             <ion-header>
                 <ion-toolbar class="ion-padding">
                     <div class="menu-logo">
-                        <div class="logo-box">
-                            <ion-icon name="storefront" style="color: var(--ion-color-primary-contrast);"></ion-icon>
-                        </div>
-                        <div>
-                            <div style="font-weight: 600;">POS Hub</div>
-                            <div style="font-size: 0.75rem; color: var(--ion-color-medium);">{% trans "Point of Sale" %}</div>
+                        <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 2rem; height: 2rem;">
+                        <div style="margin-left: 0.5rem;">
+                            <div style="font-weight: 600;">ERPlora</div>
+                            <div style="font-size: 0.75rem; color: var(--ion-color-medium);">{% trans "Business Management" %}</div>
                         </div>
                     </div>
                 </ion-toolbar>
