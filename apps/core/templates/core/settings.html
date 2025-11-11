@@ -235,18 +235,34 @@
         </ion-card-header>
         <ion-card-content>
             <div style="display: grid; gap: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <ion-label>{% trans "Dark Mode" %}</ion-label>
-                        <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
-                            {% trans "Enable dark theme" %}
-                        </p>
+                <!-- Color Theme Selector -->
+                <div>
+                    <ion-label position="stacked">{% trans "Color Palette" %}</ion-label>
+                    <ion-select
+                        id="colorThemeSelect"
+                        :value="colorTheme"
+                        style="margin-top: 8px;">
+                        <ion-select-option value="default">{% trans "Default (Gray)" %}</ion-select-option>
+                        <ion-select-option value="blue">{% trans "Blue" %}</ion-select-option>
+                    </ion-select>
+                    <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
+                        {% trans "Choose your preferred color palette. Works with both light and dark modes." %}
+                    </p>
+                </div>
+
+                <!-- Dark Mode Info -->
+                <div style="padding: 12px; background: var(--ion-color-light); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                        <ion-icon :name="parentIsDark ? 'moon' : 'sunny'" style="color: var(--ion-color-primary);"></ion-icon>
+                        <ion-label style="font-weight: 600;">
+                            {% trans "Current Mode" %}: <span x-text="parentIsDark ? '{% trans "Dark" %}' : '{% trans "Light" %}'"></span>
+                        </ion-label>
                     </div>
-                    <ion-toggle
-                        color="success"
-                        x-model="darkMode"
-                        @ionChange="toggleDarkMode()">
-                    </ion-toggle>
+                    <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin: 0;">
+                        {% trans "Toggle between light and dark modes using the" %}
+                        <ion-icon :name="parentIsDark ? 'sunny-outline' : 'moon-outline'" style="vertical-align: middle;"></ion-icon>
+                        {% trans "icon in the header" %}
+                    </p>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -258,8 +274,8 @@
                     </div>
                     <ion-toggle
                         color="success"
-                        x-model="autoPrint"
-                        @ionChange="toggleAutoPrint()">
+                        :checked="autoPrint"
+                        @ionChange="autoPrint = $event.target.checked; toggleAutoPrint()">
                     </ion-toggle>
                 </div>
             </div>
@@ -271,25 +287,83 @@
 function settingsApp() {
     return {
         language: '{{ hub_config.os_language }}',
-        darkMode: false,
-        autoPrint: false,
+        autoPrint: {{ hub_config.auto_print|yesno:"true,false" }},
+        colorTheme: '{{ hub_config.color_theme }}',
+        parentIsDark: {{ hub_config.dark_mode|yesno:"true,false" }},
 
         init() {
-            // Check if dark mode is enabled
-            this.darkMode = document.body.classList.contains('dark');
-            // Load auto-print setting from localStorage
-            const autoPrintSaved = localStorage.getItem('autoPrint');
-            this.autoPrint = autoPrintSaved === 'true';
+            // Alpine.js with :value binding handles initialization automatically
+            // Listen for dark mode changes from parent hubApp
+            document.addEventListener('theme-changed', (e) => {
+                this.parentIsDark = e.detail.isDark;
+            });
+
+            // Add native event listener for color theme select (Ionic Web Component)
+            const themeSelect = document.getElementById('colorThemeSelect');
+            if (themeSelect) {
+                console.log('[INIT] Attaching event listener to colorThemeSelect');
+                themeSelect.addEventListener('ionChange', (e) => {
+                    console.log('[SELECT EVENT] ionChange triggered, value:', e.detail.value);
+                    this.changeColorTheme(e.detail.value);
+                });
+            } else {
+                console.error('[INIT] colorThemeSelect element not found');
+            }
         },
 
-        toggleDarkMode() {
-            document.body.classList.toggle('dark', this.darkMode);
-            localStorage.setItem('darkMode', this.darkMode);
+        async changeColorTheme(newTheme) {
+            console.log('[CHANGE THEME] New theme selected:', newTheme);
+            console.log('[CHANGE THEME] Current colorTheme before update:', this.colorTheme);
+
+            // Update the colorTheme value
+            this.colorTheme = newTheme;
+            console.log('[CHANGE THEME] Updated colorTheme to:', this.colorTheme);
+
+            // Save theme preference to database
+            console.log('[CHANGE THEME] Calling saveThemePreferences...');
+            await this.saveThemePreferences();
+            console.log('[CHANGE THEME] saveThemePreferences completed');
+
+            // Reload page to apply new theme
+            console.log('[CHANGE THEME] Reloading page...');
+            window.location.reload();
+        },
+
+        async saveThemePreferences() {
+            try {
+                console.log('[SAVE PREFS] Building FormData with:', {
+                    action: 'update_theme',
+                    color_theme: this.colorTheme,
+                    auto_print: this.autoPrint
+                });
+
+                const formData = new FormData();
+                formData.append('action', 'update_theme');
+                formData.append('color_theme', this.colorTheme);
+                formData.append('auto_print', this.autoPrint);
+                formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+                console.log('[SAVE PREFS] Sending POST request...');
+                const response = await fetch('{% url "core:settings" %}', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('[SAVE PREFS] Response status:', response.status);
+                const result = await response.json();
+                console.log('[SAVE PREFS] Response data:', result);
+
+                if (!response.ok) {
+                    throw new Error('Failed to save preferences');
+                }
+            } catch (error) {
+                console.error('[SAVE PREFS ERROR]', error);
+            }
         },
 
         async toggleAutoPrint() {
-            // Save to localStorage automatically
-            localStorage.setItem('autoPrint', this.autoPrint);
+            // Save to database
+            await this.saveThemePreferences();
 
             // Show success toast
             const toast = document.createElement('ion-toast');

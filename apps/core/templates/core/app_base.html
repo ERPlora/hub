@@ -8,21 +8,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}CPOS Hub - POS System{% endblock %}</title>
 
-    <!-- Ionic CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css" />
+    <!-- Ionic CSS (offline) -->
+    <link rel="stylesheet" href="{% static 'css/ionic.bundle.css' %}" />
 
-    <!-- Custom Ionic Theme -->
-    <link rel="stylesheet" href="{% static 'css/ionic-theme.css' %}">
+    <!-- Theme Colors (carga desde carpeta del tema: default o blue) -->
+    <link rel="stylesheet" href="{% static 'css/themes/' %}{{ hub_config.color_theme }}/ionic-theme.css" id="theme-stylesheet">
 
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Base Styles (variables base, componentes y utilidades) -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
 
-    <!-- Ionic Core -->
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"></script>
+    <!-- Tailwind CSS (offline) -->
+    <script src="{% static 'js/tailwind.cdn.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/tailwind-ionic.css' %}">
 
-    <!-- Ionicons -->
-    <script type="module" src="https://cdn.jsdelivr.net/npm/ionicons@latest/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://cdn.jsdelivr.net/npm/ionicons@latest/dist/ionicons/ionicons.js"></script>
+    <!-- Alpine.js (offline) -->
+    <script defer src="{% static 'js/alpine.min.js' %}"></script>
+
+    <!-- Ionic Core (offline) -->
+    <script type="module" src="{% static 'js/ionic/ionic.esm.js' %}"></script>
+
+    <!-- Ionicons (offline) -->
+    <script type="module" src="{% static 'ionicons/dist/ionicons/ionicons.esm.js' %}"></script>
+    <script nomodule src="{% static 'ionicons/dist/ionicons/ionicons.js' %}"></script>
+
+    <!-- Theme Switcher Script -->
+    <script>
+        // Theme already loaded from template (line 15)
+        // Dark mode is handled by Alpine.js with :class="isDark ? 'dark' : ''"
+
+        function setTheme(themeName) {
+            const themeLink = document.getElementById('theme-stylesheet');
+            const themeUrl = `/static/css/themes/${themeName}/ionic-theme.css`;
+
+            if (themeLink) {
+                themeLink.href = themeUrl;
+            }
+        }
+
+        function getCurrentTheme() {
+            return '{{ hub_config.color_theme }}';
+        }
+
+        function getThemeLogo() {
+            return `/static/css/themes/{{ hub_config.color_theme }}/erplorer-logo.svg`;
+        }
+    </script>
 
     <style>
         [x-cloak] {
@@ -108,7 +138,7 @@
             --ion-color-danger: var(--ion-color-danger);
         }
        .action-sheet-title,.action-sheet-has-sub-title {
-            color: red
+            color: var(--ion-color-danger)
         }
     </style>
 
@@ -116,14 +146,14 @@
 </head>
 
 <body x-data="hubApp()" :class="isDark ? 'dark' : ''">
-    <ion-app :mode="ionicMode">
+    <ion-app mode="ios">
         <!-- Menu (Sidebar) -->
         <ion-menu content-id="main-content" menu-id="main-menu" type="reveal">
             <ion-header>
                 <ion-toolbar class="ion-padding">
                     <div class="menu-logo">
                         <div class="logo-box">
-                            <ion-icon name="storefront" style="color: white;"></ion-icon>
+                            <ion-icon name="storefront" style="color: var(--ion-color-primary-contrast);"></ion-icon>
                         </div>
                         <div>
                             <div style="font-weight: 600;">POS Hub</div>
@@ -135,7 +165,7 @@
                 <!-- Logged User Info -->
                 <ion-toolbar class="ion-padding-horizontal" style="padding-top: 0;">
                     <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--ion-color-step-50); border-radius: 0.5rem;">
-                        <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--ion-color-primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.875rem;">
+                        <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--ion-color-primary); display: flex; align-items: center; justify-content: center; color: var(--ion-color-primary-contrast); font-weight: 600; font-size: 0.875rem;">
                             {{ request.session.user_name|first|upper }}
                         </div>
                         <div style="flex: 1; min-width: 0;">
@@ -245,11 +275,6 @@
                             <ion-icon slot="icon-only" :name="isFullscreen ? 'contract-outline' : 'expand-outline'"></ion-icon>
                         </ion-button>
 
-                        <!-- Platform Mode Toggle (iOS/Android) -->
-                        <ion-button @click="togglePlatformMode()" :title="ionicMode === 'ios' ? 'iOS Mode' : 'Material Design'">
-                            <ion-icon slot="icon-only" :name="ionicMode === 'ios' ? 'logo-apple' : 'logo-android'"></ion-icon>
-                        </ion-button>
-
                         <!-- Theme Toggle -->
                         <ion-button @click="toggleTheme()">
                             <ion-icon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
@@ -281,7 +306,6 @@
             return {
                 isDark: false,
                 isFullscreen: false,
-                ionicMode: 'ios', // 'ios' or 'md' (Material Design)
                 currentView: '{{ current_view|default:"dashboard" }}',
 
                 toggleMenu() {
@@ -289,10 +313,31 @@
                     menu.toggle();
                 },
 
-                toggleTheme() {
+                async toggleTheme() {
                     this.isDark = !this.isDark;
                     document.body.classList.toggle('dark');
-                    localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
+
+                    // Dispatch event for child components (like settingsApp)
+                    document.dispatchEvent(new CustomEvent('theme-changed', {
+                        detail: { isDark: this.isDark }
+                    }));
+
+                    // Save to database
+                    try {
+                        const formData = new FormData();
+                        formData.append('action', 'update_theme');
+                        formData.append('color_theme', '{{ hub_config.color_theme }}');
+                        formData.append('dark_mode', this.isDark);
+                        formData.append('auto_print', '{{ hub_config.auto_print|yesno:"true,false" }}');
+                        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+                        await fetch('{% url "core:settings" %}', {
+                            method: 'POST',
+                            body: formData
+                        });
+                    } catch (error) {
+                        console.error('Error saving dark mode:', error);
+                    }
                 },
 
                 toggleFullscreen() {
@@ -323,14 +368,6 @@
                             }
                         }
                     }
-                },
-
-                togglePlatformMode() {
-                    this.ionicMode = this.ionicMode === 'ios' ? 'md' : 'ios';
-                    localStorage.setItem('ionicMode', this.ionicMode);
-
-                    // Show feedback toast
-                    this.showToast(`Switched to ${this.ionicMode === 'ios' ? 'iOS' : 'Android'} mode`);
                 },
 
                 async showToast(message) {
@@ -399,22 +436,8 @@
                 },
 
                 init() {
-                    // Initialize theme from localStorage
-                    const savedTheme = localStorage.getItem('theme');
-                    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                        this.isDark = true;
-                        document.body.classList.add('dark');
-                    }
-
-                    // Initialize platform mode from localStorage
-                    const savedMode = localStorage.getItem('ionicMode');
-                    if (savedMode) {
-                        this.ionicMode = savedMode;
-                    } else {
-                        // Default: iOS mode
-                        this.ionicMode = 'ios';
-                        localStorage.setItem('ionicMode', 'ios');
-                    }
+                    // Initialize theme from database (already applied by script above)
+                    this.isDark = {{ hub_config.dark_mode|yesno:"true,false" }};
 
                     // Listen to fullscreen changes
                     document.addEventListener('fullscreenchange', () => {
