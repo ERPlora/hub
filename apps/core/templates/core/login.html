@@ -4,8 +4,6 @@
 
 {% block title %}CPOS Hub - {% trans "Login" %}{% endblock %}
 
-{% endblock %}
-
 {% block content %}
 <div x-data="loginApp()" x-init="init()">
     <!-- Theme Toggle -->
@@ -37,7 +35,7 @@
                 </ion-segment>
 
                 <!-- Local Login (Employee Selection + PIN) -->
-                <div x-show="loginMode === 'local'" class="hidden" x-cloak>
+                <div x-show="loginMode === 'local'" x-cloak>
                     <!-- Employee Selection -->
                     <div x-show="!selectedEmployee">
                         <h2 class="text-xl font-semibold mb-4">{% trans "Select your profile" %}</h2>
@@ -112,7 +110,7 @@
                 </div>
 
                 <!-- Cloud Login (Email/Password) -->
-                <div x-show="loginMode === 'cloud'" class="hidden" x-cloak>
+                <div x-show="loginMode === 'cloud'" x-cloak>
                     <form @submit.prevent="cloudLogin()" class="flex flex-col gap-6">
                         {% csrf_token %}
                         <div>
