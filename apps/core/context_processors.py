@@ -28,3 +28,17 @@ def plugin_menu_items(request):
     return {
         'PLUGIN_MENU_ITEMS': menu_items
     }
+
+
+def hub_config_context(request):
+    """
+    Add hub_config to template context for theme system.
+
+    This makes hub_config available in all templates without having to
+    explicitly pass it in each view.
+    """
+    from .models import HubConfig
+
+    return {
+        'hub_config': HubConfig.get_config()
+    }

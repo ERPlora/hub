@@ -6,7 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.conf import settings as django_settings
-from .models import HubConfig, LocalUser, StoreConfig
+from .models import HubConfig, LocalUser, StoreConfig, TokenCache
 
 
 # Helper functions
@@ -179,6 +179,12 @@ def cloud_login(request):
             if response.status_code == 200:
                 auth_data = response.json()
                 access_token = auth_data.get('access')
+                refresh_token = auth_data.get('refresh')
+
+                # Cache JWT tokens in database for offline validation
+                token_cache = TokenCache.get_cache()
+                token_cache.cache_jwt_tokens(access_token, refresh_token)
+                print(f"[CLOUD LOGIN] ✓ JWT tokens cached for offline validation")
 
                 # Get user info from Cloud
                 user_response = requests.get(
@@ -287,6 +293,15 @@ def cloud_login(request):
 
                     # Check if user has PIN configured
                     first_time = not local_user.pin_hash
+
+                    # Store JWT token in session for middleware validation
+                    request.session['jwt_token'] = access_token
+                    request.session['jwt_refresh'] = refresh_token
+                    request.session['local_user_id'] = local_user.id
+                    request.session['user_name'] = local_user.name
+                    request.session['user_email'] = local_user.email
+                    request.session['user_role'] = local_user.role
+                    request.session['user_language'] = local_user.language
 
                     return JsonResponse({
                         'success': True,
@@ -404,7 +419,29 @@ def settings(request):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'update_store':
+        if action == 'update_theme':
+            # Update theme preferences
+            color_theme = request.POST.get('color_theme', 'default')
+            auto_print = request.POST.get('auto_print') == 'true'
+            dark_mode_param = request.POST.get('dark_mode')
+
+            # Log for debugging
+            print(f"[UPDATE THEME] color_theme={color_theme}, auto_print={auto_print}, dark_mode={dark_mode_param}")
+
+            hub_config.color_theme = color_theme
+            hub_config.auto_print = auto_print
+
+            # Update dark_mode if provided (from header toggle)
+            if dark_mode_param is not None:
+                hub_config.dark_mode = dark_mode_param == 'true'
+                print(f"[UPDATE THEME] Updated dark_mode to {hub_config.dark_mode}")
+
+            hub_config.save()
+            print(f"[UPDATE THEME] Saved: color_theme={hub_config.color_theme}, dark_mode={hub_config.dark_mode}")
+
+            return JsonResponse({'success': True})
+
+        elif action == 'update_store':
             # Update store configuration
             store_config.business_name = request.POST.get('business_name', '').strip()
             store_config.business_address = request.POST.get('business_address', '').strip()
