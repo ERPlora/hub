@@ -50,6 +50,30 @@
                 </div>
 
                 <div>
+                    <ion-label position="stacked">{% trans "Currency" %}</ion-label>
+                    <ion-select
+                        id="currencySelect"
+                        value="{{ hub_config.currency }}"
+                        style="margin-top: 8px;"
+                        x-model="currency">
+                        <ion-select-option value="USD">US Dollar ($)</ion-select-option>
+                        <ion-select-option value="EUR">Euro (€)</ion-select-option>
+                        <ion-select-option value="GBP">British Pound (£)</ion-select-option>
+                        <ion-select-option value="JPY">Japanese Yen (¥)</ion-select-option>
+                        <ion-select-option value="CNY">Chinese Yuan (¥)</ion-select-option>
+                        <ion-select-option value="MXN">Mexican Peso ($)</ion-select-option>
+                        <ion-select-option value="CAD">Canadian Dollar ($)</ion-select-option>
+                        <ion-select-option value="AUD">Australian Dollar ($)</ion-select-option>
+                        <ion-select-option value="BRL">Brazilian Real (R$)</ion-select-option>
+                        <ion-select-option value="ARS">Argentine Peso ($)</ion-select-option>
+                        <ion-select-option value="COP">Colombian Peso ($)</ion-select-option>
+                        <ion-select-option value="CLP">Chilean Peso ($)</ion-select-option>
+                        <ion-select-option value="PEN">Peruvian Sol (S/)</ion-select-option>
+                        <ion-select-option value="CRC">Costa Rican Colón (₡)</ion-select-option>
+                    </ion-select>
+                </div>
+
+                <div>
                     <ion-label position="stacked">{% trans "Hub Status" %}</ion-label>
                     <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
                         <ion-badge color="{% if hub_config.is_configured %}success{% else %}warning{% endif %}">
@@ -287,6 +311,7 @@
 function settingsApp() {
     return {
         language: '{{ hub_config.os_language }}',
+        currency: '{{ hub_config.currency }}',
         autoPrint: {{ hub_config.auto_print|yesno:"true,false" }},
         colorTheme: '{{ hub_config.color_theme }}',
         parentIsDark: {{ hub_config.dark_mode|yesno:"true,false" }},
@@ -308,6 +333,55 @@ function settingsApp() {
                 });
             } else {
                 console.error('[INIT] colorThemeSelect element not found');
+            }
+
+            // Add event listener for currency select
+            const currencySelect = document.getElementById('currencySelect');
+            if (currencySelect) {
+                currencySelect.addEventListener('ionChange', (e) => {
+                    this.currency = e.detail.value;
+                    this.saveCurrency();
+                });
+            }
+        },
+
+        async saveCurrency() {
+            try {
+                const formData = new FormData();
+                formData.append('action', 'update_currency');
+                formData.append('currency', this.currency);
+                formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+                const response = await fetch('{% url "core:settings" %}', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Show success toast
+                    const toast = document.createElement('ion-toast');
+                    toast.message = '{% trans "Currency updated" %}';
+                    toast.duration = 2000;
+                    toast.color = 'success';
+                    toast.position = 'top';
+                    document.body.appendChild(toast);
+                    await toast.present();
+                } else {
+                    throw new Error('Failed to save currency');
+                }
+            } catch (error) {
+                console.error('[SAVE CURRENCY ERROR]', error);
+
+                // Show error toast
+                const toast = document.createElement('ion-toast');
+                toast.message = '{% trans "Failed to update currency" %}';
+                toast.duration = 3000;
+                toast.color = 'danger';
+                toast.position = 'top';
+                document.body.appendChild(toast);
+                await toast.present();
             }
         },
 
