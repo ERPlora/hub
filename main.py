@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CPOS Hub - Launcher para macOS
+ERPlora Hub - Launcher para macOS
 Este script inicia Django embebido y abre pywebview con la interfaz
 
 Copyright (c) 2025 CPOS Team
@@ -137,8 +137,8 @@ def initialize_data_directories():
     Inicializa los directorios de datos de usuario en ubicaciones externas.
 
     Crea directorios según la plataforma:
-    - Windows: C:\\Users\\<user>\\AppData\\Local\\CPOSHub\\
-    - macOS: ~/Library/Application Support/CPOSHub/
+    - Windows: C:\\Users\\<user>\\AppData\\Local\\ERPloraHub\\
+    - macOS: ~/Library/Application Support/ERPloraHub/
     - Linux: ~/.cpos-hub/
 
     También migra datos legacy si existen en el directorio de la app.
@@ -286,7 +286,7 @@ def on_shown():
 try:
     # Crear ventana de pywebview con el navegador nativo de macOS
     window = webview.create_window(
-        'CPOS Hub',
+        'ERPlora Hub',
         'http://localhost:8001',
         width=1200,
         height=800,
