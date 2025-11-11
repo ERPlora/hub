@@ -206,7 +206,7 @@ class Command(BaseCommand):
         self.stdout.write('')
         self.stdout.write('📋 Próximos pasos:')
         self.stdout.write('\n   OPCIÓN 1: Subir a Cloud (Privado)')
-        self.stdout.write('   1. Inicia sesión en https://cpos.app')
+        self.stdout.write('   1. Inicia sesión en https://erplora.com')
         self.stdout.write('   2. Ve a "Plugins" → "Mis Plugins"')
         self.stdout.write(f'   3. Sube {zip_filename}')
         self.stdout.write('   4. Configura precio/visibilidad')

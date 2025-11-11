@@ -352,7 +352,7 @@ function settingsApp() {
                 formData.append('currency', this.currency);
                 formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
-                const response = await fetch('{% url "core:settings" %}', {
+                const response = await fetch('{% url "configuration:settings" %}', {
                     method: 'POST',
                     body: formData
                 });
@@ -418,7 +418,7 @@ function settingsApp() {
                 formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
                 console.log('[SAVE PREFS] Sending POST request...');
-                const response = await fetch('{% url "core:settings" %}', {
+                const response = await fetch('{% url "configuration:settings" %}', {
                     method: 'POST',
                     body: formData
                 });

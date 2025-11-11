@@ -1,5 +1,5 @@
 # Generated migration for accounts app
-# This migration references existing tables from core app
+# This migration creates tables (they were deleted by core.0008)
 
 from django.db import migrations, models
 import django.contrib.auth.hashers
@@ -13,11 +13,8 @@ class Migration(migrations.Migration):
         ('core', '0007_hubconfig_currency'),
     ]
 
-    # No database operations - tables already exist
-    database_operations = []
-
-    # Declare models in Django state
-    state_operations = [
+    # Create tables (they were deleted by core.0008)
+    operations = [
         migrations.CreateModel(
             name='LocalUser',
             fields=[
@@ -40,11 +37,4 @@ class Migration(migrations.Migration):
                 'db_table': 'core_localuser',
             },
         ),
-    ]
-
-    operations = [
-        migrations.SeparateDatabaseAndState(
-            database_operations=database_operations,
-            state_operations=state_operations,
-        )
     ]

@@ -110,7 +110,6 @@
                 <!-- Cloud Login (Email/Password) -->
                 <div x-show="loginMode === 'cloud'" x-cloak>
                     <form @submit.prevent="cloudLogin()" class="flex flex-col gap-6">
-                        {% csrf_token %}
                         <div>
                             <ion-label class="block mb-2 font-medium">{% trans "Email" %}</ion-label>
                             <ion-input
@@ -270,11 +269,10 @@
 
             async verifyPin() {
                 try {
-                    const response = await fetch('{% url "core:verify_pin" %}', {
+                    const response = await fetch('{% url "accounts:verify_pin" %}', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': '{{ csrf_token }}'
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
                             user_id: this.selectedEmployee.id,
@@ -294,7 +292,7 @@
                         toast.present();
 
                         setTimeout(() => {
-                            window.location.href = '{% url "core:dashboard" %}';
+                            window.location.href = '{% url "configuration:dashboard" %}';
                         }, 1000);
                     } else {
                         // Error
@@ -328,11 +326,10 @@
                 this.cloudLoading = true;
 
                 try {
-                    const response = await fetch('{% url "core:cloud_login" %}', {
+                    const response = await fetch('{% url "accounts:cloud_login" %}', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': '{{ csrf_token }}'
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
                             email: this.cloudCredentials.email,
@@ -357,7 +354,7 @@
                             toast.present();
 
                             setTimeout(() => {
-                                window.location.href = '{% url "core:dashboard" %}';
+                                window.location.href = '{% url "configuration:dashboard" %}';
                             }, 1000);
                         }
                     } else {
@@ -412,11 +409,10 @@
                 if (this.setupPinInput === this.setupPinFirst) {
                     // Success - save PIN
                     try {
-                        const response = await fetch('{% url "core:setup_pin" %}', {
+                        const response = await fetch('{% url "accounts:setup_pin" %}', {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': '{{ csrf_token }}'
+                                'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
                                 user_id: this.newUser.id,
@@ -435,7 +431,7 @@
                             toast.present();
 
                             setTimeout(() => {
-                                window.location.href = '{% url "core:dashboard" %}';
+                                window.location.href = '{% url "configuration:dashboard" %}';
                             }, 1000);
                         }
                     } catch (error) {
