@@ -39,12 +39,21 @@ class JWTMiddleware:
     def __init__(self, get_response):
         """Initialize middleware."""
         self.get_response = get_response
-        self.connectivity_checker = get_connectivity_checker()
-        self.public_key_fetcher = get_public_key_fetcher()
-        self.jwt_validator = get_jwt_validator()
+        # Don't initialize singletons here to make testing easier
+        self.connectivity_checker = None
+        self.public_key_fetcher = None
+        self.jwt_validator = None
 
     def __call__(self, request):
         """Process request."""
+        # Initialize singletons lazily
+        if not self.connectivity_checker:
+            self.connectivity_checker = get_connectivity_checker()
+        if not self.public_key_fetcher:
+            self.public_key_fetcher = get_public_key_fetcher()
+        if not self.jwt_validator:
+            self.jwt_validator = get_jwt_validator()
+
         # Check if path is exempt
         if self._is_exempt_path(request.path):
             return self.get_response(request)

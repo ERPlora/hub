@@ -12,6 +12,17 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+def _get_token_cache():
+    """
+    Get TokenCache model lazily to avoid circular imports.
+
+    Returns:
+        TokenCache: Token cache model instance
+    """
+    from apps.core.models import TokenCache
+    return TokenCache.get_cache()
+
+
 class PublicKeyFetchError(Exception):
     """Raised when public key cannot be fetched."""
     pass
@@ -44,8 +55,10 @@ class PublicKeyFetcher:
         self._cache_dir = Path(settings.BASE_DIR) / 'cache'
         self._cache_file = self._cache_dir / 'jwt_public_key.pem'
 
-        # Load from disk cache if available
-        self._load_from_disk()
+        # Load from database cache first, then disk cache
+        self._load_from_database()
+        if not self._cached_key:
+            self._load_from_disk()
 
     def fetch(self):
         """
@@ -64,6 +77,7 @@ class PublicKeyFetcher:
             logger.info("Fetching public key from Cloud")
             public_key = self._fetch_from_cloud()
             self._cache_key(public_key)
+            self._save_to_database()
             self._save_to_disk()
             return public_key
         except Exception as e:
@@ -148,6 +162,29 @@ class PublicKeyFetcher:
                 logger.debug(f"Loaded public key from {self._cache_file}")
         except Exception as e:
             logger.warning(f"Failed to load public key from disk: {e}")
+
+    def _save_to_database(self):
+        """Save public key to database cache."""
+        try:
+            token_cache = _get_token_cache()
+            token_cache.cache_public_key(self._cached_key)
+            logger.debug("Saved public key to database cache")
+        except Exception as e:
+            logger.warning(f"Failed to save public key to database: {e}")
+
+    def _load_from_database(self):
+        """Load cached key from database if available."""
+        try:
+            token_cache = _get_token_cache()
+            cached_key = token_cache.get_cached_public_key()
+            if cached_key:
+                self._cached_key = cached_key
+                # Use database timestamp
+                if token_cache.public_key_cached_at:
+                    self._cache_timestamp = token_cache.public_key_cached_at
+                logger.debug("Loaded public key from database cache")
+        except Exception as e:
+            logger.warning(f"Failed to load public key from database: {e}")
 
 
 # Global singleton
