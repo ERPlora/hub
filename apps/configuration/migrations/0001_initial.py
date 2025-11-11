@@ -1,0 +1,75 @@
+# Generated migration for configuration app
+# This migration references existing tables from core app
+
+from django.db import migrations, models
+from django.conf import settings
+
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+        ('core', '0007_hubconfig_currency'),
+    ]
+
+    # No database operations - tables already exist
+    database_operations = []
+
+    # Declare models in Django state
+    state_operations = [
+        migrations.CreateModel(
+            name='HubConfig',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('hub_id', models.UUIDField(blank=True, null=True, unique=True)),
+                ('tunnel_port', models.IntegerField(blank=True, null=True)),
+                ('tunnel_token', models.CharField(blank=True, max_length=255)),
+                ('is_configured', models.BooleanField(default=False)),
+                ('os_language', models.CharField(default='en', max_length=10)),
+                ('currency', models.CharField(choices=settings.CURRENCY_CHOICES, default='USD', help_text='Currency used for transactions in this Hub', max_length=3)),
+                ('color_theme', models.CharField(choices=[('default', 'Default (Gray)'), ('blue', 'Blue')], default='default', max_length=20)),
+                ('dark_mode', models.BooleanField(default=False)),
+                ('auto_print', models.BooleanField(default=False)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+            ],
+            options={
+                'verbose_name': 'Hub Configuration',
+                'verbose_name_plural': 'Hub Configuration',
+                'db_table': 'core_hubconfig',
+            },
+        ),
+        migrations.CreateModel(
+            name='StoreConfig',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('business_name', models.CharField(blank=True, max_length=255)),
+                ('business_address', models.TextField(blank=True)),
+                ('vat_number', models.CharField(blank=True, max_length=100, verbose_name='VAT/Tax ID')),
+                ('phone', models.CharField(blank=True, max_length=50)),
+                ('email', models.EmailField(blank=True, max_length=254)),
+                ('website', models.URLField(blank=True)),
+                ('logo', models.ImageField(blank=True, null=True, upload_to='store/')),
+                ('tax_rate', models.DecimalField(decimal_places=2, default=0.0, help_text='Tax rate in percentage (e.g., 21.00 for 21%)', max_digits=5)),
+                ('tax_included', models.BooleanField(default=True, help_text='Tax included in prices')),
+                ('receipt_header', models.TextField(blank=True, help_text='Additional text to show at the top of receipts')),
+                ('receipt_footer', models.TextField(blank=True, help_text='Additional text to show at the bottom of receipts')),
+                ('is_configured', models.BooleanField(default=False)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+            ],
+            options={
+                'verbose_name': 'Store Configuration',
+                'verbose_name_plural': 'Store Configuration',
+                'db_table': 'core_storeconfig',
+            },
+        ),
+    ]
+
+    operations = [
+        migrations.SeparateDatabaseAndState(
+            database_operations=database_operations,
+            state_operations=state_operations,
+        )
+    ]
