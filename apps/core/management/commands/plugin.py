@@ -9,7 +9,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from apps.core.plugin_loader import plugin_loader
-from apps.core.models import Plugin
+from apps.plugins.models import Plugin
 
 
 class Command(BaseCommand):

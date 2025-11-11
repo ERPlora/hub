@@ -187,7 +187,7 @@ products/
   "version": "1.0.0",
   "description": "Gestión de productos e inventario para CPOS Hub",
   "author": "CPOS Team",
-  "author_email": "plugins@cpos.app",
+  "author_email": "plugins@erplora.com",
   "license": "BUSL-1.1",
   "homepage": "https://github.com/cpos/cpos-plugin-products",
 
@@ -647,7 +647,7 @@ python manage.py package_plugin products
 **Opción 1: Cloud (Privado/Pago)**
 
 ```bash
-# 1. Subir a https://cpos.app
+# 1. Subir a https://erplora.com
 # 2. Dashboard → Plugins → Mis Plugins → Subir
 # 3. Configurar precio y visibilidad
 ```
@@ -869,8 +869,8 @@ python manage.py package_plugin mi-plugin
 ¿Problemas o dudas?
 
 - GitHub Issues: https://github.com/cpos/cpos-hub/issues
-- Email: plugins@cpos.app
-- Docs: https://docs.cpos.app/plugins/
+- Email: plugins@erplora.com
+- Docs: https://docs.erplora.com/plugins/
 
 ---
 
