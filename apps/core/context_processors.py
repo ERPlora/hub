@@ -17,7 +17,7 @@ def plugin_menu_items(request):
     """
     Add plugin menu items to template context
     """
-    from .plugin_loader import plugin_loader
+    from apps.plugins.plugin_loader import plugin_loader
 
     # Only load plugins if user is authenticated
     if 'local_user_id' in request.session:
@@ -37,7 +37,7 @@ def hub_config_context(request):
     This makes hub_config available in all templates without having to
     explicitly pass it in each view.
     """
-    from .models import HubConfig
+    from apps.configuration.models import HubConfig
 
     return {
         'hub_config': HubConfig.get_config()

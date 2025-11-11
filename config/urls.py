@@ -21,7 +21,11 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('apps.core.urls')),
+    # Refactored app URLs
+    path('', include('apps.accounts.urls')),  # Login, employees, auth
+    path('', include('apps.configuration.urls')),  # Dashboard, POS, settings
+    path('', include('apps.plugins.urls')),  # Plugin management
+    path('', include('apps.sync.urls')),  # Sync, updates, FRP
 ]
 
 # Serve static files in development
