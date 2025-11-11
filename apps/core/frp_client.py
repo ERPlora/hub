@@ -15,7 +15,7 @@ import time
 
 from django.conf import settings
 
-from .models import HubConfig
+from apps.configuration.models import HubConfig
 
 
 logger = logging.getLogger(__name__)
