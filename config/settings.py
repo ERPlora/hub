@@ -55,6 +55,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.core.middleware.jwt_middleware.JWTMiddleware',  # JWT validation with offline support
     'apps.core.middleware.StoreConfigCheckMiddleware',  # Check if store is configured after login
 ]
 
@@ -63,7 +64,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [],  # All templates are in apps/*/templates/
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -75,6 +76,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.core.context_processors.cloud_url',
                 'apps.core.context_processors.plugin_menu_items',
+                'apps.core.context_processors.hub_config_context',
             ],
         },
     },

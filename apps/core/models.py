@@ -18,6 +18,14 @@ class HubConfig(models.Model):
     # Language configuration (detected from OS on first run)
     os_language = models.CharField(max_length=10, default='en')  # Detected from OS
 
+    # Theme preferences
+    color_theme = models.CharField(max_length=20, default='default', choices=[
+        ('default', 'Default (Gray)'),
+        ('blue', 'Blue'),
+    ])
+    dark_mode = models.BooleanField(default=False)
+    auto_print = models.BooleanField(default=False)
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -189,6 +197,66 @@ class Plugin(models.Model):
 
     def __str__(self):
         return f"{self.name} v{self.version}"
+
+
+class TokenCache(models.Model):
+    """
+    Cache for JWT tokens and RSA public key.
+
+    Enables offline JWT validation by storing:
+    - Last valid JWT access token
+    - RSA public key from Cloud
+    - Cache timestamps for expiration
+    """
+    # JWT token cache
+    jwt_access_token = models.TextField(blank=True)
+    jwt_refresh_token = models.TextField(blank=True)
+    jwt_cached_at = models.DateTimeField(null=True, blank=True)
+
+    # RSA public key cache
+    rsa_public_key = models.TextField(blank=True)
+    public_key_cached_at = models.DateTimeField(null=True, blank=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Token Cache'
+        verbose_name_plural = 'Token Cache'
+
+    def __str__(self):
+        return f"Token Cache (Updated: {self.updated_at})"
+
+    @classmethod
+    def get_cache(cls):
+        """Get or create token cache (singleton pattern)"""
+        cache, _ = cls.objects.get_or_create(id=1)
+        return cache
+
+    def cache_jwt_tokens(self, access_token, refresh_token=None):
+        """Cache JWT tokens"""
+        from django.utils import timezone
+        self.jwt_access_token = access_token
+        if refresh_token:
+            self.jwt_refresh_token = refresh_token
+        self.jwt_cached_at = timezone.now()
+        self.save()
+
+    def cache_public_key(self, public_key):
+        """Cache RSA public key"""
+        from django.utils import timezone
+        self.rsa_public_key = public_key
+        self.public_key_cached_at = timezone.now()
+        self.save()
+
+    def get_cached_jwt(self):
+        """Get cached JWT access token"""
+        return self.jwt_access_token if self.jwt_access_token else None
+
+    def get_cached_public_key(self):
+        """Get cached RSA public key"""
+        return self.rsa_public_key if self.rsa_public_key else None
 
 
 class SyncQueue(models.Model):
