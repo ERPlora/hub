@@ -5,8 +5,8 @@ Maneja las rutas de datos de usuario según la plataforma (Windows, macOS, Linux
 Todos los datos persisten fuera de la aplicación para permitir actualizaciones limpias.
 
 Estructura de directorios:
-    Windows:  C:\Users\<usuario>\AppData\Local\CPOSHub\
-    macOS:    /Users/<usuario>/Library/Application Support/CPOSHub/
+    Windows:  C:\Users\<usuario>\AppData\Local\ERPloraHub\
+    macOS:    /Users/<usuario>/Library/Application Support/ERPloraHub/
     Linux:    /home/<usuario>/.cpos-hub/
 
 Subdirectorios:
@@ -29,7 +29,7 @@ class DataPaths:
     Gestiona las rutas de datos de usuario multiplataforma.
     """
 
-    APP_NAME = "CPOSHub"
+    APP_NAME = "ERPloraHub"
     APP_NAME_HIDDEN = ".cpos-hub"  # Para Linux
 
     def __init__(self):
@@ -41,8 +41,8 @@ class DataPaths:
     def base_dir(self) -> Path:
         # Directorio base de datos de usuario según la plataforma
         # Returns Path: Directorio base
-        #   - Windows: C:\Users\<user>\AppData\Local\CPOSHub
-        #   - macOS: /Users/<user>/Library/Application Support/CPOSHub
+        #   - Windows: C:\Users\<user>\AppData\Local\ERPloraHub
+        #   - macOS: /Users/<user>/Library/Application Support/ERPloraHub
         #   - Linux: /home/<user>/.cpos-hub
         if self._base_dir is None:
             if self.platform == "win32":

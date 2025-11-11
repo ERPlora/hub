@@ -54,7 +54,7 @@ class TestDataPathsBaseDirPlatformSpecific:
         base_str = str(paths.base_dir)
 
         # Verify path contains expected components for current platform
-        assert 'CPOSHub' in base_str or '.cpos-hub' in base_str
+        assert 'ERPloraHub' in base_str or '.cpos-hub' in base_str
 
         # Platform-specific checks
         if paths.platform == 'darwin':
@@ -62,7 +62,7 @@ class TestDataPathsBaseDirPlatformSpecific:
         elif paths.platform == 'linux':
             assert '.cpos-hub' in base_str
         elif paths.platform == 'win32':
-            assert 'AppData' in base_str or 'CPOSHub' in base_str
+            assert 'AppData' in base_str or 'ERPloraHub' in base_str
 
     # NOTE: Cross-platform mocking tests removed because they created
     # directories in the project (e.g., ./C:/Users/...).

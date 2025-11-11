@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
 
-# Script para crear AppImage de CPOS Hub con autostart
+# Script para crear AppImage de ERPlora Hub con autostart
 # Requiere: appimagetool
 
 VERSION="${1:-0.8.0}"
 ARCH=$(uname -m)
 
-echo "[INFO] Creando AppImage para CPOS Hub v${VERSION} (${ARCH})"
+echo "[INFO] Creando AppImage para ERPlora Hub v${VERSION} (${ARCH})"
 
 # Directorios
 BUILD_DIR="dist/main"
@@ -32,7 +32,7 @@ cp -r "$BUILD_DIR"/* "$APPDIR/usr/bin/"
 cat > "$APPDIR/usr/bin/cpos-hub-wrapper.sh" << 'EOF'
 #!/bin/bash
 
-# CPOS Hub Wrapper Script
+# ERPlora Hub Wrapper Script
 # Maneja instalación de autostart y ejecución
 
 AUTOSTART_DIR="$HOME/.config/autostart"
@@ -42,13 +42,13 @@ APPIMAGE_PATH="$(readlink -f "$APPIMAGE")"
 # Función para instalar autostart
 install_autostart() {
     if [ ! -z "$APPIMAGE" ]; then
-        echo "[INFO] Configurando autostart de CPOS Hub..."
+        echo "[INFO] Configurando autostart de ERPlora Hub..."
         mkdir -p "$AUTOSTART_DIR"
 
         cat > "$AUTOSTART_FILE" << AUTOSTART
 [Desktop Entry]
 Type=Application
-Name=CPOS Hub
+Name=ERPlora Hub
 Comment=CPOS Point of Sale System
 Exec="$APPIMAGE_PATH"
 Icon=cpos-hub
@@ -102,7 +102,7 @@ fi
 cat > "$APPDIR/cpos-hub.desktop" << EOF
 [Desktop Entry]
 Type=Application
-Name=CPOS Hub
+Name=ERPlora Hub
 Comment=CPOS Point of Sale System
 Exec=cpos-hub-wrapper.sh
 Icon=cpos-hub
@@ -119,10 +119,10 @@ cat > "$APPDIR/usr/share/metainfo/cpos-hub.appdata.xml" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>com.cpos.hub</id>
-  <name>CPOS Hub</name>
+  <name>ERPlora Hub</name>
   <summary>Point of Sale System</summary>
   <description>
-    <p>CPOS Hub es un sistema POS completo con gestión de inventario, ventas, y sincronización en la nube.</p>
+    <p>ERPlora Hub es un sistema POS completo con gestión de inventario, ventas, y sincronización en la nube.</p>
   </description>
   <launchable type="desktop-id">cpos-hub.desktop</launchable>
   <url type="homepage">https://cpos.app</url>
