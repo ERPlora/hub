@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Third-party apps
+    'djmoney',  # Django Money for currency handling
     # Hub apps
     'apps.core.apps.CoreConfig',
 ]
@@ -318,3 +320,23 @@ PLUGIN_MAX_SIZE_MB = 50
 # Configuración de firma digital de plugins
 PLUGIN_SIGNATURE_ALGORITHM = 'RSA-SHA256'
 PLUGIN_SIGNATURE_KEY_SIZE = 4096
+
+# Django Money Configuration
+# Used for monetary fields throughout the application
+CURRENCIES = ('USD', 'EUR', 'GBP', 'JPY', 'CNY', 'MXN', 'CAD', 'AUD', 'BRL', 'ARS', 'COP', 'CLP', 'PEN', 'CRC')
+CURRENCY_CHOICES = [
+    ('USD', 'US Dollar ($)'),
+    ('EUR', 'Euro (€)'),
+    ('GBP', 'British Pound (£)'),
+    ('JPY', 'Japanese Yen (¥)'),
+    ('CNY', 'Chinese Yuan (¥)'),
+    ('MXN', 'Mexican Peso ($)'),
+    ('CAD', 'Canadian Dollar ($)'),
+    ('AUD', 'Australian Dollar ($)'),
+    ('BRL', 'Brazilian Real (R$)'),
+    ('ARS', 'Argentine Peso ($)'),
+    ('COP', 'Colombian Peso ($)'),
+    ('CLP', 'Chilean Peso ($)'),
+    ('PEN', 'Peruvian Sol (S/)'),
+    ('CRC', 'Costa Rican Colón (₡)'),
+]

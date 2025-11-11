@@ -419,7 +419,20 @@ def settings(request):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'update_theme':
+        if action == 'update_currency':
+            # Update currency
+            currency = request.POST.get('currency', 'USD')
+
+            # Validate currency
+            valid_currencies = [choice[0] for choice in HubConfig.CURRENCY_CHOICES]
+            if currency in valid_currencies:
+                hub_config.currency = currency
+                hub_config.save()
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Invalid currency'}, status=400)
+
+        elif action == 'update_theme':
             # Update theme preferences
             color_theme = request.POST.get('color_theme', 'default')
             auto_print = request.POST.get('auto_print') == 'true'
