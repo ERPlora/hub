@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
+from django.conf import settings
 
 
 class HubConfig(models.Model):
@@ -17,6 +18,19 @@ class HubConfig(models.Model):
 
     # Language configuration (detected from OS on first run)
     os_language = models.CharField(max_length=10, default='en')  # Detected from OS
+
+    # Currency configuration
+    currency = models.CharField(
+        max_length=3,
+        choices=settings.CURRENCY_CHOICES,
+        default='USD',
+        help_text='Currency used for transactions in this Hub'
+    )
+
+    @property
+    def CURRENCY_CHOICES(self):
+        """Compatibility property for existing code"""
+        return settings.CURRENCY_CHOICES
 
     # Theme preferences
     color_theme = models.CharField(max_length=20, default='default', choices=[
