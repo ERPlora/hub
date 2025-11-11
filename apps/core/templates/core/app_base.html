@@ -239,7 +239,7 @@
                     <div style="height: 1px; background: var(--ion-border-color); margin: 1rem 0;"></div>
 
                     <!-- Logout Button -->
-                    <ion-item button href="{% url 'core:logout' %}" detail="false" lines="none">
+                    <ion-item button href="{% url 'accounts:logout' %}" detail="false" lines="none">
                         <ion-icon name="log-out-outline" slot="start" color="danger"></ion-icon>
                         <ion-label color="danger">{% trans "Sign Out" %}</ion-label>
                     </ion-item>
@@ -332,7 +332,7 @@
                         formData.append('auto_print', '{{ hub_config.auto_print|yesno:"true,false" }}');
                         formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
-                        await fetch('{% url "core:settings" %}', {
+                        await fetch('{% url "configuration:settings" %}', {
                             method: 'POST',
                             body: formData
                         });
@@ -390,20 +390,20 @@
                         {
                             text: '{% trans "Settings" %}',
                             handler: () => {
-                                window.location.href = "{% url 'core:settings' %}";
+                                window.location.href = "{% url 'configuration:settings' %}";
                             }
                         },
                         {
                             text: '{% trans "Employees" %}',
                             handler: () => {
-                                window.location.href = "{% url 'core:employees' %}";
+                                window.location.href = "{% url 'accounts:employees' %}";
                             }
                         },
                         {
                             text: '{% trans "Sign Out" %}',
                             role: 'destructive',
                             handler: () => {
-                                window.location.href = "{% url 'core:logout' %}";
+                                window.location.href = "{% url 'accounts:logout' %}";
                             }
                         },
                          {
@@ -421,11 +421,11 @@
 
                 navigateTo(view) {
                     const routes = {
-                        'dashboard': "{% url 'core:dashboard' %}",
-                        'pos': "{% url 'core:pos' %}",
-                        'employees': "{% url 'core:employees' %}",
-                        'plugins': "{% url 'core:plugins' %}",
-                        'settings': "{% url 'core:settings' %}",
+                        'dashboard': "{% url 'configuration:dashboard' %}",
+                        'pos': "{% url 'configuration:pos' %}",
+                        'employees': "{% url 'accounts:employees' %}",
+                        'plugins': "{% url 'plugins:plugins' %}",
+                        'settings': "{% url 'configuration:settings' %}",
                         'products': '#',
                         'sales': '#',
                         'reports': '#'

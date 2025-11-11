@@ -189,7 +189,7 @@ Todos los instaladores se firman automáticamente con GPG en GitHub Actions.
 
 ```bash
 # Descargar clave pública
-curl -sL https://cpos.app/api/gpg/public-key/ | gpg --import
+curl -sL https://erplora.com/api/gpg/public-key/ | gpg --import
 
 # Verificar instalador
 gpg --verify CPOS-Hub-0.8.0-windows-installer.exe.asc CPOS-Hub-0.8.0-windows-installer.exe
@@ -327,7 +327,7 @@ Para crear nueva versión en todas las plataformas:
 
 - **Documentación**: [docs/README.md](../docs/README.md)
 - **Issues**: https://github.com/cpos-app/hub/issues
-- **Website**: https://cpos.app
+- **Website**: https://erplora.com
 
 ---
 

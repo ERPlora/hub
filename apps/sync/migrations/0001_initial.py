@@ -12,11 +12,8 @@ class Migration(migrations.Migration):
         ('core', '0007_hubconfig_currency'),
     ]
 
-    # No database operations - tables already exist
-    database_operations = []
-
-    # Declare models in Django state
-    state_operations = [
+    # Create tables (they were deleted by core.0008)
+    operations = [
         migrations.CreateModel(
             name='TokenCache',
             fields=[
@@ -68,11 +65,4 @@ class Migration(migrations.Migration):
             model_name='syncqueue',
             index=models.Index(fields=['operation_type', 'status'], name='core_syncqu_operati_f2c3e6_idx'),
         ),
-    ]
-
-    operations = [
-        migrations.SeparateDatabaseAndState(
-            database_operations=database_operations,
-            state_operations=state_operations,
-        )
     ]

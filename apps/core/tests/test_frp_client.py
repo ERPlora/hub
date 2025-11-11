@@ -316,7 +316,7 @@ class TestFRPClientConfiguration:
             # Should use Cloud domain from settings
             assert "server_addr" in content
             # In tests, might be localhost or actual domain
-            assert ("localhost" in content or "cpos.app" in content)
+            assert ("localhost" in content or "erplora.com" in content)
         finally:
             if config_path.exists():
                 config_path.unlink()

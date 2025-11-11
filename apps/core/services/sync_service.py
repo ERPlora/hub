@@ -6,7 +6,8 @@ Procesa la cola de sincronización y envía operaciones pendientes al Cloud.
 import requests
 import logging
 from django.conf import settings
-from apps.core.models import SyncQueue, HubConfig
+from apps.sync.models import SyncQueue
+from apps.configuration.models import HubConfig
 
 logger = logging.getLogger(__name__)
 
