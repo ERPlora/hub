@@ -374,7 +374,7 @@ def dashboard(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     context = {
         'current_view': 'dashboard'
@@ -387,7 +387,7 @@ def logout(request):
     Logout - clear session
     """
     request.session.flush()
-    return redirect('core:login')
+    return redirect('accounts:login')
 
 
 def pos(request):
@@ -396,7 +396,7 @@ def pos(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     context = {
         'current_view': 'pos'
@@ -410,7 +410,7 @@ def settings(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     hub_config = HubConfig.get_config()
     store_config = StoreConfig.get_config()
@@ -488,7 +488,7 @@ def settings(request):
             # Store success message in session
             request.session['settings_message'] = 'Store configuration saved successfully'
 
-            return redirect('core:settings')
+            return redirect('configuration:settings')
 
     # Get success message if any
     settings_message = request.session.pop('settings_message', None)
@@ -508,7 +508,7 @@ def employees(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     local_users = LocalUser.objects.filter(is_active=True).order_by('name')
     context = {
@@ -660,7 +660,7 @@ def plugins(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     from .plugin_loader import plugin_loader
     from .models import Plugin

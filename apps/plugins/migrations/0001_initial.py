@@ -1,7 +1,8 @@
 # Generated migration for plugins app
-# This migration references existing tables from core app
+# This migration creates the core_plugin table (moved from core app)
 
 from django.db import migrations, models
+from config.plugin_categories import CATEGORY_CHOICES
 
 
 class Migration(migrations.Migration):
@@ -12,11 +13,7 @@ class Migration(migrations.Migration):
         ('core', '0007_hubconfig_currency'),
     ]
 
-    # No database operations - tables already exist
-    database_operations = []
-
-    # Declare models in Django state
-    state_operations = [
+    operations = [
         migrations.CreateModel(
             name='Plugin',
             fields=[
@@ -27,7 +24,7 @@ class Migration(migrations.Migration):
                 ('version', models.CharField(max_length=50)),
                 ('author', models.CharField(blank=True, max_length=255)),
                 ('icon', models.CharField(default='extension-puzzle-outline', max_length=50)),
-                ('category', models.CharField(default='general', max_length=50)),
+                ('category', models.CharField(choices=CATEGORY_CHOICES, default='utilities', help_text='Plugin category from PLUGIN_CATEGORIES', max_length=50)),
                 ('is_installed', models.BooleanField(default=False)),
                 ('is_active', models.BooleanField(default=True)),
                 ('install_path', models.CharField(blank=True, max_length=500)),
@@ -46,11 +43,4 @@ class Migration(migrations.Migration):
                 'db_table': 'core_plugin',
             },
         ),
-    ]
-
-    operations = [
-        migrations.SeparateDatabaseAndState(
-            database_operations=database_operations,
-            state_operations=state_operations,
-        )
     ]

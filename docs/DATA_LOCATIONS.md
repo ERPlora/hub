@@ -445,7 +445,7 @@ Si tienes problemas con las ubicaciones de datos:
 1. Verifica permisos de escritura
 2. Verifica espacio en disco
 3. Revisa los logs en `logs/cpos-hub.log`
-4. Contacta soporte: https://cpos.app/support
+4. Contacta soporte: https://erplora.com/support
 
 ---
 

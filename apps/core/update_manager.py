@@ -68,7 +68,7 @@ class UpdateManager:
         self.cloud_api_url = getattr(
             settings,
             'CLOUD_API_URL',
-            'https://cpos.app/api/hubs'
+            'https://erplora.com/api/hubs'
         )
 
         # Current version

@@ -1,13 +1,14 @@
 from django.db import models
+from config.plugin_categories import CATEGORY_CHOICES
 
 
 class Plugin(models.Model):
     """
     Installed plugins in the Hub.
-    Plugins extend the functionality of the POS system.
+    Plugins extend the functionality of the ERP system.
     """
     # Plugin identification
-    plugin_id = models.CharField(max_length=100, unique=True)  # e.g., 'cpos-pos', 'cpos-inventory'
+    plugin_id = models.CharField(max_length=100, unique=True)  # e.g., 'products', 'pos-basic'
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     version = models.CharField(max_length=50)
@@ -15,7 +16,12 @@ class Plugin(models.Model):
     # Plugin metadata
     author = models.CharField(max_length=255, blank=True)
     icon = models.CharField(max_length=50, default='extension-puzzle-outline')
-    category = models.CharField(max_length=50, default='general')  # pos, inventory, reports, etc.
+    category = models.CharField(
+        max_length=50,
+        choices=CATEGORY_CHOICES,
+        default='utilities',
+        help_text='Plugin category from PLUGIN_CATEGORIES'
+    )
 
     # Installation status
     is_installed = models.BooleanField(default=False)
