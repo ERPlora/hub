@@ -10,9 +10,11 @@ Runs initialization tasks when the Hub starts, including:
 """
 
 import logging
+import asyncio
 from threading import Thread
 from .update_manager import update_manager
 from .frp_client import get_frp_client, FRPClientError
+from .websocket_client import WebSocketClient, set_websocket_client, WebSocketClientError
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +82,70 @@ def start_frp_client_async():
         logger.exception(f"Unexpected error starting FRP client: {e}")
 
 
+def start_websocket_client_async():
+    """
+    Start WebSocket client in a background thread to avoid blocking startup.
+
+    The WebSocket client maintains real-time connection with Cloud for:
+    - Heartbeat sending (every 30 seconds)
+    - Receiving plugin updates
+    - Receiving user revocations
+    - Receiving backup requests
+    """
+    try:
+        from .models import HubConfig
+
+        logger.info("Starting WebSocket client in background...")
+
+        # Get Hub configuration
+        config = HubConfig.get_config()
+
+        if not config.is_configured or not config.hub_id:
+            logger.warning("Hub not configured, skipping WebSocket connection")
+            return
+
+        if not config.tunnel_token:
+            logger.warning("No tunnel token available, skipping WebSocket connection")
+            return
+
+        # Create WebSocket client using tunnel_token (Hub's permanent credential)
+        ws_client = WebSocketClient(
+            hub_id=str(config.hub_id),
+            token=config.tunnel_token,  # Use tunnel_token, not JWT
+            cloud_url='ws://localhost:8000',
+            heartbeat_interval=30,
+        )
+
+        # Set global instance
+        set_websocket_client(ws_client)
+
+        # Start WebSocket client in asyncio loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            loop.run_until_complete(ws_client.start())
+            logger.info("✅ WebSocket client started successfully")
+            logger.info(f"   Hub ID: {config.hub_id}")
+            logger.info(f"   Heartbeat interval: 30 seconds")
+
+            # Keep the loop running to maintain connection
+            loop.run_forever()
+
+        except WebSocketClientError as e:
+            logger.error(f"Failed to start WebSocket client: {e}")
+            logger.info("Hub will run without real-time Cloud connection")
+
+        except Exception as e:
+            logger.exception(f"Unexpected error in WebSocket client: {e}")
+
+        finally:
+            loop.close()
+
+    except Exception as e:
+        logger.exception(f"Error starting WebSocket client: {e}")
+
+
 def run_startup_tasks():
     """
     Execute all startup tasks.
@@ -96,8 +162,11 @@ def run_startup_tasks():
     frp_thread = Thread(target=start_frp_client_async, daemon=True)
     frp_thread.start()
 
+    # Start WebSocket client in background thread
+    ws_thread = Thread(target=start_websocket_client_async, daemon=True)
+    ws_thread.start()
+
     # TODO: Add other startup tasks:
-    # - Check WebSocket connection to Cloud
     # - Verify database integrity
     # - Load installed plugins
     # - Initialize hardware services
