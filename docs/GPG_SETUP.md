@@ -43,12 +43,12 @@ gpg --full-generate-key
 # - Longitud: 4096
 # - Validez: 5y
 # - Nombre: CPOS Team
-# - Email: releases@cpos.app
+# - Email: releases@erplora.com
 # - Comentario: CPOS Hub Release Signing Key
 # - Passphrase: (dejar vacío para CI/CD)
 
 # Obtener Key ID
-gpg --list-keys releases@cpos.app
+gpg --list-keys releases@erplora.com
 
 # Exportar clave privada
 gpg --armor --export-secret-keys <KEY_ID> > gpg-private-key.asc
@@ -167,7 +167,7 @@ Crea documentación para que los usuarios sepan verificar las firmas:
 
 - ✅ Ya creado: `docs/SIGNATURE_VERIFICATION.md`
 - ✅ Mencionar en README.md
-- ⏳ Agregar a página web (cpos.app/security)
+- ⏳ Agregar a página web (erplora.com/security)
 
 ---
 
@@ -256,7 +256,7 @@ gpg --import GPG-PUBLIC-KEY.asc
 
 ```bash
 # Extender validez de la clave
-gpg --edit-key releases@cpos.app
+gpg --edit-key releases@erplora.com
 > expire
 > 5y
 > save

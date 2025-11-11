@@ -19,7 +19,7 @@ def _get_token_cache():
     Returns:
         TokenCache: Token cache model instance
     """
-    from apps.core.models import TokenCache
+    from apps.sync.models import TokenCache
     return TokenCache.get_cache()
 
 

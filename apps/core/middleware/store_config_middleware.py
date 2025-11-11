@@ -13,9 +13,9 @@ class StoreConfigCheckMiddleware:
         self.get_response = get_response
         # Paths that don't require store configuration
         self.exempt_paths = [
-            reverse('core:login'),
-            reverse('core:logout'),
-            reverse('core:settings'),
+            reverse('accounts:login'),
+            reverse('accounts:logout'),
+            reverse('configuration:settings'),
             '/api/',  # API endpoints
             '/static/',  # Static files
             '/media/',  # Media files
@@ -37,7 +37,7 @@ class StoreConfigCheckMiddleware:
                     if not store_config.is_complete():
                         request.session['store_config_checked'] = True
                         request.session['settings_message'] = 'Please complete store configuration to continue'
-                        return redirect('core:settings')
+                        return redirect('configuration:settings')
 
                     # Mark as checked for this session
                     request.session['store_config_checked'] = True

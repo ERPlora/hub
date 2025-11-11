@@ -13,11 +13,8 @@ class Migration(migrations.Migration):
         ('core', '0007_hubconfig_currency'),
     ]
 
-    # No database operations - tables already exist
-    database_operations = []
-
-    # Declare models in Django state
-    state_operations = [
+    # Create tables (they were deleted by core.0008)
+    operations = [
         migrations.CreateModel(
             name='HubConfig',
             fields=[
@@ -65,11 +62,4 @@ class Migration(migrations.Migration):
                 'db_table': 'core_storeconfig',
             },
         ),
-    ]
-
-    operations = [
-        migrations.SeparateDatabaseAndState(
-            database_operations=database_operations,
-            state_operations=state_operations,
-        )
     ]

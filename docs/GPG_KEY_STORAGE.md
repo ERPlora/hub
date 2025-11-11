@@ -36,7 +36,7 @@ cat hub/GPG-PUBLIC-KEY.asc
 gpg --import hub/GPG-PUBLIC-KEY.asc
 
 # Ver info de la clave
-gpg --list-keys releases@cpos.app
+gpg --list-keys releases@erplora.com
 ```
 
 ---
