@@ -178,7 +178,7 @@ HUB_VERSION = "1.0.0"
 
 
 # ===========================
-# CPOS Hub Data Directories
+# ERPlora Hub Data Directories
 # ===========================
 # All user data stored outside the app for persistence across updates
 
@@ -254,7 +254,7 @@ LOGGING = {
 import sys
 
 # Detectar modo de ejecución
-DEVELOPMENT_MODE = not getattr(sys, 'frozen', False) and config('CPOS_DEV_MODE', default='true') == 'true'
+DEVELOPMENT_MODE = not getattr(sys, 'frozen', False) and config('ERPlora_DEV_MODE', default='true') == 'true'
 
 if DEVELOPMENT_MODE:
     # ========== MODO DESARROLLO ==========

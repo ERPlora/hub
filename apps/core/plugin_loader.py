@@ -3,8 +3,8 @@ Plugin Loader for CPOS Hub
 Dynamically loads and manages plugins from external data directory
 
 Plugins are stored in platform-specific locations:
-- Windows: C:\\Users\\<user>\\AppData\\Local\\CPOSHub\\plugins\\
-- macOS: ~/Library/Application Support/CPOSHub/plugins/
+- Windows: C:\\Users\\<user>\\AppData\\Local\\ERPloraHub\\plugins\\
+- macOS: ~/Library/Application Support/ERPloraHub/plugins/
 - Linux: ~/.cpos-hub/plugins/
 
 This allows plugins to persist across app updates and reinstalls.
