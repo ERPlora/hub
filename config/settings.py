@@ -44,21 +44,26 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third-party apps
     'djmoney',  # Django Money for currency handling
-    # Hub apps
+    # Hub apps (refactored from monolithic core)
+    'apps.accounts.apps.AccountsConfig',
+    'apps.configuration.apps.ConfigurationConfig',
+    'apps.plugins.apps.PluginsConfig',
+    'apps.sync.apps.SyncConfig',
+    # Core app (keeping for utilities and context processors)
     'apps.core.apps.CoreConfig',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'apps.core.middleware.LanguageMiddleware',  # Custom language middleware (OS → User)
+    'apps.accounts.middleware.LanguageMiddleware',  # Custom language middleware (OS → User)
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'apps.core.middleware.jwt_middleware.JWTMiddleware',  # JWT validation with offline support
-    'apps.core.middleware.StoreConfigCheckMiddleware',  # Check if store is configured after login
+    'apps.accounts.middleware.jwt_middleware.JWTMiddleware',  # JWT validation with offline support
+    'apps.configuration.middleware.StoreConfigCheckMiddleware',  # Check if store is configured after login
 ]
 
 ROOT_URLCONF = 'config.urls'

@@ -12,9 +12,9 @@ Runs initialization tasks when the Hub starts, including:
 import logging
 import asyncio
 from threading import Thread
-from .update_manager import update_manager
-from .frp_client import get_frp_client, FRPClientError
-from .websocket_client import WebSocketClient, set_websocket_client, WebSocketClientError
+from apps.core.update_manager import update_manager
+from apps.core.frp_client import get_frp_client, FRPClientError
+from apps.sync.websocket_client import WebSocketClient, set_websocket_client, WebSocketClientError
 
 logger = logging.getLogger(__name__)
 
