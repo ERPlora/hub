@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradientes en tonos grises/neutros que se ven bien en dark y light -->
+    <linearGradient id="gradient1-default" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#52525b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3f3f46;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="gradient2-default" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#71717a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#52525b;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="gradient3-default" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3f3f46;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#27272a;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="gradient4-default" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a1a1aa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#71717a;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Grupo principal del logo -->
+  <g id="erplorer-logo-default">
+    <!-- Círculo exterior decorativo -->
+    <circle cx="100" cy="100" r="95" fill="none" stroke="#52525b" stroke-width="2" opacity="0.3"/>
+    <circle cx="100" cy="100" r="85" fill="none" stroke="#71717a" stroke-width="1" opacity="0.2"/>
+
+    <!-- Segmentos principales de la brújula -->
+    <!-- Norte -->
+    <path d="M100 15 L120 60 L100 100 L80 60 Z" fill="url(#gradient1-default)"/>
+
+    <!-- Este -->
+    <path d="M185 100 L140 120 L100 100 L140 80 Z" fill="url(#gradient2-default)"/>
+
+    <!-- Sur -->
+    <path d="M100 185 L80 140 L100 100 L120 140 Z" fill="url(#gradient3-default)"/>
+
+    <!-- Oeste -->
+    <path d="M15 100 L60 80 L100 100 L60 120 Z" fill="url(#gradient4-default)"/>
+
+    <!-- Anillo central decorativo -->
+    <circle cx="100" cy="100" r="20" fill="none" stroke="#52525b" stroke-width="1" opacity="0.4"/>
+
+    <!-- Centro - colores que se adaptan a ambos temas -->
+    <circle cx="100" cy="100" r="12" fill="#3f3f46"/>
+    <circle cx="100" cy="100" r="8" fill="#27272a"/>
+    <circle cx="100" cy="100" r="4" fill="#a1a1aa" opacity="0.9"/>
+  </g>
+</svg>

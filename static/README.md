@@ -6,31 +6,48 @@ Esta carpeta contiene todos los archivos estáticos del Hub (CSS, JavaScript, im
 
 ```
 static/
-├── css/              # Estilos CSS custom
-│   ├── ionic-theme.css
-│   └── custom.css
+├── css/              # Estilos CSS
+│   ├── themes/      # Temas de color (cada tema en su carpeta)
+│   │   ├── default/
+│   │   │   ├── ionic-theme.css       # Colores del tema default
+│   │   │   └── erplorer-logo.svg     # Logo del tema default
+│   │   └── blue/
+│   │       ├── ionic-theme.css       # Colores del tema blue
+│   │       └── erplorer-logo.svg     # Logo del tema blue
+│   ├── style.css    # Estilos base y componentes
+│   └── tailwind-ionic.css  # Utilidades Tailwind + Ionic
 ├── js/               # JavaScript custom
-│   ├── alpine-components.js
-│   └── utils.js
-├── img/              # Imágenes y logos
-│   └── logo.png
+│   └── tailwind.cdn.js  # Tailwind CSS (offline)
+├── img/              # Imágenes y logos generales
 ├── fonts/            # Fuentes custom (opcional)
-└── ionicons/         # Iconos Ionic (descargados localmente)
+└── media/            # Uploads (logos de tienda, etc.)
 ```
 
 ## Uso en Templates
 
 ```html
 {% load static %}
+{% load theme_tags %}
 
-<!-- CSS -->
-<link rel="stylesheet" href="{% static 'css/ionic-theme.css' %}">
+<!-- Ionic CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css" />
 
-<!-- JavaScript -->
-<script src="{% static 'js/alpine-components.js' %}"></script>
+<!-- Theme CSS (carga dinámicamente desde carpeta del tema) -->
+<link rel="stylesheet" href="{% theme_css hub_config.color_theme %}" id="theme-stylesheet">
+<!-- O directamente: -->
+<link rel="stylesheet" href="{% static 'css/themes/' %}{{ hub_config.color_theme }}/ionic-theme.css">
 
-<!-- Imágenes -->
-<img src="{% static 'img/logo.png' %}" alt="CPOS Hub">
+<!-- Base Styles -->
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+<!-- Tailwind CSS (offline) -->
+<script src="{% static 'js/tailwind.cdn.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/tailwind-ionic.css' %}">
+
+<!-- Logo del tema actual -->
+<img src="{% theme_logo hub_config.color_theme %}" alt="CPOS Hub">
+<!-- O directamente: -->
+<img src="{% static 'css/themes/' %}{{ hub_config.color_theme }}/erplorer-logo.svg">
 
 <!-- Iconicons -->
 <ion-icon name="cube-outline"></ion-icon>
@@ -42,20 +59,86 @@ static/
 - **CSS custom**: guardar en `static/css/`
 - **JavaScript custom**: guardar en `static/js/`
 - **NO confundir con `assets/`**: `assets/` solo para iconos de la app (.icns, .ico)
+- **Todos los archivos son locales**: El Hub funciona 100% offline sin dependencias de CDN
 
-## Archivos CDN vs Locales
+## Archivos Locales (Offline-First)
 
-Por defecto, Ionic y Alpine.js se cargan desde CDN en desarrollo:
+Todos los recursos frontend están disponibles localmente:
 
-```html
-<!-- CDN (desarrollo) -->
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css" />
+```
+static/
+├── css/
+│   ├── ionic.bundle.css         # Ionic CSS completo (38KB)
+│   └── tailwind-ionic.css       # Utilidades Tailwind + Ionic
+├── js/
+│   ├── alpine.min.js            # Alpine.js 3.x (44KB)
+│   ├── ionic/                   # Ionic Core completo (6.5MB con todos los componentes)
+│   │   ├── ionic.esm.js        # Entry point ESM
+│   │   └── p-*.entry.js        # 93 componentes lazy-loaded
+│   ├── tailwind.cdn.js          # Tailwind CSS (403KB)
+│   └── htmx.min.js             # HTMX (47KB)
+└── ionicons/
+    └── dist/ionicons/           # Iconos completos (20MB con SVGs)
+        ├── ionicons.esm.js
+        ├── ionicons.js
+        └── svg/                 # 1300+ iconos SVG
 ```
 
-Para producción (offline), descarga y coloca en `static/`:
-- Alpine.js → `static/js/alpine.min.js`
-- Ionic → `static/css/ionic.bundle.css` + `static/js/ionic.esm.js`
+✅ **100% Offline** - Sin dependencias de CDN
+✅ **Rápido** - Sin latencia de red
+✅ **Confiable** - Funciona sin internet
+
+## Tailwind CSS + Ionic Integration
+
+El archivo `tailwind-ionic.css` proporciona utilidades Tailwind que usan variables de Ionic para seamless theming:
+
+### Colores con Ionic Variables
+
+```html
+<!-- Text colors -->
+<div class="text-primary">Primary color text</div>
+<div class="text-success">Success text</div>
+<div class="text-danger">Danger text</div>
+
+<!-- Background colors -->
+<div class="bg-primary">Primary background</div>
+<div class="bg-card">Card background (adapts to theme)</div>
+<div class="bg-muted">Muted background</div>
+
+<!-- Con opacidad -->
+<div class="bg-primary/10">10% opacity primary</div>
+```
+
+### Componentes Pre-styled
+
+```html
+<!-- Buttons with Ionic colors -->
+<button class="btn-primary px-4 py-2">Primary Button</button>
+<button class="btn-success px-4 py-2">Success Button</button>
+
+<!-- Cards -->
+<div class="card-ionic p-4 shadow-ionic-md">
+  Card with Ionic theme colors
+</div>
+
+<!-- Inputs -->
+<input class="input-ionic px-3 py-2 w-full" placeholder="Input with theme">
+```
+
+### Border Radius con Ionic
+
+```html
+<div class="rounded-ionic">Uses --radius variable</div>
+<div class="rounded-ionic-sm">Smaller radius</div>
+<div class="rounded-ionic-lg">Larger radius</div>
+```
+
+### Ventajas
+
+✅ **Seamless theming**: Colores cambian automáticamente con el tema
+✅ **Dark mode support**: Se adapta automáticamente a `body.dark`
+✅ **Consistencia**: Usa las mismas variables que Ionic components
+✅ **Flexibilidad**: Combina poder de Tailwind con colores de Ionic
 
 ## Collectstatic
 
