@@ -326,7 +326,7 @@ Para crear nueva versión en todas las plataformas:
 ## 📞 Soporte
 
 - **Documentación**: [docs/README.md](../docs/README.md)
-- **Issues**: https://github.com/cpos-app/hub/issues
+- **Issues**: https://github.com/ERPlora/hub/issues
 - **Website**: https://erplora.com
 
 ---
