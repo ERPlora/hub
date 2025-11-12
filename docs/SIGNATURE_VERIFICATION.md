@@ -33,7 +33,7 @@ gpg --import cpos-hub-public-key.asc
 
 ```bash
 # Descargar clave pública
-curl -O https://raw.githubusercontent.com/cpos-app/hub/main/GPG-PUBLIC-KEY.asc
+curl -O https://raw.githubusercontent.com/ERPlora/hub/main/GPG-PUBLIC-KEY.asc
 
 # Importar clave
 gpg --import GPG-PUBLIC-KEY.asc
@@ -149,7 +149,7 @@ gpg --fingerprint releases@erplora.com
 ```
 
 Compara el fingerprint con el publicado en:
-- https://github.com/cpos-app/hub/blob/main/GPG-PUBLIC-KEY.asc
+- https://github.com/ERPlora/hub/blob/main/GPG-PUBLIC-KEY.asc
 - https://erplora.com/security/gpg (página web oficial)
 
 ---
@@ -249,7 +249,7 @@ chmod +x verify-cpos.sh
 
 1. **NO uses el archivo**
 2. Elimínalo inmediatamente
-3. Descarga nuevamente desde https://github.com/cpos-app/hub/releases
+3. Descarga nuevamente desde https://github.com/ERPlora/hub/releases
 4. Verifica nuevamente
 5. Si persiste, reporta el problema: security@erplora.com
 
@@ -278,9 +278,9 @@ Si encuentras un problema de seguridad:
 
 ### Transparencia
 
-- Clave pública: https://github.com/cpos-app/hub/blob/main/GPG-PUBLIC-KEY.asc
-- Historial de firmas: https://github.com/cpos-app/hub/releases
-- Policy de seguridad: https://github.com/cpos-app/hub/security/policy
+- Clave pública: https://github.com/ERPlora/hub/blob/main/GPG-PUBLIC-KEY.asc
+- Historial de firmas: https://github.com/ERPlora/hub/releases
+- Policy de seguridad: https://github.com/ERPlora/hub/security/policy
 
 ---
 

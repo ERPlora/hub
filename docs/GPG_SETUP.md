@@ -61,7 +61,7 @@ gpg --armor --export <KEY_ID> > gpg-public-key.asc
 
 ## 🔒 Paso 2: Configurar GitHub Secrets
 
-Ve a: `https://github.com/cpos-app/hub/settings/secrets/actions`
+Ve a: `https://github.com/ERPlora/hub/settings/secrets/actions`
 
 ### Secret 1: GPG_PRIVATE_KEY
 
@@ -228,7 +228,7 @@ echo "use-agent" >> ~/.gnupg/gpg.conf
 
 Los usuarios necesitan importar tu clave pública primero:
 ```bash
-curl -O https://raw.githubusercontent.com/cpos-app/hub/main/GPG-PUBLIC-KEY.asc
+curl -O https://raw.githubusercontent.com/ERPlora/hub/main/GPG-PUBLIC-KEY.asc
 gpg --import GPG-PUBLIC-KEY.asc
 ```
 

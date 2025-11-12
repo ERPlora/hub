@@ -548,7 +548,7 @@ Los instaladores se crean automáticamente en GitHub Actions:
 1. **GitHub Actions** → **Build Release Executables**
 2. **Run workflow** → Ingresar versión (ej: `0.8.0`)
 3. **Esperar** ~15-20 minutos
-4. **Descargar** desde [Releases](https://github.com/cpos-app/hub/releases)
+4. **Descargar** desde [Releases](https://github.com/ERPlora/hub/releases)
 
 **Archivos generados**:
 - `CPOS-Hub-0.8.0-windows-installer.exe` + `.asc` (firma GPG)
