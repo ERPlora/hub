@@ -8,8 +8,8 @@ import zipfile
 from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
-from apps.core.plugin_loader import plugin_loader
-from apps.plugins.models import Plugin
+from apps.plugins_runtime.loader import plugin_loader
+from django.apps import apps as django_apps
 
 
 class Command(BaseCommand):
@@ -180,6 +180,7 @@ class Command(BaseCommand):
 
     def list_plugins(self):
         """List all plugins"""
+        Plugin = django_apps.get_model("plugins_admin", "Plugin")
         plugins = Plugin.objects.all().order_by('menu_order', 'name')
 
         if not plugins.exists():

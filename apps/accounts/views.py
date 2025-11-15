@@ -231,17 +231,34 @@ def cloud_login(request):
                     # Check if this is the first user in the Hub
                     is_first_user = LocalUser.objects.count() == 0
 
-                    # Check if user already exists locally
-                    local_user, created = LocalUser.objects.get_or_create(
-                        cloud_user_id=user_info.get('id'),
-                        defaults={
-                            'email': email,
-                            'name': user_info.get('name', email.split('@')[0]),
-                            'role': 'admin' if is_first_user else 'cashier',  # First user is admin, others are cashier by default
-                            'pin_hash': '',  # Will be set during PIN setup
-                            'language': user_info.get('language', hub_config.os_language),  # Use Cloud language or OS language
-                        }
-                    )
+                    # Check if user already exists locally (by email or cloud_user_id)
+                    cloud_user_id = user_info.get('id')
+
+                    # Try to get existing user by cloud_user_id or email
+                    local_user = None
+                    created = False
+
+                    try:
+                        # First try by cloud_user_id
+                        local_user = LocalUser.objects.get(cloud_user_id=cloud_user_id)
+                    except LocalUser.DoesNotExist:
+                        try:
+                            # Then try by email
+                            local_user = LocalUser.objects.get(email=email)
+                            # Update cloud_user_id if it changed
+                            local_user.cloud_user_id = cloud_user_id
+                            local_user.save(update_fields=['cloud_user_id'])
+                        except LocalUser.DoesNotExist:
+                            # Create new user
+                            local_user = LocalUser.objects.create(
+                                cloud_user_id=cloud_user_id,
+                                email=email,
+                                name=user_info.get('name', email.split('@')[0]),
+                                role='admin' if is_first_user else 'cashier',
+                                pin_hash='',
+                                language=user_info.get('language', hub_config.os_language),
+                            )
+                            created = True
 
                     # Si el usuario existía pero estaba inactivo, reactivarlo
                     if not created and not local_user.is_active:

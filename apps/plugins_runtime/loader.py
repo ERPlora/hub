@@ -92,7 +92,8 @@ class PluginLoader:
 
         Returns True if successful
         """
-        from apps.plugins.models import Plugin
+        from django.apps import apps as django_apps
+        Plugin = django_apps.get_model("plugins_admin", "Plugin")
 
         try:
             # Get plugin from database
@@ -174,7 +175,8 @@ class PluginLoader:
         Load all active plugins from database
         Returns count of successfully loaded plugins
         """
-        from apps.plugins.models import Plugin
+        from django.apps import apps as django_apps
+        Plugin = django_apps.get_model("plugins_admin", "Plugin")
 
         active_plugins = Plugin.objects.filter(is_active=True, is_installed=True)
         loaded_count = 0
@@ -190,7 +192,8 @@ class PluginLoader:
         Unload a plugin (mark as inactive)
         Note: Cannot truly unload from Python runtime, but can mark as inactive
         """
-        from apps.plugins.models import Plugin
+        from django.apps import apps as django_apps
+        Plugin = django_apps.get_model("plugins_admin", "Plugin")
 
         try:
             plugin = Plugin.objects.get(plugin_id=plugin_id)
@@ -210,7 +213,8 @@ class PluginLoader:
         Install a plugin from its metadata (plugin.json)
         Creates/updates Plugin model instance
         """
-        from apps.plugins.models import Plugin
+        from django.apps import apps as django_apps
+        Plugin = django_apps.get_model("plugins_admin", "Plugin")
 
         plugin_id = metadata.get('plugin_id')
         if not plugin_id:
@@ -280,7 +284,8 @@ class PluginLoader:
         Get all active plugin menu items for sidebar
         Returns list of menu items sorted by order
         """
-        from apps.plugins.models import Plugin
+        from django.apps import apps as django_apps
+        Plugin = django_apps.get_model("plugins_admin", "Plugin")
 
         plugins = Plugin.objects.filter(
             is_active=True,
