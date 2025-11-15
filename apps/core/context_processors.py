@@ -17,7 +17,7 @@ def plugin_menu_items(request):
     """
     Add plugin menu items to template context
     """
-    from apps.plugins.plugin_loader import plugin_loader
+    from apps.plugins_runtime.loader import plugin_loader
 
     # Only load plugins if user is authenticated
     if 'local_user_id' in request.session:
