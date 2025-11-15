@@ -13,7 +13,13 @@ sys.path.insert(0, os.path.dirname(__file__))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from apps.core.frp_client import get_frp_client, FRPClientError
+# Updated to use multi_device plugin
+# Note: This test should be run after plugin is installed and active
+try:
+    from multi_device.frp_client import get_frp_client, FRPClientError
+except ImportError:
+    # Fallback for backward compatibility during migration
+    from apps.core.frp_client import get_frp_client, FRPClientError
 
 def test_frp_tunnel():
     """Test FRP tunnel connection."""

@@ -112,7 +112,7 @@ class PluginRuntimeManager:
 
             # Step 5: Register plugin in database
             result['messages'].append('Registering plugin in database...')
-            from apps.core.plugin_loader import plugin_loader
+            from apps.plugins_runtime.loader import plugin_loader
             plugin = plugin_loader.install_plugin_from_metadata(plugin_data)
 
             if plugin:
@@ -344,7 +344,7 @@ class PluginRuntimeManager:
             plugin_path = self.plugins_dir / plugin_id
 
             # Mark as inactive in database
-            from apps.core.plugin_loader import plugin_loader
+            from apps.plugins_runtime.loader import plugin_loader
             if plugin_loader.unload_plugin(plugin_id):
                 result['messages'].append(f'Plugin {plugin_id} deactivated')
 

@@ -3,6 +3,16 @@ from django.http import JsonResponse
 from .models import HubConfig, StoreConfig
 
 
+def index(request):
+    """
+    Root URL - redirect to dashboard if logged in, otherwise to login
+    """
+    if 'local_user_id' in request.session:
+        return redirect('configuration:dashboard')
+    else:
+        return redirect('accounts:login')
+
+
 def dashboard(request):
     """
     Dashboard view - placeholder for now

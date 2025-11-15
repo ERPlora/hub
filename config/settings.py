@@ -10,16 +10,15 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import sys
 from pathlib import Path
 from decouple import config
 from config.paths import get_data_paths
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 # User data paths (outside the app for persistence across updates)
 DATA_PATHS = get_data_paths()
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -29,6 +28,20 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-hub-development-key-c
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
+USE_LOCAL_PLUGINS_DIR = DEBUG
+
+# --- Config de plugins ---
+USE_LOCAL_PLUGINS_DIR = DEBUG  # en dev: ./plugins
+
+if USE_LOCAL_PLUGINS_DIR:
+    PLUGINS_ROOT = BASE_DIR / "plugins"
+else:
+    # aquí la ruta externa de producción, por ejemplo:
+    PLUGINS_ROOT = DATA_PATHS / "plugins"
+
+# añadir al sys.path para import "products", "loyalty", etc.
+if PLUGINS_ROOT.exists():
+    sys.path.insert(0, str(PLUGINS_ROOT))
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=lambda v: [s.strip() for s in v.split(',')])
 
@@ -44,8 +57,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
 ]
 
-# Application definition
 
+# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -58,11 +71,56 @@ INSTALLED_APPS = [
     # Hub apps (refactored from monolithic core)
     'apps.accounts.apps.AccountsConfig',
     'apps.configuration.apps.ConfigurationConfig',
-    'apps.plugins.apps.PluginsConfig',
+    # 'apps.plugins.apps.PluginsConfig',
     'apps.sync.apps.SyncConfig',
     # Core app (keeping for utilities and context processors)
     'apps.core.apps.CoreConfig',
+    
+    # gestión de plugins
+    "apps.plugins_admin",
+
+    # runtime/carga de plugins
+    "apps.plugins_runtime",
 ]
+
+# Función para cargar plugins dinámicamente en INSTALLED_APPS
+def load_active_plugins():
+    """
+    Carga plugins activos en INSTALLED_APPS antes de que Django los procese.
+    Esto se ejecuta en settings.py, antes de apps.populate().
+    """
+    import os
+    import sqlite3
+    from pathlib import Path
+
+    # Solo cargar si la BD existe
+    db_path = BASE_DIR / "db.sqlite3"
+    if not db_path.exists():
+        return []
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+
+        # Obtener plugins activos (usando el nombre de tabla correcto)
+        cursor.execute("""
+            SELECT plugin_id FROM plugins_admin_plugin
+            WHERE is_installed = 1 AND is_active = 1
+        """)
+
+        active_plugins = [row[0] for row in cursor.fetchall()]
+        conn.close()
+
+        return active_plugins
+    except Exception as e:
+        # Si la tabla no existe, retornar lista vacía
+        return []
+
+# Cargar plugins activos dinámicamente
+INSTALLED_APPS += load_active_plugins()
+
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -132,6 +190,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Login URL
+LOGIN_URL = '/login/'  # Redirect to /login/ when @login_required fails
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -175,7 +236,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Cloud API Configuration
 # URL of the Cloud server for authentication and hub registration
-CLOUD_API_URL = config('CLOUD_API_URL', default='http://localhost:8000')
+# For testing: https://int.erplora.com
+# For production: https://erplora.com
+# Can be overridden via environment variable CLOUD_API_URL
+CLOUD_API_URL = config('CLOUD_API_URL', default='https://int.erplora.com')
 
 
 # FRP Client Configuration

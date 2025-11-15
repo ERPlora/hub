@@ -14,7 +14,7 @@ def plugins(request):
     if 'local_user_id' not in request.session:
         return redirect('accounts:login')
 
-    from .plugin_loader import plugin_loader
+    from apps.plugins_runtime.loader import plugin_loader
 
     # Get all installed plugins
     installed_plugins = Plugin.objects.filter(is_installed=True).order_by('name')
@@ -48,7 +48,7 @@ def api_plugin_install(request):
             return JsonResponse({'success': False, 'error': 'File must be a ZIP archive'})
 
         # Save uploaded file to temp directory (cross-platform)
-        from .runtime_manager import plugin_runtime_manager
+        from apps.plugins_runtime.manager import plugin_runtime_manager
 
         # Use runtime manager's temp directory (works on Windows, macOS, Linux)
         tmp_file_path = plugin_runtime_manager.get_temp_file_path(plugin_file.name)
@@ -82,7 +82,7 @@ def api_plugin_activate(request):
         if not plugin_id:
             return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
 
-        from .plugin_loader import plugin_loader
+        from apps.plugins_runtime.loader import plugin_loader
 
         plugin = Plugin.objects.get(plugin_id=plugin_id)
 
@@ -121,7 +121,7 @@ def api_plugin_uninstall(request):
         if not plugin_id:
             return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
 
-        from .runtime_manager import plugin_runtime_manager
+        from apps.plugins_runtime.manager import plugin_runtime_manager
 
         result = plugin_runtime_manager.uninstall_plugin(plugin_id)
 
