@@ -19,7 +19,13 @@ import os
 # Add apps to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from apps.core.websocket_client import WebSocketClient
+# Updated to use multi_device plugin
+# Note: This test should be run after plugin is installed and active
+try:
+    from multi_device.websocket_client import WebSocketClient
+except ImportError:
+    # Fallback for backward compatibility during migration
+    from apps.core.websocket_client import WebSocketClient
 
 
 async def test_websocket_e2e():

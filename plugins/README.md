@@ -283,8 +283,8 @@ Vistas del plugin Products Manager
 """
 
 from django.shortcuts import render, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from apps.accounts.decorators import login_required  # ✅ Usar decorador del Hub
 from .models import Product
 
 

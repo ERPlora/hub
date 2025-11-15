@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views_update, views_frp
+from . import views_update
 
 app_name = 'sync'
 
@@ -13,9 +13,6 @@ urlpatterns = [
     path('api/update/rollback/', views_update.rollback_update, name='update_rollback'),
     path('api/update/notification/', views_update.update_notification, name='update_notification'),
 
-    # FRP Client API endpoints
-    path('api/frp/status/', views_frp.frp_status, name='frp_status'),
-    path('api/frp/start/', views_frp.frp_start, name='frp_start'),
-    path('api/frp/stop/', views_frp.frp_stop, name='frp_stop'),
-    path('api/frp/restart/', views_frp.frp_restart, name='frp_restart'),
+    # FRP Client API endpoints - Moved to multi_device plugin
+    # Access via /multi_device/frp/status/, /multi_device/frp/start/, etc.
 ]
