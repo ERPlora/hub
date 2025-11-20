@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third-party apps
+    'django_components',  # Django Components for reusable components
     'djmoney',  # Django Money for currency handling
     # Hub apps (refactored from monolithic core)
     'apps.accounts.apps.AccountsConfig',
@@ -75,7 +76,7 @@ INSTALLED_APPS = [
     'apps.sync.apps.SyncConfig',
     # Core app (keeping for utilities and context processors)
     'apps.core.apps.CoreConfig',
-    
+
     # gestión de plugins
     "apps.plugins_admin",
 
@@ -154,6 +155,9 @@ TEMPLATES = [
                 'apps.core.context_processors.plugin_menu_items',
                 'apps.core.context_processors.hub_config_context',
             ],
+            'builtins': [
+                'django_components.templatetags.component_tags',  # Django Components template tags
+            ],
         },
     },
 ]
@@ -219,8 +223,19 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+    BASE_DIR / 'components',  # Django Components
+]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Django Components configuration
+COMPONENTS = {
+    "dirs": [
+        BASE_DIR / "components",  # Global components directory
+    ],
+    "app_dirs": ["components"],  # Look for components in each app's "components" directory
+}
 
 # Media files (user uploads)
 # https://docs.djangoproject.com/en/5.2/ref/settings/#media-root

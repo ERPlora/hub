@@ -1,0 +1,18 @@
+{# Stat Card Component
+   Usage:
+   {% include 'components/stat_card/stat_card.html' with
+       value="42"
+       label="Total Hubs"
+       color="primary"
+   %}
+#}
+<ion-card>
+    <ion-card-content class="text-center py-6">
+        <div class="text-4xl font-bold {% if color %}text-{{ color }}{% else %}text-primary{% endif %}">
+            {{ value }}
+        </div>
+        <ion-text color="medium">
+            <div class="mt-1 text-sm">{{ label }}</div>
+        </ion-text>
+    </ion-card-content>
+</ion-card>
