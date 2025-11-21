@@ -5,11 +5,11 @@ from .models import HubConfig, StoreConfig
 @admin.register(HubConfig)
 class HubConfigAdmin(admin.ModelAdmin):
     list_display = ('hub_id', 'is_configured', 'os_language', 'currency', 'dark_mode', 'created_at')
-    readonly_fields = ('hub_id', 'tunnel_port', 'tunnel_token', 'created_at', 'updated_at')
+    readonly_fields = ('hub_id', 'cloud_api_token', 'created_at', 'updated_at')
 
     fieldsets = (
         ('Cloud Connection', {
-            'fields': ('hub_id', 'tunnel_port', 'tunnel_token', 'is_configured')
+            'fields': ('hub_id', 'cloud_api_token', 'is_configured')
         }),
         ('Language & Currency', {
             'fields': ('os_language', 'currency')

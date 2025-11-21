@@ -183,39 +183,53 @@
 
             <ion-content>
                 <ion-list class="ion-padding">
-                    <!-- Navigation Items -->
+                    <!-- Core Navigation Items -->
                     <ion-item button @click="navigateTo('dashboard')"
                         :class="currentView === 'dashboard' ? 'nav-item active' : 'nav-item'" detail="false">
                         <ion-icon name="grid-outline" slot="start"></ion-icon>
                         <ion-label>{% trans "Dashboard" %}</ion-label>
                     </ion-item>
 
-                    <ion-item button @click="navigateTo('pos')"
-                        :class="currentView === 'pos' ? 'nav-item active' : 'nav-item'" detail="false">
-                        <ion-icon name="cart-outline" slot="start"></ion-icon>
-                        <ion-label>{% trans "Point of Sale" %}</ion-label>
-                    </ion-item>
+                    <!-- Plugin Menu Items (Dynamic) -->
+                    {% if PLUGIN_MENU_ITEMS %}
+                    <div style="height: 1px; background: var(--ion-border-color); margin: 1rem 0;"></div>
+                    <div class="nav-section-title">{% trans "Plugins" %}</div>
 
-                    <ion-item button @click="navigateTo('products')"
-                        :class="currentView === 'products' ? 'nav-item active' : 'nav-item'" detail="false">
-                        <ion-icon name="cube-outline" slot="start"></ion-icon>
-                        <ion-label>{% trans "Products" %}</ion-label>
-                    </ion-item>
-
-                    <ion-item button @click="navigateTo('sales')"
-                        :class="currentView === 'sales' ? 'nav-item active' : 'nav-item'" detail="false">
-                        <ion-icon name="receipt-outline" slot="start"></ion-icon>
-                        <ion-label>{% trans "Sales" %}</ion-label>
-                    </ion-item>
-
-                    <ion-item button @click="navigateTo('reports')"
-                        :class="currentView === 'reports' ? 'nav-item active' : 'nav-item'" detail="false">
-                        <ion-icon name="bar-chart-outline" slot="start"></ion-icon>
-                        <ion-label>{% trans "Reports" %}</ion-label>
-                    </ion-item>
+                    {% for item in PLUGIN_MENU_ITEMS %}
+                        {% if item.has_submenu %}
+                        <!-- Plugin with submenu (accordion) -->
+                        <ion-accordion-group>
+                            <ion-accordion>
+                                <ion-item slot="header" class="nav-item">
+                                    <ion-icon name="{{ item.icon }}" slot="start"></ion-icon>
+                                    <ion-label>{{ item.label }}</ion-label>
+                                </ion-item>
+                                <div slot="content" style="padding-left: 1rem;">
+                                    {% for subitem in item.items %}
+                                    <ion-item button href="{{ subitem.url }}" class="nav-item" detail="false">
+                                        <ion-icon name="{{ subitem.icon }}" slot="start" style="font-size: 1.2rem;"></ion-icon>
+                                        <ion-label>{{ subitem.label }}</ion-label>
+                                    </ion-item>
+                                    {% endfor %}
+                                </div>
+                            </ion-accordion>
+                        </ion-accordion-group>
+                        {% else %}
+                        <!-- Simple plugin menu item -->
+                        <ion-item button href="{{ item.url }}"
+                            :class="currentView === '{{ item.plugin_id }}' ? 'nav-item active' : 'nav-item'" detail="false">
+                            <ion-icon name="{{ item.icon }}" slot="start"></ion-icon>
+                            <ion-label>{{ item.label }}</ion-label>
+                        </ion-item>
+                        {% endif %}
+                    {% endfor %}
+                    {% endif %}
 
                     <!-- Separator -->
                     <div style="height: 1px; background: var(--ion-border-color); margin: 1rem 0;"></div>
+
+                    <!-- System Section -->
+                    <div class="nav-section-title">{% trans "System" %}</div>
 
                     <ion-item button @click="navigateTo('employees')"
                         :class="currentView === 'employees' ? 'nav-item active' : 'nav-item'" detail="false">
@@ -227,6 +241,12 @@
                         :class="currentView === 'plugins' ? 'nav-item active' : 'nav-item'" detail="false">
                         <ion-icon name="extension-puzzle-outline" slot="start"></ion-icon>
                         <ion-label>{% trans "Plugins" %}</ion-label>
+                    </ion-item>
+
+                    <ion-item button @click="navigateTo('marketplace')"
+                        :class="currentView === 'marketplace' ? 'nav-item active' : 'nav-item'" detail="false">
+                        <ion-icon name="storefront-outline" slot="start"></ion-icon>
+                        <ion-label>{% trans "Plugin Store" %}</ion-label>
                     </ion-item>
 
                     <ion-item button @click="navigateTo('settings')"
@@ -422,13 +442,10 @@
                 navigateTo(view) {
                     const routes = {
                         'dashboard': "{% url 'configuration:dashboard' %}",
-                        'pos': "{% url 'configuration:pos' %}",
                         'employees': "{% url 'accounts:employees' %}",
                         'plugins': "{% url 'plugins:plugins' %}",
-                        'settings': "{% url 'configuration:settings' %}",
-                        'products': '#',
-                        'sales': '#',
-                        'reports': '#'
+                        'marketplace': "{% url 'plugins:marketplace' %}",
+                        'settings': "{% url 'configuration:settings' %}"
                     };
 
                     if (routes[view] && routes[view] !== '#') {

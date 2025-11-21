@@ -1,0 +1,59 @@
+{% extends "core/app_base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}ERPlora Hub - {% trans "Subscription Required" %}{% endblock %}
+{% block page_title %}{% trans "Subscription Required" %}{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: center; min-height: 60vh;">
+    <ion-card style="max-width: 500px; text-align: center;">
+        <ion-card-content style="padding: 48px 24px;">
+            <!-- Icon -->
+            <div style="margin-bottom: 24px;">
+                <ion-icon name="lock-closed-outline" style="font-size: 80px; color: var(--ion-color-warning);"></ion-icon>
+            </div>
+
+            <!-- Title -->
+            <h2 style="margin: 0 0 12px 0;">
+                {% trans "Subscription Required" %}
+            </h2>
+
+            <!-- Message -->
+            <p style="color: var(--ion-color-medium); margin-bottom: 24px;">
+                {{ message|default:"This feature requires an active subscription. Please subscribe to continue using this premium feature." }}
+            </p>
+
+            <!-- Plugin Info -->
+            {% if plugin_slug %}
+            <div style="background: var(--ion-color-light); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                <div style="font-size: 0.875rem; color: var(--ion-color-medium); margin-bottom: 4px;">
+                    {% trans "Plugin" %}
+                </div>
+                <div style="font-weight: 600; text-transform: capitalize;">
+                    {{ plugin_slug|replace:"_":" " }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <ion-button href="{% url 'plugins:marketplace' %}" expand="block">
+                    <ion-icon slot="start" name="cart-outline"></ion-icon>
+                    {% trans "Go to Marketplace" %}
+                </ion-button>
+
+                <ion-button href="{% url 'plugins:plugins' %}" fill="outline" expand="block">
+                    <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
+                    {% trans "Back to My Plugins" %}
+                </ion-button>
+            </div>
+
+            <!-- Help Text -->
+            <p style="font-size: 0.875rem; color: var(--ion-color-medium); margin-top: 24px;">
+                {% trans "Already subscribed? Try refreshing the page or contact support if the issue persists." %}
+            </p>
+        </ion-card-content>
+    </ion-card>
+</div>
+{% endblock %}
