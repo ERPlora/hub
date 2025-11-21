@@ -255,6 +255,11 @@ class PluginLoader:
             plugin.menu_order = menu_config.get('order', 100)
             plugin.show_in_menu = menu_config.get('show', True)
 
+            # Process menu items (multiple submenu items)
+            menu_items = menu_config.get('items', [])
+            if menu_items:
+                plugin.menu_items = menu_items
+
         plugin.main_url = metadata.get('main_url', '')
         plugin.save()
 
@@ -283,6 +288,10 @@ class PluginLoader:
         """
         Get all active plugin menu items for sidebar
         Returns list of menu items sorted by order
+
+        Structure:
+        - If plugin has menu_items (submenu), returns it with 'items' key
+        - If plugin has no menu_items, returns simple menu item
         """
         from django.apps import apps as django_apps
         Plugin = django_apps.get_model("plugins_admin", "Plugin")
@@ -295,13 +304,23 @@ class PluginLoader:
 
         menu_items = []
         for plugin in plugins:
-            menu_items.append({
+            menu_item = {
                 'plugin_id': plugin.plugin_id,
                 'label': plugin.menu_label or plugin.name,
                 'icon': plugin.menu_icon or 'cube-outline',
-                'url': plugin.main_url or f'#',
                 'order': plugin.menu_order,
-            })
+            }
+
+            # If plugin has multiple menu items (submenu), add them
+            if plugin.menu_items and len(plugin.menu_items) > 0:
+                menu_item['items'] = plugin.menu_items
+                menu_item['has_submenu'] = True
+            else:
+                # Single menu item, use main_url
+                menu_item['url'] = plugin.main_url or f'#'
+                menu_item['has_submenu'] = False
+
+            menu_items.append(menu_item)
 
         return menu_items
 
