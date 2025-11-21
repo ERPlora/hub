@@ -88,7 +88,7 @@ class SyncService:
         # Preparar headers
         headers = {
             'Content-Type': 'application/json',
-            'X-Hub-Token': self.hub_config.tunnel_token,
+            'X-Hub-Token': self.hub_config.cloud_api_token,
             **operation.headers
         }
 

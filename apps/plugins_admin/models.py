@@ -30,6 +30,10 @@ class Plugin(models.Model):
     # URL routing
     main_url = models.CharField(max_length=200, blank=True)  # "/products/" or empty
 
+    # Multiple menu items support (JSON field)
+    # Format: [{"label": "Products", "url": "/products/", "icon": "cube-outline"}, ...]
+    menu_items = models.JSONField(default=list, blank=True)
+
     # Timestamps
     installed_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -36,7 +36,7 @@ def verify_user_access_with_cloud(user):
         # Consultar estado del usuario en Cloud
         response = requests.get(
             f"{django_settings.CLOUD_API_URL}/api/hubs/{hub_config.hub_id}/users/check/{user.email}/",
-            headers={'X-Hub-Token': hub_config.tunnel_token},
+            headers={'X-Hub-Token': hub_config.cloud_api_token},
             timeout=5  # Short timeout para no bloquear login
         )
 
@@ -220,8 +220,7 @@ def cloud_login(request):
 
                             # Save Hub configuration
                             hub_config.hub_id = hub_data.get('hub_id')
-                            hub_config.tunnel_port = hub_data.get('tunnel_port')
-                            hub_config.tunnel_token = hub_data.get('tunnel_token')
+                            hub_config.cloud_api_token = hub_data.get('cloud_api_token')
                             hub_config.is_configured = True
                             hub_config.save()
 
