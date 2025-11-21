@@ -108,5 +108,11 @@ def sync_fs_with_db(dev_mode: bool = False):
             plugin.menu_order = md.get("menu", {}).get("order", plugin.menu_order)
             plugin.show_in_menu = md.get("menu", {}).get("show", plugin.show_in_menu)
             plugin.main_url = md.get("main_url", plugin.main_url)
+
+            # Process menu items (multiple submenu items)
+            menu_items = md.get("menu", {}).get("items", [])
+            if menu_items:
+                plugin.menu_items = menu_items
+
             plugin.is_installed = True
             plugin.save()

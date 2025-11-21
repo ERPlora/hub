@@ -9,8 +9,11 @@ class HubConfig(models.Model):
     """
     # Cloud connection credentials
     hub_id = models.UUIDField(unique=True, null=True, blank=True)
-    tunnel_port = models.IntegerField(null=True, blank=True)
-    tunnel_token = models.CharField(max_length=255, blank=True)
+    cloud_api_token = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Token for authenticating HTTP requests to Cloud API'
+    )
 
     # Configuration flags
     is_configured = models.BooleanField(default=False)

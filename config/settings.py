@@ -95,7 +95,7 @@ def load_active_plugins():
     from pathlib import Path
 
     # Solo cargar si la BD existe
-    db_path = BASE_DIR / "db.sqlite3"
+    db_path = DATA_PATHS.database_path
     if not db_path.exists():
         return []
 
@@ -141,7 +141,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],  # All templates are in apps/*/templates/
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -293,6 +293,20 @@ BACKUPS_DIR = DATA_PATHS.backups_dir
 
 # Temp directory (external)
 TEMP_DIR = DATA_PATHS.temp_dir
+
+
+# Add plugin template directories to Django template loader (development only)
+TEMPLATE_DIRS = []
+
+# Add plugin template directories from development path
+if (BASE_DIR / 'plugins').exists():
+    for plugin_dir in (BASE_DIR / 'plugins').iterdir():
+        if plugin_dir.is_dir() and (plugin_dir / 'templates').exists():
+            TEMPLATE_DIRS.append(plugin_dir / 'templates')
+
+# Update TEMPLATES configuration with plugin directories
+if TEMPLATE_DIRS:
+    TEMPLATES[0]['DIRS'] = TEMPLATE_DIRS
 
 
 # Logging configuration
