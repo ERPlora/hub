@@ -1,0 +1,305 @@
+{% extends "core/app_base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}ERPlora Hub - {% trans "Plugin Marketplace" %}{% endblock %}
+{% block page_title %}{% trans "Plugin Marketplace" %}{% endblock %}
+
+{% block content %}
+<div style="padding: 24px;" x-data="marketplaceApp()">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h2 style="margin: 0;">{% trans "Plugin Marketplace" %}</h2>
+            <p style="color: var(--ion-color-medium); margin-top: 4px;">
+                {% trans "Browse and purchase plugins from Cloud" %}
+            </p>
+        </div>
+        <ion-button href="{% url 'plugins:plugins' %}">
+            <ion-icon slot="start" name="cube-outline"></ion-icon>
+            {% trans "My Plugins" %}
+        </ion-button>
+    </div>
+
+    {% if error %}
+    <!-- Error Message -->
+    <ion-card color="danger">
+        <ion-card-content>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <ion-icon name="alert-circle-outline" style="font-size: 24px;"></ion-icon>
+                <div>
+                    <strong>{% trans "Error" %}</strong>
+                    <p style="margin: 4px 0 0 0;">{{ error }}</p>
+                </div>
+            </div>
+        </ion-card-content>
+    </ion-card>
+    {% else %}
+
+    <!-- Success/Cancel Messages -->
+    <template x-if="purchaseStatus === 'success'">
+        <ion-card color="success">
+            <ion-card-content>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <ion-icon name="checkmark-circle-outline" style="font-size: 24px;"></ion-icon>
+                    <div>
+                        <strong>{% trans "Purchase Successful!" %}</strong>
+                        <p style="margin: 4px 0 0 0;">{% trans "You can now download and install the plugin." %}</p>
+                    </div>
+                </div>
+            </ion-card-content>
+        </ion-card>
+    </template>
+
+    <template x-if="purchaseStatus === 'cancelled'">
+        <ion-card color="warning">
+            <ion-card-content>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <ion-icon name="close-circle-outline" style="font-size: 24px;"></ion-icon>
+                    <div>
+                        <strong>{% trans "Purchase Cancelled" %}</strong>
+                        <p style="margin: 4px 0 0 0;">{% trans "Your purchase was cancelled." %}</p>
+                    </div>
+                </div>
+            </ion-card-content>
+        </ion-card>
+    </template>
+
+    <!-- Filters -->
+    <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+        <ion-segment :value="selectedCategory" @ionChange="filterByCategory($event.detail.value)">
+            <ion-segment-button value="all">
+                <ion-label>{% trans "All" %}</ion-label>
+            </ion-segment-button>
+            {% for category in categories %}
+            <ion-segment-button value="{{ category.slug }}">
+                <ion-label>{{ category.name }}</ion-label>
+            </ion-segment-button>
+            {% endfor %}
+        </ion-segment>
+
+        <ion-segment :value="selectedType" @ionChange="filterByType($event.detail.value)">
+            <ion-segment-button value="all">
+                <ion-label>{% trans "All Types" %}</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="free">
+                <ion-label>{% trans "Free" %}</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="paid">
+                <ion-label>{% trans "Paid" %}</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="subscription">
+                <ion-label>{% trans "Subscription" %}</ion-label>
+            </ion-segment-button>
+        </ion-segment>
+    </div>
+
+    <!-- Plugins Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 16px;">
+        {% for plugin in plugins %}
+        <ion-card>
+            <ion-card-content>
+                <div style="display: flex; align-items: start; gap: 16px;">
+                    <!-- Icon -->
+                    <div style="width: 64px; height: 64px; border-radius: 12px; background: var(--ion-color-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        {% if plugin.icon_url %}
+                        <img src="{{ plugin.icon_url }}" style="width: 48px; height: 48px; object-fit: contain;">
+                        {% else %}
+                        <ion-icon name="extension-puzzle-outline" style="font-size: 32px; color: var(--ion-color-primary);"></ion-icon>
+                        {% endif %}
+                    </div>
+
+                    <!-- Info -->
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 4px;">
+                            {{ plugin.name }}
+                        </div>
+                        <div style="color: var(--ion-color-medium); font-size: 0.875rem; margin-bottom: 8px;">
+                            {{ plugin.description|truncatewords:20 }}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <!-- Type Badge -->
+                            <ion-badge color="{% if plugin.plugin_type == 'free' %}success{% elif plugin.plugin_type == 'paid' %}primary{% else %}warning{% endif %}">
+                                {{ plugin.plugin_type|upper }}
+                            </ion-badge>
+
+                            <!-- Price -->
+                            {% if plugin.plugin_type != 'free' %}
+                            <span style="font-weight: 600; color: var(--ion-color-primary);">
+                                ${{ plugin.price }}{% if plugin.plugin_type == 'subscription' %}/mo{% endif %}
+                            </span>
+                            {% endif %}
+
+                            <!-- Downloaded Badge -->
+                            {% if plugin.is_purchased %}
+                            <ion-badge color="success">
+                                <ion-icon name="checkmark-circle" style="margin-right: 4px;"></ion-icon>
+                                {% trans "Purchased" %}
+                            </ion-badge>
+                            {% endif %}
+
+                            <!-- Stats -->
+                            <span style="color: var(--ion-color-medium); font-size: 0.75rem;">
+                                <ion-icon name="download-outline"></ion-icon> {{ plugin.downloads }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ion-color-light-shade);">
+                    {% if plugin.is_purchased %}
+                        <!-- Already purchased, can download -->
+                        <ion-button expand="block" @click="downloadPlugin({{ plugin.id }}, '{{ plugin.name }}')">
+                            <ion-icon slot="start" name="download-outline"></ion-icon>
+                            {% trans "Install" %}
+                        </ion-button>
+                    {% elif plugin.plugin_type == 'free' %}
+                        <!-- Free plugin, can download directly -->
+                        <ion-button expand="block" @click="downloadPlugin({{ plugin.id }}, '{{ plugin.name }}')">
+                            <ion-icon slot="start" name="download-outline"></ion-icon>
+                            {% trans "Install Free" %}
+                        </ion-button>
+                    {% else %}
+                        <!-- Paid/Subscription, need to purchase first -->
+                        <ion-button expand="block" @click="purchasePlugin({{ plugin.id }}, '{{ plugin.name }}', '{{ plugin.plugin_type }}', {{ plugin.price }})">
+                            <ion-icon slot="start" name="cart-outline"></ion-icon>
+                            {% trans "Purchase" %}
+                        </ion-button>
+                    {% endif %}
+
+                    <ion-button fill="outline" @click="viewDetails({{ plugin.id }})">
+                        <ion-icon slot="icon-only" name="information-circle-outline"></ion-icon>
+                    </ion-button>
+                </div>
+            </ion-card-content>
+        </ion-card>
+        {% empty %}
+        <ion-card>
+            <ion-card-content style="text-align: center; padding: 48px;">
+                <ion-icon name="cloud-offline-outline" style="font-size: 64px; color: var(--ion-color-medium);"></ion-icon>
+                <h3>{% trans "No Plugins Available" %}</h3>
+                <p style="color: var(--ion-color-medium);">{% trans "Check your internet connection or try again later." %}</p>
+            </ion-card-content>
+        </ion-card>
+        {% endfor %}
+    </div>
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function marketplaceApp() {
+    return {
+        selectedCategory: 'all',
+        selectedType: 'all',
+        purchaseStatus: null,
+
+        init() {
+            // Check URL params for purchase status
+            const urlParams = new URLSearchParams(window.location.search);
+            this.purchaseStatus = urlParams.get('purchase');
+        },
+
+        filterByCategory(category) {
+            this.selectedCategory = category;
+            // Reload page with filter
+            window.location.href = `?category=${category}&type=${this.selectedType}`;
+        },
+
+        filterByType(type) {
+            this.selectedType = type;
+            // Reload page with filter
+            window.location.href = `?category=${this.selectedCategory}&type=${type}`;
+        },
+
+        async purchasePlugin(pluginId, pluginName, pluginType, price) {
+            const confirmed = confirm(
+                `Purchase ${pluginName}?\n\n` +
+                `Type: ${pluginType}\n` +
+                `Price: $${price}${pluginType === 'subscription' ? '/month' : ''}\n\n` +
+                `You will be redirected to Stripe for payment.`
+            );
+
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch('/api/plugins/checkout/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ plugin_id: pluginId })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.checkout_url) {
+                    // Redirect to Stripe Checkout
+                    window.location.href = data.checkout_url;
+                } else {
+                    alert(`Error: ${data.error || 'Could not create checkout session'}`);
+                }
+
+            } catch (error) {
+                console.error('Purchase error:', error);
+                alert('Error creating purchase session. Please try again.');
+            }
+        },
+
+        async downloadPlugin(pluginId, pluginName) {
+            const confirmed = confirm(`Install ${pluginName}?`);
+            if (!confirmed) return;
+
+            const toast = this.showToast('Downloading plugin...', 'primary');
+
+            try {
+                const response = await fetch('/api/plugins/download-from-cloud/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ plugin_id: pluginId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.showToast('Plugin installed successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/plugins/';
+                    }, 2000);
+                } else {
+                    if (data.requires_purchase) {
+                        alert('This plugin requires purchase. Please buy it first.');
+                    } else {
+                        alert(`Error: ${data.error || 'Installation failed'}`);
+                    }
+                }
+
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('Error downloading plugin. Please try again.');
+            }
+        },
+
+        viewDetails(pluginId) {
+            // TODO: Navigate to plugin detail page
+            alert(`Plugin details: ${pluginId}`);
+        },
+
+        showToast(message, color = 'primary') {
+            const toast = document.createElement('ion-toast');
+            toast.message = message;
+            toast.duration = 3000;
+            toast.color = color;
+            document.body.appendChild(toast);
+            toast.present();
+            return toast;
+        }
+    }
+}
+</script>
+{% endblock %}

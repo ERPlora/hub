@@ -1,8 +1,10 @@
 import json
+import requests
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.conf import settings
 from .models import Plugin
 
 
@@ -160,5 +162,192 @@ def api_plugins_list(request):
 
         return JsonResponse({'success': True, 'plugins': plugins_data})
 
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+def marketplace(request):
+    """
+    Plugin marketplace view - browse and purchase plugins from Cloud
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return redirect('accounts:login')
+
+    from apps.configuration.models import HubConfig
+
+    hub_config = HubConfig.get_config()
+
+    # Verificar que el Hub esté configurado
+    if not hub_config.is_configured or not hub_config.cloud_api_token:
+        context = {
+            'error': 'Hub not configured. Please complete setup first.',
+            'current_view': 'marketplace'
+        }
+        return render(request, 'plugins/marketplace.html', context)
+
+    # Obtener plugins desde Cloud API
+    api_url = f"{settings.CLOUD_API_URL}/api/plugins/"
+    headers = {'X-Hub-Token': hub_config.cloud_api_token}
+
+    try:
+        # Obtener lista de plugins
+        response = requests.get(api_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        # Obtener categorías
+        categories_response = requests.get(
+            f"{settings.CLOUD_API_URL}/api/plugins/categories/",
+            headers=headers,
+            timeout=10
+        )
+        categories_data = categories_response.json() if categories_response.ok else {'categories': []}
+
+        # Obtener compras del usuario
+        purchases_response = requests.get(
+            f"{settings.CLOUD_API_URL}/api/plugins/my-purchases/",
+            headers=headers,
+            timeout=10
+        )
+        purchases_data = purchases_response.json() if purchases_response.ok else {'purchases': []}
+
+        # Crear set de IDs de plugins comprados para fácil lookup
+        purchased_plugin_ids = {p['plugin_id'] for p in purchases_data.get('purchases', [])}
+
+        # Marcar plugins como comprados
+        for plugin in data.get('results', []):
+            plugin['is_purchased'] = plugin['id'] in purchased_plugin_ids
+
+        context = {
+            'plugins': data.get('results', []),
+            'categories': categories_data.get('categories', []),
+            'purchased_plugins': purchases_data.get('purchases', []),
+            'current_view': 'marketplace'
+        }
+
+    except requests.exceptions.ConnectionError:
+        context = {
+            'error': 'Could not connect to Cloud. Please check your internet connection.',
+            'current_view': 'marketplace'
+        }
+    except requests.exceptions.Timeout:
+        context = {
+            'error': 'Request timeout. Please try again later.',
+            'current_view': 'marketplace'
+        }
+    except Exception as e:
+        context = {
+            'error': f'Error loading marketplace: {str(e)}',
+            'current_view': 'marketplace'
+        }
+
+    return render(request, 'plugins/marketplace.html', context)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_create_checkout(request):
+    """
+    API: Create Stripe Checkout session for plugin purchase
+    """
+    try:
+        from apps.configuration.models import HubConfig
+
+        data = json.loads(request.body)
+        plugin_id = data.get('plugin_id')
+
+        if not plugin_id:
+            return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
+
+        hub_config = HubConfig.get_config()
+
+        if not hub_config.is_configured or not hub_config.cloud_api_token:
+            return JsonResponse({'success': False, 'error': 'Hub not configured'})
+
+        # Crear sesión de checkout en Cloud
+        api_url = f"{settings.CLOUD_API_URL}/api/plugins/checkout/"
+        headers = {
+            'X-Hub-Token': hub_config.cloud_api_token,
+            'Content-Type': 'application/json'
+        }
+
+        # Build success/cancel URLs
+        success_url = request.build_absolute_uri('/plugins/marketplace/?purchase=success')
+        cancel_url = request.build_absolute_uri('/plugins/marketplace/?purchase=cancelled')
+
+        payload = {
+            'plugin_id': plugin_id,
+            'success_url': success_url,
+            'cancel_url': cancel_url
+        }
+
+        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+        result = response.json()
+
+        return JsonResponse({
+            'success': True,
+            'checkout_url': result.get('checkout_url'),
+            'session_id': result.get('session_id')
+        })
+
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({'success': False, 'error': f'Cloud API error: {str(e)}'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_download_plugin_from_cloud(request):
+    """
+    API: Download plugin from Cloud and install it
+    """
+    try:
+        from apps.configuration.models import HubConfig
+        from apps.plugins_runtime.manager import plugin_runtime_manager
+
+        data = json.loads(request.body)
+        plugin_id = data.get('plugin_id')
+
+        if not plugin_id:
+            return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
+
+        hub_config = HubConfig.get_config()
+
+        if not hub_config.is_configured or not hub_config.cloud_api_token:
+            return JsonResponse({'success': False, 'error': 'Hub not configured'})
+
+        # Download plugin from Cloud
+        api_url = f"{settings.CLOUD_API_URL}/api/plugins/{plugin_id}/download/"
+        headers = {'X-Hub-Token': hub_config.cloud_api_token}
+
+        response = requests.get(api_url, headers=headers, timeout=30, stream=True)
+
+        # Check if purchase is required
+        if response.status_code == 402:
+            return JsonResponse({
+                'success': False,
+                'error': 'Plugin not purchased',
+                'requires_purchase': True
+            })
+
+        response.raise_for_status()
+
+        # Save to temp file
+        tmp_file_path = plugin_runtime_manager.get_temp_file_path(f'plugin_{plugin_id}.zip')
+
+        with open(tmp_file_path, 'wb') as tmp_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                tmp_file.write(chunk)
+
+        # Install plugin
+        result = plugin_runtime_manager.install_plugin_from_zip(str(tmp_file_path))
+
+        return JsonResponse(result)
+
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({'success': False, 'error': f'Download error: {str(e)}'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
