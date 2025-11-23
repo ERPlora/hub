@@ -18,7 +18,7 @@ El Hub se comunica con Cloud mediante:
 ### 1. Login (obtener JWT del owner)
 
 ```http
-POST https://cpos.app/api/auth/login/
+POST https://erplora.com/api/auth/login/
 Content-Type: application/json
 
 {
@@ -50,7 +50,7 @@ Content-Type: application/json
 ### 2. Auto-registro del Hub
 
 ```http
-POST https://cpos.app/api/hubs/register/
+POST https://erplora.com/api/hubs/register/
 Authorization: Bearer {jwt_access_token_del_owner}
 Content-Type: application/json
 
@@ -109,7 +109,7 @@ def register_hub(owner_jwt, hub_name):
 ### 3. Refresh Token (si fuera necesario)
 
 ```http
-POST https://cpos.app/api/auth/refresh/
+POST https://erplora.com/api/auth/refresh/
 Content-Type: application/json
 
 {
@@ -135,7 +135,7 @@ Content-Type: application/json
 ### 4. Obtener clave pública RSA
 
 ```http
-GET https://cpos.app/api/auth/public-key/
+GET https://erplora.com/api/auth/public-key/
 ```
 
 **Response:**
@@ -158,7 +158,7 @@ GET https://cpos.app/api/auth/public-key/
 ### Conexión al Cloud
 
 ```
-wss://cpos.app/ws/hub/{hub_id}/?token={tunnel_token}
+wss://erplora.com/ws/hub/{hub_id}/?token={tunnel_token}
 ```
 
 **Parámetros:**
@@ -275,7 +275,7 @@ async def send_heartbeat(websocket):
   "plugin_id": "uuid",
   "current_version": "1.0.0",
   "new_version": "1.1.0",
-  "download_url": "https://cpos.app/api/plugins/uuid/download/"
+  "download_url": "https://erplora.com/api/plugins/uuid/download/"
 }
 ```
 
@@ -321,7 +321,7 @@ async def send_heartbeat(websocket):
 
 **Propósito:**
 - Permitir acceso remoto desde Cloud al Hub local
-- Usuario en portal web puede acceder a `hub-{slug}.cpos.app`
+- Usuario en portal web puede acceder a `hub-{slug}.erplora.com`
 - Traefik proxy en Cloud redirige a puerto FRP → Hub local
 
 **Configuración FRP (generada por Cloud):**
@@ -329,7 +329,7 @@ async def send_heartbeat(websocket):
 ```toml
 # config/frpc.toml
 [common]
-server_addr = cpos.app
+server_addr = erplora.com
 server_port = 7000
 token = {tunnel_token}
 

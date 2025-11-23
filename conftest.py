@@ -2,9 +2,36 @@
 Pytest configuration and fixtures for CPOS Hub tests
 """
 import pytest
+import shutil
+from pathlib import Path
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+@pytest.fixture(autouse=True)
+def cleanup_test_artifacts():
+    """
+    Automatically cleanup test artifacts after each test.
+    This prevents test directories (C:/, /home/testuser/, etc.) from being created.
+    """
+    yield  # Run the test
+
+    # Cleanup after test
+    test_dirs = [
+        'C:',
+        'C:\\',
+        Path('home/testuser'),
+        Path('Users/testuser'),
+    ]
+
+    for test_dir in test_dirs:
+        dir_path = Path(test_dir)
+        if dir_path.exists():
+            try:
+                shutil.rmtree(dir_path)
+            except Exception:
+                pass  # Ignore errors during cleanup
 
 
 @pytest.fixture

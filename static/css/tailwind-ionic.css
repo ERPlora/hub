@@ -1,0 +1,221 @@
+/**
+ * Tailwind CSS + Ionic Theme Integration (CDN Version)
+ * Extends Tailwind CDN with Ionic color variables for seamless theme switching
+ */
+
+/* ========================================
+   TAILWIND UTILITIES WITH IONIC COLORS
+   ======================================== */
+
+/* Text color utilities using Ionic variables */
+.text-primary {
+  color: var(--ion-color-primary) !important;
+}
+
+.text-secondary {
+  color: var(--ion-color-secondary) !important;
+}
+
+.text-success {
+  color: var(--ion-color-success) !important;
+}
+
+.text-warning {
+  color: var(--ion-color-warning) !important;
+}
+
+.text-danger {
+  color: var(--ion-color-danger) !important;
+}
+
+.text-medium {
+  color: var(--ion-color-medium) !important;
+}
+
+.text-muted {
+  color: var(--muted-foreground) !important;
+}
+
+/* Background utilities using Ionic variables */
+.bg-primary {
+  background-color: var(--ion-color-primary) !important;
+  color: var(--ion-color-primary-contrast) !important;
+}
+
+.bg-secondary {
+  background-color: var(--ion-color-secondary) !important;
+  color: var(--ion-color-secondary-contrast) !important;
+}
+
+.bg-success {
+  background-color: var(--ion-color-success) !important;
+  color: var(--ion-color-success-contrast) !important;
+}
+
+.bg-warning {
+  background-color: var(--ion-color-warning) !important;
+  color: var(--ion-color-warning-contrast) !important;
+}
+
+.bg-danger {
+  background-color: var(--ion-color-danger) !important;
+  color: var(--ion-color-danger-contrast) !important;
+}
+
+.bg-card {
+  background-color: var(--ion-card-background) !important;
+  color: var(--ion-card-color) !important;
+}
+
+.bg-muted {
+  background-color: var(--muted) !important;
+  color: var(--muted-foreground) !important;
+}
+
+/* Border utilities */
+.border-ionic {
+  border-color: var(--ion-border-color) !important;
+}
+
+.border-primary {
+  border-color: var(--ion-color-primary) !important;
+}
+
+.border-secondary {
+  border-color: var(--ion-color-secondary) !important;
+}
+
+/* Hover states with Ionic colors */
+.hover\:bg-primary:hover {
+  background-color: var(--ion-color-primary) !important;
+  color: var(--ion-color-primary-contrast) !important;
+}
+
+.hover\:bg-secondary:hover {
+  background-color: var(--ion-color-secondary) !important;
+  color: var(--ion-color-secondary-contrast) !important;
+}
+
+.hover\:text-primary:hover {
+  color: var(--ion-color-primary) !important;
+}
+
+/* Shadow utilities that adapt to theme */
+.shadow-ionic-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+body.dark .shadow-ionic-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.shadow-ionic-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+body.dark .shadow-ionic-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+.shadow-ionic-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+body.dark .shadow-ionic-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+}
+
+/* Rounded corners using Ionic radius */
+.rounded-ionic {
+  border-radius: var(--radius) !important;
+}
+
+.rounded-ionic-sm {
+  border-radius: calc(var(--radius) - 4px) !important;
+}
+
+.rounded-ionic-md {
+  border-radius: calc(var(--radius) - 2px) !important;
+}
+
+.rounded-ionic-lg {
+  border-radius: calc(var(--radius) + 2px) !important;
+}
+
+/* Button variants with Ionic colors */
+.btn-primary {
+  background-color: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--ion-color-primary-shade);
+}
+
+.btn-secondary {
+  background-color: var(--ion-color-secondary);
+  color: var(--ion-color-secondary-contrast);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background-color: var(--ion-color-secondary-shade);
+}
+
+.btn-success {
+  background-color: var(--ion-color-success);
+  color: var(--ion-color-success-contrast);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.btn-danger {
+  background-color: var(--ion-color-danger);
+  color: var(--ion-color-danger-contrast);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+/* Card utilities */
+.card-ionic {
+  background-color: var(--ion-card-background);
+  color: var(--ion-card-color);
+  border-radius: var(--radius);
+  border: 1px solid var(--ion-border-color);
+  transition: all 0.2s ease;
+}
+
+/* Input utilities */
+.input-ionic {
+  background-color: var(--ion-item-background);
+  color: var(--ion-item-color);
+  border: 1px solid var(--ion-border-color);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.input-ionic:focus {
+  outline: none;
+  border-color: var(--ion-color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--ion-color-primary-rgb), 0.1);
+}
+
+/* Background opacity utilities for Ionic colors */
+.bg-primary\/10 {
+  background-color: rgba(var(--ion-color-primary-rgb), 0.1) !important;
+}
+
+.bg-success\/10 {
+  background-color: rgba(var(--ion-color-success-rgb), 0.1) !important;
+}
+
+.bg-warning\/10 {
+  background-color: rgba(var(--ion-color-warning-rgb), 0.1) !important;
+}
+
+.bg-danger\/10 {
+  background-color: rgba(var(--ion-color-danger-rgb), 0.1) !important;
+}

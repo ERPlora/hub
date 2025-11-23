@@ -110,7 +110,7 @@ pyinstaller main.spec --clean
    ```
 
 3. **Ejecutar workflow manual**:
-   - Ir a: https://github.com/cpos-app/hub/actions/workflows/build-release.yml
+   - Ir a: https://github.com/ERPlora/hub/actions/workflows/build-release.yml
    - Click "Run workflow"
    - Ingresar versión: `0.8.0` (sin `v`)
    - Marcar "Create GitHub Release": ✅
@@ -118,7 +118,7 @@ pyinstaller main.spec --clean
    - Esperar ~15 minutos
 
 4. **Resultado**:
-   - Release en: `https://github.com/cpos-app/hub/releases/tag/v0.8.0`
+   - Release en: `https://github.com/ERPlora/hub/releases/tag/v0.8.0`
    - Con binarios:
      - `CPOS-Hub-0.8.0-windows.zip`
      - `CPOS-Hub-0.8.0-macos.zip`

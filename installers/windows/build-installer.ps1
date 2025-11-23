@@ -1,11 +1,11 @@
-# Script PowerShell para compilar el instalador de CPOS Hub con Inno Setup
+# Script PowerShell para compilar el instalador de ERPlora Hub con Inno Setup
 # Requiere: Inno Setup 6+ instalado
 
 param(
     [string]$Version = "0.8.0"
 )
 
-Write-Host "[INFO] Compilando instalador de CPOS Hub v$Version para Windows" -ForegroundColor Green
+Write-Host "[INFO] Compilando instalador de ERPlora Hub v$Version para Windows" -ForegroundColor Green
 
 # Verificar que Inno Setup está instalado
 $InnoSetupPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
@@ -58,7 +58,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "Ubicación: dist\CPOS-Hub-$Version-Setup.exe" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Características del instalador:" -ForegroundColor White
-    Write-Host "  - Instala en: C:\Program Files\CPOS Hub" -ForegroundColor Gray
+    Write-Host "  - Instala en: C:\Program Files\ERPlora Hub" -ForegroundColor Gray
     Write-Host "  - Acceso directo en Menú Inicio" -ForegroundColor Gray
     Write-Host "  - Opción de acceso directo en Escritorio" -ForegroundColor Gray
     Write-Host "  - Autostart con Windows (opcional)" -ForegroundColor Gray

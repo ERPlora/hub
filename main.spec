@@ -61,9 +61,12 @@ datas = [
     (str(hub_root / 'static'), 'hub/static'),
     (str(hub_root / 'locale'), 'hub/locale'),
     # NOTA: db.sqlite3 YA NO se incluye - ahora está en ubicación externa
-    # - Windows: C:\Users\<user>\AppData\Local\CPOSHub\db\
-    # - macOS: ~/Library/Application Support/CPOSHub/db/
+    # - Windows: C:\Users\<user>\AppData\Local\ERPloraHub\db\
+    # - macOS: ~/Library/Application Support/ERPloraHub/db/
     # - Linux: ~/.cpos-hub/db/
+    # NOTA: plugins/ NO se incluye - se cargan desde ubicaciones externas:
+    # - Development: ./plugins/ (repo local)
+    # - Production: ~/.cpos-hub/plugins/ (instalados por usuario)
 ]
 
 a = Analysis(
@@ -138,12 +141,12 @@ coll = COLLECT(
 if sys.platform == 'darwin':
     app = BUNDLE(
         coll,
-        name='CPOS Hub.app',
+        name='ERPlora Hub.app',
         icon='assets/app_icon.icns' if Path('assets/app_icon.icns').exists() else None,
         bundle_identifier='com.cpos.hub',
         info_plist={
-            'CFBundleName': 'CPOS Hub',
-            'CFBundleDisplayName': 'CPOS Hub',
+            'CFBundleName': 'ERPlora Hub',
+            'CFBundleDisplayName': 'ERPlora Hub',
             'CFBundleShortVersionString': '1.0.0',
             'CFBundleVersion': '1.0.0',
             'NSHighResolutionCapable': 'True',

@@ -1,7 +1,7 @@
-; CPOS Hub - Inno Setup Script
+; ERPlora Hub - Inno Setup Script
 ; Crea instalador para Windows con autostart
 
-#define MyAppName "CPOS Hub"
+#define MyAppName "ERPlora Hub"
 #define MyAppVersion "0.8.0"
 #define MyAppPublisher "CPOS Team"
 #define MyAppURL "https://cpos.app"
@@ -99,7 +99,7 @@ begin
 
   if Running then
   begin
-    if MsgBox('CPOS Hub parece estar ejecutándose. ¿Desea cerrarlo para continuar con la instalación?', mbConfirmation, MB_YESNO) = IDYES then
+    if MsgBox('ERPlora Hub parece estar ejecutándose. ¿Desea cerrarlo para continuar con la instalación?', mbConfirmation, MB_YESNO) = IDYES then
     begin
       Exec('taskkill', '/F /IM main.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       Sleep(1000); // Esperar 1 segundo

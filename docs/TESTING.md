@@ -124,9 +124,69 @@ class TestCoreModels:
 
 ---
 
+## 🧹 Limpieza Automática de Tests
+
+Los tests están configurados con **limpieza automática** para evitar que se creen directorios no deseados en el proyecto (como `C:/`, `home/testuser/`, etc.).
+
+### Fixture de Limpieza
+
+El archivo `conftest.py` incluye un fixture `cleanup_test_artifacts` con `autouse=True`:
+
+```python
+@pytest.fixture(autouse=True)
+def cleanup_test_artifacts():
+    """
+    Automatically cleanup test artifacts after each test.
+    This prevents test directories (C:/, /home/testuser/, etc.) from being created.
+    """
+    yield  # Run the test
+
+    # Cleanup after test
+    test_dirs = [
+        'C:',
+        'C:\\',
+        Path('home/testuser'),
+        Path('Users/testuser'),
+    ]
+
+    for test_dir in test_dirs:
+        dir_path = Path(test_dir)
+        if dir_path.exists():
+            try:
+                shutil.rmtree(dir_path)
+            except Exception:
+                pass  # Ignore errors during cleanup
+```
+
+### ¿Qué Limpia?
+
+- Directorios `C:/` y `C:\` (creados por tests de Windows paths)
+- Directorios `home/testuser/` (creados por tests de Linux paths)
+- Directorios `Users/testuser/` (creados por tests de macOS paths)
+
+### Funcionamiento
+
+1. **Antes del test**: El fixture hace `yield` (espera)
+2. **Durante el test**: El test se ejecuta normalmente
+3. **Después del test**: El fixture limpia automáticamente los directorios
+
+**Resultado**: Los tests se pueden ejecutar múltiples veces sin crear artifacts en el proyecto.
+
+---
+
 ## 🔧 Fixtures Disponibles
 
 Fixtures globales en `conftest.py`:
+
+### `cleanup_test_artifacts` (autouse=True)
+Limpia automáticamente directorios de test después de cada ejecución
+```python
+# Se ejecuta automáticamente, no necesita ser declarado
+def test_something():
+    # Test se ejecuta normalmente
+    # Limpieza automática después del test
+    pass
+```
 
 ### `user`
 Usuario estándar de Django para testing
@@ -310,4 +370,4 @@ pytest --reuse-db
 
 ---
 
-**Última actualización**: 2025-01-28
+**Última actualización**: 2025-01-08

@@ -1,14 +1,14 @@
 [project]
-name = "cpos-hub"
+name = "erplora-hub"
 version = "0.12.1"
-description = "CPOS Hub - Aplicación POS local con Django y PyInstaller"
+description = "ERPlora Hub - Business Management Desktop Application with Django and PyInstaller"
 readme = "docs/README.md"
 requires-python = ">=3.11"
 license = { text = "BUSL-1.1" }
 authors = [
-    { name = "CPOS Team", email = "dev@cpos.app" }
+    { name = "ERPlora Team", email = "dev@erplora.com" }
 ]
-keywords = ["pos", "point-of-sale", "django", "desktop", "pyinstaller"]
+keywords = ["erp", "business-management", "pos", "django", "desktop", "pyinstaller"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: Django :: 5.2",
@@ -25,6 +25,15 @@ dependencies = [
     "python-decouple>=3.8",
     "pywebview>=5.0.0",
     "pyinstaller>=6.0.0",
+
+    # === PAQUETES DJANGO COMUNES ===
+    "django-components>=0.123",      # Componentes reutilizables
+    "django-filter>=24.0",           # Filtros avanzados para querysets
+    "djangorestframework>=3.15.0",   # Django REST Framework
+    "django-cors-headers>=4.0.0",    # CORS para APIs
+    "django-extensions>=3.2.0",      # Comandos útiles (shell_plus, etc)
+    "django-money>=3.0.0",           # Currency handling
+    "django-htmx>=1.17.0",           # HTMX integration for Django
 
     # === LIBRERÍAS PARA PLUGINS (25 pre-empaquetadas) ===
     # Ver: config/plugin_allowed_deps.py para casos de uso
@@ -49,9 +58,10 @@ dependencies = [
     "cryptography>=42.0.0",
     "zeep>=4.2.0",
 
-    # Network
+    # Network & Auth
     "requests>=2.31.0",
     "websockets>=12.0",
+    "PyJWT>=2.8.0",
 
     # Fechas & Localización
     "python-dateutil>=2.8.2",
@@ -65,8 +75,12 @@ dependencies = [
     "pandas>=2.1.0",
     "numpy>=1.26.0",
 
-    # Hardware
-    "pyserial>=3.5",
+    # Hardware POS
+    "pyserial>=3.5",                     # Puerto serial (RS232, cajón de dinero)
+    "pyusb>=1.2.1",                      # USB devices (impresoras, scanners)
+    "python-escpos>=3.0",                # Impresoras térmicas ESC/POS (USB/LAN/Serial)
+    "evdev>=1.6.0; sys_platform == 'linux'",  # Barcode scanners (Linux)
+    "pywinusb>=0.4.2; sys_platform == 'win32'",  # USB HID devices (Windows)
 
     # Email & Validation
     "email-validator>=2.1.0",

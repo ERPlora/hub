@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-03 11:55+0000\n"
+"POT-Creation-Date: 2025-11-21 23:35+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,67 +19,68 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
 "1 : 2;\n"
 
-#: apps/core/templates/core/app_base.html:118
-#: apps/core/templates/core/app_base.html:153
-#: apps/core/templates/core/pos.html:5 apps/core/templates/core/pos.html:6
-#: apps/core/templates/core/pos.html:12
-#, fuzzy
-#| msgid "Point of Sale System"
-msgid "Point of Sale"
-msgstr "Sistema de Punto de Venta"
+#: apps/core/templates/core/app_base.html:260
+msgid "Business Management"
+msgstr ""
 
-#: apps/core/templates/core/app_base.html:147
+#: apps/core/templates/core/app_base.html:289
 #: apps/core/templates/core/dashboard.html:5
 #: apps/core/templates/core/dashboard.html:6
 msgid "Dashboard"
 msgstr "Panel"
 
-#: apps/core/templates/core/app_base.html:159
-#: apps/core/templates/core/dashboard.html:54
-msgid "Products"
+#: apps/core/templates/core/app_base.html:295
+#: apps/core/templates/core/app_base.html:342
+#: apps/core/templates/core/plugins.html:5
+#: apps/core/templates/core/plugins.html:6
+msgid "Plugins"
 msgstr ""
 
-#: apps/core/templates/core/app_base.html:165
-msgid "Sales"
+#: apps/core/templates/core/app_base.html:331
+msgid "System"
 msgstr ""
 
-#: apps/core/templates/core/app_base.html:171
-msgid "Reports"
-msgstr ""
-
-#: apps/core/templates/core/app_base.html:180
-#: apps/core/templates/core/app_base.html:294
+#: apps/core/templates/core/app_base.html:336
+#: apps/core/templates/core/app_base.html:516
 #: apps/core/templates/core/employees.html:5
 #: apps/core/templates/core/employees.html:6
 msgid "Employees"
 msgstr "Empleados"
 
-#: apps/core/templates/core/app_base.html:186
-#: apps/core/templates/core/app_base.html:287
+#: apps/core/templates/core/app_base.html:348
+msgid "Plugin Store"
+msgstr ""
+
+#: apps/core/templates/core/app_base.html:354
+#: apps/core/templates/core/app_base.html:510
 #: apps/core/templates/core/settings.html:5
 #: apps/core/templates/core/settings.html:6
 msgid "Settings"
 msgstr "Configuración"
 
-#: apps/core/templates/core/app_base.html:195
-#: apps/core/templates/core/app_base.html:301
+#: apps/core/templates/core/app_base.html:363
+#: apps/core/templates/core/app_base.html:522
 msgid "Sign Out"
 msgstr "Cerrar Sesión"
 
-#: apps/core/templates/core/app_base.html:205
+#: apps/core/templates/core/app_base.html:373
 msgid "Go to CPOS Cloud"
 msgstr "Ir a CPOS Cloud"
 
-#: apps/core/templates/core/app_base.html:309
-#: apps/core/templates/core/employees.html:148
-#: apps/core/templates/core/employees.html:189
+#: apps/core/templates/core/app_base.html:529
+#: apps/core/templates/core/employees.html:150
+#: apps/core/templates/core/employees.html:191
+#: apps/core/templates/core/plugins.html:220
+#: apps/core/templates/core/plugins.html:330
+#: apps/core/templates/core/plugins.html:373
+#: apps/core/templates/core/plugins.html:416
 msgid "Cancel"
 msgstr "Cancelar"
 
 #: apps/core/templates/core/dashboard.html:13
-#: apps/core/templates/core/login.html:273
-#: apps/core/templates/core/login.html:403
-#: apps/core/templates/core/login.html:466
+#: apps/core/templates/core/login.html:158
+#: apps/core/templates/core/login.html:288
+#: apps/core/templates/core/login.html:350
 msgid "Welcome"
 msgstr "Bienvenido"
 
@@ -90,14 +91,14 @@ msgid "Hub is configured and ready"
 msgstr "¡Hub configurado y listo!"
 
 #: apps/core/templates/core/dashboard.html:17
-#: apps/core/templates/core/employees.html:105
-#: apps/core/templates/core/login.html:229
-#: apps/core/templates/core/settings.html:135
+#: apps/core/templates/core/employees.html:107
+#: apps/core/templates/core/login.html:114
+#: apps/core/templates/core/settings.html:159
 msgid "Email"
 msgstr "Correo"
 
 #: apps/core/templates/core/dashboard.html:18
-#: apps/core/templates/core/employees.html:116
+#: apps/core/templates/core/employees.html:118
 msgid "Role"
 msgstr ""
 
@@ -107,6 +108,10 @@ msgstr ""
 
 #: apps/core/templates/core/dashboard.html:42
 msgid "Today's Revenue"
+msgstr ""
+
+#: apps/core/templates/core/dashboard.html:54
+msgid "Products"
 msgstr ""
 
 #: apps/core/templates/core/dashboard.html:64
@@ -134,185 +139,394 @@ msgid "Manage employee accounts and roles"
 msgstr ""
 
 #: apps/core/templates/core/employees.html:20
-#: apps/core/templates/core/employees.html:219
+#: apps/core/templates/core/employees.html:221
 msgid "Add Employee"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:53
+#: apps/core/templates/core/employees.html:55
 msgid "Edit"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:57
-#: apps/core/templates/core/employees.html:163
-#: apps/core/templates/core/employees.html:193
+#: apps/core/templates/core/employees.html:59
+#: apps/core/templates/core/employees.html:165
+#: apps/core/templates/core/employees.html:195
 msgid "Reset PIN"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:72
+#: apps/core/templates/core/employees.html:74
 msgid "No employees found"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:95
+#: apps/core/templates/core/employees.html:97
 msgid "Name"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:98
+#: apps/core/templates/core/employees.html:100
 msgid "Enter employee name"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:109
+#: apps/core/templates/core/employees.html:111
 msgid "Enter email address"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:119
+#: apps/core/templates/core/employees.html:121
 #, fuzzy
 #| msgid "Select your profile"
 msgid "Select role"
 msgstr "Selecciona tu perfil"
 
-#: apps/core/templates/core/employees.html:121
+#: apps/core/templates/core/employees.html:123
 msgid "Cashier"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:122
+#: apps/core/templates/core/employees.html:124
 msgid "Manager"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:123
+#: apps/core/templates/core/employees.html:125
 msgid "Admin"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:129
+#: apps/core/templates/core/employees.html:131
 msgid "PIN"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:133
-#: apps/core/templates/core/employees.html:179
+#: apps/core/templates/core/employees.html:135
+#: apps/core/templates/core/employees.html:181
 msgid "4-digit PIN"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:140
+#: apps/core/templates/core/employees.html:142
 msgid "This will be the employee's login PIN"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:152
+#: apps/core/templates/core/employees.html:154
 msgid "Save"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:172
+#: apps/core/templates/core/employees.html:174
 msgid "Reset PIN for"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:175
+#: apps/core/templates/core/employees.html:177
 msgid "New PIN"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:231
+#: apps/core/templates/core/employees.html:233
 msgid "Edit Employee"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:259
+#: apps/core/templates/core/employees.html:261
 msgid "Employee saved successfully"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:269
+#: apps/core/templates/core/employees.html:271
 msgid "Failed to save employee"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:307
+#: apps/core/templates/core/employees.html:309
 #, fuzzy
 #| msgid "PIN configured successfully!"
 msgid "PIN reset successfully"
 msgstr "¡PIN configurado correctamente!"
 
-#: apps/core/templates/core/employees.html:316
+#: apps/core/templates/core/employees.html:318
 msgid "Failed to reset PIN"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:329
+#: apps/core/templates/core/employees.html:331
 msgid "Are you sure you want to delete"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:344
+#: apps/core/templates/core/employees.html:346
 msgid "Employee deleted successfully"
 msgstr ""
 
-#: apps/core/templates/core/employees.html:354
+#: apps/core/templates/core/employees.html:356
 msgid "Failed to delete employee"
 msgstr ""
 
 #: apps/core/templates/core/login.html:5
-#: apps/core/templates/core/login.html:254
+#: apps/core/templates/core/login.html:139
 msgid "Login"
 msgstr "Iniciar Sesión"
 
-#: apps/core/templates/core/login.html:140
-msgid "Point of Sale System"
-msgstr "Sistema de Punto de Venta"
+#: apps/core/templates/core/login.html:21
+msgid "Business Management System"
+msgstr ""
 
-#: apps/core/templates/core/login.html:147
+#: apps/core/templates/core/login.html:28
 msgid "Local Login"
 msgstr "Login Local"
 
-#: apps/core/templates/core/login.html:150
+#: apps/core/templates/core/login.html:31
 msgid "Cloud Login"
 msgstr "Login Cloud"
 
-#: apps/core/templates/core/login.html:158
+#: apps/core/templates/core/login.html:39
 msgid "Select your profile"
 msgstr "Selecciona tu perfil"
 
-#: apps/core/templates/core/login.html:186
+#: apps/core/templates/core/login.html:71
 msgid "Enter your PIN"
 msgstr "Ingresa tu PIN"
 
-#: apps/core/templates/core/login.html:200
+#: apps/core/templates/core/login.html:86
 msgid "Incorrect PIN"
 msgstr "PIN incorrecto"
 
-#: apps/core/templates/core/login.html:233
+#: apps/core/templates/core/login.html:118
 msgid "your@email.com"
 msgstr "tu@email.com"
 
-#: apps/core/templates/core/login.html:241
+#: apps/core/templates/core/login.html:126
 msgid "Password"
 msgstr "Contraseña"
 
-#: apps/core/templates/core/login.html:254
+#: apps/core/templates/core/login.html:139
 msgid "Logging in..."
 msgstr "Iniciando sesión..."
 
-#: apps/core/templates/core/login.html:266
+#: apps/core/templates/core/login.html:151
 msgid "Setup your PIN"
 msgstr "Configura tu PIN"
 
-#: apps/core/templates/core/login.html:274
+#: apps/core/templates/core/login.html:159
 msgid "Setup a 4-digit PIN for quick access"
 msgstr "Configura un PIN de 4 dígitos para acceso rápido"
 
-#: apps/core/templates/core/login.html:285
+#: apps/core/templates/core/login.html:171
 msgid "Confirm your PIN"
 msgstr "Confirma tu PIN"
 
-#: apps/core/templates/core/login.html:292
+#: apps/core/templates/core/login.html:178
 msgid "PINs don't match"
 msgstr "Los PINs no coinciden"
 
-#: apps/core/templates/core/login.html:433
+#: apps/core/templates/core/login.html:318
 msgid "Please complete all fields"
 msgstr "Por favor completa todos los campos"
 
-#: apps/core/templates/core/login.html:478
+#: apps/core/templates/core/login.html:362
 msgid "Login failed"
 msgstr "Error al iniciar sesión"
 
-#: apps/core/templates/core/login.html:487
+#: apps/core/templates/core/login.html:371
 msgid "Connection error. Please check your internet."
 msgstr "Error de conexión. Verifica tu internet."
 
-#: apps/core/templates/core/login.html:544
+#: apps/core/templates/core/login.html:427
 msgid "PIN configured successfully!"
 msgstr "¡PIN configurado correctamente!"
+
+#: apps/core/templates/core/partials/data_table.html:56
+msgid "Search..."
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:68
+msgid "Desktop View"
+msgstr "Vista de Escritorio"
+
+#: apps/core/templates/core/partials/data_table.html:68
+#, fuzzy
+#| msgid "Table View"
+msgid "Mobile View"
+msgstr "Vista Móvil"
+
+#: apps/core/templates/core/partials/data_table.html:78
+msgid "Import"
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:88
+msgid "Export"
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:97
+msgid "New"
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:121
+#: apps/core/templates/core/partials/data_table.html:154
+msgid "items"
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:121
+#, python-format
+msgid "No %(name)s to display"
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:141
+msgid "Show:"
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:147
+#: apps/core/templates/plugins/marketplace.html:72
+msgid "All"
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:149
+msgid "per page"
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:154
+msgid "Showing"
+msgstr ""
+
+#: apps/core/templates/core/partials/data_table.html:154
+msgid "of"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:13
+msgid "Plugin Management"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:15
+msgid "Extend your POS with plugins"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:20
+#: apps/core/templates/core/plugins.html:141
+msgid "Install Plugin"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:32
+msgid "Installed"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:43
+#: apps/core/templates/core/plugins.html:81
+msgid "Active"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:54
+msgid "Discovered"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:81
+msgid "Inactive"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:100
+#: apps/core/templates/core/plugins.html:377
+msgid "Deactivate"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:105
+#: apps/core/templates/core/plugins.html:334
+msgid "Activate"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:112
+msgid "Open"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:127
+msgid "No plugins installed"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:130
+msgid "Install Your First Plugin"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:154
+msgid "Plugin ZIP File"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:162
+msgid "Select a .zip file containing the plugin"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:194
+msgid "Installation Failed"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:209
+msgid "Installation Successful"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:210
+msgid "Plugin has been installed and activated"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:224
+msgid "Installing..."
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:224
+#: apps/core/templates/plugins/marketplace.html:155
+msgid "Install"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:288
+#, fuzzy
+#| msgid "Logging in..."
+msgid "Uploading plugin..."
+msgstr "Iniciando sesión..."
+
+#: apps/core/templates/core/plugins.html:309
+msgid "Installation complete!"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:311
+msgid "Unknown error occurred"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:318
+#: apps/core/templates/core/plugins.html:358
+#: apps/core/templates/core/plugins.html:401
+#: apps/core/templates/core/plugins.html:444
+msgid "Network error: "
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:326
+msgid "Activate Plugin"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:327
+msgid "Do you want to activate"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:355
+#: apps/core/templates/core/plugins.html:398
+#: apps/core/templates/core/plugins.html:441
+msgid "Error: "
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:369
+msgid "Deactivate Plugin"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:370
+msgid "Do you want to deactivate"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:412
+msgid "Uninstall Plugin"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:413
+msgid "Do you want to uninstall"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:413
+msgid "This will remove all plugin files."
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:420
+msgid "Uninstall"
+msgstr ""
+
+#: apps/core/templates/core/plugins.html:455
+#: apps/core/templates/plugins/marketplace.html:31
+msgid "Error"
+msgstr ""
+
+#: apps/core/templates/core/pos.html:5 apps/core/templates/core/pos.html:6
+#: apps/core/templates/core/pos.html:12
+#, fuzzy
+#| msgid "Point of Sale System"
+msgid "Point of Sale"
+msgstr "Sistema de Punto de Venta"
 
 #: apps/core/templates/core/pos.html:13
 #, fuzzy
@@ -341,1381 +555,328 @@ msgid "System Language"
 msgstr ""
 
 #: apps/core/templates/core/settings.html:53
+msgid "Currency"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:77
 msgid "Hub Status"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:57
+#: apps/core/templates/core/settings.html:81
 msgid "Configured"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:59
+#: apps/core/templates/core/settings.html:83
 msgid "Not Configured"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:66
+#: apps/core/templates/core/settings.html:90
 msgid "Tunnel Port"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:80
+#: apps/core/templates/core/settings.html:104
 msgid "Store Configuration"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:81
+#: apps/core/templates/core/settings.html:105
 msgid "Business information for receipts and invoices"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:89
+#: apps/core/templates/core/settings.html:113
 msgid "Business Name"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:93
+#: apps/core/templates/core/settings.html:117
 msgid "Enter business name"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:100
+#: apps/core/templates/core/settings.html:124
 msgid "Business Address"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:103
+#: apps/core/templates/core/settings.html:127
 msgid "Enter complete address"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:111
+#: apps/core/templates/core/settings.html:135
 msgid "VAT/Tax ID"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:115
+#: apps/core/templates/core/settings.html:139
 msgid "VAT or Tax ID"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:122
+#: apps/core/templates/core/settings.html:146
 msgid "Phone"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:127
+#: apps/core/templates/core/settings.html:151
 msgid "Phone number"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:140
+#: apps/core/templates/core/settings.html:164
 msgid "Business email"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:146
+#: apps/core/templates/core/settings.html:170
 msgid "Website"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:151
+#: apps/core/templates/core/settings.html:175
 msgid "Website URL"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:158
+#: apps/core/templates/core/settings.html:182
 msgid "Tax Rate"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:168
+#: apps/core/templates/core/settings.html:192
 #, python-format
 msgid "Tax rate in percentage (e.g., 21.00 for 21%%)"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:174
+#: apps/core/templates/core/settings.html:198
 msgid "Tax Included in Prices"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:176
+#: apps/core/templates/core/settings.html:200
 msgid "Prices include tax"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:183
+#: apps/core/templates/core/settings.html:207
 msgid "Business Logo"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:191
+#: apps/core/templates/core/settings.html:212
 msgid "Logo will be displayed on receipts (optional)"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:196
+#: apps/core/templates/core/settings.html:233
 msgid "Receipt Header"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:199
+#: apps/core/templates/core/settings.html:236
 msgid "Additional text for receipt header (optional)"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:203
+#: apps/core/templates/core/settings.html:240
 msgid "Text displayed at the top of receipts"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:208
+#: apps/core/templates/core/settings.html:245
 msgid "Receipt Footer"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:211
+#: apps/core/templates/core/settings.html:248
 msgid "Additional text for receipt footer (optional)"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:215
+#: apps/core/templates/core/settings.html:252
 msgid "Text displayed at the bottom of receipts (e.g., thank you message)"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:222
+#: apps/core/templates/core/settings.html:259
 msgid "Save Store Config"
 msgstr ""
 
-#: apps/core/templates/core/settings.html:233
+#: apps/core/templates/core/settings.html:270
 msgid "Display Settings"
 msgstr "Configuración de Pantalla"
 
-#: apps/core/templates/core/settings.html:234
+#: apps/core/templates/core/settings.html:271
 msgid "Customize the appearance and printing"
 msgstr "Personalizar apariencia e impresión"
 
-#: apps/core/templates/core/settings.html:240
-msgid "Dark Mode"
+#: apps/core/templates/core/settings.html:277
+msgid "Color Palette"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:282
+msgid "Default (Gray)"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:283
+msgid "Blue"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:286
+msgid ""
+"Choose your preferred color palette. Works with both light and dark modes."
+msgstr ""
+
+#: apps/core/templates/core/settings.html:295
+msgid "Current Mode"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:295
+#, fuzzy
+#| msgid "Dark Mode"
+msgid "Dark"
 msgstr "Modo Oscuro"
 
-#: apps/core/templates/core/settings.html:242
-msgid "Enable dark theme"
-msgstr "Activar tema oscuro"
+#: apps/core/templates/core/settings.html:295
+msgid "Light"
+msgstr ""
 
-#: apps/core/templates/core/settings.html:253
+#: apps/core/templates/core/settings.html:299
+msgid "Toggle between light and dark modes using the"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:301
+msgid "icon in the header"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:307
 msgid "Auto-print Receipts"
 msgstr "Auto-imprimir Recibos"
 
-#: apps/core/templates/core/settings.html:255
+#: apps/core/templates/core/settings.html:309
 msgid "Automatically print after each sale"
 msgstr "Imprimir automáticamente después de cada venta"
 
-#: apps/core/templates/core/settings.html:296
+#: apps/core/templates/core/settings.html:387
+msgid "Language updated. Reloading..."
+msgstr ""
+
+#: apps/core/templates/core/settings.html:406
+msgid "Failed to update language"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:432
+msgid "Currency updated"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:446
+msgid "Failed to update currency"
+msgstr ""
+
+#: apps/core/templates/core/settings.html:512
 msgid "Auto-print enabled"
 msgstr "Auto-impresión activada"
 
-#: apps/core/templates/core/settings.html:297
+#: apps/core/templates/core/settings.html:513
 msgid "Auto-print disabled"
 msgstr "Auto-impresión desactivada"
 
-#: venv/lib/python3.14/site-packages/django/contrib/messages/apps.py:16
-msgid "Messages"
+#: apps/core/templates/plugins/marketplace.html:5
+#: apps/core/templates/plugins/marketplace.html:6
+#: apps/core/templates/plugins/marketplace.html:13
+msgid "Plugin Marketplace"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/contrib/sitemaps/apps.py:8
-msgid "Site Maps"
+#: apps/core/templates/plugins/marketplace.html:15
+msgid "Browse and purchase plugins from Cloud"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/contrib/staticfiles/apps.py:9
-msgid "Static Files"
+#: apps/core/templates/plugins/marketplace.html:20
+msgid "My Plugins"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/contrib/syndication/apps.py:7
-msgid "Syndication"
+#: apps/core/templates/plugins/marketplace.html:46
+#, fuzzy
+#| msgid "PIN configured successfully!"
+msgid "Purchase Successful!"
+msgstr "¡PIN configurado correctamente!"
+
+#: apps/core/templates/plugins/marketplace.html:47
+msgid "You can now download and install the plugin."
 msgstr ""
 
-#. Translators: String used to replace omitted page numbers in elided page
-#. range generated by paginators, e.g. [1, 2, '…', 5, 6, 7, '…', 9, 10].
-#: venv/lib/python3.14/site-packages/django/core/paginator.py:30
-msgid "…"
+#: apps/core/templates/plugins/marketplace.html:60
+msgid "Purchase Cancelled"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/paginator.py:32
-msgid "That page number is not an integer"
+#: apps/core/templates/plugins/marketplace.html:61
+msgid "Your purchase was cancelled."
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/paginator.py:33
-msgid "That page number is less than 1"
+#: apps/core/templates/plugins/marketplace.html:83
+msgid "All Types"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/paginator.py:34
-msgid "That page contains no results"
+#: apps/core/templates/plugins/marketplace.html:86
+msgid "Free"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/validators.py:22
-msgid "Enter a valid value."
+#: apps/core/templates/plugins/marketplace.html:89
+msgid "Paid"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/validators.py:70
-msgid "Enter a valid domain name."
+#: apps/core/templates/plugins/marketplace.html:92
+msgid "Subscription"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/validators.py:153
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:775
-msgid "Enter a valid URL."
+#: apps/core/templates/plugins/marketplace.html:137
+msgid "Purchased"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/validators.py:200
-msgid "Enter a valid integer."
+#: apps/core/templates/plugins/marketplace.html:161
+msgid "Install Free"
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/validators.py:211
-msgid "Enter a valid email address."
+#: apps/core/templates/plugins/marketplace.html:167
+msgid "Purchase"
 msgstr ""
 
-#. Translators: "letters" means latin letters: a-z and A-Z.
-#: venv/lib/python3.14/site-packages/django/core/validators.py:289
+#: apps/core/templates/plugins/marketplace.html:181
+msgid "No Plugins Available"
+msgstr ""
+
+#: apps/core/templates/plugins/marketplace.html:182
+msgid "Check your internet connection or try again later."
+msgstr ""
+
+#: apps/core/templates/plugins/purchase_required.html:5
+#: apps/core/templates/plugins/purchase_required.html:6
+#: apps/core/templates/plugins/purchase_required.html:19
+msgid "Purchase Required"
+msgstr ""
+
+#: apps/core/templates/plugins/purchase_required.html:24
 msgid ""
-"Enter a valid “slug” consisting of letters, numbers, underscores or hyphens."
+"This is a premium feature that requires purchasing the plugin. Purchase it "
+"once and use it forever."
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/validators.py:297
+#: apps/core/templates/plugins/purchase_required.html:31
+#: apps/core/templates/plugins/subscription_required.html:31
+msgid "Plugin"
+msgstr ""
+
+#: apps/core/templates/plugins/purchase_required.html:48
+msgid "Browse Marketplace"
+msgstr ""
+
+#: apps/core/templates/plugins/purchase_required.html:53
+#: apps/core/templates/plugins/subscription_required.html:48
+msgid "Back to My Plugins"
+msgstr ""
+
+#: apps/core/templates/plugins/purchase_required.html:59
+msgid "Already purchased? Try reinstalling the plugin or contact support."
+msgstr ""
+
+#: apps/core/templates/plugins/subscription_required.html:5
+#: apps/core/templates/plugins/subscription_required.html:6
+#: apps/core/templates/plugins/subscription_required.html:19
+msgid "Subscription Required"
+msgstr ""
+
+#: apps/core/templates/plugins/subscription_required.html:43
+msgid "Go to Marketplace"
+msgstr ""
+
+#: apps/core/templates/plugins/subscription_required.html:54
 msgid ""
-"Enter a valid “slug” consisting of Unicode letters, numbers, underscores, or "
-"hyphens."
+"Already subscribed? Try refreshing the page or contact support if the issue "
+"persists."
 msgstr ""
 
-#: venv/lib/python3.14/site-packages/django/core/validators.py:309
-#: venv/lib/python3.14/site-packages/django/core/validators.py:318
-#: venv/lib/python3.14/site-packages/django/core/validators.py:332
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2220
-#, python-format
-msgid "Enter a valid %(protocol)s address."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:311
-msgid "IPv4"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:320
-#: venv/lib/python3.14/site-packages/django/utils/ipv6.py:43
-msgid "IPv6"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:334
-msgid "IPv4 or IPv6"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:375
-msgid "Enter only digits separated by commas."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:381
-#, python-format
-msgid "Ensure this value is %(limit_value)s (it is %(show_value)s)."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:416
-#, python-format
-msgid "Ensure this value is less than or equal to %(limit_value)s."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:425
-#, python-format
-msgid "Ensure this value is greater than or equal to %(limit_value)s."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:434
-#, python-format
-msgid "Ensure this value is a multiple of step size %(limit_value)s."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:441
-#, python-format
-msgid ""
-"Ensure this value is a multiple of step size %(limit_value)s, starting from "
-"%(offset)s, e.g. %(offset)s, %(valid_value1)s, %(valid_value2)s, and so on."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:473
-#, python-format
-msgid ""
-"Ensure this value has at least %(limit_value)d character (it has "
-"%(show_value)d)."
-msgid_plural ""
-"Ensure this value has at least %(limit_value)d characters (it has "
-"%(show_value)d)."
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:491
-#, python-format
-msgid ""
-"Ensure this value has at most %(limit_value)d character (it has "
-"%(show_value)d)."
-msgid_plural ""
-"Ensure this value has at most %(limit_value)d characters (it has "
-"%(show_value)d)."
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:514
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:366
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:405
-msgid "Enter a number."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:516
-#, python-format
-msgid "Ensure that there are no more than %(max)s digit in total."
-msgid_plural "Ensure that there are no more than %(max)s digits in total."
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:521
-#, python-format
-msgid "Ensure that there are no more than %(max)s decimal place."
-msgid_plural "Ensure that there are no more than %(max)s decimal places."
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:526
-#, python-format
-msgid ""
-"Ensure that there are no more than %(max)s digit before the decimal point."
-msgid_plural ""
-"Ensure that there are no more than %(max)s digits before the decimal point."
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:597
-#, python-format
-msgid ""
-"File extension “%(extension)s” is not allowed. Allowed extensions are: "
-"%(allowed_extensions)s."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/core/validators.py:659
-msgid "Null characters are not allowed."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/base.py:1600
-#: venv/lib/python3.14/site-packages/django/forms/models.py:908
-msgid "and"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/base.py:1602
-#, python-format
-msgid "%(model_name)s with this %(field_labels)s already exists."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/constraints.py:22
-#, python-format
-msgid "Constraint “%(name)s” is violated."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:134
-#, python-format
-msgid "Value %(value)r is not a valid choice."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:135
-msgid "This field cannot be null."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:136
-msgid "This field cannot be blank."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:137
-#, python-format
-msgid "%(model_name)s with this %(field_label)s already exists."
-msgstr ""
-
-#. Translators: The 'lookup_type' is one of 'date', 'year' or
-#. 'month'. Eg: "Title must be unique for pub_date year"
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:141
-#, python-format
-msgid ""
-"%(field_label)s must be unique for %(date_field_label)s %(lookup_type)s."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:180
-#, python-format
-msgid "Field of type: %(field_type)s"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1162
-#, python-format
-msgid "“%(value)s” value must be either True or False."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1163
-#, python-format
-msgid "“%(value)s” value must be either True, False, or None."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1165
-msgid "Boolean (Either True or False)"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1215
-#, python-format
-msgid "String (up to %(max_length)s)"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1217
-msgid "String (unlimited)"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1326
-msgid "Comma-separated integers"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1427
-#, python-format
-msgid ""
-"“%(value)s” value has an invalid date format. It must be in YYYY-MM-DD "
-"format."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1431
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1566
-#, python-format
-msgid ""
-"“%(value)s” value has the correct format (YYYY-MM-DD) but it is an invalid "
-"date."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1435
-msgid "Date (without time)"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1562
-#, python-format
-msgid ""
-"“%(value)s” value has an invalid format. It must be in YYYY-MM-DD "
-"HH:MM[:ss[.uuuuuu]][TZ] format."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1570
-#, python-format
-msgid ""
-"“%(value)s” value has the correct format (YYYY-MM-DD HH:MM[:ss[.uuuuuu]]"
-"[TZ]) but it is an invalid date/time."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1575
-msgid "Date (with time)"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1702
-#, python-format
-msgid "“%(value)s” value must be a decimal number."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1704
-msgid "Decimal number"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1864
-#, python-format
-msgid ""
-"“%(value)s” value has an invalid format. It must be in [DD] "
-"[[HH:]MM:]ss[.uuuuuu] format."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1868
-msgid "Duration"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1920
-msgid "Email address"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:1945
-msgid "File path"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2023
-#, python-format
-msgid "“%(value)s” value must be a float."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2025
-msgid "Floating point number"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2065
-#, python-format
-msgid "“%(value)s” value must be an integer."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2067
-msgid "Integer"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2163
-msgid "Big (8 byte) integer"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2180
-msgid "Small integer"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2188
-msgid "IPv4 address"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2219
-msgid "IP address"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2310
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2311
-#, python-format
-msgid "“%(value)s” value must be either None, True or False."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2313
-msgid "Boolean (Either True, False or None)"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2364
-msgid "Positive big integer"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2379
-msgid "Positive integer"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2394
-msgid "Positive small integer"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2410
-#, python-format
-msgid "Slug (up to %(max_length)s)"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2446
-msgid "Text"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2526
-#, python-format
-msgid ""
-"“%(value)s” value has an invalid format. It must be in HH:MM[:ss[.uuuuuu]] "
-"format."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2530
-#, python-format
-msgid ""
-"“%(value)s” value has the correct format (HH:MM[:ss[.uuuuuu]]) but it is an "
-"invalid time."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2534
-msgid "Time"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2642
-msgid "URL"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2666
-msgid "Raw binary data"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2731
-#, python-format
-msgid "“%(value)s” is not a valid UUID."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/__init__.py:2733
-msgid "Universally unique identifier"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/files.py:244
-msgid "File"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/files.py:420
-msgid "Image"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/json.py:24
-msgid "A JSON object"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/json.py:26
-msgid "Value must be valid JSON."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/related.py:979
-#, python-format
-msgid "%(model)s instance with %(field)s %(value)r is not a valid choice."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/related.py:982
-msgid "Foreign Key (type determined by related field)"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/related.py:1276
-msgid "One-to-one relationship"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/related.py:1333
-#, python-format
-msgid "%(from)s-%(to)s relationship"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/related.py:1335
-#, python-format
-msgid "%(from)s-%(to)s relationships"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/db/models/fields/related.py:1383
-msgid "Many-to-many relationship"
-msgstr ""
-
-#. Translators: If found as last label character, these punctuation
-#. characters will prevent the default label_suffix to be appended to the label
-#: venv/lib/python3.14/site-packages/django/forms/boundfield.py:185
-msgid ":?.!"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:95
-msgid "This field is required."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:315
-msgid "Enter a whole number."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:486
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:1267
-msgid "Enter a valid date."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:509
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:1268
-msgid "Enter a valid time."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:536
-msgid "Enter a valid date/time."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:570
-msgid "Enter a valid duration."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:571
-#, python-brace-format
-msgid "The number of days must be between {min_days} and {max_days}."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:640
-msgid "No file was submitted. Check the encoding type on the form."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:641
-msgid "No file was submitted."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:642
-msgid "The submitted file is empty."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:644
-#, python-format
-msgid "Ensure this filename has at most %(max)d character (it has %(length)d)."
-msgid_plural ""
-"Ensure this filename has at most %(max)d characters (it has %(length)d)."
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:649
-msgid "Please either submit a file or check the clear checkbox, not both."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:717
-msgid ""
-"Upload a valid image. The file you uploaded was either not an image or a "
-"corrupted image."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:889
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:975
-#: venv/lib/python3.14/site-packages/django/forms/models.py:1592
-#, python-format
-msgid "Select a valid choice. %(value)s is not one of the available choices."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:977
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:1096
-#: venv/lib/python3.14/site-packages/django/forms/models.py:1590
-msgid "Enter a list of values."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:1097
-msgid "Enter a complete value."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:1339
-msgid "Enter a valid UUID."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/fields.py:1369
-msgid "Enter a valid JSON."
-msgstr ""
-
-#. Translators: This is the default suffix added to form field labels
-#: venv/lib/python3.14/site-packages/django/forms/forms.py:97
-msgid ":"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/forms.py:239
-#, python-format
-msgid "(Hidden field %(name)s) %(error)s"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/formsets.py:61
-#, python-format
-msgid ""
-"ManagementForm data is missing or has been tampered with. Missing fields: "
-"%(field_names)s. You may need to file a bug report if the issue persists."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/formsets.py:65
-#, python-format
-msgid "Please submit at most %(num)d form."
-msgid_plural "Please submit at most %(num)d forms."
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/forms/formsets.py:70
-#, python-format
-msgid "Please submit at least %(num)d form."
-msgid_plural "Please submit at least %(num)d forms."
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/forms/formsets.py:484
-#: venv/lib/python3.14/site-packages/django/forms/formsets.py:491
-msgid "Order"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/formsets.py:499
-msgid "Delete"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/models.py:901
-#, python-format
-msgid "Please correct the duplicate data for %(field)s."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/models.py:906
-#, python-format
-msgid "Please correct the duplicate data for %(field)s, which must be unique."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/models.py:913
-#, python-format
-msgid ""
-"Please correct the duplicate data for %(field_name)s which must be unique "
-"for the %(lookup)s in %(date_field)s."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/models.py:922
-msgid "Please correct the duplicate values below."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/models.py:1359
-msgid "The inline value did not match the parent instance."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/models.py:1450
-msgid "Select a valid choice. That choice is not one of the available choices."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/models.py:1594
-#, python-format
-msgid "“%(pk)s” is not a valid value."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/utils.py:229
-#, python-format
-msgid ""
-"%(datetime)s couldn’t be interpreted in time zone %(current_timezone)s; it "
-"may be ambiguous or it may not exist."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/widgets.py:527
-msgid "Clear"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/widgets.py:528
-msgid "Currently"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/widgets.py:529
-msgid "Change"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/widgets.py:866
-msgid "Unknown"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/widgets.py:867
-msgid "Yes"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/forms/widgets.py:868
-msgid "No"
-msgstr ""
+#~ msgid "Point of Sale System"
+#~ msgstr "Sistema de Punto de Venta"
 
-#. Translators: Please do not add spaces around commas.
-#: venv/lib/python3.14/site-packages/django/template/defaultfilters.py:873
-msgid "yes,no,maybe"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/template/defaultfilters.py:903
-#: venv/lib/python3.14/site-packages/django/template/defaultfilters.py:920
-#, python-format
-msgid "%(size)d byte"
-msgid_plural "%(size)d bytes"
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/template/defaultfilters.py:922
-#, python-format
-msgid "%s KB"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/template/defaultfilters.py:924
-#, python-format
-msgid "%s MB"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/template/defaultfilters.py:926
-#, python-format
-msgid "%s GB"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/template/defaultfilters.py:928
-#, python-format
-msgid "%s TB"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/template/defaultfilters.py:930
-#, python-format
-msgid "%s PB"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dateformat.py:74
-msgid "p.m."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dateformat.py:75
-msgid "a.m."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dateformat.py:80
-msgid "PM"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dateformat.py:81
-msgid "AM"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dateformat.py:153
-msgid "midnight"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dateformat.py:155
-msgid "noon"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:7
-msgid "Monday"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:8
-msgid "Tuesday"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:9
-msgid "Wednesday"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:10
-msgid "Thursday"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:11
-msgid "Friday"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:12
-msgid "Saturday"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:13
-msgid "Sunday"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:16
-msgid "Mon"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:17
-msgid "Tue"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:18
-msgid "Wed"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:19
-msgid "Thu"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:20
-msgid "Fri"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:21
-msgid "Sat"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:22
-msgid "Sun"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:25
-msgid "January"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:26
-msgid "February"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:27
-msgid "March"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:28
-msgid "April"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:29
-msgid "May"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:30
-msgid "June"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:31
-msgid "July"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:32
-msgid "August"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:33
-msgid "September"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:34
-msgid "October"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:35
-msgid "November"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:36
-msgid "December"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:39
-msgid "jan"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:40
-msgid "feb"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:41
-msgid "mar"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:42
-msgid "apr"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:43
-msgid "may"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:44
-msgid "jun"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:45
-msgid "jul"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:46
-msgid "aug"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:47
-msgid "sep"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:48
-msgid "oct"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:49
-msgid "nov"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:50
-msgid "dec"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:53
-msgctxt "abbrev. month"
-msgid "Jan."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:54
-msgctxt "abbrev. month"
-msgid "Feb."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:55
-msgctxt "abbrev. month"
-msgid "March"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:56
-msgctxt "abbrev. month"
-msgid "April"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:57
-msgctxt "abbrev. month"
-msgid "May"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:58
-msgctxt "abbrev. month"
-msgid "June"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:59
-msgctxt "abbrev. month"
-msgid "July"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:60
-msgctxt "abbrev. month"
-msgid "Aug."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:61
-msgctxt "abbrev. month"
-msgid "Sept."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:62
-msgctxt "abbrev. month"
-msgid "Oct."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:63
-msgctxt "abbrev. month"
-msgid "Nov."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:64
-msgctxt "abbrev. month"
-msgid "Dec."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:67
-msgctxt "alt. month"
-msgid "January"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:68
-msgctxt "alt. month"
-msgid "February"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:69
-msgctxt "alt. month"
-msgid "March"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:70
-msgctxt "alt. month"
-msgid "April"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:71
-msgctxt "alt. month"
-msgid "May"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:72
-msgctxt "alt. month"
-msgid "June"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:73
-msgctxt "alt. month"
-msgid "July"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:74
-msgctxt "alt. month"
-msgid "August"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:75
-msgctxt "alt. month"
-msgid "September"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:76
-msgctxt "alt. month"
-msgid "October"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:77
-msgctxt "alt. month"
-msgid "November"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/dates.py:78
-msgctxt "alt. month"
-msgid "December"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/ipv6.py:20
-msgid "This is not a valid IPv6 address."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/text.py:76
-#, python-format
-msgctxt "String to return when truncating text"
-msgid "%(truncated_text)s…"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/text.py:287
-msgid "or"
-msgstr ""
-
-#. Translators: This string is used as a separator between list elements
-#: venv/lib/python3.14/site-packages/django/utils/text.py:306
-#: venv/lib/python3.14/site-packages/django/utils/timesince.py:135
-msgid ", "
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/utils/timesince.py:8
-#, python-format
-msgid "%(num)d year"
-msgid_plural "%(num)d years"
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/utils/timesince.py:9
-#, python-format
-msgid "%(num)d month"
-msgid_plural "%(num)d months"
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/utils/timesince.py:10
-#, python-format
-msgid "%(num)d week"
-msgid_plural "%(num)d weeks"
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/utils/timesince.py:11
-#, python-format
-msgid "%(num)d day"
-msgid_plural "%(num)d days"
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/utils/timesince.py:12
-#, python-format
-msgid "%(num)d hour"
-msgid_plural "%(num)d hours"
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/utils/timesince.py:13
-#, python-format
-msgid "%(num)d minute"
-msgid_plural "%(num)d minutes"
-msgstr[0] ""
-msgstr[1] ""
-
-#: venv/lib/python3.14/site-packages/django/views/csrf.py:29
-msgid "Forbidden"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/csrf.py:30
-msgid "CSRF verification failed. Request aborted."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/csrf.py:34
-msgid ""
-"You are seeing this message because this HTTPS site requires a “Referer "
-"header” to be sent by your web browser, but none was sent. This header is "
-"required for security reasons, to ensure that your browser is not being "
-"hijacked by third parties."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/csrf.py:40
-msgid ""
-"If you have configured your browser to disable “Referer” headers, please re-"
-"enable them, at least for this site, or for HTTPS connections, or for “same-"
-"origin” requests."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/csrf.py:45
-msgid ""
-"If you are using the <meta name=\"referrer\" content=\"no-referrer\"> tag or "
-"including the “Referrer-Policy: no-referrer” header, please remove them. The "
-"CSRF protection requires the “Referer” header to do strict referer checking. "
-"If you’re concerned about privacy, use alternatives like <a "
-"rel=\"noreferrer\" …> for links to third-party sites."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/csrf.py:54
-msgid ""
-"You are seeing this message because this site requires a CSRF cookie when "
-"submitting forms. This cookie is required for security reasons, to ensure "
-"that your browser is not being hijacked by third parties."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/csrf.py:60
-msgid ""
-"If you have configured your browser to disable cookies, please re-enable "
-"them, at least for this site, or for “same-origin” requests."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/csrf.py:66
-msgid "More information is available with DEBUG=True."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:44
-msgid "No year specified"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:64
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:115
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:214
-msgid "Date out of range"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:94
-msgid "No month specified"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:147
-msgid "No day specified"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:194
-msgid "No week specified"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:353
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:384
-#, python-format
-msgid "No %(verbose_name_plural)s available"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:680
-#, python-format
-msgid ""
-"Future %(verbose_name_plural)s not available because "
-"%(class_name)s.allow_future is False."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/dates.py:720
-#, python-format
-msgid "Invalid date string “%(datestr)s” given format “%(format)s”"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/detail.py:56
-#, python-format
-msgid "No %(verbose_name)s found matching the query"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/list.py:70
-msgid "Page is not “last”, nor can it be converted to an int."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/list.py:77
-#, python-format
-msgid "Invalid page (%(page_number)s): %(message)s"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/generic/list.py:173
-#, python-format
-msgid "Empty list and “%(class_name)s.allow_empty” is False."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/static.py:49
-msgid "Directory indexes are not allowed here."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/static.py:51
-#, python-format
-msgid "“%(path)s” does not exist"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/static.py:68
-#: venv/lib/python3.14/site-packages/django/views/templates/directory_index.html:8
-#: venv/lib/python3.14/site-packages/django/views/templates/directory_index.html:11
-#, python-format
-msgid "Index of %(directory)s"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:7
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:204
-msgid "The install worked successfully! Congratulations!"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:206
-#, python-format
-msgid ""
-"View <a href=\"https://docs.djangoproject.com/en/%(version)s/releases/\" "
-"target=\"_blank\" rel=\"noopener\">release notes</a> for Django %(version)s"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:208
-#, python-format
-msgid ""
-"You are seeing this page because <a href=\"https://docs.djangoproject.com/en/"
-"%(version)s/ref/settings/#debug\" target=\"_blank\" "
-"rel=\"noopener\">DEBUG=True</a> is in your settings file and you have not "
-"configured any URLs."
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:217
-msgid "Django Documentation"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:218
-msgid "Topics, references, &amp; how-to’s"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:226
-msgid "Tutorial: A Polling App"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:227
-msgid "Get started with Django"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:235
-msgid "Django Community"
-msgstr ""
-
-#: venv/lib/python3.14/site-packages/django/views/templates/default_urlconf.html:236
-msgid "Connect, get help, or contribute"
-msgstr ""
+#~ msgid "Enable dark theme"
+#~ msgstr "Activar tema oscuro"
 
 #, fuzzy
 #~| msgid "Enter your PIN"
@@ -1731,3 +892,6 @@ msgstr ""
 #~| msgid "PIN configured successfully!"
 #~ msgid "Settings reset successfully"
 #~ msgstr "¡PIN configurado correctamente!"
+
+#~ msgid "Card View"
+#~ msgstr "Vista de Tarjetas"

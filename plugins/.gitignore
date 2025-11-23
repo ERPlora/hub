@@ -1,6 +1,21 @@
-# Ignore all plugin directories except example
-*
+# Plugin Development Directory
+# ============================
+#
+# Esta carpeta contiene plugins en desarrollo.
+# Cada plugin tiene su propio repositorio Git.
+#
+# IMPORTANTE:
+# - Ignorar TODOS los subdirectorios (plugins individuales)
+# - Mantener solo README.md y documentación
+# - Cada plugin debe tener su propio .git/
+
+# Ignorar todos los subdirectorios (plugins)
+*/
+
+# Excepciones: mantener archivos de documentación
 !.gitignore
-!.gitkeep
 !README.md
-!_example-plugin/
+!PLUGIN_DEVELOPMENT.md
+!PLUGIN_API.md
+!.template/
+!example

@@ -210,3 +210,18 @@ Temporary Items
 
 **/jwt_key*
 venv
+# Test artifacts - ignore accidental directory creation from mocking
+/home/testuser/
+/Users/testuser/
+
+# ==============================================================================
+# PLUGIN DEVELOPMENT
+# ==============================================================================
+# Ignorar todos los plugins en desarrollo (cada uno tiene su propio repo)
+# Solo mantener archivos de documentación en plugins/
+plugins/*/
+!plugins/.gitignore
+!plugins/README.md
+!plugins/PLUGIN_DEVELOPMENT.md
+!plugins/PLUGIN_API.md
+!plugins/.template/

@@ -1,15 +1,15 @@
 #!/bin/bash
 set -e
 
-# Script para firmar y empaquetar CPOS Hub para macOS
+# Script para firmar y empaquetar ERPlora Hub para macOS
 # Requiere: Apple Developer ID certificate
 
 VERSION="${1:-0.8.0}"
-APP_NAME="CPOS Hub.app"
+APP_NAME="ERPlora Hub.app"
 DMG_NAME="CPOS-Hub-${VERSION}-macos.dmg"
 BUILD_PATH="dist/${APP_NAME}"
 
-echo "[INFO] Firmando y empaquetando CPOS Hub v${VERSION} para macOS"
+echo "[INFO] Firmando y empaquetando ERPlora Hub v${VERSION} para macOS"
 
 # Verificar que existe el build
 if [ ! -d "$BUILD_PATH" ]; then
@@ -85,13 +85,13 @@ create_dmg() {
 
     # Crear DMG temporal
     local temp_dmg="temp_${DMG_NAME}"
-    hdiutil create -srcfolder "$BUILD_PATH" -volname "CPOS Hub" -fs HFS+ \
+    hdiutil create -srcfolder "$BUILD_PATH" -volname "ERPlora Hub" -fs HFS+ \
         -fsargs "-c c=64,a=16,e=16" -format UDRW -size 500m "$temp_dmg"
 
     # Montar DMG
     local device=$(hdiutil attach -readwrite -noverify -noautoopen "$temp_dmg" | \
         grep -Eo '/dev/disk[0-9]+')
-    local mount_point="/Volumes/CPOS Hub"
+    local mount_point="/Volumes/ERPlora Hub"
 
     # Crear alias a Applications
     ln -s /Applications "$mount_point/Applications"

@@ -22,10 +22,10 @@ Antes de verificar, necesitas importar la clave pública de CPOS Team:
 
 ```bash
 # Descargar e importar directamente desde la API
-curl -sL https://cpos.app/api/gpg/public-key/ | gpg --import
+curl -sL https://erplora.com/api/gpg/public-key/ | gpg --import
 
 # O descargar y guardar
-curl -sL https://cpos.app/api/gpg/public-key/ -o cpos-hub-public-key.asc
+curl -sL https://erplora.com/api/gpg/public-key/ -o cpos-hub-public-key.asc
 gpg --import cpos-hub-public-key.asc
 ```
 
@@ -33,7 +33,7 @@ gpg --import cpos-hub-public-key.asc
 
 ```bash
 # Descargar clave pública
-curl -O https://raw.githubusercontent.com/cpos-app/hub/main/GPG-PUBLIC-KEY.asc
+curl -O https://raw.githubusercontent.com/ERPlora/hub/main/GPG-PUBLIC-KEY.asc
 
 # Importar clave
 gpg --import GPG-PUBLIC-KEY.asc
@@ -43,14 +43,14 @@ gpg --import GPG-PUBLIC-KEY.asc
 
 ```bash
 # Ver información detallada en JSON
-curl -s https://cpos.app/api/gpg/public-key/info/ | jq
+curl -s https://erplora.com/api/gpg/public-key/info/ | jq
 ```
 
 ### Información de la Clave
 
 ```
 Name:        CPOS Team
-Email:       releases@cpos.app
+Email:       releases@erplora.com
 Comment:     CPOS Hub Release Signing Key
 Key Type:    RSA 4096-bit
 Key ID:      998A98EF7BE1D222837D30EBC27E75F06D413478
@@ -99,7 +99,7 @@ gpg --verify CPOS-Hub-0.8.0-windows.zip.asc CPOS-Hub-0.8.0-windows.zip
 ```
 gpg: Signature made Mon 07 Jan 2025 10:00:00 AM UTC
 gpg:                using RSA key <KEY_ID>
-gpg: Good signature from "CPOS Team (CPOS Hub Release Signing Key) <releases@cpos.app>" [unknown]
+gpg: Good signature from "CPOS Team (CPOS Hub Release Signing Key) <releases@erplora.com>" [unknown]
 ```
 
 Si ves `Good signature`, el archivo es auténtico.
@@ -115,10 +115,10 @@ Este warning es **normal** si es la primera vez que usas la clave. Para confiar 
 
 ```bash
 # Listar claves importadas
-gpg --list-keys releases@cpos.app
+gpg --list-keys releases@erplora.com
 
 # Confiar en la clave (interactivo)
-gpg --edit-key releases@cpos.app
+gpg --edit-key releases@erplora.com
 > trust
 > 5 (I trust ultimately)
 > quit
@@ -145,12 +145,12 @@ Para asegurarte de que importaste la clave correcta:
 
 ```bash
 # Ver fingerprint completo
-gpg --fingerprint releases@cpos.app
+gpg --fingerprint releases@erplora.com
 ```
 
 Compara el fingerprint con el publicado en:
-- https://github.com/cpos-app/hub/blob/main/GPG-PUBLIC-KEY.asc
-- https://cpos.app/security/gpg (página web oficial)
+- https://github.com/ERPlora/hub/blob/main/GPG-PUBLIC-KEY.asc
+- https://erplora.com/security/gpg (página web oficial)
 
 ---
 
@@ -188,7 +188,7 @@ https://gpg4win.org/download.html
 Si planeas verificar múltiples releases, marca la clave como confiable:
 
 ```bash
-gpg --edit-key releases@cpos.app
+gpg --edit-key releases@erplora.com
 gpg> trust
 Your decision? 5 (I trust ultimately)
 gpg> quit
@@ -249,9 +249,9 @@ chmod +x verify-cpos.sh
 
 1. **NO uses el archivo**
 2. Elimínalo inmediatamente
-3. Descarga nuevamente desde https://github.com/cpos-app/hub/releases
+3. Descarga nuevamente desde https://github.com/ERPlora/hub/releases
 4. Verifica nuevamente
-5. Si persiste, reporta el problema: security@cpos.app
+5. Si persiste, reporta el problema: security@erplora.com
 
 ### ¿La firma garantiza que el software es seguro?
 
@@ -273,14 +273,14 @@ Sí, mientras la clave GPG no haya expirado (válida hasta 2030-01-07).
 
 Si encuentras un problema de seguridad:
 - **NO lo publiques públicamente**
-- Envía un email a: security@cpos.app
+- Envía un email a: security@erplora.com
 - Incluye: versión, sistema operativo, pasos para reproducir
 
 ### Transparencia
 
-- Clave pública: https://github.com/cpos-app/hub/blob/main/GPG-PUBLIC-KEY.asc
-- Historial de firmas: https://github.com/cpos-app/hub/releases
-- Policy de seguridad: https://github.com/cpos-app/hub/security/policy
+- Clave pública: https://github.com/ERPlora/hub/blob/main/GPG-PUBLIC-KEY.asc
+- Historial de firmas: https://github.com/ERPlora/hub/releases
+- Policy de seguridad: https://github.com/ERPlora/hub/security/policy
 
 ---
 

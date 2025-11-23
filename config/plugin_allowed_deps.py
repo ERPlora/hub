@@ -37,7 +37,7 @@ CRITICAL_DEPENDENCIES = {
     'websockets': '>=12.0',        # WebSocket cliente (notificaciones Cloud)
 }
 
-# === IMPORTANTES (10) - Funcionalidad muy útil ===
+# === IMPORTANTES (13) - Funcionalidad muy útil ===
 IMPORTANT_DEPENDENCIES = {
     # Fechas & Localización
     'python-dateutil': '>=2.8.2',  # Parsing de fechas flexible
@@ -51,8 +51,11 @@ IMPORTANT_DEPENDENCIES = {
     'pandas': '>=2.1.0',           # Análisis de datos (reportes avanzados)
     'numpy': '>=1.26.0',           # Cálculos numéricos (márgenes, inventarios)
 
-    # Hardware
-    'pyserial': '>=3.5',           # Puerto serial (básculas, cajones, displays)
+    # Hardware POS
+    'pyserial': '>=3.5',           # Puerto serial RS232 (cajón de dinero, displays)
+    'pyusb': '>=1.2.1',            # USB devices (impresoras USB, scanners)
+    'evdev': '>=1.6.0',            # Barcode scanners HID (Linux)
+    'pywinusb': '>=0.4.2',         # USB HID devices (Windows)
 
     # Email & Validation
     'email-validator': '>=2.1.0',  # Validar emails
@@ -71,7 +74,7 @@ USEFUL_DEPENDENCIES = {
     'PyPDF2': '>=3.0.0',           # Manipular PDFs existentes
 }
 
-# === TODAS LAS DEPENDENCIAS PERMITIDAS (25 total) ===
+# === TODAS LAS DEPENDENCIAS PERMITIDAS (28 total) ===
 PLUGIN_ALLOWED_DEPENDENCIES = {
     **CRITICAL_DEPENDENCIES,
     **IMPORTANT_DEPENDENCIES,
@@ -181,7 +184,7 @@ if __name__ == '__main__':
         print(f"  - {pkg}{version}")
 
     print()
-    print("[IMPORTANT] IMPORTANTES (10):")
+    print("[IMPORTANT] IMPORTANTES (13):")
     for pkg, version in IMPORTANT_DEPENDENCIES.items():
         print(f"  - {pkg}{version}")
 
