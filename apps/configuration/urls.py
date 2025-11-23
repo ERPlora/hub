@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import views_plugins
+from . import views_maintenance
 
 app_name = 'configuration'
 
@@ -14,6 +15,10 @@ urlpatterns = [
 
     # Settings
     path('settings/', views.settings, name='settings'),
+
+    # Database Maintenance
+    path('settings/scan-orphaned/', views_maintenance.scan_orphaned_data, name='scan_orphaned_data'),
+    path('settings/clean-orphaned/', views_maintenance.clean_orphaned_data, name='clean_orphaned_data'),
 
     # Plugins Management
     path('plugins/', views_plugins.plugins_index, name='plugins'),
