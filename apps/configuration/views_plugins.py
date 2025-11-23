@@ -4,11 +4,14 @@ Similar to WordPress plugin management page
 """
 import json
 import shutil
+import sys
+import os
 from pathlib import Path
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.conf import settings as django_settings
+from django.core.management import call_command
 
 
 def plugins_index(request):
@@ -77,11 +80,17 @@ def plugins_index(request):
     active_count = sum(1 for p in all_plugins if p['is_active'])
     inactive_count = sum(1 for p in all_plugins if not p['is_active'])
 
+    # Check if there are plugins pending restart
+    plugins_pending_restart = request.session.get('plugins_pending_restart', [])
+    requires_restart = len(plugins_pending_restart) > 0
+
     context = {
         'plugins': all_plugins,
         'active_count': active_count,
         'inactive_count': inactive_count,
-        'current_view': 'plugins'
+        'current_view': 'plugins',
+        'requires_restart': requires_restart,
+        'plugins_pending_restart': plugins_pending_restart
     }
     return render(request, 'core/plugins.html', context)
 
@@ -108,7 +117,20 @@ def plugin_activate(request, plugin_id):
     try:
         # Rename folder to activate
         disabled_folder.rename(active_folder)
-        return JsonResponse({'success': True, 'message': 'Plugin activated. Restart required.'})
+
+        # Mark that restart is needed in session
+        if 'plugins_pending_restart' not in request.session:
+            request.session['plugins_pending_restart'] = []
+
+        if plugin_id not in request.session['plugins_pending_restart']:
+            request.session['plugins_pending_restart'].append(plugin_id)
+            request.session.modified = True
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Plugin activated. Restart required.',
+            'requires_restart': True
+        })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
@@ -168,5 +190,37 @@ def plugin_delete(request, plugin_id):
         # Delete folder completely
         shutil.rmtree(folder_to_delete)
         return JsonResponse({'success': True, 'message': 'Plugin deleted successfully.'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@require_http_methods(["POST"])
+def plugin_restart_server(request):
+    """
+    Restart the Django development server and run migrations for activated plugins
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+
+    try:
+        # Run migrations for all active plugins
+        call_command('migrate', '--run-syncdb')
+
+        # Clear plugins pending restart from session
+        if 'plugins_pending_restart' in request.session:
+            del request.session['plugins_pending_restart']
+            request.session.modified = True
+
+        # Trigger server restart by touching wsgi.py or main file
+        # In development, Django's autoreload will detect this
+        wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
+        if wsgi_file.exists():
+            wsgi_file.touch()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Server restarting... Migrations applied.'
+        })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
