@@ -44,70 +44,27 @@ class PluginLoader:
         print(f"[INFO] Plugin loader initialized")
         print(f"[INFO] Plugins directory: {self.plugins_dir}")
 
-    def discover_plugins(self) -> List[Dict]:
-        """
-        Discover all plugins in the plugins directory
-        Returns list of plugin metadata
-        """
-        discovered = []
-
-        if not self.plugins_dir.exists():
-            return discovered
-
-        # Iterate through plugin directories
-        for plugin_dir in self.plugins_dir.iterdir():
-            if not plugin_dir.is_dir():
-                continue
-
-            # Skip hidden directories and example
-            if plugin_dir.name.startswith('.') or plugin_dir.name.startswith('_'):
-                continue
-
-            # Check for plugin.json
-            plugin_json = plugin_dir / 'plugin.json'
-            if not plugin_json.exists():
-                continue
-
-            try:
-                with open(plugin_json, 'r', encoding='utf-8') as f:
-                    metadata = json.load(f)
-                    metadata['install_path'] = str(plugin_dir)
-                    discovered.append(metadata)
-            except (json.JSONDecodeError, Exception) as e:
-                print(f"Error loading plugin {plugin_dir.name}: {e}")
-                continue
-
-        return discovered
 
     def load_plugin(self, plugin_id: str) -> bool:
         """
-        Load a plugin into Django INSTALLED_APPS from external directory.
+        Load a plugin directly from filesystem (no DB check).
 
-        Plugins are Django apps stored in the external plugins directory.
-        This method:
-        1. Adds the plugin directory to PYTHONPATH
-        2. Imports the plugin module
-        3. Adds it to INSTALLED_APPS
-        4. Runs migrations
+        Simply checks if folder exists and doesn't start with _.
 
         Returns True if successful
         """
-        from django.apps import apps as django_apps
-        Plugin = django_apps.get_model("plugins_admin", "Plugin")
-
         try:
-            # Get plugin from database
-            plugin = Plugin.objects.get(plugin_id=plugin_id, is_active=True)
-
-            if not plugin.install_path:
-                print(f"[ERROR] Plugin {plugin_id} has no install path")
-                return False
-
-            plugin_path = Path(plugin.install_path)
+            # Build plugin path directly from plugin_id
+            plugin_path = self.plugins_dir / plugin_id
 
             # Check if plugin directory exists
             if not plugin_path.exists():
                 print(f"[ERROR] Plugin directory not found: {plugin_path}")
+                return False
+
+            # Check if disabled (starts with _)
+            if plugin_id.startswith('_'):
+                print(f"[INFO] Plugin {plugin_id} is disabled (starts with _)")
                 return False
 
             # Ensure parent directory (plugins/) is in Python path
@@ -116,41 +73,31 @@ class PluginLoader:
                 sys.path.insert(0, plugin_parent)
                 print(f"[INFO] Added to PYTHONPATH: {plugin_parent}")
 
-            # Import plugin module using relative import from plugins directory
-            plugin_module_name = plugin_path.name
-
             # Check if already loaded
-            if plugin_module_name in self.loaded_plugins:
+            if plugin_id in self.loaded_plugins:
                 print(f"[INFO] Plugin {plugin_id} already loaded")
                 return True
 
             try:
                 # Import the plugin module
-                # Since plugins/ is in sys.path, we can import directly
-                print(f"[INFO] Importing plugin module: {plugin_module_name}")
-                plugin_module = importlib.import_module(plugin_module_name)
+                print(f"[INFO] Importing plugin module: {plugin_id}")
+                plugin_module = importlib.import_module(plugin_id)
 
                 # Add to Django INSTALLED_APPS if not already there
-                # Use just the module name since it's importable from plugins/
-                app_label = plugin_module_name
-                if app_label not in settings.INSTALLED_APPS:
-                    settings.INSTALLED_APPS = list(settings.INSTALLED_APPS) + [app_label]
-                    print(f"[OK] Added {app_label} to INSTALLED_APPS")
+                if plugin_id not in settings.INSTALLED_APPS:
+                    settings.INSTALLED_APPS = list(settings.INSTALLED_APPS) + [plugin_id]
+                    print(f"[OK] Added {plugin_id} to INSTALLED_APPS")
 
                 # Store in loaded plugins
                 self.loaded_plugins[plugin_id] = {
                     'module': plugin_module,
                     'path': str(plugin_path),
-                    'app_label': app_label
+                    'app_label': plugin_id
                 }
 
-                # Apply migrations if any
-                try:
-                    print(f"[INFO] Running migrations for {plugin_module_name}...")
-                    call_command('migrate', plugin_module_name, '--noinput')
-                    print(f"[OK] Migrations applied for {plugin_module_name}")
-                except Exception as e:
-                    print(f"[WARNING] Migration warning for {plugin_id}: {e}")
+                # Note: Migrations must be run manually via:
+                # python manage.py migrate
+                # (Cannot run migrations during app initialization)
 
                 print(f"[OK] Plugin {plugin_id} loaded successfully")
                 return True
@@ -161,9 +108,6 @@ class PluginLoader:
                 traceback.print_exc()
                 return False
 
-        except Plugin.DoesNotExist:
-            print(f"[ERROR] Plugin {plugin_id} not found in database")
-            return False
         except Exception as e:
             print(f"[ERROR] Failed to load plugin {plugin_id}: {e}")
             import traceback
@@ -172,155 +116,100 @@ class PluginLoader:
 
     def load_all_active_plugins(self) -> int:
         """
-        Load all active plugins from database
+        Load all active plugins from filesystem (folders without _)
         Returns count of successfully loaded plugins
         """
-        from django.apps import apps as django_apps
-        Plugin = django_apps.get_model("plugins_admin", "Plugin")
-
-        active_plugins = Plugin.objects.filter(is_active=True, is_installed=True)
         loaded_count = 0
 
-        for plugin in active_plugins:
-            if self.load_plugin(plugin.plugin_id):
+        # Scan filesystem for active plugins
+        for plugin_dir in self.plugins_dir.iterdir():
+            if not plugin_dir.is_dir():
+                continue
+
+            # Skip disabled plugins (start with _ or .)
+            if plugin_dir.name.startswith('.') or plugin_dir.name.startswith('_'):
+                continue
+
+            plugin_id = plugin_dir.name
+
+            if self.load_plugin(plugin_id):
                 loaded_count += 1
 
         return loaded_count
 
     def unload_plugin(self, plugin_id: str) -> bool:
         """
-        Unload a plugin (mark as inactive)
-        Note: Cannot truly unload from Python runtime, but can mark as inactive
+        Unload a plugin (just remove from memory).
+        To disable permanently: rename folder to _{plugin_id}
         """
-        from django.apps import apps as django_apps
-        Plugin = django_apps.get_model("plugins_admin", "Plugin")
-
-        try:
-            plugin = Plugin.objects.get(plugin_id=plugin_id)
-            plugin.is_active = False
-            plugin.save()
-
-            # Remove from loaded plugins
-            if plugin_id in self.loaded_plugins:
-                del self.loaded_plugins[plugin_id]
-
+        # Remove from loaded plugins
+        if plugin_id in self.loaded_plugins:
+            del self.loaded_plugins[plugin_id]
+            print(f"[INFO] Plugin {plugin_id} unloaded from memory")
             return True
-        except Plugin.DoesNotExist:
-            return False
 
-    def install_plugin_from_metadata(self, metadata: Dict) -> Optional['Plugin']:
-        """
-        Install a plugin from its metadata (plugin.json)
-        Creates/updates Plugin model instance
-        """
-        from django.apps import apps as django_apps
-        Plugin = django_apps.get_model("plugins_admin", "Plugin")
+        print(f"[WARNING] Plugin {plugin_id} was not loaded")
+        return False
 
-        plugin_id = metadata.get('plugin_id')
-        if not plugin_id:
-            return None
-
-        # Get or create plugin
-        plugin, created = Plugin.objects.get_or_create(
-            plugin_id=plugin_id,
-            defaults={
-                'name': metadata.get('name', plugin_id),
-                'description': metadata.get('description', ''),
-                'version': metadata.get('version', '1.0.0'),
-                'author': metadata.get('author', ''),
-                'icon': metadata.get('icon', 'cube-outline'),
-                'category': metadata.get('category', 'general'),
-                'install_path': metadata.get('install_path', ''),
-                'is_installed': True,
-                'is_active': True,
-            }
-        )
-
-        # Update if already exists
-        if not created:
-            plugin.name = metadata.get('name', plugin.name)
-            plugin.description = metadata.get('description', plugin.description)
-            plugin.version = metadata.get('version', plugin.version)
-            plugin.author = metadata.get('author', plugin.author)
-            plugin.icon = metadata.get('icon', plugin.icon)
-            plugin.category = metadata.get('category', plugin.category)
-            plugin.install_path = metadata.get('install_path', plugin.install_path)
-            plugin.is_installed = True
-
-        # Update menu configuration
-        menu_config = metadata.get('menu', {})
-        if menu_config:
-            plugin.menu_label = menu_config.get('label', metadata.get('name', plugin_id))
-            plugin.menu_icon = menu_config.get('icon', metadata.get('icon', 'cube-outline'))
-            plugin.menu_order = menu_config.get('order', 100)
-            plugin.show_in_menu = menu_config.get('show', True)
-
-            # Process menu items (multiple submenu items)
-            menu_items = menu_config.get('items', [])
-            if menu_items:
-                plugin.menu_items = menu_items
-
-        plugin.main_url = metadata.get('main_url', '')
-        plugin.save()
-
-        return plugin
-
-    def sync_plugins(self) -> tuple:
-        """
-        Sync plugins from filesystem to database
-        Returns (installed_count, updated_count)
-        """
-        discovered = self.discover_plugins()
-        installed_count = 0
-        updated_count = 0
-
-        for metadata in discovered:
-            plugin = self.install_plugin_from_metadata(metadata)
-            if plugin:
-                if plugin.pk:
-                    updated_count += 1
-                else:
-                    installed_count += 1
-
-        return (installed_count, updated_count)
 
     def get_menu_items(self) -> List[Dict]:
         """
-        Get all active plugin menu items for sidebar
+        Get all active plugin menu items directly from filesystem.
+        Scans plugins directory and reads plugin.json for each active plugin.
+
         Returns list of menu items sorted by order
-
-        Structure:
-        - If plugin has menu_items (submenu), returns it with 'items' key
-        - If plugin has no menu_items, returns simple menu item
         """
-        from django.apps import apps as django_apps
-        Plugin = django_apps.get_model("plugins_admin", "Plugin")
-
-        plugins = Plugin.objects.filter(
-            is_active=True,
-            is_installed=True,
-            show_in_menu=True
-        ).order_by('menu_order', 'name')
-
         menu_items = []
-        for plugin in plugins:
+
+        if not self.plugins_dir.exists():
+            return menu_items
+
+        # Scan filesystem for active plugins
+        for plugin_dir in self.plugins_dir.iterdir():
+            if not plugin_dir.is_dir():
+                continue
+
+            # Skip disabled plugins (start with _ or .)
+            if plugin_dir.name.startswith('.') or plugin_dir.name.startswith('_'):
+                continue
+
+            plugin_id = plugin_dir.name
+            plugin_json_path = plugin_dir / 'plugin.json'
+
+            # Read plugin.json if exists
+            menu_config = {}
+            if plugin_json_path.exists():
+                try:
+                    with open(plugin_json_path, 'r', encoding='utf-8') as f:
+                        plugin_data = json.load(f)
+                        menu_config = plugin_data.get('menu', {})
+                except Exception as e:
+                    print(f"[WARNING] Error reading plugin.json for {plugin_id}: {e}")
+
+            # Build menu item
             menu_item = {
-                'plugin_id': plugin.plugin_id,
-                'label': plugin.menu_label or plugin.name,
-                'icon': plugin.menu_icon or 'cube-outline',
-                'order': plugin.menu_order,
+                'plugin_id': plugin_id,
+                'label': menu_config.get('label', plugin_id.title()),
+                'icon': menu_config.get('icon', 'cube-outline'),
+                'order': menu_config.get('order', 100),
             }
 
-            # If plugin has multiple menu items (submenu), add them
-            if plugin.menu_items and len(plugin.menu_items) > 0:
-                menu_item['items'] = plugin.menu_items
+            # Check if plugin has submenu items
+            menu_items_config = menu_config.get('items', [])
+            if menu_items_config:
+                menu_item['items'] = menu_items_config
                 menu_item['has_submenu'] = True
             else:
-                # Single menu item, use main_url
-                menu_item['url'] = plugin.main_url or f'#'
+                # Single menu item, use url from menu.url
+                menu_item['url'] = menu_config.get('url', f'/plugins/{plugin_id}/')
                 menu_item['has_submenu'] = False
 
-            menu_items.append(menu_item)
+            # Only add if show_in_menu is not explicitly False
+            if menu_config.get('show', True):
+                menu_items.append(menu_item)
+
+        # Sort by order, then by label
+        menu_items.sort(key=lambda x: (x['order'], x['label']))
 
         return menu_items
 

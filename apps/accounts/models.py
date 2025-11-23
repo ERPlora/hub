@@ -21,6 +21,7 @@ class LocalUser(models.Model):
 
     # User preferences
     language = models.CharField(max_length=10, default='en')  # User's preferred language
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)  # User avatar
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

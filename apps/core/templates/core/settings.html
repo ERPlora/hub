@@ -205,15 +205,29 @@
 
                     <div>
                         <ion-label position="stacked">{% trans "Business Logo" %}</ion-label>
-                        {% if store_config.logo %}
-                        <div style="margin-top: 8px; margin-bottom: 8px;">
-                            <img src="{{ store_config.logo.url }}" alt="Logo" style="max-width: 200px; max-height: 100px; object-fit: contain;">
+                        <div style="margin-top: 8px;">
+                            {% load image_picker %}
+                            {% image_picker input_id="logoInput" input_name="logo" label="Select Business Logo" icon="business-outline" show_preview=True %}
                         </div>
-                        {% endif %}
-                        <input type="file" name="logo" accept="image/*" style="margin-top: 8px;">
                         <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
                             {% trans "Logo will be displayed on receipts (optional)" %}
                         </p>
+                        {% if store_config.logo %}
+                        <script>
+                            // Set initial preview if logo exists
+                            document.addEventListener('DOMContentLoaded', function() {
+                                const preview = document.getElementById('logoInputPreview');
+                                if (preview) {
+                                    preview.src = '{{ store_config.logo.url }}';
+                                    preview.style.display = 'block';
+                                }
+                                const label = document.getElementById('logoInputLabel');
+                                if (label) {
+                                    label.textContent = '{{ store_config.logo.name }}';
+                                }
+                            });
+                        </script>
+                        {% endif %}
                     </div>
 
                     <div>
@@ -335,6 +349,15 @@ function settingsApp() {
                 console.error('[INIT] colorThemeSelect element not found');
             }
 
+            // Add event listener for language select
+            const languageSelect = document.querySelector('ion-select[x-model="language"]');
+            if (languageSelect) {
+                languageSelect.addEventListener('ionChange', (e) => {
+                    this.language = e.detail.value;
+                    this.saveLanguage();
+                });
+            }
+
             // Add event listener for currency select
             const currencySelect = document.getElementById('currencySelect');
             if (currencySelect) {
@@ -342,6 +365,51 @@ function settingsApp() {
                     this.currency = e.detail.value;
                     this.saveCurrency();
                 });
+            }
+        },
+
+        async saveLanguage() {
+            try {
+                const formData = new FormData();
+                formData.append('action', 'update_language');
+                formData.append('language', this.language);
+                formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+                const response = await fetch('{% url "configuration:settings" %}', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Show success toast
+                    const toast = document.createElement('ion-toast');
+                    toast.message = '{% trans "Language updated. Reloading..." %}';
+                    toast.duration = 2000;
+                    toast.color = 'success';
+                    toast.position = 'top';
+                    document.body.appendChild(toast);
+                    await toast.present();
+
+                    // Reload page to apply new language
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    throw new Error('Failed to save language');
+                }
+            } catch (error) {
+                console.error('[SAVE LANGUAGE ERROR]', error);
+
+                // Show error toast
+                const toast = document.createElement('ion-toast');
+                toast.message = '{% trans "Failed to update language" %}';
+                toast.duration = 3000;
+                toast.color = 'danger';
+                toast.position = 'top';
+                document.body.appendChild(toast);
+                await toast.present();
             }
         },
 
@@ -452,5 +520,7 @@ function settingsApp() {
         }
     }
 }
+
+// Image upload is auto-initialized by the image_picker component
 </script>
 {% endblock %}

@@ -66,7 +66,7 @@ When using icons in Ionic Framework you can specify different icons per platform
 To specify the icon size, you can use the size attribute for our pre-defined font sizes.
 
 ```html
-<ion-icon size="small"></ion-icon>
+<ion-icon size="large"></ion-icon>
 <ion-icon size="large"></ion-icon>
 ```
 
