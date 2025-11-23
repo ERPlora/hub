@@ -79,9 +79,6 @@ INSTALLED_APPS = [
 
     # runtime/carga de plugins
     "apps.plugins_runtime",
-
-    # Development plugins (manually added for migrations)
-    'inventory',  # Inventory/Products plugin
 ]
 
 # NOTA: La carga dinámica de plugins ahora se maneja en apps.plugins_runtime
