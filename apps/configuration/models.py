@@ -1,8 +1,178 @@
 from django.db import models
 from django.conf import settings
+from django.core.cache import cache
+from typing import Any, Optional
 
 
-class HubConfig(models.Model):
+class SingletonConfigMixin:
+    """
+    Mixin para modelos de configuración singleton con caché.
+
+    Proporciona:
+    - Patrón Singleton (solo una instancia en DB)
+    - Caché automático de la instancia completa
+    - Acceso conveniente a campos individuales via get_value()
+    - Invalidación automática de caché al guardar
+    """
+
+    CACHE_KEY_PREFIX = 'config'
+    CACHE_TIMEOUT = 3600  # 1 hora
+
+    def save(self, *args, **kwargs):
+        """Override save para asegurar singleton e invalidar caché"""
+        # Asegura que solo exista un registro con id=1
+        if not self.pk:
+            self.pk = 1
+
+        # Si ya existe otra instancia, actualizamos la existente
+        if self.pk != 1 and self.__class__.objects.filter(pk=1).exists():
+            self.pk = 1
+
+        super().save(*args, **kwargs)
+
+        # Invalida el caché después de guardar
+        self._clear_cache()
+
+    def delete(self, *args, **kwargs):
+        """Prevenir eliminación accidental del singleton"""
+        # Solo permitir eliminación explícita
+        if not kwargs.pop('force_delete', False):
+            raise models.ProtectedError(
+                "Cannot delete singleton configuration. Use force_delete=True if you really need to.",
+                [self]
+            )
+        self._clear_cache()
+        super().delete(*args, **kwargs)
+
+    @classmethod
+    def _get_cache_key(cls):
+        """Genera la clave de caché para esta configuración"""
+        return f'{cls.CACHE_KEY_PREFIX}_{cls.__name__.lower()}_instance'
+
+    @classmethod
+    def _clear_cache(cls):
+        """Invalida el caché de esta configuración"""
+        cache.delete(cls._get_cache_key())
+
+    @classmethod
+    def get_solo(cls):
+        """
+        Obtiene la instancia singleton con caché.
+
+        Returns:
+            Instancia del modelo de configuración
+        """
+        cache_key = cls._get_cache_key()
+        instance = cache.get(cache_key)
+
+        if instance is None:
+            instance, _ = cls.objects.get_or_create(pk=1)
+            cache.set(cache_key, instance, cls.CACHE_TIMEOUT)
+
+        return instance
+
+    @classmethod
+    def get_config(cls):
+        """Alias para compatibilidad con código existente"""
+        return cls.get_solo()
+
+    @classmethod
+    def get_value(cls, field_name: str, default: Any = None) -> Any:
+        """
+        Obtiene el valor de un campo específico de la configuración.
+
+        Args:
+            field_name: Nombre del campo a obtener
+            default: Valor por defecto si el campo no existe o es None
+
+        Returns:
+            Valor del campo o default
+
+        Example:
+            >>> currency = HubConfig.get_value('currency', 'USD')
+            >>> is_configured = HubConfig.get_value('is_configured', False)
+        """
+        try:
+            instance = cls.get_solo()
+            value = getattr(instance, field_name, default)
+            return value if value is not None else default
+        except Exception:
+            return default
+
+    @classmethod
+    def set_value(cls, field_name: str, value: Any) -> bool:
+        """
+        Establece el valor de un campo específico y guarda.
+
+        Args:
+            field_name: Nombre del campo a actualizar
+            value: Nuevo valor
+
+        Returns:
+            True si se guardó correctamente, False en caso de error
+
+        Example:
+            >>> HubConfig.set_value('currency', 'EUR')
+            >>> HubConfig.set_value('dark_mode', True)
+        """
+        try:
+            instance = cls.get_solo()
+            setattr(instance, field_name, value)
+            instance.save()
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def update_values(cls, **kwargs) -> bool:
+        """
+        Actualiza múltiples campos a la vez.
+
+        Args:
+            **kwargs: Pares campo=valor a actualizar
+
+        Returns:
+            True si se guardó correctamente, False en caso de error
+
+        Example:
+            >>> HubConfig.update_values(
+            ...     currency='EUR',
+            ...     dark_mode=True,
+            ...     auto_print=False
+            ... )
+        """
+        try:
+            instance = cls.get_solo()
+            for field_name, value in kwargs.items():
+                if hasattr(instance, field_name):
+                    setattr(instance, field_name, value)
+            instance.save()
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def get_all_values(cls) -> dict:
+        """
+        Obtiene todos los valores de configuración como diccionario.
+
+        Returns:
+            Dict con todos los campos y sus valores
+
+        Example:
+            >>> config = HubConfig.get_all_values()
+            >>> print(config['currency'])  # 'USD'
+            >>> print(config['dark_mode'])  # False
+        """
+        instance = cls.get_solo()
+        return {
+            field.name: getattr(instance, field.name)
+            for field in instance._meta.fields
+            if not field.name in ['id', 'created_at', 'updated_at']
+        }
+
+
+class HubConfig(SingletonConfigMixin, models.Model):
     """
     Hub configuration stored locally in SQLite.
     Contains hub credentials and configuration from Cloud.
@@ -25,7 +195,7 @@ class HubConfig(models.Model):
     currency = models.CharField(
         max_length=3,
         choices=settings.CURRENCY_CHOICES,
-        default='USD',
+        default='EUR',
         help_text='Currency used for transactions in this Hub'
     )
 
@@ -54,14 +224,8 @@ class HubConfig(models.Model):
     def __str__(self):
         return f"Hub Config (Configured: {self.is_configured})"
 
-    @classmethod
-    def get_config(cls):
-        """Get or create hub configuration (singleton pattern)"""
-        config, _ = cls.objects.get_or_create(id=1)
-        return config
 
-
-class StoreConfig(models.Model):
+class StoreConfig(SingletonConfigMixin, models.Model):
     """
     Store configuration for receipts and business information.
     This is required for the POS to function properly.
@@ -99,12 +263,6 @@ class StoreConfig(models.Model):
 
     def __str__(self):
         return f"{self.business_name or 'Store'} (Configured: {self.is_configured})"
-
-    @classmethod
-    def get_config(cls):
-        """Get or create store configuration (singleton pattern)"""
-        config, _ = cls.objects.get_or_create(id=1)
-        return config
 
     def is_complete(self):
         """Check if minimum required fields are filled"""

@@ -264,5 +264,5 @@ ignore = [
 "__init__.py" = ["F401"]
 
 [tool.pyinstaller]
-name = "CPOS Hub"
+name = "ERPlora Hub"
 icon = "assets/icon.ico"
