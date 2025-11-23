@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.8.2-rc.3 (2025-11-23)
+
+### Features
+
+* feat: include global configuration ([`74cbf9f`](https://github.com/ERPlora/hub/commit/74cbf9f7077d4256fd06f38fd1aa5ec465cefd3f))
+
+* feat: deploy ([`cf2c781`](https://github.com/ERPlora/hub/commit/cf2c781eef0bed1d8d65746d94a94e11f2ced21b))
+
+* feat: deploy ([`c9efb47`](https://github.com/ERPlora/hub/commit/c9efb4729e56fe91b9b3f7ce4fae3a87e3a81686))
+
+
 ## v0.8.2-rc.2 (2025-11-23)
 
 ### Bug Fixes
