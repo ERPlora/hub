@@ -136,16 +136,38 @@ class SubscriptionChecker:
         Returns:
             True si el plugin puede ejecutarse, False si no
         """
-        from apps.plugins_admin.models import Plugin
+        from pathlib import Path
+        import json
 
         try:
-            # Obtener plugin de la base de datos local
-            plugin = Plugin.objects.get(plugin_id=plugin_slug)
+            # Verificar plugin desde filesystem
+            plugins_dir = Path(settings.PLUGINS_DIR)
+            plugin_dir = plugins_dir / plugin_slug
 
-            # Si no está instalado o no está activo, no permitir
-            if not plugin.is_installed or not plugin.is_active:
-                logger.warning(f"[SUBSCRIPTION] Plugin {plugin_slug} not installed or not active")
-                return False
+            # Check if plugin exists and is active (not prefixed with _)
+            if not plugin_dir.exists():
+                # Try with _ prefix (inactive)
+                plugin_dir = plugins_dir / f"_{plugin_slug}"
+                if not plugin_dir.exists():
+                    logger.error(f"[SUBSCRIPTION] Plugin {plugin_slug} not found in filesystem")
+                    return False
+                else:
+                    logger.warning(f"[SUBSCRIPTION] Plugin {plugin_slug} is not active (disabled)")
+                    return False
+
+            # Plugin exists and is active (no _ prefix)
+            # Read plugin.json for metadata
+            plugin_json_path = plugin_dir / 'plugin.json'
+            if plugin_json_path.exists():
+                try:
+                    with open(plugin_json_path, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
+                        # Get plugin type from metadata if not provided
+                        if not plugin_type:
+                            plugin_type = metadata.get('type', 'free')
+                except Exception as e:
+                    logger.warning(f"[SUBSCRIPTION] Error reading plugin.json for {plugin_slug}: {e}")
+                    plugin_type = plugin_type or 'free'
 
             # Si es gratuito, siempre permitir
             if plugin_type == 'free' or not plugin_type:
@@ -157,10 +179,22 @@ class SubscriptionChecker:
 
             # Si es de suscripción, verificar estado online
             if plugin_type == 'subscription':
-                # Necesitamos el plugin_id del Cloud para verificar
-                # Asumimos que está guardado en plugin.metadata o similar
-                # Por ahora usamos el ID del plugin
-                cloud_plugin_id = plugin.id  # Esto debería venir de metadata
+                # Get cloud_plugin_id from metadata
+                if plugin_json_path.exists():
+                    try:
+                        with open(plugin_json_path, 'r', encoding='utf-8') as f:
+                            metadata = json.load(f)
+                            cloud_plugin_id = metadata.get('cloud_plugin_id')
+
+                            if not cloud_plugin_id:
+                                logger.error(f"[SUBSCRIPTION] Plugin {plugin_slug} has no cloud_plugin_id")
+                                return False
+                    except Exception as e:
+                        logger.error(f"[SUBSCRIPTION] Error reading cloud_plugin_id: {e}")
+                        return False
+                else:
+                    logger.error(f"[SUBSCRIPTION] Plugin {plugin_slug} has no plugin.json")
+                    return False
 
                 status = self.check_subscription_status(cloud_plugin_id)
 
@@ -174,10 +208,6 @@ class SubscriptionChecker:
                 return True
 
             # Por defecto, no permitir si no sabemos el tipo
-            return False
-
-        except Plugin.DoesNotExist:
-            logger.error(f"[SUBSCRIPTION] Plugin {plugin_slug} not found in database")
             return False
 
         except Exception as e:
