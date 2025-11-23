@@ -27,6 +27,10 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
 
+    defaults:
+      run:
+        working-directory: hub
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -80,6 +84,10 @@ jobs:
           - os: ubuntu-latest
             platform: linux
 
+    defaults:
+      run:
+        working-directory: hub
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -101,9 +109,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            .venv
+            hub/.venv
             ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('hub/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
@@ -160,19 +168,19 @@ jobs:
         shell: pwsh
         run: |
           cd dist/main
-          Compress-Archive -Path * -DestinationPath ../../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-windows.zip
+          Compress-Archive -Path * -DestinationPath ../../ERPlora-Hub-${{ steps.get_version.outputs.VERSION }}-windows.zip
 
       - name: Create archive (macOS)
         if: matrix.platform == 'macos'
         run: |
           cd dist
-          zip -r ../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-macos.zip "CPOS Hub.app"
+          zip -r ../ERPlora-Hub-${{ steps.get_version.outputs.VERSION }}-macos.zip "ERPlora Hub.app"
 
       - name: Create archive (Linux)
         if: matrix.platform == 'linux'
         run: |
           cd dist/main
-          tar -czf ../../CPOS-Hub-${{ steps.get_version.outputs.VERSION }}-linux.tar.gz *
+          tar -czf ../../ERPlora-Hub-${{ steps.get_version.outputs.VERSION }}-linux.tar.gz *
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
@@ -180,7 +188,7 @@ jobs:
           tag_name: ${{ needs.release.outputs.tag }}
           prerelease: ${{ github.ref != 'refs/heads/main' }}
           files: |
-            CPOS-Hub-*.zip
-            CPOS-Hub-*.tar.gz
+            hub/ERPlora-Hub-*.zip
+            hub/ERPlora-Hub-*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
