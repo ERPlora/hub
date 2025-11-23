@@ -1,6 +1,13 @@
 # CHANGELOG
 
 
+## v0.8.2-rc.7 (2025-11-23)
+
+### Features
+
+* feat: deploy ([`8e93db0`](https://github.com/ERPlora/hub/commit/8e93db09f38a9e4c565660c36cb7faf7619ed0b5))
+
+
 ## v0.8.2-rc.6 (2025-11-23)
 
 ### Features
