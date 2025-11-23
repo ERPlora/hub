@@ -63,10 +63,10 @@ datas = [
     # NOTA: db.sqlite3 YA NO se incluye - ahora está en ubicación externa
     # - Windows: C:\Users\<user>\AppData\Local\ERPloraHub\db\
     # - macOS: ~/Library/Application Support/ERPloraHub/db/
-    # - Linux: ~/.cpos-hub/db/
+    # - Linux: ~/.erplora-hub/db/
     # NOTA: plugins/ NO se incluye - se cargan desde ubicaciones externas:
     # - Development: ./plugins/ (repo local)
-    # - Production: ~/.cpos-hub/plugins/ (instalados por usuario)
+    # - Production: ~/.erplora-hub/plugins/ (instalados por usuario)
 ]
 
 a = Analysis(
@@ -143,7 +143,7 @@ if sys.platform == 'darwin':
         coll,
         name='ERPlora Hub.app',
         icon='assets/app_icon.icns' if Path('assets/app_icon.icns').exists() else None,
-        bundle_identifier='com.cpos.hub',
+        bundle_identifier='com.erplora.hub',
         info_plist={
             'CFBundleName': 'ERPlora Hub',
             'CFBundleDisplayName': 'ERPlora Hub',
