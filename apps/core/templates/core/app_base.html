@@ -17,9 +17,6 @@
     <!-- Theme Colors (carga desde carpeta del tema: default o blue) -->
     <link rel="stylesheet" href="{% static 'css/themes/' %}{{ hub_config.color_theme }}/ionic-theme.css" id="theme-stylesheet">
 
-    <!-- Base Styles (variables base, componentes y utilidades) -->
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-
     <!-- Tailwind CSS (offline) -->
     <script src="{% static 'js/tailwind.cdn.js' %}"></script>
     <link rel="stylesheet" href="{% static 'css/tailwind-ionic.css' %}">
@@ -27,12 +24,18 @@
     <!-- Alpine.js (offline) -->
     <script defer src="{% static 'js/alpine.min.js' %}"></script>
 
+    <!-- HTMX (offline) -->
+    <script src="{% static 'js/htmx.min.js' %}"></script>
+
     <!-- Ionic Core (offline) -->
     <script type="module" src="{% static 'js/ionic/ionic.esm.js' %}"></script>
 
     <!-- Ionicons (offline) -->
     <script type="module" src="{% static 'ionicons/dist/ionicons/ionicons.esm.js' %}"></script>
     <script nomodule src="{% static 'ionicons/dist/ionicons/ionicons.js' %}"></script>
+
+    <!-- Utils (Ionic helpers for alerts, toasts, modals, etc.) -->
+    <script src="{% static 'core/js/utils.js' %}"></script>
 
     <!-- Theme Switcher Script -->
     <script>
@@ -58,15 +61,114 @@
     </script>
 
     <style>
+        /* ========================================
+           BASE VARIABLES & GLOBAL STYLES
+           ======================================== */
+        :root {
+            --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            --font-size: 16px;
+            --radius: 0.625rem;
+        }
+
+        * {
+            font-family: var(--font-sans);
+        }
+
         [x-cloak] {
             display: none !important;
         }
 
-        ion-menu {
-            --width: 16rem;
+        /* ========================================
+           IONIC COMPONENT CUSTOMIZATIONS
+           ======================================== */
+
+        /* Smooth transitions */
+        ion-button, ion-card, ion-item, ion-list, ion-menu, ion-toolbar {
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
         }
 
-        /* Custom menu styles */
+        /* Rounded corners for cards */
+        ion-card {
+            border-radius: var(--radius);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        body.dark ion-card {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Button styling */
+        ion-button {
+            --border-radius: var(--radius);
+            text-transform: none;
+            font-weight: 500;
+        }
+
+        /* Input styling */
+        ion-input, ion-textarea, ion-select {
+            --border-radius: var(--radius);
+        }
+
+        /* Toolbar styling */
+        ion-toolbar {
+            --border-width: 0 0 1px 0;
+        }
+
+        /* List items */
+        ion-item {
+            --border-radius: var(--radius);
+        }
+
+        /* Remove default borders */
+        ion-list {
+            padding: 0;
+        }
+
+        /* Toast styling */
+        ion-toast {
+            --background: var(--ion-card-background) !important;
+            --color: var(--ion-card-color) !important;
+            --border-radius: var(--radius) !important;
+        }
+
+        ion-toast.toast-success {
+            --background: var(--ion-color-success) !important;
+            --color: var(--ion-color-success-contrast) !important;
+        }
+
+        /* Action Sheet styling */
+        ion-action-sheet {
+            --background: var(--ion-card-background) !important;
+            --color: var(--ion-card-color) !important;
+        }
+
+        ion-action-sheet .action-sheet-button {
+            color: var(--ion-text-color) !important;
+        }
+
+        ion-action-sheet .action-sheet-title {
+            color: var(--ion-text-color) !important;
+        }
+
+        .ion-page {
+            --padding-top: 0;
+            --padding-bottom: 0;
+            --padding-start: 0;
+            --padding-end: 0;
+        }
+
+        /* ========================================
+           MENU OVERRIDES - Force reset cached styles
+           ======================================== */
+        /* Reset ANY cached ion-menu width - this overrides ALL previous definitions */
+        ion-menu {
+            /* NO default width - each menu sets its own inline or via component CSS */
+        }
+
+        /* ========================================
+           CUSTOM MENU STYLES (app_base specific)
+           ======================================== */
         .menu-header {
             border-bottom: 1px solid var(--ion-border-color);
         }
@@ -145,13 +247,23 @@
         }
     </style>
 
+    <!-- HTMX Configuration -->
+    <script>
+        // Configure HTMX to include CSRF token in all requests
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.addEventListener('htmx:configRequest', function(event) {
+                event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            });
+        });
+    </script>
+
     {% block extra_head %}{% endblock %}
 </head>
 
 <body x-data="hubApp()" :class="isDark ? 'dark' : ''">
     <ion-app mode="ios">
         <!-- Menu (Sidebar) -->
-        <ion-menu content-id="main-content" menu-id="main-menu" type="reveal">
+        <ion-menu content-id="main-content" menu-id="main-menu" type="reveal" style="--width: 16rem;">
             <ion-header>
                 <ion-toolbar class="ion-padding">
                     <div class="menu-logo">
@@ -317,7 +429,6 @@
         </div>
 
         <ion-action-sheet
-            trigger="open-action-sheet"
             class="custom-action-sheet text-justify"
         ></ion-action-sheet>
     </ion-app>
@@ -443,8 +554,8 @@
                     const routes = {
                         'dashboard': "{% url 'configuration:dashboard' %}",
                         'employees': "{% url 'accounts:employees' %}",
-                        'plugins': "{% url 'plugins:plugins' %}",
-                        'marketplace': "{% url 'plugins:marketplace' %}",
+                        'plugins': "{% url 'configuration:plugins' %}",
+                        'marketplace': "#",
                         'settings': "{% url 'configuration:settings' %}"
                     };
 

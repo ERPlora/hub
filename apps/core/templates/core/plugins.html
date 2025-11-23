@@ -5,20 +5,140 @@
 {% block title %}ERPlora Hub - {% trans "Plugins" %}{% endblock %}
 {% block page_title %}{% trans "Plugins" %}{% endblock %}
 
+{% block extra_head %}
+<script>
+    // Activate plugin with Ionic alert
+    async function confirmActivate(pluginId, pluginName) {
+        const alert = document.createElement('ion-alert');
+        alert.header = '{% trans "Activate Plugin" %}';
+        alert.subHeader = pluginName;
+        alert.message = '{% trans "You will need to restart the application for changes to take effect." %}';
+        alert.buttons = [
+            {
+                text: '{% trans "Cancel" %}',
+                role: 'cancel'
+            },
+            {
+                text: '{% trans "Activate" %}',
+                role: 'confirm',
+                handler: async () => {
+                    try {
+                        const response = await fetch(`/plugins/activate/${pluginId}/`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken')
+                            }
+                        });
+                        const result = await response.json();
+
+                        if (result.success) {
+                            await showSuccessAlert('{% trans "Plugin activated successfully. Please restart the application." %}', '{% trans "Success" %}');
+                            window.location.reload();
+                        } else {
+                            await showErrorAlert(result.error || '{% trans "Failed to activate plugin" %}', '{% trans "Error" %}');
+                        }
+                    } catch (error) {
+                        await showErrorAlert('{% trans "Network error:" %} ' + error.message, '{% trans "Error" %}');
+                    }
+                }
+            }
+        ];
+        document.body.appendChild(alert);
+        await alert.present();
+    }
+
+    // Deactivate plugin with Ionic alert
+    async function confirmDeactivate(pluginId, pluginName) {
+        const alert = document.createElement('ion-alert');
+        alert.header = '{% trans "Deactivate Plugin" %}';
+        alert.subHeader = pluginName;
+        alert.message = '{% trans "You will need to restart the application for changes to take effect." %}';
+        alert.buttons = [
+            {
+                text: '{% trans "Cancel" %}',
+                role: 'cancel'
+            },
+            {
+                text: '{% trans "Deactivate" %}',
+                role: 'confirm',
+                handler: async () => {
+                    try {
+                        const response = await fetch(`/plugins/deactivate/${pluginId}/`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken')
+                            }
+                        });
+                        const result = await response.json();
+
+                        if (result.success) {
+                            await showSuccessAlert('{% trans "Plugin deactivated successfully. Please restart the application." %}', '{% trans "Success" %}');
+                            window.location.reload();
+                        } else {
+                            await showErrorAlert(result.error || '{% trans "Failed to deactivate plugin" %}', '{% trans "Error" %}');
+                        }
+                    } catch (error) {
+                        await showErrorAlert('{% trans "Network error:" %} ' + error.message, '{% trans "Error" %}');
+                    }
+                }
+            }
+        ];
+        document.body.appendChild(alert);
+        await alert.present();
+    }
+
+    // Delete plugin with Ionic alert
+    async function confirmDelete(pluginId, pluginName) {
+        const alert = document.createElement('ion-alert');
+        alert.header = '{% trans "Delete Plugin" %}';
+        alert.subHeader = pluginName;
+        alert.message = '{% trans "WARNING: This will permanently remove all plugin files." %}';
+        alert.buttons = [
+            {
+                text: '{% trans "Cancel" %}',
+                role: 'cancel'
+            },
+            {
+                text: '{% trans "Delete" %}',
+                role: 'destructive',
+                handler: async () => {
+                    try {
+                        const response = await fetch(`/plugins/delete/${pluginId}/`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken')
+                            }
+                        });
+                        const result = await response.json();
+
+                        if (result.success) {
+                            await showSuccessAlert('{% trans "Plugin deleted successfully." %}', '{% trans "Success" %}');
+                            window.location.reload();
+                        } else {
+                            await showErrorAlert(result.error || '{% trans "Failed to delete plugin" %}', '{% trans "Error" %}');
+                        }
+                    } catch (error) {
+                        await showErrorAlert('{% trans "Network error:" %} ' + error.message, '{% trans "Error" %}');
+                    }
+                }
+            }
+        ];
+        document.body.appendChild(alert);
+        await alert.present();
+    }
+</script>
+{% endblock %}
+
 {% block content %}
-<div style="padding: 24px;" x-data="pluginsApp()">
-    <!-- Header with Install Button -->
+<div style="padding: 24px;">
+    <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <div>
             <h2 style="margin: 0;">{% trans "Plugin Management" %}</h2>
             <p style="color: var(--ion-color-medium); margin-top: 4px;">
-                {% trans "Extend your POS with plugins" %}
+                {% trans "Activate, deactivate and manage your plugins" %}
             </p>
         </div>
-        <ion-button @click="openInstallModal()">
-            <ion-icon slot="start" name="cloud-download-outline"></ion-icon>
-            {% trans "Install Plugin" %}
-        </ion-button>
     </div>
 
     <!-- Stats -->
@@ -26,7 +146,7 @@
         <ion-card>
             <ion-card-content style="text-align: center; padding: 20px;">
                 <div style="font-size: 2rem; font-weight: 700; color: var(--ion-color-primary);">
-                    {{ installed_plugins.count }}
+                    {{ plugins|length }}
                 </div>
                 <div style="color: var(--ion-color-medium); margin-top: 4px;">
                     {% trans "Installed" %}
@@ -37,7 +157,7 @@
         <ion-card>
             <ion-card-content style="text-align: center; padding: 20px;">
                 <div style="font-size: 2rem; font-weight: 700; color: var(--ion-color-success);">
-                    <span x-text="activeCount"></span>
+                    {{ active_count }}
                 </div>
                 <div style="color: var(--ion-color-medium); margin-top: 4px;">
                     {% trans "Active" %}
@@ -47,11 +167,11 @@
 
         <ion-card>
             <ion-card-content style="text-align: center; padding: 20px;">
-                <div style="font-size: 2rem; font-weight: 700; color: var(--ion-color-tertiary);">
-                    {{ discovered_count }}
+                <div style="font-size: 2rem; font-weight: 700; color: var(--ion-color-medium);">
+                    {{ inactive_count }}
                 </div>
                 <div style="color: var(--ion-color-medium); margin-top: 4px;">
-                    {% trans "Discovered" %}
+                    {% trans "Inactive" %}
                 </div>
             </ion-card-content>
         </ion-card>
@@ -59,7 +179,7 @@
 
     <!-- Plugins Grid -->
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 16px;">
-        {% for plugin in installed_plugins %}
+        {% for plugin in plugins %}
         <ion-card>
             <ion-card-content>
                 <div style="display: flex; align-items: start; gap: 16px;">
@@ -95,25 +215,34 @@
                 <!-- Actions -->
                 <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ion-color-light-shade);">
                     {% if plugin.is_active %}
-                    <ion-button size="small" fill="outline" color="medium" @click="deactivatePlugin('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
+                    <ion-button
+                        size="large"
+                        fill="outline"
+                        color="medium"
+                        onclick="confirmDeactivate('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
                         <ion-icon slot="start" name="pause-outline"></ion-icon>
                         {% trans "Deactivate" %}
                     </ion-button>
+                    <ion-button size="large" fill="outline" href="/plugins/{{ plugin.plugin_id }}/">
+                        <ion-icon slot="start" name="open-outline"></ion-icon>
+                        {% trans "Open" %}
+                    </ion-button>
                     {% else %}
-                    <ion-button size="small" fill="outline" color="success" @click="activatePlugin('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
+                    <ion-button
+                        size="large"
+                        fill="outline"
+                        color="success"
+                        onclick="confirmActivate('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
                         <ion-icon slot="start" name="play-outline"></ion-icon>
                         {% trans "Activate" %}
                     </ion-button>
                     {% endif %}
 
-                    {% if plugin.main_url %}
-                    <ion-button size="small" fill="outline" href="{{ plugin.main_url }}">
-                        <ion-icon slot="start" name="open-outline"></ion-icon>
-                        {% trans "Open" %}
-                    </ion-button>
-                    {% endif %}
-
-                    <ion-button size="small" fill="outline" color="danger" @click="uninstallPlugin('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
+                    <ion-button
+                        size="large"
+                        fill="outline"
+                        color="danger"
+                        onclick="confirmDelete('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
                         <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
                     </ion-button>
                 </div>
@@ -126,299 +255,12 @@
                 <p style="color: var(--ion-color-medium); margin-top: 16px;">
                     {% trans "No plugins installed" %}
                 </p>
-                <ion-button @click="openInstallModal()" style="margin-top: 16px;">
-                    {% trans "Install Your First Plugin" %}
-                </ion-button>
+                <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 8px;">
+                    {% trans "Install plugins from the Plugin Store" %}
+                </p>
             </ion-card-content>
         </ion-card>
         {% endfor %}
     </div>
-
-    <!-- Install Plugin Modal -->
-    <ion-modal :is-open="showInstallModal" @didDismiss="closeInstallModal()">
-        <ion-header>
-            <ion-toolbar>
-                <ion-title>{% trans "Install Plugin" %}</ion-title>
-                <ion-buttons slot="end">
-                    <ion-button @click="closeInstallModal()">
-                        <ion-icon name="close"></ion-icon>
-                    </ion-button>
-                </ion-buttons>
-            </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-            <form @submit.prevent="installPlugin()">
-                <div style="display: grid; gap: 16px;">
-                    <!-- File Upload -->
-                    <div>
-                        <ion-label position="stacked">{% trans "Plugin ZIP File" %} *</ion-label>
-                        <input
-                            type="file"
-                            accept=".zip"
-                            @change="handleFileSelect($event)"
-                            required
-                            style="margin-top: 8px; width: 100%; padding: 12px; border: 2px dashed var(--ion-color-medium); border-radius: 8px; cursor: pointer;">
-                        <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 8px;">
-                            {% trans "Select a .zip file containing the plugin" %}
-                        </p>
-                    </div>
-
-                    <!-- Progress Bar (shown during installation) -->
-                    <template x-if="installing">
-                        <div>
-                            <ion-progress-bar type="indeterminate"></ion-progress-bar>
-                            <p style="text-align: center; color: var(--ion-color-medium); margin-top: 8px;">
-                                <span x-text="installProgress"></span>
-                            </p>
-                        </div>
-                    </template>
-
-                    <!-- Messages Log -->
-                    <template x-if="installMessages.length > 0">
-                        <div style="background: var(--ion-color-light); padding: 16px; border-radius: 8px; max-height: 300px; overflow-y: auto;">
-                            <template x-for="message in installMessages" :key="message">
-                                <div style="font-family: monospace; font-size: 0.875rem; margin-bottom: 4px;">
-                                    <span x-text="message"></span>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
-
-                    <!-- Error Display -->
-                    <template x-if="installError">
-                        <ion-card color="danger">
-                            <ion-card-content>
-                                <div style="display: flex; align-items: start; gap: 12px;">
-                                    <ion-icon name="alert-circle-outline" style="font-size: 24px; flex-shrink: 0;"></ion-icon>
-                                    <div>
-                                        <div style="font-weight: 600; margin-bottom: 4px;">{% trans "Installation Failed" %}</div>
-                                        <div style="font-size: 0.875rem;" x-text="installError"></div>
-                                    </div>
-                                </div>
-                            </ion-card-content>
-                        </ion-card>
-                    </template>
-
-                    <!-- Success Display -->
-                    <template x-if="installSuccess">
-                        <ion-card color="success">
-                            <ion-card-content>
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <ion-icon name="checkmark-circle-outline" style="font-size: 24px; flex-shrink: 0;"></ion-icon>
-                                    <div>
-                                        <div style="font-weight: 600;">{% trans "Installation Successful" %}</div>
-                                        <div style="font-size: 0.875rem;">{% trans "Plugin has been installed and activated" %}</div>
-                                    </div>
-                                </div>
-                            </ion-card-content>
-                        </ion-card>
-                    </template>
-                </div>
-
-                <div style="display: flex; gap: 12px; margin-top: 24px; justify-content: flex-end;">
-                    <ion-button color="medium" @click="closeInstallModal()" type="button" :disabled="installing">
-                        {% trans "Cancel" %}
-                    </ion-button>
-                    <ion-button type="submit" :disabled="!selectedFile || installing || installSuccess">
-                        <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
-                        <span x-text="installing ? '{% trans "Installing..." %}' : '{% trans "Install" %}'"></span>
-                    </ion-button>
-                </div>
-            </form>
-        </ion-content>
-    </ion-modal>
 </div>
-
-<script>
-function pluginsApp() {
-    return {
-        showInstallModal: false,
-        selectedFile: null,
-        installing: false,
-        installProgress: '',
-        installMessages: [],
-        installError: null,
-        installSuccess: false,
-        activeCount: {{ installed_plugins|length }},
-
-        init() {
-            this.calculateActiveCount();
-        },
-
-        calculateActiveCount() {
-            fetch('/api/plugins/list/')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        this.activeCount = data.plugins.filter(p => p.is_active).length;
-                    }
-                });
-        },
-
-        openInstallModal() {
-            this.showInstallModal = true;
-            this.resetInstallState();
-        },
-
-        closeInstallModal() {
-            this.showInstallModal = false;
-            if (this.installSuccess) {
-                window.location.reload();
-            }
-        },
-
-        resetInstallState() {
-            this.selectedFile = null;
-            this.installing = false;
-            this.installProgress = '';
-            this.installMessages = [];
-            this.installError = null;
-            this.installSuccess = false;
-        },
-
-        handleFileSelect(event) {
-            this.selectedFile = event.target.files[0];
-            this.installError = null;
-        },
-
-        async installPlugin() {
-            if (!this.selectedFile) return;
-
-            this.installing = true;
-            this.installProgress = '{% trans "Uploading plugin..." %}';
-            this.installMessages = [];
-            this.installError = null;
-
-            const formData = new FormData();
-            formData.append('plugin_zip', this.selectedFile);
-
-            try {
-                const response = await fetch('/api/plugins/install/', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': this.getCookie('csrftoken')
-                    }
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    this.installSuccess = true;
-                    this.installMessages = result.messages || [];
-                    this.installProgress = '{% trans "Installation complete!" %}';
-                } else {
-                    this.installError = result.error || '{% trans "Unknown error occurred" %}';
-                    this.installMessages = result.messages || [];
-                    if (result.errors && result.errors.length > 0) {
-                        this.installError += ': ' + result.errors.join(', ');
-                    }
-                }
-            } catch (error) {
-                this.installError = '{% trans "Network error: " %}' + error.message;
-            } finally {
-                this.installing = false;
-            }
-        },
-
-        async activatePlugin(pluginId, pluginName) {
-            if (!confirm(`{% trans "Activate" %} ${pluginName}?`)) return;
-
-            try {
-                const response = await fetch('/api/plugins/activate/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': this.getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({
-                        plugin_id: pluginId,
-                        activate: true
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    window.location.reload();
-                } else {
-                    alert('{% trans "Error: " %}' + result.error);
-                }
-            } catch (error) {
-                alert('{% trans "Network error: " %}' + error.message);
-            }
-        },
-
-        async deactivatePlugin(pluginId, pluginName) {
-            if (!confirm(`{% trans "Deactivate" %} ${pluginName}?`)) return;
-
-            try {
-                const response = await fetch('/api/plugins/activate/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': this.getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({
-                        plugin_id: pluginId,
-                        activate: false
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    window.location.reload();
-                } else {
-                    alert('{% trans "Error: " %}' + result.error);
-                }
-            } catch (error) {
-                alert('{% trans "Network error: " %}' + error.message);
-            }
-        },
-
-        async uninstallPlugin(pluginId, pluginName) {
-            if (!confirm(`{% trans "Uninstall" %} ${pluginName}? {% trans "This will remove all plugin files." %}`)) return;
-
-            try {
-                const response = await fetch('/api/plugins/uninstall/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': this.getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({
-                        plugin_id: pluginId
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    window.location.reload();
-                } else {
-                    alert('{% trans "Error: " %}' + result.error);
-                }
-            } catch (error) {
-                alert('{% trans "Network error: " %}' + error.message);
-            }
-        },
-
-        getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
-    }
-}
-</script>
 {% endblock %}
