@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
                 ('cloud_api_token', models.CharField(blank=True, help_text='Token for authenticating HTTP requests to Cloud API', max_length=255)),
                 ('is_configured', models.BooleanField(default=False)),
                 ('os_language', models.CharField(default='en', max_length=10)),
-                ('currency', models.CharField(choices=[('USD', 'US Dollar ($)'), ('EUR', 'Euro (€)'), ('GBP', 'British Pound (£)'), ('JPY', 'Japanese Yen (¥)'), ('CNY', 'Chinese Yuan (¥)'), ('MXN', 'Mexican Peso ($)'), ('CAD', 'Canadian Dollar ($)'), ('AUD', 'Australian Dollar ($)'), ('BRL', 'Brazilian Real (R$)'), ('ARS', 'Argentine Peso ($)'), ('COP', 'Colombian Peso ($)'), ('CLP', 'Chilean Peso ($)'), ('PEN', 'Peruvian Sol (S/)'), ('CRC', 'Costa Rican Colón (₡)')], default='USD', help_text='Currency used for transactions in this Hub', max_length=3)),
+                ('currency', models.CharField(choices=[('USD', 'US Dollar ($)'), ('EUR', 'Euro (€)'), ('GBP', 'British Pound (£)'), ('JPY', 'Japanese Yen (¥)'), ('CNY', 'Chinese Yuan (¥)'), ('MXN', 'Mexican Peso ($)'), ('CAD', 'Canadian Dollar ($)'), ('AUD', 'Australian Dollar ($)'), ('BRL', 'Brazilian Real (R$)'), ('ARS', 'Argentine Peso ($)'), ('COP', 'Colombian Peso ($)'), ('CLP', 'Chilean Peso ($)'), ('PEN', 'Peruvian Sol (S/)'), ('CRC', 'Costa Rican Colón (₡)')], default='EUR', help_text='Currency used for transactions in this Hub', max_length=3)),
                 ('color_theme', models.CharField(choices=[('default', 'Default (Gray)'), ('blue', 'Blue')], default='default', max_length=20)),
                 ('dark_mode', models.BooleanField(default=False)),
                 ('auto_print', models.BooleanField(default=False)),
