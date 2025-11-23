@@ -5,8 +5,65 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
-from django.conf import settings
-from .models import HubConfig, LocalUser, StoreConfig
+from django.conf import settings as django_settings
+from .models import HubConfig, LocalUser, StoreConfig, TokenCache
+
+
+# Helper functions
+
+def verify_user_access_with_cloud(user):
+    """
+    Verificar si el usuario tiene acceso activo al Hub consultando Cloud.
+
+    Se ejecuta durante el login para sincronizar el estado del usuario.
+    Si el Hub está offline, se confía en el estado local.
+
+    Args:
+        user: LocalUser instance
+
+    Returns:
+        tuple: (has_access: bool, reason: str)
+    """
+    hub_config = HubConfig.get_config()
+
+    # Si Hub no está configurado, permitir acceso local
+    if not hub_config.is_configured:
+        return True, "hub_not_configured"
+
+    try:
+        # Consultar estado del usuario en Cloud
+        response = requests.get(
+            f"{django_settings.CLOUD_API_URL}/api/hubs/{hub_config.hub_id}/users/check/{user.email}/",
+            headers={'X-Hub-Token': hub_config.cloud_api_token},
+            timeout=5  # Short timeout para no bloquear login
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            has_access = data.get('has_access', False)
+
+            # Sincronizar estado local con Cloud
+            if not has_access and user.is_active:
+                user.is_active = False
+                user.save(update_fields=['is_active'])
+                return False, "removed_from_cloud"
+            elif has_access and not user.is_active:
+                user.is_active = True
+                user.save(update_fields=['is_active'])
+                return True, "reactivated_from_cloud"
+
+            return has_access, "synced_with_cloud"
+        else:
+            # Cloud retornó error, confiar en estado local
+            return user.is_active, "cloud_error_use_local"
+
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        # Sin conexión, confiar en estado local
+        return user.is_active, "offline_use_local"
+    except Exception as e:
+        # Error inesperado, confiar en estado local pero loguear
+        print(f"Error verificando acceso en Cloud: {str(e)}")
+        return user.is_active, "error_use_local"
 
 
 def login(request):
@@ -58,6 +115,16 @@ def verify_pin(request):
 
         # Verify PIN
         if user.check_pin(pin):
+            # Verificar acceso con Cloud (sync on demand)
+            has_access, reason = verify_user_access_with_cloud(user)
+
+            if not has_access:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Access denied. You have been removed from this Hub.',
+                    'reason': reason
+                })
+
             # Update last login
             user.last_login = timezone.now()
             user.save()
@@ -75,7 +142,8 @@ def verify_pin(request):
                     'id': user.id,
                     'name': user.name,
                     'email': user.email,
-                }
+                },
+                'sync_reason': reason  # Informar al cliente cómo se sincronizó
             })
         else:
             return JsonResponse({'success': False, 'error': 'Incorrect PIN'})
@@ -99,7 +167,7 @@ def cloud_login(request):
             return JsonResponse({'success': False, 'error': 'Missing credentials'})
 
         # Call Cloud API to authenticate
-        cloud_api_url = settings.CLOUD_API_URL
+        cloud_api_url = django_settings.CLOUD_API_URL
 
         try:
             response = requests.post(
@@ -111,6 +179,12 @@ def cloud_login(request):
             if response.status_code == 200:
                 auth_data = response.json()
                 access_token = auth_data.get('access')
+                refresh_token = auth_data.get('refresh')
+
+                # Cache JWT tokens in database for offline validation
+                token_cache = TokenCache.get_cache()
+                token_cache.cache_jwt_tokens(access_token, refresh_token)
+                print(f"[CLOUD LOGIN] ✓ JWT tokens cached for offline validation")
 
                 # Get user info from Cloud
                 user_response = requests.get(
@@ -142,8 +216,7 @@ def cloud_login(request):
 
                             # Save Hub configuration
                             hub_config.hub_id = hub_data.get('hub_id')
-                            hub_config.tunnel_port = hub_data.get('tunnel_port')
-                            hub_config.tunnel_token = hub_data.get('tunnel_token')
+                            hub_config.cloud_api_token = hub_data.get('cloud_api_token')
                             hub_config.is_configured = True
                             hub_config.save()
 
@@ -165,8 +238,69 @@ def cloud_login(request):
                         }
                     )
 
+                    # Si el usuario existía pero estaba inactivo, reactivarlo
+                    if not created and not local_user.is_active:
+                        local_user.is_active = True
+                        local_user.pin_hash = ''  # Reset PIN para que configure uno nuevo
+                        local_user.save(update_fields=['is_active', 'pin_hash'])
+                        created = True  # Forzar flujo de primer login (configurar PIN)
+
+                    # Register user on Hub in Cloud (creates HubUser relationship)
+                    try:
+                        import platform
+                        register_url = f"{cloud_api_url}/api/hubs/{hub_config.hub_id}/users/register/"
+                        register_payload = {
+                            'user_email': email,
+                            'metadata': {
+                                'device': platform.system(),
+                                'hub_version': '1.0.0',  # TODO: Get from config
+                            }
+                        }
+                        register_headers = {'Authorization': f'Bearer {access_token}'}
+
+                        print(f"[CLOUD LOGIN] Registering user on Hub in Cloud...")
+                        print(f"[CLOUD LOGIN] URL: {register_url}")
+                        print(f"[CLOUD LOGIN] Payload: {register_payload}")
+                        print(f"[CLOUD LOGIN] Headers: Authorization: Bearer {access_token[:20]}...")
+
+                        register_response = requests.post(
+                            register_url,
+                            json=register_payload,
+                            headers=register_headers,
+                            timeout=10
+                        )
+
+                        print(f"[CLOUD LOGIN] Registration response status: {register_response.status_code}")
+                        print(f"[CLOUD LOGIN] Registration response: {register_response.text}")
+
+                        if register_response.status_code not in [200, 201]:
+                            # Log error but don't block login
+                            print(f"[CLOUD LOGIN] Warning: Failed to register user on Cloud Hub")
+                            print(f"[CLOUD LOGIN] Status: {register_response.status_code}")
+                            print(f"[CLOUD LOGIN] Response: {register_response.text}")
+                        else:
+                            print(f"[CLOUD LOGIN] ✓ User successfully registered on Hub in Cloud")
+                    except requests.exceptions.ConnectionError as e:
+                        print(f"[CLOUD LOGIN] Warning: Could not connect to Cloud: {str(e)}")
+                    except requests.exceptions.Timeout as e:
+                        print(f"[CLOUD LOGIN] Warning: Cloud request timeout: {str(e)}")
+                    except Exception as e:
+                        # Log error but don't block login
+                        print(f"[CLOUD LOGIN] Warning: Unexpected error registering user: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
+
                     # Check if user has PIN configured
                     first_time = not local_user.pin_hash
+
+                    # Store JWT token in session for middleware validation
+                    request.session['jwt_token'] = access_token
+                    request.session['jwt_refresh'] = refresh_token
+                    request.session['local_user_id'] = local_user.id
+                    request.session['user_name'] = local_user.name
+                    request.session['user_email'] = local_user.email
+                    request.session['user_role'] = local_user.role
+                    request.session['user_language'] = local_user.language
 
                     return JsonResponse({
                         'success': True,
@@ -239,7 +373,7 @@ def dashboard(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     context = {
         'current_view': 'dashboard'
@@ -252,7 +386,7 @@ def logout(request):
     Logout - clear session
     """
     request.session.flush()
-    return redirect('core:login')
+    return redirect('accounts:login')
 
 
 def pos(request):
@@ -261,7 +395,7 @@ def pos(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     context = {
         'current_view': 'pos'
@@ -275,7 +409,7 @@ def settings(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     hub_config = HubConfig.get_config()
     store_config = StoreConfig.get_config()
@@ -284,7 +418,42 @@ def settings(request):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'update_store':
+        if action == 'update_currency':
+            # Update currency
+            currency = request.POST.get('currency', 'USD')
+
+            # Validate currency
+            valid_currencies = [choice[0] for choice in HubConfig.CURRENCY_CHOICES]
+            if currency in valid_currencies:
+                hub_config.currency = currency
+                hub_config.save()
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Invalid currency'}, status=400)
+
+        elif action == 'update_theme':
+            # Update theme preferences
+            color_theme = request.POST.get('color_theme', 'default')
+            auto_print = request.POST.get('auto_print') == 'true'
+            dark_mode_param = request.POST.get('dark_mode')
+
+            # Log for debugging
+            print(f"[UPDATE THEME] color_theme={color_theme}, auto_print={auto_print}, dark_mode={dark_mode_param}")
+
+            hub_config.color_theme = color_theme
+            hub_config.auto_print = auto_print
+
+            # Update dark_mode if provided (from header toggle)
+            if dark_mode_param is not None:
+                hub_config.dark_mode = dark_mode_param == 'true'
+                print(f"[UPDATE THEME] Updated dark_mode to {hub_config.dark_mode}")
+
+            hub_config.save()
+            print(f"[UPDATE THEME] Saved: color_theme={hub_config.color_theme}, dark_mode={hub_config.dark_mode}")
+
+            return JsonResponse({'success': True})
+
+        elif action == 'update_store':
             # Update store configuration
             store_config.business_name = request.POST.get('business_name', '').strip()
             store_config.business_address = request.POST.get('business_address', '').strip()
@@ -318,7 +487,7 @@ def settings(request):
             # Store success message in session
             request.session['settings_message'] = 'Store configuration saved successfully'
 
-            return redirect('core:settings')
+            return redirect('configuration:settings')
 
     # Get success message if any
     settings_message = request.session.pop('settings_message', None)
@@ -338,7 +507,7 @@ def employees(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     local_users = LocalUser.objects.filter(is_active=True).order_by('name')
     context = {
@@ -438,8 +607,13 @@ def api_employee_delete(request):
         if user.role == 'admin':
             return JsonResponse({'success': False, 'error': 'Cannot delete admin users'})
 
+        # Soft delete locally
         user.is_active = False
         user.save()
+
+        # No need to sync immediately - will sync on next login attempt
+        # The user will be denied access when they try to login
+        print(f"User {user.email} marked as inactive locally")
 
         return JsonResponse({'success': True})
 
@@ -485,7 +659,7 @@ def plugins(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('core:login')
+        return redirect('accounts:login')
 
     from .plugin_loader import plugin_loader
     from .models import Plugin

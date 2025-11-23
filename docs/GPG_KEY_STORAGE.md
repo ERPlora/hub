@@ -36,7 +36,7 @@ cat hub/GPG-PUBLIC-KEY.asc
 gpg --import hub/GPG-PUBLIC-KEY.asc
 
 # Ver info de la clave
-gpg --list-keys releases@cpos.app
+gpg --list-keys releases@erplora.com
 ```
 
 ---
@@ -50,7 +50,7 @@ gpg --list-keys releases@cpos.app
 
 #### A. GitHub Secrets (OBLIGATORIO para CI/CD)
 
-1. Ir a: https://github.com/cpos-app/hub/settings/secrets/actions
+1. Ir a: https://github.com/ERPlora/hub/settings/secrets/actions
 2. Click "New repository secret"
 3. Crear secreto:
    - **Name**: `GPG_PRIVATE_KEY`
@@ -139,7 +139,7 @@ cp -r ~/.gnupg ~/Backups/gnupg-backup-$(date +%Y%m%d)
 ```
 
 ### Ubicación
-GitHub Secrets: https://github.com/cpos-app/hub/settings/secrets/actions
+GitHub Secrets: https://github.com/ERPlora/hub/settings/secrets/actions
 
 ### Pasos
 1. Click "New repository secret"
@@ -211,7 +211,7 @@ gpg --armor --export-secret-keys 998A98EF7BE1D222837D30EBC27E75F06D413478 > gpg-
 ### Paso 1: Clave Pública
 - [x] Archivo `GPG-PUBLIC-KEY.asc` en repositorio
 - [x] Commit y push a main
-- [x] Verificar en GitHub: https://github.com/cpos-app/hub/blob/main/GPG-PUBLIC-KEY.asc
+- [x] Verificar en GitHub: https://github.com/ERPlora/hub/blob/main/GPG-PUBLIC-KEY.asc
 
 ### Paso 2: Clave Privada
 - [ ] Subir a GitHub Secrets (`GPG_PRIVATE_KEY`)

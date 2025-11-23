@@ -10,16 +10,15 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import sys
 from pathlib import Path
 from decouple import config
 from config.paths import get_data_paths
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 # User data paths (outside the app for persistence across updates)
 DATA_PATHS = get_data_paths()
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -29,12 +28,37 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-hub-development-key-c
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
+USE_LOCAL_PLUGINS_DIR = DEBUG
+
+# --- Config de plugins ---
+USE_LOCAL_PLUGINS_DIR = DEBUG  # en dev: ./plugins
+
+if USE_LOCAL_PLUGINS_DIR:
+    PLUGINS_ROOT = BASE_DIR / "plugins"
+else:
+    # aquí la ruta externa de producción, por ejemplo:
+    PLUGINS_ROOT = DATA_PATHS / "plugins"
+
+# añadir al sys.path para import "products", "loyalty", etc.
+if PLUGINS_ROOT.exists():
+    sys.path.insert(0, str(PLUGINS_ROOT))
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=lambda v: [s.strip() for s in v.split(',')])
 
+# CSRF Settings - Configured for local-only Hub application
+# Security is provided by PIN codes and local network isolation
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+# Trust requests from Cloud proxy
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
+
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -42,20 +66,50 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Hub apps
+    # Third-party apps
+    'djmoney',  # Django Money for currency handling
+    'django_htmx',  # HTMX integration for Django
+    # Hub apps (refactored from monolithic core)
+    'apps.accounts.apps.AccountsConfig',
+    'apps.configuration.apps.ConfigurationConfig',
+    # 'apps.plugins.apps.PluginsConfig',
+    'apps.sync.apps.SyncConfig',
+    # Core app (keeping for utilities and context processors)
     'apps.core.apps.CoreConfig',
+
+    # runtime/carga de plugins
+    "apps.plugins_runtime",
 ]
+
+# Auto-load active plugins from filesystem
+# This must happen BEFORE Django scans for migrations
+# Plugins are "active" if their folder does NOT start with underscore or dot
+PLUGINS_DIR = PLUGINS_ROOT  # Alias for consistency with other code
+if PLUGINS_DIR.exists():
+    for plugin_dir in PLUGINS_DIR.iterdir():
+        if not plugin_dir.is_dir():
+            continue
+        # Skip disabled plugins (start with _ or .)
+        if plugin_dir.name.startswith('.') or plugin_dir.name.startswith('_'):
+            continue
+        INSTALLED_APPS.append(plugin_dir.name)
+        print(f"[SETTINGS] Auto-loaded plugin: {plugin_dir.name}")
+
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'apps.core.middleware.LanguageMiddleware',  # Custom language middleware (OS → User)
+    'apps.accounts.middleware.LanguageMiddleware',  # Custom language middleware (OS → User)
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',  # Disabled for local-only Hub app (security via PIN codes)
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'apps.core.middleware.StoreConfigCheckMiddleware',  # Check if store is configured after login
+    'django_htmx.middleware.HtmxMiddleware',  # HTMX integration middleware
+    'apps.accounts.middleware.jwt_middleware.JWTMiddleware',  # JWT validation with offline support
+    'apps.configuration.middleware.StoreConfigCheckMiddleware',  # Check if store is configured after login
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -75,6 +129,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.core.context_processors.cloud_url',
                 'apps.core.context_processors.plugin_menu_items',
+                'apps.core.context_processors.hub_config_context',
             ],
         },
     },
@@ -112,6 +167,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Login URL
+LOGIN_URL = '/login/'  # Redirect to /login/ when @login_required fails
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -138,7 +196,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files (user uploads)
@@ -155,7 +215,23 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Cloud API Configuration
 # URL of the Cloud server for authentication and hub registration
-CLOUD_API_URL = config('CLOUD_API_URL', default='http://localhost:8000')
+# For testing: https://int.erplora.com
+# For production: https://erplora.com
+# Can be overridden via environment variable CLOUD_API_URL
+CLOUD_API_URL = config('CLOUD_API_URL', default='https://int.erplora.com')
+
+
+# FRP Client Configuration
+# Server address and port for FRP tunnel connection to Cloud
+FRP_SERVER_ADDR = config('FRP_SERVER_ADDR', default='localhost')
+FRP_SERVER_PORT = config('FRP_SERVER_PORT', default=7100, cast=int)
+
+# FRP authentication token (must match server configuration)
+FRP_AUTH_TOKEN = config('FRP_AUTH_TOKEN', default='cpos-local-dev-token')
+
+# Hub local server port (where Django runs)
+# This is the port that FRP client will forward to
+HUB_LOCAL_PORT = config('HUB_LOCAL_PORT', default=8001, cast=int)
 
 
 # Hub Version
@@ -163,12 +239,16 @@ HUB_VERSION = "1.0.0"
 
 
 # ===========================
-# CPOS Hub Data Directories
+# ERPlora Hub Data Directories
 # ===========================
 # All user data stored outside the app for persistence across updates
 
 # Plugins directory (external)
-PLUGINS_DIR = DATA_PATHS.plugins_dir
+# In development mode, use local plugins directory
+if USE_LOCAL_PLUGINS_DIR:
+    PLUGINS_DIR = BASE_DIR / "plugins"
+else:
+    PLUGINS_DIR = DATA_PATHS.plugins_dir
 
 # Reports directory (external)
 REPORTS_DIR = DATA_PATHS.reports_dir
@@ -181,6 +261,20 @@ BACKUPS_DIR = DATA_PATHS.backups_dir
 
 # Temp directory (external)
 TEMP_DIR = DATA_PATHS.temp_dir
+
+
+# Add plugin template directories to Django template loader (development only)
+TEMPLATE_DIRS = []
+
+# Add plugin template directories from development path
+if (BASE_DIR / 'plugins').exists():
+    for plugin_dir in (BASE_DIR / 'plugins').iterdir():
+        if plugin_dir.is_dir() and (plugin_dir / 'templates').exists():
+            TEMPLATE_DIRS.append(plugin_dir / 'templates')
+
+# Update TEMPLATES configuration with plugin directories
+if TEMPLATE_DIRS:
+    TEMPLATES[0]['DIRS'] = TEMPLATE_DIRS
 
 
 # Logging configuration
@@ -230,3 +324,96 @@ LOGGING = {
         },
     },
 }
+
+
+# ==============================================================================
+# PLUGIN SYSTEM CONFIGURATION
+# ==============================================================================
+
+import sys
+
+# Detectar modo de ejecución
+DEVELOPMENT_MODE = not getattr(sys, 'frozen', False) and config('ERPlora_DEV_MODE', default='true') == 'true'
+
+if DEVELOPMENT_MODE:
+    # ========== MODO DESARROLLO ==========
+    # Busca plugins en ./plugins/ (desarrollo) y ~/.cpos-hub/plugins/ (instalados)
+    PLUGIN_DISCOVERY_PATHS = [
+        BASE_DIR / 'plugins',              # Plugins en desarrollo (repo local)
+        DATA_PATHS.plugins_dir,            # Plugins instalados (usuario)
+    ]
+
+    # Permitir plugins sin firmar en desarrollo
+    REQUIRE_PLUGIN_SIGNATURE = False
+
+    # Hot reload de plugins (detecta cambios automáticamente)
+    PLUGIN_AUTO_RELOAD = config('PLUGIN_AUTO_RELOAD', default='true', cast=bool)
+
+    # Validación relajada en desarrollo
+    PLUGIN_STRICT_VALIDATION = False
+
+    print(f"[DEV MODE] Plugin development mode enabled")
+    print(f"[DEV MODE] Plugin paths: {[str(p) for p in PLUGIN_DISCOVERY_PATHS]}")
+
+else:
+    # ========== MODO PRODUCCIÓN ==========
+    # Solo busca en ~/.cpos-hub/plugins/ (plugins instalados)
+    PLUGIN_DISCOVERY_PATHS = [
+        DATA_PATHS.plugins_dir,
+    ]
+
+    # Requerir firma digital en producción
+    REQUIRE_PLUGIN_SIGNATURE = config('REQUIRE_PLUGIN_SIGNATURE', default='true', cast=bool)
+
+    # Sin hot reload en producción
+    PLUGIN_AUTO_RELOAD = False
+
+    # Validación estricta en producción
+    PLUGIN_STRICT_VALIDATION = True
+
+# Directorio de datos para plugins (almacenamiento persistente)
+# Los plugins deben usar este path para guardar datos/archivos
+PLUGIN_DATA_ROOT = DATA_PATHS.plugins_dir / 'data'
+PLUGIN_MEDIA_ROOT = DATA_PATHS.media_dir / 'plugins'
+
+# Crear directorios si no existen
+PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# Lista blanca de dependencias permitidas para plugins
+# (Ver config/plugin_allowed_deps.py para la lista completa)
+PLUGIN_ALLOWED_DEPENDENCIES = [
+    'Pillow', 'qrcode', 'python-barcode', 'openpyxl', 'reportlab',
+    'python-escpos', 'lxml', 'xmltodict', 'signxml', 'cryptography',
+    'zeep', 'requests', 'websockets', 'python-dateutil', 'pytz',
+    'phonenumbers', 'stripe', 'pandas', 'numpy', 'pyserial', 'pyusb',
+    'evdev', 'pywinusb', 'email-validator', 'python-slugify', 'pydantic',
+    'beautifulsoup4', 'PyPDF2'
+]
+
+# Tamaño máximo de plugin (MB)
+PLUGIN_MAX_SIZE_MB = 50
+
+# Configuración de firma digital de plugins
+PLUGIN_SIGNATURE_ALGORITHM = 'RSA-SHA256'
+PLUGIN_SIGNATURE_KEY_SIZE = 4096
+
+# Django Money Configuration
+# Used for monetary fields throughout the application
+CURRENCIES = ('USD', 'EUR', 'GBP', 'JPY', 'CNY', 'MXN', 'CAD', 'AUD', 'BRL', 'ARS', 'COP', 'CLP', 'PEN', 'CRC')
+CURRENCY_CHOICES = [
+    ('USD', 'US Dollar ($)'),
+    ('EUR', 'Euro (€)'),
+    ('GBP', 'British Pound (£)'),
+    ('JPY', 'Japanese Yen (¥)'),
+    ('CNY', 'Chinese Yuan (¥)'),
+    ('MXN', 'Mexican Peso ($)'),
+    ('CAD', 'Canadian Dollar ($)'),
+    ('AUD', 'Australian Dollar ($)'),
+    ('BRL', 'Brazilian Real (R$)'),
+    ('ARS', 'Argentine Peso ($)'),
+    ('COP', 'Colombian Peso ($)'),
+    ('CLP', 'Chilean Peso ($)'),
+    ('PEN', 'Peruvian Sol (S/)'),
+    ('CRC', 'Costa Rican Colón (₡)'),
+]

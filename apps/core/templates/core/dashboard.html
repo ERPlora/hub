@@ -2,7 +2,7 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}CPOS Hub - {% trans "Dashboard" %}{% endblock %}
+{% block title %}ERPlora Hub - {% trans "Dashboard" %}{% endblock %}
 {% block page_title %}{% trans "Dashboard" %}{% endblock %}
 
 {% block content %}
@@ -65,7 +65,7 @@
         </ion-card-header>
         <ion-card-content>
             <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                <ion-button href="{% url 'core:pos' %}">
+                <ion-button href="{% url 'configuration:pos' %}">
                     <ion-icon slot="start" name="cart-outline"></ion-icon>
                     {% trans "New Sale" %}
                 </ion-button>
@@ -73,7 +73,7 @@
                     <ion-icon slot="start" name="cube-outline"></ion-icon>
                     {% trans "Add Product" %}
                 </ion-button>
-                <ion-button color="tertiary" href="{% url 'core:employees' %}">
+                <ion-button color="tertiary" href="{% url 'accounts:employees' %}">
                     <ion-icon slot="start" name="people-outline"></ion-icon>
                     {% trans "Manage Employees" %}
                 </ion-button>

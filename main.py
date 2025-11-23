@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CPOS Hub - Launcher para macOS
+ERPlora Hub - Launcher para macOS
 Este script inicia Django embebido y abre pywebview con la interfaz
 
 Copyright (c) 2025 CPOS Team
@@ -13,6 +13,63 @@ import sys
 import os
 from pathlib import Path
 import webview
+
+
+class WindowAPI:
+    """API expuesta al frontend para controlar la ventana"""
+
+    def __init__(self):
+        self.window = None
+        self._is_fullscreen = False
+
+    def set_window(self, window):
+        """Establecer referencia a la ventana después de crearla"""
+        self.window = window
+
+    def toggle_fullscreen(self):
+        """Toggle entre fullscreen y normal"""
+        if not self.window:
+            return {'error': 'Window not initialized'}
+
+        try:
+            self.window.toggle_fullscreen()
+            self._is_fullscreen = not self._is_fullscreen
+            return {'fullscreen': self._is_fullscreen, 'message': f'Fullscreen {"activated" if self._is_fullscreen else "deactivated"}'}
+        except Exception as e:
+            return {'error': str(e)}
+
+    def maximize(self):
+        """Maximizar ventana"""
+        if not self.window:
+            return {'error': 'Window not initialized'}
+
+        try:
+            self.window.maximize()
+            return {'maximized': True}
+        except Exception as e:
+            return {'error': str(e)}
+
+    def minimize(self):
+        """Minimizar ventana"""
+        if not self.window:
+            return {'error': 'Window not initialized'}
+
+        try:
+            self.window.minimize()
+            return {'minimized': True}
+        except Exception as e:
+            return {'error': str(e)}
+
+    def restore(self):
+        """Restaurar tamaño normal"""
+        if not self.window:
+            return {'error': 'Window not initialized'}
+
+        try:
+            self.window.restore()
+            return {'restored': True}
+        except Exception as e:
+            return {'error': str(e)}
 
 # Detectar si estamos en PyInstaller bundle
 if getattr(sys, 'frozen', False):
@@ -80,8 +137,8 @@ def initialize_data_directories():
     Inicializa los directorios de datos de usuario en ubicaciones externas.
 
     Crea directorios según la plataforma:
-    - Windows: C:\\Users\\<user>\\AppData\\Local\\CPOSHub\\
-    - macOS: ~/Library/Application Support/CPOSHub/
+    - Windows: C:\\Users\\<user>\\AppData\\Local\\ERPloraHub\\
+    - macOS: ~/Library/Application Support/ERPloraHub/
     - Linux: ~/.cpos-hub/
 
     También migra datos legacy si existen en el directorio de la app.
@@ -214,21 +271,34 @@ if not django_ready:
 
 # Abrir pywebview
 print("Opening webview...")
+
+# Crear instancia global de la API
+api = WindowAPI()
+
+def on_shown():
+    """Callback que se ejecuta cuando la ventana se muestra"""
+    # Aquí la ventana ya existe y podemos obtener referencia
+    windows = webview.windows
+    if windows:
+        api.set_window(windows[0])
+        print("[INFO] WindowAPI initialized with window reference")
+
 try:
     # Crear ventana de pywebview con el navegador nativo de macOS
     window = webview.create_window(
-        'CPOS Hub',
+        'ERPlora Hub',
         'http://localhost:8001',
         width=1200,
         height=800,
         resizable=True,
-        fullscreen=False
+        fullscreen=False,
+        js_api=api  # Pasar la API aquí
     )
 
     print("[OK] App is running. Close the window to exit.")
 
     # Iniciar webview (esto bloquea hasta que se cierra la ventana)
-    webview.start()
+    webview.start(on_shown, debug=False)
 
     print("Window closed, shutting down...")
 

@@ -2,147 +2,28 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}CPOS Hub - {% trans "Login" %}{% endblock %}
-
-{% block extra_css %}
-<style>
-    .login-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        padding: 1rem;
-    }
-
-    .login-card {
-        width: 100%;
-        max-width: 500px;
-        margin: 0;
-    }
-
-    .logo-container {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-
-    .logo-box {
-        width: 4rem;
-        height: 4rem;
-        background: var(--ion-color-primary);
-        border-radius: 1rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 1rem;
-    }
-
-    .logo-box ion-icon {
-        font-size: 2rem;
-        color: white;
-    }
-
-    .employee-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1rem;
-    }
-
-    .employee-card {
-        cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
-        margin: 0;
-    }
-
-    .employee-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .employee-card.selected {
-        border: 2px solid var(--ion-color-primary);
-    }
-
-    .employee-avatar {
-        width: 4rem;
-        height: 4rem;
-        border-radius: 50%;
-        background: var(--ion-color-primary);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 0.5rem;
-        color: white;
-        font-weight: 600;
-        font-size: 1.25rem;
-    }
-
-    .pin-input-container {
-        display: flex;
-        justify-content: center;
-        gap: 0.75rem;
-        margin: 1.5rem 0;
-    }
-
-    .pin-dot {
-        width: 1rem;
-        height: 1rem;
-        border-radius: 50%;
-        border: 2px solid var(--ion-color-medium);
-        background: transparent;
-        transition: all 0.2s;
-    }
-
-    .pin-dot.filled {
-        background: var(--ion-color-primary);
-        border-color: var(--ion-color-primary);
-    }
-
-    .pin-keypad {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1rem;
-        max-width: 300px;
-        margin: 0 auto;
-    }
-
-    .pin-key {
-        aspect-ratio: 1;
-        font-size: 1.5rem;
-        font-weight: 600;
-    }
-
-    .theme-toggle {
-        position: fixed;
-        top: 1rem;
-        right: 1rem;
-        z-index: 1000;
-    }
-</style>
-{% endblock %}
+{% block title %}ERPlora Hub - {% trans "Login" %}{% endblock %}
 
 {% block content %}
 <div x-data="loginApp()" x-init="init()">
     <!-- Theme Toggle -->
-    <ion-button class="theme-toggle" fill="clear" @click="toggleTheme()">
+    <ion-button class="fixed top-4 right-4 z-50" fill="clear" @click="toggleTheme()">
         <ion-icon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
     </ion-button>
 
     <!-- Login Container -->
-    <div class="login-container">
-        <ion-card class="login-card">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <ion-card class="w-full max-w-[500px] m-0">
             <!-- Logo -->
-            <div class="logo-container">
-                <div class="logo-box">
-                    <ion-icon name="storefront"></ion-icon>
-                </div>
-                <h1 style="margin: 0; font-size: 1.75rem; font-weight: 700;">CPOS Hub</h1>
-                <p style="margin: 0.5rem 0 0 0; color: var(--ion-color-medium);">{% trans "Point of Sale System" %}</p>
+            <div class="text-center mb-8 pt-8">
+                <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 64px; height: 64px; margin: 0 auto 1rem;">
+                <h1 class="m-0 text-3xl font-bold">ERPlora</h1>
+                <p class="mt-2 mb-0 text-medium">{% trans "Business Management System" %}</p>
             </div>
 
             <ion-card-content>
                 <!-- Login Tabs -->
-                <ion-segment :value="loginMode" style="margin-bottom: 2rem;">
+                <ion-segment :value="loginMode" class="mb-8">
                     <ion-segment-button value="local" @click="loginMode = 'local'">
                         <ion-label>{% trans "Local Login" %}</ion-label>
                     </ion-segment-button>
@@ -152,22 +33,24 @@
                 </ion-segment>
 
                 <!-- Local Login (Employee Selection + PIN) -->
-                <div x-show="loginMode === 'local'" style="display: none;" x-cloak>
+                <div x-show="loginMode === 'local'" x-cloak>
                     <!-- Employee Selection -->
                     <div x-show="!selectedEmployee">
-                        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">{% trans "Select your profile" %}</h2>
+                        <h2 class="text-xl font-semibold mb-4">{% trans "Select your profile" %}</h2>
 
-                        <div class="employee-grid">
+                        <div class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-4 mb-4">
                             <template x-for="employee in employees" :key="employee.id">
-                                <div class="employee-card" @click="selectEmployee(employee)">
-                                    <ion-card style="margin: 0;">
-                                        <ion-card-content style="padding: 1rem; text-align: center;">
-                                            <div class="employee-avatar">
-                                                <span x-text="employee.initials"></span>
-                                            </div>
-                                            <p style="margin: 0; font-size: 0.875rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="employee.name"></p>
-                                            <ion-chip :color="employee.roleColor" style="margin: 0.25rem 0 0 0; height: 1.25rem;">
-                                                <ion-label style="font-size: 0.625rem;" x-text="employee.role"></ion-label>
+                                <div class="cursor-pointer transition-transform hover:scale-105" @click="selectEmployee(employee)">
+                                    <ion-card class="m-0">
+                                        <ion-card-content class="p-4 text-center">
+                                            <ion-avatar class="mx-auto mb-2">
+                                                <div class="w-full h-full bg-[var(--ion-color-primary)] text-[var(--ion-color-primary-contrast)] bg-opacity-10 flex items-center justify-center text-lg font-bold">
+                                                    <span x-text="employee.initials"></span>
+                                                </div>
+                                            </ion-avatar>
+                                            <p class="m-0 text-sm font-medium overflow-hidden text-ellipsis whitespace-nowrap" x-text="employee.name"></p>
+                                            <ion-chip :color="employee.roleColor" class="mt-1 mb-0 h-5">
+                                                <ion-label class="text-[10px]" x-text="employee.role"></ion-label>
                                             </ion-chip>
                                         </ion-card-content>
                                     </ion-card>
@@ -178,23 +61,26 @@
 
                     <!-- PIN Entry -->
                     <div x-show="selectedEmployee" x-cloak>
-                        <div style="text-align: center; margin-bottom: 2rem;">
-                            <div class="employee-avatar" style="display: inline-flex;">
-                                <span x-text="selectedEmployee?.initials"></span>
-                            </div>
-                            <h2 style="margin: 0.75rem 0 0 0; font-size: 1.25rem; font-weight: 600;" x-text="selectedEmployee?.name"></h2>
-                            <p style="margin: 0.25rem 0 0 0; color: var(--ion-color-medium);">{% trans "Enter your PIN" %}</p>
+                        <div class="text-center mb-8">
+                            <ion-avatar class="mx-auto mb-2">
+                                <div class="w-full h-full bg-[var(--ion-color-primary)] text-[var(--ion-color-primary-contrast)] bg-opacity-10 flex items-center justify-center text-lg font-bold">
+                                    <span x-text="selectedEmployee?.initials"></span>
+                                </div>
+                            </ion-avatar>
+                            <h2 class="mt-3 mb-0 text-xl font-semibold" x-text="selectedEmployee?.name"></h2>
+                            <p class="mt-1 mb-0 text-medium">{% trans "Enter your PIN" %}</p>
                         </div>
 
                         <!-- PIN Dots -->
-                        <div class="pin-input-container">
+                        <div class="flex gap-3 justify-center mb-6">
                             <template x-for="i in 4">
-                                <div class="pin-dot" :class="{ 'filled': pinInput.length >= i }"></div>
+                                <div class="w-4 h-4 rounded-full border-2 transition-all duration-200"
+                                     :class="pinInput.length >= i ? 'bg-primary border-primary' : 'border-[var(--ion-border-color)]'"></div>
                             </template>
                         </div>
 
                         <!-- Error Message -->
-                        <div x-show="pinError" x-cloak style="text-align: center; margin-bottom: 1rem;">
+                        <div x-show="pinError" x-cloak class="text-center mb-4">
                             <ion-chip color="danger">
                                 <ion-icon name="alert-circle-outline"></ion-icon>
                                 <ion-label>{% trans "Incorrect PIN" %}</ion-label>
@@ -202,55 +88,54 @@
                         </div>
 
                         <!-- Keypad -->
-                        <div class="pin-keypad">
+                        <div class="grid grid-cols-3 gap-4 max-w-[300px] mx-auto">
                             <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
-                                <ion-button class="pin-key" @click="addPinDigit(num)" expand="block" fill="outline">
+                                <ion-button class="h-14 text-xl font-semibold" @click="addPinDigit(num)" expand="block" fill="outline">
                                     <span x-text="num"></span>
                                 </ion-button>
                             </template>
-                            <ion-button class="pin-key" @click="selectedEmployee = null; pinInput = ''; pinError = false;" expand="block" fill="clear">
-                                <ion-icon name="arrow-back-outline"></ion-icon>
+                            <ion-button class="h-14" @click="selectedEmployee = null; pinInput = ''; pinError = false;" expand="block" fill="clear">
+                                <ion-icon name="arrow-back-outline" class="text-2xl"></ion-icon>
                             </ion-button>
-                            <ion-button class="pin-key" @click="addPinDigit(0)" expand="block" fill="outline">
+                            <ion-button class="h-14 text-xl font-semibold" @click="addPinDigit(0)" expand="block" fill="outline">
                                 <span>0</span>
                             </ion-button>
-                            <ion-button class="pin-key" @click="clearPinDigit()" expand="block" fill="clear">
-                                <ion-icon name="backspace-outline"></ion-icon>
+                            <ion-button class="h-14" @click="clearPinDigit()" expand="block" fill="clear">
+                                <ion-icon name="backspace-outline" class="text-2xl"></ion-icon>
                             </ion-button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Cloud Login (Email/Password) -->
-                <div x-show="loginMode === 'cloud'" style="display: none;" x-cloak>
-                    <form @submit.prevent="cloudLogin()" style="display: flex; flex-direction: column; gap: 1.5rem;">
-                        {% csrf_token %}
+                <div x-show="loginMode === 'cloud'" x-cloak>
+                    <form @submit.prevent="cloudLogin()" class="flex flex-col gap-6">
                         <div>
-                            <ion-label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">{% trans "Email" %}</ion-label>
+                            <ion-label class="block mb-2 font-medium">{% trans "Email" %}</ion-label>
                             <ion-input
                                 x-model="cloudCredentials.email"
                                 type="email"
                                 placeholder="{% trans 'your@email.com' %}"
                                 fill="outline"
                                 required
-                                style="--background: var(--ion-background-color);">
+                                class="[--background:var(--ion-background-color)]">
                             </ion-input>
                         </div>
 
                         <div>
-                            <ion-label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">{% trans "Password" %}</ion-label>
+                            <ion-label class="block mb-2 font-medium">{% trans "Password" %}</ion-label>
                             <ion-input
                                 x-model="cloudCredentials.password"
                                 type="password"
                                 placeholder="••••••••"
                                 fill="outline"
                                 required
-                                style="--background: var(--ion-background-color);">
+                                class="[--background:var(--ion-background-color)]">
                             </ion-input>
                         </div>
 
                         <ion-button type="submit" expand="block" :disabled="cloudLoading">
-                            <ion-spinner x-show="cloudLoading" name="crescent" style="margin-right: 0.5rem;"></ion-spinner>
+                            <ion-spinner x-show="cloudLoading" name="crescent" class="mr-2"></ion-spinner>
                             <span x-text="cloudLoading ? '{% trans "Logging in..." %}' : '{% trans "Login" %}'"></span>
                         </ion-button>
                     </form>
@@ -267,26 +152,27 @@
             </ion-toolbar>
         </ion-header>
         <ion-content class="ion-padding">
-            <div style="max-width: 400px; margin: 0 auto;">
-                <div style="text-align: center; margin-bottom: 2rem;">
-                    <ion-icon name="key-outline" style="font-size: 4rem; color: var(--ion-color-primary);"></ion-icon>
-                    <h2 style="margin: 1rem 0 0.5rem 0;">{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
-                    <p style="margin: 0; color: var(--ion-color-medium);">{% trans "Setup a 4-digit PIN for quick access" %}</p>
+            <div class="max-w-[400px] mx-auto">
+                <div class="text-center mb-8">
+                    <ion-icon name="key-outline" class="text-6xl text-primary"></ion-icon>
+                    <h2 class="mt-4 mb-2">{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
+                    <p class="m-0 text-medium">{% trans "Setup a 4-digit PIN for quick access" %}</p>
                 </div>
 
                 <!-- PIN Setup Dots -->
-                <div class="pin-input-container">
+                <div class="flex gap-3 justify-center mb-6">
                     <template x-for="i in 4">
-                        <div class="pin-dot" :class="{ 'filled': setupPinInput.length >= i }"></div>
+                        <div class="w-4 h-4 rounded-full border-2 transition-all duration-200"
+                             :class="setupPinInput.length >= i ? 'bg-primary border-primary' : 'border-[var(--ion-border-color)]'"></div>
                     </template>
                 </div>
 
-                <div x-show="setupPinConfirm" x-cloak style="text-align: center; margin: 1rem 0;">
-                    <p style="color: var(--ion-color-medium);">{% trans "Confirm your PIN" %}</p>
+                <div x-show="setupPinConfirm" x-cloak class="text-center my-4">
+                    <p class="text-medium">{% trans "Confirm your PIN" %}</p>
                 </div>
 
                 <!-- Error Message -->
-                <div x-show="setupPinError" x-cloak style="text-align: center; margin-bottom: 1rem;">
+                <div x-show="setupPinError" x-cloak class="text-center mb-4">
                     <ion-chip color="danger">
                         <ion-icon name="alert-circle-outline"></ion-icon>
                         <ion-label>{% trans "PINs don't match" %}</ion-label>
@@ -294,18 +180,18 @@
                 </div>
 
                 <!-- Keypad -->
-                <div class="pin-keypad">
+                <div class="grid grid-cols-3 gap-4 max-w-[300px] mx-auto">
                     <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
-                        <ion-button class="pin-key" @click="addSetupPinDigit(num)" expand="block" fill="outline">
+                        <ion-button class="h-14 text-xl font-semibold" @click="addSetupPinDigit(num)" expand="block" fill="outline">
                             <span x-text="num"></span>
                         </ion-button>
                     </template>
                     <div></div>
-                    <ion-button class="pin-key" @click="addSetupPinDigit(0)" expand="block" fill="outline">
+                    <ion-button class="h-14 text-xl font-semibold" @click="addSetupPinDigit(0)" expand="block" fill="outline">
                         <span>0</span>
                     </ion-button>
-                    <ion-button class="pin-key" @click="clearSetupPinDigit()" expand="block" fill="clear">
-                        <ion-icon name="backspace-outline"></ion-icon>
+                    <ion-button class="h-14" @click="clearSetupPinDigit()" expand="block" fill="clear">
+                        <ion-icon name="backspace-outline" class="text-2xl"></ion-icon>
                     </ion-button>
                 </div>
             </div>
@@ -383,11 +269,10 @@
 
             async verifyPin() {
                 try {
-                    const response = await fetch('{% url "core:verify_pin" %}', {
+                    const response = await fetch('{% url "accounts:verify_pin" %}', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': '{{ csrf_token }}'
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
                             user_id: this.selectedEmployee.id,
@@ -407,7 +292,7 @@
                         toast.present();
 
                         setTimeout(() => {
-                            window.location.href = '{% url "core:dashboard" %}';
+                            window.location.href = '{% url "configuration:dashboard" %}';
                         }, 1000);
                     } else {
                         // Error
@@ -441,11 +326,10 @@
                 this.cloudLoading = true;
 
                 try {
-                    const response = await fetch('{% url "core:cloud_login" %}', {
+                    const response = await fetch('{% url "accounts:cloud_login" %}', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': '{{ csrf_token }}'
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
                             email: this.cloudCredentials.email,
@@ -470,7 +354,7 @@
                             toast.present();
 
                             setTimeout(() => {
-                                window.location.href = '{% url "core:dashboard" %}';
+                                window.location.href = '{% url "configuration:dashboard" %}';
                             }, 1000);
                         }
                     } else {
@@ -525,11 +409,10 @@
                 if (this.setupPinInput === this.setupPinFirst) {
                     // Success - save PIN
                     try {
-                        const response = await fetch('{% url "core:setup_pin" %}', {
+                        const response = await fetch('{% url "accounts:setup_pin" %}', {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': '{{ csrf_token }}'
+                                'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
                                 user_id: this.newUser.id,
@@ -548,7 +431,7 @@
                             toast.present();
 
                             setTimeout(() => {
-                                window.location.href = '{% url "core:dashboard" %}';
+                                window.location.href = '{% url "configuration:dashboard" %}';
                             }, 1000);
                         }
                     } catch (error) {

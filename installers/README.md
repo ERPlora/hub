@@ -1,6 +1,6 @@
-# CPOS Hub - Instaladores Nativos
+# ERPlora Hub - Instaladores Nativos
 
-Este directorio contiene scripts para crear instaladores nativos de CPOS Hub para cada plataforma.
+Este directorio contiene scripts para crear instaladores nativos de ERPlora Hub para cada plataforma.
 
 ---
 
@@ -33,7 +33,7 @@ cd installers/windows
 
 ### Características del Instalador
 
-- **Ubicación**: `C:\Program Files\CPOS Hub\`
+- **Ubicación**: `C:\Program Files\ERPlora Hub\`
 - **Autostart**: Opción durante instalación (añade a carpeta Inicio)
 - **Accesos directos**:
   - Menú Inicio
@@ -157,7 +157,7 @@ El AppImage crea automáticamente el archivo de autostart:
 # ~/.config/autostart/cpos-hub.desktop
 [Desktop Entry]
 Type=Application
-Name=CPOS Hub
+Name=ERPlora Hub
 Exec=/path/to/CPOS-Hub-0.8.0-x86_64.AppImage
 Icon=cpos-hub
 Terminal=false
@@ -189,7 +189,7 @@ Todos los instaladores se firman automáticamente con GPG en GitHub Actions.
 
 ```bash
 # Descargar clave pública
-curl -sL https://cpos.app/api/gpg/public-key/ | gpg --import
+curl -sL https://erplora.com/api/gpg/public-key/ | gpg --import
 
 # Verificar instalador
 gpg --verify CPOS-Hub-0.8.0-windows-installer.exe.asc CPOS-Hub-0.8.0-windows-installer.exe
@@ -326,8 +326,8 @@ Para crear nueva versión en todas las plataformas:
 ## 📞 Soporte
 
 - **Documentación**: [docs/README.md](../docs/README.md)
-- **Issues**: https://github.com/cpos-app/hub/issues
-- **Website**: https://cpos.app
+- **Issues**: https://github.com/ERPlora/hub/issues
+- **Website**: https://erplora.com
 
 ---
 

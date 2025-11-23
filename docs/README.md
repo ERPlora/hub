@@ -230,7 +230,7 @@ Cada vez que el Hub arranca:
 ### Auto-registro
 
 ```python
-# POST https://cpos.app/api/hubs/register/
+# POST https://erplora.com/api/hubs/register/
 # Headers: Authorization: Bearer {jwt_token_del_owner}
 # Body:
 {
@@ -250,7 +250,7 @@ Cada vez que el Hub arranca:
 ### Conexión WebSocket
 
 ```
-wss://cpos.app/ws/hub/{hub_id}/?token={tunnel_token}
+wss://erplora.com/ws/hub/{hub_id}/?token={tunnel_token}
 
 # Mensaje heartbeat cada 30s:
 {
@@ -279,7 +279,7 @@ class HubConfig(models.Model):
     name = CharField()                # "Mi Tienda"
     
     # Conexión Cloud
-    cloud_url = URLField()            # "https://cpos.app"
+    cloud_url = URLField()            # "https://erplora.com"
     
     # Credenciales del HUB (NO de usuario)
     tunnel_token = CharField()        # Token permanente
@@ -548,7 +548,7 @@ Los instaladores se crean automáticamente en GitHub Actions:
 1. **GitHub Actions** → **Build Release Executables**
 2. **Run workflow** → Ingresar versión (ej: `0.8.0`)
 3. **Esperar** ~15-20 minutos
-4. **Descargar** desde [Releases](https://github.com/cpos-app/hub/releases)
+4. **Descargar** desde [Releases](https://github.com/ERPlora/hub/releases)
 
 **Archivos generados**:
 - `CPOS-Hub-0.8.0-windows-installer.exe` + `.asc` (firma GPG)
@@ -577,16 +577,16 @@ Todos los archivos de release están firmados con GPG para garantizar autenticid
 
 ```bash
 # Descargar clave pública desde API
-curl -sL https://cpos.app/api/gpg/public-key/ | gpg --import
+curl -sL https://erplora.com/api/gpg/public-key/ | gpg --import
 
 # Verificar descarga
 gpg --verify CPOS-Hub-0.8.0-windows.zip.asc CPOS-Hub-0.8.0-windows.zip
 ```
 
 **Endpoints de API**:
-- `GET https://cpos.app/api/gpg/public-key/` - Descargar clave pública
-- `GET https://cpos.app/api/gpg/public-key/info/` - Información de la clave (JSON)
-- `GET https://cpos.app/api/gpg/public-key/text/` - Clave en texto plano
+- `GET https://erplora.com/api/gpg/public-key/` - Descargar clave pública
+- `GET https://erplora.com/api/gpg/public-key/info/` - Información de la clave (JSON)
+- `GET https://erplora.com/api/gpg/public-key/text/` - Clave en texto plano
 
 **Documentación adicional**:
 - Para usuarios que descargan releases: [SIGNATURE_VERIFICATION.md](SIGNATURE_VERIFICATION.md)
@@ -693,14 +693,9 @@ Después del **2030-01-07** (5 años), la licencia se convierte automáticamente
 
 ## 🤝 Contribuir
 
-Este es un proyecto con **TDD obligatorio**:
+Este es un proyecto con **TDD**:
 
-1. Escribir tests PRIMERO
-2. Ejecutar tests (deben fallar - RED)
-3. Implementar código mínimo
-4. Ejecutar tests (deben pasar - GREEN)
-5. Refactorizar
-6. Coverage mínimo: 80%
+1. Coverage mínimo: 80%
 
 ---
 

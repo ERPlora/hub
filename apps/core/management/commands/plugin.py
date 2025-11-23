@@ -8,8 +8,7 @@ import zipfile
 from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
-from apps.core.plugin_loader import plugin_loader
-from apps.core.models import Plugin
+from apps.plugins_runtime.loader import plugin_loader
 
 
 class Command(BaseCommand):
@@ -179,21 +178,61 @@ class Command(BaseCommand):
         self.stdout.write('  4. Run: python manage.py plugin package ' + plugin_id)
 
     def list_plugins(self):
-        """List all plugins"""
-        plugins = Plugin.objects.all().order_by('menu_order', 'name')
+        """List all plugins from filesystem"""
+        plugins_dir = Path(settings.PLUGINS_DIR)
 
-        if not plugins.exists():
-            self.stdout.write('No plugins installed')
+        if not plugins_dir.exists():
+            self.stdout.write('No plugins directory found')
             return
+
+        plugins = []
+
+        # Scan filesystem for plugins
+        for plugin_dir in plugins_dir.iterdir():
+            if not plugin_dir.is_dir():
+                continue
+
+            # Skip hidden directories
+            if plugin_dir.name.startswith('.'):
+                continue
+
+            plugin_id = plugin_dir.name
+            is_active = not plugin_id.startswith('_')
+            clean_id = plugin_id.lstrip('_')
+
+            # Read plugin.json
+            plugin_json_path = plugin_dir / 'plugin.json'
+            if plugin_json_path.exists():
+                try:
+                    with open(plugin_json_path, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
+                        name = metadata.get('name', clean_id.title())
+                        version = metadata.get('version', '1.0.0')
+                        plugins.append({
+                            'id': clean_id,
+                            'name': name,
+                            'version': version,
+                            'is_active': is_active
+                        })
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(
+                        f'Warning: Error reading plugin.json for {plugin_id}: {e}'
+                    ))
+
+        if not plugins:
+            self.stdout.write('No plugins found')
+            return
+
+        # Sort by name
+        plugins.sort(key=lambda x: x['name'])
 
         self.stdout.write(self.style.SUCCESS('Installed Plugins:'))
         self.stdout.write('-' * 80)
 
         for plugin in plugins:
-            status = '✓' if plugin.is_active else '✗'
-            installed = '📦' if plugin.is_installed else '⚠️'
+            status = '✓' if plugin['is_active'] else '✗'
             self.stdout.write(
-                f'{status} {installed} {plugin.plugin_id:20} {plugin.name:30} v{plugin.version}'
+                f"{status} {plugin['id']:20} {plugin['name']:30} v{plugin['version']}"
             )
 
     def sync_plugins(self):
