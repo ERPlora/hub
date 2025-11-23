@@ -82,7 +82,7 @@ def settings(request):
 
         elif action == 'update_currency':
             # Update currency
-            currency = request.POST.get('currency', 'USD')
+            currency = request.POST.get('currency', 'EUR')
 
             # Validate currency
             from django.conf import settings as django_settings

@@ -130,6 +130,7 @@ TEMPLATES = [
                 'apps.core.context_processors.cloud_url',
                 'apps.core.context_processors.plugin_menu_items',
                 'apps.core.context_processors.hub_config_context',
+                'apps.configuration.context_processors.global_config',  # Global config singleton
             ],
         },
     },
