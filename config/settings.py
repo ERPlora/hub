@@ -81,9 +81,19 @@ INSTALLED_APPS = [
     "apps.plugins_runtime",
 ]
 
-# NOTA: La carga dinámica de plugins ahora se maneja en apps.plugins_runtime
-# Los plugins se cargan automáticamente desde el filesystem al arrancar Django
-# Ver: apps/plugins_runtime/apps.py -> PluginsRuntimeConfig.ready()
+# Auto-load active plugins from filesystem
+# This must happen BEFORE Django scans for migrations
+# Plugins are "active" if their folder does NOT start with underscore or dot
+PLUGINS_DIR = PLUGINS_ROOT  # Alias for consistency with other code
+if PLUGINS_DIR.exists():
+    for plugin_dir in PLUGINS_DIR.iterdir():
+        if not plugin_dir.is_dir():
+            continue
+        # Skip disabled plugins (start with _ or .)
+        if plugin_dir.name.startswith('.') or plugin_dir.name.startswith('_'):
+            continue
+        INSTALLED_APPS.append(plugin_dir.name)
+        print(f"[SETTINGS] Auto-loaded plugin: {plugin_dir.name}")
 
 
 
