@@ -102,15 +102,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            hub/.venv
+            .venv
             ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('hub/pyproject.toml') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
       - name: Install dependencies with uv (Linux/macOS)
         if: runner.os != 'Windows'
-        working-directory: hub
         run: |
           uv venv
           source .venv/bin/activate
@@ -118,7 +117,6 @@ jobs:
 
       - name: Install dependencies with uv (Windows)
         if: runner.os == 'Windows'
-        working-directory: hub
         shell: pwsh
         run: |
           uv venv
@@ -127,14 +125,12 @@ jobs:
 
       - name: Create database (Linux/macOS)
         if: runner.os != 'Windows'
-        working-directory: hub
         run: |
           source .venv/bin/activate
           python manage.py migrate --noinput
 
       - name: Create database (Windows)
         if: runner.os == 'Windows'
-        working-directory: hub
         shell: pwsh
         run: |
           & .venv\Scripts\Activate.ps1
@@ -142,14 +138,12 @@ jobs:
 
       - name: Build with PyInstaller (Linux/macOS)
         if: runner.os != 'Windows'
-        working-directory: hub
         run: |
           source .venv/bin/activate
           pyinstaller main.spec --clean
 
       - name: Build with PyInstaller (Windows)
         if: runner.os == 'Windows'
-        working-directory: hub
         shell: pwsh
         run: |
           & .venv\Scripts\Activate.ps1
@@ -164,7 +158,6 @@ jobs:
 
       - name: Create archive (Windows)
         if: matrix.platform == 'windows'
-        working-directory: hub
         shell: pwsh
         run: |
           cd dist/main
@@ -172,14 +165,12 @@ jobs:
 
       - name: Create archive (macOS)
         if: matrix.platform == 'macos'
-        working-directory: hub
         run: |
           cd dist
           zip -r ../ERPlora-Hub-${{ steps.get_version.outputs.VERSION }}-macos.zip "ERPlora Hub.app"
 
       - name: Create archive (Linux)
         if: matrix.platform == 'linux'
-        working-directory: hub
         run: |
           cd dist/main
           tar -czf ../../ERPlora-Hub-${{ steps.get_version.outputs.VERSION }}-linux.tar.gz *
@@ -190,7 +181,7 @@ jobs:
           tag_name: ${{ needs.release.outputs.tag }}
           prerelease: ${{ github.ref != 'refs/heads/main' }}
           files: |
-            hub/ERPlora-Hub-*.zip
-            hub/ERPlora-Hub-*.tar.gz
+            ERPlora-Hub-*.zip
+            ERPlora-Hub-*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
