@@ -20,4 +20,5 @@ urlpatterns = [
     path('plugins/activate/<str:plugin_id>/', views_plugins.plugin_activate, name='plugin_activate'),
     path('plugins/deactivate/<str:plugin_id>/', views_plugins.plugin_deactivate, name='plugin_deactivate'),
     path('plugins/delete/<str:plugin_id>/', views_plugins.plugin_delete, name='plugin_delete'),
+    path('plugins/restart/', views_plugins.plugin_restart_server, name='plugin_restart_server'),
 ]
