@@ -26,7 +26,6 @@ urlpatterns = [
     # Refactored app URLs
     path('', include('apps.configuration.urls')),  # Root redirect, Dashboard, POS, settings (must be first for root URL)
     path('', include('apps.accounts.urls')),  # Login, employees, auth
-    path('', include('apps.plugins_admin.urls')),  # Plugin management
     path('', include('apps.sync.urls')),  # Sync, updates, FRP
 ]
 
@@ -34,6 +33,7 @@ urlpatterns = [
 # Añadir las URLs dinámicas de plugins
 urlpatterns += plugin_urlpatterns
 
-# Serve static files in development
+# Serve static and media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0] if settings.STATICFILES_DIRS else None)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
