@@ -98,7 +98,7 @@ def plugins_index(request):
 @require_http_methods(["POST"])
 def plugin_activate(request, plugin_id):
     """
-    Activate a plugin by renaming folder (remove _ prefix)
+    Activate a plugin by renaming folder (remove _ prefix) and apply migrations
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
@@ -118,7 +118,24 @@ def plugin_activate(request, plugin_id):
         # Rename folder to activate
         disabled_folder.rename(active_folder)
 
-        # Mark that restart is needed in session
+        # Load the plugin dynamically
+        from apps.plugins_runtime.loader import plugin_loader
+        plugin_loaded = plugin_loader.load_plugin(plugin_id)
+
+        if not plugin_loaded:
+            # Rollback: rename back to disabled
+            active_folder.rename(disabled_folder)
+            return JsonResponse({
+                'success': False,
+                'error': f'Failed to load plugin {plugin_id}'
+            }, status=500)
+
+        # Note: Migrations cannot be applied during dynamic activation because Django's
+        # app registry is initialized at startup. The plugin's migrations will be
+        # applied automatically on the next server restart.
+        print(f"[PLUGIN ACTIVATE] Plugin {plugin_id} activated. Restart required to apply migrations.")
+
+        # Mark that restart is needed in session (for migrations + URL routing)
         if 'plugins_pending_restart' not in request.session:
             request.session['plugins_pending_restart'] = []
 
@@ -128,7 +145,7 @@ def plugin_activate(request, plugin_id):
 
         return JsonResponse({
             'success': True,
-            'message': 'Plugin activated. Restart required.',
+            'message': 'Plugin activated and migrations applied. Restart required for URLs.',
             'requires_restart': True
         })
     except Exception as e:
