@@ -12,7 +12,7 @@
         const alert = document.createElement('ion-alert');
         alert.header = '{% trans "Activate Plugin" %}';
         alert.subHeader = pluginName;
-        alert.message = '{% trans "You will need to restart the application for changes to take effect." %}';
+        alert.message = '{% trans "The plugin will be activated. A server restart is required to apply migrations." %}';
         alert.buttons = [
             {
                 text: '{% trans "Cancel" %}',
@@ -32,8 +32,8 @@
                         const result = await response.json();
 
                         if (result.success) {
-                            await showSuccessAlert('{% trans "Plugin activated successfully. Please restart the application." %}', '{% trans "Success" %}');
-                            window.location.reload();
+                            // Show success and ask if restart now
+                            await showRestartConfirmation(pluginName);
                         } else {
                             await showErrorAlert(result.error || '{% trans "Failed to activate plugin" %}', '{% trans "Error" %}');
                         }
@@ -45,6 +45,65 @@
         ];
         document.body.appendChild(alert);
         await alert.present();
+    }
+
+    // Show restart confirmation after activation
+    async function showRestartConfirmation(pluginName) {
+        const alert = document.createElement('ion-alert');
+        alert.header = '{% trans "Plugin Activated" %}';
+        alert.subHeader = pluginName;
+        alert.message = '{% trans "The plugin has been activated successfully. Do you want to restart the server now to apply migrations?" %}';
+        alert.buttons = [
+            {
+                text: '{% trans "Later" %}',
+                role: 'cancel',
+                handler: () => {
+                    window.location.reload();
+                }
+            },
+            {
+                text: '{% trans "Restart Now" %}',
+                role: 'confirm',
+                handler: async () => {
+                    await restartServerNow();
+                }
+            }
+        ];
+        document.body.appendChild(alert);
+        await alert.present();
+    }
+
+    // Restart server now
+    async function restartServerNow() {
+        const loading = document.createElement('ion-loading');
+        loading.message = '{% trans "Restarting server and applying migrations..." %}';
+        document.body.appendChild(loading);
+        await loading.present();
+
+        try {
+            const response = await fetch('/plugins/restart/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            });
+            const result = await response.json();
+
+            await loading.dismiss();
+
+            if (result.success) {
+                await showSuccessAlert('{% trans "Server restarted successfully. Migrations applied." %}', '{% trans "Success" %}');
+                // Wait a moment for server to restart, then reload
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                await showErrorAlert(result.error || '{% trans "Failed to restart server" %}', '{% trans "Error" %}');
+            }
+        } catch (error) {
+            await loading.dismiss();
+            await showErrorAlert('{% trans "Error:" %} ' + error.message, '{% trans "Error" %}');
+        }
     }
 
     // Deactivate plugin with Ionic alert
@@ -141,6 +200,31 @@
         </div>
     </div>
 
+    <!-- Restart Banner (shown when plugins need restart) -->
+    {% if requires_restart %}
+    <ion-card color="warning" style="margin-bottom: 24px;">
+        <ion-card-content>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                    <ion-icon name="alert-circle-outline" style="font-size: 32px;"></ion-icon>
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">
+                            {% trans "Restart Required" %}
+                        </div>
+                        <div style="font-size: 0.875rem; opacity: 0.9;">
+                            {% trans "Some plugins have been activated and need a server restart to apply migrations." %}
+                        </div>
+                    </div>
+                </div>
+                <ion-button color="dark" onclick="restartServerNow()">
+                    <ion-icon slot="start" name="reload-outline"></ion-icon>
+                    {% trans "Restart Now" %}
+                </ion-button>
+            </div>
+        </ion-card-content>
+    </ion-card>
+    {% endif %}
+
     <!-- Stats -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
         <ion-card>
@@ -180,9 +264,9 @@
     <!-- Plugins Grid -->
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 16px;">
         {% for plugin in plugins %}
-        <ion-card>
-            <ion-card-content>
-                <div style="display: flex; align-items: start; gap: 16px;">
+        <ion-card style="display: flex; flex-direction: column; height: 100%;">
+            <ion-card-content style="flex: 1; display: flex; flex-direction: column;">
+                <div style="display: flex; align-items: start; gap: 16px; flex: 1;">
                     <!-- Icon -->
                     <div style="width: 56px; height: 56px; border-radius: 12px; background: var(--ion-color-light); color: var(--ion-color-primary); display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0;">
                         <ion-icon name="{{ plugin.icon }}"></ion-icon>
@@ -211,25 +295,25 @@
                         </div>
                     </div>
                 </div>
+            </ion-card-content>
 
-                <!-- Actions -->
-                <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ion-color-light-shade);">
+            <!-- Actions Toolbar - Always at bottom -->
+            <ion-toolbar class="ion-no-border" style="--background: transparent; --border-color: var(--ion-color-light-shade); border-top: 1px solid var(--ion-color-light-shade);">
+                <ion-buttons slot="end" class="ion-padding" style="gap: 8px;">
                     {% if plugin.is_active %}
                     <ion-button
-                        size="large"
                         fill="outline"
                         color="medium"
                         onclick="confirmDeactivate('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
                         <ion-icon slot="start" name="pause-outline"></ion-icon>
                         {% trans "Deactivate" %}
                     </ion-button>
-                    <ion-button size="large" fill="outline" href="/plugins/{{ plugin.plugin_id }}/">
+                    <ion-button fill="outline" href="/plugins/{{ plugin.plugin_id }}/">
                         <ion-icon slot="start" name="open-outline"></ion-icon>
                         {% trans "Open" %}
                     </ion-button>
                     {% else %}
                     <ion-button
-                        size="large"
                         fill="outline"
                         color="success"
                         onclick="confirmActivate('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
@@ -237,16 +321,14 @@
                         {% trans "Activate" %}
                     </ion-button>
                     {% endif %}
-
                     <ion-button
-                        size="large"
                         fill="outline"
                         color="danger"
                         onclick="confirmDelete('{{ plugin.plugin_id }}', '{{ plugin.name }}')">
                         <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
                     </ion-button>
-                </div>
-            </ion-card-content>
+                </ion-buttons>
+            </ion-toolbar>
         </ion-card>
         {% empty %}
         <ion-card>
