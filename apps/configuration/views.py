@@ -1,5 +1,9 @@
+import json
+import shutil
+from pathlib import Path
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
+from django.conf import settings as django_settings
 from .models import HubConfig, StoreConfig
 
 
@@ -56,12 +60,33 @@ def settings(request):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'update_currency':
+        if action == 'update_language':
+            # Update system language
+            language = request.POST.get('language', 'en')
+
+            # Validate language
+            valid_languages = ['en', 'es']
+            if language in valid_languages:
+                hub_config.os_language = language
+                hub_config.save()
+
+                # Activate language immediately
+                from django.utils import translation
+                translation.activate(language)
+                # Set session language key (Django uses '_language' as session key)
+                request.session['_language'] = language
+
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Invalid language'}, status=400)
+
+        elif action == 'update_currency':
             # Update currency
             currency = request.POST.get('currency', 'USD')
 
             # Validate currency
-            valid_currencies = [choice[0] for choice in HubConfig.CURRENCY_CHOICES]
+            from django.conf import settings as django_settings
+            valid_currencies = [choice[0] for choice in django_settings.CURRENCY_CHOICES]
             if currency in valid_currencies:
                 hub_config.currency = currency
                 hub_config.save()

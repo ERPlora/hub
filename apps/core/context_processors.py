@@ -32,13 +32,15 @@ def plugin_menu_items(request):
 
 def hub_config_context(request):
     """
-    Add hub_config to template context for theme system.
+    Add hub_config and store_config to template context.
 
-    This makes hub_config available in all templates without having to
-    explicitly pass it in each view.
+    This makes both HubConfig (language, currency, theme) and StoreConfig
+    (business data) available in all templates without having to explicitly
+    pass them in each view.
     """
-    from apps.configuration.models import HubConfig
+    from apps.configuration.models import HubConfig, StoreConfig
 
     return {
-        'hub_config': HubConfig.get_config()
+        'hub_config': HubConfig.get_config(),
+        'store_config': StoreConfig.get_config()
     }

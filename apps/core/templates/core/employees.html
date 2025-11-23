@@ -50,16 +50,16 @@
 
                 <!-- Actions -->
                 <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ion-color-light-shade);">
-                    <ion-button size="small" fill="outline" @click="editEmployee({{ user.id }}, '{{ user.name }}', '{{ user.email }}', '{{ user.role }}')">
+                    <ion-button size="large" fill="outline" @click="editEmployee({{ user.id }}, '{{ user.name }}', '{{ user.email }}', '{{ user.role }}')">
                         <ion-icon slot="start" name="create-outline"></ion-icon>
                         {% trans "Edit" %}
                     </ion-button>
-                    <ion-button size="small" fill="outline" color="medium" @click="resetPin({{ user.id }}, '{{ user.name }}')">
+                    <ion-button size="large" fill="outline" color="medium" @click="resetPin({{ user.id }}, '{{ user.name }}')">
                         <ion-icon slot="start" name="key-outline"></ion-icon>
                         {% trans "Reset PIN" %}
                     </ion-button>
                     {% if user.role != 'admin' %}
-                    <ion-button size="small" fill="outline" color="danger" @click="deleteEmployee({{ user.id }}, '{{ user.name }}')">
+                    <ion-button size="large" fill="outline" color="danger" @click="deleteEmployee({{ user.id }}, '{{ user.name }}')">
                         <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
                     </ion-button>
                     {% endif %}

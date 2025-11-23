@@ -33,6 +33,7 @@ dependencies = [
     "django-cors-headers>=4.0.0",    # CORS para APIs
     "django-extensions>=3.2.0",      # Comandos útiles (shell_plus, etc)
     "django-money>=3.0.0",           # Currency handling
+    "django-htmx>=1.17.0",           # HTMX integration for Django
 
     # === LIBRERÍAS PARA PLUGINS (25 pre-empaquetadas) ===
     # Ver: config/plugin_allowed_deps.py para casos de uso
