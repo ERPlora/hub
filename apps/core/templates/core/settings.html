@@ -5,6 +5,21 @@
 {% block title %}ERPlora Hub - {% trans "Settings" %}{% endblock %}
 {% block page_title %}{% trans "Settings" %}{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* HTMX indicator: hide by default, show when htmx is loading */
+    .htmx-indicator {
+        display: none;
+    }
+    .htmx-request .htmx-indicator {
+        display: inline-block;
+    }
+    .htmx-request.htmx-indicator {
+        display: inline-block;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div style="padding: 24px;" x-data="settingsApp()">
     {% if settings_message %}
@@ -206,28 +221,50 @@
                     <div>
                         <ion-label position="stacked">{% trans "Business Logo" %}</ion-label>
                         <div style="margin-top: 8px;">
-                            {% load image_picker %}
-                            {% image_picker input_id="logoInput" input_name="logo" label="Select Business Logo" icon="business-outline" show_preview=True %}
+                            <input
+                                type="file"
+                                id="logoInput"
+                                name="logo"
+                                accept="image/*"
+                                style="display: block; margin-bottom: 8px;">
+                            {% if store_config.logo %}
+                            <img
+                                id="logoPreview"
+                                src="{{ store_config.logo.url }}"
+                                alt="Business Logo"
+                                style="max-width: 200px; max-height: 100px; display: block; margin-top: 8px; border-radius: 4px;">
+                            {% else %}
+                            <img
+                                id="logoPreview"
+                                src=""
+                                alt="Logo Preview"
+                                style="max-width: 200px; max-height: 100px; display: none; margin-top: 8px; border-radius: 4px;">
+                            {% endif %}
                         </div>
                         <p style="color: var(--ion-color-medium); font-size: 0.875rem; margin-top: 4px;">
                             {% trans "Logo will be displayed on receipts (optional)" %}
                         </p>
-                        {% if store_config.logo %}
                         <script>
-                            // Set initial preview if logo exists
+                            // Preview image on file select
                             document.addEventListener('DOMContentLoaded', function() {
-                                const preview = document.getElementById('logoInputPreview');
-                                if (preview) {
-                                    preview.src = '{{ store_config.logo.url }}';
-                                    preview.style.display = 'block';
-                                }
-                                const label = document.getElementById('logoInputLabel');
-                                if (label) {
-                                    label.textContent = '{{ store_config.logo.name }}';
+                                const input = document.getElementById('logoInput');
+                                const preview = document.getElementById('logoPreview');
+
+                                if (input && preview) {
+                                    input.addEventListener('change', function(e) {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = function(event) {
+                                                preview.src = event.target.result;
+                                                preview.style.display = 'block';
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    });
                                 }
                             });
                         </script>
-                        {% endif %}
                     </div>
 
                     <div>
@@ -319,9 +356,84 @@
             </div>
         </ion-card-content>
     </ion-card>
+
+    <!-- Database Maintenance -->
+    <ion-card style="margin-top: 16px;">
+        <ion-card-header>
+            <ion-card-title>{% trans "Database Maintenance" %}</ion-card-title>
+            <ion-card-subtitle>{% trans "Clean up orphaned data from deleted plugins" %}</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+            <div style="display: grid; gap: 16px;">
+                <div style="padding: 12px; background: var(--ion-color-warning-tint); border-radius: 8px; border-left: 4px solid var(--ion-color-warning);">
+                    <div style="display: flex; align-items: start; gap: 8px;">
+                        <ion-icon name="warning-outline" style="color: var(--ion-color-warning); margin-top: 2px;"></ion-icon>
+                        <div>
+                            <ion-label style="font-weight: 600; color: #000;">
+                                {% trans "Warning" %}
+                            </ion-label>
+                            <p style="color: #000; font-size: 0.875rem; margin: 4px 0 0 0;">
+                                {% trans "This operation will permanently delete database tables and files from uninstalled plugins. This action cannot be undone." %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="scan-results"></div>
+
+                <div style="display: flex; gap: 12px; margin-top: 12px;">
+                    <ion-button
+                        hx-get="{% url 'configuration:scan_orphaned_data' %}"
+                        hx-target="#scan-results"
+                        hx-indicator="#scan-spinner">
+                        <ion-icon slot="start" name="scan-outline"></ion-icon>
+                        {% trans "Scan for Orphaned Data" %}
+                    </ion-button>
+                    <ion-spinner id="scan-spinner" class="htmx-indicator" style="margin-left: 8px;"></ion-spinner>
+                </div>
+            </div>
+        </ion-card-content>
+    </ion-card>
 </div>
 
 <script>
+// Handle clean button confirmation with Ionic alert (dynamically added by HTMX)
+document.addEventListener('htmx:afterSwap', function(event) {
+    if (event.detail.target.id === 'scan-results') {
+        // Find the clean button that was just added by HTMX
+        const cleanButton = event.detail.target.querySelector('[hx-post]');
+
+        if (cleanButton) {
+            // Intercept HTMX request and show Ionic confirmation first
+            cleanButton.addEventListener('htmx:confirm', async function(e) {
+                e.preventDefault(); // Stop HTMX from proceeding
+
+                // Create Ionic alert
+                const alert = document.createElement('ion-alert');
+                alert.header = '{% trans "Confirm Deletion" %}';
+                alert.message = '{% trans "Are you sure you want to permanently delete all orphaned data? This action cannot be undone." %}';
+                alert.buttons = [
+                    {
+                        text: '{% trans "Cancel" %}',
+                        role: 'cancel'
+                    },
+                    {
+                        text: '{% trans "Delete" %}',
+                        role: 'destructive',
+                        handler: () => {
+                            // User confirmed, issue the HTMX request
+                            e.detail.issueRequest();
+                        }
+                    }
+                ];
+
+                document.body.appendChild(alert);
+                await alert.present();
+            });
+        }
+    }
+});
+
 function settingsApp() {
     return {
         language: '{{ hub_config.os_language }}',
