@@ -67,8 +67,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third-party apps
-    'django_components',  # Django Components for reusable components
     'djmoney',  # Django Money for currency handling
+    'django_htmx',  # HTMX integration for Django
     # Hub apps (refactored from monolithic core)
     'apps.accounts.apps.AccountsConfig',
     'apps.configuration.apps.ConfigurationConfig',
@@ -77,48 +77,16 @@ INSTALLED_APPS = [
     # Core app (keeping for utilities and context processors)
     'apps.core.apps.CoreConfig',
 
-    # gestión de plugins
-    "apps.plugins_admin",
-
     # runtime/carga de plugins
     "apps.plugins_runtime",
+
+    # Development plugins (manually added for migrations)
+    'inventory',  # Inventory/Products plugin
 ]
 
-# Función para cargar plugins dinámicamente en INSTALLED_APPS
-def load_active_plugins():
-    """
-    Carga plugins activos en INSTALLED_APPS antes de que Django los procese.
-    Esto se ejecuta en settings.py, antes de apps.populate().
-    """
-    import os
-    import sqlite3
-    from pathlib import Path
-
-    # Solo cargar si la BD existe
-    db_path = DATA_PATHS.database_path
-    if not db_path.exists():
-        return []
-
-    try:
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
-
-        # Obtener plugins activos (usando el nombre de tabla correcto)
-        cursor.execute("""
-            SELECT plugin_id FROM plugins_admin_plugin
-            WHERE is_installed = 1 AND is_active = 1
-        """)
-
-        active_plugins = [row[0] for row in cursor.fetchall()]
-        conn.close()
-
-        return active_plugins
-    except Exception as e:
-        # Si la tabla no existe, retornar lista vacía
-        return []
-
-# Cargar plugins activos dinámicamente
-INSTALLED_APPS += load_active_plugins()
+# NOTA: La carga dinámica de plugins ahora se maneja en apps.plugins_runtime
+# Los plugins se cargan automáticamente desde el filesystem al arrancar Django
+# Ver: apps/plugins_runtime/apps.py -> PluginsRuntimeConfig.ready()
 
 
 
@@ -132,6 +100,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_htmx.middleware.HtmxMiddleware',  # HTMX integration middleware
     'apps.accounts.middleware.jwt_middleware.JWTMiddleware',  # JWT validation with offline support
     'apps.configuration.middleware.StoreConfigCheckMiddleware',  # Check if store is configured after login
 ]
@@ -154,9 +123,6 @@ TEMPLATES = [
                 'apps.core.context_processors.cloud_url',
                 'apps.core.context_processors.plugin_menu_items',
                 'apps.core.context_processors.hub_config_context',
-            ],
-            'builtins': [
-                'django_components.templatetags.component_tags',  # Django Components template tags
             ],
         },
     },
@@ -225,17 +191,8 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
-    BASE_DIR / 'components',  # Django Components
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-# Django Components configuration
-COMPONENTS = {
-    "dirs": [
-        BASE_DIR / "components",  # Global components directory
-    ],
-    "app_dirs": ["components"],  # Look for components in each app's "components" directory
-}
 
 # Media files (user uploads)
 # https://docs.djangoproject.com/en/5.2/ref/settings/#media-root
@@ -280,7 +237,11 @@ HUB_VERSION = "1.0.0"
 # All user data stored outside the app for persistence across updates
 
 # Plugins directory (external)
-PLUGINS_DIR = DATA_PATHS.plugins_dir
+# In development mode, use local plugins directory
+if USE_LOCAL_PLUGINS_DIR:
+    PLUGINS_DIR = BASE_DIR / "plugins"
+else:
+    PLUGINS_DIR = DATA_PATHS.plugins_dir
 
 # Reports directory (external)
 REPORTS_DIR = DATA_PATHS.reports_dir

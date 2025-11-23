@@ -396,6 +396,54 @@ def logout(request):
     return redirect('accounts:login')
 
 
+def settings(request):
+    """
+    User settings view - language, currency, avatar
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return redirect('accounts:login')
+
+    # Get current user and hub config
+    user = LocalUser.objects.get(id=request.session['local_user_id'])
+    hub_config = HubConfig.get_config()
+
+    if request.method == 'POST':
+        # Update language (LocalUser)
+        language = request.POST.get('language')
+        if language and language in ['en', 'es']:
+            user.language = language
+            request.session['user_language'] = language  # Update session
+
+        # Update currency (HubConfig)
+        currency = request.POST.get('currency')
+        if currency:
+            hub_config.currency = currency
+
+        # Handle avatar upload
+        if request.FILES.get('avatar'):
+            user.avatar = request.FILES['avatar']
+
+        user.save()
+        hub_config.save()
+
+        # Return success response for HTMX
+        return JsonResponse({'success': True, 'message': 'Settings saved successfully'})
+
+    # Get choices from settings
+    from django.conf import settings as django_settings
+
+    context = {
+        'user': user,
+        'hub_config': hub_config,
+        'language_choices': django_settings.LANGUAGES,
+        'currency_choices': django_settings.CURRENCY_CHOICES,
+        'current_view': 'settings'
+    }
+
+    return render(request, 'accounts/settings.html', context)
+
+
 def employees(request):
     """
     Employees management view
