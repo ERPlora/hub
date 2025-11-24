@@ -85,15 +85,37 @@ INSTALLED_APPS = [
 # This must happen BEFORE Django scans for migrations
 # Plugins are "active" if their folder does NOT start with underscore or dot
 PLUGINS_DIR = PLUGINS_ROOT  # Alias for consistency with other code
+PLUGIN_MIDDLEWARES = []  # Will be populated with plugin middlewares
+
 if PLUGINS_DIR.exists():
+    import json
+
     for plugin_dir in PLUGINS_DIR.iterdir():
         if not plugin_dir.is_dir():
             continue
         # Skip disabled plugins (start with _ or .)
         if plugin_dir.name.startswith('.') or plugin_dir.name.startswith('_'):
             continue
+
+        # Add to INSTALLED_APPS
         INSTALLED_APPS.append(plugin_dir.name)
         print(f"[SETTINGS] Auto-loaded plugin: {plugin_dir.name}")
+
+        # Check for middleware in plugin.json
+        plugin_json_path = plugin_dir / 'plugin.json'
+        if plugin_json_path.exists():
+            try:
+                with open(plugin_json_path, 'r') as f:
+                    plugin_metadata = json.load(f)
+
+                # Load middleware if defined
+                if 'middleware' in plugin_metadata:
+                    middleware_class = plugin_metadata['middleware']
+                    middleware_path = f"{plugin_dir.name}.{middleware_class}"
+                    PLUGIN_MIDDLEWARES.append(middleware_path)
+                    print(f"[SETTINGS] Registered middleware: {middleware_path}")
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"[SETTINGS] Warning: Could not load middleware from {plugin_dir.name}/plugin.json: {e}")
 
 
 
@@ -111,6 +133,9 @@ MIDDLEWARE = [
     'apps.accounts.middleware.jwt_middleware.JWTMiddleware',  # JWT validation with offline support
     'apps.configuration.middleware.StoreConfigCheckMiddleware',  # Check if store is configured after login
 ]
+
+# Add plugin middlewares (loaded dynamically from plugin.json)
+MIDDLEWARE.extend(PLUGIN_MIDDLEWARES)
 
 ROOT_URLCONF = 'config.urls'
 
