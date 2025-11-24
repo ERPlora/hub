@@ -61,3 +61,34 @@ class LocalUser(models.Model):
             'seller': 'warning',
         }
         return role_colors.get(self.role, 'medium')
+
+    # Django-compatible authentication properties
+    @property
+    def is_authenticated(self):
+        """Always return True for LocalUser instances (they are authenticated)"""
+        return True
+
+    @property
+    def is_anonymous(self):
+        """Always return False for LocalUser instances (they are not anonymous)"""
+        return False
+
+    @property
+    def first_name(self):
+        """Return first name from full name"""
+        return self.name.split()[0] if self.name else ''
+
+    @property
+    def last_name(self):
+        """Return last name from full name"""
+        parts = self.name.split()
+        return ' '.join(parts[1:]) if len(parts) > 1 else ''
+
+    @property
+    def username(self):
+        """Return email as username for compatibility"""
+        return self.email
+
+    def get_username(self):
+        """Return email as username for compatibility"""
+        return self.email
