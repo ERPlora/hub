@@ -127,6 +127,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     # 'django.middleware.csrf.CsrfViewMiddleware',  # Disabled for local-only Hub app (security via PIN codes)
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.accounts.middleware.LocalUserAuthenticationMiddleware',  # Attach LocalUser to request.user (AFTER Django Auth)
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',  # HTMX integration middleware
