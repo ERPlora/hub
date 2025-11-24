@@ -4,9 +4,11 @@ Este directorio es para **desarrollo de plugins**. Cada plugin es un Django app 
 
 ## 📋 Tabla de Contenidos
 
-- [Arquitectura del Sistema de Plugins](#arquitectura-del-sistema-de-plugins)
-- [Desarrollo Local](#desarrollo-local)
+- [Arquitectura de Plugins](#arquitectura-de-plugins)
 - [Estructura de un Plugin](#estructura-de-un-plugin)
+- [Dashboard y Navegación](#dashboard-y-navegación)
+- [Configuración Global vs Local](#configuración-global-vs-local)
+- [Desarrollo Local](#desarrollo-local)
 - [Management Commands](#management-commands)
 - [Dependencias Permitidas](#dependencias-permitidas)
 - [Persistencia de Datos](#persistencia-de-datos)
@@ -15,7 +17,16 @@ Este directorio es para **desarrollo de plugins**. Cada plugin es un Django app 
 
 ---
 
-## Arquitectura del Sistema de Plugins
+## Arquitectura de Plugins
+
+### Concepto General
+
+Todos los plugins siguen una arquitectura estándar:
+
+1. **Dashboard** (`index.html`) - Página principal con estadísticas y navegación interna
+2. **Secciones internas** - Funcionalidad específica del plugin
+3. **Configuración local** (opcional) - Solo si el plugin necesita settings específicos
+4. **Herencia de configuración global** - Uso automático de HubConfig y StoreConfig
 
 ### Dos Modos de Operación
 
@@ -33,26 +44,548 @@ Este directorio es para **desarrollo de plugins**. Cada plugin es un Django app 
 - Sin hot reload
 - Validación estricta
 
-### Ubicaciones de Datos
+---
 
-Los plugins **NO deben** guardar datos dentro de su propio directorio. Usar estas ubicaciones:
+## Estructura de un Plugin
 
-```python
-from django.conf import settings
+### Esquema Visual
 
-# Datos persistentes del plugin
-data_dir = settings.PLUGIN_DATA_ROOT / 'mi-plugin'
-data_dir.mkdir(parents=True, exist_ok=True)
-
-# Archivos media (imágenes, uploads)
-media_dir = settings.PLUGIN_MEDIA_ROOT / 'mi-plugin'
-media_dir.mkdir(parents=True, exist_ok=True)
+```
+plugin_name/
+│
+├── 📄 plugin.json                    # ⚠️ REQUERIDO - Metadata del plugin
+├── 📄 __init__.py                    # ⚠️ REQUERIDO
+├── 📄 apps.py                        # ⚠️ REQUERIDO - Django app config
+├── 📄 models.py                      # Modelos de datos del plugin
+├── 📄 views.py                       # Vistas del plugin
+├── 📄 urls.py                        # ⚠️ REQUERIDO - Rutas del plugin
+├── 📄 admin.py                       # Django admin (opcional)
+├── 📄 forms.py                       # Formularios (opcional)
+├── 📄 utils.py                       # Utilidades (opcional)
+├── 📄 context_processors.py          # Context processors (opcional)
+│
+├── 📁 templates/
+│   └── plugin_name/                  # ⚠️ Debe coincidir con plugin_id
+│       ├── index.html                # ⚠️ REQUERIDO - Dashboard principal
+│       ├── section1.html             # Secciones internas
+│       ├── section2.html
+│       ├── settings.html             # OPCIONAL - Solo si necesario
+│       └── partials/                 # Partials para HTMX (opcional)
+│           ├── table_partial.html
+│           └── form_partial.html
+│
+├── 📁 static/
+│   └── plugin_name/                  # ⚠️ Debe coincidir con plugin_id
+│       ├── css/
+│       │   └── styles.css
+│       ├── js/
+│       │   └── app.js
+│       └── img/
+│           └── icon.png
+│
+├── 📁 migrations/
+│   └── __init__.py
+│
+├── 📁 management/
+│   └── commands/
+│       └── __init__.py
+│
+├── 📁 tests/
+│   ├── __init__.py
+│   ├── test_models.py
+│   └── test_views.py
+│
+├── 📁 locale/                        # i18n (opcional)
+│   └── es/
+│       └── LC_MESSAGES/
+│           ├── django.po
+│           └── django.mo
+│
+└── 📄 README.md                      # Documentación del plugin
 ```
 
-**Ubicaciones por plataforma:**
-- Windows: `C:\Users\<user>\AppData\Local\CPOSHub\plugins\`
-- macOS: `~/Library/Application Support/CPOSHub/plugins/`
-- Linux: `~/.cpos-hub/plugins/`
+### Archivos Requeridos
+
+#### 1. plugin.json
+
+```json
+{
+  "plugin_id": "plugin_name",
+  "name": "Plugin Name",
+  "name_es": "Nombre del Plugin",
+  "version": "1.0.0",
+  "category": "inventory",
+  "description": "Plugin description",
+  "description_es": "Descripción del plugin",
+  "author": "Your Name",
+  "author_email": "email@example.com",
+  "license": "MIT",
+  "homepage": "https://github.com/user/plugin",
+
+  "compatibility": {
+    "min_cpos_version": "1.0.0",
+    "max_cpos_version": "2.0.0",
+    "django_version": "5.1.x"
+  },
+
+  "dependencies": {
+    "python": [
+      "Pillow>=10.0.0",
+      "openpyxl>=3.1.0"
+    ],
+    "plugins": []
+  },
+
+  "menu": {
+    "label": "Plugin Name",
+    "label_es": "Nombre del Plugin",
+    "icon": "cube-outline",
+    "url": "/plugins/plugin_name/",
+    "order": 10
+  }
+}
+```
+
+#### 2. urls.py
+
+```python
+from django.urls import path
+from . import views
+
+app_name = 'plugin_name'
+
+urlpatterns = [
+    # Dashboard (entrada principal)
+    path('', views.dashboard, name='dashboard'),
+
+    # Secciones internas
+    path('section1/', views.section1_view, name='section1'),
+    path('section1/create/', views.section1_create, name='section1_create'),
+    path('section1/<int:pk>/edit/', views.section1_edit, name='section1_edit'),
+
+    path('section2/', views.section2_view, name='section2'),
+
+    path('reports/', views.reports_view, name='reports'),
+
+    # Settings: OPCIONAL (solo si el plugin tiene configuración específica)
+    path('settings/', views.settings_view, name='settings'),
+]
+```
+
+---
+
+## Dashboard y Navegación
+
+### Dashboard Principal (index.html)
+
+El dashboard es la **página de entrada** del plugin y debe contener:
+
+1. **Estadísticas / KPIs** - Cards con métricas principales
+2. **Navegación interna** - Botones/enlaces a secciones del plugin
+3. **Resumen visual** - Vista general del estado actual
+
+**Ejemplo de estructura:**
+
+```django
+{% extends "core/app_base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="p-4">
+    <!-- 1. Page Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold">Dashboard del Plugin</h1>
+        <p class="text-sm mt-2">Descripción general</p>
+    </div>
+
+    <!-- 2. Stats Cards (KPIs) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <ion-card class="m-0">
+            <ion-card-content class="p-6">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                        <ion-icon name="cube-outline" class="text-2xl text-primary"></ion-icon>
+                    </div>
+                    <div>
+                        <div class="text-sm text-medium">Total Items</div>
+                        <div class="text-2xl font-semibold">{{ total_items }}</div>
+                    </div>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <!-- Más stats cards... -->
+    </div>
+
+    <!-- 3. Navegación Interna (Acciones Rápidas) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <ion-card class="m-0">
+            <ion-card-header>
+                <ion-card-title>Acciones Rápidas</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+                <div class="grid grid-cols-1 gap-3">
+                    <ion-button expand="block" href="/plugins/plugin_name/section1/">
+                        <ion-icon slot="start" name="list-outline"></ion-icon>
+                        Ver Sección 1
+                    </ion-button>
+                    <ion-button expand="block" href="/plugins/plugin_name/section2/" fill="outline">
+                        <ion-icon slot="start" name="albums-outline"></ion-icon>
+                        Gestionar Sección 2
+                    </ion-button>
+                    <ion-button expand="block" href="/plugins/plugin_name/reports/" fill="outline">
+                        <ion-icon slot="start" name="stats-chart-outline"></ion-icon>
+                        Informes
+                    </ion-button>
+                    <!-- Settings: OPCIONAL -->
+                    <ion-button expand="block" href="/plugins/plugin_name/settings/" fill="outline">
+                        <ion-icon slot="start" name="settings-outline"></ion-icon>
+                        Configuración
+                    </ion-button>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <!-- 4. Resumen/Preview -->
+        <ion-card class="m-0">
+            <ion-card-header>
+                <ion-card-title>Últimos Elementos</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+                <!-- Lista o tabla con últimos items -->
+            </ion-card-content>
+        </ion-card>
+    </div>
+</div>
+{% endblock %}
+```
+
+### Vista del Dashboard (views.py)
+
+```python
+from django.shortcuts import render
+from apps.accounts.decorators import login_required
+from apps.configuration.models import HubConfig, StoreConfig
+
+@login_required
+def dashboard(request):
+    """Dashboard principal del plugin con estadísticas y navegación"""
+
+    # Obtener configuración global del Hub
+    currency = HubConfig.get_value('currency', 'EUR')
+    language = HubConfig.get_value('os_language', 'en')
+
+    # Calcular estadísticas
+    total_items = Item.objects.filter(is_active=True).count()
+    active_items = Item.objects.filter(is_active=True, status='active').count()
+
+    context = {
+        'total_items': total_items,
+        'active_items': active_items,
+        'currency': currency,  # Opcional, ya disponible en templates
+    }
+
+    return render(request, 'plugin_name/index.html', context)
+```
+
+---
+
+## Configuración Global vs Local
+
+### Configuración Global del Hub (SIEMPRE usar)
+
+**Todos los plugins** deben usar la configuración global del Hub en lugar de duplicarla.
+
+#### En Python (views.py, models.py):
+
+```python
+from apps.configuration.models import HubConfig, StoreConfig
+
+def any_view(request):
+    # Obtener valores globales
+    currency = HubConfig.get_value('currency', 'EUR')
+    language = HubConfig.get_value('os_language', 'en')
+    dark_mode = HubConfig.get_value('dark_mode', False)
+
+    tax_rate = StoreConfig.get_value('tax_rate', 0.00)
+    tax_included = StoreConfig.get_value('tax_included', True)
+    business_name = StoreConfig.get_value('business_name', '')
+
+    # Usar en cálculos
+    if not tax_included:
+        price_with_tax = product.price * (1 + tax_rate/100)
+    else:
+        price_with_tax = product.price
+```
+
+#### En Templates (automático via context processor):
+
+```django
+<!-- Acceso directo a configuración global -->
+<p>Currency: {{ HUB_CONFIG.currency }}</p>
+<p>Language: {{ HUB_CONFIG.os_language }}</p>
+<p>Dark Mode: {{ HUB_CONFIG.dark_mode }}</p>
+
+<p>Business: {{ STORE_CONFIG.business_name }}</p>
+<p>Tax Rate: {{ STORE_CONFIG.tax_rate }}%</p>
+<p>Tax Included: {{ STORE_CONFIG.tax_included }}</p>
+
+<!-- Usar en Alpine.js -->
+<script>
+function productData() {
+    return {
+        currency: '{{ HUB_CONFIG.currency }}',
+        taxRate: {{ STORE_CONFIG.tax_rate }},
+        price: 100,
+
+        get formattedPrice() {
+            const symbols = {EUR: '€', USD: '$', GBP: '£'};
+            const symbol = symbols[this.currency] || this.currency;
+            return `${symbol}${this.price.toFixed(2)}`;
+        }
+    }
+}
+</script>
+```
+
+#### Configuraciones Globales Disponibles:
+
+**HubConfig:**
+- `currency` → 'EUR', 'USD', 'GBP', 'JPY', 'MXN', etc.
+- `os_language` → 'en', 'es'
+- `color_theme` → 'default', 'blue'
+- `dark_mode` → True/False
+- `auto_print` → True/False
+- `hub_id` → UUID del Hub
+- `cloud_api_token` → Token API Cloud
+
+**StoreConfig:**
+- `business_name` → Nombre del negocio
+- `business_address` → Dirección
+- `vat_number` → NIF/CIF/VAT ID
+- `phone`, `email`, `website`
+- `tax_rate` → Tasa de impuesto en % (ej: 21.00)
+- `tax_included` → Si los precios incluyen impuestos
+- `receipt_header`, `receipt_footer`
+
+### Configuración Local del Plugin (OPCIONAL)
+
+**Solo crear si el plugin necesita settings específicos** que no existen en HubConfig/StoreConfig.
+
+#### Modelo de Configuración (models.py):
+
+```python
+from django.db import models
+
+class PluginNameConfig(models.Model):
+    """
+    Configuración específica del plugin.
+    Singleton pattern (solo una instancia con id=1).
+    """
+    # Configuración específica del plugin
+    allow_some_feature = models.BooleanField(
+        default=False,
+        help_text='Enable/disable specific feature'
+    )
+
+    auto_generate_codes = models.BooleanField(
+        default=True,
+        help_text='Auto-generate codes for items'
+    )
+
+    alert_enabled = models.BooleanField(
+        default=True,
+        help_text='Show alerts for important events'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = 'plugin_name'
+        db_table = 'plugin_name_config'
+        verbose_name = 'Plugin Configuration'
+
+    def __str__(self):
+        return "Plugin Configuration"
+
+    @classmethod
+    def get_config(cls):
+        """Get or create config (singleton)"""
+        config, _ = cls.objects.get_or_create(id=1)
+        return config
+```
+
+#### Vista de Settings (views.py):
+
+```python
+import json
+from django.shortcuts import render
+from django.http import JsonResponse
+from apps.accounts.decorators import login_required
+from .models import PluginNameConfig
+
+@login_required
+def settings_view(request):
+    """Vista de configuración del plugin"""
+    config = PluginNameConfig.get_config()
+
+    if request.method == "POST":
+        try:
+            # Parse JSON body
+            data = json.loads(request.body)
+
+            # Update config
+            config.allow_some_feature = data.get('allow_some_feature', False)
+            config.alert_enabled = data.get('alert_enabled', True)
+            config.auto_generate_codes = data.get('auto_generate_codes', True)
+            config.save()
+
+            return JsonResponse({"success": True, "message": "Configuración guardada"})
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+    # GET: mostrar formulario
+    context = {
+        'config': config,
+        # HUB_CONFIG y STORE_CONFIG disponibles automáticamente
+    }
+    return render(request, 'plugin_name/settings.html', context)
+```
+
+#### Template de Settings (settings.html):
+
+```django
+{% extends "core/app_base.html" %}
+
+{% block content %}
+{% csrf_token %}
+<div x-data="settingsApp()" x-init="init()" class="p-4">
+    <ion-card class="m-4">
+        <ion-card-header class="p-0">
+            <ion-toolbar>
+                <ion-buttons slot="start">
+                    <ion-button href="/plugins/plugin_name/" fill="clear">
+                        <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+                    </ion-button>
+                </ion-buttons>
+                <ion-title>Configuración del Plugin</ion-title>
+            </ion-toolbar>
+        </ion-card-header>
+
+        <ion-card-content>
+            <!-- Configuración específica del plugin -->
+            <div class="mb-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <h3 class="font-semibold mb-1">Habilitar Feature</h3>
+                        <p class="text-sm" style="color: var(--ion-color-medium);">
+                            Descripción de la funcionalidad
+                        </p>
+                    </div>
+                    <ion-toggle
+                        x-ref="toggle_feature"
+                        :checked="settings.allow_some_feature"
+                        color="primary">
+                    </ion-toggle>
+                </div>
+            </div>
+
+            <div style="height: 1px; background: var(--ion-border-color); margin: 1.5rem 0;"></div>
+
+            <!-- Info sobre configuración global (read-only) -->
+            <div class="mt-6 p-4 rounded-lg" style="background: var(--ion-color-step-50);">
+                <div class="flex items-start gap-2">
+                    <ion-icon name="information-circle-outline" style="font-size: 20px;"></ion-icon>
+                    <div>
+                        <h4 class="font-semibold mb-2">Configuración Global del Hub</h4>
+                        <p class="text-sm">Moneda: {{ HUB_CONFIG.currency }}</p>
+                        <p class="text-sm">Impuestos: {{ STORE_CONFIG.tax_rate }}%</p>
+                        <p class="text-sm mt-2" style="color: var(--ion-color-medium);">
+                            Esta configuración se gestiona en Settings del Hub
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </ion-card-content>
+    </ion-card>
+</div>
+
+<script>
+function settingsApp() {
+    return {
+        settings: {
+            allow_some_feature: {{ config.allow_some_feature|lower }},
+            alert_enabled: {{ config.alert_enabled|lower }},
+            auto_generate_codes: {{ config.auto_generate_codes|lower }}
+        },
+
+        init() {
+            this.$nextTick(() => {
+                const toggle = this.$refs.toggle_feature;
+                if (toggle) {
+                    toggle.addEventListener('ionChange', (e) => {
+                        this.updateSetting('allow_some_feature', e.detail.checked);
+                    });
+                }
+            });
+        },
+
+        async updateSetting(key, value) {
+            this.settings[key] = value;
+
+            try {
+                const response = await fetch('{% url "plugin_name:settings" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify(this.settings)
+                });
+
+                if (response.ok) {
+                    this.showToast('Configuración guardada', 'success');
+                } else {
+                    throw new Error('Error al guardar');
+                }
+            } catch (error) {
+                this.showToast('Error al guardar la configuración', 'danger');
+                this.settings[key] = !value;  // Revert
+            }
+        },
+
+        async showToast(message, color = 'primary') {
+            const toast = document.createElement('ion-toast');
+            toast.message = message;
+            toast.duration = 2000;
+            toast.color = color;
+            toast.position = 'top';
+            document.body.appendChild(toast);
+            await toast.present();
+        }
+    }
+}
+</script>
+{% endblock %}
+```
+
+### ¿Cuándo Crear Settings Page?
+
+| Caso | Crear Settings? |
+|------|----------------|
+| Plugin solo lee/muestra datos | ❌ NO |
+| Plugin tiene funcionalidad fija sin config | ❌ NO |
+| Plugin usa solo config global (currency, tax) | ❌ NO |
+| Plugin necesita activar/desactivar features | ✅ SÍ |
+| Plugin tiene parámetros personalizables | ✅ SÍ |
+| Plugin necesita config adicional específica | ✅ SÍ |
+
+**Ejemplos:**
+- **Inventory**: ✅ Settings (allow_negative_stock, barcode_enabled)
+- **Reports**: ❌ NO settings (solo muestra datos)
+- **POS**: ✅ Settings (auto_print, default_payment_method)
+- **Customers**: ❌ NO settings (solo CRUD)
 
 ---
 
@@ -68,33 +601,19 @@ cd hub
 source .venv/bin/activate
 
 # Crear plugin desde template
-python manage.py create_plugin products --name "Products Manager" --author "Tu Nombre"
-
-# Resultado:
-# plugins/
-# └── products/
-#     ├── plugin.json
-#     ├── apps.py
-#     ├── models.py
-#     ├── views.py
-#     ├── urls.py
-#     ├── templates/
-#     ├── static/
-#     ├── migrations/
-#     ├── tests/
-#     └── README.md
+python manage.py create_plugin my_plugin --name "My Plugin" --author "Your Name"
 ```
 
 ### 2. Inicializar Git para el Plugin
 
 ```bash
-cd plugins/products
+cd plugins/my_plugin
 git init
 git add .
 git commit -m "Initial commit"
 
 # Opcional: crear repositorio remoto
-git remote add origin https://github.com/tu-usuario/cpos-plugin-products.git
+git remote add origin https://github.com/user/cpos-plugin-my-plugin.git
 git push -u origin main
 ```
 
@@ -104,16 +623,16 @@ git push -u origin main
 # Editar modelos, vistas, templates
 nano models.py
 nano views.py
-nano templates/products/index.html
+nano templates/my_plugin/index.html
 
 # Crear migraciones
-python manage.py makemigrations products
+python manage.py makemigrations my_plugin
 
 # Aplicar migraciones
-python manage.py migrate products
+python manage.py migrate my_plugin
 
 # Ejecutar tests
-pytest plugins/products/tests/
+pytest plugins/my_plugin/tests/
 ```
 
 ### 4. Probar en el Hub
@@ -123,283 +642,7 @@ pytest plugins/products/tests/
 python manage.py runserver 8001
 
 # Acceder al plugin
-# http://localhost:8001/products/
-```
-
----
-
-## Estructura de un Plugin
-
-### Estructura Completa
-
-```
-products/
-├── plugin.json              # ⚠️ REQUERIDO - Metadata del plugin
-├── __init__.py              # ⚠️ REQUERIDO - Package init
-├── apps.py                  # ⚠️ REQUERIDO - Django app config
-├── models.py                # Modelos de datos
-├── views.py                 # Vistas
-├── urls.py                  # URLs
-├── admin.py                 # Django admin (opcional)
-├── forms.py                 # Formularios (opcional)
-├── signals.py               # Signals (opcional)
-├── utils.py                 # Utilidades (opcional)
-│
-├── templates/
-│   └── products/            # ⚠️ Debe coincidir con plugin_id
-│       ├── index.html
-│       ├── list.html
-│       └── detail.html
-│
-├── static/
-│   └── products/            # ⚠️ Debe coincidir con plugin_id
-│       ├── css/
-│       │   └── products.css
-│       ├── js/
-│       │   └── products.js
-│       └── img/
-│           └── icon.png
-│
-├── migrations/
-│   └── __init__.py
-│
-├── management/
-│   └── commands/
-│       └── __init__.py
-│
-├── tests/
-│   ├── __init__.py
-│   ├── test_models.py
-│   ├── test_views.py
-│   └── test_basic.py
-│
-├── README.md                # Documentación del plugin
-├── LICENSE                  # Licencia
-└── .gitignore              # Git ignore
-```
-
-### plugin.json - Formato Completo
-
-```json
-{
-  "plugin_id": "products",
-  "name": "Products Manager",
-  "version": "1.0.0",
-  "description": "Gestión de productos e inventario para CPOS Hub",
-  "author": "CPOS Team",
-  "author_email": "plugins@erplora.com",
-  "license": "BUSL-1.1",
-  "homepage": "https://github.com/cpos/cpos-plugin-products",
-
-  "dependencies": {
-    "python": [
-      "Pillow>=10.0.0",
-      "openpyxl>=3.1.0",
-      "qrcode>=7.4.0"
-    ],
-    "plugins": [
-      "cpos-plugin-shared>=1.0.0"
-    ]
-  },
-
-  "compatibility": {
-    "min_cpos_version": "1.0.0",
-    "max_cpos_version": "2.0.0"
-  },
-
-  "permissions": {
-    "database": true,
-    "filesystem": false,
-    "network": false,
-    "hardware": false
-  },
-
-  "menu": {
-    "label": "Products",
-    "icon": "cube-outline",
-    "url": "/products/",
-    "order": 100,
-    "show": true
-  }
-}
-```
-
-### models.py - Ejemplo con Prefijos
-
-```python
-"""
-Modelos del plugin Products Manager
-
-⚠️ IMPORTANTE: Usa prefijos en db_table para evitar conflictos
-"""
-
-from django.db import models
-from django.conf import settings
-
-
-class Product(models.Model):
-    """Modelo de producto"""
-    name = models.CharField(max_length=255)
-    sku = models.CharField(max_length=100, unique=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    stock = models.IntegerField(default=0)
-
-    # Media: usar PLUGIN_MEDIA_ROOT
-    image = models.ImageField(upload_to='plugins/products/images/', blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True
-    )
-
-    class Meta:
-        db_table = 'products_product'  # ⚠️ Prefijo para evitar conflictos
-        ordering = ['-created_at']
-        verbose_name = 'Product'
-        verbose_name_plural = 'Products'
-
-    def __str__(self):
-        return f"{self.sku} - {self.name}"
-
-    def save_barcode(self):
-        """Ejemplo: guardar datos en PLUGIN_DATA_ROOT"""
-        from pathlib import Path
-        from django.conf import settings
-
-        data_dir = Path(settings.PLUGIN_DATA_ROOT) / 'products' / 'barcodes'
-        data_dir.mkdir(parents=True, exist_ok=True)
-
-        barcode_file = data_dir / f"{self.sku}.txt"
-        barcode_file.write_text(self.sku)
-```
-
-### views.py - Ejemplo con Ionic + Alpine.js
-
-```python
-"""
-Vistas del plugin Products Manager
-"""
-
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
-from apps.accounts.decorators import login_required  # ✅ Usar decorador del Hub
-from .models import Product
-
-
-@login_required
-def index(request):
-    """Vista principal del plugin"""
-    products = Product.objects.all()[:10]
-
-    context = {
-        'plugin_name': 'Products Manager',
-        'products': products,
-    }
-    return render(request, 'products/index.html', context)
-
-
-@login_required
-def product_list_api(request):
-    """API para listado de productos (HTMX/Alpine.js)"""
-    products = Product.objects.all()
-
-    data = {
-        'products': [
-            {
-                'id': p.id,
-                'name': p.name,
-                'sku': p.sku,
-                'price': str(p.price),
-                'stock': p.stock,
-            }
-            for p in products
-        ]
-    }
-    return JsonResponse(data)
-```
-
-### templates/products/index.html - Ejemplo
-
-```html
-{% extends "core/app_base.html" %}
-{% load static %}
-
-{% block content %}
-<ion-content>
-    <div class="ion-padding" x-data="productsData()">
-
-        <!-- Header Card -->
-        <ion-card>
-            <ion-card-header>
-                <ion-card-title>Products Manager</ion-card-title>
-                <ion-card-subtitle>Gestión de productos e inventario</ion-card-subtitle>
-            </ion-card-header>
-        </ion-card>
-
-        <!-- Product List -->
-        <ion-card>
-            <ion-card-header>
-                <ion-card-title>Products</ion-card-title>
-            </ion-card-header>
-            <ion-card-content>
-
-                <!-- Search -->
-                <ion-searchbar
-                    x-model="search"
-                    placeholder="Buscar producto..."
-                    @input="filterProducts()">
-                </ion-searchbar>
-
-                <!-- List -->
-                <ion-list>
-                    <template x-for="product in filteredProducts" :key="product.id">
-                        <ion-item>
-                            <ion-label>
-                                <h2 x-text="product.name"></h2>
-                                <p x-text="'SKU: ' + product.sku"></p>
-                            </ion-label>
-                            <ion-note slot="end" x-text="'$' + product.price"></ion-note>
-                        </ion-item>
-                    </template>
-                </ion-list>
-
-            </ion-card-content>
-        </ion-card>
-
-    </div>
-</ion-content>
-{% endblock %}
-
-{% block scripts %}
-<script>
-function productsData() {
-    return {
-        products: {{ products|safe }},
-        filteredProducts: [],
-        search: '',
-
-        filterProducts() {
-            if (!this.search) {
-                this.filteredProducts = this.products;
-                return;
-            }
-
-            const term = this.search.toLowerCase();
-            this.filteredProducts = this.products.filter(p =>
-                p.name.toLowerCase().includes(term) ||
-                p.sku.toLowerCase().includes(term)
-            );
-        },
-
-        init() {
-            this.filteredProducts = this.products;
-        }
-    }
-}
-</script>
-{% endblock %}
+# http://localhost:8001/plugins/my_plugin/
 ```
 
 ---
@@ -417,15 +660,9 @@ python manage.py create_plugin <plugin_id> [options]
 #   --description "Desc"      # Descripción corta
 
 # Ejemplos:
-python manage.py create_plugin products --name "Products Manager"
-python manage.py create_plugin restaurant-pos --name "Restaurant POS" --author "John Doe"
+python manage.py create_plugin inventory --name "Inventory Manager"
+python manage.py create_plugin pos --name "Point of Sale" --author "Your Name"
 ```
-
-**Resultado:**
-- Crea estructura completa del plugin
-- Genera archivos base (models, views, urls, templates)
-- Crea tests básicos
-- Genera README.md y .gitignore
 
 ### validate_plugin - Validar Plugin
 
@@ -436,18 +673,9 @@ python manage.py validate_plugin <plugin_id> [options]
 #   --strict    # Modo estricto (falla en warnings)
 
 # Ejemplos:
-python manage.py validate_plugin products
-python manage.py validate_plugin products --strict
+python manage.py validate_plugin inventory
+python manage.py validate_plugin inventory --strict
 ```
-
-**Validaciones:**
-- ✓ Estructura de archivos requerida
-- ✓ plugin.json válido y completo
-- ✓ Dependencias en whitelist
-- ✓ Sin conflictos de base de datos
-- ✓ Sintaxis Python correcta
-- ✓ Tests ejecutables
-- ✓ Templates válidos
 
 ### sign_plugin - Firmar Plugin
 
@@ -455,23 +683,13 @@ python manage.py validate_plugin products --strict
 python manage.py sign_plugin <plugin_id> [options]
 
 # Opciones:
-#   --key-file path/to/key.pem    # Clave privada RSA (genera una si no existe)
+#   --key-file path/to/key.pem    # Clave privada RSA
 #   --force                        # Re-firmar aunque ya tenga firma
 
 # Ejemplos:
-python manage.py sign_plugin products
-python manage.py sign_plugin products --key-file ~/.cpos-dev/signing-key.pem
+python manage.py sign_plugin inventory
+python manage.py sign_plugin inventory --force
 ```
-
-**Proceso:**
-1. Carga o genera clave RSA-4096
-2. Calcula hash SHA256 del plugin
-3. Firma con RSA-SHA256
-4. Guarda `.signature` con clave pública
-
-**⚠️ IMPORTANTE:**
-- Clave privada: `~/.cpos-dev/signing-key.pem` (NO incluir en repo)
-- Clave pública: incluida en `.signature` (SÍ incluir)
 
 ### package_plugin - Empaquetar Plugin
 
@@ -479,65 +697,47 @@ python manage.py sign_plugin products --key-file ~/.cpos-dev/signing-key.pem
 python manage.py package_plugin <plugin_id> [options]
 
 # Opciones:
-#   --output-dir path/      # Directorio de salida (default: ~/Downloads/)
+#   --output-dir path/      # Directorio de salida
 #   --skip-validation       # Omitir validación
 
 # Ejemplos:
-python manage.py package_plugin products
-python manage.py package_plugin products --output-dir ~/Desktop/
+python manage.py package_plugin inventory
+python manage.py package_plugin inventory --output-dir ~/Desktop/
 ```
-
-**Resultado:**
-- Valida plugin automáticamente
-- Crea ZIP: `<plugin_id>-<version>.zip`
-- Incluye `.signature` si existe
-- Excluye archivos de desarrollo
 
 ---
 
 ## Dependencias Permitidas
 
-Los plugins pueden usar **25 librerías Python pre-empaquetadas** en la app:
+Los plugins pueden usar **25 librerías Python pre-empaquetadas**:
 
 ### Críticas (13)
-- `Pillow` - Imágenes (productos, categorías)
-- `qrcode` - QR codes (mesas, productos, pagos)
-- `python-barcode` - Códigos de barras (EAN, UPC)
-- `openpyxl` - Excel (import/export)
-- `reportlab` - PDFs (tickets, facturas)
-- `python-escpos` - Impresoras térmicas
-- `lxml` - XML (facturación electrónica)
-- `xmltodict` - XML parsing
-- `signxml` - Firmas digitales XML
-- `cryptography` - Cifrado, certificados
-- `zeep` - SOAP (APIs Hacienda/SAT/AFIP)
-- `requests` - HTTP requests
-- `websockets` - WebSocket
+- `Pillow>=10.0.0` - Imágenes
+- `qrcode>=7.4.0` - QR codes
+- `python-barcode>=0.15.0` - Códigos de barras
+- `openpyxl>=3.1.0` - Excel
+- `reportlab>=4.0.0` - PDFs
+- `python-escpos>=3.0` - Impresoras térmicas
+- `lxml>=5.0.0` - XML
+- `xmltodict>=0.13.0` - XML parsing
+- `signxml>=3.2.0` - Firmas digitales XML
+- `cryptography>=42.0.0` - Cifrado
+- `zeep>=4.2.0` - SOAP
+- `requests>=2.31.0` - HTTP requests
+- `websockets>=12.0` - WebSocket
 
 ### Importantes (10)
-- `python-dateutil`, `pytz`, `phonenumbers` - Fechas & localización
-- `stripe` - Pagos
-- `pandas`, `numpy` - Análisis de datos
-- `pyserial` - Hardware (básculas, cajones)
-- `email-validator`, `python-slugify`, `pydantic` - Utils
+- `python-dateutil>=2.8.2`, `pytz>=2024.1`, `phonenumbers>=8.13.0`
+- `stripe>=7.0.0` - Pagos
+- `pandas>=2.1.0`, `numpy>=1.26.0` - Análisis
+- `pyserial>=3.5` - Hardware
+- `email-validator>=2.1.0`, `python-slugify>=8.0.0`, `pydantic>=2.5.0`
 
 ### Útiles (2)
-- `beautifulsoup4` - HTML parsing
-- `PyPDF2` - PDF manipulación
+- `beautifulsoup4>=4.12.0` - HTML parsing
+- `PyPDF2>=3.0.0` - PDF manipulación
 
-**Uso en plugin.json:**
-
-```json
-{
-  "dependencies": {
-    "python": [
-      "Pillow>=10.0.0",
-      "qrcode>=7.4.0",
-      "openpyxl>=3.1.0"
-    ]
-  }
-}
-```
+**Ver lista completa:** `hub/config/plugin_allowed_deps.py`
 
 ---
 
@@ -545,10 +745,7 @@ Los plugins pueden usar **25 librerías Python pre-empaquetadas** en la app:
 
 ### ⚠️ REGLA IMPORTANTE
 
-**NO guardar datos dentro del directorio del plugin** porque:
-- Los plugins se actualizan reemplazando el directorio completo
-- Los datos se perderían en cada actualización
-- El directorio del plugin es solo para código
+**NO guardar datos dentro del directorio del plugin**. Los plugins se actualizan reemplazando el directorio completo.
 
 ### ✅ Ubicaciones Correctas
 
@@ -557,26 +754,21 @@ from django.conf import settings
 from pathlib import Path
 
 # 1. Base de datos SQLite (mejor opción)
-# Django ORM maneja migraciones automáticamente
-class Product(models.Model):
+class Item(models.Model):
     name = models.CharField(max_length=255)
     # Los datos se guardan en ~/.cpos-hub/db/db.sqlite3
 
 # 2. Archivos de datos (config, cache, exports)
-data_dir = Path(settings.PLUGIN_DATA_ROOT) / 'mi-plugin'
+data_dir = Path(settings.PLUGIN_DATA_ROOT) / 'my_plugin'
 data_dir.mkdir(parents=True, exist_ok=True)
 
 config_file = data_dir / 'config.json'
 config_file.write_text(json.dumps({'setting': 'value'}))
 
 # 3. Media files (imágenes, uploads)
-media_dir = Path(settings.PLUGIN_MEDIA_ROOT) / 'mi-plugin'
-media_dir.mkdir(parents=True, exist_ok=True)
-
-# O usar Django ImageField/FileField
-class Product(models.Model):
-    image = models.ImageField(upload_to='plugins/mi-plugin/images/')
-    # Se guarda en ~/.cpos-hub/media/plugins/mi-plugin/images/
+class Item(models.Model):
+    image = models.ImageField(upload_to='plugins/my_plugin/images/')
+    # Se guarda en ~/.cpos-hub/media/plugins/my_plugin/images/
 ```
 
 ### Ubicaciones por Plataforma
@@ -587,29 +779,6 @@ class Product(models.Model):
 | macOS | `~/Library/Application Support/CPOSHub/` |
 | Linux | `~/.cpos-hub/` |
 
-**Estructura completa:**
-
-```
-~/.cpos-hub/  (o equivalente)
-├── db/
-│   └── db.sqlite3                    # Base de datos SQLite
-├── plugins/
-│   ├── data/
-│   │   └── mi-plugin/               # Datos del plugin
-│   │       ├── config.json
-│   │       ├── cache/
-│   │       └── exports/
-│   └── installed/
-│       └── mi-plugin/               # Código del plugin instalado
-├── media/
-│   └── plugins/
-│       └── mi-plugin/               # Media del plugin
-│           └── images/
-├── reports/
-├── logs/
-└── backups/
-```
-
 ---
 
 ## Firma Digital y Distribución
@@ -617,73 +786,24 @@ class Product(models.Model):
 ### 1. Desarrollo Local (Sin Firma)
 
 ```bash
-# Crear y probar plugin
-python manage.py create_plugin products
-python manage.py validate_plugin products
-
-# Probar localmente
+python manage.py create_plugin my_plugin
+python manage.py validate_plugin my_plugin
 python manage.py runserver 8001
 ```
 
 ### 2. Preparar para Distribución
 
 ```bash
-# Validar en modo estricto
-python manage.py validate_plugin products --strict
-
-# Firmar (genera clave si no existe)
-python manage.py sign_plugin products
-
-# Empaquetar
-python manage.py package_plugin products
+python manage.py validate_plugin my_plugin --strict
+python manage.py sign_plugin my_plugin
+python manage.py package_plugin my_plugin
 ```
-
-**Resultado:**
-- `~/Downloads/products-1.0.0.zip` - Listo para distribución
-- Incluye `.signature` con clave pública
 
 ### 3. Distribución
 
-**Opción 1: Cloud (Privado/Pago)**
-
-```bash
-# 1. Subir a https://erplora.com
-# 2. Dashboard → Plugins → Mis Plugins → Subir
-# 3. Configurar precio y visibilidad
-```
-
-**Opción 2: GitHub Release (Público)**
-
-```bash
-cd plugins/products
-git tag v1.0.0
-git push origin v1.0.0
-
-# Crear GitHub Release
-# Adjuntar products-1.0.0.zip
-```
-
-**Opción 3: Distribución Directa**
-
-```bash
-# Compartir ZIP directamente
-# Usuarios instalan desde Hub con URL del ZIP
-```
-
-### 4. Actualización
-
-```bash
-# Incrementar versión en plugin.json
-# "version": "1.0.0" → "1.1.0"
-
-# Crear migraciones si hay cambios en modelos
-python manage.py makemigrations products
-
-# Re-validar, firmar y empaquetar
-python manage.py validate_plugin products --strict
-python manage.py sign_plugin products --force
-python manage.py package_plugin products
-```
+- **Cloud**: Subir a marketplace de ERPlora
+- **GitHub Release**: Publicar como release
+- **Directo**: Compartir ZIP
 
 ---
 
@@ -692,165 +812,47 @@ python manage.py package_plugin products
 ### 1. Nombres de Tabla
 
 ```python
-# ❌ MAL - Sin prefijo
-class Product(models.Model):
-    class Meta:
-        db_table = 'product'  # Conflicto con otros plugins
-
 # ✅ BIEN - Con prefijo del plugin
-class Product(models.Model):
+class Item(models.Model):
     class Meta:
-        db_table = 'products_product'  # Único
+        db_table = 'my_plugin_item'
+
+# ❌ MAL - Sin prefijo
+class Item(models.Model):
+    class Meta:
+        db_table = 'item'  # Conflicto
 ```
 
-### 2. Dependencias
+### 2. Configuración Global
 
 ```python
-# ❌ MAL - Dependencia no permitida
-{
-  "dependencies": {
-    "python": ["tensorflow>=2.0.0"]  # NO está en whitelist
-  }
-}
+# ✅ BIEN - Usar config global
+currency = HubConfig.get_value('currency', 'EUR')
 
-# ✅ BIEN - Solo dependencias permitidas
-{
-  "dependencies": {
-    "python": [
-      "Pillow>=10.0.0",
-      "qrcode>=7.4.0"
-    ]
-  }
-}
+# ❌ MAL - Duplicar config global
+class MyPluginConfig(models.Model):
+    currency = models.CharField(...)  # NO!
 ```
 
-### 3. Persistencia
+### 3. Dashboard
+
+```django
+<!-- ✅ BIEN - Dashboard con navegación interna -->
+<ion-card>
+    <ion-card-header>Acciones Rápidas</ion-card-header>
+    <ion-card-content>
+        <ion-button href="/plugins/my_plugin/items/">Items</ion-button>
+        <ion-button href="/plugins/my_plugin/reports/">Reports</ion-button>
+        <ion-button href="/plugins/my_plugin/settings/">Settings</ion-button>
+    </ion-card-content>
+</ion-card>
+```
+
+### 4. Settings Page
 
 ```python
-# ❌ MAL - Guardar en directorio del plugin
-plugin_dir = Path(__file__).parent
-config_file = plugin_dir / 'config.json'  # Se pierde en update
-
-# ✅ BIEN - Usar PLUGIN_DATA_ROOT
-from django.conf import settings
-data_dir = settings.PLUGIN_DATA_ROOT / 'mi-plugin'
-config_file = data_dir / 'config.json'  # Persiste en updates
-```
-
-### 4. Media Files
-
-```python
-# ❌ MAL - Guardar en static/
-image_path = 'static/mi-plugin/uploads/image.jpg'
-
-# ✅ BIEN - Usar ImageField con upload_to
-class Product(models.Model):
-    image = models.ImageField(upload_to='plugins/mi-plugin/images/')
-```
-
-### 5. Testing
-
-```python
-# tests/test_models.py
-import pytest
-from django.test import TestCase
-from ..models import Product
-
-
-class ProductTestCase(TestCase):
-    """Tests del modelo Product"""
-
-    def test_create_product(self):
-        """Verifica que se puede crear un producto"""
-        product = Product.objects.create(
-            name='Test Product',
-            sku='TEST-001',
-            price=10.00
-        )
-        self.assertEqual(product.name, 'Test Product')
-        self.assertEqual(str(product), 'TEST-001 - Test Product')
-```
-
-### 6. Versioning
-
-```json
-{
-  "version": "1.2.3"
-}
-```
-
-**Semantic Versioning:**
-- `MAJOR.MINOR.PATCH`
-- `1.0.0` → Primera versión estable
-- `1.0.1` → Bug fix
-- `1.1.0` → Nueva funcionalidad (compatible)
-- `2.0.0` → Breaking change
-
----
-
-## Ejemplos de Plugins
-
-### Plugin Mínimo (Hello World)
-
-```bash
-python manage.py create_plugin hello --name "Hello World"
-```
-
-**Estructura creada:**
-- `plugin.json` - Metadata
-- `views.py` - Vista básica
-- `templates/hello/index.html` - Template
-- Tests básicos
-
-### Plugin con Modelos (Products)
-
-```bash
-python manage.py create_plugin products --name "Products Manager"
-
-# Editar models.py
-# Crear migraciones
-python manage.py makemigrations products
-python manage.py migrate products
-```
-
-### Plugin con API (Restaurant POS)
-
-```bash
-python manage.py create_plugin restaurant --name "Restaurant POS"
-
-# Agregar views API
-# Agregar templates con HTMX/Alpine.js
-# Agregar static files (CSS/JS)
-```
-
----
-
-## Troubleshooting
-
-### Error: "Dependencia no permitida"
-
-```bash
-# Verifica que la dependencia esté en whitelist
-python manage.py validate_plugin mi-plugin
-
-# Ver lista completa de dependencias permitidas
-grep -A 30 "PLUGIN_ALLOWED_DEPENDENCIES" config/settings.py
-```
-
-### Error: "Conflicto de tabla"
-
-```python
-# Asegúrate de usar prefijo en db_table
-class Meta:
-    db_table = 'mi_plugin_tabla'  # Con prefijo
-```
-
-### Error: "Plugin sin firma"
-
-```bash
-# Firmar plugin antes de empaquetar
-python manage.py sign_plugin mi-plugin
-python manage.py package_plugin mi-plugin
+# ✅ Solo crear si el plugin necesita config específica
+# ❌ NO crear si solo usa config global
 ```
 
 ---
@@ -864,14 +866,4 @@ python manage.py package_plugin mi-plugin
 
 ---
 
-## Soporte
-
-¿Problemas o dudas?
-
-- GitHub Issues: https://github.com/cpos/cpos-hub/issues
-- Email: plugins@erplora.com
-- Docs: https://docs.erplora.com/plugins/
-
----
-
-**Última actualización:** 2025-01-10
+**Última actualización:** 2025-01-23
