@@ -9,21 +9,56 @@ from django.utils.functional import SimpleLazyObject
 from apps.accounts.models import LocalUser
 
 
+class AnonymousUser:
+    """
+    Anonymous user for unauthenticated requests.
+    Compatible with Django's authentication system.
+    """
+    id = None
+    pk = None
+    username = ''
+    is_staff = False
+    is_active = False
+    is_superuser = False
+    is_authenticated = False
+
+    def __str__(self):
+        return 'AnonymousUser'
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__)
+
+    def __hash__(self):
+        return 1
+
+    def save(self):
+        raise NotImplementedError("Django doesn't provide a DB representation for AnonymousUser.")
+
+    def delete(self):
+        raise NotImplementedError("Django doesn't provide a DB representation for AnonymousUser.")
+
+    def set_password(self, raw_password):
+        raise NotImplementedError("Django doesn't provide a DB representation for AnonymousUser.")
+
+    def check_password(self, raw_password):
+        raise NotImplementedError("Django doesn't provide a DB representation for AnonymousUser.")
+
+
 def get_user(request):
     """
     Get LocalUser from session.
-    Returns LocalUser instance if authenticated, None otherwise.
+    Returns LocalUser instance if authenticated, AnonymousUser otherwise.
     """
     local_user_id = request.session.get('local_user_id')
     if not local_user_id:
-        return None
+        return AnonymousUser()
 
     try:
         return LocalUser.objects.get(id=local_user_id, is_active=True)
     except LocalUser.DoesNotExist:
         # User was deleted or deactivated, clear session
         request.session.flush()
-        return None
+        return AnonymousUser()
 
 
 class LocalUserAuthenticationMiddleware:

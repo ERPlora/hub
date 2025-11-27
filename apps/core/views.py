@@ -813,3 +813,40 @@ def api_plugins_list(request):
 
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+# Health check endpoint for Docker
+@require_http_methods(["GET"])
+def health_check(request):
+    """
+    Health check endpoint for Docker healthcheck and monitoring.
+
+    Verifies:
+    - Django is running
+    - Database is accessible
+    - Returns version and status
+
+    Returns:
+        JsonResponse with status 200 if healthy, 500 if unhealthy
+    """
+    try:
+        # Verificar conexión a base de datos
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+
+        # Obtener versión del Hub
+        import config.settings as settings
+        version = getattr(settings, 'HUB_VERSION', 'unknown')
+
+        return JsonResponse({
+            'status': 'ok',
+            'database': 'ok',
+            'version': version,
+        }, status=200)
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'error': str(e),
+        }, status=500)
