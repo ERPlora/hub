@@ -1,5 +1,5 @@
 from django.utils import translation
-from ..models import HubConfig
+from apps.configuration.models import HubConfig
 from ..utils import detect_os_language
 
 

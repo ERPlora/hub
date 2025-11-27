@@ -1,27 +1,86 @@
 r"""
-Path Management for CPOS Hub
+Path Management for ERPlora Hub
 
-Maneja las rutas de datos de usuario según la plataforma (Windows, macOS, Linux).
+Maneja las rutas de datos de usuario según el ENTORNO (Docker vs Desktop) y PLATAFORMA.
 Todos los datos persisten fuera de la aplicación para permitir actualizaciones limpias.
 
-Estructura de directorios:
-    Windows:  C:\Users\<usuario>\AppData\Local\ERPloraHub\
-    macOS:    /Users/<usuario>/Library/Application Support/ERPloraHub/
-    Linux:    /home/<usuario>/.cpos-hub/
+DETECCIÓN DE ENTORNO:
+    1. Variable DEPLOYMENT_MODE='web' → Docker
+    2. Archivo /.dockerenv existe → Docker
+    3. /proc/1/cgroup contiene 'docker' → Docker
+    4. De lo contrario → Desktop
 
-Subdirectorios:
+PATHS POR ENTORNO:
+
+    DOCKER (Cloud Hub):
+        Base:     /app/
+        DB:       /app/db/db.sqlite3
+        Media:    /app/media/
+        Plugins:  /app/plugins/
+        Logs:     /app/logs/
+        Backups:  /app/backups/
+
+        IMPORTANTE: Estos directorios se montan como volúmenes Docker persistentes
+                    para que los datos sobrevivan recreaciones del contenedor.
+
+    DESKTOP (PyInstaller):
+        Windows:
+            Base:     C:\Users\<usuario>\AppData\Local\ERPloraHub\
+            DB:       C:\Users\<usuario>\AppData\Local\ERPloraHub\db\db.sqlite3
+            Media:    C:\Users\<usuario>\AppData\Local\ERPloraHub\media\
+
+        macOS:
+            Base:     /Users/<usuario>/Library/Application Support/ERPloraHub/
+            DB:       /Users/<usuario>/Library/Application Support/ERPloraHub/db/db.sqlite3
+            Media:    /Users/<usuario>/Library/Application Support/ERPloraHub/media/
+
+        Linux:
+            Base:     /home/<usuario>/.cpos-hub/
+            DB:       /home/<usuario>/.cpos-hub/db/db.sqlite3
+            Media:    /home/<usuario>/.cpos-hub/media/
+
+Subdirectorios (comunes a todos los entornos):
     - db/              Base de datos SQLite
-    - media/           Archivos subidos (imágenes, etc.)
+    - media/           Archivos subidos (imágenes, logos, etc.)
     - plugins/         Plugins instalados y sus datos
     - reports/         Reportes generados (PDF, Excel)
     - logs/            Logs de la aplicación
     - backups/         Backups automáticos de la DB
+    - temp/            Archivos temporales
 """
 
 import os
 import sys
 from pathlib import Path
 from typing import Dict
+from decouple import config
+
+
+def is_docker_environment() -> bool:
+    """
+    Detecta si estamos corriendo en un contenedor Docker.
+
+    Returns:
+        bool: True si estamos en Docker, False si no
+    """
+    # Método 1: Variable de entorno DEPLOYMENT_MODE
+    deployment_mode = config('DEPLOYMENT_MODE', default='local')
+    if deployment_mode == 'web':
+        return True
+
+    # Método 2: Verificar archivo /.dockerenv
+    if os.path.exists('/.dockerenv'):
+        return True
+
+    # Método 3: Verificar cgroup (Linux containers)
+    try:
+        with open('/proc/1/cgroup', 'r') as f:
+            if 'docker' in f.read():
+                return True
+    except Exception:
+        pass
+
+    return False
 
 
 class DataPaths:
@@ -39,14 +98,26 @@ class DataPaths:
 
     @property
     def base_dir(self) -> Path:
-        # Directorio base de datos de usuario según la plataforma
-        # Returns Path: Directorio base
-        #   - Windows: C:\Users\<user>\AppData\Local\ERPloraHub
-        #   - macOS: /Users/<user>/Library/Application Support/ERPloraHub
-        #   - Linux: /home/<user>/.cpos-hub
+        r"""
+        Directorio base de datos de usuario según el entorno.
+
+        Returns:
+            Path: Directorio base
+              DOCKER (Cloud Hub):
+                - /app (root del contenedor, montado como volumen)
+              DESKTOP (PyInstaller):
+                - Windows: C:\Users\<user>\AppData\Local\ERPloraHub
+                - macOS: /Users/<user>/Library/Application Support/ERPloraHub
+                - Linux: /home/<user>/.cpos-hub
+        """
         if self._base_dir is None:
-            if self.platform == "win32":
-                # Windows: AppData\Local
+            # Detectar si estamos en Docker
+            if is_docker_environment():
+                # Docker: Usar /app como base (montado como volumen persistente)
+                self._base_dir = Path("/app")
+
+            elif self.platform == "win32":
+                # Windows Desktop: AppData\Local
                 local_appdata = os.getenv("LOCALAPPDATA")
                 if not local_appdata:
                     # Fallback si LOCALAPPDATA no existe
@@ -54,11 +125,11 @@ class DataPaths:
                 self._base_dir = Path(local_appdata) / self.APP_NAME
 
             elif self.platform == "darwin":
-                # macOS: Library/Application Support
+                # macOS Desktop: Library/Application Support
                 self._base_dir = Path.home() / "Library" / "Application Support" / self.APP_NAME
 
             else:
-                # Linux: directorio oculto en home
+                # Linux Desktop: directorio oculto en home
                 self._base_dir = Path.home() / self.APP_NAME_HIDDEN
 
         return self._base_dir
@@ -243,10 +314,37 @@ def get_backups_dir() -> Path:
 
 if __name__ == "__main__":
     # Test y debugging
+    print("=" * 70)
+    print("ERPlora Hub - Path Configuration")
+    print("=" * 70)
+
+    # Detectar entorno
+    is_docker = is_docker_environment()
+    deployment_mode = config('DEPLOYMENT_MODE', default='local')
+
+    print(f"\nEnvironment Detection:")
+    print(f"  DEPLOYMENT_MODE:     {deployment_mode}")
+    print(f"  Is Docker:           {is_docker}")
+    print(f"  Platform:            {sys.platform}")
+
+    # Mostrar paths
     paths = get_data_paths()
-    print(f"Platform: {paths.platform}")
-    print(f"\nBase directory: {paths.base_dir}")
+    print(f"\nBase directory:        {paths.base_dir}")
+
     print(f"\nAll paths:")
     for name, path in paths.get_all_paths().items():
-        exists = "[OK]" if path.exists() else "[MISSING]"
-        print(f"  {exists} {name:15} -> {path}")
+        exists = "✓ EXISTS" if path.exists() else "✗ MISSING"
+        print(f"  {exists:12} {name:15} -> {path}")
+
+    print("\n" + "=" * 70)
+    print("NOTES:")
+    if is_docker:
+        print("  Running in DOCKER - using /app as base")
+        print("  Ensure volumes are mounted:")
+        print("    -v hub_db:/app/db")
+        print("    -v hub_media:/app/media")
+        print("    -v hub_plugins:/app/plugins")
+    else:
+        print("  Running on DESKTOP - using OS-specific user directory")
+        print(f"  Data will persist in: {paths.base_dir}")
+    print("=" * 70)
