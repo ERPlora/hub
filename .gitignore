@@ -225,3 +225,10 @@ plugins/*/
 !plugins/PLUGIN_DEVELOPMENT.md
 !plugins/PLUGIN_API.md
 !plugins/.template/
+
+# ==============================================================================
+# CACHE AND BACKUP FILES
+# ==============================================================================
+cache/
+*.bak
+*.backup
