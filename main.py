@@ -11,6 +11,7 @@ import threading
 import time
 import sys
 import os
+import argparse
 from pathlib import Path
 import webview
 
@@ -21,10 +22,23 @@ class WindowAPI:
     def __init__(self):
         self.window = None
         self._is_fullscreen = False
+        self._print_service = None
 
     def set_window(self, window):
         """Establecer referencia a la ventana después de crearla"""
         self.window = window
+
+    def _get_print_service(self):
+        """Obtiene la instancia del servicio de impresión (lazy loading)"""
+        if self._print_service is None:
+            try:
+                # Importar el servicio de impresión del plugin
+                from plugins.printers.print_service import print_service
+                self._print_service = print_service
+            except ImportError as e:
+                print(f"[WARNING] Print service not available: {e}")
+                return None
+        return self._print_service
 
     def toggle_fullscreen(self):
         """Toggle entre fullscreen y normal"""
@@ -70,6 +84,142 @@ class WindowAPI:
             return {'restored': True}
         except Exception as e:
             return {'error': str(e)}
+
+    # =========================================================================
+    # PRINT SERVICE METHODS
+    # =========================================================================
+
+    def print_receipt(self, receipt_data):
+        """
+        Imprime un recibo usando el servicio de impresión.
+
+        Args:
+            receipt_data (dict): Datos del recibo (ver print_service.py para formato)
+
+        Returns:
+            dict: {'success': bool, 'message': str}
+        """
+        print_service = self._get_print_service()
+        if not print_service:
+            return {
+                'success': False,
+                'message': 'Print service not available. Make sure printers plugin is installed.'
+            }
+
+        try:
+            return print_service.print_receipt(receipt_data)
+        except Exception as e:
+            print(f"[ERROR] print_receipt failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'success': False,
+                'message': f'Error: {str(e)}'
+            }
+
+    def get_system_printers(self):
+        """
+        Obtiene lista de impresoras del sistema.
+
+        Returns:
+            list: Lista de diccionarios con info de impresoras
+        """
+        print_service = self._get_print_service()
+        if not print_service:
+            return []
+
+        try:
+            return print_service.get_system_printers()
+        except Exception as e:
+            print(f"[ERROR] get_system_printers failed: {e}")
+            return []
+
+    def get_default_printer(self):
+        """
+        Obtiene el nombre de la impresora por defecto.
+
+        Returns:
+            str or None: Nombre de la impresora o None
+        """
+        print_service = self._get_print_service()
+        if not print_service:
+            return None
+
+        try:
+            return print_service.get_default_printer()
+        except Exception as e:
+            print(f"[ERROR] get_default_printer failed: {e}")
+            return None
+
+    def print_barcode(self, svg_content):
+        """
+        Imprime un código de barras usando el diálogo nativo del sistema.
+
+        Args:
+            svg_content (str): Contenido SVG del código de barras
+
+        Returns:
+            dict: {'success': bool, 'message': str}
+        """
+        import tempfile
+        import subprocess
+
+        try:
+            # Crear archivo temporal HTML con el SVG
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
+                html_content = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {{
+                            margin: 0;
+                            padding: 20px;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            min-height: 100vh;
+                        }}
+                        svg {{
+                            max-width: 100%;
+                            height: auto;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    {svg_content}
+                </body>
+                </html>
+                """
+                f.write(html_content)
+                temp_path = f.name
+
+            # Abrir diálogo de impresión nativo según el sistema operativo
+            if sys.platform == 'darwin':
+                # macOS: abrir con el comando open que muestra el diálogo de impresión
+                subprocess.run(['open', '-a', 'Safari', temp_path])
+                return {
+                    'success': True,
+                    'message': 'Barcode opened in Safari. Use Cmd+P to print.'
+                }
+            elif sys.platform == 'win32':
+                # Windows: abrir con el navegador predeterminado
+                os.startfile(temp_path)
+                return {
+                    'success': True,
+                    'message': 'Barcode opened in default browser. Use Ctrl+P to print.'
+                }
+            else:
+                # Linux: usar xdg-open
+                subprocess.run(['xdg-open', temp_path])
+                return {
+                    'success': True,
+                    'message': 'Barcode opened in default browser. Use Ctrl+P to print.'
+                }
+
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
 
 # Detectar si estamos en PyInstaller bundle
 if getattr(sys, 'frozen', False):
@@ -269,8 +419,17 @@ if not django_ready:
     print("ERROR: Django did not start in time")
     sys.exit(1)
 
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='ERPlora Hub - Desktop Application')
+parser.add_argument('--kiosk', action='store_true', help='Start in kiosk mode (fullscreen, no browser UI)')
+parser.add_argument('--width', type=int, default=1200, help='Window width (default: 1200)')
+parser.add_argument('--height', type=int, default=800, help='Window height (default: 800)')
+args = parser.parse_args()
+
 # Abrir pywebview
 print("Opening webview...")
+if args.kiosk:
+    print("[INFO] Starting in KIOSK MODE (fullscreen)")
 
 # Crear instancia global de la API
 api = WindowAPI()
@@ -288,10 +447,10 @@ try:
     window = webview.create_window(
         'ERPlora Hub',
         'http://localhost:8001',
-        width=1200,
-        height=800,
-        resizable=True,
-        fullscreen=False,
+        width=args.width,
+        height=args.height,
+        resizable=not args.kiosk,  # No resizable en kiosk mode
+        fullscreen=args.kiosk,     # Fullscreen en kiosk mode
         js_api=api  # Pasar la API aquí
     )
 

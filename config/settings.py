@@ -101,24 +101,14 @@ if PLUGINS_DIR.exists():
         INSTALLED_APPS.append(plugin_dir.name)
         print(f"[SETTINGS] Auto-loaded plugin: {plugin_dir.name}")
 
-        # Check for middleware in plugin.json
-        plugin_json_path = plugin_dir / 'plugin.json'
-        if plugin_json_path.exists():
-            try:
-                with open(plugin_json_path, 'r') as f:
-                    plugin_metadata = json.load(f)
-
-                # Load middleware if defined
-                if 'middleware' in plugin_metadata:
-                    middleware_class = plugin_metadata['middleware']
-                    middleware_path = f"{plugin_dir.name}.{middleware_class}"
-                    PLUGIN_MIDDLEWARES.append(middleware_path)
-                    print(f"[SETTINGS] Registered middleware: {middleware_path}")
-            except (json.JSONDecodeError, KeyError) as e:
-                print(f"[SETTINGS] Warning: Could not load middleware from {plugin_dir.name}/plugin.json: {e}")
+        # NOTE: Plugin middlewares are now loaded dynamically via PluginMiddlewareManager
+        # This allows middlewares to be enabled/disabled based on plugin active status
 
 
 
+
+# Deployment mode detection
+DEPLOYMENT_MODE = config('DEPLOYMENT_MODE', default='local')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -133,10 +123,15 @@ MIDDLEWARE = [
     'django_htmx.middleware.HtmxMiddleware',  # HTMX integration middleware
     'apps.accounts.middleware.jwt_middleware.JWTMiddleware',  # JWT validation with offline support
     'apps.configuration.middleware.StoreConfigCheckMiddleware',  # Check if store is configured after login
+    # Dynamic plugin middleware manager (loads middlewares based on plugin active status)
+    'apps.core.middleware.plugin_middleware_manager.PluginMiddlewareManager',
 ]
 
-# Add plugin middlewares (loaded dynamically from plugin.json)
-MIDDLEWARE.extend(PLUGIN_MIDDLEWARES)
+# Add CloudSSOMiddleware ONLY for Cloud Hubs (DEPLOYMENT_MODE='web')
+# Desktop Hubs keep their PIN-based authentication system
+if DEPLOYMENT_MODE == 'web':
+    # Insert SSO middleware at the beginning (after SecurityMiddleware and SessionMiddleware)
+    MIDDLEWARE.insert(2, 'apps.core.middleware.CloudSSOMiddleware')
 
 ROOT_URLCONF = 'config.urls'
 
@@ -156,6 +151,7 @@ TEMPLATES = [
                 'apps.core.context_processors.cloud_url',
                 'apps.core.context_processors.plugin_menu_items',
                 'apps.core.context_processors.hub_config_context',
+                'apps.core.context_processors.deployment_config',  # Deployment mode (local/web)
                 'apps.configuration.context_processors.global_config',  # Global config singleton
             ],
         },
@@ -248,17 +244,27 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CLOUD_API_URL = config('CLOUD_API_URL', default='https://int.erplora.com')
 
 
-# FRP Client Configuration
-# Server address and port for FRP tunnel connection to Cloud
-FRP_SERVER_ADDR = config('FRP_SERVER_ADDR', default='localhost')
-FRP_SERVER_PORT = config('FRP_SERVER_PORT', default=7100, cast=int)
+# ==============================================================================
+# DEPLOYMENT MODE
+# ==============================================================================
+# Controls behavior for different deployment scenarios
+# 'local': Desktop app with PyWebView (default)
+# 'web': Browser-based deployment
+DEPLOYMENT_MODE = config('DEPLOYMENT_MODE', default='local')
 
-# FRP authentication token (must match server configuration)
-FRP_AUTH_TOKEN = config('FRP_AUTH_TOKEN', default='cpos-local-dev-token')
+# Validate deployment mode
+if DEPLOYMENT_MODE not in ['local', 'web']:
+    raise ValueError(f"Invalid DEPLOYMENT_MODE: {DEPLOYMENT_MODE}. Must be 'local' or 'web'")
+
+# Local Print Service (for web deployments with local printer access)
+LOCAL_PRINT_SERVICE_URL = config('LOCAL_PRINT_SERVICE_URL', default='http://localhost:8080')
+
 
 # Hub local server port (where Django runs)
-# This is the port that FRP client will forward to
 HUB_LOCAL_PORT = config('HUB_LOCAL_PORT', default=8001, cast=int)
+
+# NOTE: FRP (Fast Reverse Proxy) configuration is now handled by the multi_device plugin
+# If you need remote access to this Hub, install the multi_device plugin
 
 
 # Hub Version

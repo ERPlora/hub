@@ -1,6 +1,6 @@
 from django.shortcuts import redirect
 from django.urls import reverse
-from ..models import StoreConfig
+from apps.configuration.models import StoreConfig
 
 
 class StoreConfigCheckMiddleware:
