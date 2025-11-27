@@ -1,6 +1,6 @@
 [project]
 name = "erplora-hub"
-version = "0.12.1"
+version = "0.13.0"
 description = "ERPlora Hub - Business Management Desktop Application with Django and PyInstaller"
 readme = "docs/README.md"
 requires-python = ">=3.11"
