@@ -4,6 +4,9 @@ from . import views, views_update
 app_name = 'core'
 
 urlpatterns = [
+    # Health check endpoint (for Docker healthcheck)
+    path('health/', views.health_check, name='health_check'),
+
     path('', views.login, name='login'),
     path('verify-pin/', views.verify_pin, name='verify_pin'),
     path('cloud-login/', views.cloud_login, name='cloud_login'),

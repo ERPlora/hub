@@ -92,3 +92,7 @@ class LocalUser(models.Model):
     def get_username(self):
         """Return email as username for compatibility"""
         return self.email
+
+    def get_full_name(self):
+        """Return full name or empty string if not set"""
+        return self.name if self.name else ''

@@ -44,3 +44,23 @@ def hub_config_context(request):
         'hub_config': HubConfig.get_config(),
         'store_config': StoreConfig.get_config()
     }
+
+
+def deployment_config(request):
+    """
+    Expose deployment configuration to templates.
+
+    Makes DEPLOYMENT_MODE and related settings available in templates:
+    - {{ DEPLOYMENT_MODE }} - 'local' or 'web'
+    - {{ IS_LOCAL_DEPLOYMENT }} - True if local (desktop app)
+    - {{ IS_WEB_DEPLOYMENT }} - True if web (browser)
+    - {{ LOCAL_PRINT_SERVICE_URL }} - URL for local print service
+    """
+    deployment_mode = getattr(settings, 'DEPLOYMENT_MODE', 'local')
+
+    return {
+        'DEPLOYMENT_MODE': deployment_mode,
+        'IS_LOCAL_DEPLOYMENT': deployment_mode == 'local',
+        'IS_WEB_DEPLOYMENT': deployment_mode == 'web',
+        'LOCAL_PRINT_SERVICE_URL': getattr(settings, 'LOCAL_PRINT_SERVICE_URL', 'http://localhost:8080'),
+    }
