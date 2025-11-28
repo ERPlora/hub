@@ -158,6 +158,68 @@ En templates (automático):
 {{ STORE_CONFIG.tax_rate }}
 ```
 
+## Almacenamiento de Datos
+
+Los plugins tienen acceso a dos directorios para almacenar datos, ambos definidos en settings:
+
+### PLUGIN_DATA_ROOT (Datos internos del plugin)
+
+Directorio para datos internos del plugin (configuraciones, cache, archivos temporales):
+
+```python
+from django.conf import settings
+
+# Crear subdirectorio para tu plugin
+plugin_data_dir = settings.PLUGIN_DATA_ROOT / 'mi_plugin'
+plugin_data_dir.mkdir(parents=True, exist_ok=True)
+
+# Guardar archivo de configuración
+config_file = plugin_data_dir / 'config.json'
+config_file.write_text('{"setting": "value"}')
+```
+
+**Ubicación por entorno:**
+- **Web/Docker**: `{DATA_DIR}/plugin_data/`
+- **Linux**: `~/.erplora-hub/plugin_data/`
+- **macOS**: `~/Library/Application Support/ERPloraHub/plugin_data/`
+- **Windows**: `%LOCALAPPDATA%\ERPloraHub\plugin_data\`
+
+### PLUGIN_MEDIA_ROOT (Archivos media públicos)
+
+Directorio para archivos media accesibles via HTTP (imágenes, documentos):
+
+```python
+from django.conf import settings
+
+# Crear subdirectorio para tu plugin
+plugin_media_dir = settings.PLUGIN_MEDIA_ROOT / 'mi_plugin'
+plugin_media_dir.mkdir(parents=True, exist_ok=True)
+
+# Guardar imagen subida
+image_path = plugin_media_dir / 'logo.png'
+```
+
+**URL pública**: `/media/plugins/mi_plugin/logo.png`
+
+### Ejemplo de uso en modelo
+
+```python
+from django.db import models
+from django.conf import settings
+
+class ProductImage(models.Model):
+    product = models.ForeignKey('Product', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='plugins/products/images/')
+
+    # Las imágenes se guardan en MEDIA_ROOT/plugins/products/images/
+```
+
+### Importante
+
+- **NO crear carpetas dentro de PLUGINS_DIR** - serían detectadas como plugins
+- Usar siempre `settings.PLUGIN_DATA_ROOT` o `settings.PLUGIN_MEDIA_ROOT`
+- Crear subdirectorios con el nombre del plugin para evitar colisiones
+
 ## Dependencias Python Permitidas
 
 - **Imágenes**: `Pillow`
