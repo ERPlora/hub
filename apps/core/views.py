@@ -657,24 +657,32 @@ def api_employee_reset_pin(request):
 
 def plugins(request):
     """
-    Plugins management view - list installed and available plugins
+    Plugins management view - list all plugins from filesystem.
+
+    Plugins are discovered from the plugins directory:
+    - Active plugins: directory name without underscore prefix
+    - Inactive plugins: directory name starts with underscore (_)
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
         return redirect('accounts:login')
 
     from .plugin_loader import plugin_loader
-    from apps.core.models import Plugin
 
-    # Get all installed plugins
-    installed_plugins = Plugin.objects.filter(is_installed=True).order_by('name')
+    # Discover ALL plugins from filesystem (including inactive ones with _ prefix)
+    all_plugins = plugin_loader.discover_plugins(include_inactive=True)
 
-    # Get discovered plugins (from filesystem)
-    discovered = plugin_loader.discover_plugins()
+    # Sort by name
+    all_plugins.sort(key=lambda x: x.get('name', ''))
+
+    # Count active and inactive
+    active_count = sum(1 for p in all_plugins if p.get('is_active', False))
+    inactive_count = len(all_plugins) - active_count
 
     context = {
-        'installed_plugins': installed_plugins,
-        'discovered_count': len(discovered),
+        'plugins': all_plugins,
+        'active_count': active_count,
+        'inactive_count': inactive_count,
         'current_view': 'plugins'
     }
     return render(request, 'core/plugins.html', context)
@@ -720,62 +728,70 @@ def api_plugin_install(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def api_plugin_activate(request):
+def api_plugin_activate(request, plugin_id=None):
     """
-    API: Activate/deactivate a plugin
+    API: Activate a plugin (rename directory to remove underscore prefix)
     """
     try:
-        data = json.loads(request.body)
-        plugin_id = data.get('plugin_id')
-        activate = data.get('activate', True)
+        # Get plugin_id from URL or body
+        if not plugin_id:
+            data = json.loads(request.body) if request.body else {}
+            plugin_id = data.get('plugin_id')
 
         if not plugin_id:
             return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
 
-        from apps.core.models import Plugin
         from .plugin_loader import plugin_loader
 
-        plugin = Plugin.objects.get(plugin_id=plugin_id)
+        result = plugin_loader.activate_plugin(plugin_id)
+        return JsonResponse(result)
 
-        if activate:
-            # Activate and load plugin
-            plugin.is_active = True
-            plugin.save()
-
-            if plugin_loader.load_plugin(plugin_id):
-                return JsonResponse({'success': True, 'message': f'Plugin {plugin_id} activated'})
-            else:
-                return JsonResponse({'success': False, 'error': 'Failed to load plugin'})
-        else:
-            # Deactivate plugin
-            if plugin_loader.unload_plugin(plugin_id):
-                return JsonResponse({'success': True, 'message': f'Plugin {plugin_id} deactivated'})
-            else:
-                return JsonResponse({'success': False, 'error': 'Failed to deactivate plugin'})
-
-    except Plugin.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Plugin not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def api_plugin_uninstall(request):
+def api_plugin_deactivate(request, plugin_id=None):
     """
-    API: Uninstall a plugin
+    API: Deactivate a plugin (rename directory to add underscore prefix)
     """
     try:
-        data = json.loads(request.body)
-        plugin_id = data.get('plugin_id')
+        # Get plugin_id from URL or body
+        if not plugin_id:
+            data = json.loads(request.body) if request.body else {}
+            plugin_id = data.get('plugin_id')
 
         if not plugin_id:
             return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
 
-        from .runtime_manager import plugin_runtime_manager
+        from .plugin_loader import plugin_loader
 
-        result = plugin_runtime_manager.uninstall_plugin(plugin_id)
+        result = plugin_loader.deactivate_plugin(plugin_id)
+        return JsonResponse(result)
 
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_plugin_delete(request, plugin_id=None):
+    """
+    API: Delete a plugin from filesystem
+    """
+    try:
+        # Get plugin_id from URL or body
+        if not plugin_id:
+            data = json.loads(request.body) if request.body else {}
+            plugin_id = data.get('plugin_id')
+
+        if not plugin_id:
+            return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
+
+        from .plugin_loader import plugin_loader
+
+        result = plugin_loader.delete_plugin(plugin_id)
         return JsonResponse(result)
 
     except Exception as e:
@@ -786,32 +802,13 @@ def api_plugin_uninstall(request):
 @require_http_methods(["GET"])
 def api_plugins_list(request):
     """
-    API: List all plugins with their status
+    API: List all plugins with their status from filesystem
     """
     try:
-        from apps.core.models import Plugin
+        from .plugin_loader import plugin_loader
 
-        plugins = Plugin.objects.all().order_by('name')
-        plugins_data = []
-
-        for plugin in plugins:
-            plugins_data.append({
-                'plugin_id': plugin.plugin_id,
-                'name': plugin.name,
-                'description': plugin.description,
-                'version': plugin.version,
-                'author': plugin.author,
-                'icon': plugin.icon,
-                'category': plugin.category,
-                'is_installed': plugin.is_installed,
-                'is_active': plugin.is_active,
-                'show_in_menu': plugin.show_in_menu,
-                'menu_label': plugin.menu_label,
-                'menu_icon': plugin.menu_icon,
-                'menu_order': plugin.menu_order,
-            })
-
-        return JsonResponse({'success': True, 'plugins': plugins_data})
+        plugins = plugin_loader.discover_plugins(include_inactive=True)
+        return JsonResponse({'success': True, 'plugins': plugins})
 
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
