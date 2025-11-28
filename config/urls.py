@@ -24,6 +24,7 @@ from apps.plugins_runtime.router import plugin_urlpatterns
 urlpatterns = [
     path('admin/', admin.site.urls),
     # Refactored app URLs
+    path('', include('apps.core.urls')),  # Health check, core views
     path('', include('apps.configuration.urls')),  # Root redirect, Dashboard, POS, settings (must be first for root URL)
     path('', include('apps.accounts.urls')),  # Login, employees, auth
     path('', include('apps.sync.urls')),  # Sync, updates, FRP
