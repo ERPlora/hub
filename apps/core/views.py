@@ -6,7 +6,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.conf import settings as django_settings
-from .models import HubConfig, LocalUser, StoreConfig, TokenCache
+from apps.configuration.models import HubConfig, StoreConfig
+from apps.accounts.models import LocalUser
+from apps.sync.models import TokenCache
 
 
 # Helper functions
