@@ -70,8 +70,8 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_DIR = DATA_DIR / 'temp'
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-# Plugin data
-PLUGIN_DATA_ROOT = PLUGINS_DIR / 'data'
+# Plugin data (outside PLUGINS_DIR to avoid being detected as a plugin)
+PLUGIN_DATA_ROOT = DATA_DIR / 'plugin_data'
 PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
 PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
 PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
