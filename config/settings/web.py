@@ -1,0 +1,120 @@
+"""
+ERPlora Hub - Web/Docker Settings
+
+Configuración para despliegue en Docker/Cloud.
+Este es el entorno default para Dockerfile.
+
+Variables de entorno requeridas:
+  - HUB_NAME: Nombre del Hub (ej: mi-tienda)
+  - HUB_ID: UUID del Hub (ej: abc123)
+  - HUB_VOLUME_PATH: Ruta del volumen externo (desde modelo Cloud)
+
+Estructura en disco:
+  {HUB_VOLUME_PATH}/{HUB_NAME}-{HUB_ID}/
+  ├── db/db.sqlite3
+  ├── media/
+  ├── plugins/
+  ├── logs/
+  ├── backups/
+  ├── reports/
+  └── temp/
+"""
+
+from .base import *
+from pathlib import Path
+
+# =============================================================================
+# DEPLOYMENT
+# =============================================================================
+
+DEPLOYMENT_MODE = 'web'
+DEBUG = config('DEBUG', default=False, cast=bool)
+OFFLINE_ENABLED = False
+CLOUD_SYNC_REQUIRED = True
+
+# =============================================================================
+# HUB IDENTITY (from Cloud database model)
+# =============================================================================
+
+HUB_NAME = config('HUB_NAME', default='hub')
+HUB_ID = config('HUB_ID', default='default')
+HUB_VOLUME_PATH = Path(config('HUB_VOLUME_PATH', default='/app'))
+
+# =============================================================================
+# PATHS - Hub-specific folder on external volume
+# =============================================================================
+
+HUB_FOLDER_NAME = f"{HUB_NAME}-{HUB_ID}"
+DATA_DIR = HUB_VOLUME_PATH / HUB_FOLDER_NAME
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# Database
+DATABASE_DIR = DATA_DIR / 'db'
+DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
+
+# Media
+MEDIA_ROOT = DATA_DIR / 'media'
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# Plugins
+PLUGINS_DIR = DATA_DIR / 'plugins'
+PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
+PLUGINS_ROOT = PLUGINS_DIR
+PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
+
+# Logs
+LOGS_DIR = DATA_DIR / 'logs'
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
+
+# Backups
+BACKUPS_DIR = DATA_DIR / 'backups'
+BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Reports
+REPORTS_DIR = DATA_DIR / 'reports'
+REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Temp
+TEMP_DIR = DATA_DIR / 'temp'
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+# Plugin data
+PLUGIN_DATA_ROOT = PLUGINS_DIR / 'data'
+PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
+PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# =============================================================================
+# SECURITY - Fixed for erplora.com
+# =============================================================================
+
+ALLOWED_HOSTS = ['*.erplora.com', 'erplora.com', 'localhost', '127.0.0.1']
+
+CSRF_COOKIE_SECURE = True
+CSRF_TRUSTED_ORIGINS = [
+    'https://erplora.com',
+    'https://*.erplora.com',
+]
+
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_HTTPONLY = True
+
+# =============================================================================
+# MIDDLEWARE - Add Cloud SSO for web deployment
+# =============================================================================
+
+MIDDLEWARE.insert(2, 'apps.core.middleware.CloudSSOMiddleware')
+
+# =============================================================================
+# PLUGIN SECURITY - Strict for web
+# =============================================================================
+
+REQUIRE_PLUGIN_SIGNATURE = True
+PLUGIN_AUTO_RELOAD = False
+PLUGIN_STRICT_VALIDATION = True
+DEVELOPMENT_MODE = False
+
+print(f"[WEB] Hub: {HUB_NAME} ({HUB_ID})")
+print(f"[WEB] Data: {DATA_DIR}")
