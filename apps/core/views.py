@@ -664,7 +664,7 @@ def plugins(request):
         return redirect('accounts:login')
 
     from .plugin_loader import plugin_loader
-    from .models import Plugin
+    from apps.core.models import Plugin
 
     # Get all installed plugins
     installed_plugins = Plugin.objects.filter(is_installed=True).order_by('name')
@@ -732,7 +732,7 @@ def api_plugin_activate(request):
         if not plugin_id:
             return JsonResponse({'success': False, 'error': 'Missing plugin_id'})
 
-        from .models import Plugin
+        from apps.core.models import Plugin
         from .plugin_loader import plugin_loader
 
         plugin = Plugin.objects.get(plugin_id=plugin_id)
@@ -789,7 +789,7 @@ def api_plugins_list(request):
     API: List all plugins with their status
     """
     try:
-        from .models import Plugin
+        from apps.core.models import Plugin
 
         plugins = Plugin.objects.all().order_by('name')
         plugins_data = []
