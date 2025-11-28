@@ -4,7 +4,11 @@
 # Build on deploy por Coolify (sin registry externo)
 # Coolify clona el repo → detecta Dockerfile → build → run
 #
-# VOLUMES (mount for persistence):
+# MODES:
+#   1. PRODUCTION (default): Data on external volume (persistent)
+#   2. DEMO (DEMO_MODE=true): Data in /app/data/ (non-persistent)
+#
+# VOLUMES (mount for persistence - production mode):
 #   Defined by HUB_VOLUME_PATH/{HUB_NAME}-{HUB_ID}/
 #   ├── db/       - SQLite database
 #   ├── media/    - User uploads (images, logos)
@@ -18,10 +22,15 @@
 #   HUB_NAME          - Slug del Hub (ej: tienda-de-maria)
 #   HUB_ID            - UUID corto (ej: a1b2c3)
 #   HUB_VOLUME_PATH   - Ruta del volumen Hetzner (ej: /mnt/HC_Volume_104073157)
+#   DEMO_MODE         - Set to "true" for demo deployments (non-persistent)
 #
-# Result:
+# Result (production):
 #   URL:  https://tienda-de-maria.a.erplora.com
 #   Data: /mnt/HC_Volume_104073157/tienda-de-maria-a1b2c3/
+#
+# Result (demo):
+#   URL:  https://demo.int.erplora.com
+#   Data: /app/data/ (inside container, non-persistent)
 # ==============================================================================
 
 FROM python:3.11-slim
@@ -57,7 +66,9 @@ RUN uv pip install --system --no-cache .
 RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
 
 # Create non-root user for security
+# Also create /app/data directory for DEMO_MODE (non-persistent storage)
 RUN useradd --create-home --shell /bin/bash hubuser \
+    && mkdir -p /app/data \
     && chown -R hubuser:hubuser /app
 USER hubuser
 
