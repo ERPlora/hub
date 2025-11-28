@@ -130,18 +130,26 @@ else:
     ]
 
 # -----------------------------------------------------------------------------
-# COOKIES - Shared across subdomain family for SSO
+# COOKIES - Hub has its own session, reads Cloud's sessionid for SSO
 # -----------------------------------------------------------------------------
 
-# Session cookies shared within the parent domain family
-SESSION_COOKIE_DOMAIN = f'.{PARENT_DOMAIN}'
-SESSION_COOKIE_SAMESITE = 'None'  # Required for cross-subdomain SSO
-SESSION_COOKIE_SECURE = True      # Required with SameSite=None
+# IMPORTANT: Hub uses a DIFFERENT session cookie name than Cloud
+# - Cloud uses 'sessionid' (Django default)
+# - Hub uses 'hubsessionid' to avoid conflicts
+# - SSO middleware reads Cloud's 'sessionid' for authentication verification
+# - Hub stores local session data (local_user_id, etc.) in 'hubsessionid'
+SESSION_COOKIE_NAME = 'hubsessionid'
+
+# Hub session cookie is scoped to this subdomain only (not shared)
+# This prevents conflicts with Cloud's session
+SESSION_COOKIE_DOMAIN = None  # Scoped to current subdomain (demo.int.erplora.com)
+SESSION_COOKIE_SAMESITE = 'Lax'  # Standard security
+SESSION_COOKIE_SECURE = True     # HTTPS only
 SESSION_COOKIE_HTTPONLY = True
 
-# CSRF cookies also shared for cross-subdomain forms
-CSRF_COOKIE_DOMAIN = SESSION_COOKIE_DOMAIN
-CSRF_COOKIE_SAMESITE = 'None'
+# CSRF cookies also scoped to this subdomain
+CSRF_COOKIE_DOMAIN = None  # Scoped to current subdomain
+CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = True
 
 # CSRF trusted origins for the domain family
