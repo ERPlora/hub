@@ -164,8 +164,9 @@ class CloudSSOMiddleware:
 
     def _redirect_to_login(self, request):
         """Redirige al login de Cloud con next parameter."""
-        # Allauth usa /accounts/login/ no /login/
-        login_url = f"{self.cloud_api_url}/accounts/login/"
+        # two_factor usa /account/login/ (sin 's')
+        # /accounts/login/ redirige a /account/login/
+        login_url = f"{self.cloud_api_url}/account/login/"
 
         # Construir next_url asegurando HTTPS en producción
         next_url = request.build_absolute_uri()
