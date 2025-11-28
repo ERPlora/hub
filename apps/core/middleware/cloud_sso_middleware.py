@@ -3,13 +3,22 @@ Middleware para Cloud Hubs - SSO Authentication.
 
 Este middleware solo se activa para Cloud Hubs (DEPLOYMENT_MODE='web').
 Desktop Hubs siguen usando su sistema de login con PIN.
+
+La cookie de sesión del Cloud Portal se comparte con el Hub gracias a
+SESSION_COOKIE_DOMAIN configurado en Cloud (ej: '.int.erplora.com').
+
+Requisitos:
+  - Cloud debe tener SESSION_COOKIE_DOMAIN configurado según entorno:
+    - INT: '.int.erplora.com'
+    - PRE: '.pre.erplora.com'
+    - PROD: '.erplora.com'
+  - Hub debe estar en el mismo dominio (ej: demo.int.erplora.com)
 """
 import logging
 import requests
 from django.shortcuts import redirect
 from django.conf import settings
 from django.urls import reverse
-from decouple import config
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +27,8 @@ class CloudSSOMiddleware:
     """
     Middleware de SSO para Cloud Hubs.
 
-    Verifica que el usuario esté autenticado en Cloud (cookie sessionid con dominio .erplora.com).
-    Si no está autenticado, redirige a erplora.com/login.
+    Verifica que el usuario esté autenticado en Cloud leyendo la cookie 'sessionid'
+    compartida gracias a SESSION_COOKIE_DOMAIN en Cloud.
 
     IMPORTANTE: Solo se activa si DEPLOYMENT_MODE='web' (Cloud Hub).
     Desktop Hubs (DEPLOYMENT_MODE='local') no usan este middleware.
@@ -30,13 +39,16 @@ class CloudSSOMiddleware:
         '/health/',  # Health check endpoint
         '/static/',  # Static files
         '/media/',   # Media files
+        '/favicon.ico',  # Favicon
     ]
 
     def __init__(self, get_response):
         self.get_response = get_response
-        self.deployment_mode = config('DEPLOYMENT_MODE', default='local')
-        self.cloud_api_url = config('CLOUD_API_URL', default='https://erplora.com')
-        self.hub_id = config('HUB_ID', default='')
+        # Use settings instead of decouple for consistency
+        self.deployment_mode = getattr(settings, 'DEPLOYMENT_MODE', 'local')
+        self.cloud_api_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
+        self.hub_id = getattr(settings, 'HUB_ID', '')
+        self.demo_mode = getattr(settings, 'DEMO_MODE', False)
 
     def __call__(self, request):
         # Solo aplicar middleware en Cloud Hubs
@@ -61,7 +73,14 @@ class CloudSSOMiddleware:
             logger.info(f"[SSO] Invalid session. Redirecting to login.")
             return self._redirect_to_login(request)
 
-        # Verificar que el usuario tiene acceso a este Hub
+        # En modo DEMO, cualquier usuario autenticado tiene acceso
+        # No verificamos permisos de Hub específico
+        if self.demo_mode:
+            logger.info(f"[SSO] DEMO MODE: User {user_email} authenticated - access granted")
+            request.cloud_user_email = user_email
+            return self.get_response(request)
+
+        # Verificar que el usuario tiene acceso a este Hub (solo modo producción)
         has_access = self._verify_hub_access(session_id, user_email)
 
         if not has_access:
@@ -97,16 +116,20 @@ class CloudSSOMiddleware:
 
             if response.status_code == 200:
                 data = response.json()
-                return True, data.get('email')
+                # Cloud returns 'authenticated' field, check it
+                if data.get('authenticated'):
+                    return True, data.get('email')
+                else:
+                    return False, None
             else:
                 logger.warning(f"[SSO] Session verification failed: {response.status_code}")
                 return False, None
 
         except requests.exceptions.RequestException as e:
             logger.error(f"[SSO] Error verifying session with Cloud: {str(e)}")
-            # En caso de error de red, permitir acceso (fallback a modo offline)
-            # Esto evita bloquear el Hub si Cloud está temporalmente inaccesible
-            return True, None
+            # En caso de error de red, denegar acceso por seguridad
+            # El usuario será redirigido al login
+            return False, None
 
     def _verify_hub_access(self, session_id, user_email):
         """
