@@ -40,6 +40,11 @@ class CloudSSOMiddleware:
         '/static/',  # Static files
         '/media/',   # Media files
         '/favicon.ico',  # Favicon
+        '/login/',   # Login page (handled by SSO)
+        '/cloud-login/',  # Cloud login endpoint
+        '/setup-pin/',  # PIN setup endpoint
+        '/verify-pin/',  # PIN verification endpoint
+        '/logout/',  # Logout endpoint
     ]
 
     def __init__(self, get_response):
