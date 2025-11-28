@@ -47,7 +47,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir uv
 
 # Copy only dependency files first (for better layer caching)
+# Include docs/README.md required by pyproject.toml
 COPY pyproject.toml ./
+COPY docs/README.md docs/README.md
 
 # Install dependencies directly (no venv needed in Docker)
 RUN uv pip install --system --no-cache -e .
