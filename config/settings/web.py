@@ -107,45 +107,86 @@ PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
 PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
-# SECURITY - Configurable via environment
+# SECURITY - PARENT_DOMAIN based configuration for SSO
 # =============================================================================
 
-# ALLOWED_HOSTS from environment (comma-separated) or defaults
+# Parent domain for this instance (controls cookies and CORS)
+# Examples:
+#   INT:  PARENT_DOMAIN=int.erplora.com
+#   PRE:  PARENT_DOMAIN=pre.erplora.com
+#   PROD: PARENT_DOMAIN=erplora.com
+PARENT_DOMAIN = config('PARENT_DOMAIN', default='erplora.com').strip()
+
+# ALLOWED_HOSTS - allow parent domain and all subdomains
 _allowed_hosts_env = config('ALLOWED_HOSTS', default='')
 if _allowed_hosts_env:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',')]
 else:
     ALLOWED_HOSTS = [
-        '*.erplora.com',
-        '*.int.erplora.com',
-        '*.pre.erplora.com',
-        'erplora.com',
+        PARENT_DOMAIN,
+        f'*.{PARENT_DOMAIN}',
         'localhost',
         '127.0.0.1',
     ]
 
-# CSRF_TRUSTED_ORIGINS from environment (comma-separated) or defaults
-_csrf_origins_env = config('CSRF_TRUSTED_ORIGINS', default='')
-if _csrf_origins_env:
-    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins_env.split(',')]
-else:
-    CSRF_TRUSTED_ORIGINS = [
-        'https://erplora.com',
-        'https://*.erplora.com',
-        'https://*.int.erplora.com',
-        'https://*.pre.erplora.com',
-    ]
+# -----------------------------------------------------------------------------
+# COOKIES - Shared across subdomain family for SSO
+# -----------------------------------------------------------------------------
 
-CSRF_COOKIE_SECURE = True
-
-SESSION_COOKIE_SECURE = True
+# Session cookies shared within the parent domain family
+SESSION_COOKIE_DOMAIN = f'.{PARENT_DOMAIN}'
+SESSION_COOKIE_SAMESITE = 'None'  # Required for cross-subdomain SSO
+SESSION_COOKIE_SECURE = True      # Required with SameSite=None
 SESSION_COOKIE_HTTPONLY = True
 
+# CSRF cookies also shared for cross-subdomain forms
+CSRF_COOKIE_DOMAIN = SESSION_COOKIE_DOMAIN
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SECURE = True
+
+# CSRF trusted origins for the domain family
+CSRF_TRUSTED_ORIGINS = [
+    f'https://{PARENT_DOMAIN}',
+    f'https://*.{PARENT_DOMAIN}',
+]
+
+# -----------------------------------------------------------------------------
+# CORS - Allow cross-origin requests within domain family
+# -----------------------------------------------------------------------------
+
+# CORS base domains (can include multiple for global PROD that serves all)
+# Example: CORS_BASE_DOMAINS=erplora.com,int.erplora.com,pre.erplora.com
+CORS_BASE_DOMAINS = [
+    d.strip() for d in config('CORS_BASE_DOMAINS', default=PARENT_DOMAIN).split(',') if d.strip()
+]
+
+# Allow all subdomains of each base domain
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    rf'^https://.*\.{d.replace(".", r".")}$'
+    for d in CORS_BASE_DOMAINS
+]
+# Also allow the base domains themselves
+CORS_ALLOWED_ORIGIN_REGEXES += [
+    rf'^https://{d.replace(".", r".")}$'
+    for d in CORS_BASE_DOMAINS
+]
+
+CORS_ALLOW_CREDENTIALS = True  # Allow cookies in CORS requests
+
 # =============================================================================
-# MIDDLEWARE - Add Cloud SSO for web deployment
+# CORS HEADERS - Required for cross-subdomain requests
 # =============================================================================
 
-MIDDLEWARE.insert(2, 'apps.core.middleware.CloudSSOMiddleware')
+INSTALLED_APPS += ['corsheaders']
+
+# =============================================================================
+# MIDDLEWARE - Add CORS and Cloud SSO for web deployment
+# =============================================================================
+
+# CORS middleware must be before CommonMiddleware
+MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
+# Cloud SSO middleware after session middleware
+MIDDLEWARE.insert(3, 'apps.core.middleware.CloudSSOMiddleware')
 
 # =============================================================================
 # PLUGIN SECURITY - Strict for web
