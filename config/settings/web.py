@@ -107,16 +107,36 @@ PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
 PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
-# SECURITY - Fixed for erplora.com
+# SECURITY - Configurable via environment
 # =============================================================================
 
-ALLOWED_HOSTS = ['*.erplora.com', 'erplora.com', 'localhost', '127.0.0.1']
+# ALLOWED_HOSTS from environment (comma-separated) or defaults
+_allowed_hosts_env = config('ALLOWED_HOSTS', default='')
+if _allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',')]
+else:
+    ALLOWED_HOSTS = [
+        '*.erplora.com',
+        '*.int.erplora.com',
+        '*.pre.erplora.com',
+        'erplora.com',
+        'localhost',
+        '127.0.0.1',
+    ]
+
+# CSRF_TRUSTED_ORIGINS from environment (comma-separated) or defaults
+_csrf_origins_env = config('CSRF_TRUSTED_ORIGINS', default='')
+if _csrf_origins_env:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins_env.split(',')]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        'https://erplora.com',
+        'https://*.erplora.com',
+        'https://*.int.erplora.com',
+        'https://*.pre.erplora.com',
+    ]
 
 CSRF_COOKIE_SECURE = True
-CSRF_TRUSTED_ORIGINS = [
-    'https://erplora.com',
-    'https://*.erplora.com',
-]
 
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
