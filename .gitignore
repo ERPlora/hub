@@ -232,3 +232,4 @@ plugins/*/
 cache/
 *.bak
 *.backup
+.secret_key
