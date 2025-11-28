@@ -37,7 +37,7 @@ if USE_LOCAL_PLUGINS_DIR:
     PLUGINS_ROOT = BASE_DIR / "plugins"
 else:
     # aquí la ruta externa de producción, por ejemplo:
-    PLUGINS_ROOT = DATA_PATHS / "plugins"
+    PLUGINS_ROOT = DATA_PATHS.plugins_dir
 
 # añadir al sys.path para import "products", "loyalty", etc.
 if PLUGINS_ROOT.exists():
