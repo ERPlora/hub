@@ -9,7 +9,7 @@ Variables de entorno requeridas:
   - HUB_ID: UUID del Hub (ej: abc123)
   - HUB_VOLUME_PATH: Ruta del volumen externo (desde modelo Cloud)
 
-Estructura en disco:
+Estructura en disco (modo normal - persistente):
   {HUB_VOLUME_PATH}/{HUB_NAME}-{HUB_ID}/
   ├── db/db.sqlite3
   ├── media/
@@ -18,6 +18,12 @@ Estructura en disco:
   ├── backups/
   ├── reports/
   └── temp/
+
+Modo DEMO (DEMO_MODE=true):
+  - Datos almacenados en /app/data/ (dentro del contenedor)
+  - NO persistente - se pierde al reiniciar contenedor
+  - Sin problemas de permisos con volúmenes externos
+  - Ideal para demos y testing
 """
 
 from .base import *
@@ -33,19 +39,33 @@ OFFLINE_ENABLED = False
 CLOUD_SYNC_REQUIRED = True
 
 # =============================================================================
+# DEMO MODE - Non-persistent data inside container
+# =============================================================================
+
+DEMO_MODE = config('DEMO_MODE', default=False, cast=bool)
+
+# =============================================================================
 # HUB IDENTITY (from Cloud database model)
 # =============================================================================
 
 HUB_NAME = config('HUB_NAME', default='hub')
 HUB_ID = config('HUB_ID', default='default')
-HUB_VOLUME_PATH = Path(config('HUB_VOLUME_PATH', default='/app'))
 
 # =============================================================================
-# PATHS - Hub-specific folder on external volume
+# PATHS - Conditional based on DEMO_MODE
 # =============================================================================
 
-HUB_FOLDER_NAME = f"{HUB_NAME}-{HUB_ID}"
-DATA_DIR = HUB_VOLUME_PATH / HUB_FOLDER_NAME
+if DEMO_MODE:
+    # Demo mode: data inside container (non-persistent, no permission issues)
+    DATA_DIR = Path('/app/data')
+    HUB_FOLDER_NAME = 'demo'
+    print(f"[WEB] DEMO MODE: Data stored in /app/data/ (non-persistent)")
+else:
+    # Production mode: data on external volume (persistent)
+    HUB_VOLUME_PATH = Path(config('HUB_VOLUME_PATH', default='/app'))
+    HUB_FOLDER_NAME = f"{HUB_NAME}-{HUB_ID}"
+    DATA_DIR = HUB_VOLUME_PATH / HUB_FOLDER_NAME
+
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database
@@ -116,5 +136,8 @@ PLUGIN_AUTO_RELOAD = False
 PLUGIN_STRICT_VALIDATION = True
 DEVELOPMENT_MODE = False
 
-print(f"[WEB] Hub: {HUB_NAME} ({HUB_ID})")
+if DEMO_MODE:
+    print(f"[WEB] Hub: {HUB_NAME} ({HUB_ID}) - DEMO MODE (non-persistent)")
+else:
+    print(f"[WEB] Hub: {HUB_NAME} ({HUB_ID})")
 print(f"[WEB] Data: {DATA_DIR}")
