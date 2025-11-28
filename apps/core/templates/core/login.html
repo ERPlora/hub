@@ -223,8 +223,8 @@
             cloudLoading: false,
 
             // PIN Setup (First Time)
-            showPinSetup: false,
-            newUser: null,
+            showPinSetup: {% if show_pin_setup %}true{% else %}false{% endif %},
+            newUser: {% if pending_user %}{{ pending_user|safe }}{% else %}null{% endif %},
             setupPinInput: '',
             setupPinConfirm: false,
             setupPinFirst: '',
@@ -239,6 +239,11 @@
                 if (savedTheme === 'dark') {
                     this.isDark = true;
                     document.body.classList.add('dark');
+                }
+
+                // If SSO flow redirected to setup PIN, show the setup form
+                if (this.showPinSetup && this.newUser) {
+                    console.log('[SSO] PIN setup required for user:', this.newUser.email);
                 }
             },
 

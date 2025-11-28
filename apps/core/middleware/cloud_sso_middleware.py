@@ -7,6 +7,13 @@ Desktop Hubs siguen usando su sistema de login con PIN.
 La cookie de sesión del Cloud Portal se comparte con el Hub gracias a
 SESSION_COOKIE_DOMAIN configurado en Cloud (ej: '.int.erplora.com').
 
+Flujo SSO completo:
+  1. Usuario visita Hub → SSO verifica cookie de Cloud
+  2. Si no autenticado → redirige a Cloud login
+  3. Si autenticado → crea/actualiza LocalUser
+  4. Si LocalUser sin PIN → redirige a /setup-pin/
+  5. Si LocalUser con PIN → establece sesión y permite acceso
+
 Requisitos:
   - Cloud debe tener SESSION_COOKIE_DOMAIN configurado según entorno:
     - INT: '.int.erplora.com'
@@ -19,6 +26,7 @@ import requests
 from django.shortcuts import redirect
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -82,19 +90,29 @@ class CloudSSOMiddleware:
         # No verificamos permisos de Hub específico
         if self.demo_mode:
             logger.info(f"[SSO] DEMO MODE: User {user_email} authenticated - access granted")
-            request.cloud_user_email = user_email
+        else:
+            # Verificar que el usuario tiene acceso a este Hub (solo modo producción)
+            has_access = self._verify_hub_access(session_id, user_email)
+
+            if not has_access:
+                logger.warning(f"[SSO] User {user_email} does not have access to Hub {self.hub_id}")
+                return self._render_no_access_page(request, user_email)
+
+            logger.info(f"[SSO] User {user_email} authenticated and has access to Hub {self.hub_id}")
+
+        # Establecer email en request para uso en views
+        request.cloud_user_email = user_email
+
+        # Verificar si el usuario ya tiene sesión local válida
+        local_user_id = request.session.get('local_user_id')
+        if local_user_id:
+            # Ya tiene sesión local, permitir acceso
             return self.get_response(request)
 
-        # Verificar que el usuario tiene acceso a este Hub (solo modo producción)
-        has_access = self._verify_hub_access(session_id, user_email)
-
-        if not has_access:
-            logger.warning(f"[SSO] User {user_email} does not have access to Hub {self.hub_id}")
-            return self._render_no_access_page(request, user_email)
-
-        # Usuario autenticado y con acceso → permitir request
-        logger.info(f"[SSO] User {user_email} authenticated and has access to Hub {self.hub_id}")
-        request.cloud_user_email = user_email  # Añadir email al request para uso en views
+        # No tiene sesión local → crear/obtener LocalUser y verificar PIN
+        redirect_response = self._ensure_local_user_and_session(request, user_email)
+        if redirect_response:
+            return redirect_response
 
         return self.get_response(request)
 
@@ -104,6 +122,70 @@ class CloudSSOMiddleware:
             if path.startswith(exempt_url):
                 return True
         return False
+
+    def _ensure_local_user_and_session(self, request, user_email):
+        """
+        Crea o obtiene LocalUser y establece sesión.
+
+        Si el usuario no tiene PIN configurado, redirige a /setup-pin/.
+        Si tiene PIN, establece la sesión local.
+
+        Returns:
+            HttpResponse redirect si necesita configurar PIN, None si sesión establecida
+        """
+        from apps.accounts.models import LocalUser
+        from apps.configuration.models import HubConfig
+
+        try:
+            # Intentar obtener usuario existente
+            local_user = LocalUser.objects.filter(email=user_email).first()
+
+            if not local_user:
+                # Crear nuevo usuario
+                hub_config = HubConfig.get_config()
+                is_first_user = LocalUser.objects.count() == 0
+
+                local_user = LocalUser.objects.create(
+                    email=user_email,
+                    name=user_email.split('@')[0],  # Nombre temporal del email
+                    role='admin' if is_first_user else 'cashier',
+                    pin_hash='',  # Sin PIN todavía
+                    language=hub_config.os_language,
+                )
+                logger.info(f"[SSO] Created LocalUser for {user_email}")
+
+            # Si usuario estaba inactivo, reactivarlo
+            if not local_user.is_active:
+                local_user.is_active = True
+                local_user.pin_hash = ''  # Reset PIN
+                local_user.save(update_fields=['is_active', 'pin_hash'])
+                logger.info(f"[SSO] Reactivated LocalUser for {user_email}")
+
+            # Verificar si tiene PIN configurado
+            if not local_user.pin_hash:
+                # Guardar user_id en sesión temporalmente para setup-pin
+                request.session['pending_user_id'] = local_user.id
+                request.session['pending_user_email'] = user_email
+                logger.info(f"[SSO] User {user_email} needs to setup PIN, redirecting...")
+                return redirect('/setup-pin/')
+
+            # Usuario tiene PIN → establecer sesión completa
+            local_user.last_login = timezone.now()
+            local_user.save(update_fields=['last_login'])
+
+            request.session['local_user_id'] = local_user.id
+            request.session['user_name'] = local_user.name
+            request.session['user_email'] = local_user.email
+            request.session['user_role'] = local_user.role
+            request.session['user_language'] = local_user.language
+
+            logger.info(f"[SSO] Session established for {user_email}")
+            return None
+
+        except Exception as e:
+            logger.error(f"[SSO] Error ensuring local user: {str(e)}")
+            # En caso de error, permitir que continúe (fallback)
+            return None
 
     def _verify_session_with_cloud(self, session_id):
         """
