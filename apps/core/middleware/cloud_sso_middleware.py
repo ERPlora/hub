@@ -80,11 +80,13 @@ class CloudSSOMiddleware:
             return self._redirect_to_login(request)
 
         # Verificar sesión con Cloud API
-        is_authenticated, user_email = self._verify_session_with_cloud(session_id)
+        is_authenticated, user_data = self._verify_session_with_cloud(session_id)
 
         if not is_authenticated:
             logger.info(f"[SSO] Invalid session. Redirecting to login.")
             return self._redirect_to_login(request)
+
+        user_email = user_data.get('email')
 
         # En modo DEMO, cualquier usuario autenticado tiene acceso
         # No verificamos permisos de Hub específico
@@ -100,8 +102,9 @@ class CloudSSOMiddleware:
 
             logger.info(f"[SSO] User {user_email} authenticated and has access to Hub {self.hub_id}")
 
-        # Establecer email en request para uso en views
+        # Establecer datos de Cloud en request para uso en views
         request.cloud_user_email = user_email
+        request.cloud_user_data = user_data
 
         # Verificar si el usuario ya tiene sesión local válida
         local_user_id = request.session.get('local_user_id')
@@ -110,7 +113,7 @@ class CloudSSOMiddleware:
             return self.get_response(request)
 
         # No tiene sesión local → crear/obtener LocalUser y verificar PIN
-        redirect_response = self._ensure_local_user_and_session(request, user_email)
+        redirect_response = self._ensure_local_user_and_session(request, user_data)
         if redirect_response:
             return redirect_response
 
@@ -123,18 +126,26 @@ class CloudSSOMiddleware:
                 return True
         return False
 
-    def _ensure_local_user_and_session(self, request, user_email):
+    def _ensure_local_user_and_session(self, request, user_data):
         """
         Crea o obtiene LocalUser y establece sesión.
 
         Si el usuario no tiene PIN configurado, redirige a /setup-pin/.
         Si tiene PIN, establece la sesión local.
 
+        Args:
+            request: Django request
+            user_data: dict with 'email', 'user_id', 'name' from Cloud API
+
         Returns:
             HttpResponse redirect si necesita configurar PIN, None si sesión establecida
         """
         from apps.accounts.models import LocalUser
         from apps.configuration.models import HubConfig
+
+        user_email = user_data.get('email')
+        cloud_user_id = user_data.get('user_id')
+        cloud_name = user_data.get('name', '')
 
         try:
             # Intentar obtener usuario existente
@@ -145,9 +156,13 @@ class CloudSSOMiddleware:
                 hub_config = HubConfig.get_config()
                 is_first_user = LocalUser.objects.count() == 0
 
+                # Use name from Cloud if available, otherwise extract from email
+                name = cloud_name if cloud_name else user_email.split('@')[0]
+
                 local_user = LocalUser.objects.create(
+                    cloud_user_id=cloud_user_id,  # Link to Cloud user (nullable)
                     email=user_email,
-                    name=user_email.split('@')[0],  # Nombre temporal del email
+                    name=name,
                     role='admin' if is_first_user else 'cashier',
                     pin_hash='',  # Sin PIN todavía
                     language=hub_config.os_language,
@@ -192,7 +207,8 @@ class CloudSSOMiddleware:
         Verifica la sesión con Cloud API.
 
         Returns:
-            tuple: (is_authenticated: bool, user_email: str or None)
+            tuple: (is_authenticated: bool, user_data: dict or None)
+                   user_data contains: email, user_id, name
         """
         try:
             response = requests.get(
@@ -205,7 +221,11 @@ class CloudSSOMiddleware:
                 data = response.json()
                 # Cloud returns 'authenticated' field, check it
                 if data.get('authenticated'):
-                    return True, data.get('email')
+                    return True, {
+                        'email': data.get('email'),
+                        'user_id': data.get('user_id'),
+                        'name': data.get('name', ''),
+                    }
                 else:
                     return False, None
             else:
