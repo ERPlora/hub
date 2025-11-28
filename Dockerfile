@@ -46,14 +46,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (fast Python package manager)
 RUN pip install --no-cache-dir uv
 
-# Copy only dependency files first (for better layer caching)
-COPY pyproject.toml ./
+# Copy application code first (needed for uv pip install)
+COPY . .
 
 # Install dependencies directly (no venv needed in Docker)
-RUN uv pip install --system --no-cache -e .
-
-# Copy application code
-COPY . .
+# Note: We use regular install, not editable (-e) since this is production
+RUN uv pip install --system --no-cache .
 
 # Collect static files during build (don't change between Hubs)
 RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
