@@ -110,12 +110,21 @@ PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 # SECURITY - Fixed for erplora.com
 # =============================================================================
 
-ALLOWED_HOSTS = ['*.erplora.com', 'erplora.com', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = [
+    '*.erplora.com',
+    '*.int.erplora.com',  # INT environment subdomains
+    '*.pre.erplora.com',  # PRE environment subdomains
+    'erplora.com',
+    'localhost',
+    '127.0.0.1',
+]
 
 CSRF_COOKIE_SECURE = True
 CSRF_TRUSTED_ORIGINS = [
     'https://erplora.com',
     'https://*.erplora.com',
+    'https://*.int.erplora.com',  # INT environment
+    'https://*.pre.erplora.com',  # PRE environment
 ]
 
 SESSION_COOKIE_SECURE = True
