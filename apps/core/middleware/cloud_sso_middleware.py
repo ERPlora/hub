@@ -164,8 +164,16 @@ class CloudSSOMiddleware:
 
     def _redirect_to_login(self, request):
         """Redirige al login de Cloud con next parameter."""
-        login_url = f"{self.cloud_api_url}/login/"
+        # two_factor usa /account/login/ (sin 's')
+        # /accounts/login/ redirige a /account/login/
+        login_url = f"{self.cloud_api_url}/account/login/"
+
+        # Construir next_url asegurando HTTPS en producción
         next_url = request.build_absolute_uri()
+        # Forzar HTTPS si estamos en modo web (no local)
+        if self.deployment_mode == 'web' and next_url.startswith('http://'):
+            next_url = next_url.replace('http://', 'https://', 1)
+
         redirect_url = f"{login_url}?next={next_url}"
 
         logger.info(f"[SSO] Redirecting to login: {redirect_url}")
