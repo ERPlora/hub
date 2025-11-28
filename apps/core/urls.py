@@ -26,10 +26,13 @@ urlpatterns = [
     # Plugin Management
     path('plugins/', views.plugins, name='plugins'),
 
+    # Plugin action endpoints (used by template JavaScript)
+    path('plugins/activate/<str:plugin_id>/', views.api_plugin_activate, name='plugin_activate'),
+    path('plugins/deactivate/<str:plugin_id>/', views.api_plugin_deactivate, name='plugin_deactivate'),
+    path('plugins/delete/<str:plugin_id>/', views.api_plugin_delete, name='plugin_delete'),
+
     # Plugin API endpoints
     path('api/plugins/install/', views.api_plugin_install, name='api_plugin_install'),
-    path('api/plugins/activate/', views.api_plugin_activate, name='api_plugin_activate'),
-    path('api/plugins/uninstall/', views.api_plugin_uninstall, name='api_plugin_uninstall'),
     path('api/plugins/list/', views.api_plugins_list, name='api_plugins_list'),
 
     # Update API endpoints
