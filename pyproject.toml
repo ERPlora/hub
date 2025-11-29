@@ -34,6 +34,7 @@ dependencies = [
     "django-extensions>=3.2.0", # Comandos útiles (shell_plus, etc)
     "django-money>=3.0.0", # Currency handling
     "django-htmx>=1.17.0", # HTMX integration for Django
+    "django-health-check>=3.18.0", # Health check endpoint for monitoring
     # === LIBRERÍAS PARA PLUGINS (25 pre-empaquetadas) ===
     # Ver: config/plugin_allowed_deps.py para casos de uso
     # Imágenes & Media
