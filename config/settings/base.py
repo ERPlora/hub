@@ -83,6 +83,11 @@ INSTALLED_APPS = [
     # Third-party
     'djmoney',
     'django_htmx',
+    # Health Check
+    'health_check',
+    'health_check.db',
+    'health_check.cache',
+    'health_check.storage',
     # Hub apps
     'apps.accounts.apps.AccountsConfig',
     'apps.configuration.apps.ConfigurationConfig',

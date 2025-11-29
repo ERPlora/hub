@@ -23,6 +23,8 @@ from apps.plugins_runtime.router import plugin_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Health check endpoint (for Cloud monitoring)
+    path('ht/', include('health_check.urls')),
     # Refactored app URLs
     path('', include('apps.core.urls')),  # Health check, core views
     path('', include('apps.configuration.urls')),  # Root redirect, Dashboard, POS, settings (must be first for root URL)
