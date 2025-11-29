@@ -188,13 +188,29 @@ CORS_ALLOW_CREDENTIALS = True  # Allow cookies in CORS requests
 INSTALLED_APPS += ['corsheaders']
 
 # =============================================================================
-# MIDDLEWARE - Add CORS and Cloud SSO for web deployment
+# MIDDLEWARE - Add CORS, WhiteNoise and Cloud SSO for web deployment
 # =============================================================================
 
 # CORS middleware must be before CommonMiddleware
 MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
+# WhiteNoise right after SecurityMiddleware for static files
+MIDDLEWARE.insert(2, 'whitenoise.middleware.WhiteNoiseMiddleware')
 # Cloud SSO middleware after session middleware
-MIDDLEWARE.insert(3, 'apps.core.middleware.CloudSSOMiddleware')
+MIDDLEWARE.insert(4, 'apps.core.middleware.CloudSSOMiddleware')
+
+# =============================================================================
+# STATIC FILES - WhiteNoise configuration for production
+# =============================================================================
+
+# WhiteNoise serves static files from STATIC_ROOT with compression and caching
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+}
 
 # =============================================================================
 # PLUGIN SECURITY - Strict for web
