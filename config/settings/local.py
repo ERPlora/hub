@@ -126,3 +126,22 @@ if PLUGINS_DIR.exists():
 print(f"[LOCAL] Development mode")
 print(f"[LOCAL] Plugins: {PLUGINS_DIR}")
 print(f"[LOCAL] Data: {DATA_DIR}")
+
+# =============================================================================
+# DJANGO DEBUG TOOLBAR
+# =============================================================================
+
+INSTALLED_APPS += ['debug_toolbar']
+
+MIDDLEWARE = [
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
+] + MIDDLEWARE
+
+INTERNAL_IPS = [
+    '127.0.0.1',
+    'localhost',
+]
+
+DEBUG_TOOLBAR_CONFIG = {
+    'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
+}
