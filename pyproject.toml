@@ -23,75 +23,62 @@ dependencies = [
     # === CORE HUB ===
     "Django>=5.2.7",
     "python-decouple>=3.8",
-    "gunicorn>=21.0.0",               # WSGI server para Docker (web deployment)
-    "pywebview>=5.0.0",               # Desktop webview (desktop deployment)
-    "pyinstaller>=6.0.0",             # Desktop builds (desktop deployment)
-
+    "gunicorn>=21.0.0", # WSGI server para Docker (web deployment)
+    "pywebview>=5.0.0", # Desktop webview (desktop deployment)
+    "pyinstaller>=6.0.0", # Desktop builds (desktop deployment)
     # === PAQUETES DJANGO COMUNES ===
-    "django-components>=0.123",      # Componentes reutilizables
-    "django-filter>=24.0",           # Filtros avanzados para querysets
-    "djangorestframework>=3.15.0",   # Django REST Framework
-    "django-cors-headers>=4.0.0",    # CORS para APIs
-    "django-extensions>=3.2.0",      # Comandos útiles (shell_plus, etc)
-    "django-money>=3.0.0",           # Currency handling
-    "django-htmx>=1.17.0",           # HTMX integration for Django
-
+    "django-components>=0.123", # Componentes reutilizables
+    "django-filter>=24.0", # Filtros avanzados para querysets
+    "djangorestframework>=3.15.0", # Django REST Framework
+    "django-cors-headers>=4.0.0", # CORS para APIs
+    "django-extensions>=3.2.0", # Comandos útiles (shell_plus, etc)
+    "django-money>=3.0.0", # Currency handling
+    "django-htmx>=1.17.0", # HTMX integration for Django
     # === LIBRERÍAS PARA PLUGINS (25 pre-empaquetadas) ===
     # Ver: config/plugin_allowed_deps.py para casos de uso
-
     # Imágenes & Media
     "Pillow>=10.0.0",
     "qrcode>=7.4.0",
     "python-barcode>=0.15.0",
-
     # Office & Reports
     "openpyxl>=3.1.0",
     "reportlab>=4.0.0",
     "PyPDF2>=3.0.0",
-
     # Impresión
     "python-escpos>=3.0",
-
     # XML & Facturación Electrónica
     "lxml>=5.0.0",
     "xmltodict>=0.13.0",
     "signxml>=3.2.0",
     "cryptography>=42.0.0",
     "zeep>=4.2.0",
-
     # Network & Auth
     "requests>=2.31.0",
     "websockets>=12.0",
     "PyJWT>=2.8.0",
-
     # Fechas & Localización
     "python-dateutil>=2.8.2",
     "pytz>=2024.1",
     "phonenumbers>=8.13.0",
-
     # Pagos
     "stripe>=7.0.0",
-
     # Data & Analysis
     "pandas>=2.1.0",
     "numpy>=1.26.0",
-
     # Hardware POS
-    "pyserial>=3.5",                     # Puerto serial (RS232, cajón de dinero)
-    "pyusb>=1.2.1",                      # USB devices (impresoras, scanners)
-    "python-escpos>=3.0",                # Impresoras térmicas ESC/POS (USB/LAN/Serial)
-    "evdev>=1.6.0; sys_platform == 'linux'",  # Barcode scanners (Linux)
-    "pywinusb>=0.4.2; sys_platform == 'win32'",  # USB HID devices (Windows)
-
+    "pyserial>=3.5", # Puerto serial (RS232, cajón de dinero)
+    "pyusb>=1.2.1", # USB devices (impresoras, scanners)
+    "python-escpos>=3.0", # Impresoras térmicas ESC/POS (USB/LAN/Serial)
+    "evdev>=1.6.0; sys_platform == 'linux'", # Barcode scanners (Linux)
+    "pywinusb>=0.4.2; sys_platform == 'win32'", # USB HID devices (Windows)
     # Email & Validation
     "email-validator>=2.1.0",
-
     # Utils
     "python-slugify>=8.0.0",
     "pydantic>=2.5.0",
-
     # Scraping
     "beautifulsoup4>=4.12.0",
+    "whitenoise>=6.11.0",
 ]
 
 [project.optional-dependencies]
