@@ -44,7 +44,8 @@ class CloudSSOMiddleware:
 
     # URLs que no requieren autenticación
     EXEMPT_URLS = [
-        '/health/',  # Health check endpoint
+        '/health/',  # Legacy health check endpoint
+        '/ht/',      # django-health-check endpoint (for Cloud monitoring)
         '/static/',  # Static files
         '/media/',   # Media files
         '/favicon.ico',  # Favicon
