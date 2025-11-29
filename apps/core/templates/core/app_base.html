@@ -260,7 +260,7 @@
     {% block extra_head %}{% endblock %}
 </head>
 
-<body x-data="hubApp()" :class="isDark ? 'dark' : ''">
+<body x-data="hubApp()" class="{% if HUB_CONFIG.dark_mode %}dark{% endif %}" :class="isDark ? 'dark' : ''">
     <ion-app mode="ios">
         <!-- Menu (Sidebar) -->
         <ion-menu content-id="main-content" menu-id="main-menu" type="reveal" style="--width: 16rem;">
