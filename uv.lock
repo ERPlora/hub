@@ -496,6 +496,19 @@ wheels = [
 ]
 
 [[package]]
+name = "django-debug-toolbar"
+version = "6.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "sqlparse" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c0/50/acae2dd379164f6f4c6b6b36fd48a4d21b02095a03f4df7c30a8d1f1a62c/django_debug_toolbar-6.1.0.tar.gz", hash = "sha256:e962ec350c9be8bdba918138e975a9cdb193f60ec396af2bb71b769e8e165519", size = 309141, upload-time = "2025-10-30T19:50:39.458Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6d/72/685c978af45ad08257e2c69687a873eda6b6531c79b6e6091794c41c5ff6/django_debug_toolbar-6.1.0-py3-none-any.whl", hash = "sha256:e214dea4494087e7cebdcea84223819c5eb97f9de3110a3665ad673f0ba98413", size = 269069, upload-time = "2025-10-30T19:50:37.71Z" },
+]
+
+[[package]]
 name = "django-extensions"
 version = "4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -517,6 +530,31 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/2c/e4/465d2699cd388c0005fb8d6ae6709f239917c6d8790ac35719676fffdcf3/django_filter-25.2.tar.gz", hash = "sha256:760e984a931f4468d096f5541787efb8998c61217b73006163bf2f9523fe8f23", size = 143818, upload-time = "2025-10-05T09:51:31.521Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/40/6a02495c5658beb1f31eb09952d8aa12ef3c2a66342331ce3a35f7132439/django_filter-25.2-py3-none-any.whl", hash = "sha256:9c0f8609057309bba611062fe1b720b4a873652541192d232dd28970383633e3", size = 94145, upload-time = "2025-10-05T09:51:29.728Z" },
+]
+
+[[package]]
+name = "django-health-check"
+version = "3.20.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1e/a5/5c33c7dc834df3351f9acf448e8fec97b096db32c94265885a1062841199/django_health_check-3.20.0.tar.gz", hash = "sha256:cd69ac5facf73fe7241d9492d939b57bd20e24f46c4edea91e6a900bf22c2d8e", size = 20641, upload-time = "2025-06-16T09:22:35.015Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/7f/49ba63f078015b0a52e09651b94ba16b41154ac7079c83153edd14e15ca0/django_health_check-3.20.0-py3-none-any.whl", hash = "sha256:bcb2b8f36f463cead0564a028345c5b17e2a2d18e9cc88ecd611b13a26521926", size = 31788, upload-time = "2025-06-16T09:22:32.069Z" },
+]
+
+[[package]]
+name = "django-htmx"
+version = "1.26.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "asgiref" },
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e8/ea/3d0fb10e6ebbceab57b5e228c8ae5e4ebed3b6d6767d07468923ca000fa3/django_htmx-1.26.0.tar.gz", hash = "sha256:88ecc2f8a3f13ad5a50e6b16be127f04fba369124cc40a09b21ce33babb04aa6", size = 65345, upload-time = "2025-09-22T09:23:41.582Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/fc/dbbc54af504427f5f248a73cf9a2d40bfd22631bbf042d313563acc4d223/django_htmx-1.26.0-py3-none-any.whl", hash = "sha256:3a80ffaa6df5a07e833752cd8ada7cee0fa711787841ab17a805075b1aecacc7", size = 62122, upload-time = "2025-09-22T09:23:40.18Z" },
 ]
 
 [[package]]
@@ -657,12 +695,16 @@ dependencies = [
     { name = "django" },
     { name = "django-components" },
     { name = "django-cors-headers" },
+    { name = "django-debug-toolbar" },
     { name = "django-extensions" },
     { name = "django-filter" },
+    { name = "django-health-check" },
+    { name = "django-htmx" },
     { name = "django-money" },
     { name = "djangorestframework" },
     { name = "email-validator" },
     { name = "evdev", marker = "sys_platform == 'linux'" },
+    { name = "gunicorn" },
     { name = "lxml" },
     { name = "numpy" },
     { name = "openpyxl" },
@@ -689,6 +731,7 @@ dependencies = [
     { name = "signxml" },
     { name = "stripe" },
     { name = "websockets" },
+    { name = "whitenoise" },
     { name = "xmltodict" },
     { name = "zeep" },
 ]
@@ -697,10 +740,12 @@ dependencies = [
 dev = [
     { name = "coverage" },
     { name = "faker" },
+    { name = "freezegun" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-django" },
     { name = "python-semantic-release" },
+    { name = "responses" },
 ]
 
 [package.metadata]
@@ -711,13 +756,18 @@ requires-dist = [
     { name = "django", specifier = ">=5.2.7" },
     { name = "django-components", specifier = ">=0.123" },
     { name = "django-cors-headers", specifier = ">=4.0.0" },
+    { name = "django-debug-toolbar", specifier = ">=6.1.0" },
     { name = "django-extensions", specifier = ">=3.2.0" },
     { name = "django-filter", specifier = ">=24.0" },
+    { name = "django-health-check", specifier = ">=3.18.0" },
+    { name = "django-htmx", specifier = ">=1.17.0" },
     { name = "django-money", specifier = ">=3.0.0" },
     { name = "djangorestframework", specifier = ">=3.15.0" },
     { name = "email-validator", specifier = ">=2.1.0" },
     { name = "evdev", marker = "sys_platform == 'linux'", specifier = ">=1.6.0" },
     { name = "faker", marker = "extra == 'dev'", specifier = ">=37.12.0" },
+    { name = "freezegun", marker = "extra == 'dev'", specifier = ">=1.4.0" },
+    { name = "gunicorn", specifier = ">=21.0.0" },
     { name = "lxml", specifier = ">=5.0.0" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
@@ -745,9 +795,11 @@ requires-dist = [
     { name = "qrcode", specifier = ">=7.4.0" },
     { name = "reportlab", specifier = ">=4.0.0" },
     { name = "requests", specifier = ">=2.31.0" },
+    { name = "responses", marker = "extra == 'dev'", specifier = ">=0.25.0" },
     { name = "signxml", specifier = ">=3.2.0" },
     { name = "stripe", specifier = ">=7.0.0" },
     { name = "websockets", specifier = ">=12.0" },
+    { name = "whitenoise", specifier = ">=6.11.0" },
     { name = "xmltodict", specifier = ">=0.13.0" },
     { name = "zeep", specifier = ">=4.2.0" },
 ]
@@ -781,6 +833,18 @@ wheels = [
 ]
 
 [[package]]
+name = "freezegun"
+version = "1.5.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/95/dd/23e2f4e357f8fd3bdff613c1fe4466d21bfb00a6177f238079b17f7b1c84/freezegun-1.5.5.tar.gz", hash = "sha256:ac7742a6cc6c25a2c35e9292dfd554b897b517d2dec26891a2e8debf205cb94a", size = 35914, upload-time = "2025-08-09T10:39:08.338Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5e/2e/b41d8a1a917d6581fc27a35d05561037b048e47df50f27f8ac9c7e27a710/freezegun-1.5.5-py3-none-any.whl", hash = "sha256:cd557f4a75cf074e84bc374249b9dd491eaeacd61376b9eb3c423282211619d2", size = 19266, upload-time = "2025-08-09T10:39:06.636Z" },
+]
+
+[[package]]
 name = "gitdb"
 version = "4.0.12"
 source = { registry = "https://pypi.org/simple" }
@@ -802,6 +866,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9a/c8/dd58967d119baab745caec2f9d853297cec1989ec1d63f677d3880632b88/gitpython-3.1.45.tar.gz", hash = "sha256:85b0ee964ceddf211c41b9f27a49086010a190fd8132a24e21f362a4b36a791c", size = 215076, upload-time = "2025-07-24T03:45:54.871Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/01/61/d4b89fec821f72385526e1b9d9a3a0385dda4a72b206d28049e2c7cd39b8/gitpython-3.1.45-py3-none-any.whl", hash = "sha256:8908cb2e02fb3b93b7eb0f2827125cb699869470432cc885f019b8fd0fccff77", size = 208168, upload-time = "2025-07-24T03:45:52.517Z" },
+]
+
+[[package]]
+name = "gunicorn"
+version = "23.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/34/72/9614c465dc206155d93eff0ca20d42e1e35afc533971379482de953521a4/gunicorn-23.0.0.tar.gz", hash = "sha256:f014447a0101dc57e294f6c18ca6b40227a4c90e9bdb586042628030cba004ec", size = 375031, upload-time = "2024-08-10T20:25:27.378Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/7d/6dac2a6e1eba33ee43f318edbed4ff29151a49b5d37f080aad1e6469bca4/gunicorn-23.0.0-py3-none-any.whl", hash = "sha256:ec400d38950de4dfd418cff8328b2c8faed0edb0d517d3394e457c317908ca4d", size = 85029, upload-time = "2024-08-10T20:25:24.996Z" },
 ]
 
 [[package]]
@@ -1995,6 +2071,20 @@ wheels = [
 ]
 
 [[package]]
+name = "responses"
+version = "0.25.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/95/89c054ad70bfef6da605338b009b2e283485835351a9935c7bfbfaca7ffc/responses-0.25.8.tar.gz", hash = "sha256:9374d047a575c8f781b94454db5cab590b6029505f488d12899ddb10a4af1cf4", size = 79320, upload-time = "2025-08-08T19:01:46.709Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/4c/cc276ce57e572c102d9542d383b2cfd551276581dc60004cb94fe8774c11/responses-0.25.8-py3-none-any.whl", hash = "sha256:0c710af92def29c8352ceadff0c3fe340ace27cf5af1bbe46fb71275bcd2831c", size = 34769, upload-time = "2025-08-08T19:01:45.018Z" },
+]
+
+[[package]]
 name = "rich"
 version = "14.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2234,6 +2324,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/86/eb/20b6cdf273913d0ad05a6a14aed4b9a85591c18a987a3d47f20fa13dcc47/websockets-15.0.1-cp313-cp313-win32.whl", hash = "sha256:ba9e56e8ceeeedb2e080147ba85ffcd5cd0711b89576b83784d8605a7df455fa", size = 176393, upload-time = "2025-03-05T20:02:53.814Z" },
     { url = "https://files.pythonhosted.org/packages/1b/6c/c65773d6cab416a64d191d6ee8a8b1c68a09970ea6909d16965d26bfed1e/websockets-15.0.1-cp313-cp313-win_amd64.whl", hash = "sha256:e09473f095a819042ecb2ab9465aee615bd9c2028e4ef7d933600a8401c79561", size = 176837, upload-time = "2025-03-05T20:02:55.237Z" },
     { url = "https://files.pythonhosted.org/packages/fa/a8/5b41e0da817d64113292ab1f8247140aac61cbf6cfd085d6a0fa77f4984f/websockets-15.0.1-py3-none-any.whl", hash = "sha256:f7a866fbc1e97b5c617ee4116daaa09b722101d4a3c170c787450ba409f9736f", size = 169743, upload-time = "2025-03-05T20:03:39.41Z" },
+]
+
+[[package]]
+name = "whitenoise"
+version = "6.11.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/15/95/8c81ec6b6ebcbf8aca2de7603070ccf37dbb873b03f20708e0f7c1664bc6/whitenoise-6.11.0.tar.gz", hash = "sha256:0f5bfce6061ae6611cd9396a8231e088722e4fc67bc13a111be74c738d99375f", size = 26432, upload-time = "2025-09-18T09:16:10.995Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/e9/4366332f9295fe0647d7d3251ce18f5615fbcb12d02c79a26f8dba9221b3/whitenoise-6.11.0-py3-none-any.whl", hash = "sha256:b2aeb45950597236f53b5342b3121c5de69c8da0109362aee506ce88e022d258", size = 20197, upload-time = "2025-09-18T09:16:09.754Z" },
 ]
 
 [[package]]

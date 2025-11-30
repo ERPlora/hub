@@ -23,7 +23,10 @@ from apps.plugins_runtime.router import plugin_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Health check endpoint (for Cloud monitoring)
+    path('ht/', include('health_check.urls')),
     # Refactored app URLs
+    path('', include('apps.core.urls')),  # Health check, core views
     path('', include('apps.configuration.urls')),  # Root redirect, Dashboard, POS, settings (must be first for root URL)
     path('', include('apps.accounts.urls')),  # Login, employees, auth
     path('', include('apps.sync.urls')),  # Sync, updates, FRP
@@ -37,3 +40,10 @@ urlpatterns += plugin_urlpatterns
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0] if settings.STATICFILES_DIRS else None)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+    # Django Debug Toolbar (only if installed and in INSTALLED_APPS)
+    if 'debug_toolbar' in settings.INSTALLED_APPS:
+        import debug_toolbar
+        urlpatterns = [
+            path('__debug__/', include(debug_toolbar.urls)),
+        ] + urlpatterns

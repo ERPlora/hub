@@ -6,9 +6,12 @@ class LocalUser(models.Model):
     """
     Local users stored in Hub's SQLite database.
     These users are linked to Cloud users but can log in offline with PIN.
+
+    Note: cloud_user_id is nullable to support DEMO_MODE where users
+    authenticate via Cloud SSO but we don't need strict Cloud linking.
     """
-    # User information from Cloud
-    cloud_user_id = models.IntegerField(unique=True)
+    # User information from Cloud (nullable for DEMO_MODE)
+    cloud_user_id = models.IntegerField(unique=True, null=True, blank=True)
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=255)
 

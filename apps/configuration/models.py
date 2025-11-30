@@ -182,7 +182,17 @@ class HubConfig(SingletonConfigMixin, models.Model):
     cloud_api_token = models.CharField(
         max_length=255,
         blank=True,
-        help_text='Token for authenticating HTTP requests to Cloud API'
+        help_text='Legacy token (deprecated, use hub_jwt instead)'
+    )
+
+    # JWT Authentication (Arquitectura Unificada Opción A)
+    hub_jwt = models.TextField(
+        blank=True,
+        help_text='JWT token for Hub-to-Cloud authentication (RS256, 1 year)'
+    )
+    cloud_public_key = models.TextField(
+        blank=True,
+        help_text='Cloud RSA public key for validating command JWTs'
     )
 
     # Configuration flags

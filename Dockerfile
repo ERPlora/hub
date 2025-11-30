@@ -1,25 +1,36 @@
 # ==============================================================================
 # ERPlora Hub - Production Dockerfile
 # ==============================================================================
-# Single-stage optimized build for Cloud Hub deployments (Docker containers)
-# Each Hub runs as an independent container with its own SQLite database
+# Build on deploy por Coolify (sin registry externo)
+# Coolify clona el repo → detecta Dockerfile → build → run
 #
-# VOLUMES (mount for persistence):
-#   /app/db       - SQLite database
-#   /app/media    - User uploads (images, logos)
-#   /app/plugins  - Installed plugins
-#   /app/logs     - Application logs
-#   /app/backups  - Automatic backups
+# MODES:
+#   1. PRODUCTION (default): Data on external volume (persistent)
+#   2. DEMO (DEMO_MODE=true): Data in /app/data/ (non-persistent)
 #
-# ENVIRONMENT VARIABLES (injected by Coolify):
-#   HUB_ID            - Unique Hub identifier (UUID)
-#   CLOUD_API_URL     - Cloud API endpoint
-#   CLOUD_API_TOKEN   - Hub authentication token
-#   ALLOWED_HOSTS     - Comma-separated list of allowed hosts
-#   SECRET_KEY        - Django secret key (auto-generated if not set)
+# VOLUMES (mount for persistence - production mode):
+#   Defined by HUB_VOLUME_PATH/{HUB_NAME}-{HUB_ID}/
+#   ├── db/       - SQLite database
+#   ├── media/    - User uploads (images, logos)
+#   ├── plugins/  - Installed plugins
+#   ├── logs/     - Application logs
+#   ├── backups/  - Automatic backups
+#   ├── reports/  - Generated reports
+#   └── temp/     - Temporary files
 #
-# BUILD: docker build -t erplora/hub:latest .
-# RUN:   docker run -p 8000:8000 -v hub_data:/app/db erplora/hub:latest
+# ENVIRONMENT VARIABLES (injected by Coolify from Cloud model):
+#   HUB_NAME          - Slug del Hub (ej: tienda-de-maria)
+#   HUB_ID            - UUID corto (ej: a1b2c3)
+#   HUB_VOLUME_PATH   - Ruta del volumen Hetzner (ej: /mnt/HC_Volume_104073157)
+#   DEMO_MODE         - Set to "true" for demo deployments (non-persistent)
+#
+# Result (production):
+#   URL:  https://tienda-de-maria.a.erplora.com
+#   Data: /mnt/HC_Volume_104073157/tienda-de-maria-a1b2c3/
+#
+# Result (demo):
+#   URL:  https://demo.int.erplora.com
+#   Data: /app/data/ (inside container, non-persistent)
 # ==============================================================================
 
 FROM python:3.11-slim
@@ -30,26 +41,9 @@ LABEL org.opencontainers.image.description="Cloud Hub for ERPlora POS System"
 LABEL org.opencontainers.image.vendor="ERPlora"
 LABEL org.opencontainers.image.source="https://github.com/ERPlora/hub"
 
-# Prevent Python from writing pyc files and buffering stdout/stderr
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    # Pip configuration
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    # App configuration defaults
-    DEPLOYMENT_MODE=web \
-    DEBUG=False \
-    ALLOWED_HOSTS=* \
-    HUB_LOCAL_PORT=8000
-
 WORKDIR /app
 
 # Install system dependencies
-# - build-essential: Required for compiling some Python packages
-# - libusb-1.0-0: For USB device access (thermal printers, barcode scanners)
-# - cups: For printing support (python-escpos)
-# - curl: For healthcheck
-# - libpq-dev: PostgreSQL client (future compatibility)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libusb-1.0-0 \
@@ -61,80 +55,46 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (fast Python package manager)
 RUN pip install --no-cache-dir uv
 
-# Copy only dependency files first (for better layer caching)
-COPY pyproject.toml ./
-
-# Install dependencies
-# Note: We copy code after dependencies to leverage Docker layer caching
-# Using --system to install directly (no venv needed in Docker)
-# Note: Using sync instead of install for better reproducibility
-RUN uv pip install --system --no-cache \
-    Django>=5.2.7 \
-    python-decouple>=3.8 \
-    gunicorn>=21.0.0 \
-    whitenoise>=6.6.0 \
-    django-components>=0.123 \
-    django-filter>=24.0 \
-    djangorestframework>=3.15.0 \
-    django-cors-headers>=4.0.0 \
-    django-extensions>=3.2.0 \
-    django-money>=3.0.0 \
-    django-htmx>=1.17.0 \
-    Pillow>=10.0.0 \
-    qrcode>=7.4.0 \
-    python-barcode>=0.15.0 \
-    openpyxl>=3.1.0 \
-    reportlab>=4.0.0 \
-    PyPDF2>=3.0.0 \
-    python-escpos>=3.0 \
-    lxml>=5.0.0 \
-    xmltodict>=0.13.0 \
-    signxml>=3.2.0 \
-    cryptography>=42.0.0 \
-    zeep>=4.2.0 \
-    requests>=2.31.0 \
-    websockets>=12.0 \
-    PyJWT>=2.8.0 \
-    python-dateutil>=2.8.2 \
-    pytz>=2024.1 \
-    phonenumbers>=8.13.0 \
-    stripe>=7.0.0 \
-    pandas>=2.1.0 \
-    numpy>=1.26.0 \
-    pyserial>=3.5 \
-    pyusb>=1.2.1 \
-    email-validator>=2.1.0 \
-    python-slugify>=8.0.0 \
-    pydantic>=2.5.0 \
-    beautifulsoup4>=4.12.0
-
-# Copy application code
+# Copy application code first (needed for uv pip install)
 COPY . .
 
-# Create necessary directories for volumes
-# These will be mount points for persistent data
-RUN mkdir -p /app/db /app/media /app/plugins /app/logs /app/backups /app/temp /app/staticfiles \
-    && chmod -R 755 /app
+# Install dependencies directly (no venv needed in Docker)
+# Note: We use regular install, not editable (-e) since this is production
+RUN uv pip install --system --no-cache .
 
-# Collect static files
+# Collect static files during build (don't change between Hubs)
 RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
 
 # Create non-root user for security
+# Also create /app/data directory for DEMO_MODE (non-persistent storage)
 RUN useradd --create-home --shell /bin/bash hubuser \
+    && mkdir -p /app/data \
     && chown -R hubuser:hubuser /app
 USER hubuser
 
-# Expose port
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+# Fixed variables (don't change between Hubs)
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HUB_ENV=web \
+    DEBUG=false
+
+# Dynamic variables come from Coolify at deploy time:
+# HUB_NAME, HUB_ID, HUB_VOLUME_PATH
+
+# =============================================================================
+# EXPOSE & HEALTHCHECK
+# =============================================================================
 EXPOSE 8000
 
-# Healthcheck using curl (more reliable than Python inline)
-# Checks the /health/ endpoint every 30 seconds
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health/ || exit 1
 
-# Start script
-# 1. Run migrations (create/update database schema)
-# 2. Start gunicorn (production WSGI server)
+# =============================================================================
+# ENTRYPOINT
+# =============================================================================
 CMD ["sh", "-c", "\
     echo '=== ERPlora Hub Starting ===' && \
     echo 'Running database migrations...' && \

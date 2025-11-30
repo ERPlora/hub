@@ -347,15 +347,49 @@ def cloud_login(request):
 
 
 @csrf_exempt
-@require_http_methods(["POST"])
 def setup_pin(request):
     """
-    Setup PIN for first-time Cloud login user
+    Setup PIN for first-time Cloud login user.
+
+    GET: Shows PIN setup page (for SSO flow)
+    POST: Saves PIN and establishes session
     """
+    if request.method == 'GET':
+        # SSO flow: user was redirected here to setup PIN
+        pending_user_id = request.session.get('pending_user_id')
+        pending_user_email = request.session.get('pending_user_email')
+
+        if not pending_user_id:
+            # No pending user, redirect to login
+            return redirect('accounts:login')
+
+        try:
+            user = LocalUser.objects.get(id=pending_user_id)
+        except LocalUser.DoesNotExist:
+            return redirect('accounts:login')
+
+        # Show PIN setup page
+        pending_user_data = {
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+        }
+        context = {
+            'show_pin_setup': True,
+            'pending_user': json.dumps(pending_user_data),
+            'local_users_json': '[]',  # No employees list needed for setup
+        }
+        return render(request, 'core/login.html', context)
+
+    # POST: Save PIN
     try:
         data = json.loads(request.body)
         user_id = data.get('user_id')
         pin = data.get('pin')
+
+        # Also check session for pending user (SSO flow)
+        if not user_id:
+            user_id = request.session.get('pending_user_id')
 
         if not user_id or not pin:
             return JsonResponse({'success': False, 'error': 'Missing data'})
@@ -375,12 +409,18 @@ def setup_pin(request):
         user.last_login = timezone.now()
         user.save()
 
+        # Clear pending user from session
+        if 'pending_user_id' in request.session:
+            del request.session['pending_user_id']
+        if 'pending_user_email' in request.session:
+            del request.session['pending_user_email']
+
         # Store user session
         request.session['local_user_id'] = user.id
         request.session['user_name'] = user.name
         request.session['user_email'] = user.email
         request.session['user_role'] = user.role
-        request.session['user_language'] = user.language  # User's preferred language
+        request.session['user_language'] = user.language
 
         return JsonResponse({'success': True})
 

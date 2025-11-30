@@ -31,8 +31,8 @@
     <script type="module" src="{% static 'js/ionic/ionic.esm.js' %}"></script>
 
     <!-- Ionicons (offline) -->
-    <script type="module" src="{% static 'ionicons/dist/ionicons/ionicons.esm.js' %}"></script>
-    <script nomodule src="{% static 'ionicons/dist/ionicons/ionicons.js' %}"></script>
+    <script type="module" src="{% static 'ionicons/dist/esm/ionicons.js' %}"></script>
+    <script nomodule src="{% static 'ionicons/dist/ionicons.js' %}"></script>
 
     <!-- Utils (Ionic helpers for alerts, toasts, modals, etc.) -->
     <script src="{% static 'core/js/utils.js' %}"></script>
@@ -260,7 +260,7 @@
     {% block extra_head %}{% endblock %}
 </head>
 
-<body x-data="hubApp()" :class="isDark ? 'dark' : ''">
+<body x-data="hubApp()" class="{% if HUB_CONFIG.dark_mode %}dark{% endif %}" :class="isDark ? 'dark' : ''">
     <ion-app mode="ios">
         <!-- Menu (Sidebar) -->
         <ion-menu content-id="main-content" menu-id="main-menu" type="reveal" style="--width: 16rem;">
