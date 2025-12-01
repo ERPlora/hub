@@ -1,0 +1,124 @@
+/**
+ * No More Tables - Responsive Table Pattern
+ * Converts tables to stacked cards on mobile devices
+ * https://css-tricks.com/responsive-data-tables/
+ */
+
+/* Default table styles */
+table.responsive-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table.responsive-table th,
+table.responsive-table td {
+    padding: 0.75rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+table.responsive-table thead {
+    background-color: var(--ion-color-light, #f4f5f8);
+}
+
+table.responsive-table tbody tr {
+    border-bottom: 1px solid var(--ion-border-color, #c8c7cc);
+}
+
+table.responsive-table tbody tr:hover {
+    background-color: var(--ion-color-light-tint, #f9fafb);
+}
+
+/* Mobile responsive transformation */
+@media only screen and (max-width: 768px) {
+    /* Force table to not be like tables anymore */
+    table.responsive-table,
+    table.responsive-table thead,
+    table.responsive-table tbody,
+    table.responsive-table th,
+    table.responsive-table td,
+    table.responsive-table tr {
+        display: block;
+    }
+
+    /* Hide table headers (but not display: none for accessibility) */
+    table.responsive-table thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    table.responsive-table tr {
+        margin-bottom: 1rem;
+        border: 1px solid var(--ion-border-color, #c8c7cc);
+        border-radius: 8px;
+        background: var(--ion-background-color, #fff);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    table.responsive-table td {
+        /* Behave like a "row" */
+        border: none;
+        border-bottom: 1px solid var(--ion-border-color, #c8c7cc);
+        position: relative;
+        padding-left: 50%;
+        min-height: 2.5rem;
+    }
+
+    table.responsive-table td:last-child {
+        border-bottom: none;
+    }
+
+    table.responsive-table td:before {
+        /* Now like a table header */
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        left: 0.75rem;
+        width: 45%;
+        padding-right: 0.75rem;
+        white-space: nowrap;
+        font-weight: 600;
+        color: var(--ion-color-medium, #92949c);
+        font-size: 0.875rem;
+    }
+
+    /* Label the data using data-label attribute */
+    table.responsive-table td[data-label]:before {
+        content: attr(data-label);
+    }
+
+    /* Alternative: numbered labels */
+    table.responsive-table td:nth-of-type(1):before { content: attr(data-label); }
+    table.responsive-table td:nth-of-type(2):before { content: attr(data-label); }
+    table.responsive-table td:nth-of-type(3):before { content: attr(data-label); }
+    table.responsive-table td:nth-of-type(4):before { content: attr(data-label); }
+    table.responsive-table td:nth-of-type(5):before { content: attr(data-label); }
+    table.responsive-table td:nth-of-type(6):before { content: attr(data-label); }
+}
+
+/* Utility classes for tables */
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+@media only screen and (max-width: 768px) {
+    .table-actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
+
+/* Empty state for tables */
+.table-empty {
+    text-align: center;
+    padding: 2rem;
+    color: var(--ion-color-medium, #92949c);
+}
+
+.table-empty ion-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
