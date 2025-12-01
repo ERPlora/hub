@@ -28,6 +28,7 @@ media
 build/
 develop-eggs/
 dist/
+!static/ionicons/dist/
 downloads/
 eggs/
 .eggs/
