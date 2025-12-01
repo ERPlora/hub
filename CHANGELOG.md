@@ -1,6 +1,37 @@
 # CHANGELOG
 
 
+## v0.14.0-rc.2 (2025-12-01)
+
+### Bug Fixes
+
+* fix: add missing no-more-tables.css for responsive tables
+
+This CSS file was referenced in base.html but missing from the static files,
+causing a 500 error when WhiteNoise tried to serve it. ([`7da1122`](https://github.com/ERPlora/hub/commit/7da112296dbba4a46f958d0eade48347c4b4ada7))
+
+* fix: add ionicons/dist to git (was ignored by dist/ rule)
+
+The dist/ rule in .gitignore was excluding static/ionicons/dist/ which
+contains the actual ionicons JS and SVG files needed for the Hub UI.
+
+Added exception for static/ionicons/dist/ in .gitignore and included
+all ionicons distribution files. ([`87b1699`](https://github.com/ERPlora/hub/commit/87b1699cb5bbb419b3f6a938689d3663bd41ca34))
+
+* fix: remove unused no-more-tables.css
+
+The CSS file was referenced in base.html but none of its classes
+(responsive-table, table-actions, table-empty) were used anywhere.
+
+This was causing a 500 error when WhiteNoise tried to serve it because
+the file didn't exist in staticfiles manifest. ([`2c02d36`](https://github.com/ERPlora/hub/commit/2c02d36e0de802a6f10f464b848691f49d6ce8f8))
+
+* fix: add missing no-more-tables.css for responsive tables
+
+This CSS file was referenced in base.html but missing from the static files,
+causing a 500 error when WhiteNoise tried to serve it. ([`9e051b5`](https://github.com/ERPlora/hub/commit/9e051b5d56b29138e0d2ae03bd1445c1e3ac8e0d))
+
+
 ## v0.14.0-rc.1 (2025-11-30)
 
 ### Bug Fixes
