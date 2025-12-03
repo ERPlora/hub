@@ -2,28 +2,25 @@
 ERPlora Hub - Web/Docker Settings
 
 Configuración para despliegue en Docker/Cloud.
-Este es el entorno default para Dockerfile.
+Desplegado automáticamente via Coolify API cuando el cliente compra un Hub.
 
-Variables de entorno requeridas:
+Variables de entorno (configuradas por Cloud durante deploy):
+  - HUB_ID: UUID del Hub (ej: 1aba6e2f-777b-450d-9818-edc2bd0a93c4)
   - HUB_NAME: Nombre del Hub (ej: mi-tienda)
-  - HUB_ID: UUID del Hub (ej: abc123)
-  - HUB_VOLUME_PATH: Ruta del volumen externo (desde modelo Cloud)
+  - AWS_* : Credenciales S3
 
-Estructura en disco (modo normal - persistente):
-  {HUB_VOLUME_PATH}/{HUB_NAME}-{HUB_ID}/
-  ├── db/db.sqlite3
-  ├── media/
-  ├── plugins/
-  ├── logs/
-  ├── backups/
-  ├── reports/
-  └── temp/
+Estructura de almacenamiento (todo automático via HUB_ID):
 
-Modo DEMO (DEMO_MODE=true):
-  - Datos almacenados en /app/data/ (dentro del contenedor)
-  - NO persistente - se pierde al reiniciar contenedor
-  - Sin problemas de permisos con volúmenes externos
-  - Ideal para demos y testing
+  Docker Volume /app/data/{HUB_ID}/:
+    - db/db.sqlite3 - Base de datos SQLite
+
+  S3 hubs/{HUB_ID}/:
+    - logs/        - Logs de aplicación
+    - backups/     - Backups de BD
+    - temp/        - Archivos temporales
+    - plugin_data/ - Datos de plugins
+    - reports/     - Reportes generados
+    - media/       - Archivos subidos (Django media)
 """
 
 from .base import *
@@ -35,74 +32,84 @@ from pathlib import Path
 
 DEPLOYMENT_MODE = 'web'
 DEBUG = config('DEBUG', default=False, cast=bool)
-OFFLINE_ENABLED = False
-CLOUD_SYNC_REQUIRED = True
 
 # =============================================================================
-# DEMO MODE - Non-persistent data inside container
+# HUB IDENTITY (from Cloud database, passed via env vars during deploy)
 # =============================================================================
 
-DEMO_MODE = config('DEMO_MODE', default=False, cast=bool)
-
-# =============================================================================
-# HUB IDENTITY (from Cloud database model)
-# =============================================================================
-
+HUB_ID = config('HUB_ID')  # Required - UUID del Hub
 HUB_NAME = config('HUB_NAME', default='hub')
-HUB_ID = config('HUB_ID', default='default')
 
 # =============================================================================
-# PATHS - Conditional based on DEMO_MODE
+# PATHS - Local storage for SQLite (persistent via Docker Volume)
 # =============================================================================
 
-if DEMO_MODE:
-    # Demo mode: data inside container (non-persistent, no permission issues)
-    DATA_DIR = Path('/app/data')
-    HUB_FOLDER_NAME = 'demo'
-    print(f"[WEB] DEMO MODE: Data stored in /app/data/ (non-persistent)")
-else:
-    # Production mode: data on external volume (persistent)
-    HUB_VOLUME_PATH = Path(config('HUB_VOLUME_PATH', default='/app'))
-    HUB_FOLDER_NAME = f"{HUB_NAME}-{HUB_ID}"
-    DATA_DIR = HUB_VOLUME_PATH / HUB_FOLDER_NAME
-
+# Data directory - /app/data is a Docker Volume shared by all Hubs on this server
+# Each Hub uses HUB_ID as subfolder to isolate its database
+DATA_DIR = Path('/app/data')
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Database
-DATABASE_DIR = DATA_DIR / 'db'
+# Database (SQLite) - isolated by HUB_ID folder
+# Structure: /app/data/{HUB_ID}/db/db.sqlite3
+DATABASE_DIR = DATA_DIR / HUB_ID / 'db'
 DATABASE_DIR.mkdir(parents=True, exist_ok=True)
 DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
 
-# Media
-MEDIA_ROOT = DATA_DIR / 'media'
-MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-
-# Plugins
-PLUGINS_DIR = DATA_DIR / 'plugins'
-PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
+# Plugins - stored locally in container (distributed from Cloud marketplace)
+# Coolify deploys with latest plugins from GitHub repo
+PLUGINS_DIR = BASE_DIR / 'plugins'
 PLUGINS_ROOT = PLUGINS_DIR
 PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
 
-# Logs
-LOGS_DIR = DATA_DIR / 'logs'
+# =============================================================================
+# S3 STORAGE - Hetzner Object Storage (hubs/{HUB_ID}/)
+# =============================================================================
+
+AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='erplora')
+AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default='https://fsn1.your-objectstorage.com')
+AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='eu-central')
+AWS_LOCATION = f'hubs/{HUB_ID}'  # Each Hub has its own S3 folder
+AWS_DEFAULT_ACL = 'public-read'
+AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
+AWS_S3_SIGNATURE_VERSION = 's3v4'
+AWS_S3_FILE_OVERWRITE = False
+AWS_QUERYSTRING_AUTH = False
+AWS_S3_USE_SSL = True
+AWS_S3_VERIFY = True
+
+# Django storages configuration
+INSTALLED_APPS += ['storages']
+MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/'
+
+# Local temp directory for processing (ephemeral, inside container)
+MEDIA_ROOT = Path('/tmp/hub_media')
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# S3 paths for Hub data (all under hubs/{HUB_ID}/)
+S3_LOGS_PREFIX = 'logs'
+S3_BACKUPS_PREFIX = 'backups'
+S3_TEMP_PREFIX = 'temp'
+S3_PLUGIN_DATA_PREFIX = 'plugin_data'
+S3_REPORTS_PREFIX = 'reports'
+
+# Local temp paths for code that needs filesystem access
+LOGS_DIR = MEDIA_ROOT / 'logs'
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
-LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
-
-# Backups
-BACKUPS_DIR = DATA_DIR / 'backups'
+BACKUPS_DIR = MEDIA_ROOT / 'backups'
 BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
-
-# Reports
-REPORTS_DIR = DATA_DIR / 'reports'
+TEMP_DIR = MEDIA_ROOT / 'temp'
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
+PLUGIN_DATA_ROOT = MEDIA_ROOT / 'plugin_data'
+PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+REPORTS_DIR = MEDIA_ROOT / 'reports'
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Temp
-TEMP_DIR = DATA_DIR / 'temp'
-TEMP_DIR.mkdir(parents=True, exist_ok=True)
+# Logging to local file (ephemeral)
+LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
 
-# Plugin data (outside PLUGINS_DIR to avoid being detected as a plugin)
-PLUGIN_DATA_ROOT = DATA_DIR / 'plugin_data'
-PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+# Plugin media
 PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
 PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -199,16 +206,15 @@ MIDDLEWARE.insert(2, 'whitenoise.middleware.WhiteNoiseMiddleware')
 MIDDLEWARE.insert(4, 'apps.core.middleware.CloudSSOMiddleware')
 
 # =============================================================================
-# STATIC FILES - WhiteNoise configuration for production
+# STATIC & MEDIA STORAGE BACKENDS
 # =============================================================================
 
-# WhiteNoise serves static files from STATIC_ROOT with compression and caching
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
     },
 }
 
@@ -241,10 +247,6 @@ COMMAND_POLL_INTERVAL = config('COMMAND_POLL_INTERVAL', default=300, cast=int)  
 # STARTUP INFO
 # =============================================================================
 
-if DEMO_MODE:
-    print(f"[WEB] Hub: {HUB_NAME} ({HUB_ID}) - DEMO MODE (non-persistent)")
-else:
-    print(f"[WEB] Hub: {HUB_NAME} ({HUB_ID})")
-print(f"[WEB] Data: {DATA_DIR}")
-if HUB_JWT:
-    print(f"[WEB] Cloud API: {CLOUD_API_URL} (JWT configured)")
+print(f"[HUB] {HUB_NAME} ({HUB_ID})")
+print(f"[HUB] Database: {DATABASES['default']['NAME']}")
+print(f"[HUB] S3: {AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/")
