@@ -1,17 +1,20 @@
 # ==============================================================================
-# ERPlora Hub - Docker Compose for Coolify
+# ERPlora Hub - Docker Compose for Dokploy
 # ==============================================================================
-# Coolify detecta este archivo y usa Docker Compose en lugar de Dockerfile puro.
-# Esto permite definir volúmenes persistentes correctamente.
+# Dokploy usa este archivo para desplegar el Hub como Docker Compose.
+# Los volúmenes persisten entre deploys automáticamente.
 #
-# Variables de entorno (inyectadas por Coolify):
+# Variables de entorno (inyectadas por Dokploy via .env):
 #   - HUB_ID: UUID del Hub
 #   - HUB_NAME: Nombre/subdomain del Hub
 #   - AWS_*: Credenciales S3
-#   - Todas las demás env vars configuradas en Coolify
+#   - Todas las demás env vars configuradas en Dokploy
 #
 # Volumen persistente:
 #   - hub-data:/app/data → SQLite en /app/data/{HUB_ID}/db/db.sqlite3
+#
+# Red:
+#   - dokploy-network: Red de Dokploy para Traefik
 # ==============================================================================
 
 services:
@@ -25,7 +28,7 @@ services:
       # Cada Hub tiene su carpeta: /app/data/{HUB_ID}/db/db.sqlite3
       - hub-data:/app/data
     environment:
-      # Estas variables son inyectadas por Coolify
+      # Estas variables son inyectadas por Dokploy via .env
       - HUB_ID=${HUB_ID}
       - HUB_NAME=${HUB_NAME}
       - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-config.settings.web}
@@ -42,11 +45,11 @@ services:
       - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME}
       - AWS_LOCATION=${AWS_LOCATION}
     labels:
-      # Traefik routing - Coolify genera estas labels automáticamente
+      # Traefik routing - Dokploy gestiona las labels automáticamente
       # pero las definimos explícitamente para asegurar el dominio correcto
       - "traefik.enable=true"
       - "traefik.http.routers.hub-${HUB_NAME}.rule=Host(`${HUB_NAME}.${PARENT_DOMAIN}`)"
-      - "traefik.http.routers.hub-${HUB_NAME}.entrypoints=https"
+      - "traefik.http.routers.hub-${HUB_NAME}.entrypoints=websecure"
       - "traefik.http.routers.hub-${HUB_NAME}.tls=true"
       - "traefik.http.routers.hub-${HUB_NAME}.tls.certresolver=letsencrypt"
       - "traefik.http.services.hub-${HUB_NAME}.loadbalancer.server.port=8000"
@@ -54,17 +57,17 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
       interval: 30s
       timeout: 10s
-      start_period: 30s
+      start_period: 60s
       retries: 3
     networks:
-      - coolify
+      - dokploy-network
 
 networks:
-  coolify:
+  dokploy-network:
     external: true
 
 volumes:
   hub-data:
     # Volumen Docker nombrado - persiste entre deploys
-    # Coolify añade prefijo automático: {app_uuid}_hub-data
+    # Dokploy mantiene los volúmenes automáticamente
     name: hub-data-${HUB_ID:-default}

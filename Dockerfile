@@ -1,7 +1,7 @@
 # ==============================================================================
 # ERPlora Hub - Production Dockerfile
 # ==============================================================================
-# Usado por docker-compose.yaml para deploy via Coolify.
+# Usado por docker-compose.yaml para deploy via Dokploy.
 #
 # STORAGE (automatic via HUB_ID):
 #   Docker Volume /app/data/{HUB_ID}/:
@@ -17,7 +17,7 @@
 #     - /tmp/hub_media/ - Temporary processing files
 #     - Logs via stdout/stderr (Docker captures)
 #
-# ENVIRONMENT VARIABLES (injected by Coolify):
+# ENVIRONMENT VARIABLES (injected by Dokploy):
 #   HUB_ID            - UUID del Hub
 #   HUB_NAME          - Subdomain del Hub
 #   AWS_*             - S3 credentials
