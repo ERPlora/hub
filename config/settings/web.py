@@ -12,15 +12,17 @@ Variables de entorno (configuradas por Cloud durante deploy):
 Estructura de almacenamiento (todo automático via HUB_ID):
 
   Docker Volume /app/data/{HUB_ID}/:
-    - db/db.sqlite3 - Base de datos SQLite
+    - db/db.sqlite3 - Base de datos SQLite (PERSISTENTE)
 
   S3 hubs/{HUB_ID}/:
-    - logs/        - Logs de aplicación
     - backups/     - Backups de BD
-    - temp/        - Archivos temporales
     - plugin_data/ - Datos de plugins
     - reports/     - Reportes generados
     - media/       - Archivos subidos (Django media)
+
+  Contenedor (efímero, se pierde al reiniciar):
+    - /tmp/hub_media/ - Archivos temporales de procesamiento
+    - Logs via stdout/stderr (Docker los captura automáticamente)
 """
 
 from .base import *
@@ -88,15 +90,13 @@ MEDIA_ROOT = Path('/tmp/hub_media')
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # S3 paths for Hub data (all under hubs/{HUB_ID}/)
-S3_LOGS_PREFIX = 'logs'
+# Note: logs go to Docker stdout/stderr, not S3
 S3_BACKUPS_PREFIX = 'backups'
 S3_TEMP_PREFIX = 'temp'
 S3_PLUGIN_DATA_PREFIX = 'plugin_data'
 S3_REPORTS_PREFIX = 'reports'
 
 # Local temp paths for code that needs filesystem access
-LOGS_DIR = MEDIA_ROOT / 'logs'
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
 BACKUPS_DIR = MEDIA_ROOT / 'backups'
 BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_DIR = MEDIA_ROOT / 'temp'
@@ -106,8 +106,17 @@ PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
 REPORTS_DIR = MEDIA_ROOT / 'reports'
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Logging to local file (ephemeral)
-LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
+# =============================================================================
+# LOGGING - Console only (Docker captures stdout/stderr)
+# =============================================================================
+
+# Remove file handler - Docker logs capture everything
+LOGGING['handlers'].pop('file', None)
+
+# Update loggers to use only console
+LOGGING['root']['handlers'] = ['console']
+LOGGING['loggers']['django']['handlers'] = ['console']
+LOGGING['loggers']['apps']['handlers'] = ['console']
 
 # Plugin media
 PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
