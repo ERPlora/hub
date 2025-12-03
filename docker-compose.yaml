@@ -1,0 +1,57 @@
+# ==============================================================================
+# ERPlora Hub - Docker Compose for Coolify
+# ==============================================================================
+# Coolify detecta este archivo y usa Docker Compose en lugar de Dockerfile puro.
+# Esto permite definir volúmenes persistentes correctamente.
+#
+# Variables de entorno (inyectadas por Coolify):
+#   - HUB_ID: UUID del Hub
+#   - HUB_NAME: Nombre/subdomain del Hub
+#   - AWS_*: Credenciales S3
+#   - Todas las demás env vars configuradas en Coolify
+#
+# Volumen persistente:
+#   - hub-data:/app/data → SQLite en /app/data/{HUB_ID}/db/db.sqlite3
+# ==============================================================================
+
+services:
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Volumen persistente para SQLite
+      # Cada Hub tiene su carpeta: /app/data/{HUB_ID}/db/db.sqlite3
+      - hub-data:/app/data
+    environment:
+      # Estas variables son inyectadas por Coolify
+      - HUB_ID=${HUB_ID}
+      - HUB_NAME=${HUB_NAME}
+      - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-config.settings.web}
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-web}
+      - CLOUD_API_URL=${CLOUD_API_URL}
+      - HUB_JWT=${HUB_JWT}
+      - PARENT_DOMAIN=${PARENT_DOMAIN}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      # S3 configuration
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL}
+      - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME}
+      - AWS_LOCATION=${AWS_LOCATION}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  hub-data:
+    # Volumen Docker nombrado - persiste entre deploys
+    # Coolify añade prefijo automático: {app_uuid}_hub-data
+    name: hub-data-${HUB_ID:-default}

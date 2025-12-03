@@ -1,36 +1,27 @@
 # ==============================================================================
 # ERPlora Hub - Production Dockerfile
 # ==============================================================================
-# Build on deploy por Coolify (sin registry externo)
-# Coolify clona el repo → detecta Dockerfile → build → run
+# Usado por docker-compose.yaml para deploy via Coolify.
 #
-# MODES:
-#   1. PRODUCTION (default): Data on external volume (persistent)
-#   2. DEMO (DEMO_MODE=true): Data in /app/data/ (non-persistent)
+# STORAGE (automatic via HUB_ID):
+#   Docker Volume /app/data/{HUB_ID}/:
+#     - db/db.sqlite3 - SQLite database (PERSISTENT)
 #
-# VOLUMES (mount for persistence - production mode):
-#   Defined by HUB_VOLUME_PATH/{HUB_NAME}-{HUB_ID}/
-#   ├── db/       - SQLite database
-#   ├── media/    - User uploads (images, logos)
-#   ├── plugins/  - Installed plugins
-#   ├── logs/     - Application logs
-#   ├── backups/  - Automatic backups
-#   ├── reports/  - Generated reports
-#   └── temp/     - Temporary files
+#   S3 hubs/{HUB_ID}/:
+#     - backups/     - Database backups
+#     - plugin_data/ - Plugin data
+#     - reports/     - Generated reports
+#     - media/       - User uploads (Django media)
 #
-# ENVIRONMENT VARIABLES (injected by Coolify from Cloud model):
-#   HUB_NAME          - Slug del Hub (ej: tienda-de-maria)
-#   HUB_ID            - UUID corto (ej: a1b2c3)
-#   HUB_VOLUME_PATH   - Ruta del volumen Hetzner (ej: /mnt/HC_Volume_104073157)
-#   DEMO_MODE         - Set to "true" for demo deployments (non-persistent)
+#   Container (ephemeral):
+#     - /tmp/hub_media/ - Temporary processing files
+#     - Logs via stdout/stderr (Docker captures)
 #
-# Result (production):
-#   URL:  https://tienda-de-maria.a.erplora.com
-#   Data: /mnt/HC_Volume_104073157/tienda-de-maria-a1b2c3/
-#
-# Result (demo):
-#   URL:  https://demo.int.erplora.com
-#   Data: /app/data/ (inside container, non-persistent)
+# ENVIRONMENT VARIABLES (injected by Coolify):
+#   HUB_ID            - UUID del Hub
+#   HUB_NAME          - Subdomain del Hub
+#   AWS_*             - S3 credentials
+#   DJANGO_SETTINGS_MODULE=config.settings.web
 # ==============================================================================
 
 FROM python:3.11-slim
@@ -66,7 +57,7 @@ RUN uv pip install --system --no-cache .
 RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
 
 # Create non-root user for security
-# Also create /app/data directory for DEMO_MODE (non-persistent storage)
+# /app/data is mounted as Docker volume for persistent SQLite
 RUN useradd --create-home --shell /bin/bash hubuser \
     && mkdir -p /app/data \
     && chown -R hubuser:hubuser /app
@@ -76,13 +67,10 @@ USER hubuser
 # ENVIRONMENT VARIABLES
 # =============================================================================
 # Fixed variables (don't change between Hubs)
+# Dynamic variables (HUB_ID, HUB_NAME, AWS_*) come from docker-compose.yaml
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    HUB_ENV=web \
     DEBUG=false
-
-# Dynamic variables come from Coolify at deploy time:
-# HUB_NAME, HUB_ID, HUB_VOLUME_PATH
 
 # =============================================================================
 # EXPOSE & HEALTHCHECK
