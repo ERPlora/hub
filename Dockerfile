@@ -54,7 +54,9 @@ COPY . .
 RUN uv pip install --system --no-cache .
 
 # Collect static files during build (don't change between Hubs)
-RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
+# Use web settings for proper WhiteNoise configuration
+ENV DJANGO_SETTINGS_MODULE=config.settings.web
+RUN python manage.py collectstatic --noinput --clear
 
 # Create non-root user for security
 # /app/data is mounted as Docker volume for persistent SQLite
