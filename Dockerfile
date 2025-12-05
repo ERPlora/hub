@@ -4,8 +4,9 @@
 # Usado por docker-compose.yaml para deploy via Dokploy.
 #
 # STORAGE (automatic via HUB_ID):
-#   Docker Volume /app/data/{HUB_ID}/:
-#     - db/db.sqlite3 - SQLite database (PERSISTENT)
+#   Docker Volume (bind mount isolates by HUB_ID):
+#     Host: ${VOLUME_PATH}/hubs/${HUB_ID}/ -> Container: /app/data/
+#     - /app/data/db/db.sqlite3 - SQLite database (PERSISTENT)
 #
 #   S3 hubs/{HUB_ID}/:
 #     - backups/     - Database backups
@@ -35,11 +36,13 @@ LABEL org.opencontainers.image.source="https://github.com/ERPlora/hub"
 WORKDIR /app
 
 # Install system dependencies
+# gosu is used for proper privilege dropping in entrypoint
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libusb-1.0-0 \
     cups \
     curl \
+    gosu \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -68,11 +71,14 @@ ENV DJANGO_SETTINGS_MODULE=config.settings.web \
 RUN python manage.py collectstatic --noinput --clear
 
 # Create non-root user for security
-# /app/data is mounted as Docker volume for persistent SQLite
+# Note: We don't switch to hubuser here - entrypoint handles privilege dropping
+# This is necessary because /app/data is a bind mount with host permissions
 RUN useradd --create-home --shell /bin/bash hubuser \
-    && mkdir -p /app/data \
     && chown -R hubuser:hubuser /app
-USER hubuser
+
+# Move entrypoint script to /usr/local/bin and make executable
+# (script is copied to /app with COPY . .)
+RUN mv docker-entrypoint.sh /usr/local/bin/ && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # =============================================================================
 # ENVIRONMENT VARIABLES
@@ -94,19 +100,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # =============================================================================
 # ENTRYPOINT
 # =============================================================================
-CMD ["sh", "-c", "\
-    echo '=== ERPlora Hub Starting ===' && \
-    echo 'Running database migrations...' && \
-    python manage.py migrate --noinput && \
-    echo 'Starting Gunicorn server...' && \
-    exec gunicorn config.wsgi:application \
-        --bind 0.0.0.0:8000 \
-        --workers 2 \
-        --threads 4 \
-        --worker-class gthread \
-        --timeout 120 \
-        --access-logfile - \
-        --error-logfile - \
-        --capture-output \
-        --enable-stdio-inheritance \
-    "]
+# Entrypoint runs as root to set up /app/data permissions,
+# then drops privileges to hubuser for the application
+ENTRYPOINT ["docker-entrypoint.sh"]
