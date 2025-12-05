@@ -46,14 +46,15 @@ HUB_NAME = config('HUB_NAME', default='hub')
 # PATHS - Local storage for SQLite (persistent via Docker Volume)
 # =============================================================================
 
-# Data directory - /app/data is a Docker Volume shared by all Hubs on this server
-# Each Hub uses HUB_ID as subfolder to isolate its database
+# Data directory - /app/data is mounted as Docker Volume
+# The volume mount already isolates by HUB_ID:
+#   Host: ${VOLUME_PATH}/hubs/${HUB_ID} -> Container: /app/data
+# So /app/data IS the Hub-specific directory
 DATA_DIR = Path('/app/data')
-DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Database (SQLite) - isolated by HUB_ID folder
-# Structure: /app/data/{HUB_ID}/db/db.sqlite3
-DATABASE_DIR = DATA_DIR / HUB_ID / 'db'
+# Database (SQLite) - inside the Hub's data directory
+# Structure: /app/data/db/db.sqlite3 (which maps to ${VOLUME_PATH}/hubs/${HUB_ID}/db/db.sqlite3 on host)
+DATABASE_DIR = DATA_DIR / 'db'
 DATABASE_DIR.mkdir(parents=True, exist_ok=True)
 DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
 
