@@ -38,6 +38,7 @@ services:
       - CLOUD_API_URL=${CLOUD_API_URL}
       - HUB_JWT=${HUB_JWT}
       - PARENT_DOMAIN=${PARENT_DOMAIN}
+      - SERVER_DOMAIN=${SERVER_DOMAIN}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
       # S3 configuration
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -49,8 +50,10 @@ services:
     labels:
       # Traefik routing - Dokploy gestiona las labels automáticamente
       # pero las definimos explícitamente para asegurar el dominio correcto
+      # SERVER_DOMAIN = dominio del servidor (ej: a.erplora.com)
+      # PARENT_DOMAIN = dominio raíz para cookies (ej: erplora.com)
       - "traefik.enable=true"
-      - "traefik.http.routers.hub-${HUB_NAME}.rule=Host(`${HUB_NAME}.${PARENT_DOMAIN}`)"
+      - "traefik.http.routers.hub-${HUB_NAME}.rule=Host(`${HUB_NAME}.${SERVER_DOMAIN}`)"
       - "traefik.http.routers.hub-${HUB_NAME}.entrypoints=websecure"
       - "traefik.http.routers.hub-${HUB_NAME}.tls=true"
       - "traefik.http.routers.hub-${HUB_NAME}.tls.certresolver=letsencrypt"
