@@ -54,8 +54,10 @@ COPY . .
 RUN uv pip install --system --no-cache .
 
 # Collect static files during build (don't change between Hubs)
-# Use web settings for proper WhiteNoise configuration
-ENV DJANGO_SETTINGS_MODULE=config.settings.web
+# Use web settings with dummy HUB_ID (only needed for settings import, not collectstatic)
+ENV DJANGO_SETTINGS_MODULE=config.settings.web \
+    HUB_ID=00000000-0000-0000-0000-000000000000 \
+    HUB_NAME=build
 RUN python manage.py collectstatic --noinput --clear
 
 # Create non-root user for security
