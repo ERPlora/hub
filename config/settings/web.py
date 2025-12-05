@@ -249,7 +249,9 @@ CLOUD_API_URL = config('CLOUD_API_URL', default='https://erplora.com')
 HUB_JWT = config('HUB_JWT', default='')
 
 # Heartbeat configuration
-HEARTBEAT_ENABLED = config('HEARTBEAT_ENABLED', default=True, cast=bool)
+# Disabled by default for MVP - Hub works 100% offline
+# Enable when Cloud endpoints are ready and you need online/offline status
+HEARTBEAT_ENABLED = config('HEARTBEAT_ENABLED', default=False, cast=bool)
 HEARTBEAT_INTERVAL = config('HEARTBEAT_INTERVAL', default=60, cast=int)  # seconds
 COMMAND_POLL_INTERVAL = config('COMMAND_POLL_INTERVAL', default=300, cast=int)  # 5 minutes
 
