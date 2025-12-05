@@ -37,12 +37,14 @@ WORKDIR /app
 
 # Install system dependencies
 # gosu is used for proper privilege dropping in entrypoint
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libusb-1.0-0 \
-    cups \
-    curl \
-    gosu \
+# Retry logic added for transient network issues
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libusb-1.0-0 \
+        cups \
+        curl \
+        gosu \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 

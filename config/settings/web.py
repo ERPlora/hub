@@ -248,12 +248,14 @@ CLOUD_API_URL = config('CLOUD_API_URL', default='https://erplora.com')
 # This is a long-lived token (1 year) for Hub authentication
 HUB_JWT = config('HUB_JWT', default='')
 
-# Heartbeat configuration
-# Disabled by default for MVP - Hub works 100% offline
-# Enable when Cloud endpoints are ready and you need online/offline status
-HEARTBEAT_ENABLED = config('HEARTBEAT_ENABLED', default=False, cast=bool)
+# Cloud Sync configuration
+# WebSocket is preferred (real-time), HTTP polling is fallback
+CLOUD_SYNC_ENABLED = config('CLOUD_SYNC_ENABLED', default=True, cast=bool)
+CLOUD_SYNC_WEBSOCKET = config('CLOUD_SYNC_WEBSOCKET', default=True, cast=bool)
+
+# HTTP polling intervals (used when WebSocket is disabled)
 HEARTBEAT_INTERVAL = config('HEARTBEAT_INTERVAL', default=60, cast=int)  # seconds
-COMMAND_POLL_INTERVAL = config('COMMAND_POLL_INTERVAL', default=300, cast=int)  # 5 minutes
+COMMAND_POLL_INTERVAL = config('COMMAND_POLL_INTERVAL', default=30, cast=int)  # seconds
 
 # =============================================================================
 # STARTUP INFO

@@ -74,7 +74,7 @@ class SyncConfig(AppConfig):
             print(f"[SYNC] Error initializing HubConfig: {e}")
 
     def _start_heartbeat_service(self):
-        """Start heartbeat service in background."""
+        """Start Cloud sync service (WebSocket or HTTP polling)."""
         from django.conf import settings
 
         # Only in web deployment mode
@@ -82,9 +82,9 @@ class SyncConfig(AppConfig):
         if deployment_mode != 'web':
             return
 
-        # Check if heartbeat is enabled
-        heartbeat_enabled = getattr(settings, 'HEARTBEAT_ENABLED', True)
-        if not heartbeat_enabled:
+        # Check if sync is enabled
+        sync_enabled = getattr(settings, 'CLOUD_SYNC_ENABLED', True)
+        if not sync_enabled:
             return
 
         # Don't start in Django's autoreloader child process
@@ -95,8 +95,17 @@ class SyncConfig(AppConfig):
             if 'runserver' in sys.argv:
                 return
 
+        # Choose sync method: WebSocket (preferred) or HTTP polling (fallback)
+        use_websocket = getattr(settings, 'CLOUD_SYNC_WEBSOCKET', True)
+
         try:
-            from .services.heartbeat import start_heartbeat_service
-            start_heartbeat_service()
+            if use_websocket:
+                from .services.websocket_client import start_websocket_client
+                start_websocket_client()
+                print("[SYNC] WebSocket client started")
+            else:
+                from .services.heartbeat import start_heartbeat_service
+                start_heartbeat_service()
+                print("[SYNC] HTTP polling started")
         except Exception as e:
-            print(f"[SYNC] Error starting heartbeat service: {e}")
+            print(f"[SYNC] Error starting sync service: {e}")
