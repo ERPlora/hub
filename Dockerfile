@@ -54,10 +54,17 @@ COPY . .
 RUN uv pip install --system --no-cache .
 
 # Collect static files during build (don't change between Hubs)
-# Use web settings with dummy HUB_ID (only needed for settings import, not collectstatic)
+# Use web settings with dummy values (only needed for settings import, not collectstatic)
+# Real values come from docker-compose.yaml at runtime
 ENV DJANGO_SETTINGS_MODULE=config.settings.web \
     HUB_ID=00000000-0000-0000-0000-000000000000 \
-    HUB_NAME=build
+    HUB_NAME=build \
+    AWS_ACCESS_KEY_ID=dummy \
+    AWS_SECRET_ACCESS_KEY=dummy \
+    AWS_STORAGE_BUCKET_NAME=dummy \
+    AWS_S3_ENDPOINT_URL=https://dummy.com \
+    AWS_S3_REGION_NAME=eu-central \
+    AWS_LOCATION=dummy
 RUN python manage.py collectstatic --noinput --clear
 
 # Create non-root user for security
