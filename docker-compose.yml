@@ -2,16 +2,17 @@
 # ERPlora Hub - Docker Compose for Dokploy
 # ==============================================================================
 # Dokploy usa este archivo para desplegar el Hub como Docker Compose.
-# Los volúmenes persisten entre deploys automáticamente.
+# Los volúmenes persisten entre deploys usando bind mounts al volumen Hetzner.
 #
 # Variables de entorno (inyectadas por Dokploy via .env):
 #   - HUB_ID: UUID del Hub
 #   - HUB_NAME: Nombre/subdomain del Hub
+#   - VOLUME_PATH: Ruta del volumen en el host (ej: /mnt/data-a)
 #   - AWS_*: Credenciales S3
 #   - Todas las demás env vars configuradas en Dokploy
 #
-# Volumen persistente:
-#   - hub-data:/app/data → SQLite en /app/data/{HUB_ID}/db/db.sqlite3
+# Volumen persistente (Hetzner Volume):
+#   - ${VOLUME_PATH}/hubs/${HUB_ID}:/app/data → SQLite en /app/data/db/db.sqlite3
 #
 # Red:
 #   - dokploy-network: Red de Dokploy para Traefik
@@ -24,9 +25,9 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     volumes:
-      # Volumen persistente para SQLite
-      # Cada Hub tiene su carpeta: /app/data/{HUB_ID}/db/db.sqlite3
-      - hub-data:/app/data
+      # Bind mount al volumen Hetzner del servidor
+      # Cada Hub tiene su carpeta en el volumen: ${VOLUME_PATH}/hubs/${HUB_ID}/
+      - ${VOLUME_PATH}/hubs/${HUB_ID}:/app/data
     environment:
       # Estas variables son inyectadas por Dokploy via .env
       - HUB_ID=${HUB_ID}
@@ -66,8 +67,5 @@ networks:
   dokploy-network:
     external: true
 
-volumes:
-  hub-data:
-    # Volumen Docker nombrado - persiste entre deploys
-    # Dokploy mantiene los volúmenes automáticamente
-    name: hub-data-${HUB_ID:-default}
+# No usamos volúmenes Docker nombrados - usamos bind mounts al volumen Hetzner
+# El path del volumen viene de VOLUME_PATH (configurado en el Server model)
