@@ -47,17 +47,14 @@ services:
       - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL}
       - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME}
       - AWS_LOCATION=${AWS_LOCATION}
-    labels:
-      # Traefik routing - Dokploy gestiona las labels automáticamente
-      # pero las definimos explícitamente para asegurar el dominio correcto
-      # SERVER_DOMAIN = dominio del servidor (ej: a.erplora.com)
-      # PARENT_DOMAIN = dominio raíz para cookies (ej: erplora.com)
-      - "traefik.enable=true"
-      - "traefik.http.routers.hub-${HUB_NAME}.rule=Host(`${HUB_NAME}.${SERVER_DOMAIN}`)"
-      - "traefik.http.routers.hub-${HUB_NAME}.entrypoints=websecure"
-      - "traefik.http.routers.hub-${HUB_NAME}.tls=true"
-      - "traefik.http.routers.hub-${HUB_NAME}.tls.certresolver=letsencrypt"
-      - "traefik.http.services.hub-${HUB_NAME}.loadbalancer.server.port=8000"
+    # Labels de Traefik comentados - Dokploy gestiona dominios via API domain.create
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.hub-${HUB_NAME}.rule=Host(`${HUB_NAME}.${SERVER_DOMAIN}`)"
+    #   - "traefik.http.routers.hub-${HUB_NAME}.entrypoints=websecure"
+    #   - "traefik.http.routers.hub-${HUB_NAME}.tls=true"
+    #   - "traefik.http.routers.hub-${HUB_NAME}.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.hub-${HUB_NAME}.loadbalancer.server.port=8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
       interval: 30s
