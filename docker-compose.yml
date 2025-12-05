@@ -33,6 +33,7 @@ services:
       - HUB_ID=${HUB_ID}
       - HUB_NAME=${HUB_NAME}
       - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-config.settings.web}
+      - HUB_ENV=${HUB_ENV:-web}
       - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-web}
       - CLOUD_API_URL=${CLOUD_API_URL}
       - HUB_JWT=${HUB_JWT}
