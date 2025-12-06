@@ -54,6 +54,7 @@ class CloudSSOMiddleware:
         '/setup-pin/',  # PIN setup endpoint
         '/verify-pin/',  # PIN verification endpoint
         '/logout/',  # Logout endpoint
+        '/api/backup/',  # Backup API (called by Cloud)
     ]
 
     def __init__(self, get_response):
