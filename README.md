@@ -1,14 +1,25 @@
 # ERPlora Hub
 
-Sistema POS (Point of Sale) modular Django desplegado como contenedores Docker.
+Sistema POS (Point of Sale) modular Django con **dos modos de despliegue**.
 
-## Arquitectura
+## Modos de Despliegue
 
-Cada Hub es un **contenedor Docker independiente** con:
-- Django 5.1 + SQLite (base de datos propia)
-- Volumen Docker persistente para datos
-- Desplegado y gestionado vía Dokploy
-- Acceso vía `erplora.com/hubs/{hub-id}`
+### 1. Desktop Hub (On-Premise) - GRATIS
+- Aplicacion empaquetada con **PyInstaller**
+- **100% GRATUITA** - sin costo de licencia
+- SQLite local en la maquina del cliente
+- **Funciona 100% offline** despues de setup inicial
+- Extensible con plugins (gratuitos o de pago)
+
+### 2. Cloud Hub (SaaS)
+- Contenedor Docker desplegado via Dokploy
+- SQLite en volumen Docker persistente
+- Acceso via navegador: `erplora.com/hubs/{hub-id}`
+- Planes de suscripcion (definidos en base de datos)
+
+**Nota:** Ambos modos usan el mismo codigo Django. La unica diferencia es el metodo de despliegue.
+
+---
 
 ## Requisitos (Desarrollo Local)
 
@@ -16,7 +27,7 @@ Cada Hub es un **contenedor Docker independiente** con:
 - SQLite 3+ (incluido con Python)
 - uv (gestor de paquetes Python)
 
-## Instalación (Desarrollo)
+## Instalacion (Desarrollo)
 
 ```bash
 cd hub
@@ -37,18 +48,20 @@ python manage.py runserver 8001
 
 El Hub corre en puerto **8001** por defecto (Cloud Portal usa 8000).
 
+---
+
 ## Estructura del Proyecto
 
 ```
 hub/
 ├── apps/                      # Aplicaciones Django
-│   ├── accounts/             # LocalUser, autenticación con PIN
+│   ├── accounts/             # LocalUser, autenticacion con PIN
 │   ├── configuration/        # HubConfig, StoreConfig (singleton)
 │   ├── plugins/              # Plugin model, runtime manager
 │   ├── sync/                 # Cloud API client (HTTP)
 │   └── core/                 # Utilidades compartidas
 │
-├── config/                   # Configuración Django
+├── config/                   # Configuracion Django
 │   ├── settings.py
 │   ├── urls.py
 │   └── plugin_allowed_deps.py
@@ -59,43 +72,46 @@ hub/
 │
 ├── templates/               # Django templates (Ionic + HTMX)
 ├── static/                  # CSS/JS
-├── Dockerfile               # Build para Dokploy
-├── docker-compose.yml       # Deploy config
+├── Dockerfile               # Build para Cloud Hub (Dokploy)
+├── main.py                  # Entry point para Desktop Hub (PyInstaller)
+├── main.spec                # Configuracion PyInstaller
+├── build.py                 # Script de build Desktop
 └── pyproject.toml           # Dependencias (uv)
 ```
 
-## Configuración del Hub
+---
 
-El Hub almacena su configuración en SQLite:
+## Desktop Hub (PyInstaller)
 
-```python
-# apps/configuration/models.py
-class HubConfig(models.Model):
-    hub_id = models.UUIDField()           # UUID único del Hub
-    cloud_api_token = models.CharField()  # Token para Cloud API
-    is_configured = models.BooleanField() # Estado de configuración
+### Build
 
-    # Preferencias
-    currency = models.CharField()         # EUR, USD, etc.
-    color_theme = models.CharField()      # default, blue
-    dark_mode = models.BooleanField()
-    auto_print = models.BooleanField()
-
-class StoreConfig(models.Model):
-    business_name = models.CharField()    # Nombre del negocio
-    tax_rate = models.DecimalField()      # Tasa de impuestos
-    # ... más campos de configuración
+```bash
+cd hub
+python build.py
 ```
 
-## Docker Deployment
+### Ejecutables Generados
+
+- **Windows:** `dist/ERPlora Hub/ERPlora Hub.exe`
+- **macOS:** `dist/ERPlora Hub.app`
+- **Linux:** `dist/ERPlora Hub/ERPlora Hub`
+
+### GitHub Actions
+
+- Push a `staging` → build automatico de RC
+- Merge a `main` → build de release final
+
+---
+
+## Cloud Hub (Docker)
 
 ### Variables de Entorno
 
 ```bash
-# Identificación (inyectadas por Dokploy)
+# Identificacion (inyectadas por Dokploy)
 HUB_ID=a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
-# Conexión con Cloud
+# Conexion con Cloud
 CLOUD_API_URL=https://erplora.com/api
 CLOUD_API_TOKEN=jwt_token_del_hub
 
@@ -108,74 +124,75 @@ ALLOWED_HOSTS=erplora.com
 ### Build Local (Docker)
 
 ```bash
-# Build imagen
 docker build -t erplora/hub:latest .
-
-# Test local
-docker run -d \
-  -p 8001:8000 \
-  -e HUB_ID=test-hub-123 \
-  -e DEBUG=True \
-  erplora/hub:latest
+docker run -d -p 8001:8000 -e HUB_ID=test-hub-123 erplora/hub:latest
 ```
 
-### Volúmenes Persistentes
+### Volumenes Persistentes
 
 ```
 /app/data/{HUB_ID}/
 ├── db/
 │   └── db.sqlite3        # Base de datos
 ├── media/                # Archivos subidos
-├── logs/                 # Logs de la aplicación
-├── backups/              # Backups automáticos
+├── logs/                 # Logs
+├── backups/              # Backups automaticos
 └── temp/                 # Archivos temporales
 ```
 
+---
+
 ## Sistema de Plugins
 
-El Hub soporta plugins dinámicos con dependencias pre-aprobadas.
+El Hub soporta plugins dinamicos con dependencias pre-aprobadas.
 
 **Dependencias permitidas**:
-- `Pillow` - Imágenes
+- `Pillow` - Imagenes
 - `qrcode` - QR codes
-- `python-barcode` - Códigos de barras
+- `python-barcode` - Codigos de barras
 - `openpyxl` - Excel
 - `reportlab` - PDFs
-- Y más...
+- Y mas...
 
 Ver lista completa en [config/plugin_allowed_deps.py](config/plugin_allowed_deps.py).
 
-**Gestión de plugins**:
+**Gestion de plugins**:
 - Activar: mover de `_plugin_name/` a `plugin_name/`
 - Desactivar: mover de `plugin_name/` a `_plugin_name/`
 - Ocultar: prefijar con `.` (`.plugin_name/`)
 
+---
+
 ## Testing
 
 ```bash
-# Todos los tests
 pytest
-
-# Tests específicos
 pytest tests/unit
 pytest tests/integration
-
-# Con coverage
 pytest --cov=apps --cov-report=html
 ```
 
-## Stack Tecnológico
+---
 
-| Componente | Tecnología |
+## Stack Tecnologico
+
+| Componente | Tecnologia |
 |------------|------------|
 | Backend | Django 5.1 |
 | Database | SQLite |
 | Frontend | Ionic 8 (iOS mode) + Alpine.js + HTMX |
-| Autenticación | LocalUser con PIN + JWT (Cloud API) |
-| Deployment | Docker + Dokploy |
+| Autenticacion | LocalUser con PIN + JWT (Cloud API) |
+| Deployment Cloud | Docker + Dokploy |
+| Deployment Desktop | PyInstaller |
+
+---
 
 ## Enlaces
 
 - **Arquitectura**: [/docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
-- **CLAUDE.md**: [/CLAUDE.md](../CLAUDE.md)
-- **Plugin Development**: [/docs/plugins.md](../docs/plugins.md)
+- **CLAUDE.md Hub**: [CLAUDE.md](CLAUDE.md)
+- **CLAUDE.md principal**: [/CLAUDE.md](../CLAUDE.md)
+
+---
+
+**Ultima actualizacion:** 2025-12-09

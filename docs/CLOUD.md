@@ -295,4 +295,4 @@ print(response.status_code)  # Debe ser 200
 
 ---
 
-**Última actualización**: 2025-11-30
+**Ultima actualizacion**: 2025-12-09

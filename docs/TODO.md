@@ -21,7 +21,7 @@
 - ✅ Login con PIN offline funcionando
 
 ### Infraestructura
-- ✅ Redeploy automático via Coolify API
+- ✅ Redeploy automático via Dokploy API
 - ✅ WhiteNoise staticfiles funcionando correctamente
 - ✅ Volúmenes Docker persistentes para SQLite, media, plugins
 
@@ -104,7 +104,7 @@
 - PIN local almacenado como hash en SQLite
 
 ### Deployment
-- Docker containers via Coolify
+- Docker containers via Dokploy
 - Branch: `develop` para INT
 - URL pattern: `{hub-slug}.a.erplora.com`
 

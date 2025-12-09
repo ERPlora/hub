@@ -226,7 +226,7 @@ Ver documentación completa: [TESTING.md](TESTING.md)
 # Build de imagen
 docker build -t erplora/hub:latest .
 
-# El despliegue se hace via Coolify
+# El despliegue se hace via Dokploy
 # Cada Hub es un contenedor independiente con SQLite
 ```
 

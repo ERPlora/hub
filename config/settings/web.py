@@ -2,7 +2,7 @@
 ERPlora Hub - Web/Docker Settings
 
 Configuración para despliegue en Docker/Cloud.
-Desplegado automáticamente via Coolify API cuando el cliente compra un Hub.
+Desplegado automáticamente via Dokploy API cuando el cliente compra un Hub.
 
 Variables de entorno (configuradas por Cloud durante deploy):
   - HUB_ID: UUID del Hub (ej: 1aba6e2f-777b-450d-9818-edc2bd0a93c4)
@@ -59,7 +59,7 @@ DATABASE_DIR.mkdir(parents=True, exist_ok=True)
 DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
 
 # Plugins - stored locally in container (distributed from Cloud marketplace)
-# Coolify deploys with latest plugins from GitHub repo
+# Dokploy deploys with latest plugins from GitHub repo
 PLUGINS_DIR = BASE_DIR / 'plugins'
 PLUGINS_ROOT = PLUGINS_DIR
 PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
