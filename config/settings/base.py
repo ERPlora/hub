@@ -195,7 +195,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CLOUD API
 # =============================================================================
 
-CLOUD_API_URL = config('CLOUD_API_URL', default='https://int.erplora.com')
+# Read from CLOUD_BASE_URL (consistent with Cloud) or fallback to CLOUD_API_URL for backwards compatibility
+CLOUD_API_URL = config('CLOUD_BASE_URL', default=config('CLOUD_API_URL', default='https://int.erplora.com'))
 
 # =============================================================================
 # DEPLOYMENT MODE (overridden per environment)
