@@ -28,6 +28,7 @@ media
 build/
 develop-eggs/
 dist/
+!static/ionicons/dist/
 downloads/
 eggs/
 .eggs/
@@ -134,6 +135,12 @@ celerybeat.pid
 
 # Environments
 .env
+.env.web
+.env.demo
+.env.local
+.env.production
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -232,3 +239,4 @@ plugins/*/
 cache/
 *.bak
 *.backup
+.secret_key

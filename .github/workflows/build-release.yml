@@ -25,10 +25,13 @@ jobs:
         include:
           - os: windows-latest
             platform: windows
+            hub_env: desktop_windows
           - os: macos-latest
             platform: macos
+            hub_env: desktop_macos
           - os: ubuntu-latest
             platform: linux
+            hub_env: desktop_linux
 
     steps:
       - name: Checkout code
@@ -61,19 +64,27 @@ jobs:
 
       - name: Create database (Linux/macOS)
         if: runner.os != 'Windows'
+        env:
+          HUB_ENV: ${{ matrix.hub_env }}
         run: |
           source .venv/bin/activate
           python manage.py migrate --noinput
+          echo "✅ Database created (HUB_ENV=$HUB_ENV)"
 
       - name: Create database (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          HUB_ENV: ${{ matrix.hub_env }}
         run: |
           & .venv\Scripts\Activate.ps1
           python manage.py migrate --noinput
+          Write-Host "✅ Database created (HUB_ENV=$env:HUB_ENV)"
 
       - name: Build with PyInstaller (Linux/macOS)
         if: runner.os != 'Windows'
+        env:
+          HUB_ENV: ${{ matrix.hub_env }}
         run: |
           source .venv/bin/activate
           pyinstaller main.spec --clean
@@ -81,6 +92,8 @@ jobs:
       - name: Build with PyInstaller (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          HUB_ENV: ${{ matrix.hub_env }}
         run: |
           & .venv\Scripts\Activate.ps1
           pyinstaller main.spec --clean

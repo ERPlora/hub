@@ -1,9 +1,12 @@
 from django.urls import path
-from . import views_update
+from . import views_update, views_backup
 
 app_name = 'sync'
 
 urlpatterns = [
+    # Backup API endpoints
+    path('api/backup/database/', views_backup.backup_database, name='backup_database'),
+
     # Update API endpoints
     path('api/update/check/', views_update.check_updates, name='update_check'),
     path('api/update/status/', views_update.update_status, name='update_status'),

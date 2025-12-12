@@ -1,0 +1,72 @@
+# ==============================================================================
+# ERPlora Hub - Docker Compose for Dokploy
+# ==============================================================================
+# Dokploy usa este archivo para desplegar el Hub como Docker Compose.
+# Los volúmenes persisten entre deploys usando bind mounts al volumen Hetzner.
+#
+# Variables de entorno (inyectadas por Dokploy via .env):
+#   - HUB_ID: UUID del Hub
+#   - HUB_NAME: Nombre/subdomain del Hub
+#   - VOLUME_PATH: Ruta del volumen en el host (ej: /mnt/data-a)
+#   - AWS_*: Credenciales S3
+#   - Todas las demás env vars configuradas en Dokploy
+#
+# Volumen persistente (Hetzner Volume):
+#   - ${VOLUME_PATH}/hubs/${HUB_ID}:/app/data → SQLite en /app/data/db/db.sqlite3
+#
+# Red:
+#   - dokploy-network: Red de Dokploy para Traefik
+# ==============================================================================
+
+services:
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      # Bind mount al volumen Hetzner del servidor
+      # Cada Hub tiene su carpeta en el volumen: ${VOLUME_PATH}/hubs/${HUB_ID}/
+      - ${VOLUME_PATH}/hubs/${HUB_ID}:/app/data
+    environment:
+      # Estas variables son inyectadas por Dokploy via .env
+      - HUB_ID=${HUB_ID}
+      - HUB_NAME=${HUB_NAME}
+      - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-config.settings.web}
+      - HUB_ENV=${HUB_ENV:-web}
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-web}
+      - CLOUD_API_URL=${CLOUD_API_URL}
+      - HUB_JWT=${HUB_JWT}
+      - PARENT_DOMAIN=${PARENT_DOMAIN}
+      - SERVER_DOMAIN=${SERVER_DOMAIN}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      # S3 configuration
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL}
+      - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME}
+      - AWS_LOCATION=${AWS_LOCATION}
+    # Labels de Traefik comentados - Dokploy gestiona dominios via API domain.create
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.hub-${HUB_NAME}.rule=Host(`${HUB_NAME}.${SERVER_DOMAIN}`)"
+    #   - "traefik.http.routers.hub-${HUB_NAME}.entrypoints=websecure"
+    #   - "traefik.http.routers.hub-${HUB_NAME}.tls=true"
+    #   - "traefik.http.routers.hub-${HUB_NAME}.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.hub-${HUB_NAME}.loadbalancer.server.port=8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true
+
+# No usamos volúmenes Docker nombrados - usamos bind mounts al volumen Hetzner
+# El path del volumen viene de VOLUME_PATH (configurado en el Server model)

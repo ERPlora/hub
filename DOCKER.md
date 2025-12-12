@@ -74,7 +74,7 @@ docker rm hub-{hub-id}
 | `/app/plugins` | Plugins instalados | ✅ SÍ - Persistir plugins |
 | `/app/logs` | Logs de la aplicación | ⚠️ Opcional - Debugging |
 
-**IMPORTANTE:** En producción (Coolify), estos volúmenes deben ser persistentes.
+**IMPORTANTE:** En producción (Dokploy), estos volúmenes deben ser persistentes.
 
 ---
 
@@ -137,7 +137,7 @@ curl http://your-domain.com/health/
 
 ---
 
-## 🚀 Deployment con Coolify
+## 🚀 Deployment con Dokploy
 
 ### 1. Preparar imagen
 
@@ -174,9 +174,9 @@ POST /api/hubs/deploy/
 }
 ```
 
-### 3. Coolify crea contenedor
+### 3. Dokploy crea contenedor
 
-Coolify ejecuta automáticamente:
+Dokploy ejecuta automáticamente:
 
 ```bash
 docker run -d \
