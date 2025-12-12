@@ -4,7 +4,8 @@ Tests for theme system (color themes and dark mode).
 import pytest
 from django.test import Client
 from django.urls import reverse
-from apps.core.models import HubConfig, LocalUser
+from apps.configuration.models import HubConfig
+from apps.accounts.models import LocalUser
 
 
 @pytest.fixture
