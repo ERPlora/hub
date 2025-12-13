@@ -1,0 +1,51 @@
+#!/bin/bash
+#
+# Pre-push hook: Block commits with "Co-Authored-By: Claude"
+#
+# This hook prevents pushing commits that contain the Co-Authored-By line
+# for Claude, ensuring all commits are attributed only to the actual author.
+
+remote="$1"
+url="$2"
+
+z40=0000000000000000000000000000000000000000
+
+while read local_ref local_sha remote_ref remote_sha
+do
+    if [ "$local_sha" = $z40 ]; then
+        # Branch deleted, skip
+        continue
+    fi
+
+    if [ "$remote_sha" = $z40 ]; then
+        # New branch, check all commits
+        range="$local_sha"
+    else
+        # Existing branch, check new commits only
+        range="$remote_sha..$local_sha"
+    fi
+
+    # Check for Co-Authored-By: Claude in commit messages
+    commits_with_claude=$(git log --format="%H %s" $range 2>/dev/null | while read hash rest; do
+        body=$(git show -s --format='%b' $hash 2>/dev/null)
+        if echo "$body" | grep -q "Co-Authored-By: Claude"; then
+            echo "$hash"
+        fi
+    done)
+
+    if [ -n "$commits_with_claude" ]; then
+        echo ""
+        echo "ERROR: Found commits with 'Co-Authored-By: Claude' in message body:"
+        echo ""
+        for commit in $commits_with_claude; do
+            git show -s --format='  %h - %s' $commit
+        done
+        echo ""
+        echo "Please amend these commits to remove the Co-Authored-By line before pushing."
+        echo "Use: git commit --amend"
+        echo ""
+        exit 1
+    fi
+done
+
+exit 0
