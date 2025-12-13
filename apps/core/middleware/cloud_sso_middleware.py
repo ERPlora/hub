@@ -61,9 +61,17 @@ class CloudSSOMiddleware:
         self.get_response = get_response
         # Use settings instead of decouple for consistency
         self.deployment_mode = getattr(settings, 'DEPLOYMENT_MODE', 'local')
-        self.cloud_api_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
         self.hub_id = getattr(settings, 'HUB_ID', '')
         self.demo_mode = getattr(settings, 'DEMO_MODE', False)
+
+        # Build Cloud base URL from PARENT_DOMAIN (preferred) or fallback to CLOUD_API_URL
+        parent_domain = getattr(settings, 'PARENT_DOMAIN', '')
+        if parent_domain:
+            self.cloud_base_url = f'https://{parent_domain}'
+        else:
+            # Fallback: use CLOUD_API_URL but strip /api if present
+            cloud_api_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
+            self.cloud_base_url = cloud_api_url.rstrip('/').replace('/api', '')
 
     def __call__(self, request):
         # Solo aplicar middleware en Cloud Hubs
@@ -214,7 +222,7 @@ class CloudSSOMiddleware:
         """
         try:
             response = requests.get(
-                f"{self.cloud_api_url}/api/auth/verify-session/",
+                f"{self.cloud_base_url}/api/auth/verify-session/",
                 cookies={'sessionid': session_id},
                 timeout=5
             )
@@ -253,7 +261,7 @@ class CloudSSOMiddleware:
 
         try:
             response = requests.get(
-                f"{self.cloud_api_url}/api/hubs/{self.hub_id}/check-access/",
+                f"{self.cloud_base_url}/api/hubs/{self.hub_id}/check-access/",
                 cookies={'sessionid': session_id},
                 timeout=5
             )
@@ -275,7 +283,7 @@ class CloudSSOMiddleware:
         """Redirige al login de Cloud con next parameter."""
         # two_factor usa /account/login/ (sin 's')
         # /accounts/login/ redirige a /account/login/
-        login_url = f"{self.cloud_api_url}/account/login/"
+        login_url = f"{self.cloud_base_url}/account/login/"
 
         # Construir next_url asegurando HTTPS en producción
         next_url = request.build_absolute_uri()
@@ -360,7 +368,7 @@ class CloudSSOMiddleware:
                 <p>
                     Please contact the Hub owner to request access.
                 </p>
-                <a href="{self.cloud_api_url}/dashboard/">Go to Dashboard</a>
+                <a href="{self.cloud_base_url}/dashboard/">Go to Dashboard</a>
             </div>
         </body>
         </html>
