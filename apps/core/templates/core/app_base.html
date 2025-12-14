@@ -426,6 +426,9 @@
                 <!-- Page content goes here -->
                 {% endblock %}
             </ion-content>
+
+            <!-- Section Tab Bar (different per page) -->
+            {% block section_tabbar %}{% endblock %}
         </div>
 
         <ion-action-sheet
@@ -555,7 +558,7 @@
                         'dashboard': "{% url 'configuration:dashboard' %}",
                         'employees': "{% url 'accounts:employees' %}",
                         'plugins': "{% url 'configuration:plugins' %}",
-                        'marketplace': "#",
+                        'marketplace': "{% url 'configuration:marketplace' %}",
                         'settings': "{% url 'configuration:settings' %}"
                     };
 

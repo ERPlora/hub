@@ -17,5 +17,4 @@
 !README.md
 !PLUGIN_DEVELOPMENT.md
 !PLUGIN_API.md
-!.template/
-!example
+!.template/**
