@@ -401,9 +401,10 @@ def purchase_plugin(request):
         # Get Cloud API URL
         cloud_api_url = getattr(django_settings, 'ERPLORA_CLOUD_API_URL', 'https://erplora.com')
 
-        # Build success and cancel URLs for Hub
-        success_url = request.build_absolute_uri('/plugins/purchase-success/')
-        cancel_url = request.build_absolute_uri('/plugins/marketplace/')
+        # Build success and cancel URLs - redirect to Cloud's success page with source=hub
+        # This allows Cloud to show "close this window" message for popup purchases
+        success_url = f"{cloud_api_url}/dashboard/plugins/marketplace/payment-success/?plugin_id={plugin_id}&source=hub"
+        cancel_url = f"{cloud_api_url}/dashboard/plugins/marketplace/"
 
         # Prepare auth header - prefer JWT, fall back to legacy token
         auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
@@ -490,6 +491,72 @@ def purchase_success(request):
         'current_view': 'marketplace',
     }
     return render(request, 'core/purchase_success.html', context)
+
+
+@require_http_methods(["GET"])
+def check_ownership(request, plugin_id):
+    """
+    Proxy to Cloud API to check if Hub owner owns a specific plugin.
+    Used for polling after Stripe checkout in popup.
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+
+    try:
+        # Get Hub configuration
+        from apps.configuration.models import HubConfig
+        hub_config = HubConfig.get_solo()
+
+        if not hub_config.hub_jwt and not hub_config.cloud_api_token:
+            return JsonResponse({
+                'success': False,
+                'owned': False,
+                'error': 'Hub not connected to Cloud'
+            }, status=400)
+
+        # Get Cloud API URL
+        cloud_api_url = getattr(django_settings, 'ERPLORA_CLOUD_API_URL', 'https://erplora.com')
+
+        # Prepare auth header
+        auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+        headers = {
+            'Accept': 'application/json',
+            'X-Hub-Token': auth_token,
+        }
+
+        # Call Cloud API to check ownership
+        api_url = f"{cloud_api_url}/api/marketplace/plugins/{plugin_id}/check_ownership/"
+
+        response = requests.get(api_url, headers=headers, timeout=10)
+
+        if response.status_code == 200:
+            data = response.json()
+            return JsonResponse({
+                'success': True,
+                'owned': data.get('owned', False),
+                'purchase_type': data.get('purchase_type'),
+                'purchase_id': data.get('purchase_id'),
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'owned': False,
+                'error': f'Cloud API returned {response.status_code}'
+            }, status=response.status_code)
+
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({
+            'success': False,
+            'owned': False,
+            'error': f'Failed to connect to Cloud: {str(e)}'
+        }, status=500)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'owned': False,
+            'error': str(e)
+        }, status=500)
 
 
 @require_http_methods(["POST"])
