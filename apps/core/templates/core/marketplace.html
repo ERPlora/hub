@@ -163,7 +163,7 @@
                                     </template>
                                     <template x-if="plugin.plugin_type !== 'free'">
                                         <span>
-                                            $<span x-text="plugin.price"></span>
+                                            €<span x-text="plugin.price"></span>
                                             <template x-if="plugin.plugin_type === 'subscription'">
                                                 <span style="font-size: 0.75rem; font-weight: normal;">/{% trans "month" %}</span>
                                             </template>
@@ -175,10 +175,20 @@
                                         <ion-icon slot="start" name="information-circle-outline"></ion-icon>
                                         {% trans "Details" %}
                                     </ion-button>
-                                    <ion-button size="small" @click="installPlugin(plugin)" :disabled="isInstalled(plugin.slug)">
-                                        <ion-icon slot="start" :name="isInstalled(plugin.slug) ? 'checkmark-circle' : 'download-outline'"></ion-icon>
-                                        <span x-text="isInstalled(plugin.slug) ? '{% trans "Installed" %}' : '{% trans "Install" %}'"></span>
-                                    </ion-button>
+                                    <!-- Install button for free plugins or already purchased -->
+                                    <template x-if="plugin.plugin_type === 'free' || plugin.is_owned">
+                                        <ion-button size="small" @click="installPlugin(plugin)" :disabled="isInstalled(plugin.slug)">
+                                            <ion-icon slot="start" :name="isInstalled(plugin.slug) ? 'checkmark-circle' : 'download-outline'"></ion-icon>
+                                            <span x-text="isInstalled(plugin.slug) ? '{% trans "Installed" %}' : '{% trans "Install" %}'"></span>
+                                        </ion-button>
+                                    </template>
+                                    <!-- Purchase button for paid plugins not owned -->
+                                    <template x-if="plugin.plugin_type !== 'free' && !plugin.is_owned">
+                                        <ion-button size="small" color="success" @click="purchasePlugin(plugin)" :disabled="isInstalled(plugin.slug)">
+                                            <ion-icon slot="start" name="cart-outline"></ion-icon>
+                                            {% trans "Buy" %}
+                                        </ion-button>
+                                    </template>
                                 </div>
                             </div>
                         </ion-card-content>
@@ -269,11 +279,19 @@
                         <p style="color: var(--ion-color-medium); line-height: 1.6;" x-text="selectedPlugin.description"></p>
                     </div>
 
-                    <!-- Install Button -->
-                    <ion-button expand="block" @click="installPlugin(selectedPlugin)" :disabled="isInstalled(selectedPlugin.slug)">
-                        <ion-icon slot="start" :name="isInstalled(selectedPlugin.slug) ? 'checkmark-circle' : 'download-outline'"></ion-icon>
-                        <span x-text="isInstalled(selectedPlugin.slug) ? '{% trans "Already Installed" %}' : '{% trans "Install Plugin" %}'"></span>
-                    </ion-button>
+                    <!-- Action Button -->
+                    <template x-if="selectedPlugin.plugin_type === 'free' || selectedPlugin.is_owned">
+                        <ion-button expand="block" @click="installPlugin(selectedPlugin)" :disabled="isInstalled(selectedPlugin.slug)">
+                            <ion-icon slot="start" :name="isInstalled(selectedPlugin.slug) ? 'checkmark-circle' : 'download-outline'"></ion-icon>
+                            <span x-text="isInstalled(selectedPlugin.slug) ? '{% trans "Already Installed" %}' : '{% trans "Install Plugin" %}'"></span>
+                        </ion-button>
+                    </template>
+                    <template x-if="selectedPlugin.plugin_type !== 'free' && !selectedPlugin.is_owned">
+                        <ion-button expand="block" color="success" @click="purchasePlugin(selectedPlugin)" :disabled="isInstalled(selectedPlugin.slug)">
+                            <ion-icon slot="start" name="cart-outline"></ion-icon>
+                            {% trans "Purchase Plugin" %} - €<span x-text="selectedPlugin.price"></span>
+                        </ion-button>
+                    </template>
                 </div>
             </template>
         </ion-content>
@@ -357,7 +375,8 @@ function marketplaceData() {
             this.error = null;
 
             try {
-                const response = await fetch(`${this.apiUrl}/api/plugins/marketplace/`, {
+                // Fetch plugins through local proxy endpoint (handles Cloud API auth)
+                const response = await fetch('/plugins/fetch-marketplace/', {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json',
@@ -369,10 +388,15 @@ function marketplaceData() {
                 }
 
                 const data = await response.json();
-                this.plugins = data.plugins || [];
-                this.categories = data.categories || [];
-                this.filteredPlugins = [...this.plugins];
-                this.isConnected = true;
+
+                if (data.success) {
+                    this.plugins = data.plugins || [];
+                    this.categories = data.categories || [];
+                    this.filteredPlugins = [...this.plugins];
+                    this.isConnected = true;
+                } else {
+                    throw new Error(data.error || '{% trans "Failed to load plugins" %}');
+                }
 
             } catch (err) {
                 console.error('Failed to load plugins:', err);
@@ -489,6 +513,51 @@ function marketplaceData() {
             this.$refs.installModal.dismiss();
             this.installSuccess = false;
             this.installError = null;
+        },
+
+        async purchasePlugin(plugin) {
+            // Close details modal if open
+            if (this.selectedPlugin) {
+                this.$refs.detailsModal.dismiss();
+            }
+
+            // Show loading
+            const loading = document.createElement('ion-loading');
+            loading.message = '{% trans "Redirecting to payment..." %}';
+            document.body.appendChild(loading);
+            await loading.present();
+
+            try {
+                // Call local API to initiate purchase via Cloud API
+                const response = await fetch('/plugins/purchase/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        plugin_id: plugin.id
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success && result.checkout_url) {
+                    // Redirect to Stripe Checkout
+                    window.location.href = result.checkout_url;
+                } else if (result.is_free) {
+                    // Plugin is free, install directly
+                    await loading.dismiss();
+                    await this.installPlugin(plugin);
+                } else {
+                    await loading.dismiss();
+                    await showErrorAlert(result.error || '{% trans "Failed to initiate purchase" %}', '{% trans "Error" %}');
+                }
+            } catch (err) {
+                await loading.dismiss();
+                console.error('Purchase error:', err);
+                await showErrorAlert(err.message || '{% trans "Failed to connect to server" %}', '{% trans "Error" %}');
+            }
         }
     }
 }

@@ -276,6 +276,222 @@ def marketplace(request):
     return render(request, 'core/marketplace.html', context)
 
 
+@require_http_methods(["GET"])
+def fetch_marketplace(request):
+    """
+    Proxy endpoint to fetch plugins from Cloud API with Hub authentication.
+    This allows the Hub to check ownership status for paid plugins.
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+
+    try:
+        # Get Hub configuration
+        from apps.configuration.models import HubConfig
+        hub_config = HubConfig.get_solo()
+
+        # Get Cloud API URL
+        cloud_api_url = getattr(django_settings, 'ERPLORA_CLOUD_API_URL', 'https://erplora.com')
+
+        # Prepare headers - use Hub token if available for ownership info
+        headers = {
+            'Accept': 'application/json',
+        }
+
+        # If Hub is connected to Cloud, use authenticated endpoint
+        auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+        if auth_token:
+            headers['X-Hub-Token'] = auth_token
+            api_url = f"{cloud_api_url}/api/marketplace/plugins/"
+        else:
+            # Use public endpoint (no ownership info)
+            api_url = f"{cloud_api_url}/api/plugins/marketplace/"
+
+        print(f"[MARKETPLACE] Fetching plugins from: {api_url}")
+
+        response = requests.get(api_url, headers=headers, timeout=30)
+
+        if response.status_code == 200:
+            data = response.json()
+
+            # Handle paginated response
+            if 'results' in data:
+                plugins = data['results']
+            elif isinstance(data, list):
+                plugins = data
+            else:
+                plugins = data.get('plugins', [])
+
+            # Fetch categories if available
+            categories = []
+            if auth_token:
+                try:
+                    cat_response = requests.get(
+                        f"{cloud_api_url}/api/marketplace/categories/",
+                        headers=headers,
+                        timeout=10
+                    )
+                    if cat_response.status_code == 200:
+                        categories = cat_response.json()
+                except Exception as cat_err:
+                    print(f"[MARKETPLACE] Failed to fetch categories: {cat_err}")
+
+            return JsonResponse({
+                'success': True,
+                'plugins': plugins,
+                'categories': categories
+            })
+        else:
+            error_msg = f'Cloud API returned {response.status_code}'
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('detail', error_msg)
+            except Exception:
+                pass
+            return JsonResponse({
+                'success': False,
+                'error': error_msg
+            }, status=response.status_code)
+
+    except requests.exceptions.RequestException as e:
+        print(f"[MARKETPLACE] Request error: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to connect to Cloud: {str(e)}'
+        }, status=500)
+    except Exception as e:
+        print(f"[MARKETPLACE] Error: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_http_methods(["POST"])
+def purchase_plugin(request):
+    """
+    Initiate plugin purchase via Cloud API.
+    Cloud creates Stripe Checkout session and returns checkout URL.
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+        plugin_id = data.get('plugin_id')
+
+        if not plugin_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'Missing plugin_id'
+            }, status=400)
+
+        # Get Hub configuration to get the cloud_api_token
+        from apps.configuration.models import HubConfig
+        hub_config = HubConfig.get_solo()
+
+        if not hub_config.hub_jwt and not hub_config.cloud_api_token:
+            return JsonResponse({
+                'success': False,
+                'error': 'Hub not connected to Cloud. Please configure your Hub first.'
+            }, status=400)
+
+        # Get Cloud API URL
+        cloud_api_url = getattr(django_settings, 'ERPLORA_CLOUD_API_URL', 'https://erplora.com')
+
+        # Build success and cancel URLs for Hub
+        success_url = request.build_absolute_uri('/plugins/purchase-success/')
+        cancel_url = request.build_absolute_uri('/plugins/marketplace/')
+
+        # Prepare auth header - prefer JWT, fall back to legacy token
+        auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Hub-Token': auth_token,
+        }
+
+        # Call Cloud API to create Stripe Checkout session
+        purchase_url = f"{cloud_api_url}/api/marketplace/plugins/{plugin_id}/purchase/"
+        print(f"[PURCHASE] Calling Cloud API: {purchase_url}")
+
+        response = requests.post(
+            purchase_url,
+            json={
+                'success_url': success_url,
+                'cancel_url': cancel_url
+            },
+            headers=headers,
+            timeout=30
+        )
+
+        result = response.json()
+        print(f"[PURCHASE] Cloud API response: {response.status_code} - {result}")
+
+        if response.status_code == 201 and result.get('is_free'):
+            # Plugin is free, no payment needed
+            return JsonResponse({
+                'success': True,
+                'is_free': True,
+                'message': result.get('message', 'Free plugin acquired')
+            })
+
+        if response.status_code == 200 and result.get('checkout_url'):
+            # Return Stripe checkout URL
+            return JsonResponse({
+                'success': True,
+                'checkout_url': result['checkout_url'],
+                'session_id': result.get('session_id'),
+                'mode': result.get('mode'),
+                'amount': result.get('amount'),
+                'currency': result.get('currency', 'EUR')
+            })
+
+        if response.status_code == 409:
+            # Already purchased
+            return JsonResponse({
+                'success': False,
+                'error': result.get('error', 'You already own this plugin'),
+                'already_owned': True
+            }, status=409)
+
+        # Other errors
+        return JsonResponse({
+            'success': False,
+            'error': result.get('error', f'Cloud API error: {response.status_code}')
+        }, status=response.status_code)
+
+    except requests.exceptions.RequestException as e:
+        print(f"[PURCHASE] Request error: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to connect to Cloud: {str(e)}'
+        }, status=500)
+    except Exception as e:
+        print(f"[PURCHASE] Error: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_http_methods(["GET"])
+def purchase_success(request):
+    """
+    Handle successful purchase return from Stripe.
+    Shows success message and offers to install the plugin.
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return redirect('accounts:login')
+
+    context = {
+        'current_view': 'marketplace',
+    }
+    return render(request, 'core/purchase_success.html', context)
+
+
 @require_http_methods(["POST"])
 def install_from_marketplace(request):
     """

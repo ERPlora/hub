@@ -23,6 +23,9 @@ urlpatterns = [
     # Plugins Management
     path('plugins/', views_plugins.plugins_index, name='plugins'),
     path('plugins/marketplace/', views_plugins.marketplace, name='marketplace'),
+    path('plugins/fetch-marketplace/', views_plugins.fetch_marketplace, name='fetch_marketplace'),
+    path('plugins/purchase/', views_plugins.purchase_plugin, name='purchase_plugin'),
+    path('plugins/purchase-success/', views_plugins.purchase_success, name='purchase_success'),
     path('plugins/install-from-marketplace/', views_plugins.install_from_marketplace, name='install_from_marketplace'),
     path('plugins/activate/<str:plugin_id>/', views_plugins.plugin_activate, name='plugin_activate'),
     path('plugins/deactivate/<str:plugin_id>/', views_plugins.plugin_deactivate, name='plugin_deactivate'),
