@@ -266,7 +266,7 @@ def marketplace(request):
                 installed_plugin_ids.append(plugin_id)
 
     # Get Cloud API URL from settings
-    cloud_api_url = getattr(django_settings, 'ERPLORA_CLOUD_API_URL', 'https://erplora.com')
+    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
 
     context = {
         'current_view': 'marketplace',
@@ -292,21 +292,23 @@ def fetch_marketplace(request):
         hub_config = HubConfig.get_solo()
 
         # Get Cloud API URL
-        cloud_api_url = getattr(django_settings, 'ERPLORA_CLOUD_API_URL', 'https://erplora.com')
+        cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
 
         # Prepare headers - use Hub token if available for ownership info
         headers = {
             'Accept': 'application/json',
         }
 
-        # If Hub is connected to Cloud, use authenticated endpoint
+        # Use authenticated endpoint with Hub token
         auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
-        if auth_token:
-            headers['X-Hub-Token'] = auth_token
-            api_url = f"{cloud_api_url}/api/marketplace/plugins/"
-        else:
-            # Use public endpoint (no ownership info)
-            api_url = f"{cloud_api_url}/api/plugins/marketplace/"
+        if not auth_token:
+            return JsonResponse({
+                'success': False,
+                'error': 'Hub not connected to Cloud. Please connect your Hub in Settings to access the marketplace.'
+            }, status=401)
+
+        headers['X-Hub-Token'] = auth_token
+        api_url = f"{cloud_api_url}/api/marketplace/plugins/"
 
         print(f"[MARKETPLACE] Fetching plugins from: {api_url}")
 
@@ -323,19 +325,18 @@ def fetch_marketplace(request):
             else:
                 plugins = data.get('plugins', [])
 
-            # Fetch categories if available
+            # Fetch categories
             categories = []
-            if auth_token:
-                try:
-                    cat_response = requests.get(
-                        f"{cloud_api_url}/api/marketplace/categories/",
-                        headers=headers,
-                        timeout=10
-                    )
-                    if cat_response.status_code == 200:
-                        categories = cat_response.json()
-                except Exception as cat_err:
-                    print(f"[MARKETPLACE] Failed to fetch categories: {cat_err}")
+            try:
+                cat_response = requests.get(
+                    f"{cloud_api_url}/api/marketplace/categories/",
+                    headers=headers,
+                    timeout=10
+                )
+                if cat_response.status_code == 200:
+                    categories = cat_response.json()
+            except Exception as cat_err:
+                print(f"[MARKETPLACE] Failed to fetch categories: {cat_err}")
 
             return JsonResponse({
                 'success': True,
@@ -399,7 +400,7 @@ def purchase_plugin(request):
             }, status=400)
 
         # Get Cloud API URL
-        cloud_api_url = getattr(django_settings, 'ERPLORA_CLOUD_API_URL', 'https://erplora.com')
+        cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
 
         # Build success and cancel URLs - redirect to Cloud's success page with source=hub
         # This allows Cloud to show "close this window" message for popup purchases
@@ -516,7 +517,7 @@ def check_ownership(request, plugin_id):
             }, status=400)
 
         # Get Cloud API URL
-        cloud_api_url = getattr(django_settings, 'ERPLORA_CLOUD_API_URL', 'https://erplora.com')
+        cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
 
         # Prepare auth header
         auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
