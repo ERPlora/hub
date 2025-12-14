@@ -5,6 +5,21 @@
 {% block title %}ERPlora Hub - {% trans "Plugins" %}{% endblock %}
 {% block page_title %}{% trans "Plugins" %}{% endblock %}
 
+{% block section_tabbar %}
+<ion-footer>
+    <ion-tab-bar>
+        <ion-tab-button href="{% url 'configuration:marketplace' %}">
+            <ion-icon name="storefront-outline"></ion-icon>
+            <ion-label>{% trans "Marketplace" %}</ion-label>
+        </ion-tab-button>
+        <ion-tab-button href="{% url 'configuration:plugins' %}" class="tab-selected">
+            <ion-icon name="download-outline"></ion-icon>
+            <ion-label>{% trans "Installed" %}</ion-label>
+        </ion-tab-button>
+    </ion-tab-bar>
+</ion-footer>
+{% endblock %}
+
 {% block extra_head %}
 <script>
     // Activate plugin with Ionic alert
