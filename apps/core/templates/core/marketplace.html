@@ -297,56 +297,59 @@
         </ion-content>
     </ion-modal>
 
-    <!-- Payment Waiting Modal -->
-    <ion-modal x-ref="paymentModal" :can-dismiss="false">
+    <!-- Payment Modal (Fullscreen with iframe) -->
+    <ion-modal x-ref="paymentModal" :can-dismiss="!paymentWaiting">
         <ion-header>
             <ion-toolbar>
-                <ion-title>{% trans "Processing Payment" %}</ion-title>
+                <ion-buttons slot="start">
+                    <ion-button @click="cancelPayment()" :disabled="paymentSuccess">
+                        <ion-icon slot="icon-only" name="close"></ion-icon>
+                    </ion-button>
+                </ion-buttons>
+                <ion-title>{% trans "Complete Payment" %}</ion-title>
             </ion-toolbar>
         </ion-header>
-        <ion-content class="ion-padding">
-            <div style="text-align: center; padding: 48px;">
-                <template x-if="paymentWaiting">
-                    <div>
-                        <ion-spinner name="crescent" style="width: 64px; height: 64px;"></ion-spinner>
-                        <h3 style="margin-top: 24px;">{% trans "Waiting for payment..." %}</h3>
-                        <p style="color: var(--ion-color-medium);">
-                            {% trans "Complete the payment in the Stripe window" %}
-                        </p>
-                        <ion-button fill="outline" style="margin-top: 24px;" @click="cancelPayment()">
-                            {% trans "Cancel" %}
-                        </ion-button>
-                    </div>
-                </template>
-                <template x-if="!paymentWaiting && paymentSuccess">
-                    <div>
-                        <ion-icon name="checkmark-circle" style="font-size: 64px; color: var(--ion-color-success);"></ion-icon>
-                        <h3 style="margin-top: 24px;">{% trans "Payment Successful!" %}</h3>
-                        <p style="color: var(--ion-color-medium);">
-                            {% trans "You can now install the plugin." %}
-                        </p>
-                        <ion-button expand="block" style="margin-top: 24px;" @click="installAfterPurchase()">
-                            <ion-icon slot="start" name="download-outline"></ion-icon>
-                            {% trans "Install Now" %}
-                        </ion-button>
-                        <ion-button expand="block" fill="outline" style="margin-top: 8px;" @click="closePaymentModal()">
-                            {% trans "Later" %}
-                        </ion-button>
-                    </div>
-                </template>
-                <template x-if="!paymentWaiting && paymentCancelled">
-                    <div>
-                        <ion-icon name="close-circle" style="font-size: 64px; color: var(--ion-color-warning);"></ion-icon>
-                        <h3 style="margin-top: 24px;">{% trans "Payment Cancelled" %}</h3>
-                        <p style="color: var(--ion-color-medium);">
-                            {% trans "The payment window was closed without completing the purchase." %}
-                        </p>
-                        <ion-button expand="block" style="margin-top: 24px;" @click="closePaymentModal()">
-                            {% trans "Close" %}
-                        </ion-button>
-                    </div>
-                </template>
-            </div>
+        <ion-content>
+            <!-- Payment iframe (Stripe Checkout) -->
+            <template x-if="paymentWaiting && checkoutUrl">
+                <iframe
+                    :src="checkoutUrl"
+                    style="width: 100%; height: 100%; border: none;"
+                    allow="payment"
+                ></iframe>
+            </template>
+
+            <!-- Success state -->
+            <template x-if="paymentSuccess">
+                <div style="text-align: center; padding: 48px;">
+                    <ion-icon name="checkmark-circle" style="font-size: 80px; color: var(--ion-color-success);"></ion-icon>
+                    <h2 style="margin-top: 24px;">{% trans "Payment Successful!" %}</h2>
+                    <p style="color: var(--ion-color-medium); margin-bottom: 32px;">
+                        {% trans "You can now install the plugin." %}
+                    </p>
+                    <ion-button expand="block" size="large" @click="installAfterPurchase()">
+                        <ion-icon slot="start" name="download-outline"></ion-icon>
+                        {% trans "Install Now" %}
+                    </ion-button>
+                    <ion-button expand="block" fill="outline" style="margin-top: 12px;" @click="closePaymentModal()">
+                        {% trans "Later" %}
+                    </ion-button>
+                </div>
+            </template>
+
+            <!-- Cancelled state -->
+            <template x-if="paymentCancelled">
+                <div style="text-align: center; padding: 48px;">
+                    <ion-icon name="close-circle" style="font-size: 80px; color: var(--ion-color-warning);"></ion-icon>
+                    <h2 style="margin-top: 24px;">{% trans "Payment Cancelled" %}</h2>
+                    <p style="color: var(--ion-color-medium); margin-bottom: 32px;">
+                        {% trans "The payment was not completed." %}
+                    </p>
+                    <ion-button expand="block" @click="closePaymentModal()">
+                        {% trans "Close" %}
+                    </ion-button>
+                </div>
+            </template>
         </ion-content>
     </ion-modal>
 
@@ -421,7 +424,7 @@ function marketplaceData() {
         paymentSuccess: false,
         paymentCancelled: false,
         paymentPlugin: null,
-        paymentPopup: null,
+        checkoutUrl: null,
         pollingInterval: null,
 
         // API URL
@@ -605,34 +608,14 @@ function marketplaceData() {
                 await loading.dismiss();
 
                 if (result.success && result.checkout_url) {
-                    // Open Stripe Checkout in popup
+                    // Set up payment state for iframe modal
                     this.paymentPlugin = plugin;
                     this.paymentWaiting = true;
                     this.paymentSuccess = false;
                     this.paymentCancelled = false;
+                    this.checkoutUrl = result.checkout_url;
 
-                    // Open popup
-                    const popupWidth = 500;
-                    const popupHeight = 700;
-                    const left = (window.screen.width - popupWidth) / 2;
-                    const top = (window.screen.height - popupHeight) / 2;
-
-                    this.paymentPopup = window.open(
-                        result.checkout_url,
-                        'stripe_checkout',
-                        `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
-                    );
-
-                    // Check if popup was blocked
-                    if (!this.paymentPopup || this.paymentPopup.closed) {
-                        await showErrorAlert(
-                            '{% trans "Popup was blocked. Please allow popups for this site and try again." %}',
-                            '{% trans "Popup Blocked" %}'
-                        );
-                        return;
-                    }
-
-                    // Show waiting modal
+                    // Show fullscreen modal with Stripe Checkout iframe
                     this.$refs.paymentModal.present();
 
                     // Start polling for ownership
@@ -659,33 +642,12 @@ function marketplaceData() {
         startOwnershipPolling(pluginId) {
             // Poll every 3 seconds to check if purchase completed
             this.pollingInterval = setInterval(async () => {
-                // Check if popup was closed
-                if (this.paymentPopup && this.paymentPopup.closed) {
-                    // Popup closed - do one final check
-                    clearInterval(this.pollingInterval);
-                    this.pollingInterval = null;
-
-                    const owned = await this.checkOwnership(pluginId);
-                    if (owned) {
-                        this.onPurchaseComplete();
-                    } else {
-                        this.onPurchaseCancelled();
-                    }
-                    return;
-                }
-
                 // Check ownership via API
                 const owned = await this.checkOwnership(pluginId);
                 if (owned) {
                     // Purchase completed!
                     clearInterval(this.pollingInterval);
                     this.pollingInterval = null;
-
-                    // Close the popup
-                    if (this.paymentPopup && !this.paymentPopup.closed) {
-                        this.paymentPopup.close();
-                    }
-
                     this.onPurchaseComplete();
                 }
             }, 3000);
@@ -726,10 +688,8 @@ function marketplaceData() {
                 this.pollingInterval = null;
             }
 
-            // Close popup if open
-            if (this.paymentPopup && !this.paymentPopup.closed) {
-                this.paymentPopup.close();
-            }
+            // Clear checkout URL to remove iframe
+            this.checkoutUrl = null;
 
             this.onPurchaseCancelled();
         },
@@ -740,6 +700,7 @@ function marketplaceData() {
             this.paymentSuccess = false;
             this.paymentCancelled = false;
             this.paymentPlugin = null;
+            this.checkoutUrl = null;
         },
 
         async installAfterPurchase() {
