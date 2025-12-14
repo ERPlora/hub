@@ -6,6 +6,9 @@ import json
 import shutil
 import sys
 import os
+import tempfile
+import zipfile
+import requests
 from pathlib import Path
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
@@ -241,3 +244,147 @@ def plugin_restart_server(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+def marketplace(request):
+    """
+    Marketplace view - shows plugins available from ERPlora Cloud
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return redirect('accounts:login')
+
+    # Get list of installed plugin IDs (slugs)
+    plugins_dir = Path(django_settings.PLUGINS_DIR)
+    installed_plugin_ids = []
+
+    if plugins_dir.exists():
+        for plugin_dir in plugins_dir.iterdir():
+            if plugin_dir.is_dir() and not plugin_dir.name.startswith('.'):
+                # Remove _ prefix if disabled
+                plugin_id = plugin_dir.name.lstrip('_')
+                installed_plugin_ids.append(plugin_id)
+
+    # Get Cloud API URL from settings
+    cloud_api_url = getattr(django_settings, 'ERPLORA_CLOUD_API_URL', 'https://erplora.com')
+
+    context = {
+        'current_view': 'marketplace',
+        'installed_plugin_ids': json.dumps(installed_plugin_ids),
+        'cloud_api_url': cloud_api_url,
+    }
+    return render(request, 'core/marketplace.html', context)
+
+
+@require_http_methods(["POST"])
+def install_from_marketplace(request):
+    """
+    Download and install a plugin from ERPlora Cloud marketplace
+    """
+    # Check if user is logged in
+    if 'local_user_id' not in request.session:
+        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+        plugin_id = data.get('plugin_id')
+        plugin_slug = data.get('plugin_slug')
+        download_url = data.get('download_url')
+
+        if not plugin_slug or not download_url:
+            return JsonResponse({
+                'success': False,
+                'error': 'Missing plugin_slug or download_url'
+            }, status=400)
+
+        plugins_dir = Path(django_settings.PLUGINS_DIR)
+        plugin_target_dir = plugins_dir / plugin_slug
+
+        # Check if already installed
+        if plugin_target_dir.exists() or (plugins_dir / f"_{plugin_slug}").exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Plugin already installed'
+            }, status=400)
+
+        # Download the plugin zip file
+        print(f"[MARKETPLACE] Downloading plugin from: {download_url}")
+        response = requests.get(download_url, timeout=60, stream=True)
+        response.raise_for_status()
+
+        # Save to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                tmp_file.write(chunk)
+            tmp_path = tmp_file.name
+
+        try:
+            # Extract zip file
+            with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
+                # Check if the zip contains a single root folder
+                namelist = zip_ref.namelist()
+                root_folders = set()
+                for name in namelist:
+                    parts = name.split('/')
+                    if parts[0]:
+                        root_folders.add(parts[0])
+
+                if len(root_folders) == 1:
+                    # Single root folder - extract and rename
+                    root_folder = list(root_folders)[0]
+                    zip_ref.extractall(plugins_dir)
+                    extracted_dir = plugins_dir / root_folder
+                    if extracted_dir != plugin_target_dir:
+                        extracted_dir.rename(plugin_target_dir)
+                else:
+                    # Multiple files/folders - extract into plugin folder
+                    plugin_target_dir.mkdir(parents=True, exist_ok=True)
+                    zip_ref.extractall(plugin_target_dir)
+
+            print(f"[MARKETPLACE] Plugin extracted to: {plugin_target_dir}")
+
+            # Try to load the plugin dynamically
+            from apps.plugins_runtime.loader import plugin_loader
+            plugin_loaded = plugin_loader.load_plugin(plugin_slug)
+
+            if plugin_loaded:
+                print(f"[MARKETPLACE] Plugin {plugin_slug} loaded successfully")
+            else:
+                print(f"[MARKETPLACE] Plugin {plugin_slug} installed but requires restart")
+
+            # Mark that restart is needed
+            if 'plugins_pending_restart' not in request.session:
+                request.session['plugins_pending_restart'] = []
+
+            if plugin_slug not in request.session['plugins_pending_restart']:
+                request.session['plugins_pending_restart'].append(plugin_slug)
+                request.session.modified = True
+
+            return JsonResponse({
+                'success': True,
+                'message': f'Plugin {plugin_slug} installed successfully',
+                'requires_restart': True
+            })
+
+        finally:
+            # Clean up temp file
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    except requests.exceptions.RequestException as e:
+        print(f"[MARKETPLACE] Download error: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to download plugin: {str(e)}'
+        }, status=500)
+    except zipfile.BadZipFile:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid plugin package (not a valid zip file)'
+        }, status=400)
+    except Exception as e:
+        print(f"[MARKETPLACE] Install error: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
