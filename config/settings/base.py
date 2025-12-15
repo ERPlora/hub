@@ -97,8 +97,6 @@ INSTALLED_APPS = [
     'apps.sync.apps.SyncConfig',
     'apps.core.apps.CoreConfig',
     'apps.plugins_runtime',
-    # Hub apps - Dashboard
-    'apps.dashboard.core.apps.DashboardCoreConfig',
     # Hub apps - Auth
     'apps.auth.login.apps.AuthLoginConfig',
     # Hub apps - Main
