@@ -2,13 +2,14 @@
 ERPlora Hub - Local Development Settings
 
 Configuración para desarrollo local.
-Plugins se cargan desde el proyecto (./plugins/)
-Base de datos en ubicación específica del OS.
+Usa DataPaths para rutas consistentes con producción.
+Plugins desde ./plugins/ del proyecto (para desarrollo).
 """
 
 from .base import *
 from pathlib import Path
 import sys
+from config.paths import get_data_paths
 
 # =============================================================================
 # DEPLOYMENT
@@ -21,11 +22,40 @@ CLOUD_SYNC_REQUIRED = False
 DEVELOPMENT_MODE = True
 
 # =============================================================================
-# PATHS - Local development
+# PATHS - Using DataPaths (same as production)
 # =============================================================================
 
-# Override: En desarrollo local, plugins SIEMPRE desde el proyecto
-# (base.py usa get_plugins_dir() que apunta a ~/Library/... en Desktop)
+# Get all paths from DataPaths (auto-detects OS)
+_paths = get_data_paths()
+DATA_DIR = _paths.base_dir
+
+# Database - same location as production
+DATABASE_DIR = _paths.database_dir
+DATABASES['default']['NAME'] = _paths.database_path
+
+# Media
+MEDIA_ROOT = _paths.media_dir
+
+# Logs
+LOGS_DIR = _paths.logs_dir
+LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
+
+# Backups & Reports
+BACKUPS_DIR = _paths.backups_dir
+REPORTS_DIR = _paths.reports_dir
+
+# Plugin data
+PLUGIN_DATA_ROOT = DATA_DIR / 'plugin_data'
+PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
+PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# =============================================================================
+# PLUGINS - Override: use project ./plugins/ for development
+# =============================================================================
+# En desarrollo queremos editar plugins directamente en el repo
+# En producción (desktop_*) usarían _paths.plugins_dir
+
 PLUGINS_DIR = BASE_DIR / 'plugins'
 PLUGINS_ROOT = PLUGINS_DIR
 PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
@@ -33,37 +63,6 @@ PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
 # Add plugins to sys.path
 if PLUGINS_DIR.exists() and str(PLUGINS_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGINS_DIR))
-
-# Data directory based on OS
-import platform
-if platform.system() == 'Darwin':
-    DATA_DIR = Path.home() / 'Library' / 'Application Support' / 'ERPloraHub'
-elif platform.system() == 'Windows':
-    DATA_DIR = Path.home() / 'AppData' / 'Local' / 'ERPloraHub'
-else:
-    DATA_DIR = Path.home() / '.local' / 'share' / 'erplora-hub'
-
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-# Database
-DATABASE_DIR = DATA_DIR / 'db'
-DATABASE_DIR.mkdir(parents=True, exist_ok=True)
-DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
-
-# Media
-MEDIA_ROOT = DATA_DIR / 'media'
-MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-
-# Logs
-LOGS_DIR = DATA_DIR / 'logs'
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
-
-# Plugin data (still in DATA_DIR for persistence)
-PLUGIN_DATA_ROOT = DATA_DIR / 'plugin_data'
-PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
-PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
-PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
 # SECURITY - Relaxed for local development
