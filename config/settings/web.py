@@ -58,11 +58,8 @@ DATABASE_DIR = DATA_DIR / 'db'
 DATABASE_DIR.mkdir(parents=True, exist_ok=True)
 DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
 
-# Plugins - stored locally in container (distributed from Cloud marketplace)
-# Dokploy deploys with latest plugins from GitHub repo
-PLUGINS_DIR = BASE_DIR / 'plugins'
-PLUGINS_ROOT = PLUGINS_DIR
-PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
+# Plugins - uses base.py config (PLUGINS_DIR from DataPaths or env var)
+# In Docker: /app/plugins/ by default, can be overridden via PLUGINS_DIR env var
 
 # =============================================================================
 # S3 STORAGE - Hetzner Object Storage (hubs/{HUB_ID}/)

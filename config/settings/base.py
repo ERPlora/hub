@@ -242,11 +242,19 @@ HUB_VERSION = "1.0.0"
 # Detect frozen (PyInstaller) vs development
 DEVELOPMENT_MODE = not getattr(sys, 'frozen', False) and config('ERPLORA_DEV_MODE', default='true', cast=bool)
 
-# Plugin paths (set per environment)
-PLUGINS_DIR = BASE_DIR / 'plugins'
+# Plugin paths - auto-detected via DataPaths (Docker vs Desktop)
+# Can be overridden via PLUGINS_DIR env var
+from config.paths import get_plugins_dir
+_plugins_dir_env = config('PLUGINS_DIR', default='')
+if _plugins_dir_env:
+    PLUGINS_DIR = Path(_plugins_dir_env)
+    PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
+else:
+    PLUGINS_DIR = get_plugins_dir()
+
 PLUGINS_ROOT = PLUGINS_DIR
 
-# Plugin discovery paths (extended per environment)
+# Plugin discovery paths
 PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
 
 # Plugin security
@@ -447,10 +455,6 @@ def load_plugin_templates():
     TEMPLATES[0]['DIRS'] = template_dirs
 
 
-# Load plugins on import
-load_plugins()
-load_plugin_templates()
-
-# Add plugins to sys.path
-if PLUGINS_DIR.exists():
-    sys.path.insert(0, str(PLUGINS_DIR))
+# NOTE: load_plugins() and load_plugin_templates() are called by each
+# environment-specific settings file AFTER PLUGINS_DIR is properly set.
+# Do NOT call them here in base.py.
