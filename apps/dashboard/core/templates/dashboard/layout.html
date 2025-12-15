@@ -352,6 +352,7 @@
             userName: '{{ request.session.user_name|default:"" }}',
             userEmail: '{{ request.session.user_email|default:"" }}',
             userRole: '{{ request.session.user_role|default:"" }}',
+            canInstall: false,
 
             init() {
                 // Apply dark mode
@@ -372,6 +373,20 @@
                 // Listen to fullscreen changes
                 document.addEventListener('fullscreenchange', () => {
                     this.isFullscreen = !!document.fullscreenElement;
+                });
+
+                // PWA Install - check if installable
+                this.canInstall = typeof canInstallPWA === 'function' && canInstallPWA();
+
+                // Listen for PWA installable event
+                document.addEventListener('pwa-installable', () => {
+                    this.canInstall = true;
+                });
+
+                // Listen for PWA installed event
+                document.addEventListener('pwa-installed', () => {
+                    this.canInstall = false;
+                    this.showToast('{% trans "App installed successfully!" %}', 'success');
                 });
             },
 
@@ -440,6 +455,15 @@
                     } else {
                         document.exitFullscreen();
                         this.isFullscreen = false;
+                    }
+                }
+            },
+
+            async installApp() {
+                if (typeof installPWA === 'function') {
+                    const installed = await installPWA();
+                    if (installed) {
+                        this.canInstall = false;
                     }
                 }
             },

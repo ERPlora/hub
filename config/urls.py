@@ -29,6 +29,9 @@ urlpatterns = [
     # Health check endpoint (for Cloud monitoring)
     path('ht/', include('health_check.urls')),
 
+    # PWA (Progressive Web App) - manifest.json and serviceworker.js
+    path('', include('pwa.urls')),
+
     # Language switcher (auto-detected from browser)
     path('set-language/', set_language, name='set_language'),
 

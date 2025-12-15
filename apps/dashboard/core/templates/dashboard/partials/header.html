@@ -12,6 +12,16 @@
         <ion-title>{% block header_title %}{{ page_title|default:"Dashboard" }}{% endblock %}</ion-title>
 
         <ion-buttons slot="end">
+            <!-- PWA Install Button (only shown when installable) -->
+            <ion-button
+                x-show="canInstall"
+                @click="installApp()"
+                x-cloak
+                color="primary">
+                <ion-icon slot="start" name="download-outline"></ion-icon>
+                <span class="hidden sm:inline">{% trans "Install" %}</span>
+            </ion-button>
+
             <!-- Fullscreen Toggle -->
             <ion-button @click="toggleFullscreen()">
                 <ion-icon slot="icon-only" :name="isFullscreen ? 'contract-outline' : 'expand-outline'"></ion-icon>

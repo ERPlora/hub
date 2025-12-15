@@ -1,14 +1,20 @@
 {% load static %}
 {% load i18n %}
+{% load pwa %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="ERPlora Hub - Point of Sale System">
     <title>{% block title %}ERPlora Hub{% endblock %}</title>
+
+    <!-- PWA Meta Tags -->
+    {% progressive_web_app_meta %}
 
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+    <link rel="apple-touch-icon" href="{% static 'img/icons/icon-152x152.png' %}">
 
     <!-- Plus Jakarta Sans Font (local) -->
     <link rel="stylesheet" href="{% static 'fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
@@ -189,6 +195,67 @@
 
     {% block extra_css %}{% endblock %}
     {% block extra_head %}{% endblock %}
+
+    <!-- PWA Install Handler -->
+    <script>
+        // Store the install prompt event
+        let deferredPrompt = null;
+        let pwaInstalled = false;
+
+        // Check if app is already installed
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            pwaInstalled = true;
+        }
+
+        // Listen for the beforeinstallprompt event
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the mini-infobar from appearing
+            e.preventDefault();
+            // Save the event for later
+            deferredPrompt = e;
+            // Show install button
+            document.dispatchEvent(new CustomEvent('pwa-installable'));
+            console.log('[PWA] Install prompt available');
+        });
+
+        // Listen for successful installation
+        window.addEventListener('appinstalled', () => {
+            pwaInstalled = true;
+            deferredPrompt = null;
+            document.dispatchEvent(new CustomEvent('pwa-installed'));
+            console.log('[PWA] App installed successfully');
+        });
+
+        // Function to trigger installation
+        async function installPWA() {
+            if (!deferredPrompt) {
+                console.log('[PWA] No install prompt available');
+                return false;
+            }
+
+            // Show the install prompt
+            deferredPrompt.prompt();
+
+            // Wait for user response
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log('[PWA] User response:', outcome);
+
+            // Clear the prompt
+            deferredPrompt = null;
+
+            return outcome === 'accepted';
+        }
+
+        // Check if PWA can be installed
+        function canInstallPWA() {
+            return deferredPrompt !== null && !pwaInstalled;
+        }
+
+        // Check if PWA is installed
+        function isPWAInstalled() {
+            return pwaInstalled || window.matchMedia('(display-mode: standalone)').matches;
+        }
+    </script>
 </head>
 <body class="{% if HUB_CONFIG.dark_mode %}dark{% endif %}">
     <ion-app mode="ios">
