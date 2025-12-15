@@ -35,9 +35,9 @@ PATHS POR ENTORNO:
             Media:    /Users/<usuario>/Library/Application Support/ERPloraHub/media/
 
         Linux:
-            Base:     /home/<usuario>/.cpos-hub/
-            DB:       /home/<usuario>/.cpos-hub/db/db.sqlite3
-            Media:    /home/<usuario>/.cpos-hub/media/
+            Base:     /home/<usuario>/.erplora-hub/
+            DB:       /home/<usuario>/.erplora-hub/db/db.sqlite3
+            Media:    /home/<usuario>/.erplora-hub/media/
 
 Subdirectorios (comunes a todos los entornos):
     - db/              Base de datos SQLite
@@ -89,7 +89,7 @@ class DataPaths:
     """
 
     APP_NAME = "ERPloraHub"
-    APP_NAME_HIDDEN = ".cpos-hub"  # Para Linux
+    APP_NAME_HIDDEN = ".erplora-hub"  # Para Linux
 
     def __init__(self):
         self.platform = sys.platform
@@ -108,7 +108,7 @@ class DataPaths:
               DESKTOP (PyInstaller):
                 - Windows: C:\Users\<user>\AppData\Local\ERPloraHub
                 - macOS: /Users/<user>/Library/Application Support/ERPloraHub
-                - Linux: /home/<user>/.cpos-hub
+                - Linux: /home/<user>/.erplora-hub
         """
         if self._base_dir is None:
             # Detectar si estamos en Docker

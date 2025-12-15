@@ -24,7 +24,8 @@ DEVELOPMENT_MODE = True
 # PATHS - Local development
 # =============================================================================
 
-# Plugins SIEMPRE desde el proyecto en local
+# Override: En desarrollo local, plugins SIEMPRE desde el proyecto
+# (base.py usa get_plugins_dir() que apunta a ~/Library/... en Desktop)
 PLUGINS_DIR = BASE_DIR / 'plugins'
 PLUGINS_ROOT = PLUGINS_DIR
 PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
