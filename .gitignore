@@ -237,6 +237,10 @@ plugins/*/
 # CACHE AND BACKUP FILES
 # ==============================================================================
 cache/
+logs/
+backups/
 *.bak
 *.backup
+*.old
+*~
 .secret_key

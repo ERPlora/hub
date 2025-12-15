@@ -9,6 +9,118 @@
     <h1 class="text-2xl font-bold mb-6">{% trans "Settings" %}</h1>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Store Information (Full Width) -->
+        <ion-card class="lg:col-span-2">
+            <ion-card-header>
+                <ion-card-title>
+                    {% trans "Store Information" %}
+                    {% if not store_config.is_configured %}
+                    <ion-chip color="warning" class="ml-2">{% trans "Required" %}</ion-chip>
+                    {% endif %}
+                </ion-card-title>
+                <ion-card-subtitle>{% trans "Business details for invoices and receipts" %}</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content>
+                <form @submit.prevent="saveStoreSettings()">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Left Column: Basic Info -->
+                        <div>
+                            <ion-list>
+                                <!-- Business Name -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "Business Name" %} *</ion-label>
+                                    <ion-input type="text" x-model="store.business_name" placeholder="{% trans 'Your business name' %}"></ion-input>
+                                </ion-item>
+
+                                <!-- Business Address -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "Address" %} *</ion-label>
+                                    <ion-textarea x-model="store.business_address" rows="2" placeholder="{% trans 'Street, City, Postal Code' %}"></ion-textarea>
+                                </ion-item>
+
+                                <!-- VAT Number -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "VAT/Tax ID" %} *</ion-label>
+                                    <ion-input type="text" x-model="store.vat_number" placeholder="{% trans 'e.g., ES12345678A' %}"></ion-input>
+                                </ion-item>
+
+                                <!-- Phone -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "Phone" %}</ion-label>
+                                    <ion-input type="tel" x-model="store.phone" placeholder="+34 600 000 000"></ion-input>
+                                </ion-item>
+
+                                <!-- Email -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "Email" %}</ion-label>
+                                    <ion-input type="email" x-model="store.email" placeholder="info@business.com"></ion-input>
+                                </ion-item>
+
+                                <!-- Website -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "Website" %}</ion-label>
+                                    <ion-input type="url" x-model="store.website" placeholder="https://www.business.com"></ion-input>
+                                </ion-item>
+                            </ion-list>
+                        </div>
+
+                        <!-- Right Column: Tax & Receipt -->
+                        <div>
+                            <ion-list>
+                                <!-- Logo -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "Logo" %}</ion-label>
+                                    <div class="flex items-center gap-4 py-2 w-full">
+                                        <div class="w-16 h-16 border rounded flex items-center justify-center bg-gray-50 dark:bg-gray-800">
+                                            {% if store_config.logo %}
+                                            <img src="{{ store_config.logo.url }}" alt="Logo" class="max-w-full max-h-full object-contain" id="logo-preview">
+                                            {% else %}
+                                            <ion-icon name="image-outline" class="text-3xl text-gray-400" id="logo-preview"></ion-icon>
+                                            {% endif %}
+                                        </div>
+                                        <input type="file" id="logo-input" accept="image/*" class="hidden" @change="handleLogoChange">
+                                        <ion-button fill="outline" size="small" @click="document.getElementById('logo-input').click()">
+                                            {% trans "Upload" %}
+                                        </ion-button>
+                                    </div>
+                                </ion-item>
+
+                                <!-- Tax Rate -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "Tax Rate (%)" %}</ion-label>
+                                    <ion-input type="number" x-model="store.tax_rate" step="0.01" min="0" max="100" placeholder="21.00"></ion-input>
+                                </ion-item>
+
+                                <!-- Tax Included -->
+                                <ion-item>
+                                    <ion-label>{% trans "Tax included in prices" %}</ion-label>
+                                    <ion-toggle slot="end" :checked="store.tax_included" @ionChange="store.tax_included = $event.detail.checked"></ion-toggle>
+                                </ion-item>
+
+                                <!-- Receipt Header -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "Receipt Header" %}</ion-label>
+                                    <ion-textarea x-model="store.receipt_header" rows="2" placeholder="{% trans 'Text shown at the top of receipts' %}"></ion-textarea>
+                                </ion-item>
+
+                                <!-- Receipt Footer -->
+                                <ion-item>
+                                    <ion-label position="stacked">{% trans "Receipt Footer" %}</ion-label>
+                                    <ion-textarea x-model="store.receipt_footer" rows="2" placeholder="{% trans 'Thank you for your purchase!' %}"></ion-textarea>
+                                </ion-item>
+                            </ion-list>
+                        </div>
+                    </div>
+
+                    <ion-button type="submit" expand="block" class="mt-4" :disabled="saving">
+                        <ion-spinner x-show="saving" name="crescent" class="mr-2"></ion-spinner>
+                        {% trans "Save Store Settings" %}
+                    </ion-button>
+                </form>
+            </ion-card-content>
+        </ion-card>
+
         <!-- User Settings -->
         <ion-card>
             <ion-card-header>
@@ -158,6 +270,21 @@
             isDark: {{ hub_config.dark_mode|yesno:"true,false" }},
             saving: false,
             avatarFile: null,
+            logoFile: null,
+
+            // Store configuration
+            store: {
+                business_name: '{{ store_config.business_name|escapejs }}',
+                business_address: '{{ store_config.business_address|escapejs }}',
+                vat_number: '{{ store_config.vat_number|escapejs }}',
+                phone: '{{ store_config.phone|escapejs }}',
+                email: '{{ store_config.email|escapejs }}',
+                website: '{{ store_config.website|escapejs }}',
+                tax_rate: '{{ store_config.tax_rate }}',
+                tax_included: {{ store_config.tax_included|yesno:"true,false" }},
+                receipt_header: '{{ store_config.receipt_header|escapejs }}',
+                receipt_footer: '{{ store_config.receipt_footer|escapejs }}',
+            },
 
             init() {
                 // Listen to theme changes from parent
@@ -168,6 +295,65 @@
 
             handleAvatarChange(event) {
                 this.avatarFile = event.target.files[0];
+            },
+
+            handleLogoChange(event) {
+                this.logoFile = event.target.files[0];
+                // Preview the logo
+                if (this.logoFile) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const preview = document.getElementById('logo-preview');
+                        if (preview.tagName === 'IMG') {
+                            preview.src = e.target.result;
+                        } else {
+                            // Replace icon with image
+                            const img = document.createElement('img');
+                            img.src = e.target.result;
+                            img.alt = 'Logo';
+                            img.className = 'max-w-full max-h-full object-contain';
+                            img.id = 'logo-preview';
+                            preview.parentNode.replaceChild(img, preview);
+                        }
+                    };
+                    reader.readAsDataURL(this.logoFile);
+                }
+            },
+
+            async saveStoreSettings() {
+                this.saving = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'update_store');
+                    formData.append('business_name', this.store.business_name);
+                    formData.append('business_address', this.store.business_address);
+                    formData.append('vat_number', this.store.vat_number);
+                    formData.append('phone', this.store.phone);
+                    formData.append('email', this.store.email);
+                    formData.append('website', this.store.website);
+                    formData.append('tax_rate', this.store.tax_rate);
+                    formData.append('tax_included', this.store.tax_included);
+                    formData.append('receipt_header', this.store.receipt_header);
+                    formData.append('receipt_footer', this.store.receipt_footer);
+
+                    if (this.logoFile) {
+                        formData.append('logo', this.logoFile);
+                    }
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        await this.showToast('{% trans "Store settings saved" %}', 'success');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Error saving store settings" %}', 'danger');
+                } finally {
+                    this.saving = false;
+                }
             },
 
             async saveUserSettings() {
