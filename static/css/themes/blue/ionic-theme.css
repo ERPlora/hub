@@ -282,3 +282,21 @@ body.dark {
   --muted-foreground: #94a3b8;
   --border: #334155;
 }
+
+/* ========================================
+   ION-SEGMENT STYLES
+   ======================================== */
+
+/* Light mode segment */
+ion-segment-button {
+  --color: var(--ion-color-medium);
+  --color-checked: #ffffff;
+  --indicator-color: var(--ion-color-primary);
+}
+
+/* Dark mode segment */
+body.dark ion-segment-button {
+  --color: var(--ion-color-medium);
+  --color-checked: #000000;
+  --indicator-color: var(--ion-color-primary);
+}

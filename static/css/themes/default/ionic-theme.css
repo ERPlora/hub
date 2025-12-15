@@ -109,6 +109,7 @@
   --ion-tab-bar-color: #717182;
   --ion-tab-bar-color-selected: #030213;
 
+
   /* Overlay colors (alerts, toasts, action sheets) */
   --ion-overlay-background-color: #ffffff;
 
@@ -269,4 +270,22 @@ body.dark {
   --muted: #3a3a3a;
   --muted-foreground: #b0b0b0;
   --border: #3a3a3a;
+}
+
+/* ========================================
+   ION-SEGMENT STYLES
+   ======================================== */
+
+/* Light mode segment */
+ion-segment-button {
+  --color: var(--ion-color-medium);
+  --color-checked: #ffffff;
+  --indicator-color: var(--ion-color-primary);
+}
+
+/* Dark mode segment */
+body.dark ion-segment-button {
+  --color: var(--ion-color-medium);
+  --color-checked: #000000;
+  --indicator-color: var(--ion-color-primary);
 }
