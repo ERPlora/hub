@@ -21,6 +21,9 @@ OFFLINE_ENABLED = True
 CLOUD_SYNC_REQUIRED = False
 DEVELOPMENT_MODE = True
 
+# Use production Cloud API for local development
+CLOUD_API_URL = 'https://erplora.com'
+
 # =============================================================================
 # PATHS - Using DataPaths (same as production)
 # =============================================================================
