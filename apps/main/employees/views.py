@@ -48,9 +48,9 @@ def api_create(request):
         if LocalUser.objects.filter(email=email).exists():
             return JsonResponse({'success': False, 'error': 'Email already exists'})
 
-        # Create user (cloud_user_id will be synced later)
+        # Create local-only employee (no cloud_user_id = pure local user with PIN auth)
         user = LocalUser.objects.create(
-            cloud_user_id=0,  # Temporary, will be updated when synced
+            cloud_user_id=None,  # NULL = local-only employee (PIN auth only)
             email=email,
             name=name,
             role=role

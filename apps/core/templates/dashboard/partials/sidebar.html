@@ -26,10 +26,20 @@
                               hx-get="{% url 'main:index' %}"
                               hx-target="#dashboard-content"
                               hx-push-url="true"
-                              detail="false"
-                              lines="none">
+                              detail="false">
                         <ion-icon name="grid-outline" slot="start"></ion-icon>
                         <ion-label>{% trans "Dashboard" %}</ion-label>
+                    </ion-item>
+
+                    <ion-item id="nav-files"
+                              class="nav-item {% if current_section == 'files' %}active{% endif %}"
+                              hx-get="{% url 'main:files' %}"
+                              hx-target="#dashboard-content"
+                              hx-push-url="true"
+                              detail="false"
+                              lines="none">
+                        <ion-icon name="folder-outline" slot="start"></ion-icon>
+                        <ion-label>{% trans "Files" %}</ion-label>
                     </ion-item>
                 </ion-item-group>
 
@@ -79,10 +89,10 @@
                 </ion-item-group>
                 {% endif %}
 
-                <!-- System Group -->
+                <!-- Marketplace Group -->
                 <ion-item-group>
                     <ion-item-divider>
-                        <ion-label>{% trans "System" %}</ion-label>
+                        <ion-label>{% trans "Marketplace" %}</ion-label>
                     </ion-item-divider>
 
                     <ion-item id="nav-plugins"

@@ -4,22 +4,49 @@ from django.contrib.auth.hashers import make_password, check_password
 
 class LocalUser(models.Model):
     """
-    Local users stored in Hub's SQLite database.
-    These users are linked to Cloud users but can log in offline with PIN.
+    Users stored in Hub's local SQLite database.
 
-    Note: cloud_user_id is nullable to support DEMO_MODE where users
-    authenticate via Cloud SSO but we don't need strict Cloud linking.
+    There are TWO types of LocalUsers:
+
+    1. CLOUD USERS (cloud_user_id is set):
+       - Linked to Cloud account
+       - Authenticate via Cloud SSO (email + password)
+       - Created automatically when user logs in via Cloud
+       - Can also use PIN for quick access
+
+    2. LOCAL EMPLOYEES (cloud_user_id is NULL):
+       - Created locally in Hub
+       - Authenticate ONLY with 4-digit PIN
+       - NOT synced to Cloud
+       - Use cases: cashiers, employees without Cloud accounts
+
+    The owner/admin who sets up the Hub is always a Cloud User.
+    Additional employees can be either Cloud Users (invited) or Local Employees.
     """
-    # User information from Cloud (nullable for DEMO_MODE)
-    cloud_user_id = models.IntegerField(unique=True, null=True, blank=True)
-    email = models.EmailField(unique=True)
+    # Role choices (aligned with Cloud HubUser model for consistency)
+    ROLE_CHOICES = [
+        ('admin', 'Admin'),
+        ('manager', 'Manager'),
+        ('employee', 'Employee'),
+    ]
+
+    # Link to Cloud user (NULL = local-only employee with PIN auth)
+    cloud_user_id = models.IntegerField(
+        unique=True,
+        null=True,
+        blank=True,
+        help_text='Cloud user ID. NULL = local-only employee (PIN auth only)'
+    )
+
+    # User information
+    email = models.EmailField(unique=True, help_text='Unique identifier')
     name = models.CharField(max_length=255)
 
-    # Local authentication
+    # Local PIN authentication (4 digits)
     pin_hash = models.CharField(max_length=255)
 
     # User role and permissions
-    role = models.CharField(max_length=50, default='cashier')  # admin, cashier, seller
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
     is_active = models.BooleanField(default=True)
 
     # User preferences
@@ -60,10 +87,20 @@ class LocalUser(models.Model):
         """Return Ionic color for user role"""
         role_colors = {
             'admin': 'primary',
-            'cashier': 'success',
-            'seller': 'warning',
+            'manager': 'tertiary',
+            'employee': 'success',
         }
         return role_colors.get(self.role, 'medium')
+
+    @property
+    def is_cloud_user(self):
+        """True if user is linked to Cloud account (can use SSO)"""
+        return self.cloud_user_id is not None
+
+    @property
+    def is_local_only(self):
+        """True if user is local-only (PIN auth only, not synced to Cloud)"""
+        return self.cloud_user_id is None
 
     # Django-compatible authentication properties
     @property

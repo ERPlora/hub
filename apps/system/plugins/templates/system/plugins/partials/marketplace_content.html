@@ -7,311 +7,198 @@
 </div>
 {% endif %}
 
-<div class="ion-padding" x-data="marketplaceApp()" x-init="init()">
+<div class="ion-padding">
     <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <h1 class="text-2xl font-bold">{% trans "Plugin Store" %}</h1>
-            <p class="text-medium">{% trans "Extend your Hub with powerful plugins" %}</p>
-        </div>
-        <ion-button
-            fill="outline"
-            hx-get="{% url 'system:plugins' %}"
-            hx-target="#dashboard-content"
-            hx-push-url="true">
-            <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
-            {% trans "Back to Installed" %}
-        </ion-button>
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold">{% trans "Plugin Store" %}</h1>
+        <p class="text-medium">{% trans "Extend your Hub with powerful plugins" %}</p>
     </div>
 
     <!-- Search and Filters -->
     <div class="flex flex-wrap gap-4 mb-6">
         <ion-searchbar
-            x-model="searchQuery"
-            @ionInput="filterPlugins()"
+            id="search-input"
             placeholder="{% trans 'Search plugins...' %}"
             class="flex-1 min-w-64"
             debounce="300">
         </ion-searchbar>
+
         <ion-select
-            x-model="selectedCategory"
-            @ionChange="filterPlugins()"
+            id="category-select"
             placeholder="{% trans 'All Categories' %}"
             interface="popover">
             <ion-select-option value="">{% trans "All Categories" %}</ion-select-option>
-            <template x-for="cat in categories" :key="cat.slug">
-                <ion-select-option :value="cat.slug" x-text="cat.name"></ion-select-option>
-            </template>
+            {% for category in categories %}
+            <ion-select-option value="{{ category.slug }}">{{ category.name }}</ion-select-option>
+            {% endfor %}
         </ion-select>
     </div>
 
-    <!-- Loading State -->
-    <div x-show="loading" class="flex justify-center py-12">
+    <script>
+    // Ionic components need event listeners for HTMX integration
+    (function() {
+        const searchInput = document.getElementById('search-input');
+        const categorySelect = document.getElementById('category-select');
+        const pluginsGrid = document.getElementById('marketplace-plugins-grid');
+        let searchTimeout = null;
+
+        function fetchPlugins() {
+            const searchValue = searchInput?.value || '';
+            const categoryValue = categorySelect?.value || '';
+            const params = new URLSearchParams();
+            if (searchValue) params.set('q', searchValue);
+            if (categoryValue) params.set('category', categoryValue);
+
+            const url = '{% url "system:marketplace_plugins_list" %}' + (params.toString() ? '?' + params.toString() : '');
+            htmx.ajax('GET', url, { target: '#marketplace-plugins-grid', swap: 'innerHTML', indicator: '#loading-spinner' });
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('ionInput', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(fetchPlugins, 300);
+            });
+        }
+
+        if (categorySelect) {
+            categorySelect.addEventListener('ionChange', fetchPlugins);
+        }
+    })();
+    </script>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="htmx-indicator flex justify-center py-12">
         <ion-spinner name="crescent"></ion-spinner>
     </div>
 
-    <!-- Error State -->
-    <ion-card x-show="error && !loading" class="bg-danger-50">
-        <ion-card-content class="text-center py-8">
-            <ion-icon name="cloud-offline-outline" class="text-6xl text-danger mb-4"></ion-icon>
-            <h3 class="text-lg font-semibold text-danger mb-2">{% trans "Connection Error" %}</h3>
-            <p class="text-medium mb-4" x-text="error"></p>
-            <ion-button @click="fetchPlugins()">
-                <ion-icon slot="start" name="refresh-outline"></ion-icon>
-                {% trans "Try Again" %}
-            </ion-button>
-        </ion-card-content>
-    </ion-card>
-
-    <!-- Plugins Grid -->
-    <div x-show="!loading && !error" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <template x-for="plugin in filteredPlugins" :key="plugin.slug">
-            <ion-card>
-                <ion-card-header>
-                    <div class="flex items-center gap-3">
-                        <ion-icon :name="plugin.icon || 'cube-outline'" class="text-2xl text-primary"></ion-icon>
-                        <div class="flex-1 min-w-0">
-                            <ion-card-title class="truncate" x-text="plugin.name"></ion-card-title>
-                            <ion-card-subtitle x-text="'v' + plugin.version"></ion-card-subtitle>
-                        </div>
-                        <template x-if="isInstalled(plugin.slug)">
-                            <ion-chip color="success">{% trans "Installed" %}</ion-chip>
-                        </template>
-                    </div>
-                </ion-card-header>
-                <ion-card-content>
-                    <p class="text-sm text-medium mb-4 line-clamp-2" x-text="plugin.description"></p>
-                    <div class="flex justify-between items-center text-xs text-medium">
-                        <span x-text="plugin.author"></span>
-                        <span x-text="formatPrice(plugin)"></span>
-                    </div>
-                </ion-card-content>
-                <div class="flex border-t border-gray-200 dark:border-gray-700">
-                    <template x-if="isInstalled(plugin.slug)">
-                        <ion-button fill="clear" size="small" color="medium" class="flex-1" disabled>
-                            <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
-                            {% trans "Installed" %}
-                        </ion-button>
-                    </template>
-                    <template x-if="!isInstalled(plugin.slug)">
-                        <ion-button
-                            fill="clear"
-                            size="small"
-                            color="primary"
-                            class="flex-1"
-                            @click="handlePluginAction(plugin)"
-                            :disabled="processingPlugin === plugin.slug">
-                            <ion-spinner x-show="processingPlugin === plugin.slug" name="crescent" class="mr-2"></ion-spinner>
-                            <ion-icon x-show="processingPlugin !== plugin.slug" slot="start" :name="plugin.is_free ? 'download-outline' : 'cart-outline'"></ion-icon>
-                            <span x-text="plugin.is_free ? '{% trans "Install" %}' : '{% trans "Purchase" %}'"></span>
-                        </ion-button>
-                    </template>
-                </div>
-            </ion-card>
-        </template>
-
-        <!-- Empty State -->
-        <ion-card x-show="filteredPlugins.length === 0 && !loading" class="col-span-full">
-            <ion-card-content class="text-center py-8">
-                <ion-icon name="search-outline" class="text-6xl text-medium mb-4"></ion-icon>
-                <h3 class="text-lg font-semibold mb-2">{% trans "No plugins found" %}</h3>
-                <p class="text-medium">{% trans "Try adjusting your search or filters" %}</p>
-            </ion-card-content>
-        </ion-card>
+    <!-- Plugins Grid (loaded via HTMX) -->
+    <div id="marketplace-plugins-grid"
+         hx-get="{% url 'system:marketplace_plugins_list' %}"
+         hx-trigger="load"
+         hx-swap="innerHTML"
+         hx-indicator="#loading-spinner">
+        <!-- Initial loading state -->
+        <div class="flex justify-center py-12">
+            <ion-spinner name="crescent"></ion-spinner>
+        </div>
     </div>
 </div>
 
+<!-- Marketplace plugin actions (uses global UI helpers from toast-helper.js) -->
 <script>
-// Define globally so it works with both page load and HTMX navigation
-window.marketplaceApp = function() {
-    return {
-        loading: true,
-        error: null,
-        plugins: [],
-        filteredPlugins: [],
-        categories: [],
-        installedPluginIds: {{ installed_plugin_ids|safe }},
-        searchQuery: '',
-        selectedCategory: '',
-        processingPlugin: null,
+// Install free plugin
+async function installFreePlugin(pluginId, pluginSlug, downloadUrl, button) {
+    setButtonLoading(button, true);
+    try {
+        // First acquire the free plugin
+        const purchaseResponse = await fetch('{% url "system:purchase_plugin" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ plugin_id: pluginId })
+        });
+        const purchaseData = await purchaseResponse.json();
 
-        async init() {
-            await this.fetchPlugins();
-        },
+        if (!purchaseData.success && !purchaseData.is_free && !purchaseData.already_owned) {
+            Toast.error(purchaseData.error || '{% trans "Error acquiring plugin" %}');
+            return;
+        }
 
-        async fetchPlugins() {
-            this.loading = true;
-            this.error = null;
+        // Now download and install
+        if (downloadUrl) {
+            await downloadAndInstall(pluginSlug, downloadUrl);
+        } else {
+            Toast.warning('{% trans "Plugin acquired. Download not available yet." %}');
+        }
+    } catch (error) {
+        Toast.error('{% trans "Error acquiring plugin" %}');
+    } finally {
+        setButtonLoading(button, false);
+    }
+}
 
-            try {
-                const response = await fetch('{% url "system:fetch_marketplace" %}');
-                const data = await response.json();
+// Purchase paid plugin
+async function purchasePlugin(pluginId, button) {
+    setButtonLoading(button, true);
+    try {
+        const response = await fetch('{% url "system:purchase_plugin" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ plugin_id: pluginId })
+        });
+        const data = await response.json();
 
-                if (data.success) {
-                    this.plugins = data.plugins || [];
-                    this.categories = data.categories || [];
-                    this.filterPlugins();
-                } else {
-                    this.error = data.error || '{% trans "Failed to load plugins" %}';
-                }
-            } catch (error) {
-                this.error = '{% trans "Failed to connect to Plugin Store" %}';
-            } finally {
-                this.loading = false;
-            }
-        },
+        if (data.success && data.checkout_url) {
+            window.open(data.checkout_url, '_blank');
+            Toast.info('{% trans "Complete payment in the opened window" %}');
+        } else if (data.already_owned) {
+            Toast.warning('{% trans "You already own this plugin" %}');
+        } else {
+            Toast.error(data.error || '{% trans "Error starting purchase" %}');
+        }
+    } catch (error) {
+        Toast.error('{% trans "Error processing purchase" %}');
+    } finally {
+        setButtonLoading(button, false);
+    }
+}
 
-        filterPlugins() {
-            let filtered = [...this.plugins];
+// Download and install plugin
+async function downloadAndInstall(pluginSlug, downloadUrl) {
+    try {
+        const response = await fetch('{% url "system:install_from_marketplace" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ plugin_slug: pluginSlug, download_url: downloadUrl })
+        });
+        const data = await response.json();
 
-            if (this.searchQuery) {
-                const query = this.searchQuery.toLowerCase();
-                filtered = filtered.filter(p =>
-                    p.name.toLowerCase().includes(query) ||
-                    p.description.toLowerCase().includes(query)
+        if (data.success) {
+            Toast.success('{% trans "Plugin installed successfully!" %}');
+            // Refresh the plugins grid
+            htmx.ajax('GET', '{% url "system:marketplace_plugins_list" %}', { target: '#marketplace-plugins-grid', swap: 'innerHTML' });
+
+            if (data.requires_restart) {
+                showConfirm(
+                    '{% trans "Restart Required" %}',
+                    '{% trans "The server needs to restart to complete plugin setup. Restart now?" %}',
+                    () => {
+                        fetch('{% url "system:plugin_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+                            .then(() => setTimeout(() => window.location.reload(), 2000));
+                    },
+                    '{% trans "Restart" %}',
+                    '{% trans "Later" %}'
                 );
             }
-
-            if (this.selectedCategory) {
-                filtered = filtered.filter(p => p.category === this.selectedCategory);
-            }
-
-            this.filteredPlugins = filtered;
-        },
-
-        isInstalled(slug) {
-            return this.installedPluginIds.includes(slug);
-        },
-
-        formatPrice(plugin) {
-            if (plugin.is_free) return '{% trans "Free" %}';
-            const price = parseFloat(plugin.price) || 0;
-            return new Intl.NumberFormat('es-ES', {
-                style: 'currency',
-                currency: plugin.currency || 'EUR'
-            }).format(price);
-        },
-
-        async handlePluginAction(plugin) {
-            if (this.processingPlugin) return;
-            this.processingPlugin = plugin.slug;
-
-            try {
-                if (plugin.is_free) {
-                    await this.installFreePlugin(plugin);
-                } else {
-                    await this.purchasePlugin(plugin);
-                }
-            } finally {
-                this.processingPlugin = null;
-            }
-        },
-
-        async installFreePlugin(plugin) {
-            try {
-                // First acquire the free plugin
-                const purchaseResponse = await fetch('{% url "system:purchase_plugin" %}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plugin_id: plugin.id })
-                });
-                const purchaseData = await purchaseResponse.json();
-
-                if (!purchaseData.success && !purchaseData.already_owned) {
-                    await this.showToast(purchaseData.error || '{% trans "Error acquiring plugin" %}', 'danger');
-                    return;
-                }
-
-                // Then install it
-                if (plugin.download_url) {
-                    await this.downloadAndInstall(plugin);
-                } else {
-                    await this.showToast('{% trans "Plugin acquired. Download not available yet." %}', 'warning');
-                }
-            } catch (error) {
-                await this.showToast('{% trans "Error installing plugin" %}', 'danger');
-            }
-        },
-
-        async purchasePlugin(plugin) {
-            try {
-                const response = await fetch('{% url "system:purchase_plugin" %}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plugin_id: plugin.id })
-                });
-                const data = await response.json();
-
-                if (data.success && data.checkout_url) {
-                    window.open(data.checkout_url, '_blank');
-                    await this.showToast('{% trans "Complete payment in the opened window" %}', 'primary');
-                } else if (data.already_owned) {
-                    await this.showToast('{% trans "You already own this plugin" %}', 'warning');
-                    if (plugin.download_url) {
-                        await this.downloadAndInstall(plugin);
-                    }
-                } else {
-                    await this.showToast(data.error || '{% trans "Error starting purchase" %}', 'danger');
-                }
-            } catch (error) {
-                await this.showToast('{% trans "Error processing purchase" %}', 'danger');
-            }
-        },
-
-        async downloadAndInstall(plugin) {
-            try {
-                const response = await fetch('{% url "system:install_from_marketplace" %}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        plugin_slug: plugin.slug,
-                        download_url: plugin.download_url
-                    })
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    this.installedPluginIds.push(plugin.slug);
-                    await this.showToast('{% trans "Plugin installed successfully!" %}', 'success');
-
-                    if (data.requires_restart) {
-                        const alert = document.createElement('ion-alert');
-                        alert.header = '{% trans "Restart Required" %}';
-                        alert.message = '{% trans "The server needs to restart to complete plugin setup. Restart now?" %}';
-                        alert.buttons = [
-                            { text: '{% trans "Later" %}', role: 'cancel' },
-                            {
-                                text: '{% trans "Restart" %}',
-                                handler: () => {
-                                    fetch('{% url "system:plugin_restart" %}', { method: 'POST' })
-                                        .then(() => setTimeout(() => window.location.reload(), 2000));
-                                }
-                            }
-                        ];
-                        document.body.appendChild(alert);
-                        await alert.present();
-                    }
-                } else {
-                    await this.showToast(data.error || '{% trans "Error installing plugin" %}', 'danger');
-                }
-            } catch (error) {
-                await this.showToast('{% trans "Error downloading plugin" %}', 'danger');
-            }
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 3000;
-            toast.color = color;
-            document.body.appendChild(toast);
-            await toast.present();
+        } else {
+            Toast.error(data.error || '{% trans "Error installing plugin" %}');
         }
-    };
-};
+    } catch (error) {
+        Toast.error('{% trans "Error downloading plugin" %}');
+    }
+}
 
-// Also expose as regular function for x-data="marketplaceApp()"
-if (typeof marketplaceApp === 'undefined') {
-    var marketplaceApp = window.marketplaceApp;
+// Button loading state helper
+function setButtonLoading(button, loading) {
+    if (!button) return;
+    const spinner = button.querySelector('.install-spinner');
+    const icon = button.querySelector('.install-icon');
+    if (spinner) spinner.style.display = loading ? 'block' : 'none';
+    if (icon) icon.style.display = loading ? 'none' : 'block';
+    button.disabled = loading;
 }
 </script>
+
+<style>
+.htmx-indicator {
+    display: none;
+}
+.htmx-request .htmx-indicator {
+    display: flex;
+}
+.htmx-request .install-icon {
+    display: none;
+}
+.htmx-request .install-spinner {
+    display: block !important;
+}
+</style>

@@ -1,0 +1,85 @@
+{% load i18n %}
+
+<!-- Breadcrumbs -->
+<div class="flex items-center gap-2 mb-4 text-sm flex-wrap">
+    {% for crumb in breadcrumbs %}
+    {% if not forloop.last %}
+    <a href="#"
+       hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ crumb.path }}"
+       hx-target="#file-browser-content"
+       class="text-primary hover:underline">
+        {{ crumb.name }}
+    </a>
+    <ion-icon name="chevron-forward-outline" class="text-medium"></ion-icon>
+    {% else %}
+    <span class="font-semibold">{{ crumb.name }}</span>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<!-- Directory Tabs -->
+<div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+    {% for key, dir_info in directories.items %}
+    <ion-chip
+        {% if key == dir_key %}color="primary"{% else %}color="medium"{% endif %}
+        class="cursor-pointer"
+        hx-get="{% url 'configuration:file_browser' %}?dir={{ key }}"
+        hx-target="#file-browser-content">
+        <ion-icon name="{{ dir_info.icon }}-outline"></ion-icon>
+        <ion-label>{{ dir_info.name }}</ion-label>
+    </ion-chip>
+    {% endfor %}
+</div>
+
+<!-- Back Button -->
+{% if has_parent %}
+<ion-item button
+    hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ parent_path }}"
+    hx-target="#file-browser-content"
+    class="mb-2">
+    <ion-icon name="arrow-back-outline" slot="start"></ion-icon>
+    <ion-label>{% trans "Back" %}</ion-label>
+</ion-item>
+{% endif %}
+
+<!-- Files List -->
+{% if is_empty %}
+<div class="text-center py-8">
+    <ion-icon name="folder-open-outline" class="text-6xl text-medium"></ion-icon>
+    <p class="text-medium mt-2">{% trans "No files in this directory" %}</p>
+</div>
+{% else %}
+<ion-list>
+    {% for item in items %}
+    {% if item.is_dir %}
+    <!-- Directory -->
+    <ion-item button
+        hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ item.path }}"
+        hx-target="#file-browser-content">
+        <ion-icon name="folder" slot="start" color="warning"></ion-icon>
+        <ion-label>
+            <h3>{{ item.name }}</h3>
+            <p class="text-xs text-medium">{{ item.modified }}</p>
+        </ion-label>
+        <ion-icon name="chevron-forward-outline" slot="end"></ion-icon>
+    </ion-item>
+    {% else %}
+    <!-- File -->
+    <ion-item>
+        <ion-icon name="{{ item.icon }}-outline" slot="start" color="medium"></ion-icon>
+        <ion-label>
+            <h3>{{ item.name }}</h3>
+            <p class="text-xs text-medium">{{ item.size }} • {{ item.modified }}</p>
+        </ion-label>
+        <ion-button
+            fill="clear"
+            slot="end"
+            href="{% url 'configuration:download_file' %}?dir={{ dir_key }}&path={{ item.path }}"
+            download>
+            <ion-icon name="download-outline" slot="icon-only"></ion-icon>
+        </ion-button>
+    </ion-item>
+    {% endif %}
+    {% endfor %}
+</ion-list>
+{% endif %}
