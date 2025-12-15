@@ -19,17 +19,44 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 from apps.plugins_runtime.router import plugin_urlpatterns
-from apps.core.views import set_language, pwa_manifest, pwa_serviceworker, pwa_offline
+from apps.core.views import set_language
+from apps.configuration.views import pwa_manifest, pwa_serviceworker, pwa_offline
+
+# Import API URL patterns from each app
+from apps.auth.login.api import api_urlpatterns as auth_api_urls
+from apps.accounts.api import api_urlpatterns as employees_api_urls
+from apps.configuration.api import api_urlpatterns as config_api_urls
+from apps.system.plugins.api import api_urlpatterns as plugins_api_urls
+from apps.core.api import api_urlpatterns as system_api_urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
+    # ==========================================================================
+    # REST API v1
+    # ==========================================================================
+    path('api/v1/auth/', include((auth_api_urls, 'api_auth'))),
+    path('api/v1/employees/', include((employees_api_urls, 'api_employees'))),
+    path('api/v1/config/', include((config_api_urls, 'api_config'))),
+    path('api/v1/plugins/', include((plugins_api_urls, 'api_plugins'))),
+    path('api/v1/system/', include((system_api_urls, 'api_system'))),
+
+    # API Documentation (Swagger/OpenAPI)
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+
+    # ==========================================================================
     # Health check endpoint (for Cloud monitoring)
+    # ==========================================================================
     path('ht/', include('health_check.urls')),
 
+    # ==========================================================================
     # PWA (Progressive Web App)
+    # ==========================================================================
     path('manifest.json', pwa_manifest, name='pwa_manifest'),
     path('serviceworker.js', pwa_serviceworker, name='pwa_serviceworker'),
     path('offline/', pwa_offline, name='pwa_offline'),
@@ -37,27 +64,30 @@ urlpatterns = [
     # Language switcher (auto-detected from browser)
     path('set-language/', set_language, name='set_language'),
 
-    # Root redirect to dashboard
-    path('', lambda request: redirect('main:index'), name='root'),
+    # ==========================================================================
+    # Web UI Routes
+    # ==========================================================================
 
-    # NEW: Auth routes (login, logout, etc.)
+    # Root redirect to dashboard (or login if not authenticated)
+    path('', lambda request: redirect('main:index') if 'local_user_id' in request.session else redirect('auth:login'), name='root'),
+
+    # Auth routes (login, logout, etc.)
     path('', include('apps.auth.login.urls')),
 
-    # NEW: Main routes (dashboard, settings, employees) - all under 'main' namespace
+    # Main routes (dashboard, settings, employees)
     path('dashboard/', include('apps.main.urls')),
 
-    # NEW: System routes (plugins, marketplace)
+    # System routes (plugins, marketplace)
     path('plugins/', include('apps.system.plugins.urls')),
 
-    # LEGACY: Keep old URLs and namespaces working during transition
-    # Configuration namespace (dashboard, settings, plugins)
-    path('', include('apps.configuration.urls')),
-    # Health check and core utilities
+    # Configuration (maintenance utilities)
+    path('config/', include('apps.configuration.urls')),
+
+    # Core utilities (health check, update notifications)
     path('', include('apps.core.urls')),
+
     # Sync with Cloud
-    path('', include('apps.sync.urls')),
-    # Employee API and accounts namespace (login, logout, employees)
-    path('', include('apps.accounts.urls')),
+    path('sync/', include('apps.sync.urls')),
 ]
 
 
