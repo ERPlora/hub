@@ -24,7 +24,7 @@ def plugins_index(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('accounts:login')
+        return redirect('auth:login')
 
     from apps.plugins_runtime.loader import plugin_loader
 
@@ -257,7 +257,7 @@ def marketplace(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('accounts:login')
+        return redirect('auth:login')
 
     # Get list of installed plugin IDs (slugs)
     plugins_dir = Path(django_settings.PLUGINS_DIR)
@@ -496,7 +496,7 @@ def purchase_success(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return redirect('accounts:login')
+        return redirect('auth:login')
 
     context = {
         'current_view': 'marketplace',

@@ -81,6 +81,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third-party
+    'rest_framework',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
     'djmoney',
     'django_htmx',
     # Health Check
@@ -270,6 +273,77 @@ PLUGIN_ALLOWED_DEPENDENCIES = [
 PLUGIN_MAX_SIZE_MB = 50
 PLUGIN_SIGNATURE_ALGORITHM = 'RSA-SHA256'
 PLUGIN_SIGNATURE_KEY_SIZE = 4096
+
+# =============================================================================
+# DJANGO REST FRAMEWORK
+# =============================================================================
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PERMISSION_CLASSES': [
+        'apps.core.api_base.IsAuthenticated',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+}
+
+# =============================================================================
+# DRF-SPECTACULAR (SWAGGER/OPENAPI)
+# =============================================================================
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'ERPlora Hub API',
+    'DESCRIPTION': '''
+## ERPlora Hub REST API
+
+API completa para gestionar el Hub de ERPlora:
+
+- **Authentication**: Login con PIN o Cloud, setup de PIN, logout
+- **Employees**: CRUD de empleados, reset de PIN
+- **Configuration**: Configuración del Hub y tienda
+- **Plugins**: Gestión de plugins, marketplace
+- **System**: Health check, actualizaciones
+
+### Autenticación
+
+La API usa autenticación basada en sesión. Primero debes hacer login:
+
+1. `POST /api/v1/auth/pin-login/` - Login con PIN local
+2. `POST /api/v1/auth/cloud-login/` - Login con credenciales de Cloud
+
+Después del login, las cookies de sesión se incluyen automáticamente en las peticiones.
+    ''',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+        'filter': True,
+    },
+    'TAGS': [
+        {'name': 'Authentication', 'description': 'Login, logout, PIN setup'},
+        {'name': 'Employees', 'description': 'Employee/user management'},
+        {'name': 'Configuration', 'description': 'Hub and store settings'},
+        {'name': 'Plugins', 'description': 'Plugin management'},
+        {'name': 'Marketplace', 'description': 'Plugin marketplace'},
+        {'name': 'System', 'description': 'Health check, updates, language'},
+    ],
+    'COMPONENT_SPLIT_REQUEST': True,
+    # Use sidecar for static files (Swagger UI CSS/JS)
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
+}
 
 # =============================================================================
 # DJANGO MONEY

@@ -27,7 +27,7 @@ def login_required(function=None, redirect_url=None):
 
     Args:
         function: The view function to decorate
-        redirect_url: Custom URL to redirect to if not authenticated (default: 'accounts:login')
+        redirect_url: Custom URL to redirect to if not authenticated (default: 'auth:login')
 
     Returns:
         Decorated function that checks for 'local_user_id' in session
@@ -41,7 +41,7 @@ def login_required(function=None, redirect_url=None):
                 if redirect_url:
                     login_url = redirect_url
                 else:
-                    login_url = reverse('accounts:login')
+                    login_url = reverse('auth:login')
 
                 # Add 'next' parameter to redirect back after login
                 next_url = request.get_full_path()
@@ -77,7 +77,7 @@ def role_required(*roles):
         def _wrapped_view(request, *args, **kwargs):
             # First check if user is logged in
             if 'local_user_id' not in request.session:
-                login_url = reverse('accounts:login')
+                login_url = reverse('auth:login')
                 next_url = request.get_full_path()
                 return redirect(f'{login_url}?next={next_url}')
 
