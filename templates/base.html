@@ -1,6 +1,5 @@
 {% load static %}
 {% load i18n %}
-{% load pwa %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
@@ -10,7 +9,12 @@
     <title>{% block title %}ERPlora Hub{% endblock %}</title>
 
     <!-- PWA Meta Tags -->
-    {% progressive_web_app_meta %}
+    <meta name="theme-color" content="#3880ff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ERPlora Hub">
+    <link rel="manifest" href="/manifest.json">
 
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
