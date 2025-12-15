@@ -1,9 +1,11 @@
 {% load i18n %}
 
-<!-- Tab bar update via OOB swap -->
+{% if request.htmx %}
+<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
 <div id="dashboard-tabbar" hx-swap-oob="innerHTML">
 {% include "system/plugins/partials/tabbar_system.html" %}
 </div>
+{% endif %}
 
 <div class="ion-padding" x-data="pluginsApp()">
     <!-- Header -->
