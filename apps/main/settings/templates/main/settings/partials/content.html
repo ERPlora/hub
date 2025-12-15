@@ -261,6 +261,34 @@
                 </ion-button>
             </ion-card-content>
         </ion-card>
+
+        <!-- Database Maintenance (Full Width) -->
+        <ion-card class="lg:col-span-2">
+            <ion-card-header>
+                <ion-card-title>
+                    <ion-icon name="build-outline" class="align-middle mr-2"></ion-icon>
+                    {% trans "Database Maintenance" %}
+                </ion-card-title>
+                <ion-card-subtitle>{% trans "Clean up orphaned data from deleted plugins" %}</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content>
+                <p class="text-sm text-medium mb-4">
+                    {% trans "Scan for and remove orphaned database tables, migration records, and media files left behind by deleted plugins." %}
+                </p>
+
+                <ion-button
+                    fill="outline"
+                    hx-get="{% url 'configuration:scan_orphaned_data' %}"
+                    hx-target="#scan-results"
+                    hx-indicator="#scan-spinner">
+                    <ion-icon slot="start" name="search-outline"></ion-icon>
+                    {% trans "Scan for Orphaned Data" %}
+                    <ion-spinner id="scan-spinner" name="crescent" class="htmx-indicator ml-2" style="display: none;"></ion-spinner>
+                </ion-button>
+
+                <div id="scan-results" class="mt-4"></div>
+            </ion-card-content>
+        </ion-card>
     </div>
 </div>
 
@@ -350,6 +378,8 @@
                     const data = await response.json();
                     if (data.success) {
                         await this.showToast('{% trans "Store settings saved" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error saving store settings" %}', 'danger');
                     }
                 } catch (error) {
                     await this.showToast('{% trans "Error saving store settings" %}', 'danger');
@@ -379,6 +409,8 @@
                         if (this.language !== '{{ user.language }}') {
                             window.location.reload();
                         }
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error saving preferences" %}', 'danger');
                     }
                 } catch (error) {
                     await this.showToast('{% trans "Error saving preferences" %}', 'danger');
@@ -401,6 +433,8 @@
                     const data = await response.json();
                     if (data.success) {
                         await this.showToast('{% trans "Hub settings saved" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error saving settings" %}', 'danger');
                     }
                 } catch (error) {
                     await this.showToast('{% trans "Error saving settings" %}', 'danger');
@@ -425,22 +459,25 @@
                     formData.append('action', 'update_theme');
                     formData.append('dark_mode', this.isDark);
 
-                    await fetch('{% url "main:settings" %}', {
+                    const response = await fetch('{% url "main:settings" %}', {
                         method: 'POST',
                         body: formData
                     });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        await this.showToast('{% trans "Theme updated" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error updating theme" %}', 'danger');
+                    }
                 } catch (error) {
-                    console.error('Error saving theme:', error);
+                    await this.showToast('{% trans "Error updating theme" %}', 'danger');
                 }
             },
 
+            // Use global Toast helper from toast-helper.js
             async showToast(message, color = 'primary') {
-                const toast = document.createElement('ion-toast');
-                toast.message = message;
-                toast.duration = 2000;
-                toast.color = color;
-                document.body.appendChild(toast);
-                await toast.present();
+                await showToast(message, color);
             }
         }
     }

@@ -1,0 +1,86 @@
+{% load i18n %}
+
+{% if request.htmx %}
+<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+{% include "dashboard/partials/tabbar_main.html" %}
+</div>
+{% endif %}
+
+<div class="ion-padding">
+    <h1 class="text-2xl font-bold mb-6">{% trans "Files" %}</h1>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Left Column: Storage Info + Database Download -->
+        <div class="space-y-6">
+            <!-- Database Download Card -->
+            <ion-card>
+                <ion-card-header>
+                    <ion-card-title>
+                        <ion-icon name="server-outline" class="align-middle mr-2"></ion-icon>
+                        {% trans "Database" %}
+                    </ion-card-title>
+                    <ion-card-subtitle>{% trans "Download your Hub database" %}</ion-card-subtitle>
+                </ion-card-header>
+                <ion-card-content>
+                    <p class="text-sm text-medium mb-4">
+                        {% trans "Download a backup of your SQLite database containing all your data." %}
+                    </p>
+
+                    <ion-button expand="block" href="{% url 'configuration:download_database' %}" download>
+                        <ion-icon slot="start" name="download-outline"></ion-icon>
+                        {% trans "Download Database" %}
+                    </ion-button>
+                </ion-card-content>
+            </ion-card>
+
+            <!-- Storage Info Card -->
+            <ion-card>
+                <ion-card-header>
+                    <ion-card-title>
+                        <ion-icon name="pie-chart-outline" class="align-middle mr-2"></ion-icon>
+                        {% trans "Storage" %}
+                    </ion-card-title>
+                    <ion-card-subtitle>{% trans "Disk usage by category" %}</ion-card-subtitle>
+                </ion-card-header>
+                <ion-card-content>
+                    <div id="storage-info"
+                         hx-get="{% url 'configuration:storage_info' %}"
+                         hx-trigger="load"
+                         hx-swap="innerHTML">
+                        <!-- Loading state -->
+                        <div class="flex justify-center py-4">
+                            <ion-spinner name="crescent"></ion-spinner>
+                        </div>
+                    </div>
+                </ion-card-content>
+            </ion-card>
+        </div>
+
+        <!-- Right Column: File Browser (2 cols wide) -->
+        <div class="lg:col-span-2">
+            <ion-card>
+                <ion-card-header>
+                    <ion-card-title>
+                        <ion-icon name="folder-open-outline" class="align-middle mr-2"></ion-icon>
+                        {% trans "File Browser" %}
+                    </ion-card-title>
+                    <ion-card-subtitle>{% trans "Browse and download local files" %}</ion-card-subtitle>
+                </ion-card-header>
+                <ion-card-content>
+                    <div id="file-browser-content"
+                         hx-get="{% url 'configuration:file_browser' %}?dir=media"
+                         hx-trigger="load"
+                         hx-swap="innerHTML">
+                        <!-- Loading state -->
+                        <div class="flex justify-center py-8">
+                            <ion-spinner name="crescent"></ion-spinner>
+                        </div>
+                    </div>
+                </ion-card-content>
+            </ion-card>
+        </div>
+
+    </div>
+</div>

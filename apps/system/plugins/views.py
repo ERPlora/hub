@@ -88,6 +88,8 @@ def plugins_index(request):
 @htmx_view('system/plugins/pages/marketplace.html', 'system/plugins/partials/marketplace_content.html')
 def marketplace(request):
     """Marketplace view - shows plugins from ERPlora Cloud"""
+    from apps.configuration.models import HubConfig
+
     plugins_dir = Path(django_settings.PLUGINS_DIR)
     installed_plugin_ids = []
 
@@ -97,14 +99,118 @@ def marketplace(request):
                 plugin_id = plugin_dir.name.lstrip('_')
                 installed_plugin_ids.append(plugin_id)
 
-    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+    # Fetch categories for the select dropdown
+    categories = []
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if auth_token:
+        cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+        headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
+        try:
+            response = requests.get(
+                f"{cloud_api_url}/api/marketplace/categories/",
+                headers=headers, timeout=10
+            )
+            if response.status_code == 200:
+                categories = response.json()
+        except Exception:
+            pass
 
     return {
         'current_section': 'marketplace',
         'page_title': 'Plugin Store',
-        'installed_plugin_ids': json.dumps(installed_plugin_ids),
-        'cloud_api_url': cloud_api_url,
+        'installed_plugin_ids': installed_plugin_ids,
+        'categories': categories,
     }
+
+
+@login_required
+def marketplace_plugins_list(request):
+    """
+    HTMX endpoint: Fetch and render plugins from Cloud API.
+    Returns HTML partial with plugin cards.
+    """
+    from django.template.loader import render_to_string
+    from django.http import HttpResponse
+    from apps.configuration.models import HubConfig
+
+    # Get filters from query params
+    search_query = request.GET.get('q', '').strip()
+    category_filter = request.GET.get('category', '').strip()
+
+    # Get installed plugins
+    plugins_dir = Path(django_settings.PLUGINS_DIR)
+    installed_plugin_ids = []
+    if plugins_dir.exists():
+        for plugin_dir in plugins_dir.iterdir():
+            if plugin_dir.is_dir() and not plugin_dir.name.startswith('.'):
+                installed_plugin_ids.append(plugin_dir.name.lstrip('_'))
+
+    # Fetch from Cloud API
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        html = render_to_string('system/plugins/partials/marketplace_error.html', {
+            'error': 'Hub not connected to Cloud. Please connect in Settings.'
+        })
+        return HttpResponse(html)
+
+    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+    headers = {
+        'Accept': 'application/json',
+        'X-Hub-Token': auth_token,
+    }
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/plugins/",
+            headers=headers,
+            timeout=30
+        )
+
+        if response.status_code != 200:
+            html = render_to_string('system/plugins/partials/marketplace_error.html', {
+                'error': f'Cloud API returned {response.status_code}'
+            })
+            return HttpResponse(html)
+
+        data = response.json()
+        plugins = data.get('results', data) if isinstance(data, dict) else data
+        if not isinstance(plugins, list):
+            plugins = []
+
+        # Apply filters
+        if search_query:
+            query_lower = search_query.lower()
+            plugins = [
+                p for p in plugins
+                if query_lower in p.get('name', '').lower()
+                or query_lower in p.get('description', '').lower()
+            ]
+
+        if category_filter:
+            plugins = [p for p in plugins if p.get('category') == category_filter]
+
+        # Mark installed plugins
+        for plugin in plugins:
+            plugin['is_installed'] = plugin.get('slug', '') in installed_plugin_ids
+
+        html = render_to_string('system/plugins/partials/marketplace_plugins_grid.html', {
+            'plugins': plugins,
+            'search_query': search_query,
+            'category_filter': category_filter,
+        })
+        return HttpResponse(html)
+
+    except requests.exceptions.RequestException as e:
+        html = render_to_string('system/plugins/partials/marketplace_error.html', {
+            'error': f'Failed to connect to Cloud: {str(e)}'
+        })
+        return HttpResponse(html)
+
+
 
 
 # API endpoints (no HTMX, just JSON)

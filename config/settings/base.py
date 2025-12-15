@@ -101,6 +101,7 @@ INSTALLED_APPS = [
     'apps.auth.login.apps.AuthLoginConfig',
     # Hub apps - Main
     'apps.main.index.apps.MainIndexConfig',
+    'apps.main.files.apps.FilesConfig',
     'apps.main.settings.apps.MainSettingsConfig',
     'apps.main.employees.apps.MainEmployeesConfig',
     # Hub apps - System

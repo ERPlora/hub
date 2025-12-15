@@ -39,8 +39,8 @@
     <!-- HTMX (offline) -->
     <script src="{% static 'js/htmx.min.js' %}"></script>
 
-    <!-- Toast Helper -->
-    <script src="{% static 'js/toast-helper.js' %}"></script>
+    <!-- UI Helpers (Toast, Alert, Loading) -->
+    <script src="{% static 'js/ui-helpers.js' %}"></script>
 
     <!-- Ionic Core (offline) -->
     <script type="module" src="{% static 'js/ionic/ionic.esm.js' %}"></script>
@@ -70,10 +70,21 @@
 
     <!-- HTMX Configuration -->
     <script>
+        // Enable HTMX to process inline scripts
+        htmx.config.allowScriptTags = true;
+
         document.addEventListener('DOMContentLoaded', function() {
             // Include CSRF token in all HTMX requests
             document.body.addEventListener('htmx:configRequest', function(event) {
                 event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            });
+
+            // Re-initialize Alpine components after HTMX swaps
+            document.body.addEventListener('htmx:afterSwap', function(event) {
+                // Let Alpine process any new x-data elements
+                if (typeof Alpine !== 'undefined') {
+                    Alpine.initTree(event.detail.target);
+                }
             });
         });
     </script>

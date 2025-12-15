@@ -83,10 +83,9 @@
                     <ion-item>
                         <ion-label position="stacked">{% trans "Role" %}</ion-label>
                         <ion-select x-model="form.role" interface="popover">
-                            <ion-select-option value="admin">Admin</ion-select-option>
-                            <ion-select-option value="manager">Manager</ion-select-option>
-                            <ion-select-option value="cashier">Cashier</ion-select-option>
-                            <ion-select-option value="seller">Seller</ion-select-option>
+                            <ion-select-option value="admin">{% trans "Admin" %}</ion-select-option>
+                            <ion-select-option value="manager">{% trans "Manager" %}</ion-select-option>
+                            <ion-select-option value="employee">{% trans "Employee" %}</ion-select-option>
                         </ion-select>
                     </ion-item>
                     <ion-item>
@@ -128,10 +127,9 @@
                     <ion-item>
                         <ion-label position="stacked">{% trans "Role" %}</ion-label>
                         <ion-select x-model="form.role" interface="popover">
-                            <ion-select-option value="admin">Admin</ion-select-option>
-                            <ion-select-option value="manager">Manager</ion-select-option>
-                            <ion-select-option value="cashier">Cashier</ion-select-option>
-                            <ion-select-option value="seller">Seller</ion-select-option>
+                            <ion-select-option value="admin">{% trans "Admin" %}</ion-select-option>
+                            <ion-select-option value="manager">{% trans "Manager" %}</ion-select-option>
+                            <ion-select-option value="employee">{% trans "Employee" %}</ion-select-option>
                         </ion-select>
                     </ion-item>
                 </ion-list>
@@ -165,12 +163,12 @@
                 id: null,
                 name: '',
                 email: '',
-                role: 'cashier',
+                role: 'employee',
                 pin: ''
             },
 
             resetForm() {
-                this.form = { id: null, name: '', email: '', role: 'cashier', pin: '' };
+                this.form = { id: null, name: '', email: '', role: 'employee', pin: '' };
             },
 
             editEmployee(id, name, email, role) {
@@ -191,7 +189,7 @@
 
                 this.saving = true;
                 try {
-                    const response = await fetch('{% url "accounts:api_employee_create" %}', {
+                    const response = await fetch('{% url "main:employee_create" %}', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.form)
@@ -219,7 +217,7 @@
             async updateEmployee() {
                 this.saving = true;
                 try {
-                    const response = await fetch('{% url "accounts:api_employee_update" %}', {
+                    const response = await fetch('{% url "main:employee_update" %}', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.form)
@@ -260,7 +258,7 @@
                         text: '{% trans "Reset" %}',
                         handler: async (data) => {
                             if (data.pin && data.pin.length === 4) {
-                                const response = await fetch('{% url "accounts:api_employee_reset_pin" %}', {
+                                const response = await fetch('{% url "main:employee_reset_pin" %}', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ user_id: this.form.id, pin: data.pin })
@@ -287,7 +285,7 @@
                         text: '{% trans "Delete" %}',
                         role: 'destructive',
                         handler: async () => {
-                            const response = await fetch('{% url "accounts:api_employee_delete" %}', {
+                            const response = await fetch('{% url "main:employee_delete" %}', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ user_id: this.form.id })

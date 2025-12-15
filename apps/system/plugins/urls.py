@@ -14,6 +14,9 @@ urlpatterns = [
     path('', views.plugins_index, name='plugins'),
     path('marketplace/', views.marketplace, name='marketplace'),
 
+    # HTMX partials (HTML responses)
+    path('htmx/plugins-list/', views.marketplace_plugins_list, name='marketplace_plugins_list'),
+
     # API endpoints (JSON)
     path('api/activate/<str:plugin_id>/', views.plugin_activate, name='plugin_activate'),
     path('api/deactivate/<str:plugin_id>/', views.plugin_deactivate, name='plugin_deactivate'),
