@@ -287,16 +287,18 @@ body.dark {
    ION-SEGMENT STYLES
    ======================================== */
 
-/* Light mode segment */
-ion-segment-button {
-  --color: var(--ion-color-medium);
-  --color-checked: #ffffff;
-  --indicator-color: var(--ion-color-primary);
+/* Segment container */
+ion-segment {
+  --background: var(--ion-color-light);
 }
 
-/* Dark mode segment */
-body.dark ion-segment-button {
+body.dark ion-segment {
+  --background: var(--ion-color-light);
+}
+
+/* Segment buttons - uses theme variables for automatic adaptation */
+ion-segment-button {
   --color: var(--ion-color-medium);
-  --color-checked: #000000;
+  --color-checked: var(--ion-color-primary-contrast);
   --indicator-color: var(--ion-color-primary);
 }

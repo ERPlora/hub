@@ -86,24 +86,14 @@
                     </ion-item-divider>
 
                     <ion-item id="nav-plugins"
-                              class="nav-item {% if current_section == 'plugins' %}active{% endif %}"
+                              class="nav-item {% if current_section == 'plugins' or current_section == 'marketplace' %}active{% endif %}"
                               hx-get="{% url 'system:plugins' %}"
-                              hx-target="#dashboard-content"
-                              hx-push-url="true"
-                              detail="false">
-                        <ion-icon name="extension-puzzle-outline" slot="start"></ion-icon>
-                        <ion-label>{% trans "Plugins" %}</ion-label>
-                    </ion-item>
-
-                    <ion-item id="nav-marketplace"
-                              class="nav-item {% if current_section == 'marketplace' %}active{% endif %}"
-                              hx-get="{% url 'system:marketplace' %}"
                               hx-target="#dashboard-content"
                               hx-push-url="true"
                               detail="false"
                               lines="none">
-                        <ion-icon name="storefront-outline" slot="start"></ion-icon>
-                        <ion-label>{% trans "Plugin Store" %}</ion-label>
+                        <ion-icon name="extension-puzzle-outline" slot="start"></ion-icon>
+                        <ion-label>{% trans "Plugins" %}</ion-label>
                     </ion-item>
                 </ion-item-group>
             </ion-list>

@@ -119,10 +119,10 @@ def health_check(request):
 
 def connection_status(request):
     """
-    HTMX endpoint - Returns WiFi icon based on Cloud connection status.
+    HTMX endpoint - Returns cloud icon based on Cloud connection status.
 
-    Green: Connected to Cloud
-    Red: No connection to Cloud
+    Green cloud: Connected to Cloud
+    Red cloud-offline: No connection to Cloud
     """
     from django.http import HttpResponse
     from apps.core.services.connectivity import ConnectivityChecker
@@ -134,13 +134,13 @@ def connection_status(request):
     if checker.is_online():
         # Green - Connected
         return HttpResponse(
-            '<ion-icon name="wifi" class="text-green-500 text-xl" '
+            '<ion-icon name="cloudy-outline" class="text-green-500 text-xl" '
             'title="Connected to Cloud"></ion-icon>'
         )
     else:
         # Red - No connection
         return HttpResponse(
-            '<ion-icon name="wifi-outline" class="text-red-500 text-xl" '
+            '<ion-icon name="cloud-offline-outline" class="text-red-500 text-xl" '
             'title="No Cloud connection"></ion-icon>'
         )
 

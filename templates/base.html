@@ -70,10 +70,21 @@
 
     <!-- HTMX Configuration -->
     <script>
+        // Enable HTMX to process inline scripts
+        htmx.config.allowScriptTags = true;
+
         document.addEventListener('DOMContentLoaded', function() {
             // Include CSRF token in all HTMX requests
             document.body.addEventListener('htmx:configRequest', function(event) {
                 event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            });
+
+            // Re-initialize Alpine components after HTMX swaps
+            document.body.addEventListener('htmx:afterSwap', function(event) {
+                // Let Alpine process any new x-data elements
+                if (typeof Alpine !== 'undefined') {
+                    Alpine.initTree(event.detail.target);
+                }
             });
         });
     </script>

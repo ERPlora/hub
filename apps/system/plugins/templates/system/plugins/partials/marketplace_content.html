@@ -122,7 +122,8 @@
 </div>
 
 <script>
-function marketplaceApp() {
+// Define globally so it works with both page load and HTMX navigation
+window.marketplaceApp = function() {
     return {
         loading: true,
         error: null,
@@ -306,6 +307,11 @@ function marketplaceApp() {
             document.body.appendChild(toast);
             await toast.present();
         }
-    }
+    };
+};
+
+// Also expose as regular function for x-data="marketplaceApp()"
+if (typeof marketplaceApp === 'undefined') {
+    var marketplaceApp = window.marketplaceApp;
 }
 </script>
