@@ -18,18 +18,41 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import redirect
 
 from apps.plugins_runtime.router import plugin_urlpatterns
+from apps.core.views import set_language
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
     # Health check endpoint (for Cloud monitoring)
     path('ht/', include('health_check.urls')),
-    # Refactored app URLs
-    path('', include('apps.core.urls')),  # Health check, core views
-    path('', include('apps.configuration.urls')),  # Root redirect, Dashboard, POS, settings (must be first for root URL)
-    path('', include('apps.accounts.urls')),  # Login, employees, auth
-    path('', include('apps.sync.urls')),  # Sync, updates, FRP
+
+    # Language switcher (auto-detected from browser)
+    path('set-language/', set_language, name='set_language'),
+
+    # Root redirect to dashboard
+    path('', lambda request: redirect('main:index'), name='root'),
+
+    # NEW: Auth routes (login, logout, etc.)
+    path('', include('apps.auth.login.urls')),
+
+    # NEW: Main routes (dashboard, settings, employees) - all under 'main' namespace
+    path('dashboard/', include('apps.main.urls')),
+
+    # NEW: System routes (plugins, marketplace)
+    path('plugins/', include('apps.system.plugins.urls')),
+
+    # LEGACY: Keep old URLs and namespaces working during transition
+    # Configuration namespace (dashboard, settings, plugins)
+    path('', include('apps.configuration.urls')),
+    # Health check and core utilities
+    path('', include('apps.core.urls')),
+    # Sync with Cloud
+    path('', include('apps.sync.urls')),
+    # Employee API and accounts namespace (login, logout, employees)
+    path('', include('apps.accounts.urls')),
 ]
 
 

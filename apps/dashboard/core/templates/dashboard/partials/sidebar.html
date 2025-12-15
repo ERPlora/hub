@@ -1,0 +1,120 @@
+{% load static %}
+{% load i18n %}
+
+<!-- Sidebar Menu Content -->
+<ion-content id="sidebar-content">
+    <div id="sidebar-wrapper" style="display: flex; flex-direction: column; height: 100%;">
+        <!-- Menu Header -->
+        <div id="sidebar-header" class="menu-header ion-padding">
+            <div class="menu-logo" style="text-decoration: none; color: inherit;">
+                <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 2rem; height: 2rem;">
+                <span style="font-weight: 500;">ERPlora Hub</span>
+            </div>
+        </div>
+
+        <!-- Menu Content - Grouped Navigation -->
+        <nav id="sidebar-nav" class="menu-content" style="flex: 1; overflow-y: auto;">
+            <ion-list>
+                <!-- Main Group -->
+                <ion-item-group>
+                    <ion-item-divider>
+                        <ion-label>&nbsp;&nbsp;</ion-label>
+                    </ion-item-divider>
+
+                    <ion-item id="nav-dashboard"
+                              class="nav-item {% if current_section == 'dashboard' or current_section == 'employees' or current_section == 'settings' %}active{% endif %}"
+                              hx-get="{% url 'main:index' %}"
+                              hx-target="#dashboard-content"
+                              hx-push-url="true"
+                              detail="false"
+                              lines="none">
+                        <ion-icon name="grid-outline" slot="start"></ion-icon>
+                        <ion-label>{% trans "Dashboard" %}</ion-label>
+                    </ion-item>
+                </ion-item-group>
+
+                <!-- Plugins Group (Dynamic) -->
+                {% if PLUGIN_MENU_ITEMS %}
+                <ion-item-group>
+                    <ion-item-divider>
+                        <ion-label>{% trans "Plugins" %}</ion-label>
+                    </ion-item-divider>
+
+                    {% for item in PLUGIN_MENU_ITEMS %}
+                        {% if item.has_submenu %}
+                        <!-- Plugin with submenu -->
+                        <ion-accordion-group>
+                            <ion-accordion>
+                                <ion-item slot="header" class="nav-item">
+                                    <ion-icon name="{{ item.icon }}" slot="start"></ion-icon>
+                                    <ion-label>{{ item.label }}</ion-label>
+                                </ion-item>
+                                <div slot="content" class="submenu-content">
+                                    {% for subitem in item.items %}
+                                    <ion-item class="submenu-item"
+                                        hx-get="{{ subitem.url }}"
+                                        hx-target="#dashboard-content"
+                                        hx-push-url="true"
+                                        detail="false">
+                                        <ion-icon name="{{ subitem.icon }}" slot="start" style="font-size: 1rem;"></ion-icon>
+                                        <ion-label>{{ subitem.label }}</ion-label>
+                                    </ion-item>
+                                    {% endfor %}
+                                </div>
+                            </ion-accordion>
+                        </ion-accordion-group>
+                        {% else %}
+                        <!-- Simple plugin menu item -->
+                        <ion-item class="nav-item"
+                            hx-get="{{ item.url }}"
+                            hx-target="#dashboard-content"
+                            hx-push-url="true"
+                            detail="false"
+                            {% if forloop.last %}lines="none"{% endif %}>
+                            <ion-icon name="{{ item.icon }}" slot="start"></ion-icon>
+                            <ion-label>{{ item.label }}</ion-label>
+                        </ion-item>
+                        {% endif %}
+                    {% endfor %}
+                </ion-item-group>
+                {% endif %}
+
+                <!-- System Group -->
+                <ion-item-group>
+                    <ion-item-divider>
+                        <ion-label>{% trans "System" %}</ion-label>
+                    </ion-item-divider>
+
+                    <ion-item id="nav-plugins"
+                              class="nav-item {% if current_section == 'plugins' %}active{% endif %}"
+                              hx-get="{% url 'system:plugins' %}"
+                              hx-target="#dashboard-content"
+                              hx-push-url="true"
+                              detail="false">
+                        <ion-icon name="extension-puzzle-outline" slot="start"></ion-icon>
+                        <ion-label>{% trans "Plugins" %}</ion-label>
+                    </ion-item>
+
+                    <ion-item id="nav-marketplace"
+                              class="nav-item {% if current_section == 'marketplace' %}active{% endif %}"
+                              hx-get="{% url 'system:marketplace' %}"
+                              hx-target="#dashboard-content"
+                              hx-push-url="true"
+                              detail="false"
+                              lines="none">
+                        <ion-icon name="storefront-outline" slot="start"></ion-icon>
+                        <ion-label>{% trans "Plugin Store" %}</ion-label>
+                    </ion-item>
+                </ion-item-group>
+            </ion-list>
+        </nav>
+
+        <!-- Menu Footer -->
+        <div id="sidebar-footer" class="menu-footer ion-padding">
+            <ion-item id="btn-signout" button href="{% url 'auth:logout' %}" detail="false" lines="none">
+                <ion-icon slot="start" name="log-out-outline"></ion-icon>
+                {% trans "Sign Out" %}
+            </ion-item>
+        </div>
+    </div>
+</ion-content>

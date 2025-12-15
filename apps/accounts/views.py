@@ -72,29 +72,10 @@ def verify_user_access_with_cloud(user):
 
 def login(request):
     """
-    Login page - supports both local PIN login and Cloud login
+    Login page - redirects to new auth login view
     """
-    # Get all local users for employee selection
-    local_users = LocalUser.objects.filter(is_active=True).order_by('name')
-
-    # Convert to JSON for Alpine.js
-    local_users_data = [
-        {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'initials': user.get_initials(),
-            'role': user.role.capitalize(),
-            'roleColor': user.get_role_color(),
-        }
-        for user in local_users
-    ]
-
-    context = {
-        'local_users_json': json.dumps(local_users_data),
-    }
-
-    return render(request, 'core/login.html', context)
+    from apps.auth.login.views import login as new_login
+    return new_login(request)
 
 
 @csrf_exempt
@@ -349,83 +330,10 @@ def cloud_login(request):
 @csrf_exempt
 def setup_pin(request):
     """
-    Setup PIN for first-time Cloud login user.
-
-    GET: Shows PIN setup page (for SSO flow)
-    POST: Saves PIN and establishes session
+    Setup PIN for first-time Cloud login user - redirects to new auth view
     """
-    if request.method == 'GET':
-        # SSO flow: user was redirected here to setup PIN
-        pending_user_id = request.session.get('pending_user_id')
-        pending_user_email = request.session.get('pending_user_email')
-
-        if not pending_user_id:
-            # No pending user, redirect to login
-            return redirect('accounts:login')
-
-        try:
-            user = LocalUser.objects.get(id=pending_user_id)
-        except LocalUser.DoesNotExist:
-            return redirect('accounts:login')
-
-        # Show PIN setup page
-        pending_user_data = {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-        }
-        context = {
-            'show_pin_setup': True,
-            'pending_user': json.dumps(pending_user_data),
-            'local_users_json': '[]',  # No employees list needed for setup
-        }
-        return render(request, 'core/login.html', context)
-
-    # POST: Save PIN
-    try:
-        data = json.loads(request.body)
-        user_id = data.get('user_id')
-        pin = data.get('pin')
-
-        # Also check session for pending user (SSO flow)
-        if not user_id:
-            user_id = request.session.get('pending_user_id')
-
-        if not user_id or not pin:
-            return JsonResponse({'success': False, 'error': 'Missing data'})
-
-        # Validate PIN (4 digits)
-        if len(pin) != 4 or not pin.isdigit():
-            return JsonResponse({'success': False, 'error': 'PIN must be 4 digits'})
-
-        # Get user
-        try:
-            user = LocalUser.objects.get(id=user_id)
-        except LocalUser.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'User not found'})
-
-        # Set PIN
-        user.set_pin(pin)
-        user.last_login = timezone.now()
-        user.save()
-
-        # Clear pending user from session
-        if 'pending_user_id' in request.session:
-            del request.session['pending_user_id']
-        if 'pending_user_email' in request.session:
-            del request.session['pending_user_email']
-
-        # Store user session
-        request.session['local_user_id'] = user.id
-        request.session['user_name'] = user.name
-        request.session['user_email'] = user.email
-        request.session['user_role'] = user.role
-        request.session['user_language'] = user.language
-
-        return JsonResponse({'success': True})
-
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+    from apps.auth.login.views import setup_pin as new_setup_pin
+    return new_setup_pin(request)
 
 
 def logout(request):
@@ -486,18 +394,10 @@ def settings(request):
 
 def employees(request):
     """
-    Employees management view
+    Employees management view - redirects to new main employees view
     """
-    # Check if user is logged in
-    if 'local_user_id' not in request.session:
-        return redirect('accounts:login')
-
-    local_users = LocalUser.objects.filter(is_active=True).order_by('name')
-    context = {
-        'local_users': local_users,
-        'current_view': 'employees'
-    }
-    return render(request, 'core/employees.html', context)
+    from apps.main.employees.views import index as new_employees
+    return new_employees(request)
 
 
 @csrf_exempt

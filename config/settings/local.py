@@ -113,15 +113,16 @@ def reload_local_plugins():
 
 reload_local_plugins()
 
-# Add plugin templates
+# Add plugin templates (keeping global templates directory)
 if PLUGINS_DIR.exists():
-    plugin_template_dirs = []
+    # Start with existing global templates directory
+    template_dirs = [str(d) for d in TEMPLATES[0]['DIRS']]
+
     for plugin_dir in PLUGINS_DIR.iterdir():
         if plugin_dir.is_dir() and (plugin_dir / 'templates').exists():
-            plugin_template_dirs.append(str(plugin_dir / 'templates'))
+            template_dirs.append(str(plugin_dir / 'templates'))
 
-    if plugin_template_dirs:
-        TEMPLATES[0]['DIRS'] = plugin_template_dirs
+    TEMPLATES[0]['DIRS'] = template_dirs
 
 print(f"[LOCAL] Development mode")
 print(f"[LOCAL] Plugins: {PLUGINS_DIR}")

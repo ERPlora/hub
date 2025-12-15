@@ -1,0 +1,687 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% block page_title %}Dashboard{% endblock %} - ERPlora Hub{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Split Pane */
+    ion-split-pane {
+        --side-width: 14rem;
+        --side-min-width: 14rem;
+        --side-max-width: 14rem;
+    }
+
+    ion-menu {
+        --width: 14rem;
+        --min-width: 14rem;
+        --max-width: 14rem;
+    }
+
+    /* Menu Styles */
+    .menu-header {
+        border-bottom: 1px solid var(--ion-border-color);
+    }
+
+    .menu-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    #sidebar-content ion-item-divider {
+        --background: transparent;
+        --color: var(--ion-text-color);
+        --padding-start: 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: capitalize;
+        letter-spacing: 0.05em;
+    }
+
+    ion-item.nav-item {
+        --padding-start: 0.75rem;
+        --padding-end: 0.75rem;
+        --inner-padding-end: 0;
+        --background: transparent;
+        --background-hover: var(--ion-color-secondary);
+        --background-activated: var(--ion-color-secondary);
+        --color: var(--ion-color-medium);
+        --border-radius: 0.5rem;
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+        cursor: pointer;
+    }
+
+    ion-item.nav-item.active {
+        --background: var(--ion-color-secondary);
+        --color: var(--ion-text-color);
+    }
+
+    ion-item.nav-item ion-icon {
+        margin-right: 0.75rem;
+        font-size: 1.125rem;
+    }
+
+    /* Accordion submenu styles */
+    ion-accordion-group {
+        margin-bottom: 0.25rem;
+    }
+
+    ion-accordion {
+        --background: transparent;
+    }
+
+    ion-accordion ion-item[slot="header"] {
+        --padding-start: 0.75rem;
+        --padding-end: 0.75rem;
+        --inner-padding-end: 0;
+        --background: transparent;
+        --background-hover: var(--ion-color-secondary);
+        --background-activated: var(--ion-color-secondary);
+        --color: var(--ion-color-medium);
+        --border-radius: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    ion-accordion ion-item[slot="header"].active {
+        --background: var(--ion-color-secondary);
+        --color: var(--ion-text-color);
+    }
+
+    ion-accordion ion-item[slot="header"] ion-icon {
+        margin-right: 0.75rem;
+        font-size: 1.125rem;
+    }
+
+    .submenu-content {
+        padding-left: 2.5rem;
+    }
+
+    ion-item.submenu-item {
+        --padding-start: 0;
+        --padding-end: 0.75rem;
+        --background: transparent;
+        --background-hover: var(--ion-color-light);
+        --color: var(--ion-color-medium);
+        font-size: 0.8125rem;
+        min-height: 2.5rem;
+        cursor: pointer;
+    }
+
+    ion-item.submenu-item:hover {
+        --color: var(--ion-text-color);
+    }
+
+    /* Menu Footer */
+    .menu-footer {
+        border-top: 1px solid var(--ion-border-color);
+    }
+
+    .menu-footer ion-item {
+        --padding-start: 0.75rem;
+        --padding-end: 0.75rem;
+        --background: transparent;
+        --background-hover: var(--ion-color-secondary);
+        --color: var(--ion-color-medium);
+        --border-radius: 0.5rem;
+        font-size: 0.875rem;
+        cursor: pointer;
+    }
+
+    .menu-footer ion-item ion-icon {
+        margin-right: 0.75rem;
+        font-size: 1.125rem;
+    }
+
+    /* Header Styles */
+    ion-toolbar {
+        --padding-start: 1rem;
+        --padding-end: 1rem;
+        border-radius: .8rem;
+    }
+
+    ion-menu-button {
+        display: block !important;
+    }
+
+    .header-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+
+    .user-avatar {
+        width: 2rem;
+        height: 2rem;
+        background: var(--ion-color-primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ion-color-primary-contrast);
+        font-size: 0.875rem;
+        font-weight: bold;
+    }
+
+    /* Tab Bar Styles */
+    ion-tab-bar {
+        border-radius: .8rem;
+        margin: .5rem;
+    }
+
+    ion-tab-button {
+        --color: var(--ion-color-medium);
+        --color-selected: var(--ion-color-primary);
+        font-size: 0.75rem;
+        min-width: 64px;
+        cursor: pointer;
+    }
+
+    ion-tab-button.tab-selected {
+        --color: var(--ion-color-primary);
+    }
+
+    ion-tab-button ion-icon {
+        font-size: 1.25rem;
+    }
+
+    ion-tab-button.tab-hidden {
+        display: none !important;
+    }
+
+    ion-tab-button.tab-more {
+        --color: var(--ion-color-medium);
+    }
+
+    ion-tab-button.tab-more.has-active {
+        --color: var(--ion-color-primary);
+    }
+
+    /* More Tabs Grid */
+    .more-tabs-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+
+    .more-tab-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 1rem 0.5rem;
+        border-radius: 0.75rem;
+        text-decoration: none;
+        color: var(--ion-text-color);
+        transition: background 0.2s;
+        cursor: pointer;
+    }
+
+    .more-tab-item:hover {
+        background: var(--ion-color-secondary);
+    }
+
+    .more-tab-item.active {
+        background: var(--ion-color-primary-tint);
+        color: var(--ion-color-primary);
+    }
+
+    .more-tab-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 0.75rem;
+        background: var(--ion-color-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .more-tab-icon ion-icon {
+        font-size: 1.5rem;
+        color: var(--ion-color-primary);
+    }
+
+    .more-tab-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Section tabs wrapper */
+    .section-tabs {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .section-tabs ion-content {
+        flex: 1;
+    }
+
+    /* Modal Styles */
+    ion-modal {
+        --border-radius: 16px;
+        --box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    ion-modal::part(backdrop) {
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+    }
+
+    ion-modal::part(content) {
+        max-width: 500px;
+        max-height: 80vh;
+    }
+
+    @media (max-width: 576px) {
+        ion-modal::part(content) {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 0;
+        }
+
+        .more-tabs-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    /* Action Sheet */
+    .custom-action-sheet {
+        --background: var(--ion-color-step-850,#262626);
+        --backdrop-opacity: 0.6;
+    }
+
+    /* HTMX Loading indicator */
+    .htmx-request #dashboard-content {
+        opacity: 0.6;
+        transition: opacity 0.2s;
+    }
+</style>
+{% block section_css %}{% endblock %}
+{% endblock %}
+
+{% block content %}
+<ion-app id="dashboard-app" x-data="dashboardApp()" x-init="init()" :class="isDark ? 'dark' : ''">
+    <ion-split-pane id="dashboard-split-pane" content-id="main-content">
+        <!-- Sidebar Menu -->
+        <ion-menu id="dashboard-sidebar" content-id="main-content" menu-id="main-menu" type="push">
+            {% include "dashboard/partials/sidebar.html" %}
+        </ion-menu>
+
+        <!-- Main Content Area -->
+        <div class="ion-page section-tabs" id="main-content">
+            <!-- Header -->
+            <div id="dashboard-header">
+                {% include "dashboard/partials/header.html" %}
+            </div>
+
+            <!-- Content (SPA target) -->
+            <ion-content id="dashboard-content">
+                {% block dashboard_content %}
+                <!-- Page content loaded here via HTMX -->
+                {% endblock %}
+            </ion-content>
+
+            <!-- Tab Bar -->
+            <div id="dashboard-tabbar">
+                {% block section_tabbar %}
+                {% include "dashboard/partials/tabbar.html" %}
+                {% endblock %}
+            </div>
+        </div>
+    </ion-split-pane>
+
+    <!-- Action Sheet (reusable) -->
+    <ion-action-sheet class="custom-action-sheet"></ion-action-sheet>
+</ion-app>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function dashboardApp() {
+        return {
+            isDark: {{ HUB_CONFIG.dark_mode|yesno:"true,false" }},
+            isFullscreen: false,
+            currentSection: '{{ current_section|default:"dashboard" }}',
+            userName: '{{ request.session.user_name|default:"" }}',
+            userEmail: '{{ request.session.user_email|default:"" }}',
+            userRole: '{{ request.session.user_role|default:"" }}',
+
+            init() {
+                // Apply dark mode
+                if (this.isDark) {
+                    document.body.classList.add('dark');
+                }
+
+                // Listen to HTMX URL changes for SPA navigation
+                document.body.addEventListener('htmx:pushedIntoHistory', (e) => {
+                    this.updateCurrentSection(e.detail.path);
+                });
+
+                // Listen to popstate for back/forward navigation
+                window.addEventListener('popstate', () => {
+                    this.updateCurrentSection(window.location.pathname);
+                });
+
+                // Listen to fullscreen changes
+                document.addEventListener('fullscreenchange', () => {
+                    this.isFullscreen = !!document.fullscreenElement;
+                });
+            },
+
+            updateCurrentSection(path) {
+                if (path.includes('/settings')) this.currentSection = 'settings';
+                else if (path.includes('/plugins') || path.includes('/marketplace')) this.currentSection = 'plugins';
+                else if (path.includes('/employees')) this.currentSection = 'employees';
+                else this.currentSection = 'dashboard';
+
+                // Update tab bar active state
+                this.updateTabBar();
+            },
+
+            updateTabBar() {
+                document.querySelectorAll('ion-tab-button').forEach(btn => {
+                    const href = btn.getAttribute('hx-get') || btn.getAttribute('href');
+                    if (href && window.location.pathname.startsWith(href)) {
+                        btn.classList.add('tab-selected');
+                    } else {
+                        btn.classList.remove('tab-selected');
+                    }
+                });
+            },
+
+            toggleMenu() {
+                const menu = document.querySelector('ion-menu[menu-id="main-menu"]');
+                if (menu) menu.toggle();
+            },
+
+            async toggleTheme() {
+                this.isDark = !this.isDark;
+                document.body.classList.toggle('dark');
+
+                // Dispatch event for child components
+                document.dispatchEvent(new CustomEvent('theme-changed', {
+                    detail: { isDark: this.isDark }
+                }));
+
+                // Save to database
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'update_theme');
+                    formData.append('dark_mode', this.isDark);
+                    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+                    await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+                } catch (error) {
+                    console.error('Error saving dark mode:', error);
+                }
+            },
+
+            toggleFullscreen() {
+                if (window.pywebview && window.pywebview.api) {
+                    // PyWebView (Desktop Hub)
+                    window.pywebview.api.toggle_fullscreen().then(response => {
+                        this.isFullscreen = response.fullscreen;
+                    });
+                } else {
+                    // Browser fallback
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen();
+                        this.isFullscreen = true;
+                    } else {
+                        document.exitFullscreen();
+                        this.isFullscreen = false;
+                    }
+                }
+            },
+
+            async showToast(message, color = 'primary') {
+                const toast = document.createElement('ion-toast');
+                toast.message = message;
+                toast.duration = 2000;
+                toast.position = 'bottom';
+                toast.color = color;
+                document.body.appendChild(toast);
+                await toast.present();
+            },
+
+            async handleUserMenu() {
+                const actionSheet = document.querySelector('ion-action-sheet');
+                actionSheet.header = this.userName;
+                actionSheet.subHeader = this.userEmail;
+                actionSheet.buttons = [
+                    {
+                        text: '{% trans "Settings" %}',
+                        handler: () => {
+                            htmx.ajax('GET', '{% url "main:settings" %}', {
+                                target: '#dashboard-content',
+                                swap: 'innerHTML'
+                            });
+                            history.pushState({}, '', '{% url "main:settings" %}');
+                            this.currentSection = 'settings';
+                        }
+                    },
+                    {
+                        text: '{% trans "Employees" %}',
+                        handler: () => {
+                            htmx.ajax('GET', '{% url "main:employees" %}', {
+                                target: '#dashboard-content',
+                                swap: 'innerHTML'
+                            });
+                            history.pushState({}, '', '{% url "main:employees" %}');
+                            this.currentSection = 'employees';
+                        }
+                    },
+                    {
+                        text: '{% trans "Sign Out" %}',
+                        role: 'destructive',
+                        handler: () => {
+                            window.location.href = '{% url "auth:logout" %}';
+                        }
+                    },
+                    {
+                        text: '{% trans "Cancel" %}',
+                        role: 'cancel'
+                    }
+                ];
+
+                await actionSheet.present();
+            },
+
+            // SPA Navigation helper
+            navigateTo(url) {
+                htmx.ajax('GET', url, {
+                    target: '#dashboard-content',
+                    swap: 'innerHTML'
+                });
+                history.pushState({}, '', url);
+                this.updateCurrentSection(url);
+            }
+        }
+    }
+</script>
+
+<!-- Dynamic Tab Bar Manager -->
+<script>
+    class DynamicTabBar {
+        constructor() {
+            this.TAB_MIN_WIDTH = 72;
+            this.moreModalOpen = false;
+            this.hiddenTabs = [];
+            this.init();
+        }
+
+        init() {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.setup());
+            } else {
+                setTimeout(() => this.setup(), 100);
+            }
+        }
+
+        setup() {
+            const tabBar = document.querySelector('ion-tab-bar');
+            if (!tabBar) return;
+
+            this.tabBar = tabBar;
+            this.originalTabs = Array.from(tabBar.querySelectorAll('ion-tab-button:not(.tab-more)'));
+
+            // Make HTMX tabs work
+            this.originalTabs.forEach(tab => {
+                if (!tab.hasAttribute('hx-get')) return;
+
+                tab.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+
+            if (this.originalTabs.length <= 3) return;
+
+            this.createMoreButton();
+            this.calculateWithRetry();
+
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => this.calculateVisibleTabs(), 100);
+            });
+        }
+
+        createMoreButton() {
+            if (this.tabBar.querySelector('.tab-more')) return;
+
+            this.moreButton = document.createElement('ion-tab-button');
+            this.moreButton.className = 'tab-more tab-hidden';
+            this.moreButton.innerHTML = `
+                <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
+                <ion-label>{% trans "More" %}</ion-label>
+            `;
+            this.moreButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showMoreModal();
+            });
+            this.tabBar.appendChild(this.moreButton);
+        }
+
+        calculateWithRetry(attempts = 0) {
+            const availableWidth = this.tabBar.offsetWidth;
+            if (availableWidth === 0 && attempts < 5) {
+                setTimeout(() => this.calculateWithRetry(attempts + 1), 100);
+                return;
+            }
+            this.calculateVisibleTabs();
+        }
+
+        calculateVisibleTabs() {
+            const availableWidth = this.tabBar.offsetWidth;
+            const totalTabs = this.originalTabs.length;
+
+            if (availableWidth < 100) {
+                this.originalTabs.forEach(tab => tab.classList.remove('tab-hidden'));
+                if (this.moreButton) this.moreButton.classList.add('tab-hidden');
+                this.hiddenTabs = [];
+                return;
+            }
+
+            const maxVisibleTabs = Math.floor(availableWidth / this.TAB_MIN_WIDTH);
+
+            if (maxVisibleTabs >= totalTabs) {
+                this.originalTabs.forEach(tab => tab.classList.remove('tab-hidden'));
+                this.moreButton.classList.add('tab-hidden');
+                this.hiddenTabs = [];
+                return;
+            }
+
+            const visibleCount = Math.max(1, maxVisibleTabs - 1);
+            this.hiddenTabs = [];
+
+            this.originalTabs.forEach((tab, index) => {
+                if (index < visibleCount) {
+                    tab.classList.remove('tab-hidden');
+                } else {
+                    tab.classList.add('tab-hidden');
+                    this.hiddenTabs.push({
+                        href: tab.getAttribute('hx-get') || tab.getAttribute('href'),
+                        icon: tab.querySelector('ion-icon')?.getAttribute('name') || 'ellipse',
+                        label: tab.querySelector('ion-label')?.textContent?.trim() || '',
+                        isActive: tab.classList.contains('tab-selected')
+                    });
+                }
+            });
+
+            this.moreButton.classList.remove('tab-hidden');
+            const hasActiveHidden = this.hiddenTabs.some(t => t.isActive);
+            this.moreButton.classList.toggle('has-active', hasActiveHidden);
+            this.moreButton.classList.toggle('tab-selected', hasActiveHidden);
+        }
+
+        async showMoreModal() {
+            if (this.moreModalOpen || this.hiddenTabs.length === 0) return;
+            this.moreModalOpen = true;
+
+            const modal = document.createElement('ion-modal');
+            modal.initialBreakpoint = 0.5;
+            modal.breakpoints = [0, 0.5, 0.75, 1];
+            modal.handleBehavior = 'cycle';
+            modal.showBackdrop = true;
+            modal.backdropDismiss = true;
+
+            modal.innerHTML = `
+                <ion-header>
+                    <ion-toolbar>
+                        <ion-title>{% trans "More Options" %}</ion-title>
+                        <ion-buttons slot="end">
+                            <ion-button id="close-more-modal">
+                                <ion-icon name="close"></ion-icon>
+                            </ion-button>
+                        </ion-buttons>
+                    </ion-toolbar>
+                </ion-header>
+                <ion-content class="ion-padding">
+                    <div class="more-tabs-grid">
+                        ${this.hiddenTabs.map(tab => `
+                            <div class="more-tab-item ${tab.isActive ? 'active' : ''}"
+                                 hx-get="${tab.href}"
+                                 hx-target="#dashboard-content"
+                                 hx-push-url="true"
+                                 onclick="this.closest('ion-modal').dismiss()">
+                                <div class="more-tab-icon">
+                                    <ion-icon name="${tab.icon}"></ion-icon>
+                                </div>
+                                <span class="more-tab-label">${tab.label}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </ion-content>
+            `;
+
+            document.body.appendChild(modal);
+
+            modal.querySelector('#close-more-modal').addEventListener('click', () => {
+                modal.dismiss();
+            });
+
+            modal.addEventListener('didDismiss', () => {
+                this.moreModalOpen = false;
+                modal.remove();
+            });
+
+            await modal.present();
+            htmx.process(modal);
+        }
+    }
+
+    new DynamicTabBar();
+</script>
+{% block section_scripts %}{% endblock %}
+{% endblock %}
