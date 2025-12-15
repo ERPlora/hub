@@ -21,7 +21,7 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 
 from apps.plugins_runtime.router import plugin_urlpatterns
-from apps.core.views import set_language
+from apps.core.views import set_language, pwa_manifest, pwa_serviceworker, pwa_offline
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,8 +29,10 @@ urlpatterns = [
     # Health check endpoint (for Cloud monitoring)
     path('ht/', include('health_check.urls')),
 
-    # PWA (Progressive Web App) - manifest.json and serviceworker.js
-    path('', include('pwa.urls')),
+    # PWA (Progressive Web App)
+    path('manifest.json', pwa_manifest, name='pwa_manifest'),
+    path('serviceworker.js', pwa_serviceworker, name='pwa_serviceworker'),
+    path('offline/', pwa_offline, name='pwa_offline'),
 
     # Language switcher (auto-detected from browser)
     path('set-language/', set_language, name='set_language'),
