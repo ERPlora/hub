@@ -263,3 +263,9 @@ ignore = [
 [tool.pyinstaller]
 name = "ERPlora Hub"
 icon = "assets/icon.ico"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.1",
+    "pytest-django>=4.11.1",
+]
