@@ -70,29 +70,10 @@ def verify_user_access_with_cloud(user):
 
 def login(request):
     """
-    Login page - supports both local PIN login and Cloud login
+    Login page - redirects to new auth login view
     """
-    # Get all local users for employee selection
-    local_users = LocalUser.objects.filter(is_active=True).order_by('name')
-
-    # Convert to JSON for Alpine.js
-    local_users_data = [
-        {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'initials': user.get_initials(),
-            'role': user.role.capitalize(),
-            'roleColor': user.get_role_color(),
-        }
-        for user in local_users
-    ]
-
-    context = {
-        'local_users_json': json.dumps(local_users_data),
-    }
-
-    return render(request, 'core/login.html', context)
+    from apps.auth.login.views import login as new_login
+    return new_login(request)
 
 
 @csrf_exempt
@@ -371,16 +352,10 @@ def setup_pin(request):
 
 def dashboard(request):
     """
-    Dashboard view - placeholder for now
+    Dashboard view - redirects to new main index view
     """
-    # Check if user is logged in
-    if 'local_user_id' not in request.session:
-        return redirect('accounts:login')
-
-    context = {
-        'current_view': 'dashboard'
-    }
-    return render(request, 'core/dashboard.html', context)
+    from apps.main.index.views import index as new_dashboard
+    return new_dashboard(request)
 
 
 def logout(request):
@@ -498,25 +473,22 @@ def settings(request):
         'hub_config': hub_config,
         'store_config': store_config,
         'settings_message': settings_message,
-        'current_view': 'settings'
+        'current_section': 'settings',
+        'page_title': 'Settings',
     }
-    return render(request, 'core/settings.html', context)
+
+    # Use new SPA templates with HTMX support
+    if request.headers.get('HX-Request'):
+        return render(request, 'main/settings/partials/content.html', context)
+    return render(request, 'main/settings/pages/index.html', context)
 
 
 def employees(request):
     """
-    Employees management view
+    Employees management view - redirects to new main employees view
     """
-    # Check if user is logged in
-    if 'local_user_id' not in request.session:
-        return redirect('accounts:login')
-
-    local_users = LocalUser.objects.filter(is_active=True).order_by('name')
-    context = {
-        'local_users': local_users,
-        'current_view': 'employees'
-    }
-    return render(request, 'core/employees.html', context)
+    from apps.main.employees.views import index as new_employees
+    return new_employees(request)
 
 
 @csrf_exempt
@@ -657,35 +629,10 @@ def api_employee_reset_pin(request):
 
 def plugins(request):
     """
-    Plugins management view - list all plugins from filesystem.
-
-    Plugins are discovered from the plugins directory:
-    - Active plugins: directory name without underscore prefix
-    - Inactive plugins: directory name starts with underscore (_)
+    Plugins management view - redirects to new system plugins view
     """
-    # Check if user is logged in
-    if 'local_user_id' not in request.session:
-        return redirect('accounts:login')
-
-    from .plugin_loader import plugin_loader
-
-    # Discover ALL plugins from filesystem (including inactive ones with _ prefix)
-    all_plugins = plugin_loader.discover_plugins(include_inactive=True)
-
-    # Sort by name
-    all_plugins.sort(key=lambda x: x.get('name', ''))
-
-    # Count active and inactive
-    active_count = sum(1 for p in all_plugins if p.get('is_active', False))
-    inactive_count = len(all_plugins) - active_count
-
-    context = {
-        'plugins': all_plugins,
-        'active_count': active_count,
-        'inactive_count': inactive_count,
-        'current_view': 'plugins'
-    }
-    return render(request, 'core/plugins.html', context)
+    from apps.system.plugins.views import plugins_index
+    return plugins_index(request)
 
 
 @csrf_exempt
@@ -812,6 +759,58 @@ def api_plugins_list(request):
 
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+# ============================================================================
+# Language Management
+# ============================================================================
+
+def set_language(request):
+    """
+    Change user's language preference without URL prefixes.
+    Accepts language code via POST or GET parameter 'language'.
+    Saves preference in:
+    - LocalUser.language (if authenticated)
+    - Session and cookie (always)
+    """
+    from django.http import HttpResponseRedirect
+    from django.utils.translation import activate
+
+    language = request.POST.get('language') or request.GET.get('language')
+    next_url = request.POST.get('next') or request.GET.get('next') or request.META.get('HTTP_REFERER', '/')
+
+    if language and language in [lang[0] for lang in django_settings.LANGUAGES]:
+        # Activate the language for this request
+        activate(language)
+
+        # Save to LocalUser if authenticated
+        if 'local_user_id' in request.session:
+            try:
+                user = LocalUser.objects.get(id=request.session['local_user_id'])
+                user.language = language
+                user.save(update_fields=['language'])
+                request.session['user_language'] = language
+            except LocalUser.DoesNotExist:
+                pass
+
+        response = HttpResponseRedirect(next_url)
+
+        # Set language cookie (persistent preference - 1 year)
+        response.set_cookie(
+            django_settings.LANGUAGE_COOKIE_NAME,
+            language,
+            max_age=django_settings.LANGUAGE_COOKIE_AGE,
+            path='/',
+            secure=getattr(django_settings, 'LANGUAGE_COOKIE_SECURE', False),
+            samesite=getattr(django_settings, 'LANGUAGE_COOKIE_SAMESITE', 'Lax')
+        )
+
+        # Also save in session (higher priority than cookie)
+        request.session[django_settings.LANGUAGE_COOKIE_NAME] = language
+
+        return response
+
+    return HttpResponseRedirect(next_url)
 
 
 # Health check endpoint for Docker

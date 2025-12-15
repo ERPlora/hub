@@ -88,12 +88,22 @@ INSTALLED_APPS = [
     'health_check.db',
     'health_check.cache',
     'health_check.storage',
-    # Hub apps
+    # Hub apps - Core
     'apps.accounts.apps.AccountsConfig',
     'apps.configuration.apps.ConfigurationConfig',
     'apps.sync.apps.SyncConfig',
     'apps.core.apps.CoreConfig',
     'apps.plugins_runtime',
+    # Hub apps - Dashboard
+    'apps.dashboard.core.apps.DashboardCoreConfig',
+    # Hub apps - Auth
+    'apps.auth.login.apps.AuthLoginConfig',
+    # Hub apps - Main
+    'apps.main.index.apps.MainIndexConfig',
+    'apps.main.settings.apps.MainSettingsConfig',
+    'apps.main.employees.apps.MainEmployeesConfig',
+    # Hub apps - System
+    'apps.system.plugins.apps.SystemPluginsConfig',
 ]
 
 MIDDLEWARE = [
@@ -118,7 +128,9 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'templates',  # Global templates (base.html)
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -177,6 +189,14 @@ LOCALE_PATHS = [BASE_DIR / 'locale']
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
+
+# Language cookie settings (for auto-detection and persistence)
+# Middleware priority: 1. LocaleMiddleware checks URL (not used)
+# 2. Session, 3. Cookie, 4. Browser Accept-Language, 5. LANGUAGE_CODE
+LANGUAGE_COOKIE_NAME = 'django_language'
+LANGUAGE_COOKIE_AGE = 31536000  # 1 year
+LANGUAGE_COOKIE_SECURE = False  # Hub runs locally
+LANGUAGE_COOKIE_SAMESITE = 'Lax'
 
 # =============================================================================
 # STATIC & MEDIA FILES
@@ -255,23 +275,14 @@ PLUGIN_SIGNATURE_KEY_SIZE = 4096
 # DJANGO MONEY
 # =============================================================================
 
-CURRENCIES = ('USD', 'EUR', 'GBP', 'JPY', 'CNY', 'MXN', 'CAD', 'AUD', 'BRL', 'ARS', 'COP', 'CLP', 'PEN', 'CRC')
-CURRENCY_CHOICES = [
-    ('USD', 'US Dollar ($)'),
-    ('EUR', 'Euro (€)'),
-    ('GBP', 'British Pound (£)'),
-    ('JPY', 'Japanese Yen (¥)'),
-    ('CNY', 'Chinese Yuan (¥)'),
-    ('MXN', 'Mexican Peso ($)'),
-    ('CAD', 'Canadian Dollar ($)'),
-    ('AUD', 'Australian Dollar ($)'),
-    ('BRL', 'Brazilian Real (R$)'),
-    ('ARS', 'Argentine Peso ($)'),
-    ('COP', 'Colombian Peso ($)'),
-    ('CLP', 'Chilean Peso ($)'),
-    ('PEN', 'Peruvian Sol (S/)'),
-    ('CRC', 'Costa Rican Colón (₡)'),
-]
+# Import all currencies from django-money (308 ISO 4217 currencies)
+from config.currencies import CURRENCY_CHOICES, POPULAR_CURRENCY_CHOICES
+
+# Default currency for Hub
+DEFAULT_CURRENCY = "EUR"
+
+# Allowed currencies (use popular for UI selects)
+CURRENCIES = tuple([code for code, _ in POPULAR_CURRENCY_CHOICES])
 
 # =============================================================================
 # LOGGING (base config - paths set per environment)
@@ -352,15 +363,16 @@ def load_plugins():
 
 def load_plugin_templates():
     """Add plugin template directories to Django"""
-    template_dirs = []
+    # Start with the existing global templates directory
+    template_dirs = list(TEMPLATES[0]['DIRS'])
 
     if PLUGINS_DIR.exists():
         for plugin_dir in PLUGINS_DIR.iterdir():
             if plugin_dir.is_dir() and (plugin_dir / 'templates').exists():
                 template_dirs.append(plugin_dir / 'templates')
 
-    if template_dirs:
-        TEMPLATES[0]['DIRS'] = template_dirs
+    # Update DIRS with all template directories
+    TEMPLATES[0]['DIRS'] = template_dirs
 
 
 # Load plugins on import

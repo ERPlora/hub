@@ -1,4 +1,5 @@
 from django.utils import translation
+from django.conf import settings
 from apps.configuration.models import HubConfig
 from apps.core.utils import detect_os_language
 
@@ -6,24 +7,34 @@ from apps.core.utils import detect_os_language
 class LanguageMiddleware:
     """
     Custom language middleware that:
-    1. Uses OS language for login page (before authentication)
-    2. Uses user's preferred language after login
+    1. Uses cookie language (set by browser auto-detection)
+    2. Uses user's preferred language after login (from session)
+    3. Falls back to OS language for login page (before authentication)
+    4. Falls back to default language code
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Check if user is logged in
-        local_user_id = request.session.get('local_user_id')
+        language = None
 
+        # Priority 1: Check session language (logged-in user preference)
+        local_user_id = request.session.get('local_user_id')
         if local_user_id:
-            # User is logged in - use user's language preference
-            user_language = request.session.get('user_language', 'en')
-            translation.activate(user_language)
-            request.LANGUAGE_CODE = user_language
-        else:
-            # User not logged in - use OS language
+            language = request.session.get('user_language')
+
+        # Priority 2: Check cookie (browser auto-detected language)
+        if not language:
+            cookie_name = getattr(settings, 'LANGUAGE_COOKIE_NAME', 'django_language')
+            language = request.COOKIES.get(cookie_name)
+
+        # Priority 3: Check session cookie key (alternative session storage)
+        if not language:
+            language = request.session.get(getattr(settings, 'LANGUAGE_COOKIE_NAME', 'django_language'))
+
+        # Priority 4: Use OS detected language (for login page)
+        if not language:
             hub_config = HubConfig.get_config()
 
             # Detect and save OS language on first run
@@ -33,9 +44,20 @@ class LanguageMiddleware:
                     hub_config.os_language = os_lang
                     hub_config.save()
 
-            # Activate OS language
-            translation.activate(hub_config.os_language)
-            request.LANGUAGE_CODE = hub_config.os_language
+            language = hub_config.os_language
+
+        # Priority 5: Fallback to default
+        if not language:
+            language = settings.LANGUAGE_CODE
+
+        # Validate language is supported
+        supported_languages = [code for code, name in settings.LANGUAGES]
+        if language not in supported_languages:
+            language = settings.LANGUAGE_CODE
+
+        # Activate the determined language
+        translation.activate(language)
+        request.LANGUAGE_CODE = language
 
         response = self.get_response(request)
 

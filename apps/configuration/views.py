@@ -12,23 +12,17 @@ def index(request):
     Root URL - redirect to dashboard if logged in, otherwise to login
     """
     if 'local_user_id' in request.session:
-        return redirect('configuration:dashboard')
+        return redirect('main:index')
     else:
-        return redirect('accounts:login')
+        return redirect('auth:login')
 
 
 def dashboard(request):
     """
-    Dashboard view - placeholder for now
+    Dashboard view - redirects to new main index view
     """
-    # Check if user is logged in
-    if 'local_user_id' not in request.session:
-        return redirect('accounts:login')
-
-    context = {
-        'current_view': 'dashboard'
-    }
-    return render(request, 'core/dashboard.html', context)
+    from apps.main.index.views import index as new_dashboard
+    return new_dashboard(request)
 
 
 def pos(request):
@@ -159,6 +153,11 @@ def settings(request):
         'hub_config': hub_config,
         'store_config': store_config,
         'settings_message': settings_message,
-        'current_view': 'settings'
+        'current_section': 'settings',
+        'page_title': 'Settings',
     }
-    return render(request, 'core/settings.html', context)
+
+    # Use new SPA templates with HTMX support
+    if request.headers.get('HX-Request'):
+        return render(request, 'main/settings/partials/content.html', context)
+    return render(request, 'main/settings/pages/index.html', context)
