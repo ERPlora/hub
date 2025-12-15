@@ -1,9 +1,11 @@
 {% load i18n %}
 
-<!-- Tab bar update via OOB swap -->
+{% if request.htmx %}
+<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
 <div id="dashboard-tabbar" hx-swap-oob="innerHTML">
 {% include "dashboard/partials/tabbar_main.html" %}
 </div>
+{% endif %}
 
 <div class="ion-padding">
     <h1 class="text-2xl font-bold mb-6">{% trans "Welcome to ERPlora Hub" %}</h1>
