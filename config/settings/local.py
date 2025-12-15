@@ -51,18 +51,52 @@ PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
 PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
-# PLUGINS - Override: use project ./plugins/ for development
+# PLUGINS - Same as production (from DataPaths)
 # =============================================================================
-# En desarrollo queremos editar plugins directamente en el repo
-# En producción (desktop_*) usarían _paths.plugins_dir
+# Uses ~/Library/.../ERPloraHub/plugins/ (same as desktop builds)
+# A symlink at ./plugins -> real location makes development easier
 
-PLUGINS_DIR = BASE_DIR / 'plugins'
+PLUGINS_DIR = _paths.plugins_dir
 PLUGINS_ROOT = PLUGINS_DIR
 PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
 
 # Add plugins to sys.path
 if PLUGINS_DIR.exists() and str(PLUGINS_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGINS_DIR))
+
+# =============================================================================
+# SYMLINKS - Create convenience symlinks in ERPlora root (parent of hub/)
+# =============================================================================
+# Creates symlinks for easy access during development:
+#   ERPlora/hub_data -> ~/Library/Application Support/ERPloraHub/
+#   ERPlora/hub_plugins -> ~/Library/Application Support/ERPloraHub/plugins/
+
+def _create_dev_symlinks():
+    """Create symlinks in ERPlora root for development convenience."""
+    import os
+
+    # ERPlora root is parent of hub/
+    erplora_root = BASE_DIR.parent
+
+    # Symlink: ERPlora/hub_data -> DATA_DIR
+    data_link = erplora_root / 'hub_data'
+    if not data_link.exists():
+        try:
+            os.symlink(DATA_DIR, data_link)
+            print(f"[LOCAL] Created symlink: hub_data -> {DATA_DIR}")
+        except (OSError, FileExistsError):
+            pass  # Symlink already exists or can't create
+
+    # Symlink: ERPlora/hub_plugins -> PLUGINS_DIR
+    plugins_link = erplora_root / 'hub_plugins'
+    if not plugins_link.exists():
+        try:
+            os.symlink(PLUGINS_DIR, plugins_link)
+            print(f"[LOCAL] Created symlink: hub_plugins -> {PLUGINS_DIR}")
+        except (OSError, FileExistsError):
+            pass
+
+_create_dev_symlinks()
 
 # =============================================================================
 # SECURITY - Relaxed for local development

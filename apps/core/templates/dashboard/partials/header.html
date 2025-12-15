@@ -12,6 +12,15 @@
         <ion-title>{% block header_title %}{{ page_title|default:"Dashboard" }}{% endblock %}</ion-title>
 
         <ion-buttons slot="end">
+            <!-- Cloud Connection Status -->
+            <div id="connection-status"
+                 hx-get="{% url 'core:connection_status' %}"
+                 hx-trigger="load, every 30s"
+                 hx-swap="innerHTML"
+                 class="flex items-center mr-1">
+                <ion-icon name="wifi-outline" class="text-gray-400 text-xl"></ion-icon>
+            </div>
+
             <!-- PWA Install Button (only shown when installable) -->
             <ion-button
                 x-show="canInstall"

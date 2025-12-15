@@ -153,9 +153,11 @@ def cloud_login(request):
         cloud_api_url = django_settings.CLOUD_API_URL
 
         try:
+            # Send X-Client-Type header so Cloud registers Hub and returns hub_jwt
             response = requests.post(
                 f"{cloud_api_url}/api/auth/login/",
                 json={'email': email, 'password': password},
+                headers={'X-Client-Type': 'hub-desktop'},
                 timeout=10
             )
 
@@ -163,6 +165,20 @@ def cloud_login(request):
                 auth_data = response.json()
                 access_token = auth_data.get('access')
                 refresh_token = auth_data.get('refresh')
+
+                # Save hub_jwt if Cloud returned it (Hub registration)
+                hub_jwt = auth_data.get('hub_jwt')
+                hub_id = auth_data.get('hub_id')
+                public_key = auth_data.get('public_key')
+
+                if hub_jwt and hub_id:
+                    hub_config = HubConfig.get_config()
+                    hub_config.hub_id = hub_id
+                    hub_config.hub_jwt = hub_jwt
+                    if public_key:
+                        hub_config.cloud_public_key = public_key
+                    hub_config.is_configured = True
+                    hub_config.save()
 
                 token_cache = TokenCache.get_cache()
                 token_cache.cache_jwt_tokens(access_token, refresh_token)
@@ -175,26 +191,6 @@ def cloud_login(request):
 
                 if user_response.status_code == 200:
                     user_info = user_response.json()
-                    hub_config = HubConfig.get_config()
-
-                    if not hub_config.is_configured:
-                        hub_response = requests.post(
-                            f"{cloud_api_url}/api/hubs/register/",
-                            json={
-                                'name': f"Hub - {email}",
-                                'address': 'Local'
-                            },
-                            headers={'Authorization': f'Bearer {access_token}'},
-                            timeout=10
-                        )
-
-                        if hub_response.status_code == 201:
-                            hub_data = hub_response.json()
-                            hub_config.hub_id = hub_data.get('hub_id')
-                            hub_config.cloud_api_token = hub_data.get('cloud_api_token')
-                            hub_config.is_configured = True
-                            hub_config.save()
-
                     hub_config = HubConfig.get_config()
                     is_first_user = LocalUser.objects.count() == 0
                     cloud_user_id = user_info.get('id')

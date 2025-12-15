@@ -114,6 +114,38 @@ def health_check(request):
 
 
 # =============================================================================
+# Cloud Connection Status (HTMX partial)
+# =============================================================================
+
+def connection_status(request):
+    """
+    HTMX endpoint - Returns WiFi icon based on Cloud connection status.
+
+    Green: Connected to Cloud
+    Red: No connection to Cloud
+    """
+    from django.http import HttpResponse
+    from apps.core.services.connectivity import ConnectivityChecker
+
+    # Get Cloud URL from settings
+    cloud_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+    checker = ConnectivityChecker(cloud_url=cloud_url)
+
+    if checker.is_online():
+        # Green - Connected
+        return HttpResponse(
+            '<ion-icon name="wifi" class="text-green-500 text-xl" '
+            'title="Connected to Cloud"></ion-icon>'
+        )
+    else:
+        # Red - No connection
+        return HttpResponse(
+            '<ion-icon name="wifi-outline" class="text-red-500 text-xl" '
+            'title="No Cloud connection"></ion-icon>'
+        )
+
+
+# =============================================================================
 # Update Notifications (HTMX partials)
 # =============================================================================
 

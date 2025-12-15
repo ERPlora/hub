@@ -16,6 +16,9 @@ urlpatterns = [
     # Health check endpoint (for Docker healthcheck)
     path('health/', views.health_check, name='health_check'),
 
+    # Connection status (HTMX partial - WiFi indicator)
+    path('connection-status/', views.connection_status, name='connection_status'),
+
     # Update notification (HTMX partial)
     path('update-notification/', views.update_notification, name='update_notification'),
 ]
