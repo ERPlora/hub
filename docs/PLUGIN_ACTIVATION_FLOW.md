@@ -196,9 +196,9 @@ plugins/
 ├── .template/        ← SKIP (hidden)
 ├── _inventory/       ← SKIP (disabled with underscore)
 ├── products/         ← LOAD ✅ (active)
-└── multi_store/      ← LOAD ✅ (active)
+└── reports/          ← LOAD ✅ (active)
 
-Result: 2 plugins loaded (products, multi_store)
+Result: 2 plugins loaded (products, reports)
 ```
 
 ---

@@ -43,7 +43,7 @@ def require_active_subscription(view_func):
                 'error': 'Invalid plugin context'
             }, status=500)
 
-        # Extraer plugin_id del módulo (e.g., plugins.multi_device.views -> multi_device)
+        # Extraer plugin_id del módulo (e.g., plugins.analytics.views -> analytics)
         try:
             plugin_index = parts.index('plugins')
             plugin_slug = parts[plugin_index + 1]

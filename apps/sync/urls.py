@@ -15,7 +15,4 @@ urlpatterns = [
     path('api/update/apply/', views_update.apply_update, name='update_apply'),
     path('api/update/rollback/', views_update.rollback_update, name='update_rollback'),
     path('api/update/notification/', views_update.update_notification, name='update_notification'),
-
-    # FRP Client API endpoints - Moved to multi_device plugin
-    # Access via /multi_device/frp/status/, /multi_device/frp/start/, etc.
 ]
