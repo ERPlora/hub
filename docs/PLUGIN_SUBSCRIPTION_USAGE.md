@@ -14,8 +14,8 @@ ERPlora soporta 3 tipos de plugins:
 
 ```json
 {
-  "plugin_id": "multi_device",
-  "name": "Multi-Device Support",
+  "plugin_id": "analytics",
+  "name": "Advanced Analytics",
   "version": "1.0.0",
   "plugin_type": "subscription",
   "price": 9.99,
@@ -29,18 +29,18 @@ ERPlora soporta 3 tipos de plugins:
 ### Opción 1: Decorator (Recomendado)
 
 ```python
-# plugins/multi_device/views.py
+# plugins/analytics/views.py
 from apps.plugins_runtime.decorators import require_active_subscription
 from django.shortcuts import render
 
 @require_active_subscription
-def sync_devices(request):
+def dashboard(request):
     """
     Esta vista solo se ejecuta si la suscripción está activa.
     Si no está activa, retorna error 402 automáticamente.
     """
     # Tu lógica aquí
-    return render(request, 'multi_device/sync.html')
+    return render(request, 'analytics/dashboard.html')
 ```
 
 ### Opción 2: Verificación Manual
@@ -56,7 +56,7 @@ def premium_feature(request):
 
     # Verificar acceso
     has_access = checker.verify_plugin_access(
-        plugin_slug='multi_device',
+        plugin_slug='analytics',
         plugin_type='subscription'
     )
 
@@ -206,10 +206,10 @@ Puedes sobrescribirlos en tu plugin:
 8. **Usuario usa feature** → Decorator verifica suscripción
 9. **Cache por 5 min** → Reduce latencia en requests subsecuentes
 
-## Ejemplo Completo: Multi-Device Plugin
+## Ejemplo Completo: Analytics Plugin
 
 ```python
-# plugins/multi_device/views.py
+# plugins/analytics/views.py
 from apps.plugins_runtime.decorators import require_active_subscription
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -218,15 +218,14 @@ import json
 @require_active_subscription
 def dashboard(request):
     """Dashboard principal - requiere suscripción activa"""
-    return render(request, 'multi_device/dashboard.html')
+    return render(request, 'analytics/dashboard.html')
 
 @require_active_subscription
-def sync_data(request):
-    """API para sincronizar datos - requiere suscripción activa"""
+def export_data(request):
+    """API para exportar datos - requiere suscripción activa"""
     if request.method == 'POST':
-        # Sincronizar con Cloud
         data = json.loads(request.body)
-        # ... lógica de sync
+        # ... lógica de exportación
         return JsonResponse({'success': True})
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)

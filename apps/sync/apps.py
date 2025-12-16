@@ -77,11 +77,6 @@ class SyncConfig(AppConfig):
         """Start Cloud sync service (WebSocket or HTTP polling)."""
         from django.conf import settings
 
-        # Only in web deployment mode
-        deployment_mode = getattr(settings, 'DEPLOYMENT_MODE', 'local')
-        if deployment_mode != 'web':
-            return
-
         # Check if sync is enabled
         sync_enabled = getattr(settings, 'CLOUD_SYNC_ENABLED', True)
         if not sync_enabled:
@@ -94,6 +89,16 @@ class SyncConfig(AppConfig):
             # In production (daphne/gunicorn), RUN_MAIN won't be set
             if 'runserver' in sys.argv:
                 return
+
+        # Check if Hub is configured (has hub_jwt)
+        try:
+            from apps.configuration.models import HubConfig
+            config = HubConfig.get_solo()
+            if not config.hub_jwt:
+                print("[SYNC] Hub not configured (no hub_jwt), skipping heartbeat")
+                return
+        except Exception:
+            return
 
         # Choose sync method: WebSocket (preferred) or HTTP polling (fallback)
         use_websocket = getattr(settings, 'CLOUD_SYNC_WEBSOCKET', True)

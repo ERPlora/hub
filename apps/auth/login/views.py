@@ -4,6 +4,7 @@ Auth Login Views
 Handles local PIN login and Cloud login authentication.
 """
 import json
+import logging
 import requests
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
@@ -11,6 +12,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.conf import settings as django_settings
+
+logger = logging.getLogger(__name__)
 
 from apps.accounts.models import LocalUser
 from apps.configuration.models import HubConfig
@@ -179,6 +182,13 @@ def cloud_login(request):
                         hub_config.cloud_public_key = public_key
                     hub_config.is_configured = True
                     hub_config.save()
+
+                    # Start WebSocket client for heartbeat now that we have hub_jwt
+                    try:
+                        from apps.sync.services.websocket_client import start_websocket_client
+                        start_websocket_client()
+                    except Exception as e:
+                        logger.warning(f"Failed to start WebSocket client: {e}")
 
                 token_cache = TokenCache.get_cache()
                 token_cache.cache_jwt_tokens(access_token, refresh_token)

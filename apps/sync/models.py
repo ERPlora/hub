@@ -1,15 +1,28 @@
+"""
+Synchronization models for Hub-Cloud communication.
+"""
+
+from datetime import timedelta
+
 from django.db import models
+from django.utils import timezone
+
+from apps.core.models import HubBaseModel, HubManager, HubManagerWithDeleted
 
 
 class TokenCache(models.Model):
     """
     Cache for JWT tokens and RSA public key.
 
-    Enables offline JWT validation by storing:
-    - Last valid JWT access token
-    - RSA public key from Cloud
-    - Cache timestamps for expiration
+    This is a singleton model (pk=1) that stores authentication tokens
+    for Hub-to-Cloud communication.
+
+    Note: This does NOT inherit from HubBaseModel because:
+    - It's a singleton per Hub instance
+    - It stores Hub-wide configuration, not per-record data
+    - The hub_id is in HubConfig, not needed here
     """
+
     # JWT token cache
     jwt_access_token = models.TextField(blank=True)
     jwt_refresh_token = models.TextField(blank=True)
@@ -26,48 +39,59 @@ class TokenCache(models.Model):
     class Meta:
         verbose_name = 'Token Cache'
         verbose_name_plural = 'Token Cache'
-        db_table = 'core_tokencache'  # Keep existing table name
+        db_table = 'sync_tokencache'
 
     def __str__(self):
         return f"Token Cache (Updated: {self.updated_at})"
 
+    def save(self, *args, **kwargs):
+        """Ensure singleton pattern (pk=1)."""
+        if not self.pk:
+            self.pk = 1
+        super().save(*args, **kwargs)
+
     @classmethod
     def get_cache(cls):
-        """Get or create token cache (singleton pattern)"""
-        cache, _ = cls.objects.get_or_create(id=1)
+        """Get or create token cache (singleton pattern)."""
+        cache, _ = cls.objects.get_or_create(pk=1)
         return cache
 
     def cache_jwt_tokens(self, access_token, refresh_token=None):
-        """Cache JWT tokens"""
-        from django.utils import timezone
+        """Cache JWT tokens."""
         self.jwt_access_token = access_token
         if refresh_token:
             self.jwt_refresh_token = refresh_token
         self.jwt_cached_at = timezone.now()
-        self.save()
+        self.save(update_fields=['jwt_access_token', 'jwt_refresh_token', 'jwt_cached_at', 'updated_at'])
 
     def cache_public_key(self, public_key):
-        """Cache RSA public key"""
-        from django.utils import timezone
+        """Cache RSA public key."""
         self.rsa_public_key = public_key
         self.public_key_cached_at = timezone.now()
-        self.save()
+        self.save(update_fields=['rsa_public_key', 'public_key_cached_at', 'updated_at'])
 
     def get_cached_jwt(self):
-        """Get cached JWT access token"""
+        """Get cached JWT access token."""
         return self.jwt_access_token if self.jwt_access_token else None
 
     def get_cached_public_key(self):
-        """Get cached RSA public key"""
+        """Get cached RSA public key."""
         return self.rsa_public_key if self.rsa_public_key else None
 
 
-class SyncQueue(models.Model):
+class SyncQueue(HubBaseModel):
     """
-    Queue de sincronización para operaciones offline.
+    Queue for offline synchronization operations.
 
-    Almacena operaciones que deben sincronizarse con Cloud cuando
-    el Hub recupere conexión a internet.
+    Stores operations that must be synchronized with Cloud when
+    the Hub regains internet connection.
+
+    Inherits from HubBaseModel:
+    - id (UUID primary key)
+    - hub_id (for multi-tenancy)
+    - created_at, updated_at
+    - created_by, updated_by
+    - is_deleted, deleted_at (soft delete)
     """
 
     OPERATION_TYPES = [
@@ -88,10 +112,10 @@ class SyncQueue(models.Model):
 
     # Operation details
     operation_type = models.CharField(max_length=50, choices=OPERATION_TYPES)
-    endpoint = models.CharField(max_length=500)  # API endpoint to call
-    method = models.CharField(max_length=10, default='POST')  # HTTP method (POST, DELETE, PUT, PATCH)
-    payload = models.JSONField(default=dict)  # Request body
-    headers = models.JSONField(default=dict)  # Additional headers
+    endpoint = models.CharField(max_length=500, help_text='API endpoint to call')
+    method = models.CharField(max_length=10, default='POST', help_text='HTTP method')
+    payload = models.JSONField(default=dict, help_text='Request body')
+    headers = models.JSONField(default=dict, help_text='Additional headers')
 
     # Sync status
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -99,20 +123,22 @@ class SyncQueue(models.Model):
     max_retries = models.IntegerField(default=5)
     last_error = models.TextField(blank=True)
 
-    # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # Timing
     completed_at = models.DateTimeField(null=True, blank=True)
     next_retry_at = models.DateTimeField(null=True, blank=True)
+
+    # Managers
+    objects = HubManager()
+    all_objects = HubManagerWithDeleted()
 
     class Meta:
         verbose_name = 'Sync Queue Item'
         verbose_name_plural = 'Sync Queue'
         ordering = ['created_at']
-        db_table = 'core_syncqueue'  # Keep existing table name
+        db_table = 'sync_syncqueue'
         indexes = [
-            models.Index(fields=['status', 'next_retry_at']),
-            models.Index(fields=['operation_type', 'status']),
+            models.Index(fields=['hub_id', 'status', 'next_retry_at']),
+            models.Index(fields=['hub_id', 'operation_type', 'status']),
         ]
 
     def __str__(self):
@@ -121,61 +147,56 @@ class SyncQueue(models.Model):
     @classmethod
     def add_operation(cls, operation_type, endpoint, method='POST', payload=None, headers=None):
         """
-        Agregar operación a la cola de sincronización.
+        Add operation to the sync queue.
 
         Args:
-            operation_type: Tipo de operación (user_register, user_remove, etc.)
-            endpoint: URL del endpoint (sin dominio, ej: /api/hubs/{id}/users/{email}/)
-            method: Método HTTP (POST, DELETE, PUT, PATCH)
-            payload: Datos a enviar en el body
-            headers: Headers adicionales (el X-Hub-Token se agrega automáticamente)
+            operation_type: Type of operation (user_register, user_remove, etc.)
+            endpoint: API endpoint URL (without domain)
+            method: HTTP method (POST, DELETE, PUT, PATCH)
+            payload: Data to send in request body
+            headers: Additional headers (X-Hub-Token added automatically)
 
         Returns:
-            SyncQueue: Item creado en la cola
+            SyncQueue: Created queue item
         """
         return cls.objects.create(
             operation_type=operation_type,
             endpoint=endpoint,
             method=method.upper(),
             payload=payload or {},
-            headers=headers or {}
+            headers=headers or {},
         )
 
     @classmethod
     def get_pending_operations(cls, limit=10):
         """
-        Obtener operaciones pendientes para sincronizar.
+        Get pending operations for synchronization.
 
         Returns:
-            QuerySet: Operaciones pendientes ordenadas por fecha de creación
+            QuerySet: Pending operations ordered by creation date
         """
-        from django.utils import timezone
         now = timezone.now()
 
         return cls.objects.filter(
             status='pending',
-            retry_count__lt=models.F('max_retries')
+            retry_count__lt=models.F('max_retries'),
         ).filter(
             models.Q(next_retry_at__isnull=True) | models.Q(next_retry_at__lte=now)
         ).order_by('created_at')[:limit]
 
     def mark_completed(self):
-        """Marcar operación como completada."""
-        from django.utils import timezone
+        """Mark operation as completed."""
         self.status = 'completed'
         self.completed_at = timezone.now()
         self.save(update_fields=['status', 'completed_at', 'updated_at'])
 
     def mark_failed(self, error_message):
         """
-        Marcar operación como fallida e incrementar contador de reintentos.
+        Mark operation as failed and increment retry counter.
 
         Args:
-            error_message: Mensaje de error
+            error_message: Error message to store
         """
-        from django.utils import timezone
-        from datetime import timedelta
-
         self.retry_count += 1
         self.last_error = error_message
 

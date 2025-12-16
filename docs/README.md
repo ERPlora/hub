@@ -132,7 +132,6 @@ El Hub usa **HTTP REST API** para comunicación con Cloud:
 
 **Sincronización:** Sistema "sync-on-access" - verifica usuarios on-demand, no proactivamente.
 
-**Features Premium:** WebSocket y FRP (acceso remoto) están disponibles en el plugin `multi_device`.
 
 Ver documentación completa: [CLOUD.md](CLOUD.md)
 
