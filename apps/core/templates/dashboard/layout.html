@@ -346,7 +346,8 @@
 <script>
     function dashboardApp() {
         return {
-            isDark: {{ HUB_CONFIG.dark_mode|yesno:"true,false" }},
+            isDark: window.ERPlora?.isDark || false,
+            darkModeAuto: window.ERPlora?.darkModeAuto ?? true,
             isFullscreen: false,
             currentSection: '{{ current_section|default:"dashboard" }}',
             userName: '{{ request.session.user_name|default:"" }}',
@@ -355,10 +356,9 @@
             canInstall: false,
 
             init() {
-                // Apply dark mode
-                if (this.isDark) {
-                    document.body.classList.add('dark');
-                }
+                // Dark mode is already applied by base.html
+                // Sync localStorage for consistency
+                localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
 
                 // Listen to HTMX URL changes for SPA navigation
                 document.body.addEventListener('htmx:pushedIntoHistory', (e) => {

@@ -271,8 +271,50 @@
             return pwaInstalled || window.matchMedia('(display-mode: standalone)').matches;
         }
     </script>
+    <!-- Auto dark mode detection (runs before body renders to prevent flash) -->
+    <script>
+        (function() {
+            const darkModeAuto = {{ HUB_CONFIG.dark_mode_auto|yesno:"true,false" }};
+            const darkModeManual = {{ HUB_CONFIG.dark_mode|yesno:"true,false" }};
+
+            let isDark = false;
+            if (darkModeAuto) {
+                // Use browser/OS preference
+                isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            } else {
+                // Use manual setting from database
+                isDark = darkModeManual;
+            }
+
+            // Store for Alpine.js components to access
+            window.ERPlora = window.ERPlora || {};
+            window.ERPlora.isDark = isDark;
+            window.ERPlora.darkModeAuto = darkModeAuto;
+
+            // Apply immediately to prevent flash
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
 </head>
-<body class="{% if HUB_CONFIG.dark_mode %}dark{% endif %}">
+<body>
+    <script>
+        // Apply dark class to body (documentElement already has it if needed)
+        if (window.ERPlora && window.ERPlora.isDark) {
+            document.body.classList.add('dark');
+        }
+
+        // Listen for system preference changes (only if auto mode)
+        if (window.ERPlora && window.ERPlora.darkModeAuto) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                document.body.classList.toggle('dark', e.matches);
+                document.documentElement.classList.toggle('dark', e.matches);
+                window.ERPlora.isDark = e.matches;
+            });
+        }
+    </script>
+
     <ion-app mode="ios">
         {% block content %}{% endblock %}
     </ion-app>

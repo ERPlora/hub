@@ -282,7 +282,8 @@
 <script>
     function loginApp() {
         return {
-            isDark: false,
+            isDark: window.ERPlora?.isDark || false,
+            darkModeAuto: window.ERPlora?.darkModeAuto ?? true,
             loginMode: 'local',
 
             // Local Login
@@ -304,11 +305,9 @@
             setupPinError: false,
 
             init() {
-                const savedTheme = localStorage.getItem('theme');
-                if (savedTheme === 'dark') {
-                    this.isDark = true;
-                    document.body.classList.add('dark');
-                }
+                // Dark mode is already applied by base.html
+                // Sync localStorage for consistency
+                localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
             },
 
             selectEmployee(employee) {
@@ -448,10 +447,24 @@
                 }
             },
 
-            toggleTheme() {
+            async toggleTheme() {
                 this.isDark = !this.isDark;
                 document.body.classList.toggle('dark');
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
+
+                // Save to database
+                try {
+                    await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: `action=update_theme&dark_mode=${this.isDark}`
+                    });
+                } catch (e) {
+                    console.log('Theme saved locally only');
+                }
             },
 
             async showToast(message, color = 'primary') {

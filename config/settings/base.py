@@ -104,6 +104,7 @@ INSTALLED_APPS = [
     'apps.main.files.apps.FilesConfig',
     'apps.main.settings.apps.MainSettingsConfig',
     'apps.main.employees.apps.MainEmployeesConfig',
+    'apps.main.setup.apps.SetupConfig',
     # Hub apps - System
     'apps.system.plugins.apps.SystemPluginsConfig',
 ]
@@ -217,8 +218,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CLOUD API
 # =============================================================================
 
-# Read from CLOUD_BASE_URL (consistent with Cloud) or fallback to CLOUD_API_URL for backwards compatibility
-CLOUD_API_URL = config('CLOUD_BASE_URL', default=config('CLOUD_API_URL', default='https://int.erplora.com'))
+# Cloud base URL (API endpoints are at /api/...)
+# Priority: CLOUD_URL > CLOUD_BASE_URL > CLOUD_API_URL (legacy)
+CLOUD_API_URL = config('CLOUD_URL', default=config('CLOUD_BASE_URL', default=config('CLOUD_API_URL', default='https://int.erplora.com')))
 
 # =============================================================================
 # DEPLOYMENT MODE (overridden per environment)
