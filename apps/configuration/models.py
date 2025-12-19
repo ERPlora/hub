@@ -220,6 +220,10 @@ class HubConfig(SingletonConfigMixin, models.Model):
         ('blue', 'Blue'),
     ])
     dark_mode = models.BooleanField(default=False)
+    dark_mode_auto = models.BooleanField(
+        default=True,
+        help_text='Use browser/OS preference for dark mode (ignores dark_mode field)'
+    )
     auto_print = models.BooleanField(default=False)
 
     # Timestamps
@@ -281,3 +285,107 @@ class StoreConfig(SingletonConfigMixin, models.Model):
             self.business_address and
             self.vat_number
         )
+
+
+class BackupConfig(SingletonConfigMixin, models.Model):
+    """
+    Backup configuration for automated database backups.
+
+    Supports both S3 (web/cloud) and local filesystem (desktop) storage,
+    determined automatically by deployment mode.
+    """
+
+    class Frequency(models.TextChoices):
+        DISABLED = 'disabled', 'Disabled'
+        DAILY = 'daily', 'Daily'
+        WEEKLY = 'weekly', 'Weekly'
+        MONTHLY = 'monthly', 'Monthly'
+
+    # Backup schedule
+    enabled = models.BooleanField(
+        default=False,
+        help_text='Enable automatic backups'
+    )
+    frequency = models.CharField(
+        max_length=20,
+        choices=Frequency.choices,
+        default=Frequency.DAILY,
+        help_text='How often to run backups'
+    )
+    time_hour = models.PositiveSmallIntegerField(
+        default=3,
+        help_text='Hour to run backup (0-23, default 3 AM)'
+    )
+    time_minute = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Minute to run backup (0-59)'
+    )
+
+    # Retention
+    retention_days = models.PositiveIntegerField(
+        default=30,
+        help_text='Days to keep backups (0 = keep forever)'
+    )
+    max_backups = models.PositiveIntegerField(
+        default=10,
+        help_text='Maximum number of backups to keep (0 = unlimited)'
+    )
+
+    # Last backup info
+    last_backup_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp of last successful backup'
+    )
+    last_backup_size = models.PositiveIntegerField(
+        default=0,
+        help_text='Size of last backup in bytes'
+    )
+    last_backup_path = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text='Path/key of last backup'
+    )
+    last_error = models.TextField(
+        blank=True,
+        help_text='Last backup error message (empty if successful)'
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Backup Configuration'
+        verbose_name_plural = 'Backup Configuration'
+        db_table = 'core_backupconfig'
+
+    def __str__(self):
+        if not self.enabled:
+            return "Backup Config (Disabled)"
+        return f"Backup Config ({self.frequency} at {self.time_hour:02d}:{self.time_minute:02d})"
+
+    def get_cron_trigger_kwargs(self) -> dict:
+        """
+        Returns kwargs for APScheduler CronTrigger based on frequency.
+
+        Returns:
+            dict: Keyword arguments for CronTrigger
+        """
+        base = {
+            'hour': self.time_hour,
+            'minute': self.time_minute,
+        }
+
+        if self.frequency == self.Frequency.DAILY:
+            return base  # Every day at specified time
+
+        elif self.frequency == self.Frequency.WEEKLY:
+            base['day_of_week'] = 'sun'  # Every Sunday
+            return base
+
+        elif self.frequency == self.Frequency.MONTHLY:
+            base['day'] = 1  # First of each month
+            return base
+
+        return base  # Default to daily

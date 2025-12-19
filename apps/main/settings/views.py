@@ -8,7 +8,7 @@ from django.utils import translation
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 from apps.accounts.models import LocalUser
-from apps.configuration.models import HubConfig, StoreConfig
+from apps.configuration.models import HubConfig, StoreConfig, BackupConfig
 
 
 @login_required
@@ -26,6 +26,7 @@ def index(request):
         if action == 'update_theme':
             dark_mode = request.POST.get('dark_mode') == 'true'
             hub_config.dark_mode = dark_mode
+            hub_config.dark_mode_auto = False  # User chose manually, disable auto
             hub_config.save()
             return JsonResponse({'success': True})
 
@@ -95,7 +96,45 @@ def index(request):
             else:
                 return JsonResponse({'success': False, 'error': 'Invalid currency'}, status=400)
 
+        # Handle backup settings form
+        if action == 'update_backup':
+            backup_config = BackupConfig.get_solo()
+            backup_config.enabled = request.POST.get('backup_enabled') == 'true'
+            backup_config.frequency = request.POST.get('backup_frequency', 'daily')
+            try:
+                backup_config.time_hour = int(request.POST.get('backup_hour', 3))
+                backup_config.retention_days = int(request.POST.get('retention_days', 30))
+                backup_config.max_backups = int(request.POST.get('max_backups', 10))
+            except (ValueError, TypeError):
+                pass
+            backup_config.save()
+
+            # Reschedule the backup job
+            from apps.configuration.services import backup_service
+            backup_service.reschedule()
+
+            return JsonResponse({'success': True, 'message': 'Backup settings saved'})
+
+        # Handle manual backup trigger
+        if action == 'run_backup':
+            from apps.configuration.services import backup_service
+            success, path, size = backup_service.run_backup()
+            if success:
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Backup completed',
+                    'path': path,
+                    'size': size
+                })
+            else:
+                return JsonResponse({'success': False, 'error': path}, status=500)
+
         return JsonResponse({'success': True})
+
+    # Get backup config and scheduler status
+    backup_config = BackupConfig.get_solo()
+    from apps.configuration.scheduler import get_scheduler_status
+    scheduler_status = get_scheduler_status()
 
     # Use POPULAR_CURRENCY_CHOICES for the UI (24 most common currencies)
     return {
@@ -104,6 +143,9 @@ def index(request):
         'user': user,
         'hub_config': hub_config,
         'store_config': store_config,
+        'backup_config': backup_config,
+        'scheduler_status': scheduler_status,
         'language_choices': django_settings.LANGUAGES,
         'currency_choices': django_settings.POPULAR_CURRENCY_CHOICES,
+        'backup_frequency_choices': BackupConfig.Frequency.choices,
     }
