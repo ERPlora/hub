@@ -11,5 +11,7 @@ class ConfigurationConfig(AppConfig):
         Initialize configuration app.
         Import signals and perform app-level initialization.
         """
-        # Import signals here if needed
-        pass
+        # Initialize the background scheduler for automated backups
+        # This runs once when Django starts up
+        from .scheduler import init_scheduler
+        init_scheduler()

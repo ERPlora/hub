@@ -31,38 +31,68 @@
                             <ion-list>
                                 <!-- Business Name -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "Business Name" %} *</ion-label>
-                                    <ion-input type="text" x-model="store.business_name" placeholder="{% trans 'Your business name' %}"></ion-input>
+                                    <ion-input
+                                        type="text"
+                                        label="{% trans 'Business Name' %} *"
+                                        label-placement="floating"
+                                        x-model="store.business_name"
+                                        placeholder="{% trans 'Your business name' %}"
+                                    ></ion-input>
                                 </ion-item>
 
                                 <!-- Business Address -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "Address" %} *</ion-label>
-                                    <ion-textarea x-model="store.business_address" rows="2" placeholder="{% trans 'Street, City, Postal Code' %}"></ion-textarea>
+                                    <ion-textarea
+                                        label="{% trans 'Address' %} *"
+                                        label-placement="floating"
+                                        x-model="store.business_address"
+                                        rows="2"
+                                        placeholder="{% trans 'Street, City, Postal Code' %}"
+                                    ></ion-textarea>
                                 </ion-item>
 
                                 <!-- VAT Number -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "VAT/Tax ID" %} *</ion-label>
-                                    <ion-input type="text" x-model="store.vat_number" placeholder="{% trans 'e.g., ES12345678A' %}"></ion-input>
+                                    <ion-input
+                                        type="text"
+                                        label="{% trans 'VAT/Tax ID' %} *"
+                                        label-placement="floating"
+                                        x-model="store.vat_number"
+                                        placeholder="{% trans 'e.g., ES12345678A' %}"
+                                    ></ion-input>
                                 </ion-item>
 
                                 <!-- Phone -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "Phone" %}</ion-label>
-                                    <ion-input type="tel" x-model="store.phone" placeholder="+34 600 000 000"></ion-input>
+                                    <ion-input
+                                        type="tel"
+                                        label="{% trans 'Phone' %}"
+                                        label-placement="floating"
+                                        x-model="store.phone"
+                                        placeholder="+34 600 000 000"
+                                    ></ion-input>
                                 </ion-item>
 
                                 <!-- Email -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "Email" %}</ion-label>
-                                    <ion-input type="email" x-model="store.email" placeholder="info@business.com"></ion-input>
+                                    <ion-input
+                                        type="email"
+                                        label="{% trans 'Email' %}"
+                                        label-placement="floating"
+                                        x-model="store.email"
+                                        placeholder="info@business.com"
+                                    ></ion-input>
                                 </ion-item>
 
                                 <!-- Website -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "Website" %}</ion-label>
-                                    <ion-input type="url" x-model="store.website" placeholder="https://www.business.com"></ion-input>
+                                    <ion-input
+                                        type="url"
+                                        label="{% trans 'Website' %}"
+                                        label-placement="floating"
+                                        x-model="store.website"
+                                        placeholder="https://www.business.com"
+                                    ></ion-input>
                                 </ion-item>
                             </ion-list>
                         </div>
@@ -72,7 +102,7 @@
                             <ion-list>
                                 <!-- Logo -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "Logo" %}</ion-label>
+                                    <ion-label>{% trans "Logo" %}</ion-label>
                                     <div class="flex items-center gap-4 py-2 w-full">
                                         <div class="w-16 h-16 border rounded flex items-center justify-center bg-gray-50 dark:bg-gray-800">
                                             {% if store_config.logo %}
@@ -90,8 +120,16 @@
 
                                 <!-- Tax Rate -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "Tax Rate (%)" %}</ion-label>
-                                    <ion-input type="number" x-model="store.tax_rate" step="0.01" min="0" max="100" placeholder="21.00"></ion-input>
+                                    <ion-input
+                                        type="number"
+                                        label="{% trans 'Tax Rate (%)' %}"
+                                        label-placement="floating"
+                                        x-model="store.tax_rate"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        placeholder="21.00"
+                                    ></ion-input>
                                 </ion-item>
 
                                 <!-- Tax Included -->
@@ -102,14 +140,24 @@
 
                                 <!-- Receipt Header -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "Receipt Header" %}</ion-label>
-                                    <ion-textarea x-model="store.receipt_header" rows="2" placeholder="{% trans 'Text shown at the top of receipts' %}"></ion-textarea>
+                                    <ion-textarea
+                                        label="{% trans 'Receipt Header' %}"
+                                        label-placement="floating"
+                                        x-model="store.receipt_header"
+                                        rows="2"
+                                        placeholder="{% trans 'Text shown at the top of receipts' %}"
+                                    ></ion-textarea>
                                 </ion-item>
 
                                 <!-- Receipt Footer -->
                                 <ion-item>
-                                    <ion-label position="stacked">{% trans "Receipt Footer" %}</ion-label>
-                                    <ion-textarea x-model="store.receipt_footer" rows="2" placeholder="{% trans 'Thank you for your purchase!' %}"></ion-textarea>
+                                    <ion-textarea
+                                        label="{% trans 'Receipt Footer' %}"
+                                        label-placement="floating"
+                                        x-model="store.receipt_footer"
+                                        rows="2"
+                                        placeholder="{% trans 'Thank you for your purchase!' %}"
+                                    ></ion-textarea>
                                 </ion-item>
                             </ion-list>
                         </div>
@@ -133,8 +181,12 @@
                     <ion-list>
                         <!-- Language -->
                         <ion-item>
-                            <ion-label position="stacked">{% trans "Language" %}</ion-label>
-                            <ion-select x-model="language" interface="popover">
+                            <ion-select
+                                label="{% trans 'Language' %}"
+                                label-placement="floating"
+                                x-model="language"
+                                interface="popover"
+                            >
                                 {% for code, name in language_choices %}
                                 <ion-select-option value="{{ code }}" {% if user.language == code %}selected{% endif %}>{{ name }}</ion-select-option>
                                 {% endfor %}
@@ -143,7 +195,7 @@
 
                         <!-- Avatar -->
                         <ion-item>
-                            <ion-label position="stacked">{% trans "Avatar" %}</ion-label>
+                            <ion-label>{% trans "Avatar" %}</ion-label>
                             <div class="flex items-center gap-4 py-2">
                                 <ion-avatar>
                                     {% if user.avatar %}
@@ -180,8 +232,13 @@
                     <ion-list>
                         <!-- Currency -->
                         <ion-item>
-                            <ion-label position="stacked">{% trans "Currency" %}</ion-label>
-                            <ion-select x-model="currency" interface="action-sheet" placeholder="{% trans 'Select currency' %}">
+                            <ion-select
+                                label="{% trans 'Currency' %}"
+                                label-placement="floating"
+                                x-model="currency"
+                                interface="action-sheet"
+                                placeholder="{% trans 'Select currency' %}"
+                            >
                                 {% for code, name in currency_choices %}
                                 <ion-select-option value="{{ code }}" {% if hub_config.currency == code %}selected{% endif %}>{{ code }} - {{ name }}</ion-select-option>
                                 {% endfor %}
@@ -289,6 +346,140 @@
                 <div id="scan-results" class="mt-4"></div>
             </ion-card-content>
         </ion-card>
+
+        <!-- Automatic Backups (Full Width) -->
+        <ion-card class="lg:col-span-2">
+            <ion-card-header>
+                <ion-card-title>
+                    <ion-icon name="cloud-upload-outline" class="align-middle mr-2"></ion-icon>
+                    {% trans "Automatic Backups" %}
+                </ion-card-title>
+                <ion-card-subtitle>{% trans "Schedule automatic database backups" %}</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content>
+                <form @submit.prevent="saveBackupSettings()">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Left Column: Schedule Settings -->
+                        <div>
+                            <ion-list>
+                                <!-- Enable Backups -->
+                                <ion-item>
+                                    <ion-label>{% trans "Enable automatic backups" %}</ion-label>
+                                    <ion-toggle
+                                        slot="end"
+                                        :checked="backup.enabled"
+                                        @ionChange="backup.enabled = $event.detail.checked"
+                                    ></ion-toggle>
+                                </ion-item>
+
+                                <!-- Frequency -->
+                                <ion-item>
+                                    <ion-select
+                                        label="{% trans 'Frequency' %}"
+                                        label-placement="floating"
+                                        x-model="backup.frequency"
+                                        interface="popover"
+                                        :disabled="!backup.enabled"
+                                    >
+                                        {% for value, label in backup_frequency_choices %}
+                                        <ion-select-option value="{{ value }}">{{ label }}</ion-select-option>
+                                        {% endfor %}
+                                    </ion-select>
+                                </ion-item>
+
+                                <!-- Time (Hour) -->
+                                <ion-item>
+                                    <ion-select
+                                        label="{% trans 'Backup Time' %}"
+                                        label-placement="floating"
+                                        x-model="backup.time_hour"
+                                        interface="popover"
+                                        :disabled="!backup.enabled"
+                                    >
+                                        {% for hour in "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23"|make_list %}
+                                        <option value="{{ hour }}">{{ hour }}:00</option>
+                                        {% endfor %}
+                                        <ion-select-option value="0">00:00</ion-select-option>
+                                        <ion-select-option value="1">01:00</ion-select-option>
+                                        <ion-select-option value="2">02:00</ion-select-option>
+                                        <ion-select-option value="3">03:00</ion-select-option>
+                                        <ion-select-option value="4">04:00</ion-select-option>
+                                        <ion-select-option value="5">05:00</ion-select-option>
+                                        <ion-select-option value="6">06:00</ion-select-option>
+                                        <ion-select-option value="12">12:00</ion-select-option>
+                                        <ion-select-option value="18">18:00</ion-select-option>
+                                        <ion-select-option value="22">22:00</ion-select-option>
+                                        <ion-select-option value="23">23:00</ion-select-option>
+                                    </ion-select>
+                                </ion-item>
+                            </ion-list>
+                        </div>
+
+                        <!-- Right Column: Retention & Status -->
+                        <div>
+                            <ion-list>
+                                <!-- Retention Days -->
+                                <ion-item>
+                                    <ion-input
+                                        type="number"
+                                        label="{% trans 'Keep backups for (days)' %}"
+                                        label-placement="floating"
+                                        x-model="backup.retention_days"
+                                        min="0"
+                                        max="365"
+                                        :disabled="!backup.enabled"
+                                    ></ion-input>
+                                </ion-item>
+
+                                <!-- Max Backups -->
+                                <ion-item>
+                                    <ion-input
+                                        type="number"
+                                        label="{% trans 'Maximum backups to keep' %}"
+                                        label-placement="floating"
+                                        x-model="backup.max_backups"
+                                        min="0"
+                                        max="100"
+                                        :disabled="!backup.enabled"
+                                    ></ion-input>
+                                </ion-item>
+
+                                <!-- Last Backup Info -->
+                                <ion-item>
+                                    <ion-label>
+                                        <h3>{% trans "Last Backup" %}</h3>
+                                        <p>
+                                            {% if backup_config.last_backup_at %}
+                                            {{ backup_config.last_backup_at|date:"M d, Y H:i" }}
+                                            ({{ backup_config.last_backup_size|filesizeformat }})
+                                            {% else %}
+                                            <span class="text-medium">{% trans "No backups yet" %}</span>
+                                            {% endif %}
+                                        </p>
+                                        {% if backup_config.last_error %}
+                                        <p class="text-danger text-xs">{{ backup_config.last_error|truncatechars:50 }}</p>
+                                        {% endif %}
+                                    </ion-label>
+                                </ion-item>
+                            </ion-list>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 mt-4">
+                        <ion-button type="submit" :disabled="savingBackup">
+                            <ion-spinner x-show="savingBackup" name="crescent" class="mr-2"></ion-spinner>
+                            {% trans "Save Backup Settings" %}
+                        </ion-button>
+
+                        <ion-button fill="outline" @click="runBackupNow()" :disabled="runningBackup">
+                            <ion-spinner x-show="runningBackup" name="crescent" class="mr-2"></ion-spinner>
+                            <ion-icon slot="start" name="cloud-upload-outline" x-show="!runningBackup"></ion-icon>
+                            {% trans "Backup Now" %}
+                        </ion-button>
+                    </div>
+                </form>
+            </ion-card-content>
+        </ion-card>
     </div>
 </div>
 
@@ -299,8 +490,19 @@
             currency: '{{ hub_config.currency }}',
             isDark: {{ hub_config.dark_mode|yesno:"true,false" }},
             saving: false,
+            savingBackup: false,
+            runningBackup: false,
             avatarFile: null,
             logoFile: null,
+
+            // Backup configuration
+            backup: {
+                enabled: {{ backup_config.enabled|yesno:"true,false" }},
+                frequency: '{{ backup_config.frequency }}',
+                time_hour: '{{ backup_config.time_hour }}',
+                retention_days: {{ backup_config.retention_days }},
+                max_backups: {{ backup_config.max_backups }},
+            },
 
             // Store configuration
             store: {
@@ -472,6 +674,63 @@
                     }
                 } catch (error) {
                     await this.showToast('{% trans "Error updating theme" %}', 'danger');
+                }
+            },
+
+            // Backup settings
+            async saveBackupSettings() {
+                this.savingBackup = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'update_backup');
+                    formData.append('backup_enabled', this.backup.enabled);
+                    formData.append('backup_frequency', this.backup.frequency);
+                    formData.append('backup_hour', this.backup.time_hour);
+                    formData.append('retention_days', this.backup.retention_days);
+                    formData.append('max_backups', this.backup.max_backups);
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        await this.showToast('{% trans "Backup settings saved" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error saving backup settings" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Error saving backup settings" %}', 'danger');
+                } finally {
+                    this.savingBackup = false;
+                }
+            },
+
+            async runBackupNow() {
+                this.runningBackup = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'run_backup');
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        const sizeKB = Math.round(data.size / 1024);
+                        await this.showToast(`{% trans "Backup completed" %} (${sizeKB} KB)`, 'success');
+                        // Reload page to show updated last backup info
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        await this.showToast(data.error || '{% trans "Backup failed" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Backup failed" %}', 'danger');
+                } finally {
+                    this.runningBackup = false;
                 }
             },
 
