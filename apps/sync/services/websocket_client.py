@@ -3,8 +3,8 @@ WebSocket Client for Hub-to-Cloud real-time communication.
 
 Maintains persistent WebSocket connection to Cloud for:
 - Heartbeat (online/offline status)
-- Receiving commands from Cloud (install plugin, sync config)
-- Sending events to Cloud (plugin installed, user sync)
+- Receiving commands from Cloud (install module, sync config)
+- Sending events to Cloud (module installed, user sync)
 """
 import json
 import logging
@@ -29,7 +29,7 @@ class WebSocketClient:
 
     Usage:
         client = WebSocketClient()
-        client.register_handler('install_plugin', handle_install)
+        client.register_handler('install_module', handle_install)
         client.start()
     """
 
@@ -78,9 +78,9 @@ class WebSocketClient:
 
     def _register_default_handlers(self):
         """Register default command handlers."""
-        self.register_handler('install_plugin', self._handle_install_plugin)
-        self.register_handler('update_plugin', self._handle_update_plugin)
-        self.register_handler('remove_plugin', self._handle_remove_plugin)
+        self.register_handler('install_module', self._handle_install_module)
+        self.register_handler('update_module', self._handle_update_module)
+        self.register_handler('remove_module', self._handle_remove_module)
         self.register_handler('sync_config', self._handle_sync_config)
         self.register_handler('user_revoked', self._handle_user_revoked)
         self.register_handler('backup_request', self._handle_backup_request)
@@ -262,25 +262,25 @@ class WebSocketClient:
     # Default Command Handlers
     # ==========================================================================
 
-    def _handle_install_plugin(self, data: Dict):
-        """Handle install_plugin command from Cloud."""
-        plugin_id = data.get('plugin_id')
+    def _handle_install_module(self, data: Dict):
+        """Handle install_module command from Cloud."""
+        module_id = data.get('module_id')
         version = data.get('version')
-        logger.info(f"[WS] Command: Install plugin {plugin_id} v{version}")
-        # TODO: Implement plugin installation
+        logger.info(f"[WS] Command: Install module {module_id} v{version}")
+        # TODO: Implement module installation
 
-    def _handle_update_plugin(self, data: Dict):
-        """Handle update_plugin command from Cloud."""
-        plugin_id = data.get('plugin_id')
+    def _handle_update_module(self, data: Dict):
+        """Handle update_module command from Cloud."""
+        module_id = data.get('module_id')
         version = data.get('version')
-        logger.info(f"[WS] Command: Update plugin {plugin_id} to v{version}")
-        # TODO: Implement plugin update
+        logger.info(f"[WS] Command: Update module {module_id} to v{version}")
+        # TODO: Implement module update
 
-    def _handle_remove_plugin(self, data: Dict):
-        """Handle remove_plugin command from Cloud."""
-        plugin_id = data.get('plugin_id')
-        logger.info(f"[WS] Command: Remove plugin {plugin_id}")
-        # TODO: Implement plugin removal
+    def _handle_remove_module(self, data: Dict):
+        """Handle remove_module command from Cloud."""
+        module_id = data.get('module_id')
+        logger.info(f"[WS] Command: Remove module {module_id}")
+        # TODO: Implement module removal
 
     def _handle_sync_config(self, data: Dict):
         """Handle sync_config command from Cloud."""

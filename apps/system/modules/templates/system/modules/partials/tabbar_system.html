@@ -2,24 +2,24 @@
 
 <ion-footer>
     <ion-tab-bar>
-        <!-- Plugins -->
+        <!-- Modules -->
         <ion-tab-button
-            hx-get="{% url 'system:plugins' %}"
+            hx-get="{% url 'system:modules' %}"
             hx-target="#dashboard-content"
             hx-push-url="true"
-            :class="currentSection === 'plugins' ? 'tab-selected' : ''">
+            :class="currentSection === 'modules' ? 'tab-selected' : ''">
             <ion-icon name="extension-puzzle-outline"></ion-icon>
-            <ion-label>{% trans "Plugins" %}</ion-label>
+            <ion-label>{% trans "Modules" %}</ion-label>
         </ion-tab-button>
 
-        <!-- Plugin Store -->
+        <!-- Module Store -->
         <ion-tab-button
             hx-get="{% url 'system:marketplace' %}"
             hx-target="#dashboard-content"
             hx-push-url="true"
             :class="currentSection === 'marketplace' ? 'tab-selected' : ''">
             <ion-icon name="storefront-outline"></ion-icon>
-            <ion-label>{% trans "Plugin Store" %}</ion-label>
+            <ion-label>{% trans "Module Store" %}</ion-label>
         </ion-tab-button>
     </ion-tab-bar>
 </ion-footer>

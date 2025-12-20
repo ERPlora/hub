@@ -1,8 +1,8 @@
 """
-Plugin Subscription Status Checker
+Module Subscription Status Checker
 
-Verifica el estado de suscripciones de plugins con Cloud API.
-Los plugins de suscripción deben tener conexión a internet activa.
+Verifica el estado de suscripciones de módulos con Cloud API.
+Los módulos de suscripción deben tener conexión a internet activa.
 """
 import requests
 import logging
@@ -16,24 +16,24 @@ logger = logging.getLogger(__name__)
 
 class SubscriptionChecker:
     """
-    Verifica estado de suscripciones de plugins en tiempo real con Cloud.
+    Verifica estado de suscripciones de módulos en tiempo real con Cloud.
     Cachea resultados para evitar requests excesivos.
     """
 
     # Cache de 5 minutos para estado de suscripciones
     CACHE_TIMEOUT = 300  # 5 minutes
-    CACHE_KEY_PREFIX = 'plugin_subscription_status_'
+    CACHE_KEY_PREFIX = 'module_subscription_status_'
 
     def __init__(self):
         from apps.configuration.models import HubConfig
         self.hub_config = HubConfig.get_config()
 
-    def check_subscription_status(self, plugin_id: int) -> Dict:
+    def check_subscription_status(self, module_id: int) -> Dict:
         """
-        Verificar estado de suscripción de un plugin.
+        Verificar estado de suscripción de un módulo.
 
         Args:
-            plugin_id: ID del plugin en Cloud
+            module_id: ID del módulo en Cloud
 
         Returns:
             {
@@ -44,11 +44,11 @@ class SubscriptionChecker:
             }
         """
         # Verificar cache primero
-        cache_key = f"{self.CACHE_KEY_PREFIX}{plugin_id}"
+        cache_key = f"{self.CACHE_KEY_PREFIX}{module_id}"
         cached_status = cache.get(cache_key)
 
         if cached_status:
-            logger.debug(f"[SUBSCRIPTION] Using cached status for plugin {plugin_id}")
+            logger.debug(f"[SUBSCRIPTION] Using cached status for module {module_id}")
             return cached_status
 
         # Si no hay conexión a Cloud configurada
@@ -60,7 +60,7 @@ class SubscriptionChecker:
             }
 
         # Consultar Cloud API
-        api_url = f"{settings.CLOUD_API_URL}/api/plugins/{plugin_id}/subscription-status/"
+        api_url = f"{settings.CLOUD_API_URL}/api/modules/{module_id}/subscription-status/"
         headers = {'X-Hub-Token': self.hub_config.cloud_api_token}
 
         try:
@@ -72,14 +72,14 @@ class SubscriptionChecker:
             cache.set(cache_key, result, self.CACHE_TIMEOUT)
 
             logger.info(
-                f"[SUBSCRIPTION] Plugin {plugin_id} subscription status: "
+                f"[SUBSCRIPTION] Module {module_id} subscription status: "
                 f"{result.get('subscription_status')}"
             )
 
             return result
 
         except requests.exceptions.ConnectionError:
-            logger.warning(f"[SUBSCRIPTION] No internet connection to verify plugin {plugin_id}")
+            logger.warning(f"[SUBSCRIPTION] No internet connection to verify module {module_id}")
             return {
                 'has_active_subscription': False,
                 'subscription_status': 'offline',
@@ -87,7 +87,7 @@ class SubscriptionChecker:
             }
 
         except requests.exceptions.Timeout:
-            logger.warning(f"[SUBSCRIPTION] Timeout verifying plugin {plugin_id}")
+            logger.warning(f"[SUBSCRIPTION] Timeout verifying module {module_id}")
             return {
                 'has_active_subscription': False,
                 'subscription_status': 'timeout',
@@ -103,11 +103,11 @@ class SubscriptionChecker:
                     'error': 'Invalid Hub token'
                 }
             elif e.response.status_code == 404:
-                logger.warning(f"[SUBSCRIPTION] Plugin {plugin_id} not found")
+                logger.warning(f"[SUBSCRIPTION] Module {module_id} not found")
                 return {
                     'has_active_subscription': False,
                     'subscription_status': 'not_found',
-                    'error': 'Plugin not found'
+                    'error': 'Module not found'
                 }
             else:
                 logger.error(f"[SUBSCRIPTION] HTTP error: {e}")
@@ -125,82 +125,82 @@ class SubscriptionChecker:
                 'error': str(e)
             }
 
-    def verify_plugin_access(self, plugin_slug: str, plugin_type: str = None) -> bool:
+    def verify_module_access(self, module_slug: str, module_type: str = None) -> bool:
         """
-        Verificar si un plugin puede ejecutarse basado en su tipo y estado de suscripción.
+        Verificar si un módulo puede ejecutarse basado en su tipo y estado de suscripción.
 
         Args:
-            plugin_slug: Slug del plugin (e.g., 'analytics')
-            plugin_type: Tipo de plugin ('free', 'paid', 'subscription')
+            module_slug: Slug del módulo (e.g., 'analytics')
+            module_type: Tipo de módulo ('free', 'paid', 'subscription')
 
         Returns:
-            True si el plugin puede ejecutarse, False si no
+            True si el módulo puede ejecutarse, False si no
         """
         from pathlib import Path
         import json
 
         try:
-            # Verificar plugin desde filesystem
-            plugins_dir = Path(settings.PLUGINS_DIR)
-            plugin_dir = plugins_dir / plugin_slug
+            # Verificar módulo desde filesystem
+            modules_dir = Path(settings.MODULES_DIR)
+            module_dir = modules_dir / module_slug
 
-            # Check if plugin exists and is active (not prefixed with _)
-            if not plugin_dir.exists():
+            # Check if module exists and is active (not prefixed with _)
+            if not module_dir.exists():
                 # Try with _ prefix (inactive)
-                plugin_dir = plugins_dir / f"_{plugin_slug}"
-                if not plugin_dir.exists():
-                    logger.error(f"[SUBSCRIPTION] Plugin {plugin_slug} not found in filesystem")
+                module_dir = modules_dir / f"_{module_slug}"
+                if not module_dir.exists():
+                    logger.error(f"[SUBSCRIPTION] Module {module_slug} not found in filesystem")
                     return False
                 else:
-                    logger.warning(f"[SUBSCRIPTION] Plugin {plugin_slug} is not active (disabled)")
+                    logger.warning(f"[SUBSCRIPTION] Module {module_slug} is not active (disabled)")
                     return False
 
-            # Plugin exists and is active (no _ prefix)
-            # Read plugin.json for metadata
-            plugin_json_path = plugin_dir / 'plugin.json'
-            if plugin_json_path.exists():
+            # Module exists and is active (no _ prefix)
+            # Read module.json for metadata
+            module_json_path = module_dir / 'module.json'
+            if module_json_path.exists():
                 try:
-                    with open(plugin_json_path, 'r', encoding='utf-8') as f:
+                    with open(module_json_path, 'r', encoding='utf-8') as f:
                         metadata = json.load(f)
-                        # Get plugin type from metadata if not provided
-                        if not plugin_type:
-                            plugin_type = metadata.get('type', 'free')
+                        # Get module type from metadata if not provided
+                        if not module_type:
+                            module_type = metadata.get('type', 'free')
                 except Exception as e:
-                    logger.warning(f"[SUBSCRIPTION] Error reading plugin.json for {plugin_slug}: {e}")
-                    plugin_type = plugin_type or 'free'
+                    logger.warning(f"[SUBSCRIPTION] Error reading module.json for {module_slug}: {e}")
+                    module_type = module_type or 'free'
 
             # Si es gratuito, siempre permitir
-            if plugin_type == 'free' or not plugin_type:
+            if module_type == 'free' or not module_type:
                 return True
 
             # Si es de pago único, permitir (ya fue verificado en la instalación)
-            if plugin_type == 'paid':
+            if module_type == 'paid':
                 return True
 
             # Si es de suscripción, verificar estado online
-            if plugin_type == 'subscription':
-                # Get cloud_plugin_id from metadata
-                if plugin_json_path.exists():
+            if module_type == 'subscription':
+                # Get cloud_module_id from metadata
+                if module_json_path.exists():
                     try:
-                        with open(plugin_json_path, 'r', encoding='utf-8') as f:
+                        with open(module_json_path, 'r', encoding='utf-8') as f:
                             metadata = json.load(f)
-                            cloud_plugin_id = metadata.get('cloud_plugin_id')
+                            cloud_module_id = metadata.get('cloud_module_id')
 
-                            if not cloud_plugin_id:
-                                logger.error(f"[SUBSCRIPTION] Plugin {plugin_slug} has no cloud_plugin_id")
+                            if not cloud_module_id:
+                                logger.error(f"[SUBSCRIPTION] Module {module_slug} has no cloud_module_id")
                                 return False
                     except Exception as e:
-                        logger.error(f"[SUBSCRIPTION] Error reading cloud_plugin_id: {e}")
+                        logger.error(f"[SUBSCRIPTION] Error reading cloud_module_id: {e}")
                         return False
                 else:
-                    logger.error(f"[SUBSCRIPTION] Plugin {plugin_slug} has no plugin.json")
+                    logger.error(f"[SUBSCRIPTION] Module {module_slug} has no module.json")
                     return False
 
-                status = self.check_subscription_status(cloud_plugin_id)
+                status = self.check_subscription_status(cloud_module_id)
 
                 if not status.get('has_active_subscription'):
                     logger.warning(
-                        f"[SUBSCRIPTION] Plugin {plugin_slug} subscription not active: "
+                        f"[SUBSCRIPTION] Module {module_slug} subscription not active: "
                         f"{status.get('subscription_status')}"
                     )
                     return False
@@ -211,24 +211,24 @@ class SubscriptionChecker:
             return False
 
         except Exception as e:
-            logger.error(f"[SUBSCRIPTION] Error verifying plugin access: {e}")
+            logger.error(f"[SUBSCRIPTION] Error verifying module access: {e}")
             return False
 
-    def clear_cache(self, plugin_id: Optional[int] = None):
+    def clear_cache(self, module_id: Optional[int] = None):
         """
         Limpiar cache de estado de suscripciones.
 
         Args:
-            plugin_id: Si se especifica, solo limpia ese plugin. Si no, limpia todo.
+            module_id: Si se especifica, solo limpia ese módulo. Si no, limpia todo.
         """
-        if plugin_id:
-            cache_key = f"{self.CACHE_KEY_PREFIX}{plugin_id}"
+        if module_id:
+            cache_key = f"{self.CACHE_KEY_PREFIX}{module_id}"
             cache.delete(cache_key)
-            logger.info(f"[SUBSCRIPTION] Cleared cache for plugin {plugin_id}")
+            logger.info(f"[SUBSCRIPTION] Cleared cache for module {module_id}")
         else:
             # Limpiar todos los caches de suscripciones
             # (requeriría iterar sobre todas las claves, por ahora solo loggear)
-            logger.info("[SUBSCRIPTION] Cache clear requested (all plugins)")
+            logger.info("[SUBSCRIPTION] Cache clear requested (all modules)")
 
 
 # Singleton instance

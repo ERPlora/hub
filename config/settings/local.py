@@ -3,7 +3,7 @@ ERPlora Hub - Local Development Settings
 
 Configuración para desarrollo local.
 Usa DataPaths para rutas consistentes con producción.
-Plugins desde ./plugins/ del proyecto (para desarrollo).
+Modules desde ./modules/ del proyecto (para desarrollo).
 """
 
 from .base import *
@@ -47,32 +47,32 @@ LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
 BACKUPS_DIR = _paths.backups_dir
 REPORTS_DIR = _paths.reports_dir
 
-# Plugin data
-PLUGIN_DATA_ROOT = DATA_DIR / 'plugin_data'
-PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
-PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
-PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+# Module data
+MODULE_DATA_ROOT = DATA_DIR / 'module_data'
+MODULE_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+MODULE_MEDIA_ROOT = MEDIA_ROOT / 'modules'
+MODULE_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
-# PLUGINS - Same as production (from DataPaths)
+# MODULES - Same as production (from DataPaths)
 # =============================================================================
-# Uses ~/Library/.../ERPloraHub/plugins/ (same as desktop builds)
-# A symlink at ./plugins -> real location makes development easier
+# Uses ~/Library/.../ERPloraHub/modules/ (same as desktop builds)
+# A symlink at ./modules -> real location makes development easier
 
-PLUGINS_DIR = _paths.plugins_dir
-PLUGINS_ROOT = PLUGINS_DIR
-PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
+MODULES_DIR = _paths.modules_dir
+MODULES_ROOT = MODULES_DIR
+MODULE_DISCOVERY_PATHS = [MODULES_DIR]
 
-# Add plugins to sys.path
-if PLUGINS_DIR.exists() and str(PLUGINS_DIR) not in sys.path:
-    sys.path.insert(0, str(PLUGINS_DIR))
+# Add modules to sys.path
+if MODULES_DIR.exists() and str(MODULES_DIR) not in sys.path:
+    sys.path.insert(0, str(MODULES_DIR))
 
 # =============================================================================
 # SYMLINKS - Create convenience symlinks in ERPlora root (parent of hub/)
 # =============================================================================
 # Creates symlinks for easy access during development:
 #   ERPlora/hub_data -> ~/Library/Application Support/ERPloraHub/
-#   ERPlora/hub_plugins -> ~/Library/Application Support/ERPloraHub/plugins/
+#   ERPlora/hub_modules -> ~/Library/Application Support/ERPloraHub/modules/
 
 def _create_dev_symlinks():
     """Create symlinks in ERPlora root for development convenience."""
@@ -90,12 +90,12 @@ def _create_dev_symlinks():
         except (OSError, FileExistsError):
             pass  # Symlink already exists or can't create
 
-    # Symlink: ERPlora/hub_plugins -> PLUGINS_DIR
-    plugins_link = erplora_root / 'hub_plugins'
-    if not plugins_link.exists():
+    # Symlink: ERPlora/hub_modules -> MODULES_DIR
+    modules_link = erplora_root / 'hub_modules'
+    if not modules_link.exists():
         try:
-            os.symlink(PLUGINS_DIR, plugins_link)
-            print(f"[LOCAL] Created symlink: hub_plugins -> {PLUGINS_DIR}")
+            os.symlink(MODULES_DIR, modules_link)
+            print(f"[LOCAL] Created symlink: hub_modules -> {MODULES_DIR}")
         except (OSError, FileExistsError):
             pass
 
@@ -109,23 +109,23 @@ ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '*']
 CSRF_COOKIE_SECURE = False
 
 # =============================================================================
-# PLUGIN SECURITY - Relaxed for development
+# MODULE SECURITY - Relaxed for development
 # =============================================================================
 
-REQUIRE_PLUGIN_SIGNATURE = False
-PLUGIN_AUTO_RELOAD = True
-PLUGIN_STRICT_VALIDATION = False
+REQUIRE_MODULE_SIGNATURE = False
+MODULE_AUTO_RELOAD = True
+MODULE_STRICT_VALIDATION = False
 
 # =============================================================================
-# RE-LOAD PLUGINS (override base.py loading)
+# RE-LOAD MODULES (override base.py loading)
 # =============================================================================
 
-# Clear plugins loaded by base.py and reload from local plugins dir
-def reload_local_plugins():
-    """Reload plugins from local ./plugins/ directory"""
+# Clear modules loaded by base.py and reload from local modules dir
+def reload_local_modules():
+    """Reload modules from local ./modules/ directory"""
     global INSTALLED_APPS
 
-    # Remove any plugins that were loaded from wrong directory
+    # Remove any modules that were loaded from wrong directory
     INSTALLED_APPS = [app for app in INSTALLED_APPS if not (
         isinstance(app, str) and
         not app.startswith('django') and
@@ -133,36 +133,36 @@ def reload_local_plugins():
         app not in ['djmoney', 'django_htmx']
     )]
 
-    if not PLUGINS_DIR.exists():
+    if not MODULES_DIR.exists():
         return
 
-    for plugin_dir in PLUGINS_DIR.iterdir():
-        if not plugin_dir.is_dir():
+    for module_dir in MODULES_DIR.iterdir():
+        if not module_dir.is_dir():
             continue
-        # Skip disabled plugins (start with _ or .)
-        if plugin_dir.name.startswith('.') or plugin_dir.name.startswith('_'):
+        # Skip disabled modules (start with _ or .)
+        if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
             continue
 
-        if plugin_dir.name not in INSTALLED_APPS:
-            INSTALLED_APPS.append(plugin_dir.name)
-            print(f"[LOCAL] Loaded plugin: {plugin_dir.name}")
+        if module_dir.name not in INSTALLED_APPS:
+            INSTALLED_APPS.append(module_dir.name)
+            print(f"[LOCAL] Loaded module: {module_dir.name}")
 
 
-reload_local_plugins()
+reload_local_modules()
 
-# Add plugin templates (keeping global templates directory)
-if PLUGINS_DIR.exists():
+# Add module templates (keeping global templates directory)
+if MODULES_DIR.exists():
     # Start with existing global templates directory
     template_dirs = [str(d) for d in TEMPLATES[0]['DIRS']]
 
-    for plugin_dir in PLUGINS_DIR.iterdir():
-        if plugin_dir.is_dir() and (plugin_dir / 'templates').exists():
-            template_dirs.append(str(plugin_dir / 'templates'))
+    for module_dir in MODULES_DIR.iterdir():
+        if module_dir.is_dir() and (module_dir / 'templates').exists():
+            template_dirs.append(str(module_dir / 'templates'))
 
     TEMPLATES[0]['DIRS'] = template_dirs
 
 print(f"[LOCAL] Development mode")
-print(f"[LOCAL] Plugins: {PLUGINS_DIR}")
+print(f"[LOCAL] Modules: {MODULES_DIR}")
 print(f"[LOCAL] Data: {DATA_DIR}")
 
 # =============================================================================

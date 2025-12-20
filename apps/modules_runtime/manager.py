@@ -1,6 +1,6 @@
 """
-Plugin Runtime Manager for CPOS Hub
-Handles plugin installation, dependency management, and lifecycle in PyInstaller environment
+Module Runtime Manager for CPOS Hub
+Handles module installation, dependency management, and lifecycle in PyInstaller environment
 """
 import os
 import sys
@@ -15,39 +15,39 @@ from django.conf import settings
 from django.core.management import call_command
 
 
-class PluginRuntimeManager:
+class ModuleRuntimeManager:
     """
-    Manages plugin installation and dependencies in the Hub runtime environment.
+    Manages module installation and dependencies in the Hub runtime environment.
     Designed to work in PyInstaller bundled apps across Windows, macOS, and Linux.
     """
 
     def __init__(self):
-        self.plugins_dir = Path(settings.BASE_DIR) / 'plugins'
-        self.plugins_dir.mkdir(exist_ok=True)
+        self.modules_dir = Path(settings.BASE_DIR) / 'modules'
+        self.modules_dir.mkdir(exist_ok=True)
 
-        # Create cross-platform temp directory for plugin uploads
+        # Create cross-platform temp directory for module uploads
         # Uses system temp dir (works on Windows, macOS, Linux)
-        self.temp_dir = Path(tempfile.gettempdir()) / 'cpos_hub_plugins'
+        self.temp_dir = Path(tempfile.gettempdir()) / 'cpos_hub_modules'
         self.temp_dir.mkdir(exist_ok=True)
 
-    def install_plugin_from_zip(self, zip_path: str) -> Dict:
+    def install_module_from_zip(self, zip_path: str) -> Dict:
         """
-        Install a plugin from a ZIP file.
+        Install a module from a ZIP file.
 
         Steps:
-        1. Extract ZIP to plugins directory
-        2. Read plugin.json metadata
+        1. Extract ZIP to modules directory
+        2. Read module.json metadata
         3. Install Python dependencies from requirements.txt
         4. Run migrations
         5. Compile translations
-        6. Register plugin in database
+        6. Register module in database
 
         Returns:
             Dict with installation result and messages
         """
         result = {
             'success': False,
-            'plugin_id': None,
+            'module_id': None,
             'messages': [],
             'errors': []
         }
@@ -55,17 +55,17 @@ class PluginRuntimeManager:
         zip_path_obj = None
         try:
             # Step 1: Extract ZIP
-            result['messages'].append('Extracting plugin ZIP...')
-            plugin_data = self._extract_plugin(zip_path)
+            result['messages'].append('Extracting module ZIP...')
+            module_data = self._extract_module(zip_path)
 
-            if not plugin_data:
-                result['errors'].append('Failed to extract plugin or read plugin.json')
+            if not module_data:
+                result['errors'].append('Failed to extract module or read module.json')
                 return result
 
-            plugin_id = plugin_data.get('plugin_id')
-            plugin_path = self.plugins_dir / plugin_id
-            result['plugin_id'] = plugin_id
-            result['messages'].append(f'Plugin extracted: {plugin_id}')
+            module_id = module_data.get('module_id')
+            module_path = self.modules_dir / module_id
+            result['module_id'] = module_id
+            result['messages'].append(f'Module extracted: {module_id}')
 
             # Delete ZIP file immediately after extraction
             zip_path_obj = Path(zip_path)
@@ -75,20 +75,20 @@ class PluginRuntimeManager:
 
             # Step 1.5: Validate database conflicts
             result['messages'].append('Validating database conflicts...')
-            conflict_check = self._validate_database_conflicts(plugin_id, plugin_path)
+            conflict_check = self._validate_database_conflicts(module_id, module_path)
             result['messages'].extend(conflict_check.get('messages', []))
 
             if not conflict_check['valid']:
                 result['errors'].extend(conflict_check.get('errors', []))
-                result['errors'].append('Plugin validation failed - database conflicts detected')
+                result['errors'].append('Module validation failed - database conflicts detected')
                 # Clean up extracted files
-                if plugin_path.exists():
-                    shutil.rmtree(plugin_path)
+                if module_path.exists():
+                    shutil.rmtree(module_path)
                 return result
 
             # Step 2: Install Python dependencies
             result['messages'].append('Installing Python dependencies...')
-            deps_result = self._install_python_dependencies(plugin_path)
+            deps_result = self._install_python_dependencies(module_path)
             result['messages'].extend(deps_result.get('messages', []))
 
             if not deps_result['success']:
@@ -98,7 +98,7 @@ class PluginRuntimeManager:
 
             # Step 3: Run migrations
             result['messages'].append('Running database migrations...')
-            migration_result = self._run_migrations(plugin_id)
+            migration_result = self._run_migrations(module_id)
             result['messages'].extend(migration_result.get('messages', []))
 
             if not migration_result['success']:
@@ -107,75 +107,75 @@ class PluginRuntimeManager:
 
             # Step 4: Compile translations
             result['messages'].append('Compiling translations...')
-            translation_result = self._compile_translations(plugin_path, plugin_id)
+            translation_result = self._compile_translations(module_path, module_id)
             result['messages'].extend(translation_result.get('messages', []))
 
-            # Step 5: Register plugin in database
-            result['messages'].append('Registering plugin in database...')
-            from apps.plugins_runtime.loader import plugin_loader
-            plugin = plugin_loader.install_plugin_from_metadata(plugin_data)
+            # Step 5: Register module in database
+            result['messages'].append('Registering module in database...')
+            from apps.modules_runtime.loader import module_loader
+            module = module_loader.install_module_from_metadata(module_data)
 
-            if plugin:
+            if module:
                 result['success'] = True
-                result['messages'].append(f'Plugin {plugin_id} installed successfully!')
+                result['messages'].append(f'Module {module_id} installed successfully!')
             else:
-                result['errors'].append('Failed to register plugin in database')
+                result['errors'].append('Failed to register module in database')
 
         except Exception as e:
             result['errors'].append(f'Installation error: {str(e)}')
 
         return result
 
-    def _extract_plugin(self, zip_path: str) -> Optional[Dict]:
+    def _extract_module(self, zip_path: str) -> Optional[Dict]:
         """
-        Extract plugin ZIP file to plugins directory.
+        Extract module ZIP file to modules directory.
 
         Expected ZIP structure:
-        cpos-plugin-products.zip
+        cpos-module-products.zip
         └── products/
-            ├── plugin.json
+            ├── module.json
             ├── models.py
             ├── views.py
             └── ...
 
         Returns:
-            plugin.json data or None if failed
+            module.json data or None if failed
         """
         try:
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 # Get root folder name from ZIP
                 zip_contents = zip_ref.namelist()
 
-                # Find plugin.json to determine plugin_id
-                plugin_json_path = None
+                # Find module.json to determine module_id
+                module_json_path = None
                 for file in zip_contents:
-                    if file.endswith('plugin.json') and '/' in file:
-                        plugin_json_path = file
+                    if file.endswith('module.json') and '/' in file:
+                        module_json_path = file
                         break
 
-                if not plugin_json_path:
+                if not module_json_path:
                     return None
 
-                # Extract plugin.json to read metadata
-                plugin_json_content = zip_ref.read(plugin_json_path)
-                plugin_data = json.loads(plugin_json_content)
-                plugin_id = plugin_data.get('plugin_id')
+                # Extract module.json to read metadata
+                module_json_content = zip_ref.read(module_json_path)
+                module_data = json.loads(module_json_content)
+                module_id = module_data.get('module_id')
 
-                if not plugin_id:
+                if not module_id:
                     return None
 
-                # Extract to plugins/{plugin_id}/
-                plugin_dir = self.plugins_dir / plugin_id
+                # Extract to modules/{module_id}/
+                module_dir = self.modules_dir / module_id
 
                 # Remove existing if present
-                if plugin_dir.exists():
-                    shutil.rmtree(plugin_dir)
+                if module_dir.exists():
+                    shutil.rmtree(module_dir)
 
                 # Extract all files
                 for file in zip_contents:
                     # Skip the root folder prefix (e.g., "products/" -> "")
-                    if file.startswith(plugin_id + '/'):
-                        target_path = self.plugins_dir / file
+                    if file.startswith(module_id + '/'):
+                        target_path = self.modules_dir / file
                         target_path.parent.mkdir(parents=True, exist_ok=True)
 
                         if not file.endswith('/'):
@@ -183,15 +183,15 @@ class PluginRuntimeManager:
                                 target.write(source.read())
 
                 # Add install_path to metadata
-                plugin_data['install_path'] = str(plugin_dir)
+                module_data['install_path'] = str(module_dir)
 
-                return plugin_data
+                return module_data
 
         except Exception as e:
-            print(f"Error extracting plugin: {e}")
+            print(f"Error extracting module: {e}")
             return None
 
-    def _install_python_dependencies(self, plugin_path: Path) -> Dict:
+    def _install_python_dependencies(self, module_path: Path) -> Dict:
         """
         Install Python dependencies from requirements.txt using pip.
 
@@ -203,7 +203,7 @@ class PluginRuntimeManager:
             'errors': []
         }
 
-        requirements_file = plugin_path / 'requirements.txt'
+        requirements_file = module_path / 'requirements.txt'
 
         if not requirements_file.exists():
             result['success'] = True
@@ -272,9 +272,9 @@ class PluginRuntimeManager:
             # Running in normal Python environment
             return f'{sys.executable} -m pip'
 
-    def _run_migrations(self, plugin_id: str) -> Dict:
+    def _run_migrations(self, module_id: str) -> Dict:
         """
-        Run Django migrations for the plugin.
+        Run Django migrations for the module.
         """
         result = {
             'success': False,
@@ -283,24 +283,24 @@ class PluginRuntimeManager:
         }
 
         try:
-            # Run makemigrations first (in case plugin has new migrations)
-            call_command('makemigrations', plugin_id, '--noinput')
-            result['messages'].append(f'Migrations created for {plugin_id}')
+            # Run makemigrations first (in case module has new migrations)
+            call_command('makemigrations', module_id, '--noinput')
+            result['messages'].append(f'Migrations created for {module_id}')
 
             # Run migrate
-            call_command('migrate', plugin_id, '--noinput')
-            result['messages'].append(f'Migrations applied for {plugin_id}')
+            call_command('migrate', module_id, '--noinput')
+            result['messages'].append(f'Migrations applied for {module_id}')
             result['success'] = True
 
         except Exception as e:
-            # Migrations might fail if plugin has no models or migrations
+            # Migrations might fail if module has no models or migrations
             # This is not critical, so we log but don't fail
             result['messages'].append(f'Migration note: {str(e)}')
             result['success'] = True  # Don't fail installation
 
         return result
 
-    def _compile_translations(self, plugin_path: Path, plugin_id: str) -> Dict:
+    def _compile_translations(self, module_path: Path, module_id: str) -> Dict:
         """
         Compile .po translation files to .mo files.
         """
@@ -310,7 +310,7 @@ class PluginRuntimeManager:
             'errors': []
         }
 
-        locale_dir = plugin_path / plugin_id / 'locale'
+        locale_dir = module_path / module_id / 'locale'
 
         if not locale_dir.exists():
             result['success'] = True
@@ -330,9 +330,9 @@ class PluginRuntimeManager:
 
         return result
 
-    def uninstall_plugin(self, plugin_id: str) -> Dict:
+    def uninstall_module(self, module_id: str) -> Dict:
         """
-        Uninstall a plugin (remove files and database entry).
+        Uninstall a module (remove files and database entry).
         """
         result = {
             'success': False,
@@ -341,35 +341,35 @@ class PluginRuntimeManager:
         }
 
         try:
-            plugin_path = self.plugins_dir / plugin_id
+            module_path = self.modules_dir / module_id
 
             # Mark as inactive in database
-            from apps.plugins_runtime.loader import plugin_loader
-            if plugin_loader.unload_plugin(plugin_id):
-                result['messages'].append(f'Plugin {plugin_id} deactivated')
+            from apps.modules_runtime.loader import module_loader
+            if module_loader.unload_module(module_id):
+                result['messages'].append(f'Module {module_id} deactivated')
 
-            # Remove plugin files
-            if plugin_path.exists():
-                shutil.rmtree(plugin_path)
-                result['messages'].append(f'Plugin files removed')
+            # Remove module files
+            if module_path.exists():
+                shutil.rmtree(module_path)
+                result['messages'].append(f'Module files removed')
 
             result['success'] = True
-            result['messages'].append(f'Plugin {plugin_id} uninstalled successfully')
+            result['messages'].append(f'Module {module_id} uninstalled successfully')
 
         except Exception as e:
             result['errors'].append(f'Uninstall error: {str(e)}')
 
         return result
 
-    def validate_plugin_dependencies(self, plugin_path: Path) -> Dict:
+    def validate_module_dependencies(self, module_path: Path) -> Dict:
         """
-        Validate that plugin dependencies are satisfied before installation.
+        Validate that module dependencies are satisfied before installation.
 
         Checks:
         - Python version requirements
         - Python package dependencies
         - System dependencies
-        - Other plugin dependencies
+        - Other module dependencies
         """
         result = {
             'valid': True,
@@ -377,23 +377,23 @@ class PluginRuntimeManager:
             'warnings': []
         }
 
-        # Read plugin.json
-        plugin_json = plugin_path / 'plugin.json'
-        if not plugin_json.exists():
+        # Read module.json
+        module_json = module_path / 'module.json'
+        if not module_json.exists():
             result['valid'] = False
-            result['errors'].append('plugin.json not found')
+            result['errors'].append('module.json not found')
             return result
 
         try:
-            with open(plugin_json, 'r') as f:
-                plugin_data = json.load(f)
+            with open(module_json, 'r') as f:
+                module_data = json.load(f)
         except Exception as e:
             result['valid'] = False
-            result['errors'].append(f'Invalid plugin.json: {str(e)}')
+            result['errors'].append(f'Invalid module.json: {str(e)}')
             return result
 
         # Check dependencies
-        dependencies = plugin_data.get('dependencies', {})
+        dependencies = module_data.get('dependencies', {})
 
         # Python packages (we'll install these, so just validate format)
         python_deps = dependencies.get('python', [])
@@ -401,24 +401,24 @@ class PluginRuntimeManager:
             if not dep or not isinstance(dep, str):
                 result['warnings'].append(f'Invalid Python dependency format: {dep}')
 
-        # Plugin dependencies
-        plugin_deps = dependencies.get('plugins', [])
-        for dep in plugin_deps:
-            # Check if required plugin is installed
-            dep_id = dep.split('>=')[0].replace('cpos-plugin-', '')
-            dep_path = self.plugins_dir / dep_id
+        # Module dependencies
+        module_deps = dependencies.get('modules', [])
+        for dep in module_deps:
+            # Check if required module is installed
+            dep_id = dep.split('>=')[0].replace('cpos-module-', '')
+            dep_path = self.modules_dir / dep_id
 
             if not dep_path.exists():
                 result['valid'] = False
-                result['errors'].append(f'Required plugin not installed: {dep_id}')
+                result['errors'].append(f'Required module not installed: {dep_id}')
 
         return result
 
-    def _validate_database_conflicts(self, plugin_id: str, plugin_path: Path) -> Dict:
+    def _validate_database_conflicts(self, module_id: str, module_path: Path) -> Dict:
         """
-        Validate that plugin models won't conflict with existing database tables.
+        Validate that module models won't conflict with existing database tables.
 
-        This prevents two plugins from creating the same table, which would cause
+        This prevents two modules from creating the same table, which would cause
         migration errors and data conflicts.
 
         Checks:
@@ -446,16 +446,16 @@ class PluginRuntimeManager:
             # Get all registered app labels
             existing_app_labels = set(app.label for app in apps.get_app_configs())
 
-            # Check if plugin_id conflicts with existing app label
-            if plugin_id in existing_app_labels:
+            # Check if module_id conflicts with existing app label
+            if module_id in existing_app_labels:
                 result['valid'] = False
                 result['errors'].append(
-                    f"Plugin ID '{plugin_id}' conflicts with existing Django app. "
-                    f"This plugin may already be installed or conflicts with a core app."
+                    f"Module ID '{module_id}' conflicts with existing Django app. "
+                    f"This module may already be installed or conflicts with a core app."
                 )
 
             # Parse models.py to detect potential table names
-            models_file = plugin_path / plugin_id / 'models.py'
+            models_file = module_path / module_id / 'models.py'
 
             if models_file.exists():
                 result['messages'].append('Analyzing models.py for table conflicts...')
@@ -484,7 +484,7 @@ class PluginRuntimeManager:
                             result['valid'] = False
                             result['errors'].append(
                                 f"Table '{table_name}' already exists in database. "
-                                f"This plugin conflicts with an existing plugin or app."
+                                f"This module conflicts with an existing module or app."
                             )
 
                 # Check default table names (app_label_modelname)
@@ -494,7 +494,7 @@ class PluginRuntimeManager:
                         continue
 
                     # Default Django table name format
-                    default_table_name = f"{plugin_id}_{model_name.lower()}"
+                    default_table_name = f"{module_id}_{model_name.lower()}"
 
                     # Only check if not explicitly defined
                     if default_table_name not in explicit_tables:
@@ -502,14 +502,14 @@ class PluginRuntimeManager:
                             result['valid'] = False
                             result['errors'].append(
                                 f"Table '{default_table_name}' (from model '{model_name}') already exists. "
-                                f"Plugin conflicts with existing data."
+                                f"Module conflicts with existing data."
                             )
 
             else:
                 result['messages'].append('No models.py found - skipping table validation')
 
             # Check migrations directory for CreateModel operations
-            migrations_dir = plugin_path / plugin_id / 'migrations'
+            migrations_dir = module_path / module_id / 'migrations'
 
             if migrations_dir.exists():
                 result['messages'].append('Checking migration files...')
@@ -535,7 +535,7 @@ class PluginRuntimeManager:
                         if table_match:
                             table_name = table_match.group(1)
                         else:
-                            table_name = f"{plugin_id}_{model_name.lower()}"
+                            table_name = f"{module_id}_{model_name.lower()}"
 
                         if table_name in existing_tables:
                             result['valid'] = False
@@ -555,7 +555,7 @@ class PluginRuntimeManager:
 
     def get_temp_file_path(self, filename: str) -> Path:
         """
-        Get a temporary file path for plugin operations.
+        Get a temporary file path for module operations.
 
         Args:
             filename: Name of the temporary file
@@ -567,4 +567,4 @@ class PluginRuntimeManager:
 
 
 # Global instance
-plugin_runtime_manager = PluginRuntimeManager()
+module_runtime_manager = ModuleRuntimeManager()

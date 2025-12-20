@@ -1,7 +1,7 @@
 """
-System Plugins Views
+System Modules Views
 
-Plugin management and marketplace - similar to WordPress plugins page.
+Module management and marketplace - similar to WordPress plugins page.
 All views support SPA navigation via HTMX.
 """
 import json
@@ -21,26 +21,26 @@ from apps.accounts.decorators import login_required
 
 
 @login_required
-@htmx_view('system/plugins/pages/installed.html', 'system/plugins/partials/installed_content.html')
-def plugins_index(request):
-    """Plugin management page - shows all installed plugins"""
-    from apps.plugins_runtime.loader import plugin_loader
+@htmx_view('system/modules/pages/installed.html', 'system/modules/partials/installed_content.html')
+def modules_index(request):
+    """Module management page - shows all installed modules"""
+    from apps.modules_runtime.loader import module_loader
 
-    plugins_dir = Path(django_settings.PLUGINS_DIR)
-    all_plugins = []
+    modules_dir = Path(django_settings.MODULES_DIR)
+    all_modules = []
 
-    if plugins_dir.exists():
-        for plugin_dir in plugins_dir.iterdir():
-            if not plugin_dir.is_dir() or plugin_dir.name.startswith('.'):
+    if modules_dir.exists():
+        for module_dir in modules_dir.iterdir():
+            if not module_dir.is_dir() or module_dir.name.startswith('.'):
                 continue
 
-            plugin_id = plugin_dir.name
-            is_active = not plugin_id.startswith('_')
-            display_id = plugin_id.lstrip('_')
+            module_id = module_dir.name
+            is_active = not module_id.startswith('_')
+            display_id = module_id.lstrip('_')
 
-            plugin_data = {
-                'plugin_id': display_id,
-                'folder_name': plugin_id,
+            module_data = {
+                'module_id': display_id,
+                'folder_name': module_id,
                 'name': display_id.title(),
                 'description': '',
                 'version': '1.0.0',
@@ -49,55 +49,55 @@ def plugins_index(request):
                 'is_active': is_active,
             }
 
-            plugin_json_path = plugin_dir / 'plugin.json'
-            if plugin_json_path.exists():
+            module_json_path = module_dir / 'module.json'
+            if module_json_path.exists():
                 try:
-                    with open(plugin_json_path, 'r', encoding='utf-8') as f:
+                    with open(module_json_path, 'r', encoding='utf-8') as f:
                         json_data = json.load(f)
-                        plugin_data['name'] = json_data.get('name', plugin_data['name'])
-                        plugin_data['description'] = json_data.get('description', '')
-                        plugin_data['version'] = json_data.get('version', '1.0.0')
-                        plugin_data['author'] = json_data.get('author', '')
+                        module_data['name'] = json_data.get('name', module_data['name'])
+                        module_data['description'] = json_data.get('description', '')
+                        module_data['version'] = json_data.get('version', '1.0.0')
+                        module_data['author'] = json_data.get('author', '')
                         menu_config = json_data.get('menu', {})
-                        plugin_data['icon'] = menu_config.get('icon', 'cube-outline')
+                        module_data['icon'] = menu_config.get('icon', 'cube-outline')
                 except Exception as e:
-                    print(f"[WARNING] Error reading plugin.json for {plugin_id}: {e}")
+                    print(f"[WARNING] Error reading module.json for {module_id}: {e}")
 
-            all_plugins.append(plugin_data)
+            all_modules.append(module_data)
 
-    all_plugins.sort(key=lambda x: (not x['is_active'], x['name']))
+    all_modules.sort(key=lambda x: (not x['is_active'], x['name']))
 
-    active_count = sum(1 for p in all_plugins if p['is_active'])
-    inactive_count = sum(1 for p in all_plugins if not p['is_active'])
+    active_count = sum(1 for p in all_modules if p['is_active'])
+    inactive_count = sum(1 for p in all_modules if not p['is_active'])
 
-    plugins_pending_restart = request.session.get('plugins_pending_restart', [])
-    requires_restart = len(plugins_pending_restart) > 0
+    modules_pending_restart = request.session.get('modules_pending_restart', [])
+    requires_restart = len(modules_pending_restart) > 0
 
     return {
-        'current_section': 'plugins',
-        'page_title': 'Plugins',
-        'plugins': all_plugins,
+        'current_section': 'modules',
+        'page_title': 'Modules',
+        'modules': all_modules,
         'active_count': active_count,
         'inactive_count': inactive_count,
         'requires_restart': requires_restart,
-        'plugins_pending_restart': plugins_pending_restart,
+        'modules_pending_restart': modules_pending_restart,
     }
 
 
 @login_required
-@htmx_view('system/plugins/pages/marketplace.html', 'system/plugins/partials/marketplace_content.html')
+@htmx_view('system/modules/pages/marketplace.html', 'system/modules/partials/marketplace_content.html')
 def marketplace(request):
-    """Marketplace view - shows plugins from ERPlora Cloud"""
+    """Marketplace view - shows modules from ERPlora Cloud"""
     from apps.configuration.models import HubConfig
 
-    plugins_dir = Path(django_settings.PLUGINS_DIR)
-    installed_plugin_ids = []
+    modules_dir = Path(django_settings.MODULES_DIR)
+    installed_module_ids = []
 
-    if plugins_dir.exists():
-        for plugin_dir in plugins_dir.iterdir():
-            if plugin_dir.is_dir() and not plugin_dir.name.startswith('.'):
-                plugin_id = plugin_dir.name.lstrip('_')
-                installed_plugin_ids.append(plugin_id)
+    if modules_dir.exists():
+        for module_dir in modules_dir.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith('.'):
+                module_id = module_dir.name.lstrip('_')
+                installed_module_ids.append(module_id)
 
     # Fetch categories for the select dropdown
     categories = []
@@ -119,17 +119,17 @@ def marketplace(request):
 
     return {
         'current_section': 'marketplace',
-        'page_title': 'Plugin Store',
-        'installed_plugin_ids': installed_plugin_ids,
+        'page_title': 'Module Store',
+        'installed_module_ids': installed_module_ids,
         'categories': categories,
     }
 
 
 @login_required
-def marketplace_plugins_list(request):
+def marketplace_modules_list(request):
     """
-    HTMX endpoint: Fetch and render plugins from Cloud API.
-    Returns HTML partial with plugin cards.
+    HTMX endpoint: Fetch and render modules from Cloud API.
+    Returns HTML partial with module cards.
     """
     from django.template.loader import render_to_string
     from django.http import HttpResponse
@@ -139,20 +139,20 @@ def marketplace_plugins_list(request):
     search_query = request.GET.get('q', '').strip()
     category_filter = request.GET.get('category', '').strip()
 
-    # Get installed plugins
-    plugins_dir = Path(django_settings.PLUGINS_DIR)
-    installed_plugin_ids = []
-    if plugins_dir.exists():
-        for plugin_dir in plugins_dir.iterdir():
-            if plugin_dir.is_dir() and not plugin_dir.name.startswith('.'):
-                installed_plugin_ids.append(plugin_dir.name.lstrip('_'))
+    # Get installed modules
+    modules_dir = Path(django_settings.MODULES_DIR)
+    installed_module_ids = []
+    if modules_dir.exists():
+        for module_dir in modules_dir.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith('.'):
+                installed_module_ids.append(module_dir.name.lstrip('_'))
 
     # Fetch from Cloud API
     hub_config = HubConfig.get_solo()
     auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
     if not auth_token:
-        html = render_to_string('system/plugins/partials/marketplace_error.html', {
+        html = render_to_string('system/modules/partials/marketplace_error.html', {
             'error': 'Hub not connected to Cloud. Please connect in Settings.'
         })
         return HttpResponse(html)
@@ -165,47 +165,47 @@ def marketplace_plugins_list(request):
 
     try:
         response = requests.get(
-            f"{cloud_api_url}/api/marketplace/plugins/",
+            f"{cloud_api_url}/api/marketplace/modules/",
             headers=headers,
             timeout=30
         )
 
         if response.status_code != 200:
-            html = render_to_string('system/plugins/partials/marketplace_error.html', {
+            html = render_to_string('system/modules/partials/marketplace_error.html', {
                 'error': f'Cloud API returned {response.status_code}'
             })
             return HttpResponse(html)
 
         data = response.json()
-        plugins = data.get('results', data) if isinstance(data, dict) else data
-        if not isinstance(plugins, list):
-            plugins = []
+        modules = data.get('results', data) if isinstance(data, dict) else data
+        if not isinstance(modules, list):
+            modules = []
 
         # Apply filters
         if search_query:
             query_lower = search_query.lower()
-            plugins = [
-                p for p in plugins
+            modules = [
+                p for p in modules
                 if query_lower in p.get('name', '').lower()
                 or query_lower in p.get('description', '').lower()
             ]
 
         if category_filter:
-            plugins = [p for p in plugins if p.get('category') == category_filter]
+            modules = [p for p in modules if p.get('category') == category_filter]
 
-        # Mark installed plugins
-        for plugin in plugins:
-            plugin['is_installed'] = plugin.get('slug', '') in installed_plugin_ids
+        # Mark installed modules
+        for module in modules:
+            module['is_installed'] = module.get('slug', '') in installed_module_ids
 
-        html = render_to_string('system/plugins/partials/marketplace_plugins_grid.html', {
-            'plugins': plugins,
+        html = render_to_string('system/modules/partials/marketplace_modules_grid.html', {
+            'modules': modules,
             'search_query': search_query,
             'category_filter': category_filter,
         })
         return HttpResponse(html)
 
     except requests.exceptions.RequestException as e:
-        html = render_to_string('system/plugins/partials/marketplace_error.html', {
+        html = render_to_string('system/modules/partials/marketplace_error.html', {
             'error': f'Failed to connect to Cloud: {str(e)}'
         })
         return HttpResponse(html)
@@ -216,44 +216,44 @@ def marketplace_plugins_list(request):
 # API endpoints (no HTMX, just JSON)
 
 @require_http_methods(["POST"])
-def plugin_activate(request, plugin_id):
-    """Activate a plugin by renaming folder"""
+def module_activate(request, module_id):
+    """Activate a module by renaming folder"""
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
-    plugins_dir = Path(django_settings.PLUGINS_DIR)
-    disabled_folder = plugins_dir / f"_{plugin_id}"
-    active_folder = plugins_dir / plugin_id
+    modules_dir = Path(django_settings.MODULES_DIR)
+    disabled_folder = modules_dir / f"_{module_id}"
+    active_folder = modules_dir / module_id
 
     if not disabled_folder.exists():
-        return JsonResponse({'success': False, 'error': 'Plugin not found'}, status=404)
+        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
 
     if active_folder.exists():
-        return JsonResponse({'success': False, 'error': 'Plugin already active'}, status=400)
+        return JsonResponse({'success': False, 'error': 'Module already active'}, status=400)
 
     try:
         disabled_folder.rename(active_folder)
 
-        from apps.plugins_runtime.loader import plugin_loader
-        plugin_loaded = plugin_loader.load_plugin(plugin_id)
+        from apps.modules_runtime.loader import module_loader
+        module_loaded = module_loader.load_module(module_id)
 
-        if not plugin_loaded:
+        if not module_loaded:
             active_folder.rename(disabled_folder)
             return JsonResponse({
                 'success': False,
-                'error': f'Failed to load plugin {plugin_id}'
+                'error': f'Failed to load module {module_id}'
             }, status=500)
 
-        if 'plugins_pending_restart' not in request.session:
-            request.session['plugins_pending_restart'] = []
+        if 'modules_pending_restart' not in request.session:
+            request.session['modules_pending_restart'] = []
 
-        if plugin_id not in request.session['plugins_pending_restart']:
-            request.session['plugins_pending_restart'].append(plugin_id)
+        if module_id not in request.session['modules_pending_restart']:
+            request.session['modules_pending_restart'].append(module_id)
             request.session.modified = True
 
         return JsonResponse({
             'success': True,
-            'message': 'Plugin activated. Restart required for URLs.',
+            'message': 'Module activated. Restart required for URLs.',
             'requires_restart': True
         })
     except Exception as e:
@@ -261,52 +261,52 @@ def plugin_activate(request, plugin_id):
 
 
 @require_http_methods(["POST"])
-def plugin_deactivate(request, plugin_id):
-    """Deactivate a plugin by renaming folder"""
+def module_deactivate(request, module_id):
+    """Deactivate a module by renaming folder"""
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
-    plugins_dir = Path(django_settings.PLUGINS_DIR)
-    active_folder = plugins_dir / plugin_id
-    disabled_folder = plugins_dir / f"_{plugin_id}"
+    modules_dir = Path(django_settings.MODULES_DIR)
+    active_folder = modules_dir / module_id
+    disabled_folder = modules_dir / f"_{module_id}"
 
     if not active_folder.exists():
-        return JsonResponse({'success': False, 'error': 'Plugin not found'}, status=404)
+        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
 
     if disabled_folder.exists():
-        return JsonResponse({'success': False, 'error': 'Plugin already disabled'}, status=400)
+        return JsonResponse({'success': False, 'error': 'Module already disabled'}, status=400)
 
     try:
         active_folder.rename(disabled_folder)
-        return JsonResponse({'success': True, 'message': 'Plugin deactivated. Restart required.'})
+        return JsonResponse({'success': True, 'message': 'Module deactivated. Restart required.'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 @require_http_methods(["POST"])
-def plugin_delete(request, plugin_id):
-    """Delete a plugin completely"""
+def module_delete(request, module_id):
+    """Delete a module completely"""
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
-    plugins_dir = Path(django_settings.PLUGINS_DIR)
-    active_folder = plugins_dir / plugin_id
-    disabled_folder = plugins_dir / f"_{plugin_id}"
+    modules_dir = Path(django_settings.MODULES_DIR)
+    active_folder = modules_dir / module_id
+    disabled_folder = modules_dir / f"_{module_id}"
 
     folder_to_delete = active_folder if active_folder.exists() else (disabled_folder if disabled_folder.exists() else None)
 
     if not folder_to_delete:
-        return JsonResponse({'success': False, 'error': 'Plugin not found'}, status=404)
+        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
 
     try:
         shutil.rmtree(folder_to_delete)
-        return JsonResponse({'success': True, 'message': 'Plugin deleted successfully.'})
+        return JsonResponse({'success': True, 'message': 'Module deleted successfully.'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 @require_http_methods(["POST"])
-def plugin_restart_server(request):
+def module_restart_server(request):
     """Restart server and run migrations"""
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
@@ -315,8 +315,8 @@ def plugin_restart_server(request):
         from django.core.management import call_command
         call_command('migrate', '--run-syncdb')
 
-        if 'plugins_pending_restart' in request.session:
-            del request.session['plugins_pending_restart']
+        if 'modules_pending_restart' in request.session:
+            del request.session['modules_pending_restart']
             request.session.modified = True
 
         wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
@@ -333,7 +333,7 @@ def plugin_restart_server(request):
 
 @require_http_methods(["GET"])
 def fetch_marketplace(request):
-    """Proxy to fetch plugins from Cloud API"""
+    """Proxy to fetch modules from Cloud API"""
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
@@ -352,13 +352,13 @@ def fetch_marketplace(request):
             }, status=401)
 
         headers['X-Hub-Token'] = auth_token
-        api_url = f"{cloud_api_url}/api/marketplace/plugins/"
+        api_url = f"{cloud_api_url}/api/marketplace/modules/"
 
         response = requests.get(api_url, headers=headers, timeout=30)
 
         if response.status_code == 200:
             data = response.json()
-            plugins = data.get('results', data) if isinstance(data, dict) else data
+            modules = data.get('results', data) if isinstance(data, dict) else data
 
             categories = []
             try:
@@ -373,7 +373,7 @@ def fetch_marketplace(request):
 
             return JsonResponse({
                 'success': True,
-                'plugins': plugins if isinstance(plugins, list) else [],
+                'modules': modules if isinstance(modules, list) else [],
                 'categories': categories
             })
         else:
@@ -392,17 +392,17 @@ def fetch_marketplace(request):
 
 
 @require_http_methods(["POST"])
-def purchase_plugin(request):
-    """Initiate plugin purchase via Cloud API"""
+def purchase_module(request):
+    """Initiate module purchase via Cloud API"""
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
     try:
         data = json.loads(request.body)
-        plugin_id = data.get('plugin_id')
+        module_id = data.get('module_id')
 
-        if not plugin_id:
-            return JsonResponse({'success': False, 'error': 'Missing plugin_id'}, status=400)
+        if not module_id:
+            return JsonResponse({'success': False, 'error': 'Missing module_id'}, status=400)
 
         from apps.configuration.models import HubConfig
         hub_config = HubConfig.get_solo()
@@ -414,8 +414,8 @@ def purchase_plugin(request):
             }, status=400)
 
         cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
-        success_url = f"{cloud_api_url}/dashboard/plugins/marketplace/payment-success/?plugin_id={plugin_id}&source=hub"
-        cancel_url = f"{cloud_api_url}/dashboard/plugins/marketplace/"
+        success_url = f"{cloud_api_url}/dashboard/modules/marketplace/payment-success/?module_id={module_id}&source=hub"
+        cancel_url = f"{cloud_api_url}/dashboard/modules/marketplace/"
 
         auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
         headers = {
@@ -424,7 +424,7 @@ def purchase_plugin(request):
         }
 
         response = requests.post(
-            f"{cloud_api_url}/api/marketplace/plugins/{plugin_id}/purchase/",
+            f"{cloud_api_url}/api/marketplace/modules/{module_id}/purchase/",
             json={'success_url': success_url, 'cancel_url': cancel_url},
             headers=headers, timeout=30
         )
@@ -432,7 +432,7 @@ def purchase_plugin(request):
         result = response.json()
 
         if response.status_code == 201 and result.get('is_free'):
-            return JsonResponse({'success': True, 'is_free': True, 'message': 'Free plugin acquired'})
+            return JsonResponse({'success': True, 'is_free': True, 'message': 'Free module acquired'})
 
         if response.status_code == 200 and result.get('checkout_url'):
             return JsonResponse({
@@ -447,7 +447,7 @@ def purchase_plugin(request):
         if response.status_code == 409:
             return JsonResponse({
                 'success': False,
-                'error': result.get('error', 'You already own this plugin'),
+                'error': result.get('error', 'You already own this module'),
                 'already_owned': True
             }, status=409)
 
@@ -466,8 +466,8 @@ def purchase_plugin(request):
 
 
 @require_http_methods(["GET"])
-def check_ownership(request, plugin_id):
-    """Check if Hub owner owns a specific plugin"""
+def check_ownership(request, module_id):
+    """Check if Hub owner owns a specific module"""
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
@@ -486,7 +486,7 @@ def check_ownership(request, plugin_id):
         headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
 
         response = requests.get(
-            f"{cloud_api_url}/api/marketplace/plugins/{plugin_id}/check_ownership/",
+            f"{cloud_api_url}/api/marketplace/modules/{module_id}/check_ownership/",
             headers=headers, timeout=10
         )
 
@@ -511,28 +511,28 @@ def check_ownership(request, plugin_id):
 
 @require_http_methods(["POST"])
 def install_from_marketplace(request):
-    """Download and install plugin from Cloud"""
+    """Download and install module from Cloud"""
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
     try:
         data = json.loads(request.body)
-        plugin_slug = data.get('plugin_slug')
+        module_slug = data.get('module_slug')
         download_url = data.get('download_url')
 
-        if not plugin_slug or not download_url:
+        if not module_slug or not download_url:
             return JsonResponse({
                 'success': False,
-                'error': 'Missing plugin_slug or download_url'
+                'error': 'Missing module_slug or download_url'
             }, status=400)
 
-        plugins_dir = Path(django_settings.PLUGINS_DIR)
-        plugin_target_dir = plugins_dir / plugin_slug
+        modules_dir = Path(django_settings.MODULES_DIR)
+        module_target_dir = modules_dir / module_slug
 
-        if plugin_target_dir.exists() or (plugins_dir / f"_{plugin_slug}").exists():
+        if module_target_dir.exists() or (modules_dir / f"_{module_slug}").exists():
             return JsonResponse({
                 'success': False,
-                'error': 'Plugin already installed'
+                'error': 'Module already installed'
             }, status=400)
 
         response = requests.get(download_url, timeout=60, stream=True)
@@ -550,27 +550,27 @@ def install_from_marketplace(request):
 
                 if len(root_folders) == 1:
                     root_folder = list(root_folders)[0]
-                    zip_ref.extractall(plugins_dir)
-                    extracted_dir = plugins_dir / root_folder
-                    if extracted_dir != plugin_target_dir:
-                        extracted_dir.rename(plugin_target_dir)
+                    zip_ref.extractall(modules_dir)
+                    extracted_dir = modules_dir / root_folder
+                    if extracted_dir != module_target_dir:
+                        extracted_dir.rename(module_target_dir)
                 else:
-                    plugin_target_dir.mkdir(parents=True, exist_ok=True)
-                    zip_ref.extractall(plugin_target_dir)
+                    module_target_dir.mkdir(parents=True, exist_ok=True)
+                    zip_ref.extractall(module_target_dir)
 
-            from apps.plugins_runtime.loader import plugin_loader
-            plugin_loader.load_plugin(plugin_slug)
+            from apps.modules_runtime.loader import module_loader
+            module_loader.load_module(module_slug)
 
-            if 'plugins_pending_restart' not in request.session:
-                request.session['plugins_pending_restart'] = []
+            if 'modules_pending_restart' not in request.session:
+                request.session['modules_pending_restart'] = []
 
-            if plugin_slug not in request.session['plugins_pending_restart']:
-                request.session['plugins_pending_restart'].append(plugin_slug)
+            if module_slug not in request.session['modules_pending_restart']:
+                request.session['modules_pending_restart'].append(module_slug)
                 request.session.modified = True
 
             return JsonResponse({
                 'success': True,
-                'message': f'Plugin {plugin_slug} installed successfully',
+                'message': f'Module {module_slug} installed successfully',
                 'requires_restart': True
             })
 
@@ -581,12 +581,12 @@ def install_from_marketplace(request):
     except requests.exceptions.RequestException as e:
         return JsonResponse({
             'success': False,
-            'error': f'Failed to download plugin: {str(e)}'
+            'error': f'Failed to download module: {str(e)}'
         }, status=500)
     except zipfile.BadZipFile:
         return JsonResponse({
             'success': False,
-            'error': 'Invalid plugin package'
+            'error': 'Invalid module package'
         }, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

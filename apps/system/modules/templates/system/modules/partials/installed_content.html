@@ -3,15 +3,15 @@
 {% if request.htmx %}
 <!-- Tab bar update via OOB swap (only on HTMX navigation) -->
 <div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-{% include "system/plugins/partials/tabbar_system.html" %}
+{% include "system/modules/partials/tabbar_system.html" %}
 </div>
 {% endif %}
 
-<div class="ion-padding" x-data="pluginsApp()">
+<div class="ion-padding" x-data="modulesApp()">
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-bold">{% trans "Plugins" %}</h1>
+            <h1 class="text-2xl font-bold">{% trans "Modules" %}</h1>
             <p class="text-medium">
                 {{ active_count }} {% trans "active" %}, {{ inactive_count }} {% trans "inactive" %}
             </p>
@@ -28,41 +28,41 @@
                 hx-target="#dashboard-content"
                 hx-push-url="true">
                 <ion-icon slot="start" name="storefront-outline"></ion-icon>
-                {% trans "Plugin Store" %}
+                {% trans "Module Store" %}
             </ion-button>
         </div>
     </div>
 
-    <!-- Plugins Grid -->
+    <!-- Modules Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {% for plugin in plugins %}
+        {% for module in modules %}
         <ion-card>
             <ion-card-header>
                 <div class="flex items-center gap-3">
-                    <ion-icon name="{{ plugin.icon }}" class="text-2xl text-primary"></ion-icon>
+                    <ion-icon name="{{ module.icon }}" class="text-2xl text-primary"></ion-icon>
                     <div class="flex-1 min-w-0">
-                        <ion-card-title class="truncate">{{ plugin.name }}</ion-card-title>
-                        <ion-card-subtitle>v{{ plugin.version }}</ion-card-subtitle>
+                        <ion-card-title class="truncate">{{ module.name }}</ion-card-title>
+                        <ion-card-subtitle>v{{ module.version }}</ion-card-subtitle>
                     </div>
-                    <ion-chip :color="'{{ plugin.is_active }}'==='True' ? 'success' : 'medium'">
-                        {% if plugin.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}
+                    <ion-chip :color="'{{ module.is_active }}'==='True' ? 'success' : 'medium'">
+                        {% if module.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}
                     </ion-chip>
                 </div>
             </ion-card-header>
             <ion-card-content>
-                <p class="text-sm text-medium mb-4">{{ plugin.description|default:"-" }}</p>
-                {% if plugin.author %}
-                <p class="text-xs text-medium">{% trans "By" %} {{ plugin.author }}</p>
+                <p class="text-sm text-medium mb-4">{{ module.description|default:"-" }}</p>
+                {% if module.author %}
+                <p class="text-xs text-medium">{% trans "By" %} {{ module.author }}</p>
                 {% endif %}
             </ion-card-content>
             <div class="flex border-t border-gray-200 dark:border-gray-700">
-                {% if plugin.is_active %}
+                {% if module.is_active %}
                 <ion-button
                     fill="clear"
                     size="small"
                     color="warning"
                     class="flex-1"
-                    @click="deactivatePlugin('{{ plugin.plugin_id }}')">
+                    @click="deactivateModule('{{ module.module_id }}')">
                     <ion-icon slot="start" name="pause-outline"></ion-icon>
                     {% trans "Deactivate" %}
                 </ion-button>
@@ -72,7 +72,7 @@
                     size="small"
                     color="success"
                     class="flex-1"
-                    @click="activatePlugin('{{ plugin.plugin_id }}')">
+                    @click="activateModule('{{ module.module_id }}')">
                     <ion-icon slot="start" name="play-outline"></ion-icon>
                     {% trans "Activate" %}
                 </ion-button>
@@ -82,7 +82,7 @@
                     size="small"
                     color="danger"
                     class="flex-1"
-                    @click="deletePlugin('{{ plugin.plugin_id }}')">
+                    @click="deleteModule('{{ module.module_id }}')">
                     <ion-icon slot="start" name="trash-outline"></ion-icon>
                     {% trans "Delete" %}
                 </ion-button>
@@ -92,14 +92,14 @@
         <ion-card class="col-span-full">
             <ion-card-content class="text-center py-8">
                 <ion-icon name="extension-puzzle-outline" class="text-6xl text-medium mb-4"></ion-icon>
-                <h3 class="text-lg font-semibold mb-2">{% trans "No plugins installed" %}</h3>
-                <p class="text-medium mb-4">{% trans "Explore the Plugin Store to extend your Hub" %}</p>
+                <h3 class="text-lg font-semibold mb-2">{% trans "No modules installed" %}</h3>
+                <p class="text-medium mb-4">{% trans "Explore the Module Store to extend your Hub" %}</p>
                 <ion-button
                     hx-get="{% url 'system:marketplace' %}"
                     hx-target="#dashboard-content"
                     hx-push-url="true">
                     <ion-icon slot="start" name="storefront-outline"></ion-icon>
-                    {% trans "Browse Plugin Store" %}
+                    {% trans "Browse Module Store" %}
                 </ion-button>
             </ion-card-content>
         </ion-card>
@@ -108,43 +108,43 @@
 </div>
 
 <script>
-function pluginsApp() {
+function modulesApp() {
     return {
         loading: false,
 
-        async activatePlugin(pluginId) {
+        async activateModule(moduleId) {
             if (this.loading) return;
             this.loading = true;
 
             try {
-                const response = await fetch(`{% url 'system:plugin_activate' plugin_id='__ID__' %}`.replace('__ID__', pluginId), {
+                const response = await fetch(`{% url 'system:module_activate' module_id='__ID__' %}`.replace('__ID__', moduleId), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await response.json();
 
                 if (data.success) {
-                    await this.showToast(data.message || '{% trans "Plugin activated" %}', 'success');
-                    htmx.ajax('GET', '{% url "system:plugins" %}', {
+                    await this.showToast(data.message || '{% trans "Module activated" %}', 'success');
+                    htmx.ajax('GET', '{% url "system:modules" %}', {
                         target: '#dashboard-content',
                         swap: 'innerHTML'
                     });
                 } else {
-                    await this.showToast(data.error || '{% trans "Error activating plugin" %}', 'danger');
+                    await this.showToast(data.error || '{% trans "Error activating module" %}', 'danger');
                 }
             } catch (error) {
-                await this.showToast('{% trans "Error activating plugin" %}', 'danger');
+                await this.showToast('{% trans "Error activating module" %}', 'danger');
             } finally {
                 this.loading = false;
             }
         },
 
-        async deactivatePlugin(pluginId) {
+        async deactivateModule(moduleId) {
             if (this.loading) return;
 
             const alert = document.createElement('ion-alert');
-            alert.header = '{% trans "Deactivate Plugin" %}';
-            alert.message = '{% trans "Are you sure you want to deactivate this plugin?" %}';
+            alert.header = '{% trans "Deactivate Module" %}';
+            alert.message = '{% trans "Are you sure you want to deactivate this module?" %}';
             alert.buttons = [
                 { text: '{% trans "Cancel" %}', role: 'cancel' },
                 {
@@ -152,15 +152,15 @@ function pluginsApp() {
                     handler: async () => {
                         this.loading = true;
                         try {
-                            const response = await fetch(`{% url 'system:plugin_deactivate' plugin_id='__ID__' %}`.replace('__ID__', pluginId), {
+                            const response = await fetch(`{% url 'system:module_deactivate' module_id='__ID__' %}`.replace('__ID__', moduleId), {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' }
                             });
                             const data = await response.json();
 
                             if (data.success) {
-                                await this.showToast('{% trans "Plugin deactivated" %}', 'success');
-                                htmx.ajax('GET', '{% url "system:plugins" %}', {
+                                await this.showToast('{% trans "Module deactivated" %}', 'success');
+                                htmx.ajax('GET', '{% url "system:modules" %}', {
                                     target: '#dashboard-content',
                                     swap: 'innerHTML'
                                 });
@@ -168,7 +168,7 @@ function pluginsApp() {
                                 await this.showToast(data.error, 'danger');
                             }
                         } catch (error) {
-                            await this.showToast('{% trans "Error deactivating plugin" %}', 'danger');
+                            await this.showToast('{% trans "Error deactivating module" %}', 'danger');
                         } finally {
                             this.loading = false;
                         }
@@ -179,12 +179,12 @@ function pluginsApp() {
             await alert.present();
         },
 
-        async deletePlugin(pluginId) {
+        async deleteModule(moduleId) {
             if (this.loading) return;
 
             const alert = document.createElement('ion-alert');
-            alert.header = '{% trans "Delete Plugin" %}';
-            alert.message = '{% trans "This will permanently delete the plugin and all its data. Are you sure?" %}';
+            alert.header = '{% trans "Delete Module" %}';
+            alert.message = '{% trans "This will permanently delete the module and all its data. Are you sure?" %}';
             alert.buttons = [
                 { text: '{% trans "Cancel" %}', role: 'cancel' },
                 {
@@ -193,15 +193,15 @@ function pluginsApp() {
                     handler: async () => {
                         this.loading = true;
                         try {
-                            const response = await fetch(`{% url 'system:plugin_delete' plugin_id='__ID__' %}`.replace('__ID__', pluginId), {
+                            const response = await fetch(`{% url 'system:module_delete' module_id='__ID__' %}`.replace('__ID__', moduleId), {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' }
                             });
                             const data = await response.json();
 
                             if (data.success) {
-                                await this.showToast('{% trans "Plugin deleted" %}', 'success');
-                                htmx.ajax('GET', '{% url "system:plugins" %}', {
+                                await this.showToast('{% trans "Module deleted" %}', 'success');
+                                htmx.ajax('GET', '{% url "system:modules" %}', {
                                     target: '#dashboard-content',
                                     swap: 'innerHTML'
                                 });
@@ -209,7 +209,7 @@ function pluginsApp() {
                                 await this.showToast(data.error, 'danger');
                             }
                         } catch (error) {
-                            await this.showToast('{% trans "Error deleting plugin" %}', 'danger');
+                            await this.showToast('{% trans "Error deleting module" %}', 'danger');
                         } finally {
                             this.loading = false;
                         }
@@ -223,7 +223,7 @@ function pluginsApp() {
         async restartServer() {
             const alert = document.createElement('ion-alert');
             alert.header = '{% trans "Restart Server" %}';
-            alert.message = '{% trans "This will restart the server and apply plugin changes. Continue?" %}';
+            alert.message = '{% trans "This will restart the server and apply module changes. Continue?" %}';
             alert.buttons = [
                 { text: '{% trans "Cancel" %}', role: 'cancel' },
                 {
@@ -231,7 +231,7 @@ function pluginsApp() {
                     handler: async () => {
                         this.loading = true;
                         try {
-                            const response = await fetch('{% url "system:plugin_restart" %}', {
+                            const response = await fetch('{% url "system:module_restart" %}', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' }
                             });

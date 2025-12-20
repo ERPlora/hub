@@ -1,8 +1,8 @@
 """
-Validador de plugins para CPOS Hub
+Validador de modules para CPOS Hub
 
-Valida que los plugins cumplan con:
-1. Estructura correcta de plugin.json
+Valida que los modules cumplan con:
+1. Estructura correcta de module.json
 2. Dependencias permitidas (whitelist)
 3. Compatibilidad con versión de CPOS
 4. Seguridad (no código malicioso)
@@ -13,8 +13,8 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from config.plugin_allowed_deps import (
-    PLUGIN_ALLOWED_DEPENDENCIES,
+from config.module_allowed_deps import (
+    MODULE_ALLOWED_DEPENDENCIES,
     is_dependency_allowed,
     get_allowed_dependencies_list,
 )
@@ -22,20 +22,20 @@ from config.plugin_allowed_deps import (
 logger = logging.getLogger(__name__)
 
 
-class PluginValidationError(Exception):
-    """Error de validación de plugin"""
+class ModuleValidationError(Exception):
+    """Error de validación de module"""
     pass
 
 
-class PluginValidator:
+class ModuleValidator:
     """
-    Validador de plugins CPOS Hub
+    Validador de modules CPOS Hub
 
-    Valida estructura, dependencias y seguridad de plugins antes de instalar.
+    Valida estructura, dependencias y seguridad de modules antes de instalar.
     """
 
     REQUIRED_FIELDS = [
-        'plugin_id',
+        'module_id',
         'name',
         'version',
         'description',
@@ -52,16 +52,16 @@ class PluginValidator:
         'open',  # Permitido pero con restricciones
     ]
 
-    def __init__(self, plugin_path: Path):
+    def __init__(self, module_path: Path):
         """
         Inicializa el validador
 
         Args:
-            plugin_path: Ruta al directorio del plugin
+            module_path: Ruta al directorio del module
         """
-        self.plugin_path = Path(plugin_path)
-        self.plugin_json_path = self.plugin_path / 'plugin.json'
-        self.plugin_data: Optional[Dict] = None
+        self.module_path = Path(module_path)
+        self.module_json_path = self.module_path / 'module.json'
+        self.module_data: Optional[Dict] = None
         self.errors: List[str] = []
         self.warnings: List[str] = []
 
@@ -76,8 +76,8 @@ class PluginValidator:
             # 1. Validar estructura de archivos
             self._validate_structure()
 
-            # 2. Validar plugin.json
-            self._validate_plugin_json()
+            # 2. Validar module.json
+            self._validate_module_json()
 
             # 3. Validar dependencias
             self._validate_dependencies()
@@ -92,58 +92,58 @@ class PluginValidator:
             return is_valid, self.errors, self.warnings
 
         except Exception as e:
-            logger.exception(f"Error inesperado validando plugin: {e}")
+            logger.exception(f"Error inesperado validando module: {e}")
             self.errors.append(f"Error inesperado: {str(e)}")
             return False, self.errors, self.warnings
 
     def _validate_structure(self):
         """Valida que existan los archivos requeridos"""
-        if not self.plugin_path.exists():
-            raise PluginValidationError(f"Directorio no existe: {self.plugin_path}")
+        if not self.module_path.exists():
+            raise ModuleValidationError(f"Directorio no existe: {self.module_path}")
 
-        if not self.plugin_path.is_dir():
-            raise PluginValidationError(f"No es un directorio: {self.plugin_path}")
+        if not self.module_path.is_dir():
+            raise ModuleValidationError(f"No es un directorio: {self.module_path}")
 
-        # plugin.json es obligatorio
-        if not self.plugin_json_path.exists():
-            raise PluginValidationError("Archivo plugin.json no encontrado")
+        # module.json es obligatorio
+        if not self.module_json_path.exists():
+            raise ModuleValidationError("Archivo module.json no encontrado")
 
         # __init__.py es obligatorio (debe ser un paquete Python)
-        init_file = self.plugin_path / '__init__.py'
+        init_file = self.module_path / '__init__.py'
         if not init_file.exists():
             self.errors.append("Archivo __init__.py no encontrado")
 
-    def _validate_plugin_json(self):
-        """Valida el contenido de plugin.json"""
+    def _validate_module_json(self):
+        """Valida el contenido de module.json"""
         try:
-            with open(self.plugin_json_path, 'r', encoding='utf-8') as f:
-                self.plugin_data = json.load(f)
+            with open(self.module_json_path, 'r', encoding='utf-8') as f:
+                self.module_data = json.load(f)
         except json.JSONDecodeError as e:
-            raise PluginValidationError(f"plugin.json inválido: {e}")
+            raise ModuleValidationError(f"module.json inválido: {e}")
 
         # Validar campos requeridos
         for field in self.REQUIRED_FIELDS:
-            if field not in self.plugin_data:
+            if field not in self.module_data:
                 self.errors.append(f"Campo requerido faltante: '{field}'")
 
         # Validar tipos
-        if 'plugin_id' in self.plugin_data:
-            if not isinstance(self.plugin_data['plugin_id'], str):
-                self.errors.append("'plugin_id' debe ser string")
-            elif not self.plugin_data['plugin_id'].replace('_', '').replace('-', '').isalnum():
-                self.errors.append("'plugin_id' solo puede contener letras, números, guiones y guiones bajos")
+        if 'module_id' in self.module_data:
+            if not isinstance(self.module_data['module_id'], str):
+                self.errors.append("'module_id' debe ser string")
+            elif not self.module_data['module_id'].replace('_', '').replace('-', '').isalnum():
+                self.errors.append("'module_id' solo puede contener letras, números, guiones y guiones bajos")
 
-        if 'version' in self.plugin_data:
-            if not isinstance(self.plugin_data['version'], str):
+        if 'version' in self.module_data:
+            if not isinstance(self.module_data['version'], str):
                 self.errors.append("'version' debe ser string")
             # TODO: Validar formato semver
 
     def _validate_dependencies(self):
         """Valida que las dependencias estén permitidas"""
-        if 'dependencies' not in self.plugin_data:
+        if 'dependencies' not in self.module_data:
             return  # Sin dependencias está OK
 
-        dependencies = self.plugin_data.get('dependencies', {})
+        dependencies = self.module_data.get('dependencies', {})
 
         # Validar dependencias Python
         python_deps = dependencies.get('python', [])
@@ -162,22 +162,22 @@ class PluginValidator:
                 pkg_name = dep.split('>=')[0].split('==')[0].strip()
                 self.errors.append(
                     f"[ERROR] Dependencia NO permitida: '{pkg_name}'\n"
-                    f"   Dependencias permitidas: {', '.join(list(PLUGIN_ALLOWED_DEPENDENCIES.keys())[:5])}...\n"
-                    f"   Ver lista completa en: config/plugin_allowed_deps.py"
+                    f"   Dependencias permitidas: {', '.join(list(MODULE_ALLOWED_DEPENDENCIES.keys())[:5])}...\n"
+                    f"   Ver lista completa en: config/module_allowed_deps.py"
                 )
 
-        # Validar dependencias de otros plugins
-        plugin_deps = dependencies.get('plugins', [])
-        if plugin_deps and not isinstance(plugin_deps, list):
-            self.errors.append("'dependencies.plugins' debe ser una lista")
+        # Validar dependencias de otros modules
+        module_deps = dependencies.get('modules', [])
+        if module_deps and not isinstance(module_deps, list):
+            self.errors.append("'dependencies.modules' debe ser una lista")
 
     def _validate_compatibility(self):
         """Valida compatibilidad con versión de CPOS"""
-        if 'compatibility' not in self.plugin_data:
+        if 'compatibility' not in self.module_data:
             self.warnings.append("No se especifica compatibilidad (campo 'compatibility')")
             return
 
-        compat = self.plugin_data['compatibility']
+        compat = self.module_data['compatibility']
 
         # TODO: Validar contra versión actual de CPOS
         min_version = compat.get('min_cpos_version')
@@ -197,7 +197,7 @@ class PluginValidator:
         # - Detectar network requests a IPs privadas
 
         # Por ahora, solo warnings
-        python_files = list(self.plugin_path.glob('**/*.py'))
+        python_files = list(self.module_path.glob('**/*.py'))
 
         for py_file in python_files:
             try:
@@ -213,32 +213,32 @@ class PluginValidator:
             except Exception as e:
                 self.warnings.append(f"No se pudo analizar {py_file.name}: {e}")
 
-    def get_plugin_info(self) -> Optional[Dict]:
+    def get_module_info(self) -> Optional[Dict]:
         """
-        Retorna información del plugin si es válida
+        Retorna información del module si es válida
 
         Returns:
-            Dict con datos del plugin o None si no se ha validado
+            Dict con datos del module o None si no se ha validado
         """
-        return self.plugin_data
+        return self.module_data
 
 
-def validate_plugin(plugin_path: Path) -> Tuple[bool, List[str], List[str]]:
+def validate_module(module_path: Path) -> Tuple[bool, List[str], List[str]]:
     """
-    Función helper para validar un plugin
+    Función helper para validar un module
 
     Args:
-        plugin_path: Ruta al directorio del plugin
+        module_path: Ruta al directorio del module
 
     Returns:
         Tuple[bool, List[str], List[str]]: (es_válido, errores, warnings)
 
     Example:
-        >>> is_valid, errors, warnings = validate_plugin(Path('/tmp/products'))
+        >>> is_valid, errors, warnings = validate_module(Path('/tmp/products'))
         >>> if not is_valid:
         ...     print(f"Errores: {errors}")
     """
-    validator = PluginValidator(plugin_path)
+    validator = ModuleValidator(module_path)
     return validator.validate()
 
 
@@ -251,7 +251,7 @@ def get_allowed_dependencies_help() -> str:
     """
     deps = get_allowed_dependencies_list()
     return (
-        "[INFO] Dependencias permitidas para plugins:\n\n"
+        "[INFO] Dependencias permitidas para modules:\n\n"
         + "\n".join(f"  [OK] {dep}" for dep in deps)
         + f"\n\nTotal: {len(deps)} librerías disponibles"
     )
@@ -262,15 +262,15 @@ if __name__ == '__main__':
     import sys
 
     if len(sys.argv) < 2:
-        print("Uso: python plugin_validator.py /path/to/plugin")
+        print("Uso: python module_validator.py /path/to/module")
         print()
         print(get_allowed_dependencies_help())
         sys.exit(1)
 
-    plugin_path = Path(sys.argv[1])
-    is_valid, errors, warnings = validate_plugin(plugin_path)
+    module_path = Path(sys.argv[1])
+    is_valid, errors, warnings = validate_module(module_path)
 
-    print(f"[INFO] Validando plugin: {plugin_path}")
+    print(f"[INFO] Validando module: {module_path}")
     print()
 
     if warnings:
@@ -284,8 +284,8 @@ if __name__ == '__main__':
         for error in errors:
             print(f"  - {error}")
         print()
-        print("[ERROR] Plugin invalido")
+        print("[ERROR] Module invalido")
         sys.exit(1)
     else:
-        print("[OK] Plugin valido")
+        print("[OK] Module valido")
         sys.exit(0)

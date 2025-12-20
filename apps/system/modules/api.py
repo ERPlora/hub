@@ -1,7 +1,7 @@
 """
-Plugins API
+Modules API
 
-Plugin management, marketplace, and installation endpoints.
+Module management, marketplace, and installation endpoints.
 """
 import json
 import os
@@ -25,9 +25,9 @@ from apps.core.api_base import IsAuthenticated, IsAdmin, SuccessResponseSerializ
 # Serializers
 # =============================================================================
 
-class PluginSerializer(serializers.Serializer):
-    """Serializer for plugin information"""
-    plugin_id = serializers.CharField(help_text="Plugin identifier")
+class ModuleSerializer(serializers.Serializer):
+    """Serializer for module information"""
+    module_id = serializers.CharField(help_text="Module identifier")
     folder_name = serializers.CharField(help_text="Folder name on disk")
     name = serializers.CharField(help_text="Display name")
     description = serializers.CharField(allow_blank=True)
@@ -37,27 +37,27 @@ class PluginSerializer(serializers.Serializer):
     is_active = serializers.BooleanField()
 
 
-class PluginActionSerializer(serializers.Serializer):
-    """Response serializer for plugin actions"""
+class ModuleActionSerializer(serializers.Serializer):
+    """Response serializer for module actions"""
     success = serializers.BooleanField()
     message = serializers.CharField(required=False)
     requires_restart = serializers.BooleanField(required=False)
     error = serializers.CharField(required=False)
 
 
-class PluginInstallSerializer(serializers.Serializer):
-    """Serializer for installing plugin from marketplace"""
-    plugin_slug = serializers.CharField(help_text="Plugin slug/identifier")
-    download_url = serializers.URLField(help_text="URL to download plugin ZIP")
+class ModuleInstallSerializer(serializers.Serializer):
+    """Serializer for installing module from marketplace"""
+    module_slug = serializers.CharField(help_text="Module slug/identifier")
+    download_url = serializers.URLField(help_text="URL to download module ZIP")
 
 
-class PluginPurchaseSerializer(serializers.Serializer):
-    """Serializer for purchasing a plugin"""
-    plugin_id = serializers.CharField(help_text="Plugin ID from marketplace")
+class ModulePurchaseSerializer(serializers.Serializer):
+    """Serializer for purchasing a module"""
+    module_id = serializers.CharField(help_text="Module ID from marketplace")
 
 
-class MarketplacePluginSerializer(serializers.Serializer):
-    """Serializer for marketplace plugin listing"""
+class MarketplaceModuleSerializer(serializers.Serializer):
+    """Serializer for marketplace module listing"""
     id = serializers.IntegerField()
     slug = serializers.CharField()
     name = serializers.CharField()
@@ -74,7 +74,7 @@ class MarketplacePluginSerializer(serializers.Serializer):
 class MarketplaceResponseSerializer(serializers.Serializer):
     """Response for marketplace fetch"""
     success = serializers.BooleanField()
-    plugins = MarketplacePluginSerializer(many=True)
+    modules = MarketplaceModuleSerializer(many=True)
     categories = serializers.ListField(child=serializers.DictField(), required=False)
 
 
@@ -100,32 +100,32 @@ class PurchaseResponseSerializer(serializers.Serializer):
 # API Views
 # =============================================================================
 
-@extend_schema(tags=['Plugins'])
-class PluginListView(APIView):
-    """List all installed plugins."""
+@extend_schema(tags=['Modules'])
+class ModuleListView(APIView):
+    """List all installed modules."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="List installed plugins",
-        description="Get list of all installed plugins with their status",
-        responses={200: PluginSerializer(many=True)}
+        summary="List installed modules",
+        description="Get list of all installed modules with their status",
+        responses={200: ModuleSerializer(many=True)}
     )
     def get(self, request):
-        plugins_dir = Path(django_settings.PLUGINS_DIR)
-        all_plugins = []
+        modules_dir = Path(django_settings.MODULES_DIR)
+        all_modules = []
 
-        if plugins_dir.exists():
-            for plugin_dir in plugins_dir.iterdir():
-                if not plugin_dir.is_dir() or plugin_dir.name.startswith('.'):
+        if modules_dir.exists():
+            for module_dir in modules_dir.iterdir():
+                if not module_dir.is_dir() or module_dir.name.startswith('.'):
                     continue
 
-                plugin_id = plugin_dir.name
-                is_active = not plugin_id.startswith('_')
-                display_id = plugin_id.lstrip('_')
+                module_id = module_dir.name
+                is_active = not module_id.startswith('_')
+                display_id = module_id.lstrip('_')
 
-                plugin_data = {
-                    'plugin_id': display_id,
-                    'folder_name': plugin_id,
+                module_data = {
+                    'module_id': display_id,
+                    'folder_name': module_id,
                     'name': display_id.replace('_', ' ').title(),
                     'description': '',
                     'version': '1.0.0',
@@ -134,85 +134,85 @@ class PluginListView(APIView):
                     'is_active': is_active,
                 }
 
-                # Read plugin.json if exists
-                plugin_json_path = plugin_dir / 'plugin.json'
-                if plugin_json_path.exists():
+                # Read module.json if exists
+                module_json_path = module_dir / 'module.json'
+                if module_json_path.exists():
                     try:
-                        with open(plugin_json_path, 'r', encoding='utf-8') as f:
+                        with open(module_json_path, 'r', encoding='utf-8') as f:
                             json_data = json.load(f)
-                            plugin_data['name'] = json_data.get('name', plugin_data['name'])
-                            plugin_data['description'] = json_data.get('description', '')
-                            plugin_data['version'] = json_data.get('version', '1.0.0')
-                            plugin_data['author'] = json_data.get('author', '')
+                            module_data['name'] = json_data.get('name', module_data['name'])
+                            module_data['description'] = json_data.get('description', '')
+                            module_data['version'] = json_data.get('version', '1.0.0')
+                            module_data['author'] = json_data.get('author', '')
                             menu_config = json_data.get('menu', {})
-                            plugin_data['icon'] = menu_config.get('icon', 'cube-outline')
+                            module_data['icon'] = menu_config.get('icon', 'cube-outline')
                     except Exception:
                         pass
 
-                all_plugins.append(plugin_data)
+                all_modules.append(module_data)
 
         # Sort: active first, then by name
-        all_plugins.sort(key=lambda x: (not x['is_active'], x['name']))
+        all_modules.sort(key=lambda x: (not x['is_active'], x['name']))
 
-        return Response(all_plugins)
+        return Response(all_modules)
 
 
-@extend_schema(tags=['Plugins'])
-class PluginActivateView(APIView):
-    """Activate a plugin."""
+@extend_schema(tags=['Modules'])
+class ModuleActivateView(APIView):
+    """Activate a module."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="Activate plugin",
-        description="Activate a deactivated plugin by removing underscore prefix from folder",
+        summary="Activate module",
+        description="Activate a deactivated module by removing underscore prefix from folder",
         responses={
-            200: PluginActionSerializer,
+            200: ModuleActionSerializer,
             400: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         }
     )
-    def post(self, request, plugin_id):
-        plugins_dir = Path(django_settings.PLUGINS_DIR)
-        disabled_folder = plugins_dir / f"_{plugin_id}"
-        active_folder = plugins_dir / plugin_id
+    def post(self, request, module_id):
+        modules_dir = Path(django_settings.MODULES_DIR)
+        disabled_folder = modules_dir / f"_{module_id}"
+        active_folder = modules_dir / module_id
 
         if not disabled_folder.exists():
             return Response(
-                {'success': False, 'error': 'Plugin not found'},
+                {'success': False, 'error': 'Module not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
         if active_folder.exists():
             return Response(
-                {'success': False, 'error': 'Plugin already active'},
+                {'success': False, 'error': 'Module already active'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
             disabled_folder.rename(active_folder)
 
-            # Try to load the plugin
-            from apps.plugins_runtime.loader import plugin_loader
-            plugin_loaded = plugin_loader.load_plugin(plugin_id)
+            # Try to load the module
+            from apps.modules_runtime.loader import module_loader
+            module_loaded = module_loader.load_module(module_id)
 
-            if not plugin_loaded:
+            if not module_loaded:
                 active_folder.rename(disabled_folder)
                 return Response(
-                    {'success': False, 'error': f'Failed to load plugin {plugin_id}'},
+                    {'success': False, 'error': f'Failed to load module {module_id}'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
             # Mark for restart
-            if 'plugins_pending_restart' not in request.session:
-                request.session['plugins_pending_restart'] = []
+            if 'modules_pending_restart' not in request.session:
+                request.session['modules_pending_restart'] = []
 
-            if plugin_id not in request.session['plugins_pending_restart']:
-                request.session['plugins_pending_restart'].append(plugin_id)
+            if module_id not in request.session['modules_pending_restart']:
+                request.session['modules_pending_restart'].append(module_id)
                 request.session.modified = True
 
             return Response({
                 'success': True,
-                'message': 'Plugin activated. Restart required for URLs.',
+                'message': 'Module activated. Restart required for URLs.',
                 'requires_restart': True
             })
         except Exception as e:
@@ -222,34 +222,34 @@ class PluginActivateView(APIView):
             )
 
 
-@extend_schema(tags=['Plugins'])
-class PluginDeactivateView(APIView):
-    """Deactivate a plugin."""
+@extend_schema(tags=['Modules'])
+class ModuleDeactivateView(APIView):
+    """Deactivate a module."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="Deactivate plugin",
-        description="Deactivate a plugin by adding underscore prefix to folder",
+        summary="Deactivate module",
+        description="Deactivate a module by adding underscore prefix to folder",
         responses={
-            200: PluginActionSerializer,
+            200: ModuleActionSerializer,
             400: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         }
     )
-    def post(self, request, plugin_id):
-        plugins_dir = Path(django_settings.PLUGINS_DIR)
-        active_folder = plugins_dir / plugin_id
-        disabled_folder = plugins_dir / f"_{plugin_id}"
+    def post(self, request, module_id):
+        modules_dir = Path(django_settings.MODULES_DIR)
+        active_folder = modules_dir / module_id
+        disabled_folder = modules_dir / f"_{module_id}"
 
         if not active_folder.exists():
             return Response(
-                {'success': False, 'error': 'Plugin not found'},
+                {'success': False, 'error': 'Module not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
         if disabled_folder.exists():
             return Response(
-                {'success': False, 'error': 'Plugin already disabled'},
+                {'success': False, 'error': 'Module already disabled'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -257,7 +257,7 @@ class PluginDeactivateView(APIView):
             active_folder.rename(disabled_folder)
             return Response({
                 'success': True,
-                'message': 'Plugin deactivated. Restart required.',
+                'message': 'Module deactivated. Restart required.',
                 'requires_restart': True
             })
         except Exception as e:
@@ -267,20 +267,20 @@ class PluginDeactivateView(APIView):
             )
 
 
-@extend_schema(tags=['Plugins'])
-class PluginDeleteView(APIView):
-    """Delete a plugin."""
+@extend_schema(tags=['Modules'])
+class ModuleDeleteView(APIView):
+    """Delete a module."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="Delete plugin",
-        description="Permanently delete a plugin from the filesystem",
+        summary="Delete module",
+        description="Permanently delete a module from the filesystem",
         responses={200: SuccessResponseSerializer, 404: ErrorResponseSerializer}
     )
-    def delete(self, request, plugin_id):
-        plugins_dir = Path(django_settings.PLUGINS_DIR)
-        active_folder = plugins_dir / plugin_id
-        disabled_folder = plugins_dir / f"_{plugin_id}"
+    def delete(self, request, module_id):
+        modules_dir = Path(django_settings.MODULES_DIR)
+        active_folder = modules_dir / module_id
+        disabled_folder = modules_dir / f"_{module_id}"
 
         folder_to_delete = None
         if active_folder.exists():
@@ -290,13 +290,13 @@ class PluginDeleteView(APIView):
 
         if not folder_to_delete:
             return Response(
-                {'success': False, 'error': 'Plugin not found'},
+                {'success': False, 'error': 'Module not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
         try:
             shutil.rmtree(folder_to_delete)
-            return Response({'success': True, 'message': 'Plugin deleted successfully.'})
+            return Response({'success': True, 'message': 'Module deleted successfully.'})
         except Exception as e:
             return Response(
                 {'success': False, 'error': str(e)},
@@ -304,14 +304,14 @@ class PluginDeleteView(APIView):
             )
 
 
-@extend_schema(tags=['Plugins'])
-class PluginRestartView(APIView):
-    """Restart server after plugin changes."""
+@extend_schema(tags=['Modules'])
+class ModuleRestartView(APIView):
+    """Restart server after module changes."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
         summary="Restart server",
-        description="Restart the server and run migrations after plugin changes",
+        description="Restart the server and run migrations after module changes",
         responses={200: SuccessResponseSerializer}
     )
     def post(self, request):
@@ -319,8 +319,8 @@ class PluginRestartView(APIView):
             from django.core.management import call_command
             call_command('migrate', '--run-syncdb')
 
-            if 'plugins_pending_restart' in request.session:
-                del request.session['plugins_pending_restart']
+            if 'modules_pending_restart' in request.session:
+                del request.session['modules_pending_restart']
                 request.session.modified = True
 
             wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
@@ -340,12 +340,12 @@ class PluginRestartView(APIView):
 
 @extend_schema(tags=['Marketplace'])
 class MarketplaceView(APIView):
-    """Fetch plugins from Cloud marketplace."""
+    """Fetch modules from Cloud marketplace."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="Get marketplace plugins",
-        description="Fetch available plugins from ERPlora Cloud marketplace",
+        summary="Get marketplace modules",
+        description="Fetch available modules from ERPlora Cloud marketplace",
         responses={
             200: MarketplaceResponseSerializer,
             401: ErrorResponseSerializer,
@@ -367,14 +367,14 @@ class MarketplaceView(APIView):
             headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
 
             response = requests.get(
-                f"{cloud_api_url}/api/marketplace/plugins/",
+                f"{cloud_api_url}/api/marketplace/modules/",
                 headers=headers,
                 timeout=30
             )
 
             if response.status_code == 200:
                 data = response.json()
-                plugins = data.get('results', data) if isinstance(data, dict) else data
+                modules = data.get('results', data) if isinstance(data, dict) else data
 
                 categories = []
                 try:
@@ -390,7 +390,7 @@ class MarketplaceView(APIView):
 
                 return Response({
                     'success': True,
-                    'plugins': plugins if isinstance(plugins, list) else [],
+                    'modules': modules if isinstance(modules, list) else [],
                     'categories': categories
                 })
             else:
@@ -407,14 +407,14 @@ class MarketplaceView(APIView):
 
 
 @extend_schema(tags=['Marketplace'])
-class PluginPurchaseView(APIView):
-    """Purchase a plugin from marketplace."""
+class ModulePurchaseView(APIView):
+    """Purchase a module from marketplace."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="Purchase plugin",
-        description="Initiate purchase of a plugin from the marketplace",
-        request=PluginPurchaseSerializer,
+        summary="Purchase module",
+        description="Initiate purchase of a module from the marketplace",
+        request=ModulePurchaseSerializer,
         responses={
             200: PurchaseResponseSerializer,
             400: ErrorResponseSerializer,
@@ -422,10 +422,10 @@ class PluginPurchaseView(APIView):
         }
     )
     def post(self, request):
-        serializer = PluginPurchaseSerializer(data=request.data)
+        serializer = ModulePurchaseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        plugin_id = serializer.validated_data['plugin_id']
+        module_id = serializer.validated_data['module_id']
 
         try:
             hub_config = HubConfig.get_solo()
@@ -441,10 +441,10 @@ class PluginPurchaseView(APIView):
             headers = {'Content-Type': 'application/json', 'X-Hub-Token': auth_token}
 
             response = requests.post(
-                f"{cloud_api_url}/api/marketplace/plugins/{plugin_id}/purchase/",
+                f"{cloud_api_url}/api/marketplace/modules/{module_id}/purchase/",
                 json={
-                    'success_url': f"{cloud_api_url}/dashboard/plugins/marketplace/payment-success/?plugin_id={plugin_id}&source=hub",
-                    'cancel_url': f"{cloud_api_url}/dashboard/plugins/marketplace/"
+                    'success_url': f"{cloud_api_url}/dashboard/modules/marketplace/payment-success/?module_id={module_id}&source=hub",
+                    'cancel_url': f"{cloud_api_url}/dashboard/modules/marketplace/"
                 },
                 headers=headers,
                 timeout=30
@@ -453,7 +453,7 @@ class PluginPurchaseView(APIView):
             result = response.json()
 
             if response.status_code == 201 and result.get('is_free'):
-                return Response({'success': True, 'is_free': True, 'message': 'Free plugin acquired'})
+                return Response({'success': True, 'is_free': True, 'message': 'Free module acquired'})
 
             if response.status_code == 200 and result.get('checkout_url'):
                 return Response({
@@ -467,7 +467,7 @@ class PluginPurchaseView(APIView):
 
             if response.status_code == 409:
                 return Response(
-                    {'success': False, 'error': 'You already own this plugin', 'already_owned': True},
+                    {'success': False, 'error': 'You already own this module', 'already_owned': True},
                     status=status.HTTP_409_CONFLICT
                 )
 
@@ -484,16 +484,16 @@ class PluginPurchaseView(APIView):
 
 
 @extend_schema(tags=['Marketplace'])
-class PluginOwnershipView(APIView):
-    """Check plugin ownership."""
+class ModuleOwnershipView(APIView):
+    """Check module ownership."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
         summary="Check ownership",
-        description="Check if the Hub owner owns a specific plugin",
+        description="Check if the Hub owner owns a specific module",
         responses={200: OwnershipResponseSerializer, 400: ErrorResponseSerializer}
     )
-    def get(self, request, plugin_id):
+    def get(self, request, module_id):
         try:
             hub_config = HubConfig.get_solo()
             auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
@@ -508,7 +508,7 @@ class PluginOwnershipView(APIView):
             headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
 
             response = requests.get(
-                f"{cloud_api_url}/api/marketplace/plugins/{plugin_id}/check_ownership/",
+                f"{cloud_api_url}/api/marketplace/modules/{module_id}/check_ownership/",
                 headers=headers,
                 timeout=10
             )
@@ -534,30 +534,30 @@ class PluginOwnershipView(APIView):
 
 
 @extend_schema(tags=['Marketplace'])
-class PluginInstallView(APIView):
-    """Install plugin from marketplace."""
+class ModuleInstallView(APIView):
+    """Install module from marketplace."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="Install plugin",
-        description="Download and install a plugin from the marketplace",
-        request=PluginInstallSerializer,
-        responses={200: PluginActionSerializer, 400: ErrorResponseSerializer}
+        summary="Install module",
+        description="Download and install a module from the marketplace",
+        request=ModuleInstallSerializer,
+        responses={200: ModuleActionSerializer, 400: ErrorResponseSerializer}
     )
     def post(self, request):
-        serializer = PluginInstallSerializer(data=request.data)
+        serializer = ModuleInstallSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        plugin_slug = serializer.validated_data['plugin_slug']
+        module_slug = serializer.validated_data['module_slug']
         download_url = serializer.validated_data['download_url']
 
         try:
-            plugins_dir = Path(django_settings.PLUGINS_DIR)
-            plugin_target_dir = plugins_dir / plugin_slug
+            modules_dir = Path(django_settings.MODULES_DIR)
+            module_target_dir = modules_dir / module_slug
 
-            if plugin_target_dir.exists() or (plugins_dir / f"_{plugin_slug}").exists():
+            if module_target_dir.exists() or (modules_dir / f"_{module_slug}").exists():
                 return Response(
-                    {'success': False, 'error': 'Plugin already installed'},
+                    {'success': False, 'error': 'Module already installed'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -576,27 +576,27 @@ class PluginInstallView(APIView):
 
                     if len(root_folders) == 1:
                         root_folder = list(root_folders)[0]
-                        zip_ref.extractall(plugins_dir)
-                        extracted_dir = plugins_dir / root_folder
-                        if extracted_dir != plugin_target_dir:
-                            extracted_dir.rename(plugin_target_dir)
+                        zip_ref.extractall(modules_dir)
+                        extracted_dir = modules_dir / root_folder
+                        if extracted_dir != module_target_dir:
+                            extracted_dir.rename(module_target_dir)
                     else:
-                        plugin_target_dir.mkdir(parents=True, exist_ok=True)
-                        zip_ref.extractall(plugin_target_dir)
+                        module_target_dir.mkdir(parents=True, exist_ok=True)
+                        zip_ref.extractall(module_target_dir)
 
-                from apps.plugins_runtime.loader import plugin_loader
-                plugin_loader.load_plugin(plugin_slug)
+                from apps.modules_runtime.loader import module_loader
+                module_loader.load_module(module_slug)
 
-                if 'plugins_pending_restart' not in request.session:
-                    request.session['plugins_pending_restart'] = []
+                if 'modules_pending_restart' not in request.session:
+                    request.session['modules_pending_restart'] = []
 
-                if plugin_slug not in request.session['plugins_pending_restart']:
-                    request.session['plugins_pending_restart'].append(plugin_slug)
+                if module_slug not in request.session['modules_pending_restart']:
+                    request.session['modules_pending_restart'].append(module_slug)
                     request.session.modified = True
 
                 return Response({
                     'success': True,
-                    'message': f'Plugin {plugin_slug} installed successfully',
+                    'message': f'Module {module_slug} installed successfully',
                     'requires_restart': True
                 })
 
@@ -606,12 +606,12 @@ class PluginInstallView(APIView):
 
         except requests.exceptions.RequestException as e:
             return Response(
-                {'success': False, 'error': f'Failed to download plugin: {str(e)}'},
+                {'success': False, 'error': f'Failed to download module: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         except zipfile.BadZipFile:
             return Response(
-                {'success': False, 'error': 'Invalid plugin package'},
+                {'success': False, 'error': 'Invalid module package'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
@@ -628,16 +628,16 @@ class PluginInstallView(APIView):
 from django.urls import path
 
 api_urlpatterns = [
-    # Plugin management
-    path('', PluginListView.as_view(), name='api_plugins_list'),
-    path('<str:plugin_id>/activate/', PluginActivateView.as_view(), name='api_plugin_activate'),
-    path('<str:plugin_id>/deactivate/', PluginDeactivateView.as_view(), name='api_plugin_deactivate'),
-    path('<str:plugin_id>/delete/', PluginDeleteView.as_view(), name='api_plugin_delete'),
-    path('restart/', PluginRestartView.as_view(), name='api_plugins_restart'),
+    # Module management
+    path('', ModuleListView.as_view(), name='api_modules_list'),
+    path('<str:module_id>/activate/', ModuleActivateView.as_view(), name='api_module_activate'),
+    path('<str:module_id>/deactivate/', ModuleDeactivateView.as_view(), name='api_module_deactivate'),
+    path('<str:module_id>/delete/', ModuleDeleteView.as_view(), name='api_module_delete'),
+    path('restart/', ModuleRestartView.as_view(), name='api_modules_restart'),
 
     # Marketplace
     path('marketplace/', MarketplaceView.as_view(), name='api_marketplace'),
-    path('marketplace/purchase/', PluginPurchaseView.as_view(), name='api_plugin_purchase'),
-    path('marketplace/install/', PluginInstallView.as_view(), name='api_plugin_install'),
-    path('marketplace/<str:plugin_id>/ownership/', PluginOwnershipView.as_view(), name='api_plugin_ownership'),
+    path('marketplace/purchase/', ModulePurchaseView.as_view(), name='api_module_purchase'),
+    path('marketplace/install/', ModuleInstallView.as_view(), name='api_module_install'),
+    path('marketplace/<str:module_id>/ownership/', ModuleOwnershipView.as_view(), name='api_module_ownership'),
 ]
