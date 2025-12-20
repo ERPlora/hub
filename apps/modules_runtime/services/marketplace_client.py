@@ -1,5 +1,5 @@
 """
-Marketplace Client for Hub-to-Cloud plugin API communication.
+Marketplace Client for Hub-to-Cloud module API communication.
 
 Uses hub_jwt (RS256, 1 year validity) for authentication via X-Hub-Token header.
 """
@@ -30,7 +30,7 @@ class MarketplaceConnectionError(MarketplaceError):
 
 class MarketplaceClient:
     """
-    Client for Cloud Plugin Marketplace API.
+    Client for Cloud Module Marketplace API.
 
     Authenticates using hub_jwt stored in HubConfig.
     All API calls use X-Hub-Token header.
@@ -38,17 +38,17 @@ class MarketplaceClient:
     Usage:
         client = MarketplaceClient()
 
-        # List plugins
-        plugins = client.list_plugins(category='sales')
+        # List modules
+        modules = client.list_modules(category='sales')
 
-        # Get plugin detail
-        plugin = client.get_plugin('plugin-uuid')
+        # Get module detail
+        module = client.get_module('module-uuid')
 
-        # Download plugin
-        zip_content = client.download_plugin('plugin-uuid')
+        # Download module
+        zip_content = client.download_module('module-uuid')
 
         # Check ownership
-        owned = client.check_ownership('plugin-uuid')
+        owned = client.check_ownership('module-uuid')
     """
 
     DEFAULT_TIMEOUT = 30
@@ -83,7 +83,7 @@ class MarketplaceClient:
 
         Args:
             method: HTTP method (GET, POST, etc.)
-            endpoint: API endpoint (e.g., 'plugins/', 'plugins/{id}/download/')
+            endpoint: API endpoint (e.g., 'modules/', 'modules/{id}/download/')
             params: Query parameters
             json_data: JSON body for POST/PUT
             timeout: Request timeout in seconds
@@ -137,24 +137,24 @@ class MarketplaceClient:
         return bool(self.hub_config.hub_jwt and self.hub_config.hub_id)
 
     # =========================================================================
-    # Plugin Listing
+    # Module Listing
     # =========================================================================
 
-    def list_plugins(
+    def list_modules(
         self,
         category: Optional[str] = None,
-        plugin_type: Optional[str] = None,
+        module_type: Optional[str] = None,
         search: Optional[str] = None,
         ordering: Optional[str] = None,
         page: int = 1,
         page_size: int = 20
     ) -> dict:
         """
-        List plugins from marketplace.
+        List modules from marketplace.
 
         Args:
             category: Filter by category (e.g., 'sales', 'inventory')
-            plugin_type: Filter by type ('free', 'paid', 'subscription')
+            module_type: Filter by type ('free', 'paid', 'subscription')
             search: Search term for name/description
             ordering: Order by field ('-downloads', 'price', etc.)
             page: Page number (1-based)
@@ -170,20 +170,20 @@ class MarketplaceClient:
 
         if category:
             params['category'] = category
-        if plugin_type:
-            params['plugin_type'] = plugin_type
+        if module_type:
+            params['module_type'] = module_type
         if search:
             params['search'] = search
         if ordering:
             params['ordering'] = ordering
 
-        response = self._request('GET', 'plugins/', params=params)
+        response = self._request('GET', 'modules/', params=params)
         response.raise_for_status()
         return response.json()
 
     def get_categories(self, language: str = 'en') -> list:
         """
-        Get all plugin categories.
+        Get all module categories.
 
         Args:
             language: Language code for category names ('en', 'es', etc.)
@@ -197,56 +197,56 @@ class MarketplaceClient:
 
     def get_featured(self) -> list:
         """
-        Get featured plugins.
+        Get featured modules.
 
         Returns:
-            List of plugin dicts (max 10)
+            List of module dicts (max 10)
         """
-        response = self._request('GET', 'plugins/featured/')
+        response = self._request('GET', 'modules/featured/')
         response.raise_for_status()
         return response.json()
 
-    def get_my_plugins(self, page: int = 1, page_size: int = 20) -> dict:
+    def get_my_modules(self, page: int = 1, page_size: int = 20) -> dict:
         """
-        Get plugins owned by Hub owner (purchased + free).
+        Get modules owned by Hub owner (purchased + free).
 
         Returns:
             Dict with 'count', 'next', 'previous', 'results' keys
         """
         params = {'page': page, 'page_size': page_size}
-        response = self._request('GET', 'plugins/my_plugins/', params=params)
+        response = self._request('GET', 'modules/my_modules/', params=params)
         response.raise_for_status()
         return response.json()
 
     # =========================================================================
-    # Plugin Detail
+    # Module Detail
     # =========================================================================
 
-    def get_plugin(self, plugin_id: str) -> dict:
+    def get_module(self, module_id: str) -> dict:
         """
-        Get plugin detail.
+        Get module detail.
 
         Args:
-            plugin_id: Plugin UUID
+            module_id: Module UUID
 
         Returns:
-            Plugin dict with full details
+            Module dict with full details
         """
-        response = self._request('GET', f'plugins/{plugin_id}/')
+        response = self._request('GET', f'modules/{module_id}/')
         response.raise_for_status()
         return response.json()
 
-    def check_ownership(self, plugin_id: str) -> dict:
+    def check_ownership(self, module_id: str) -> dict:
         """
-        Check if Hub owner owns this plugin.
+        Check if Hub owner owns this module.
 
         Args:
-            plugin_id: Plugin UUID
+            module_id: Module UUID
 
         Returns:
             Dict with 'owned', 'purchase_type', 'purchase_id', 'purchased_at'
         """
-        response = self._request('GET', f'plugins/{plugin_id}/check_ownership/')
+        response = self._request('GET', f'modules/{module_id}/check_ownership/')
         response.raise_for_status()
         return response.json()
 
@@ -254,15 +254,15 @@ class MarketplaceClient:
     # Download & Install
     # =========================================================================
 
-    def download_plugin(self, plugin_id: str) -> bytes:
+    def download_module(self, module_id: str) -> bytes:
         """
-        Download plugin ZIP file.
+        Download module ZIP file.
 
-        Only works for free plugins or plugins owned by Hub owner.
+        Only works for free modules or modules owned by Hub owner.
         Rate limited to 10 downloads per hour.
 
         Args:
-            plugin_id: Plugin UUID
+            module_id: Module UUID
 
         Returns:
             ZIP file content as bytes
@@ -273,13 +273,13 @@ class MarketplaceClient:
         """
         response = self._request(
             'GET',
-            f'plugins/{plugin_id}/download/',
+            f'modules/{module_id}/download/',
             timeout=60,
             stream=True
         )
 
         if response.status_code == 404:
-            raise MarketplaceError("Plugin file not available")
+            raise MarketplaceError("Module file not available")
 
         if response.status_code == 429:
             raise MarketplaceError(
@@ -291,12 +291,12 @@ class MarketplaceClient:
         # Read full content for ZIP
         return response.content
 
-    def mark_installed(self, plugin_id: str, version: Optional[str] = None) -> dict:
+    def mark_installed(self, module_id: str, version: Optional[str] = None) -> dict:
         """
-        Mark plugin as installed on this Hub (for Cloud tracking).
+        Mark module as installed on this Hub (for Cloud tracking).
 
         Args:
-            plugin_id: Plugin UUID
+            module_id: Module UUID
             version: Installed version (defaults to latest)
 
         Returns:
@@ -308,7 +308,7 @@ class MarketplaceClient:
 
         response = self._request(
             'POST',
-            f'plugins/{plugin_id}/mark_installed/',
+            f'modules/{module_id}/mark_installed/',
             json_data=json_data
         )
         response.raise_for_status()
@@ -320,18 +320,18 @@ class MarketplaceClient:
 
     def initiate_purchase(
         self,
-        plugin_id: str,
+        module_id: str,
         success_url: str,
         cancel_url: str
     ) -> dict:
         """
-        Initiate plugin purchase (creates Stripe Checkout session).
+        Initiate module purchase (creates Stripe Checkout session).
 
-        For free plugins, this completes immediately.
-        For paid plugins, returns Stripe checkout URL.
+        For free modules, this completes immediately.
+        For paid modules, returns Stripe checkout URL.
 
         Args:
-            plugin_id: Plugin UUID
+            module_id: Module UUID
             success_url: URL to redirect after successful payment
             cancel_url: URL to redirect if payment cancelled
 
@@ -341,7 +341,7 @@ class MarketplaceClient:
         """
         response = self._request(
             'POST',
-            f'plugins/{plugin_id}/purchase/',
+            f'modules/{module_id}/purchase/',
             json_data={
                 'success_url': success_url,
                 'cancel_url': cancel_url,
@@ -349,9 +349,9 @@ class MarketplaceClient:
         )
 
         if response.status_code == 409:
-            # Already owns the plugin
+            # Already owns the module
             data = response.json()
-            raise MarketplaceError(data.get('error', 'You already own this plugin'))
+            raise MarketplaceError(data.get('error', 'You already own this module'))
 
         response.raise_for_status()
         return response.json()
@@ -362,11 +362,11 @@ class MarketplaceClient:
 
     def get_hub_installations(self) -> list:
         """
-        Get all plugins installed on this Hub (from Cloud records).
+        Get all modules installed on this Hub (from Cloud records).
 
         Returns:
             List of installation dicts
         """
-        response = self._request('GET', 'hub-plugins/')
+        response = self._request('GET', 'hub-modules/')
         response.raise_for_status()
         return response.json()

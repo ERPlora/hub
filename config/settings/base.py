@@ -96,7 +96,7 @@ INSTALLED_APPS = [
     'apps.configuration.apps.ConfigurationConfig',
     'apps.sync.apps.SyncConfig',
     'apps.core.apps.CoreConfig',
-    'apps.plugins_runtime',
+    'apps.modules_runtime',
     # Hub apps - Auth
     'apps.auth.login.apps.AuthLoginConfig',
     # Hub apps - Main
@@ -106,7 +106,7 @@ INSTALLED_APPS = [
     'apps.main.employees.apps.MainEmployeesConfig',
     'apps.main.setup.apps.SetupConfig',
     # Hub apps - System
-    'apps.system.plugins.apps.SystemPluginsConfig',
+    'apps.system.modules.apps.SystemModulesConfig',
 ]
 
 MIDDLEWARE = [
@@ -123,7 +123,7 @@ MIDDLEWARE = [
     'django_htmx.middleware.HtmxMiddleware',
     'apps.accounts.middleware.jwt_middleware.JWTMiddleware',
     'apps.configuration.middleware.StoreConfigCheckMiddleware',
-    'apps.core.middleware.plugin_middleware_manager.PluginMiddlewareManager',
+    'apps.core.middleware.module_middleware_manager.ModuleMiddlewareManager',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -144,7 +144,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.core.context_processors.cloud_url',
-                'apps.core.context_processors.plugin_menu_items',
+                'apps.core.context_processors.module_menu_items',
                 'apps.core.context_processors.hub_config_context',
                 'apps.core.context_processors.deployment_config',
                 'apps.configuration.context_processors.global_config',
@@ -239,38 +239,38 @@ HUB_LOCAL_PORT = config('HUB_LOCAL_PORT', default=8001, cast=int)
 HUB_VERSION = "1.0.0"
 
 # =============================================================================
-# PLUGIN SYSTEM
+# MODULE SYSTEM
 # =============================================================================
 
 # Detect frozen (PyInstaller) vs development
 DEVELOPMENT_MODE = not getattr(sys, 'frozen', False) and config('ERPLORA_DEV_MODE', default='true', cast=bool)
 
-# Plugin paths - auto-detected via DataPaths (Docker vs Desktop)
-# Can be overridden via PLUGINS_DIR env var
-from config.paths import get_plugins_dir
-_plugins_dir_env = config('PLUGINS_DIR', default='')
-if _plugins_dir_env:
-    PLUGINS_DIR = Path(_plugins_dir_env)
-    PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
+# Module paths - auto-detected via DataPaths (Docker vs Desktop)
+# Can be overridden via MODULES_DIR env var
+from config.paths import get_modules_dir
+_modules_dir_env = config('MODULES_DIR', default='')
+if _modules_dir_env:
+    MODULES_DIR = Path(_modules_dir_env)
+    MODULES_DIR.mkdir(parents=True, exist_ok=True)
 else:
-    PLUGINS_DIR = get_plugins_dir()
+    MODULES_DIR = get_modules_dir()
 
-PLUGINS_ROOT = PLUGINS_DIR
+MODULES_ROOT = MODULES_DIR
 
-# Plugin discovery paths
-PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
+# Module discovery paths
+MODULE_DISCOVERY_PATHS = [MODULES_DIR]
 
-# Plugin security
-REQUIRE_PLUGIN_SIGNATURE = not DEVELOPMENT_MODE
-PLUGIN_AUTO_RELOAD = DEVELOPMENT_MODE
-PLUGIN_STRICT_VALIDATION = not DEVELOPMENT_MODE
+# Module security
+REQUIRE_MODULE_SIGNATURE = not DEVELOPMENT_MODE
+MODULE_AUTO_RELOAD = DEVELOPMENT_MODE
+MODULE_STRICT_VALIDATION = not DEVELOPMENT_MODE
 
-# Plugin data directories
-PLUGIN_DATA_ROOT = BASE_DIR / 'plugin_data'
-PLUGIN_MEDIA_ROOT = BASE_DIR / 'media' / 'plugins'
+# Module data directories
+MODULE_DATA_ROOT = BASE_DIR / 'module_data'
+MODULE_MEDIA_ROOT = BASE_DIR / 'media' / 'modules'
 
-# Plugin allowed dependencies
-PLUGIN_ALLOWED_DEPENDENCIES = [
+# Module allowed dependencies
+MODULE_ALLOWED_DEPENDENCIES = [
     'Pillow', 'qrcode', 'python-barcode', 'openpyxl', 'reportlab',
     'python-escpos', 'lxml', 'xmltodict', 'signxml', 'cryptography',
     'zeep', 'requests', 'websockets', 'python-dateutil', 'pytz',
@@ -279,9 +279,9 @@ PLUGIN_ALLOWED_DEPENDENCIES = [
     'beautifulsoup4', 'PyPDF2'
 ]
 
-PLUGIN_MAX_SIZE_MB = 50
-PLUGIN_SIGNATURE_ALGORITHM = 'RSA-SHA256'
-PLUGIN_SIGNATURE_KEY_SIZE = 4096
+MODULE_MAX_SIZE_MB = 50
+MODULE_SIGNATURE_ALGORITHM = 'RSA-SHA256'
+MODULE_SIGNATURE_KEY_SIZE = 4096
 
 # =============================================================================
 # DJANGO REST FRAMEWORK
@@ -423,41 +423,41 @@ LOGGING = {
 
 
 # =============================================================================
-# AUTO-LOAD PLUGINS (common logic)
+# AUTO-LOAD MODULES (common logic)
 # =============================================================================
 
-def load_plugins():
-    """Load active plugins from PLUGINS_DIR into INSTALLED_APPS"""
+def load_modules():
+    """Load active modules from MODULES_DIR into INSTALLED_APPS"""
     import json
 
-    if not PLUGINS_DIR.exists():
+    if not MODULES_DIR.exists():
         return
 
-    for plugin_dir in PLUGINS_DIR.iterdir():
-        if not plugin_dir.is_dir():
+    for module_dir in MODULES_DIR.iterdir():
+        if not module_dir.is_dir():
             continue
-        # Skip disabled plugins (start with _ or .)
-        if plugin_dir.name.startswith('.') or plugin_dir.name.startswith('_'):
+        # Skip disabled modules (start with _ or .)
+        if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
             continue
 
-        INSTALLED_APPS.append(plugin_dir.name)
-        print(f"[SETTINGS] Auto-loaded plugin: {plugin_dir.name}")
+        INSTALLED_APPS.append(module_dir.name)
+        print(f"[SETTINGS] Auto-loaded module: {module_dir.name}")
 
 
-def load_plugin_templates():
-    """Add plugin template directories to Django"""
+def load_module_templates():
+    """Add module template directories to Django"""
     # Start with the existing global templates directory
     template_dirs = list(TEMPLATES[0]['DIRS'])
 
-    if PLUGINS_DIR.exists():
-        for plugin_dir in PLUGINS_DIR.iterdir():
-            if plugin_dir.is_dir() and (plugin_dir / 'templates').exists():
-                template_dirs.append(plugin_dir / 'templates')
+    if MODULES_DIR.exists():
+        for module_dir in MODULES_DIR.iterdir():
+            if module_dir.is_dir() and (module_dir / 'templates').exists():
+                template_dirs.append(module_dir / 'templates')
 
     # Update DIRS with all template directories
     TEMPLATES[0]['DIRS'] = template_dirs
 
 
-# NOTE: load_plugins() and load_plugin_templates() are called by each
-# environment-specific settings file AFTER PLUGINS_DIR is properly set.
+# NOTE: load_modules() and load_module_templates() are called by each
+# environment-specific settings file AFTER MODULES_DIR is properly set.
 # Do NOT call them here in base.py.

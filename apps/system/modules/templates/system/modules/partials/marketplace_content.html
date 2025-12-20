@@ -3,22 +3,22 @@
 {% if request.htmx %}
 <!-- Tab bar update via OOB swap (only on HTMX navigation) -->
 <div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-{% include "system/plugins/partials/tabbar_system.html" %}
+{% include "system/modules/partials/tabbar_system.html" %}
 </div>
 {% endif %}
 
 <div class="ion-padding">
     <!-- Header -->
     <div class="mb-6">
-        <h1 class="text-2xl font-bold">{% trans "Plugin Store" %}</h1>
-        <p class="text-medium">{% trans "Extend your Hub with powerful plugins" %}</p>
+        <h1 class="text-2xl font-bold">{% trans "Module Store" %}</h1>
+        <p class="text-medium">{% trans "Extend your Hub with powerful modules" %}</p>
     </div>
 
     <!-- Search and Filters -->
     <div class="flex flex-wrap gap-4 mb-6">
         <ion-searchbar
             id="search-input"
-            placeholder="{% trans 'Search plugins...' %}"
+            placeholder="{% trans 'Search modules...' %}"
             class="flex-1 min-w-64"
             debounce="300">
         </ion-searchbar>
@@ -39,29 +39,29 @@
     (function() {
         const searchInput = document.getElementById('search-input');
         const categorySelect = document.getElementById('category-select');
-        const pluginsGrid = document.getElementById('marketplace-plugins-grid');
+        const modulesGrid = document.getElementById('marketplace-modules-grid');
         let searchTimeout = null;
 
-        function fetchPlugins() {
+        function fetchModules() {
             const searchValue = searchInput?.value || '';
             const categoryValue = categorySelect?.value || '';
             const params = new URLSearchParams();
             if (searchValue) params.set('q', searchValue);
             if (categoryValue) params.set('category', categoryValue);
 
-            const url = '{% url "system:marketplace_plugins_list" %}' + (params.toString() ? '?' + params.toString() : '');
-            htmx.ajax('GET', url, { target: '#marketplace-plugins-grid', swap: 'innerHTML', indicator: '#loading-spinner' });
+            const url = '{% url "system:marketplace_modules_list" %}' + (params.toString() ? '?' + params.toString() : '');
+            htmx.ajax('GET', url, { target: '#marketplace-modules-grid', swap: 'innerHTML', indicator: '#loading-spinner' });
         }
 
         if (searchInput) {
             searchInput.addEventListener('ionInput', function() {
                 clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(fetchPlugins, 300);
+                searchTimeout = setTimeout(fetchModules, 300);
             });
         }
 
         if (categorySelect) {
-            categorySelect.addEventListener('ionChange', fetchPlugins);
+            categorySelect.addEventListener('ionChange', fetchModules);
         }
     })();
     </script>
@@ -71,9 +71,9 @@
         <ion-spinner name="crescent"></ion-spinner>
     </div>
 
-    <!-- Plugins Grid (loaded via HTMX) -->
-    <div id="marketplace-plugins-grid"
-         hx-get="{% url 'system:marketplace_plugins_list' %}"
+    <!-- Modules Grid (loaded via HTMX) -->
+    <div id="marketplace-modules-grid"
+         hx-get="{% url 'system:marketplace_modules_list' %}"
          hx-trigger="load"
          hx-swap="innerHTML"
          hx-indicator="#loading-spinner">
@@ -84,46 +84,46 @@
     </div>
 </div>
 
-<!-- Marketplace plugin actions (uses global UI helpers from toast-helper.js) -->
+<!-- Marketplace module actions (uses global UI helpers from toast-helper.js) -->
 <script>
-// Install free plugin
-async function installFreePlugin(pluginId, pluginSlug, downloadUrl, button) {
+// Install free module
+async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
     setButtonLoading(button, true);
     try {
-        // First acquire the free plugin
-        const purchaseResponse = await fetch('{% url "system:purchase_plugin" %}', {
+        // First acquire the free module
+        const purchaseResponse = await fetch('{% url "system:purchase_module" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ plugin_id: pluginId })
+            body: JSON.stringify({ module_id: moduleId })
         });
         const purchaseData = await purchaseResponse.json();
 
         if (!purchaseData.success && !purchaseData.is_free && !purchaseData.already_owned) {
-            Toast.error(purchaseData.error || '{% trans "Error acquiring plugin" %}');
+            Toast.error(purchaseData.error || '{% trans "Error acquiring module" %}');
             return;
         }
 
         // Now download and install
         if (downloadUrl) {
-            await downloadAndInstall(pluginSlug, downloadUrl);
+            await downloadAndInstall(moduleSlug, downloadUrl);
         } else {
-            Toast.warning('{% trans "Plugin acquired. Download not available yet." %}');
+            Toast.warning('{% trans "Module acquired. Download not available yet." %}');
         }
     } catch (error) {
-        Toast.error('{% trans "Error acquiring plugin" %}');
+        Toast.error('{% trans "Error acquiring module" %}');
     } finally {
         setButtonLoading(button, false);
     }
 }
 
-// Purchase paid plugin
-async function purchasePlugin(pluginId, button) {
+// Purchase paid module
+async function purchaseModule(moduleId, button) {
     setButtonLoading(button, true);
     try {
-        const response = await fetch('{% url "system:purchase_plugin" %}', {
+        const response = await fetch('{% url "system:purchase_module" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ plugin_id: pluginId })
+            body: JSON.stringify({ module_id: moduleId })
         });
         const data = await response.json();
 
@@ -131,7 +131,7 @@ async function purchasePlugin(pluginId, button) {
             window.open(data.checkout_url, '_blank');
             Toast.info('{% trans "Complete payment in the opened window" %}');
         } else if (data.already_owned) {
-            Toast.warning('{% trans "You already own this plugin" %}');
+            Toast.warning('{% trans "You already own this module" %}');
         } else {
             Toast.error(data.error || '{% trans "Error starting purchase" %}');
         }
@@ -142,27 +142,27 @@ async function purchasePlugin(pluginId, button) {
     }
 }
 
-// Download and install plugin
-async function downloadAndInstall(pluginSlug, downloadUrl) {
+// Download and install module
+async function downloadAndInstall(moduleSlug, downloadUrl) {
     try {
         const response = await fetch('{% url "system:install_from_marketplace" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ plugin_slug: pluginSlug, download_url: downloadUrl })
+            body: JSON.stringify({ module_slug: moduleSlug, download_url: downloadUrl })
         });
         const data = await response.json();
 
         if (data.success) {
-            Toast.success('{% trans "Plugin installed successfully!" %}');
-            // Refresh the plugins grid
-            htmx.ajax('GET', '{% url "system:marketplace_plugins_list" %}', { target: '#marketplace-plugins-grid', swap: 'innerHTML' });
+            Toast.success('{% trans "Module installed successfully!" %}');
+            // Refresh the modules grid
+            htmx.ajax('GET', '{% url "system:marketplace_modules_list" %}', { target: '#marketplace-modules-grid', swap: 'innerHTML' });
 
             if (data.requires_restart) {
                 showConfirm(
                     '{% trans "Restart Required" %}',
-                    '{% trans "The server needs to restart to complete plugin setup. Restart now?" %}',
+                    '{% trans "The server needs to restart to complete module setup. Restart now?" %}',
                     () => {
-                        fetch('{% url "system:plugin_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+                        fetch('{% url "system:module_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
                             .then(() => setTimeout(() => window.location.reload(), 2000));
                     },
                     '{% trans "Restart" %}',
@@ -170,10 +170,10 @@ async function downloadAndInstall(pluginSlug, downloadUrl) {
                 );
             }
         } else {
-            Toast.error(data.error || '{% trans "Error installing plugin" %}');
+            Toast.error(data.error || '{% trans "Error installing module" %}');
         }
     } catch (error) {
-        Toast.error('{% trans "Error downloading plugin" %}');
+        Toast.error('{% trans "Error downloading module" %}');
     }
 }
 

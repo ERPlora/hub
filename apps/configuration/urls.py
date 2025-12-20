@@ -8,7 +8,7 @@ Contains:
 All other routes are now in their proper apps:
 - Dashboard: apps.main.index
 - Settings: apps.main.settings
-- Plugins: apps.system.plugins
+- Modules: apps.system.modules
 """
 from django.urls import path
 from . import views_maintenance, views_files

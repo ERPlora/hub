@@ -21,7 +21,7 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
-from apps.plugins_runtime.router import plugin_urlpatterns
+from apps.modules_runtime.router import module_urlpatterns
 from apps.core.views import set_language
 from apps.configuration.views import pwa_manifest, pwa_serviceworker, pwa_offline
 
@@ -29,7 +29,7 @@ from apps.configuration.views import pwa_manifest, pwa_serviceworker, pwa_offlin
 from apps.auth.login.api import api_urlpatterns as auth_api_urls
 from apps.accounts.api import api_urlpatterns as employees_api_urls
 from apps.configuration.api import api_urlpatterns as config_api_urls
-from apps.system.plugins.api import api_urlpatterns as plugins_api_urls
+from apps.system.modules.api import api_urlpatterns as modules_api_urls
 from apps.core.api import api_urlpatterns as system_api_urls
 
 urlpatterns = [
@@ -41,7 +41,7 @@ urlpatterns = [
     path('api/v1/auth/', include((auth_api_urls, 'api_auth'))),
     path('api/v1/employees/', include((employees_api_urls, 'api_employees'))),
     path('api/v1/config/', include((config_api_urls, 'api_config'))),
-    path('api/v1/plugins/', include((plugins_api_urls, 'api_plugins'))),
+    path('api/v1/modules/', include((modules_api_urls, 'api_modules'))),
     path('api/v1/system/', include((system_api_urls, 'api_system'))),
 
     # API Documentation (Swagger/OpenAPI)
@@ -80,8 +80,8 @@ urlpatterns = [
     # Main routes (dashboard, settings, employees)
     path('dashboard/', include('apps.main.urls')),
 
-    # System routes (plugins, marketplace)
-    path('plugins/', include('apps.system.plugins.urls')),
+    # System routes (modules, marketplace)
+    path('modules/', include('apps.system.modules.urls')),
 
     # Configuration (maintenance utilities)
     path('config/', include('apps.configuration.urls')),
@@ -94,8 +94,8 @@ urlpatterns = [
 ]
 
 
-# Añadir las URLs dinámicas de plugins
-urlpatterns += plugin_urlpatterns
+# Añadir las URLs dinámicas de modules
+urlpatterns += module_urlpatterns
 
 # Serve static and media files in development
 if settings.DEBUG:

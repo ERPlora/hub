@@ -1,0 +1,12 @@
+{% extends "dashboard/layout.html" %}
+{% load i18n %}
+
+{% block page_title %}{% trans "Modules" %}{% endblock %}
+
+{% block section_tabbar %}
+{% include "system/modules/partials/tabbar_system.html" %}
+{% endblock %}
+
+{% block dashboard_content %}
+{% include "system/modules/partials/installed_content.html" %}
+{% endblock %}
