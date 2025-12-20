@@ -87,18 +87,12 @@
 'urllib3>=2.0.0'              # HTTP bajo nivel (incluido en requests)
 'httpx>=0.25.0'               # HTTP async (más moderno que requests)
 'websockets>=12.0'            # WebSocket cliente (notificaciones Cloud)
-'paramiko>=3.4.0'             # SSH tunneling (alternativa a FRP)
-'sshtunnel>=0.4.0'            # SSH tunnels simplificados
-'frpc'                        # FRP client (ya lo usas, pero podría ser Python)
 ```
 
 **Casos de uso:**
-- Conectar Hub con Cloud vía FRP
 - WebSocket para notificaciones en tiempo real
 - APIs de pagos (Stripe, PayPal)
 - Webhooks de integraciones
-
-**Nota:** FRP client podría reemplazarse con `paramiko` + `sshtunnel` si quieres todo en Python.
 
 ---
 

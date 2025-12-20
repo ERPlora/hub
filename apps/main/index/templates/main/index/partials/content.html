@@ -1,0 +1,151 @@
+{% load i18n %}
+
+{% if request.htmx %}
+<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+{% include "dashboard/partials/tabbar_main.html" %}
+</div>
+{% endif %}
+
+<div class="ion-padding">
+    <h1 class="text-2xl font-bold mb-6">{% trans "Welcome to ERPlora Hub" %}</h1>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <ion-card>
+            <ion-card-content class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <ion-icon name="cube-outline" class="text-2xl text-primary"></ion-icon>
+                </div>
+                <div>
+                    <p class="text-sm text-medium m-0">{% trans "Products" %}</p>
+                    <p class="text-2xl font-bold m-0">0</p>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+            <ion-card-content class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center">
+                    <ion-icon name="cart-outline" class="text-2xl text-success"></ion-icon>
+                </div>
+                <div>
+                    <p class="text-sm text-medium m-0">{% trans "Sales Today" %}</p>
+                    <p class="text-2xl font-bold m-0">0</p>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+            <ion-card-content class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-lg bg-warning/10 flex items-center justify-center">
+                    <ion-icon name="people-outline" class="text-2xl text-warning"></ion-icon>
+                </div>
+                <div>
+                    <p class="text-sm text-medium m-0">{% trans "Customers" %}</p>
+                    <p class="text-2xl font-bold m-0">0</p>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+            <ion-card-content class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-lg bg-tertiary/10 flex items-center justify-center">
+                    <ion-icon name="extension-puzzle-outline" class="text-2xl text-tertiary"></ion-icon>
+                </div>
+                <div>
+                    <p class="text-sm text-medium m-0">{% trans "Plugins" %}</p>
+                    <p class="text-2xl font-bold m-0">{{ PLUGIN_MENU_ITEMS|length|default:0 }}</p>
+                </div>
+            </ion-card-content>
+        </ion-card>
+    </div>
+
+    <!-- Quick Actions -->
+    <ion-card>
+        <ion-card-header>
+            <ion-card-title>{% trans "Quick Actions" %}</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <ion-button expand="block" fill="outline"
+                    hx-get="{% url 'system:marketplace' %}"
+                    hx-target="#dashboard-content"
+                    hx-push-url="true">
+                    <ion-icon slot="start" name="storefront-outline"></ion-icon>
+                    {% trans "Plugin Store" %}
+                </ion-button>
+
+                <ion-button expand="block" fill="outline"
+                    hx-get="{% url 'main:settings' %}"
+                    hx-target="#dashboard-content"
+                    hx-push-url="true">
+                    <ion-icon slot="start" name="settings-outline"></ion-icon>
+                    {% trans "Settings" %}
+                </ion-button>
+
+                <ion-button expand="block" fill="outline"
+                    hx-get="{% url 'main:employees' %}"
+                    hx-target="#dashboard-content"
+                    hx-push-url="true">
+                    <ion-icon slot="start" name="people-outline"></ion-icon>
+                    {% trans "Employees" %}
+                </ion-button>
+
+                <ion-button expand="block" fill="outline"
+                    hx-get="{% url 'system:plugins' %}"
+                    hx-target="#dashboard-content"
+                    hx-push-url="true">
+                    <ion-icon slot="start" name="extension-puzzle-outline"></ion-icon>
+                    {% trans "Plugins" %}
+                </ion-button>
+            </div>
+        </ion-card-content>
+    </ion-card>
+
+    <!-- Getting Started -->
+    <ion-card class="mt-4">
+        <ion-card-header>
+            <ion-card-title>{% trans "Getting Started" %}</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+            <ion-list>
+                <ion-item>
+                    <ion-icon name="checkmark-circle" slot="start" color="success"></ion-icon>
+                    <ion-label>
+                        <h3>{% trans "Hub configured" %}</h3>
+                        <p>{% trans "Your Hub is connected to ERPlora Cloud" %}</p>
+                    </ion-label>
+                </ion-item>
+
+                <ion-item>
+                    <ion-icon name="ellipse-outline" slot="start" color="medium"></ion-icon>
+                    <ion-label>
+                        <h3>{% trans "Install plugins" %}</h3>
+                        <p>{% trans "Visit the Plugin Store to add functionality" %}</p>
+                    </ion-label>
+                    <ion-button slot="end" fill="clear"
+                        hx-get="{% url 'system:marketplace' %}"
+                        hx-target="#dashboard-content"
+                        hx-push-url="true">
+                        {% trans "Browse" %}
+                    </ion-button>
+                </ion-item>
+
+                <ion-item>
+                    <ion-icon name="ellipse-outline" slot="start" color="medium"></ion-icon>
+                    <ion-label>
+                        <h3>{% trans "Configure your store" %}</h3>
+                        <p>{% trans "Set up your business information" %}</p>
+                    </ion-label>
+                    <ion-button slot="end" fill="clear"
+                        hx-get="{% url 'main:settings' %}"
+                        hx-target="#dashboard-content"
+                        hx-push-url="true">
+                        {% trans "Settings" %}
+                    </ion-button>
+                </ion-item>
+            </ion-list>
+        </ion-card-content>
+    </ion-card>
+</div>

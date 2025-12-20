@@ -5,24 +5,34 @@ Configuración para despliegue en Docker/Cloud.
 Desplegado automáticamente via Dokploy API cuando el cliente compra un Hub.
 
 Variables de entorno (configuradas por Cloud durante deploy):
-  - HUB_ID: UUID del Hub (ej: 1aba6e2f-777b-450d-9818-edc2bd0a93c4)
-  - HUB_NAME: Nombre del Hub (ej: mi-tienda)
+  - HUB_ID: UUID del Hub
+  - HUB_NAME: Nombre del Hub (subdomain)
+  - DATABASE_URL: PostgreSQL connection (Hub plan - shared per org)
+  - DATABASE_PATH: SQLite path (Starter plan - isolated per hub)
   - AWS_* : Credenciales S3
 
-Estructura de almacenamiento (todo automático via HUB_ID):
+Database Configuration:
+  - Starter plan: SQLite per Hub (DATABASE_PATH)
+    Each Hub has its own isolated database.
 
-  Docker Volume /app/data/{HUB_ID}/:
-    - db/db.sqlite3 - Base de datos SQLite (PERSISTENTE)
+  - Hub plan: PostgreSQL per Organization (DATABASE_URL)
+    All Hubs in the same organization share one PostgreSQL database.
+    Products, clients, and inventory are shared across stores.
+
+Storage structure (automatic via HUB_ID):
+
+  Docker Volume /app/data/:
+    - db/db.sqlite3 - SQLite (Starter plan only)
 
   S3 hubs/{HUB_ID}/:
-    - backups/     - Backups de BD
-    - plugin_data/ - Datos de plugins
-    - reports/     - Reportes generados
-    - media/       - Archivos subidos (Django media)
+    - backups/     - Database backups
+    - plugin_data/ - Plugin data
+    - reports/     - Generated reports
+    - media/       - Uploaded files (Django media)
 
-  Contenedor (efímero, se pierde al reiniciar):
-    - /tmp/hub_media/ - Archivos temporales de procesamiento
-    - Logs via stdout/stderr (Docker los captura automáticamente)
+  Container (ephemeral):
+    - /tmp/hub_media/ - Temporary processing files
+    - Logs via stdout/stderr (Docker captures automatically)
 """
 
 from .base import *
@@ -43,26 +53,43 @@ HUB_ID = config('HUB_ID')  # Required - UUID del Hub
 HUB_NAME = config('HUB_NAME', default='hub')
 
 # =============================================================================
-# PATHS - Local storage for SQLite (persistent via Docker Volume)
+# DATABASE - PostgreSQL (Hub plan) or SQLite (Starter plan)
 # =============================================================================
 
-# Data directory - /app/data is mounted as Docker Volume
-# The volume mount already isolates by HUB_ID:
-#   Host: ${VOLUME_PATH}/hubs/${HUB_ID} -> Container: /app/data
-# So /app/data IS the Hub-specific directory
-DATA_DIR = Path('/app/data')
+# Cloud deploys Hubs with one of:
+#   - DATABASE_URL: PostgreSQL for Hub plan (shared per organization)
+#   - DATABASE_PATH: SQLite for Starter plan (isolated per Hub)
 
-# Database (SQLite) - inside the Hub's data directory
-# Structure: /app/data/db/db.sqlite3 (which maps to ${VOLUME_PATH}/hubs/${HUB_ID}/db/db.sqlite3 on host)
-DATABASE_DIR = DATA_DIR / 'db'
-DATABASE_DIR.mkdir(parents=True, exist_ok=True)
-DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
+DATABASE_URL = config('DATABASE_URL', default='')
+DATABASE_PATH = config('DATABASE_PATH', default='')
 
-# Plugins - stored locally in container (distributed from Cloud marketplace)
-# Dokploy deploys with latest plugins from GitHub repo
-PLUGINS_DIR = BASE_DIR / 'plugins'
-PLUGINS_ROOT = PLUGINS_DIR
-PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
+if DATABASE_URL:
+    # Hub plan: PostgreSQL (shared database for all Hubs in organization)
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
+    }
+    # Data directory for other local files (logs, temp, etc.)
+    DATA_DIR = Path('/app/data')
+else:
+    # Starter plan: SQLite (isolated database per Hub)
+    # Data directory - /app/data is mounted as Docker Volume
+    DATA_DIR = Path('/app/data')
+
+    # Database (SQLite) - inside the Hub's data directory
+    if DATABASE_PATH:
+        # Use explicit path from Cloud deployment
+        db_path = Path(DATABASE_PATH)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        DATABASES['default']['NAME'] = db_path
+    else:
+        # Default fallback
+        DATABASE_DIR = DATA_DIR / 'db'
+        DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+        DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
+
+# Plugins - uses base.py config (PLUGINS_DIR from DataPaths or env var)
+# In Docker: /app/plugins/ by default, can be overridden via PLUGINS_DIR env var
 
 # =============================================================================
 # S3 STORAGE - Hetzner Object Storage (hubs/{HUB_ID}/)
@@ -262,6 +289,8 @@ COMMAND_POLL_INTERVAL = config('COMMAND_POLL_INTERVAL', default=30, cast=int)  #
 # STARTUP INFO
 # =============================================================================
 
+_db_type = 'PostgreSQL' if DATABASE_URL else 'SQLite'
+_db_name = DATABASES['default'].get('NAME', DATABASE_URL.split('/')[-1] if DATABASE_URL else 'unknown')
 print(f"[HUB] {HUB_NAME} ({HUB_ID})")
-print(f"[HUB] Database: {DATABASES['default']['NAME']}")
+print(f"[HUB] Database: {_db_type} - {_db_name}")
 print(f"[HUB] S3: {AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/")

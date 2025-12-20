@@ -282,3 +282,23 @@ body.dark {
   --muted-foreground: #94a3b8;
   --border: #334155;
 }
+
+/* ========================================
+   ION-SEGMENT STYLES
+   ======================================== */
+
+/* Segment container */
+ion-segment {
+  --background: var(--ion-color-light);
+}
+
+body.dark ion-segment {
+  --background: var(--ion-color-light);
+}
+
+/* Segment buttons - uses theme variables for automatic adaptation */
+ion-segment-button {
+  --color: var(--ion-color-medium);
+  --color-checked: var(--ion-color-primary-contrast);
+  --indicator-color: var(--ion-color-primary);
+}

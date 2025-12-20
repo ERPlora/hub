@@ -81,6 +81,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third-party
+    'rest_framework',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
     'djmoney',
     'django_htmx',
     # Health Check
@@ -88,12 +91,22 @@ INSTALLED_APPS = [
     'health_check.db',
     'health_check.cache',
     'health_check.storage',
-    # Hub apps
+    # Hub apps - Core
     'apps.accounts.apps.AccountsConfig',
     'apps.configuration.apps.ConfigurationConfig',
     'apps.sync.apps.SyncConfig',
     'apps.core.apps.CoreConfig',
     'apps.plugins_runtime',
+    # Hub apps - Auth
+    'apps.auth.login.apps.AuthLoginConfig',
+    # Hub apps - Main
+    'apps.main.index.apps.MainIndexConfig',
+    'apps.main.files.apps.FilesConfig',
+    'apps.main.settings.apps.MainSettingsConfig',
+    'apps.main.employees.apps.MainEmployeesConfig',
+    'apps.main.setup.apps.SetupConfig',
+    # Hub apps - System
+    'apps.system.plugins.apps.SystemPluginsConfig',
 ]
 
 MIDDLEWARE = [
@@ -118,7 +131,9 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'templates',  # Global templates (base.html)
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -178,6 +193,14 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+# Language cookie settings (for auto-detection and persistence)
+# Middleware priority: 1. LocaleMiddleware checks URL (not used)
+# 2. Session, 3. Cookie, 4. Browser Accept-Language, 5. LANGUAGE_CODE
+LANGUAGE_COOKIE_NAME = 'django_language'
+LANGUAGE_COOKIE_AGE = 31536000  # 1 year
+LANGUAGE_COOKIE_SECURE = False  # Hub runs locally
+LANGUAGE_COOKIE_SAMESITE = 'Lax'
+
 # =============================================================================
 # STATIC & MEDIA FILES
 # =============================================================================
@@ -195,8 +218,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CLOUD API
 # =============================================================================
 
-# Read from CLOUD_BASE_URL (consistent with Cloud) or fallback to CLOUD_API_URL for backwards compatibility
-CLOUD_API_URL = config('CLOUD_BASE_URL', default=config('CLOUD_API_URL', default='https://int.erplora.com'))
+# Cloud base URL (API endpoints are at /api/...)
+# Priority: CLOUD_URL > CLOUD_BASE_URL > CLOUD_API_URL (legacy)
+CLOUD_API_URL = config('CLOUD_URL', default=config('CLOUD_BASE_URL', default=config('CLOUD_API_URL', default='https://int.erplora.com')))
 
 # =============================================================================
 # DEPLOYMENT MODE (overridden per environment)
@@ -221,11 +245,19 @@ HUB_VERSION = "1.0.0"
 # Detect frozen (PyInstaller) vs development
 DEVELOPMENT_MODE = not getattr(sys, 'frozen', False) and config('ERPLORA_DEV_MODE', default='true', cast=bool)
 
-# Plugin paths (set per environment)
-PLUGINS_DIR = BASE_DIR / 'plugins'
+# Plugin paths - auto-detected via DataPaths (Docker vs Desktop)
+# Can be overridden via PLUGINS_DIR env var
+from config.paths import get_plugins_dir
+_plugins_dir_env = config('PLUGINS_DIR', default='')
+if _plugins_dir_env:
+    PLUGINS_DIR = Path(_plugins_dir_env)
+    PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
+else:
+    PLUGINS_DIR = get_plugins_dir()
+
 PLUGINS_ROOT = PLUGINS_DIR
 
-# Plugin discovery paths (extended per environment)
+# Plugin discovery paths
 PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
 
 # Plugin security
@@ -252,26 +284,88 @@ PLUGIN_SIGNATURE_ALGORITHM = 'RSA-SHA256'
 PLUGIN_SIGNATURE_KEY_SIZE = 4096
 
 # =============================================================================
+# DJANGO REST FRAMEWORK
+# =============================================================================
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PERMISSION_CLASSES': [
+        'apps.core.api_base.IsAuthenticated',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+}
+
+# =============================================================================
+# DRF-SPECTACULAR (SWAGGER/OPENAPI)
+# =============================================================================
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'ERPlora Hub API',
+    'DESCRIPTION': '''
+## ERPlora Hub REST API
+
+API completa para gestionar el Hub de ERPlora:
+
+- **Authentication**: Login con PIN o Cloud, setup de PIN, logout
+- **Employees**: CRUD de empleados, reset de PIN
+- **Configuration**: Configuración del Hub y tienda
+- **Plugins**: Gestión de plugins, marketplace
+- **System**: Health check, actualizaciones
+
+### Autenticación
+
+La API usa autenticación basada en sesión. Primero debes hacer login:
+
+1. `POST /api/v1/auth/pin-login/` - Login con PIN local
+2. `POST /api/v1/auth/cloud-login/` - Login con credenciales de Cloud
+
+Después del login, las cookies de sesión se incluyen automáticamente en las peticiones.
+    ''',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+        'filter': True,
+    },
+    'TAGS': [
+        {'name': 'Authentication', 'description': 'Login, logout, PIN setup'},
+        {'name': 'Employees', 'description': 'Employee/user management'},
+        {'name': 'Configuration', 'description': 'Hub and store settings'},
+        {'name': 'Plugins', 'description': 'Plugin management'},
+        {'name': 'Marketplace', 'description': 'Plugin marketplace'},
+        {'name': 'System', 'description': 'Health check, updates, language'},
+    ],
+    'COMPONENT_SPLIT_REQUEST': True,
+    # Use sidecar for static files (Swagger UI CSS/JS)
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
+}
+
+# =============================================================================
 # DJANGO MONEY
 # =============================================================================
 
-CURRENCIES = ('USD', 'EUR', 'GBP', 'JPY', 'CNY', 'MXN', 'CAD', 'AUD', 'BRL', 'ARS', 'COP', 'CLP', 'PEN', 'CRC')
-CURRENCY_CHOICES = [
-    ('USD', 'US Dollar ($)'),
-    ('EUR', 'Euro (€)'),
-    ('GBP', 'British Pound (£)'),
-    ('JPY', 'Japanese Yen (¥)'),
-    ('CNY', 'Chinese Yuan (¥)'),
-    ('MXN', 'Mexican Peso ($)'),
-    ('CAD', 'Canadian Dollar ($)'),
-    ('AUD', 'Australian Dollar ($)'),
-    ('BRL', 'Brazilian Real (R$)'),
-    ('ARS', 'Argentine Peso ($)'),
-    ('COP', 'Colombian Peso ($)'),
-    ('CLP', 'Chilean Peso ($)'),
-    ('PEN', 'Peruvian Sol (S/)'),
-    ('CRC', 'Costa Rican Colón (₡)'),
-]
+# Import all currencies from django-money (308 ISO 4217 currencies)
+from config.currencies import CURRENCY_CHOICES, POPULAR_CURRENCY_CHOICES
+
+# Default currency for Hub
+DEFAULT_CURRENCY = "EUR"
+
+# Allowed currencies (use popular for UI selects)
+CURRENCIES = tuple([code for code, _ in POPULAR_CURRENCY_CHOICES])
 
 # =============================================================================
 # LOGGING (base config - paths set per environment)
@@ -352,21 +446,18 @@ def load_plugins():
 
 def load_plugin_templates():
     """Add plugin template directories to Django"""
-    template_dirs = []
+    # Start with the existing global templates directory
+    template_dirs = list(TEMPLATES[0]['DIRS'])
 
     if PLUGINS_DIR.exists():
         for plugin_dir in PLUGINS_DIR.iterdir():
             if plugin_dir.is_dir() and (plugin_dir / 'templates').exists():
                 template_dirs.append(plugin_dir / 'templates')
 
-    if template_dirs:
-        TEMPLATES[0]['DIRS'] = template_dirs
+    # Update DIRS with all template directories
+    TEMPLATES[0]['DIRS'] = template_dirs
 
 
-# Load plugins on import
-load_plugins()
-load_plugin_templates()
-
-# Add plugins to sys.path
-if PLUGINS_DIR.exists():
-    sys.path.insert(0, str(PLUGINS_DIR))
+# NOTE: load_plugins() and load_plugin_templates() are called by each
+# environment-specific settings file AFTER PLUGINS_DIR is properly set.
+# Do NOT call them here in base.py.

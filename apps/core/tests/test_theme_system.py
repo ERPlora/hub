@@ -86,14 +86,14 @@ class TestThemeContextProcessor:
 
     def test_hub_config_in_context(self, authenticated_client, hub_config):
         """Test hub_config is available in settings view."""
-        response = authenticated_client.get(reverse('configuration:settings'))
+        response = authenticated_client.get(reverse('main:settings'))
         assert response.status_code == 200
         assert 'hub_config' in response.context
         assert response.context['hub_config'] == hub_config
 
     def test_hub_config_in_dashboard(self, authenticated_client, hub_config):
         """Test hub_config is available in dashboard view."""
-        response = authenticated_client.get(reverse('configuration:dashboard'))
+        response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         assert 'hub_config' in response.context
 
@@ -107,7 +107,7 @@ class TestThemeAPI:
         assert hub_config.color_theme == 'default'
 
         response = authenticated_client.post(
-            reverse('configuration:settings'),
+            reverse('main:settings'),
             data={
                 'action': 'update_theme',
                 'color_theme': 'blue',
@@ -125,7 +125,7 @@ class TestThemeAPI:
         assert hub_config.dark_mode is False
 
         response = authenticated_client.post(
-            reverse('configuration:settings'),
+            reverse('main:settings'),
             data={
                 'action': 'update_theme',
                 'color_theme': 'default',
@@ -143,7 +143,7 @@ class TestThemeAPI:
         assert hub_config.auto_print is False
 
         response = authenticated_client.post(
-            reverse('configuration:settings'),
+            reverse('main:settings'),
             data={
                 'action': 'update_theme',
                 'color_theme': 'default',
@@ -159,7 +159,7 @@ class TestThemeAPI:
     def test_update_all_preferences(self, authenticated_client, hub_config):
         """Test updating all theme preferences at once."""
         response = authenticated_client.post(
-            reverse('configuration:settings'),
+            reverse('main:settings'),
             data={
                 'action': 'update_theme',
                 'color_theme': 'blue',
@@ -177,7 +177,7 @@ class TestThemeAPI:
     def test_theme_update_requires_authentication(self, client):
         """Test that theme update requires authentication."""
         response = client.post(
-            reverse('configuration:settings'),
+            reverse('main:settings'),
             data={
                 'action': 'update_theme',
                 'color_theme': 'blue',
@@ -188,7 +188,7 @@ class TestThemeAPI:
 
         # Should redirect to login
         assert response.status_code == 302
-        assert response.url == reverse('accounts:login')
+        assert response.url == reverse('auth:login')
 
 
 @pytest.mark.django_db
@@ -197,7 +197,7 @@ class TestThemeTemplateRendering:
 
     def test_default_theme_rendered(self, authenticated_client, hub_config):
         """Test that default theme is loaded in template."""
-        response = authenticated_client.get(reverse('configuration:dashboard'))
+        response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         content = response.content.decode()
         assert 'ionic-theme-default.css' in content
@@ -207,7 +207,7 @@ class TestThemeTemplateRendering:
         hub_config.color_theme = 'blue'
         hub_config.save()
 
-        response = authenticated_client.get(reverse('configuration:dashboard'))
+        response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         content = response.content.decode()
         assert 'ionic-theme-blue.css' in content
@@ -217,7 +217,7 @@ class TestThemeTemplateRendering:
         hub_config.dark_mode = True
         hub_config.save()
 
-        response = authenticated_client.get(reverse('configuration:dashboard'))
+        response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         content = response.content.decode()
         # Check that dark mode is applied in script
@@ -232,7 +232,7 @@ class TestThemePersistence:
         """Test that theme preferences persist after logout."""
         # Set theme preferences
         authenticated_client.post(
-            reverse('configuration:settings'),
+            reverse('main:settings'),
             data={
                 'action': 'update_theme',
                 'color_theme': 'blue',
@@ -242,7 +242,7 @@ class TestThemePersistence:
         )
 
         # Logout
-        authenticated_client.get(reverse('accounts:logout'))
+        authenticated_client.get(reverse('auth:logout'))
 
         # Check that preferences are still in database
         hub_config.refresh_from_db()

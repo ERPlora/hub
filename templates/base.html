@@ -1,0 +1,324 @@
+{% load static %}
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="ERPlora Hub - Point of Sale System">
+    <title>{% block title %}ERPlora Hub{% endblock %}</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#3880ff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ERPlora Hub">
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+    <link rel="apple-touch-icon" href="{% static 'img/icons/icon-152x152.png' %}">
+
+    <!-- Plus Jakarta Sans Font (local) -->
+    <link rel="stylesheet" href="{% static 'fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
+
+    <!-- Ionic CSS (offline) -->
+    <link rel="stylesheet" href="{% static 'css/ionic.bundle.css' %}" />
+
+    <!-- Theme Colors (from HubConfig) -->
+    <link rel="stylesheet" href="{% static 'css/themes/' %}{{ HUB_CONFIG.color_theme|default:'default' }}/ionic-theme.css" id="theme-stylesheet">
+
+    <!-- Tailwind CSS (offline) -->
+    <script src="{% static 'js/tailwind.cdn.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/tailwind-ionic.css' %}">
+
+    <!-- Alpine.js (offline) -->
+    <script defer src="{% static 'js/alpine.min.js' %}"></script>
+
+    <!-- HTMX (offline) -->
+    <script src="{% static 'js/htmx.min.js' %}"></script>
+
+    <!-- UI Helpers (Toast, Alert, Loading) -->
+    <script src="{% static 'js/ui-helpers.js' %}"></script>
+
+    <!-- Ionic Core (offline) -->
+    <script type="module" src="{% static 'js/ionic/ionic.esm.js' %}"></script>
+
+    <!-- Ionicons (offline) -->
+    <script type="module" src="{% static 'ionicons/dist/esm/ionicons.js' %}"></script>
+    <script nomodule src="{% static 'ionicons/dist/ionicons.js' %}"></script>
+
+    <!-- Ionic Config (iOS mode) -->
+    <script>
+        window.Ionic = { config: { mode: 'ios' } };
+    </script>
+
+    <!-- Theme Switcher -->
+    <script>
+        function setTheme(themeName) {
+            const themeLink = document.getElementById('theme-stylesheet');
+            if (themeLink) {
+                themeLink.href = `/static/css/themes/${themeName}/ionic-theme.css`;
+            }
+        }
+
+        function getCurrentTheme() {
+            return '{{ HUB_CONFIG.color_theme|default:"default" }}';
+        }
+    </script>
+
+    <!-- HTMX Configuration -->
+    <script>
+        // Enable HTMX to process inline scripts
+        htmx.config.allowScriptTags = true;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Include CSRF token in all HTMX requests
+            document.body.addEventListener('htmx:configRequest', function(event) {
+                event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            });
+
+            // Re-initialize Alpine components after HTMX swaps
+            document.body.addEventListener('htmx:afterSwap', function(event) {
+                // Let Alpine process any new x-data elements
+                if (typeof Alpine !== 'undefined') {
+                    Alpine.initTree(event.detail.target);
+                }
+            });
+        });
+    </script>
+
+    <!-- Automatic Language Detection -->
+    <script>
+        (function() {
+            // Check if user already has a language preference (cookie)
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+
+            const hasPreference = getCookie('django_language');
+
+            if (!hasPreference) {
+                // Detect browser language
+                const browserLang = navigator.language || navigator.userLanguage;
+                const langCode = browserLang.toLowerCase().split('-')[0]; // Get 'es' from 'es-ES'
+
+                // Supported languages
+                const supportedLangs = ['en', 'es'];
+                const selectedLang = supportedLangs.includes(langCode) ? langCode : 'en';
+
+                // Set language preference automatically (only if not English, which is default)
+                if (selectedLang !== 'en') {
+                    fetch('/set-language/?language=' + selectedLang + '&next=' + encodeURIComponent(window.location.pathname))
+                        .then(() => {
+                            // Reload page to apply language
+                            window.location.reload();
+                        });
+                }
+            }
+        })();
+    </script>
+
+    <style>
+        /* Global Variables */
+        :root {
+            --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            --font-size: 16px;
+            --radius: 0.625rem;
+        }
+
+        * {
+            font-family: var(--font-sans);
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        /* Ionic Component Customizations */
+        ion-button, ion-card, ion-item, ion-list, ion-menu, ion-toolbar {
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        ion-card {
+            border-radius: var(--radius);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        body.dark ion-card {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        ion-button {
+            --border-radius: var(--radius);
+            text-transform: none;
+            font-weight: 500;
+        }
+
+        ion-input, ion-textarea, ion-select {
+            --border-radius: var(--radius);
+        }
+
+        ion-toolbar {
+            --border-width: 0 0 1px 0;
+        }
+
+        ion-item {
+            --border-radius: var(--radius);
+        }
+
+        ion-list {
+            padding: 0;
+        }
+
+        ion-toast {
+            --background: var(--ion-card-background) !important;
+            --color: var(--ion-card-color) !important;
+            --border-radius: var(--radius) !important;
+        }
+
+        ion-toast.toast-success {
+            --background: var(--ion-color-success) !important;
+            --color: var(--ion-color-success-contrast) !important;
+        }
+
+        ion-action-sheet {
+            --background: var(--ion-card-background) !important;
+            --color: var(--ion-card-color) !important;
+        }
+
+        ion-action-sheet .action-sheet-button {
+            color: var(--ion-text-color) !important;
+        }
+
+        ion-action-sheet .action-sheet-title {
+            color: var(--ion-text-color) !important;
+        }
+
+        .ion-page {
+            --padding-top: 0;
+            --padding-bottom: 0;
+            --padding-start: 0;
+            --padding-end: 0;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+    {% block extra_head %}{% endblock %}
+
+    <!-- PWA Install Handler -->
+    <script>
+        // Store the install prompt event
+        let deferredPrompt = null;
+        let pwaInstalled = false;
+
+        // Check if app is already installed
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            pwaInstalled = true;
+        }
+
+        // Listen for the beforeinstallprompt event
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the mini-infobar from appearing
+            e.preventDefault();
+            // Save the event for later
+            deferredPrompt = e;
+            // Show install button
+            document.dispatchEvent(new CustomEvent('pwa-installable'));
+            console.log('[PWA] Install prompt available');
+        });
+
+        // Listen for successful installation
+        window.addEventListener('appinstalled', () => {
+            pwaInstalled = true;
+            deferredPrompt = null;
+            document.dispatchEvent(new CustomEvent('pwa-installed'));
+            console.log('[PWA] App installed successfully');
+        });
+
+        // Function to trigger installation
+        async function installPWA() {
+            if (!deferredPrompt) {
+                console.log('[PWA] No install prompt available');
+                return false;
+            }
+
+            // Show the install prompt
+            deferredPrompt.prompt();
+
+            // Wait for user response
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log('[PWA] User response:', outcome);
+
+            // Clear the prompt
+            deferredPrompt = null;
+
+            return outcome === 'accepted';
+        }
+
+        // Check if PWA can be installed
+        function canInstallPWA() {
+            return deferredPrompt !== null && !pwaInstalled;
+        }
+
+        // Check if PWA is installed
+        function isPWAInstalled() {
+            return pwaInstalled || window.matchMedia('(display-mode: standalone)').matches;
+        }
+    </script>
+    <!-- Auto dark mode detection (runs before body renders to prevent flash) -->
+    <script>
+        (function() {
+            const darkModeAuto = {{ HUB_CONFIG.dark_mode_auto|yesno:"true,false" }};
+            const darkModeManual = {{ HUB_CONFIG.dark_mode|yesno:"true,false" }};
+
+            let isDark = false;
+            if (darkModeAuto) {
+                // Use browser/OS preference
+                isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            } else {
+                // Use manual setting from database
+                isDark = darkModeManual;
+            }
+
+            // Store for Alpine.js components to access
+            window.ERPlora = window.ERPlora || {};
+            window.ERPlora.isDark = isDark;
+            window.ERPlora.darkModeAuto = darkModeAuto;
+
+            // Apply immediately to prevent flash
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <script>
+        // Apply dark class to body (documentElement already has it if needed)
+        if (window.ERPlora && window.ERPlora.isDark) {
+            document.body.classList.add('dark');
+        }
+
+        // Listen for system preference changes (only if auto mode)
+        if (window.ERPlora && window.ERPlora.darkModeAuto) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                document.body.classList.toggle('dark', e.matches);
+                document.documentElement.classList.toggle('dark', e.matches);
+                window.ERPlora.isDark = e.matches;
+            });
+        }
+    </script>
+
+    <ion-app mode="ios">
+        {% block content %}{% endblock %}
+    </ion-app>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

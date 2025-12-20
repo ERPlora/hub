@@ -1,0 +1,743 @@
+{% load i18n %}
+
+{% if request.htmx %}
+<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+{% include "dashboard/partials/tabbar_main.html" %}
+</div>
+{% endif %}
+
+<div class="ion-padding" x-data="settingsApp()">
+    <h1 class="text-2xl font-bold mb-6">{% trans "Settings" %}</h1>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Store Information (Full Width) -->
+        <ion-card class="lg:col-span-2">
+            <ion-card-header>
+                <ion-card-title>
+                    {% trans "Store Information" %}
+                    {% if not store_config.is_configured %}
+                    <ion-chip color="warning" class="ml-2">{% trans "Required" %}</ion-chip>
+                    {% endif %}
+                </ion-card-title>
+                <ion-card-subtitle>{% trans "Business details for invoices and receipts" %}</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content>
+                <form @submit.prevent="saveStoreSettings()">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Left Column: Basic Info -->
+                        <div>
+                            <ion-list>
+                                <!-- Business Name -->
+                                <ion-item>
+                                    <ion-input
+                                        type="text"
+                                        label="{% trans 'Business Name' %} *"
+                                        label-placement="floating"
+                                        x-model="store.business_name"
+                                        placeholder="{% trans 'Your business name' %}"
+                                    ></ion-input>
+                                </ion-item>
+
+                                <!-- Business Address -->
+                                <ion-item>
+                                    <ion-textarea
+                                        label="{% trans 'Address' %} *"
+                                        label-placement="floating"
+                                        x-model="store.business_address"
+                                        rows="2"
+                                        placeholder="{% trans 'Street, City, Postal Code' %}"
+                                    ></ion-textarea>
+                                </ion-item>
+
+                                <!-- VAT Number -->
+                                <ion-item>
+                                    <ion-input
+                                        type="text"
+                                        label="{% trans 'VAT/Tax ID' %} *"
+                                        label-placement="floating"
+                                        x-model="store.vat_number"
+                                        placeholder="{% trans 'e.g., ES12345678A' %}"
+                                    ></ion-input>
+                                </ion-item>
+
+                                <!-- Phone -->
+                                <ion-item>
+                                    <ion-input
+                                        type="tel"
+                                        label="{% trans 'Phone' %}"
+                                        label-placement="floating"
+                                        x-model="store.phone"
+                                        placeholder="+34 600 000 000"
+                                    ></ion-input>
+                                </ion-item>
+
+                                <!-- Email -->
+                                <ion-item>
+                                    <ion-input
+                                        type="email"
+                                        label="{% trans 'Email' %}"
+                                        label-placement="floating"
+                                        x-model="store.email"
+                                        placeholder="info@business.com"
+                                    ></ion-input>
+                                </ion-item>
+
+                                <!-- Website -->
+                                <ion-item>
+                                    <ion-input
+                                        type="url"
+                                        label="{% trans 'Website' %}"
+                                        label-placement="floating"
+                                        x-model="store.website"
+                                        placeholder="https://www.business.com"
+                                    ></ion-input>
+                                </ion-item>
+                            </ion-list>
+                        </div>
+
+                        <!-- Right Column: Tax & Receipt -->
+                        <div>
+                            <ion-list>
+                                <!-- Logo -->
+                                <ion-item>
+                                    <ion-label>{% trans "Logo" %}</ion-label>
+                                    <div class="flex items-center gap-4 py-2 w-full">
+                                        <div class="w-16 h-16 border rounded flex items-center justify-center bg-gray-50 dark:bg-gray-800">
+                                            {% if store_config.logo %}
+                                            <img src="{{ store_config.logo.url }}" alt="Logo" class="max-w-full max-h-full object-contain" id="logo-preview">
+                                            {% else %}
+                                            <ion-icon name="image-outline" class="text-3xl text-gray-400" id="logo-preview"></ion-icon>
+                                            {% endif %}
+                                        </div>
+                                        <input type="file" id="logo-input" accept="image/*" class="hidden" @change="handleLogoChange">
+                                        <ion-button fill="outline" size="small" @click="document.getElementById('logo-input').click()">
+                                            {% trans "Upload" %}
+                                        </ion-button>
+                                    </div>
+                                </ion-item>
+
+                                <!-- Tax Rate -->
+                                <ion-item>
+                                    <ion-input
+                                        type="number"
+                                        label="{% trans 'Tax Rate (%)' %}"
+                                        label-placement="floating"
+                                        x-model="store.tax_rate"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        placeholder="21.00"
+                                    ></ion-input>
+                                </ion-item>
+
+                                <!-- Tax Included -->
+                                <ion-item>
+                                    <ion-label>{% trans "Tax included in prices" %}</ion-label>
+                                    <ion-toggle slot="end" :checked="store.tax_included" @ionChange="store.tax_included = $event.detail.checked"></ion-toggle>
+                                </ion-item>
+
+                                <!-- Receipt Header -->
+                                <ion-item>
+                                    <ion-textarea
+                                        label="{% trans 'Receipt Header' %}"
+                                        label-placement="floating"
+                                        x-model="store.receipt_header"
+                                        rows="2"
+                                        placeholder="{% trans 'Text shown at the top of receipts' %}"
+                                    ></ion-textarea>
+                                </ion-item>
+
+                                <!-- Receipt Footer -->
+                                <ion-item>
+                                    <ion-textarea
+                                        label="{% trans 'Receipt Footer' %}"
+                                        label-placement="floating"
+                                        x-model="store.receipt_footer"
+                                        rows="2"
+                                        placeholder="{% trans 'Thank you for your purchase!' %}"
+                                    ></ion-textarea>
+                                </ion-item>
+                            </ion-list>
+                        </div>
+                    </div>
+
+                    <ion-button type="submit" expand="block" class="mt-4" :disabled="saving">
+                        <ion-spinner x-show="saving" name="crescent" class="mr-2"></ion-spinner>
+                        {% trans "Save Store Settings" %}
+                    </ion-button>
+                </form>
+            </ion-card-content>
+        </ion-card>
+
+        <!-- User Settings -->
+        <ion-card>
+            <ion-card-header>
+                <ion-card-title>{% trans "User Preferences" %}</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+                <form @submit.prevent="saveUserSettings()">
+                    <ion-list>
+                        <!-- Language -->
+                        <ion-item>
+                            <ion-select
+                                label="{% trans 'Language' %}"
+                                label-placement="floating"
+                                x-model="language"
+                                interface="popover"
+                            >
+                                {% for code, name in language_choices %}
+                                <ion-select-option value="{{ code }}" {% if user.language == code %}selected{% endif %}>{{ name }}</ion-select-option>
+                                {% endfor %}
+                            </ion-select>
+                        </ion-item>
+
+                        <!-- Avatar -->
+                        <ion-item>
+                            <ion-label>{% trans "Avatar" %}</ion-label>
+                            <div class="flex items-center gap-4 py-2">
+                                <ion-avatar>
+                                    {% if user.avatar %}
+                                    <img src="{{ user.avatar.url }}" alt="{{ user.name }}">
+                                    {% else %}
+                                    <div class="w-full h-full bg-primary flex items-center justify-center text-white font-bold">
+                                        {{ user.get_initials }}
+                                    </div>
+                                    {% endif %}
+                                </ion-avatar>
+                                <input type="file" id="avatar-input" accept="image/*" class="hidden" @change="handleAvatarChange">
+                                <ion-button fill="outline" size="small" @click="document.getElementById('avatar-input').click()">
+                                    {% trans "Change" %}
+                                </ion-button>
+                            </div>
+                        </ion-item>
+                    </ion-list>
+
+                    <ion-button type="submit" expand="block" class="mt-4" :disabled="saving">
+                        <ion-spinner x-show="saving" name="crescent" class="mr-2"></ion-spinner>
+                        {% trans "Save Preferences" %}
+                    </ion-button>
+                </form>
+            </ion-card-content>
+        </ion-card>
+
+        <!-- Hub Settings -->
+        <ion-card>
+            <ion-card-header>
+                <ion-card-title>{% trans "Hub Settings" %}</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+                <form @submit.prevent="saveHubSettings()">
+                    <ion-list>
+                        <!-- Currency -->
+                        <ion-item>
+                            <ion-select
+                                label="{% trans 'Currency' %}"
+                                label-placement="floating"
+                                x-model="currency"
+                                interface="action-sheet"
+                                placeholder="{% trans 'Select currency' %}"
+                            >
+                                {% for code, name in currency_choices %}
+                                <ion-select-option value="{{ code }}" {% if hub_config.currency == code %}selected{% endif %}>{{ code }} - {{ name }}</ion-select-option>
+                                {% endfor %}
+                            </ion-select>
+                        </ion-item>
+
+                        <!-- Dark Mode -->
+                        <ion-item>
+                            <ion-label>{% trans "Dark Mode" %}</ion-label>
+                            <ion-toggle slot="end" :checked="isDark" @ionChange="toggleTheme($event)"></ion-toggle>
+                        </ion-item>
+                    </ion-list>
+
+                    <ion-button type="submit" expand="block" class="mt-4" :disabled="saving">
+                        <ion-spinner x-show="saving" name="crescent" class="mr-2"></ion-spinner>
+                        {% trans "Save Hub Settings" %}
+                    </ion-button>
+                </form>
+            </ion-card-content>
+        </ion-card>
+
+        <!-- Hub Information -->
+        <ion-card>
+            <ion-card-header>
+                <ion-card-title>{% trans "Hub Information" %}</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+                <ion-list>
+                    <ion-item>
+                        <ion-label>
+                            <h3>{% trans "Hub ID" %}</h3>
+                            <p class="font-mono text-xs">{{ hub_config.hub_id|default:"Not configured" }}</p>
+                        </ion-label>
+                    </ion-item>
+
+                    <ion-item>
+                        <ion-label>
+                            <h3>{% trans "Status" %}</h3>
+                            <p>
+                                {% if hub_config.is_configured %}
+                                <ion-chip color="success">{% trans "Connected" %}</ion-chip>
+                                {% else %}
+                                <ion-chip color="warning">{% trans "Not configured" %}</ion-chip>
+                                {% endif %}
+                            </p>
+                        </ion-label>
+                    </ion-item>
+
+                    <ion-item>
+                        <ion-label>
+                            <h3>{% trans "Version" %}</h3>
+                            <p>1.0.0</p>
+                        </ion-label>
+                    </ion-item>
+                </ion-list>
+            </ion-card-content>
+        </ion-card>
+
+        <!-- Cloud Connection -->
+        <ion-card>
+            <ion-card-header>
+                <ion-card-title>{% trans "Cloud Connection" %}</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+                <ion-list>
+                    <ion-item>
+                        <ion-label>
+                            <h3>{% trans "Cloud URL" %}</h3>
+                            <p class="font-mono text-xs">{{ CLOUD_URL }}</p>
+                        </ion-label>
+                    </ion-item>
+                </ion-list>
+
+                <ion-button expand="block" fill="outline" class="mt-4" href="{{ CLOUD_URL }}" target="_blank">
+                    <ion-icon slot="start" name="open-outline"></ion-icon>
+                    {% trans "Open Cloud Portal" %}
+                </ion-button>
+            </ion-card-content>
+        </ion-card>
+
+        <!-- Database Maintenance (Full Width) -->
+        <ion-card class="lg:col-span-2">
+            <ion-card-header>
+                <ion-card-title>
+                    <ion-icon name="build-outline" class="align-middle mr-2"></ion-icon>
+                    {% trans "Database Maintenance" %}
+                </ion-card-title>
+                <ion-card-subtitle>{% trans "Clean up orphaned data from deleted plugins" %}</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content>
+                <p class="text-sm text-medium mb-4">
+                    {% trans "Scan for and remove orphaned database tables, migration records, and media files left behind by deleted plugins." %}
+                </p>
+
+                <ion-button
+                    fill="outline"
+                    hx-get="{% url 'configuration:scan_orphaned_data' %}"
+                    hx-target="#scan-results"
+                    hx-indicator="#scan-spinner">
+                    <ion-icon slot="start" name="search-outline"></ion-icon>
+                    {% trans "Scan for Orphaned Data" %}
+                    <ion-spinner id="scan-spinner" name="crescent" class="htmx-indicator ml-2" style="display: none;"></ion-spinner>
+                </ion-button>
+
+                <div id="scan-results" class="mt-4"></div>
+            </ion-card-content>
+        </ion-card>
+
+        <!-- Automatic Backups (Full Width) -->
+        <ion-card class="lg:col-span-2">
+            <ion-card-header>
+                <ion-card-title>
+                    <ion-icon name="cloud-upload-outline" class="align-middle mr-2"></ion-icon>
+                    {% trans "Automatic Backups" %}
+                </ion-card-title>
+                <ion-card-subtitle>{% trans "Schedule automatic database backups" %}</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content>
+                <form @submit.prevent="saveBackupSettings()">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Left Column: Schedule Settings -->
+                        <div>
+                            <ion-list>
+                                <!-- Enable Backups -->
+                                <ion-item>
+                                    <ion-label>{% trans "Enable automatic backups" %}</ion-label>
+                                    <ion-toggle
+                                        slot="end"
+                                        :checked="backup.enabled"
+                                        @ionChange="backup.enabled = $event.detail.checked"
+                                    ></ion-toggle>
+                                </ion-item>
+
+                                <!-- Frequency -->
+                                <ion-item>
+                                    <ion-select
+                                        label="{% trans 'Frequency' %}"
+                                        label-placement="floating"
+                                        x-model="backup.frequency"
+                                        interface="popover"
+                                        :disabled="!backup.enabled"
+                                    >
+                                        {% for value, label in backup_frequency_choices %}
+                                        <ion-select-option value="{{ value }}">{{ label }}</ion-select-option>
+                                        {% endfor %}
+                                    </ion-select>
+                                </ion-item>
+
+                                <!-- Time (Hour) -->
+                                <ion-item>
+                                    <ion-select
+                                        label="{% trans 'Backup Time' %}"
+                                        label-placement="floating"
+                                        x-model="backup.time_hour"
+                                        interface="popover"
+                                        :disabled="!backup.enabled"
+                                    >
+                                        {% for hour in "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23"|make_list %}
+                                        <option value="{{ hour }}">{{ hour }}:00</option>
+                                        {% endfor %}
+                                        <ion-select-option value="0">00:00</ion-select-option>
+                                        <ion-select-option value="1">01:00</ion-select-option>
+                                        <ion-select-option value="2">02:00</ion-select-option>
+                                        <ion-select-option value="3">03:00</ion-select-option>
+                                        <ion-select-option value="4">04:00</ion-select-option>
+                                        <ion-select-option value="5">05:00</ion-select-option>
+                                        <ion-select-option value="6">06:00</ion-select-option>
+                                        <ion-select-option value="12">12:00</ion-select-option>
+                                        <ion-select-option value="18">18:00</ion-select-option>
+                                        <ion-select-option value="22">22:00</ion-select-option>
+                                        <ion-select-option value="23">23:00</ion-select-option>
+                                    </ion-select>
+                                </ion-item>
+                            </ion-list>
+                        </div>
+
+                        <!-- Right Column: Retention & Status -->
+                        <div>
+                            <ion-list>
+                                <!-- Retention Days -->
+                                <ion-item>
+                                    <ion-input
+                                        type="number"
+                                        label="{% trans 'Keep backups for (days)' %}"
+                                        label-placement="floating"
+                                        x-model="backup.retention_days"
+                                        min="0"
+                                        max="365"
+                                        :disabled="!backup.enabled"
+                                    ></ion-input>
+                                </ion-item>
+
+                                <!-- Max Backups -->
+                                <ion-item>
+                                    <ion-input
+                                        type="number"
+                                        label="{% trans 'Maximum backups to keep' %}"
+                                        label-placement="floating"
+                                        x-model="backup.max_backups"
+                                        min="0"
+                                        max="100"
+                                        :disabled="!backup.enabled"
+                                    ></ion-input>
+                                </ion-item>
+
+                                <!-- Last Backup Info -->
+                                <ion-item>
+                                    <ion-label>
+                                        <h3>{% trans "Last Backup" %}</h3>
+                                        <p>
+                                            {% if backup_config.last_backup_at %}
+                                            {{ backup_config.last_backup_at|date:"M d, Y H:i" }}
+                                            ({{ backup_config.last_backup_size|filesizeformat }})
+                                            {% else %}
+                                            <span class="text-medium">{% trans "No backups yet" %}</span>
+                                            {% endif %}
+                                        </p>
+                                        {% if backup_config.last_error %}
+                                        <p class="text-danger text-xs">{{ backup_config.last_error|truncatechars:50 }}</p>
+                                        {% endif %}
+                                    </ion-label>
+                                </ion-item>
+                            </ion-list>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 mt-4">
+                        <ion-button type="submit" :disabled="savingBackup">
+                            <ion-spinner x-show="savingBackup" name="crescent" class="mr-2"></ion-spinner>
+                            {% trans "Save Backup Settings" %}
+                        </ion-button>
+
+                        <ion-button fill="outline" @click="runBackupNow()" :disabled="runningBackup">
+                            <ion-spinner x-show="runningBackup" name="crescent" class="mr-2"></ion-spinner>
+                            <ion-icon slot="start" name="cloud-upload-outline" x-show="!runningBackup"></ion-icon>
+                            {% trans "Backup Now" %}
+                        </ion-button>
+                    </div>
+                </form>
+            </ion-card-content>
+        </ion-card>
+    </div>
+</div>
+
+<script>
+    function settingsApp() {
+        return {
+            language: '{{ user.language }}',
+            currency: '{{ hub_config.currency }}',
+            isDark: {{ hub_config.dark_mode|yesno:"true,false" }},
+            saving: false,
+            savingBackup: false,
+            runningBackup: false,
+            avatarFile: null,
+            logoFile: null,
+
+            // Backup configuration
+            backup: {
+                enabled: {{ backup_config.enabled|yesno:"true,false" }},
+                frequency: '{{ backup_config.frequency }}',
+                time_hour: '{{ backup_config.time_hour }}',
+                retention_days: {{ backup_config.retention_days }},
+                max_backups: {{ backup_config.max_backups }},
+            },
+
+            // Store configuration
+            store: {
+                business_name: '{{ store_config.business_name|escapejs }}',
+                business_address: '{{ store_config.business_address|escapejs }}',
+                vat_number: '{{ store_config.vat_number|escapejs }}',
+                phone: '{{ store_config.phone|escapejs }}',
+                email: '{{ store_config.email|escapejs }}',
+                website: '{{ store_config.website|escapejs }}',
+                tax_rate: '{{ store_config.tax_rate }}',
+                tax_included: {{ store_config.tax_included|yesno:"true,false" }},
+                receipt_header: '{{ store_config.receipt_header|escapejs }}',
+                receipt_footer: '{{ store_config.receipt_footer|escapejs }}',
+            },
+
+            init() {
+                // Listen to theme changes from parent
+                document.addEventListener('theme-changed', (e) => {
+                    this.isDark = e.detail.isDark;
+                });
+            },
+
+            handleAvatarChange(event) {
+                this.avatarFile = event.target.files[0];
+            },
+
+            handleLogoChange(event) {
+                this.logoFile = event.target.files[0];
+                // Preview the logo
+                if (this.logoFile) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const preview = document.getElementById('logo-preview');
+                        if (preview.tagName === 'IMG') {
+                            preview.src = e.target.result;
+                        } else {
+                            // Replace icon with image
+                            const img = document.createElement('img');
+                            img.src = e.target.result;
+                            img.alt = 'Logo';
+                            img.className = 'max-w-full max-h-full object-contain';
+                            img.id = 'logo-preview';
+                            preview.parentNode.replaceChild(img, preview);
+                        }
+                    };
+                    reader.readAsDataURL(this.logoFile);
+                }
+            },
+
+            async saveStoreSettings() {
+                this.saving = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'update_store');
+                    formData.append('business_name', this.store.business_name);
+                    formData.append('business_address', this.store.business_address);
+                    formData.append('vat_number', this.store.vat_number);
+                    formData.append('phone', this.store.phone);
+                    formData.append('email', this.store.email);
+                    formData.append('website', this.store.website);
+                    formData.append('tax_rate', this.store.tax_rate);
+                    formData.append('tax_included', this.store.tax_included);
+                    formData.append('receipt_header', this.store.receipt_header);
+                    formData.append('receipt_footer', this.store.receipt_footer);
+
+                    if (this.logoFile) {
+                        formData.append('logo', this.logoFile);
+                    }
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        await this.showToast('{% trans "Store settings saved" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error saving store settings" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Error saving store settings" %}', 'danger');
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            async saveUserSettings() {
+                this.saving = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('language', this.language);
+                    if (this.avatarFile) {
+                        formData.append('avatar', this.avatarFile);
+                    }
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        await this.showToast('{% trans "Preferences saved" %}', 'success');
+                        // Reload if language changed
+                        if (this.language !== '{{ user.language }}') {
+                            window.location.reload();
+                        }
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error saving preferences" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Error saving preferences" %}', 'danger');
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            async saveHubSettings() {
+                this.saving = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('currency', this.currency);
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        await this.showToast('{% trans "Hub settings saved" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error saving settings" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Error saving settings" %}', 'danger');
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            async toggleTheme(event) {
+                this.isDark = event.detail.checked;
+
+                // Notify parent app
+                const parentApp = Alpine.$data(document.getElementById('dashboard-app'));
+                if (parentApp) {
+                    parentApp.isDark = this.isDark;
+                    document.body.classList.toggle('dark', this.isDark);
+                }
+
+                // Save to database
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'update_theme');
+                    formData.append('dark_mode', this.isDark);
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        await this.showToast('{% trans "Theme updated" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error updating theme" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Error updating theme" %}', 'danger');
+                }
+            },
+
+            // Backup settings
+            async saveBackupSettings() {
+                this.savingBackup = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'update_backup');
+                    formData.append('backup_enabled', this.backup.enabled);
+                    formData.append('backup_frequency', this.backup.frequency);
+                    formData.append('backup_hour', this.backup.time_hour);
+                    formData.append('retention_days', this.backup.retention_days);
+                    formData.append('max_backups', this.backup.max_backups);
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        await this.showToast('{% trans "Backup settings saved" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error saving backup settings" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Error saving backup settings" %}', 'danger');
+                } finally {
+                    this.savingBackup = false;
+                }
+            },
+
+            async runBackupNow() {
+                this.runningBackup = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'run_backup');
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        const sizeKB = Math.round(data.size / 1024);
+                        await this.showToast(`{% trans "Backup completed" %} (${sizeKB} KB)`, 'success');
+                        // Reload page to show updated last backup info
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        await this.showToast(data.error || '{% trans "Backup failed" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Backup failed" %}', 'danger');
+                } finally {
+                    this.runningBackup = false;
+                }
+            },
+
+            // Use global Toast helper from toast-helper.js
+            async showToast(message, color = 'primary') {
+                await showToast(message, color);
+            }
+        }
+    }
+</script>

@@ -1,0 +1,50 @@
+{% load i18n %}
+
+<ion-header>
+    <ion-toolbar>
+        <ion-buttons slot="start">
+            <!-- Menu Toggle Button -->
+            <ion-button @click="toggleMenu()">
+                <ion-icon slot="icon-only" name="menu-outline"></ion-icon>
+            </ion-button>
+        </ion-buttons>
+
+        <ion-title>{% block header_title %}{{ page_title|default:"Dashboard" }}{% endblock %}</ion-title>
+
+        <ion-buttons slot="end">
+            <!-- Cloud Connection Status -->
+            <div id="connection-status"
+                 hx-get="{% url 'core:connection_status' %}"
+                 hx-trigger="load, every 30s"
+                 hx-swap="innerHTML"
+                 class="flex items-center mr-1">
+                <ion-icon name="cloud-offline-outline" class="text-gray-400 text-xl"></ion-icon>
+            </div>
+
+            <!-- PWA Install Button (only shown when installable) -->
+            <ion-button
+                x-show="canInstall"
+                @click="installApp()"
+                x-cloak
+                color="primary">
+                <ion-icon slot="start" name="download-outline"></ion-icon>
+                <span class="hidden sm:inline">{% trans "Install" %}</span>
+            </ion-button>
+
+            <!-- Fullscreen Toggle -->
+            <ion-button @click="toggleFullscreen()">
+                <ion-icon slot="icon-only" :name="isFullscreen ? 'contract-outline' : 'expand-outline'"></ion-icon>
+            </ion-button>
+
+            <!-- Theme Toggle -->
+            <ion-button @click="toggleTheme()">
+                <ion-icon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
+            </ion-button>
+
+            <!-- User Menu -->
+            <ion-button @click="handleUserMenu()">
+                <ion-icon slot="icon-only" name="person-circle-outline"></ion-icon>
+            </ion-button>
+        </ion-buttons>
+    </ion-toolbar>
+</ion-header>

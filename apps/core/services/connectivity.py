@@ -60,12 +60,12 @@ class ConnectivityChecker:
             bool: True if Cloud is reachable, False otherwise
         """
         try:
-            # Simple HEAD request to /api/health/ endpoint
-            url = f"{self.cloud_url}/api/health/"
-            response = requests.head(url, timeout=5)
+            # GET request to /health/ endpoint (Cloud's health check)
+            url = f"{self.cloud_url}/health/"
+            response = requests.get(url, timeout=5)
 
-            # Consider 2xx and 3xx as "online"
-            online = 200 <= response.status_code < 400
+            # Consider 2xx as "online"
+            online = response.status_code == 200
 
             logger.info(f"Connectivity check: {'online' if online else 'offline'} (status: {response.status_code})")
             return online

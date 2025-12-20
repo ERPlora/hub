@@ -130,7 +130,7 @@ class SubscriptionChecker:
         Verificar si un plugin puede ejecutarse basado en su tipo y estado de suscripción.
 
         Args:
-            plugin_slug: Slug del plugin (e.g., 'multi_device')
+            plugin_slug: Slug del plugin (e.g., 'analytics')
             plugin_type: Tipo de plugin ('free', 'paid', 'subscription')
 
         Returns:

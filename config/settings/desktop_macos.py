@@ -34,22 +34,8 @@ DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
 MEDIA_ROOT = DATA_DIR / 'media'
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
-# Plugins
-PLUGINS_DIR = DATA_DIR / 'plugins'
-PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
-PLUGINS_ROOT = PLUGINS_DIR
-
-# In development, also check local plugins folder
-if DEVELOPMENT_MODE:
-    PLUGIN_DISCOVERY_PATHS = [
-        BASE_DIR / 'plugins',  # Development plugins
-        PLUGINS_DIR,           # Installed plugins
-    ]
-    # Use local plugins in dev
-    PLUGINS_DIR = BASE_DIR / 'plugins'
-    PLUGINS_ROOT = PLUGINS_DIR
-else:
-    PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
+# Plugins - uses base.py config (PLUGINS_DIR from DataPaths)
+# In desktop: ~/Library/Application Support/ERPloraHub/plugins/
 
 # Logs
 LOGS_DIR = DATA_DIR / 'logs'
