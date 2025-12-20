@@ -73,24 +73,44 @@
             <form @submit.prevent="addEmployee()">
                 <ion-list>
                     <ion-item>
-                        <ion-label position="stacked">{% trans "Name" %}</ion-label>
-                        <ion-input x-model="form.name" required></ion-input>
+                        <ion-input
+                            label="{% trans 'Name' %}"
+                            label-placement="floating"
+                            x-model="form.name"
+                            required
+                        ></ion-input>
                     </ion-item>
                     <ion-item>
-                        <ion-label position="stacked">{% trans "Email" %}</ion-label>
-                        <ion-input x-model="form.email" type="email" required></ion-input>
+                        <ion-input
+                            label="{% trans 'Email' %}"
+                            label-placement="floating"
+                            x-model="form.email"
+                            type="email"
+                            required
+                        ></ion-input>
                     </ion-item>
                     <ion-item>
-                        <ion-label position="stacked">{% trans "Role" %}</ion-label>
-                        <ion-select x-model="form.role" interface="popover">
+                        <ion-select
+                            label="{% trans 'Role' %}"
+                            label-placement="floating"
+                            x-model="form.role"
+                            interface="popover"
+                        >
                             <ion-select-option value="admin">{% trans "Admin" %}</ion-select-option>
                             <ion-select-option value="manager">{% trans "Manager" %}</ion-select-option>
                             <ion-select-option value="employee">{% trans "Employee" %}</ion-select-option>
                         </ion-select>
                     </ion-item>
                     <ion-item>
-                        <ion-label position="stacked">{% trans "PIN (4 digits)" %}</ion-label>
-                        <ion-input x-model="form.pin" type="password" maxlength="4" pattern="[0-9]{4}" required></ion-input>
+                        <ion-input
+                            label="{% trans 'PIN (4 digits)' %}"
+                            label-placement="floating"
+                            x-model="form.pin"
+                            type="password"
+                            maxlength="4"
+                            pattern="[0-9]{4}"
+                            required
+                        ></ion-input>
                     </ion-item>
                 </ion-list>
                 <ion-button type="submit" expand="block" class="mt-4" :disabled="saving">
@@ -117,16 +137,29 @@
             <form @submit.prevent="updateEmployee()">
                 <ion-list>
                     <ion-item>
-                        <ion-label position="stacked">{% trans "Name" %}</ion-label>
-                        <ion-input x-model="form.name" required></ion-input>
+                        <ion-input
+                            label="{% trans 'Name' %}"
+                            label-placement="floating"
+                            x-model="form.name"
+                            required
+                        ></ion-input>
                     </ion-item>
                     <ion-item>
-                        <ion-label position="stacked">{% trans "Email" %}</ion-label>
-                        <ion-input x-model="form.email" type="email" required></ion-input>
+                        <ion-input
+                            label="{% trans 'Email' %}"
+                            label-placement="floating"
+                            x-model="form.email"
+                            type="email"
+                            required
+                        ></ion-input>
                     </ion-item>
                     <ion-item>
-                        <ion-label position="stacked">{% trans "Role" %}</ion-label>
-                        <ion-select x-model="form.role" interface="popover">
+                        <ion-select
+                            label="{% trans 'Role' %}"
+                            label-placement="floating"
+                            x-model="form.role"
+                            interface="popover"
+                        >
                             <ion-select-option value="admin">{% trans "Admin" %}</ion-select-option>
                             <ion-select-option value="manager">{% trans "Manager" %}</ion-select-option>
                             <ion-select-option value="employee">{% trans "Employee" %}</ion-select-option>

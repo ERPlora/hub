@@ -72,7 +72,7 @@ def login(request):
 
     local_users_data = [
         {
-            'id': user.id,
+            'id': str(user.id),
             'name': user.name,
             'email': user.email,
             'initials': user.get_initials(),
@@ -119,7 +119,7 @@ def verify_pin(request):
             user.last_login = timezone.now()
             user.save()
 
-            request.session['local_user_id'] = user.id
+            request.session['local_user_id'] = str(user.id)
             request.session['user_name'] = user.name
             request.session['user_email'] = user.email
             request.session['user_role'] = user.role
@@ -128,7 +128,7 @@ def verify_pin(request):
             return JsonResponse({
                 'success': True,
                 'user': {
-                    'id': user.id,
+                    'id': str(user.id),
                     'name': user.name,
                     'email': user.email,
                 },
@@ -254,7 +254,7 @@ def cloud_login(request):
 
                     request.session['jwt_token'] = access_token
                     request.session['jwt_refresh'] = refresh_token
-                    request.session['local_user_id'] = local_user.id
+                    request.session['local_user_id'] = str(local_user.id)
                     request.session['user_name'] = local_user.name
                     request.session['user_email'] = local_user.email
                     request.session['user_role'] = local_user.role
@@ -264,7 +264,7 @@ def cloud_login(request):
                         'success': True,
                         'first_time': first_time,
                         'user': {
-                            'id': local_user.id,
+                            'id': str(local_user.id),
                             'name': local_user.name,
                             'email': local_user.email,
                         }
@@ -298,7 +298,7 @@ def setup_pin(request):
             return redirect('auth:login')
 
         pending_user_data = {
-            'id': user.id,
+            'id': str(user.id),
             'name': user.name,
             'email': user.email,
         }
@@ -338,7 +338,7 @@ def setup_pin(request):
         if 'pending_user_email' in request.session:
             del request.session['pending_user_email']
 
-        request.session['local_user_id'] = user.id
+        request.session['local_user_id'] = str(user.id)
         request.session['user_name'] = user.name
         request.session['user_email'] = user.email
         request.session['user_role'] = user.role

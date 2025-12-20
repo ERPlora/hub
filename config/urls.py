@@ -74,6 +74,9 @@ urlpatterns = [
     # Auth routes (login, logout, etc.)
     path('', include('apps.auth.login.urls')),
 
+    # Setup wizard (initial configuration)
+    path('setup/', include('apps.main.setup.urls')),
+
     # Main routes (dashboard, settings, employees)
     path('dashboard/', include('apps.main.urls')),
 
