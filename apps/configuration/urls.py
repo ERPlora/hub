@@ -1,31 +1,28 @@
+"""
+Configuration URLs
+
+Contains:
+- Database maintenance utilities
+- Local file browser and downloads
+
+All other routes are now in their proper apps:
+- Dashboard: apps.main.index
+- Settings: apps.main.settings
+- Plugins: apps.system.plugins
+"""
 from django.urls import path
-from . import views
-from . import views_plugins
-from . import views_maintenance
+from . import views_maintenance, views_files
 
 app_name = 'configuration'
 
 urlpatterns = [
-    # Root redirect
-    path('', views.index, name='index'),
+    # Database Maintenance (admin utilities)
+    path('maintenance/scan-orphaned/', views_maintenance.scan_orphaned_data, name='scan_orphaned_data'),
+    path('maintenance/clean-orphaned/', views_maintenance.clean_orphaned_data, name='clean_orphaned_data'),
 
-    # Dashboard and POS
-    path('dashboard/', views.dashboard, name='dashboard'),
-    path('pos/', views.pos, name='pos'),
-
-    # Settings
-    path('settings/', views.settings, name='settings'),
-
-    # Database Maintenance
-    path('settings/scan-orphaned/', views_maintenance.scan_orphaned_data, name='scan_orphaned_data'),
-    path('settings/clean-orphaned/', views_maintenance.clean_orphaned_data, name='clean_orphaned_data'),
-
-    # Plugins Management
-    path('plugins/', views_plugins.plugins_index, name='plugins'),
-    path('plugins/marketplace/', views_plugins.marketplace, name='marketplace'),
-    path('plugins/install-from-marketplace/', views_plugins.install_from_marketplace, name='install_from_marketplace'),
-    path('plugins/activate/<str:plugin_id>/', views_plugins.plugin_activate, name='plugin_activate'),
-    path('plugins/deactivate/<str:plugin_id>/', views_plugins.plugin_deactivate, name='plugin_deactivate'),
-    path('plugins/delete/<str:plugin_id>/', views_plugins.plugin_delete, name='plugin_delete'),
-    path('plugins/restart/', views_plugins.plugin_restart_server, name='plugin_restart_server'),
+    # Local Files Browser
+    path('files/browse/', views_files.file_browser, name='file_browser'),
+    path('files/download/', views_files.download_file, name='download_file'),
+    path('files/download-database/', views_files.download_database, name='download_database'),
+    path('files/storage-info/', views_files.get_storage_info, name='storage_info'),
 ]

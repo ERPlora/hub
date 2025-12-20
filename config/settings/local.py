@@ -2,13 +2,14 @@
 ERPlora Hub - Local Development Settings
 
 Configuración para desarrollo local.
-Plugins se cargan desde el proyecto (./plugins/)
-Base de datos en ubicación específica del OS.
+Usa DataPaths para rutas consistentes con producción.
+Plugins desde ./plugins/ del proyecto (para desarrollo).
 """
 
 from .base import *
 from pathlib import Path
 import sys
+from config.paths import get_data_paths
 
 # =============================================================================
 # DEPLOYMENT
@@ -20,12 +21,45 @@ OFFLINE_ENABLED = True
 CLOUD_SYNC_REQUIRED = False
 DEVELOPMENT_MODE = True
 
+# Use production Cloud API for local development
+CLOUD_API_URL = 'https://erplora.com'
+
 # =============================================================================
-# PATHS - Local development
+# PATHS - Using DataPaths (same as production)
 # =============================================================================
 
-# Plugins SIEMPRE desde el proyecto en local
-PLUGINS_DIR = BASE_DIR / 'plugins'
+# Get all paths from DataPaths (auto-detects OS)
+_paths = get_data_paths()
+DATA_DIR = _paths.base_dir
+
+# Database - same location as production
+DATABASE_DIR = _paths.database_dir
+DATABASES['default']['NAME'] = _paths.database_path
+
+# Media
+MEDIA_ROOT = _paths.media_dir
+
+# Logs
+LOGS_DIR = _paths.logs_dir
+LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
+
+# Backups & Reports
+BACKUPS_DIR = _paths.backups_dir
+REPORTS_DIR = _paths.reports_dir
+
+# Plugin data
+PLUGIN_DATA_ROOT = DATA_DIR / 'plugin_data'
+PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
+PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# =============================================================================
+# PLUGINS - Same as production (from DataPaths)
+# =============================================================================
+# Uses ~/Library/.../ERPloraHub/plugins/ (same as desktop builds)
+# A symlink at ./plugins -> real location makes development easier
+
+PLUGINS_DIR = _paths.plugins_dir
 PLUGINS_ROOT = PLUGINS_DIR
 PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
 
@@ -33,36 +67,39 @@ PLUGIN_DISCOVERY_PATHS = [PLUGINS_DIR]
 if PLUGINS_DIR.exists() and str(PLUGINS_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGINS_DIR))
 
-# Data directory based on OS
-import platform
-if platform.system() == 'Darwin':
-    DATA_DIR = Path.home() / 'Library' / 'Application Support' / 'ERPloraHub'
-elif platform.system() == 'Windows':
-    DATA_DIR = Path.home() / 'AppData' / 'Local' / 'ERPloraHub'
-else:
-    DATA_DIR = Path.home() / '.local' / 'share' / 'erplora-hub'
+# =============================================================================
+# SYMLINKS - Create convenience symlinks in ERPlora root (parent of hub/)
+# =============================================================================
+# Creates symlinks for easy access during development:
+#   ERPlora/hub_data -> ~/Library/Application Support/ERPloraHub/
+#   ERPlora/hub_plugins -> ~/Library/Application Support/ERPloraHub/plugins/
 
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+def _create_dev_symlinks():
+    """Create symlinks in ERPlora root for development convenience."""
+    import os
 
-# Database
-DATABASE_DIR = DATA_DIR / 'db'
-DATABASE_DIR.mkdir(parents=True, exist_ok=True)
-DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
+    # ERPlora root is parent of hub/
+    erplora_root = BASE_DIR.parent
 
-# Media
-MEDIA_ROOT = DATA_DIR / 'media'
-MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+    # Symlink: ERPlora/hub_data -> DATA_DIR
+    data_link = erplora_root / 'hub_data'
+    if not data_link.exists():
+        try:
+            os.symlink(DATA_DIR, data_link)
+            print(f"[LOCAL] Created symlink: hub_data -> {DATA_DIR}")
+        except (OSError, FileExistsError):
+            pass  # Symlink already exists or can't create
 
-# Logs
-LOGS_DIR = DATA_DIR / 'logs'
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
+    # Symlink: ERPlora/hub_plugins -> PLUGINS_DIR
+    plugins_link = erplora_root / 'hub_plugins'
+    if not plugins_link.exists():
+        try:
+            os.symlink(PLUGINS_DIR, plugins_link)
+            print(f"[LOCAL] Created symlink: hub_plugins -> {PLUGINS_DIR}")
+        except (OSError, FileExistsError):
+            pass
 
-# Plugin data (still in DATA_DIR for persistence)
-PLUGIN_DATA_ROOT = DATA_DIR / 'plugin_data'
-PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
-PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
-PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+_create_dev_symlinks()
 
 # =============================================================================
 # SECURITY - Relaxed for local development
@@ -113,15 +150,16 @@ def reload_local_plugins():
 
 reload_local_plugins()
 
-# Add plugin templates
+# Add plugin templates (keeping global templates directory)
 if PLUGINS_DIR.exists():
-    plugin_template_dirs = []
+    # Start with existing global templates directory
+    template_dirs = [str(d) for d in TEMPLATES[0]['DIRS']]
+
     for plugin_dir in PLUGINS_DIR.iterdir():
         if plugin_dir.is_dir() and (plugin_dir / 'templates').exists():
-            plugin_template_dirs.append(str(plugin_dir / 'templates'))
+            template_dirs.append(str(plugin_dir / 'templates'))
 
-    if plugin_template_dirs:
-        TEMPLATES[0]['DIRS'] = plugin_template_dirs
+    TEMPLATES[0]['DIRS'] = template_dirs
 
 print(f"[LOCAL] Development mode")
 print(f"[LOCAL] Plugins: {PLUGINS_DIR}")

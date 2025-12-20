@@ -12,7 +12,7 @@ El Hub se comunica con Cloud mediante **HTTP REST API**:
 |--------|-----|---------------|
 | **REST API** | Registro, sincronización, verificación de usuarios | JWT (login) o `cloud_api_token` (Hub) |
 
-**Nota**: WebSocket y FRP están disponibles en el plugin premium `multi_device` para acceso remoto y comunicación real-time. El core del Hub usa solo HTTP.
+El core del Hub usa HTTP REST API para todas las comunicaciones.
 
 ---
 
@@ -215,33 +215,6 @@ sequenceDiagram
 - ✅ **No requiere conexión constante** - solo verifica cuando puede
 - ✅ **Sin cola de sincronización compleja** - verificación on-demand
 - ✅ **Resiliente** - fallback a estado local si Cloud no disponible
-
----
-
-## 🔌 Features Premium (Plugin `multi_device`)
-
-Las siguientes features están disponibles con el plugin premium `multi_device`:
-
-### WebSocket (Real-time)
-
-```
-wss://erplora.com/ws/hub/{hub_id}/?token={cloud_api_token}
-```
-
-**Mensajes soportados:**
-- `heartbeat` - Mantener conexión activa
-- `user_sync` - Sincronización de usuarios en tiempo real
-- `plugin_update_available` - Notificación de actualizaciones
-- `user_revoked` - Revocación inmediata de acceso
-
-### FRP Tunnel (Acceso Remoto)
-
-Permite acceso remoto al Hub desde el portal Cloud:
-- URL única: `hub-{slug}.erplora.com`
-- Traefik proxy en Cloud redirige a Hub local
-- Túnel TCP autenticado con token
-
-**Nota:** Estas features requieren el plugin `multi_device` que tiene costo de suscripción.
 
 ---
 

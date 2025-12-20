@@ -109,6 +109,7 @@
   --ion-tab-bar-color: #717182;
   --ion-tab-bar-color-selected: #030213;
 
+
   /* Overlay colors (alerts, toasts, action sheets) */
   --ion-overlay-background-color: #ffffff;
 
@@ -269,4 +270,24 @@ body.dark {
   --muted: #3a3a3a;
   --muted-foreground: #b0b0b0;
   --border: #3a3a3a;
+}
+
+/* ========================================
+   ION-SEGMENT STYLES
+   ======================================== */
+
+/* Segment container */
+ion-segment {
+  --background: var(--ion-color-light);
+}
+
+body.dark ion-segment {
+  --background: var(--ion-color-light);
+}
+
+/* Segment buttons - uses theme variables for automatic adaptation */
+ion-segment-button {
+  --color: var(--ion-color-medium);
+  --color-checked: var(--ion-color-primary-contrast);
+  --indicator-color: var(--ion-color-primary);
 }

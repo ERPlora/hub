@@ -1,5 +1,14 @@
+"""
+Core URLs
+
+System-level endpoints only:
+- Health check (for Docker/monitoring)
+- Update notification partial (HTMX)
+
+Note: Update API endpoints are now in api/v1/system/ (see apps/core/api.py)
+"""
 from django.urls import path
-from . import views, views_update
+from . import views
 
 app_name = 'core'
 
@@ -7,34 +16,9 @@ urlpatterns = [
     # Health check endpoint (for Docker healthcheck)
     path('health/', views.health_check, name='health_check'),
 
-    # NOTE: Authentication routes (login, verify-pin, cloud-login, setup-pin, logout)
-    # are now in apps/accounts/urls.py - DO NOT duplicate here
+    # Connection status (HTMX partial - WiFi indicator)
+    path('connection-status/', views.connection_status, name='connection_status'),
 
-    # Dashboard and core views
-    path('dashboard/', views.dashboard, name='dashboard'),
-    path('pos/', views.pos, name='pos'),
-
-    # Plugin Management
-    path('plugins/', views.plugins, name='plugins'),
-
-    # Plugin action endpoints (used by template JavaScript)
-    path('plugins/activate/<str:plugin_id>/', views.api_plugin_activate, name='plugin_activate'),
-    path('plugins/deactivate/<str:plugin_id>/', views.api_plugin_deactivate, name='plugin_deactivate'),
-    path('plugins/delete/<str:plugin_id>/', views.api_plugin_delete, name='plugin_delete'),
-
-    # Plugin API endpoints
-    path('api/plugins/install/', views.api_plugin_install, name='api_plugin_install'),
-    path('api/plugins/list/', views.api_plugins_list, name='api_plugins_list'),
-
-    # Update API endpoints
-    path('api/update/check/', views_update.check_updates, name='update_check'),
-    path('api/update/status/', views_update.update_status, name='update_status'),
-    path('api/update/download/', views_update.download_update, name='update_download'),
-    path('api/update/install/', views_update.install_update, name='update_install'),
-    path('api/update/apply/', views_update.apply_update, name='update_apply'),
-    path('api/update/rollback/', views_update.rollback_update, name='update_rollback'),
-    path('api/update/notification/', views_update.update_notification, name='update_notification'),
-
-    # FRP Client API endpoints - Moved to multi_device plugin
-    # Access via /multi_device/frp/status/, /multi_device/frp/start/, etc.
+    # Update notification (HTMX partial)
+    path('update-notification/', views.update_notification, name='update_notification'),
 ]

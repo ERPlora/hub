@@ -1,0 +1,38 @@
+{% load i18n %}
+
+<div class="space-y-3">
+    <!-- Total Storage -->
+    <div class="flex justify-between items-center p-3 bg-primary/10 rounded-lg">
+        <div class="flex items-center gap-2">
+            <ion-icon name="folder-open" class="text-xl text-primary"></ion-icon>
+            <span class="font-semibold">{% trans "Total Storage" %}</span>
+        </div>
+        <div class="text-right">
+            <span class="font-bold text-lg">{{ total_size }}</span>
+            <span class="text-sm text-medium block">{{ total_files }} {% trans "files" %}</span>
+        </div>
+    </div>
+
+    <!-- Storage Breakdown -->
+    {% for key, info in storage_info.items %}
+    <div class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+        <div class="flex items-center gap-2">
+            <ion-icon name="{{ info.icon }}-outline" class="text-lg text-medium"></ion-icon>
+            <span>{{ info.name }}</span>
+        </div>
+        <div class="text-right">
+            <span class="font-medium">{{ info.size }}</span>
+            <span class="text-xs text-medium block">{{ info.files }} {% trans "files" %}</span>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Data Location -->
+    <div class="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <p class="text-xs text-medium">
+            <ion-icon name="folder-outline" class="align-middle"></ion-icon>
+            {% trans "Data location" %}:
+        </p>
+        <p class="text-xs font-mono break-all mt-1">{{ base_path }}</p>
+    </div>
+</div>

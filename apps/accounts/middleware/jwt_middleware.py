@@ -63,7 +63,7 @@ class JWTMiddleware:
 
         if not jwt_token:
             # No token - redirect to login
-            return redirect(reverse('accounts:login'))
+            return redirect(reverse('auth:login'))
 
         # Check connectivity
         is_online = self.connectivity_checker.is_online()
@@ -94,16 +94,16 @@ class JWTMiddleware:
             if is_online:
                 # Online - redirect to login to get new token
                 logger.info("JWT expired in online mode - redirecting to login")
-                return redirect(reverse('accounts:login'))
+                return redirect(reverse('auth:login'))
             else:
                 # Offline - redirect to login (PIN login)
                 logger.info("JWT expired in offline mode - redirecting to login (PIN)")
-                return redirect(reverse('accounts:login'))
+                return redirect(reverse('auth:login'))
 
         except (InvalidSignature, Exception) as e:
             # Invalid token
             logger.error(f"JWT validation failed: {e}")
-            return redirect(reverse('accounts:login'))
+            return redirect(reverse('auth:login'))
 
     def _is_exempt_path(self, path):
         """

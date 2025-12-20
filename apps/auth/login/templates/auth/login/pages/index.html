@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}ERPlora Hub - {% trans "Login" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 500px;
+        margin: 0;
+    }
+
+    .employee-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 1rem;
+    }
+
+    .employee-card {
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .employee-card:hover {
+        transform: scale(1.05);
+    }
+
+    .pin-dots {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .pin-dot {
+        width: 1rem;
+        height: 1rem;
+        border-radius: 50%;
+        border: 2px solid var(--ion-border-color);
+        transition: all 0.2s;
+    }
+
+    .pin-dot.filled {
+        background: var(--ion-color-primary);
+        border-color: var(--ion-color-primary);
+    }
+
+    .keypad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        max-width: 300px;
+        margin: 0 auto;
+    }
+
+    .keypad ion-button {
+        height: 3.5rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .avatar-circle {
+        width: 100%;
+        height: 100%;
+        background: var(--ion-color-primary);
+        color: var(--ion-color-primary-contrast);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.125rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="loginApp()" x-init="init()">
+    <!-- Theme Toggle -->
+    <ion-button class="fixed top-4 right-4 z-50" fill="clear" @click="toggleTheme()">
+        <ion-icon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
+    </ion-button>
+
+    <!-- Login Container -->
+    <div class="login-container">
+        <ion-card class="login-card">
+            <!-- Logo -->
+            <div class="text-center mb-8 pt-8">
+                <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 64px; height: 64px; margin: 0 auto 1rem;">
+                <h1 class="m-0 text-3xl font-bold">ERPlora</h1>
+                <p class="mt-2 mb-0 text-medium">{% trans "Business Management System" %}</p>
+            </div>
+
+            <ion-card-content>
+                <!-- Login Tabs -->
+                <ion-segment :value="loginMode" class="mb-8">
+                    <ion-segment-button value="local" @click="loginMode = 'local'">
+                        <ion-label>{% trans "Local Login" %}</ion-label>
+                    </ion-segment-button>
+                    <ion-segment-button value="cloud" @click="loginMode = 'cloud'">
+                        <ion-label>{% trans "Cloud Login" %}</ion-label>
+                    </ion-segment-button>
+                </ion-segment>
+
+                <!-- Local Login (Employee Selection + PIN) -->
+                <div x-show="loginMode === 'local'" x-cloak>
+                    <!-- Employee Selection -->
+                    <div x-show="!selectedEmployee">
+                        <h2 class="text-xl font-semibold mb-4">{% trans "Select your profile" %}</h2>
+
+                        <div class="employee-grid mb-4">
+                            <template x-for="employee in employees" :key="employee.id">
+                                <div class="employee-card" @click="selectEmployee(employee)">
+                                    <ion-card class="m-0">
+                                        <ion-card-content class="p-4 text-center">
+                                            <ion-avatar class="mx-auto mb-2">
+                                                <div class="avatar-circle">
+                                                    <span x-text="employee.initials"></span>
+                                                </div>
+                                            </ion-avatar>
+                                            <p class="m-0 text-sm font-medium overflow-hidden text-ellipsis whitespace-nowrap" x-text="employee.name"></p>
+                                            <ion-chip :color="employee.roleColor" class="mt-1 mb-0 h-5">
+                                                <ion-label class="text-[10px]" x-text="employee.role"></ion-label>
+                                            </ion-chip>
+                                        </ion-card-content>
+                                    </ion-card>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- PIN Entry -->
+                    <div x-show="selectedEmployee" x-cloak>
+                        <div class="text-center mb-8">
+                            <ion-avatar class="mx-auto mb-2">
+                                <div class="avatar-circle">
+                                    <span x-text="selectedEmployee?.initials"></span>
+                                </div>
+                            </ion-avatar>
+                            <h2 class="mt-3 mb-0 text-xl font-semibold" x-text="selectedEmployee?.name"></h2>
+                            <p class="mt-1 mb-0 text-medium">{% trans "Enter your PIN" %}</p>
+                        </div>
+
+                        <!-- PIN Dots -->
+                        <div class="pin-dots">
+                            <template x-for="i in 4">
+                                <div class="pin-dot" :class="pinInput.length >= i ? 'filled' : ''"></div>
+                            </template>
+                        </div>
+
+                        <!-- Error Message -->
+                        <div x-show="pinError" x-cloak class="text-center mb-4">
+                            <ion-chip color="danger">
+                                <ion-icon name="alert-circle-outline"></ion-icon>
+                                <ion-label>{% trans "Incorrect PIN" %}</ion-label>
+                            </ion-chip>
+                        </div>
+
+                        <!-- Keypad -->
+                        <div class="keypad">
+                            <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
+                                <ion-button @click="addPinDigit(num)" expand="block" fill="outline">
+                                    <span x-text="num"></span>
+                                </ion-button>
+                            </template>
+                            <ion-button @click="selectedEmployee = null; pinInput = ''; pinError = false;" expand="block" fill="clear">
+                                <ion-icon name="arrow-back-outline" class="text-2xl"></ion-icon>
+                            </ion-button>
+                            <ion-button @click="addPinDigit(0)" expand="block" fill="outline">
+                                <span>0</span>
+                            </ion-button>
+                            <ion-button @click="clearPinDigit()" expand="block" fill="clear">
+                                <ion-icon name="backspace-outline" class="text-2xl"></ion-icon>
+                            </ion-button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cloud Login (Email/Password) -->
+                <div x-show="loginMode === 'cloud'" x-cloak>
+                    <form @submit.prevent="cloudLogin()" class="flex flex-col gap-6">
+                        <div>
+                            <ion-label class="block mb-2 font-medium">{% trans "Email" %}</ion-label>
+                            <ion-input
+                                x-model="cloudCredentials.email"
+                                type="email"
+                                placeholder="{% trans 'your@email.com' %}"
+                                fill="outline"
+                                required
+                                class="[--background:var(--ion-background-color)]">
+                            </ion-input>
+                        </div>
+
+                        <div>
+                            <ion-label class="block mb-2 font-medium">{% trans "Password" %}</ion-label>
+                            <ion-input
+                                x-model="cloudCredentials.password"
+                                type="password"
+                                placeholder="••••••••"
+                                fill="outline"
+                                required
+                                class="[--background:var(--ion-background-color)]">
+                                <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+                            </ion-input>
+                        </div>
+
+                        <ion-button type="submit" expand="block" :disabled="cloudLoading">
+                            <ion-spinner x-show="cloudLoading" name="crescent" class="mr-2"></ion-spinner>
+                            <span x-text="cloudLoading ? '{% trans "Logging in..." %}' : '{% trans "Login" %}'"></span>
+                        </ion-button>
+                    </form>
+                </div>
+            </ion-card-content>
+        </ion-card>
+    </div>
+
+    <!-- PIN Setup Modal -->
+    <ion-modal :is-open="showPinSetup" @didDismiss="showPinSetup = false">
+        <ion-header>
+            <ion-toolbar>
+                <ion-title>{% trans "Setup your PIN" %}</ion-title>
+            </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+            <div class="max-w-[400px] mx-auto">
+                <div class="text-center mb-8">
+                    <ion-icon name="key-outline" class="text-6xl text-primary"></ion-icon>
+                    <h2 class="mt-4 mb-2">{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
+                    <p class="m-0 text-medium">{% trans "Setup a 4-digit PIN for quick access" %}</p>
+                </div>
+
+                <!-- PIN Setup Dots -->
+                <div class="pin-dots">
+                    <template x-for="i in 4">
+                        <div class="pin-dot" :class="setupPinInput.length >= i ? 'filled' : ''"></div>
+                    </template>
+                </div>
+
+                <div x-show="setupPinConfirm" x-cloak class="text-center my-4">
+                    <p class="text-medium">{% trans "Confirm your PIN" %}</p>
+                </div>
+
+                <!-- Error Message -->
+                <div x-show="setupPinError" x-cloak class="text-center mb-4">
+                    <ion-chip color="danger">
+                        <ion-icon name="alert-circle-outline"></ion-icon>
+                        <ion-label>{% trans "PINs don't match" %}</ion-label>
+                    </ion-chip>
+                </div>
+
+                <!-- Keypad -->
+                <div class="keypad">
+                    <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
+                        <ion-button @click="addSetupPinDigit(num)" expand="block" fill="outline">
+                            <span x-text="num"></span>
+                        </ion-button>
+                    </template>
+                    <div></div>
+                    <ion-button @click="addSetupPinDigit(0)" expand="block" fill="outline">
+                        <span>0</span>
+                    </ion-button>
+                    <ion-button @click="clearSetupPinDigit()" expand="block" fill="clear">
+                        <ion-icon name="backspace-outline" class="text-2xl"></ion-icon>
+                    </ion-button>
+                </div>
+            </div>
+        </ion-content>
+    </ion-modal>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function loginApp() {
+        return {
+            isDark: window.ERPlora?.isDark || false,
+            darkModeAuto: window.ERPlora?.darkModeAuto ?? true,
+            loginMode: 'local',
+
+            // Local Login
+            selectedEmployee: null,
+            pinInput: '',
+            pinError: false,
+            employees: {{ local_users_json|safe }},
+
+            // Cloud Login
+            cloudCredentials: { email: '', password: '' },
+            cloudLoading: false,
+
+            // PIN Setup
+            showPinSetup: {% if show_pin_setup %}true{% else %}false{% endif %},
+            newUser: {% if pending_user %}{{ pending_user|safe }}{% else %}null{% endif %},
+            setupPinInput: '',
+            setupPinConfirm: false,
+            setupPinFirst: '',
+            setupPinError: false,
+
+            init() {
+                // Dark mode is already applied by base.html
+                // Sync localStorage for consistency
+                localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
+            },
+
+            selectEmployee(employee) {
+                this.selectedEmployee = employee;
+                this.pinInput = '';
+                this.pinError = false;
+            },
+
+            addPinDigit(digit) {
+                if (this.pinInput.length < 4) {
+                    this.pinInput += digit;
+                    if (this.pinInput.length === 4) {
+                        this.$nextTick(() => setTimeout(() => this.verifyPin(), 200));
+                    }
+                }
+            },
+
+            clearPinDigit() {
+                this.pinInput = this.pinInput.slice(0, -1);
+                this.pinError = false;
+            },
+
+            async verifyPin() {
+                try {
+                    const response = await fetch('{% url "auth:verify_pin" %}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: this.selectedEmployee.id,
+                            pin: this.pinInput
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        await this.showToast(`{% trans "Welcome" %}, ${this.selectedEmployee.name}!`, 'success');
+                        setTimeout(() => window.location.href = '{% url "main:index" %}', 1000);
+                    } else {
+                        this.pinError = true;
+                        this.pinInput = '';
+                        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    }
+                } catch (error) {
+                    this.pinError = true;
+                    this.pinInput = '';
+                }
+            },
+
+            async cloudLogin() {
+                if (!this.cloudCredentials.email || !this.cloudCredentials.password) {
+                    await this.showToast('{% trans "Please complete all fields" %}', 'warning');
+                    return;
+                }
+
+                this.cloudLoading = true;
+
+                try {
+                    const response = await fetch('{% url "auth:cloud_login" %}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.cloudCredentials)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        if (data.first_time) {
+                            this.newUser = data.user;
+                            this.showPinSetup = true;
+                        } else {
+                            await this.showToast(`{% trans "Welcome" %}, ${data.user.name}!`, 'success');
+                            setTimeout(() => window.location.href = '{% url "main:index" %}', 1000);
+                        }
+                    } else {
+                        await this.showToast(data.error || '{% trans "Login failed" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Connection error. Please check your internet." %}', 'danger');
+                } finally {
+                    this.cloudLoading = false;
+                }
+            },
+
+            addSetupPinDigit(digit) {
+                if (this.setupPinInput.length < 4) {
+                    this.setupPinInput += digit;
+                    if (this.setupPinInput.length === 4) {
+                        this.$nextTick(() => {
+                            setTimeout(() => {
+                                if (!this.setupPinConfirm) {
+                                    this.setupPinFirst = this.setupPinInput;
+                                    this.setupPinInput = '';
+                                    this.setupPinConfirm = true;
+                                } else {
+                                    this.confirmSetupPin();
+                                }
+                            }, 200);
+                        });
+                    }
+                }
+            },
+
+            clearSetupPinDigit() {
+                this.setupPinInput = this.setupPinInput.slice(0, -1);
+                this.setupPinError = false;
+            },
+
+            async confirmSetupPin() {
+                if (this.setupPinInput === this.setupPinFirst) {
+                    try {
+                        const response = await fetch('{% url "auth:setup_pin" %}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                user_id: this.newUser.id,
+                                pin: this.setupPinInput
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            await this.showToast('{% trans "PIN configured successfully!" %}', 'success');
+                            setTimeout(() => window.location.href = '{% url "main:index" %}', 1000);
+                        }
+                    } catch (error) {
+                        console.error('Error setting up PIN:', error);
+                    }
+                } else {
+                    this.setupPinError = true;
+                    this.setupPinInput = '';
+                    this.setupPinConfirm = false;
+                    this.setupPinFirst = '';
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    setTimeout(() => this.setupPinError = false, 2000);
+                }
+            },
+
+            async toggleTheme() {
+                this.isDark = !this.isDark;
+                document.body.classList.toggle('dark');
+                localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
+
+                // Save to database
+                try {
+                    await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: `action=update_theme&dark_mode=${this.isDark}`
+                    });
+                } catch (e) {
+                    console.log('Theme saved locally only');
+                }
+            },
+
+            async showToast(message, color = 'primary') {
+                const toast = document.createElement('ion-toast');
+                toast.message = message;
+                toast.duration = 2000;
+                toast.color = color;
+                document.body.appendChild(toast);
+                await toast.present();
+            }
+        }
+    }
+</script>
+{% endblock %}

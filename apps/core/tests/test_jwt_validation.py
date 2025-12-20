@@ -303,7 +303,7 @@ class TestJWTMiddleware:
         WHEN: Making request
         THEN: Should pass through
         """
-        from apps.core.middleware.jwt_middleware import JWTMiddleware
+        from apps.accounts.middleware.jwt_middleware import JWTMiddleware
 
         mock_response = HttpResponse("OK")
         get_response = Mock(return_value=mock_response)
@@ -314,9 +314,9 @@ class TestJWTMiddleware:
         request.session = {'jwt_token': valid_jwt_token}
 
         # Mock connectivity, public key fetcher, and validator
-        with patch('apps.core.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
-            with patch('apps.core.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
-                with patch('apps.core.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
+        with patch('apps.accounts.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
+            with patch('apps.accounts.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
+                with patch('apps.accounts.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
                     # Setup mocks
                     mock_checker = Mock()
                     mock_checker.is_online.return_value = True
@@ -342,7 +342,7 @@ class TestJWTMiddleware:
         WHEN: Making request
         THEN: Should pass through with offline warning
         """
-        from apps.core.middleware.jwt_middleware import JWTMiddleware
+        from apps.accounts.middleware.jwt_middleware import JWTMiddleware
 
         mock_response = HttpResponse("OK")
         get_response = Mock(return_value=mock_response)
@@ -353,9 +353,9 @@ class TestJWTMiddleware:
         request.session = {'jwt_token': valid_jwt_token}
 
         # Mock connectivity, public key fetcher, and validator
-        with patch('apps.core.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
-            with patch('apps.core.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
-                with patch('apps.core.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
+        with patch('apps.accounts.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
+            with patch('apps.accounts.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
+                with patch('apps.accounts.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
                     # Setup mocks
                     mock_checker = Mock()
                     mock_checker.is_online.return_value = False  # Offline
@@ -382,7 +382,7 @@ class TestJWTMiddleware:
         WHEN: Making request
         THEN: Should redirect to PIN login
         """
-        from apps.core.middleware.jwt_middleware import JWTMiddleware
+        from apps.accounts.middleware.jwt_middleware import JWTMiddleware
         from apps.core.services.jwt_validator import TokenExpired
 
         mock_response = HttpResponse("OK")
@@ -394,9 +394,9 @@ class TestJWTMiddleware:
         request.session = {'jwt_token': expired_jwt_token}
 
         # Mock connectivity, public key fetcher, and validator
-        with patch('apps.core.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
-            with patch('apps.core.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
-                with patch('apps.core.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
+        with patch('apps.accounts.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
+            with patch('apps.accounts.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
+                with patch('apps.accounts.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
                     # Setup mocks
                     mock_checker = Mock()
                     mock_checker.is_online.return_value = False  # Offline

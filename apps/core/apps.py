@@ -7,11 +7,5 @@ class CoreConfig(AppConfig):
     verbose_name = 'Core'
 
     def ready(self):
-        """
-        Initialize core app when Django is ready.
-
-        Note: WebSocket and FRP startup tasks have been moved to the
-        multi_device plugin (plugins/multi_device/). The plugin handles
-        all initialization automatically when it's installed and active.
-        """
+        """Initialize core app when Django is ready."""
         pass

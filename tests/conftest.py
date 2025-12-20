@@ -2,8 +2,92 @@
 Pytest fixtures shared across all Hub tests.
 """
 import pytest
+from decimal import Decimal
 from unittest.mock import patch, MagicMock
 
+from django.test import Client
+
+
+# =============================================================================
+# Database Fixtures
+# =============================================================================
+
+@pytest.fixture
+def client():
+    """Django test client."""
+    return Client()
+
+
+@pytest.fixture
+def authenticated_client(db, client):
+    """Client with authenticated session."""
+    from apps.accounts.models import LocalUser
+
+    # Create test user
+    user = LocalUser.objects.create(
+        name='Test User',
+        email='test@example.com',
+        role='admin',
+        pin='1234',
+        is_active=True
+    )
+
+    # Simulate login by setting session
+    session = client.session
+    session['local_user_id'] = user.id
+    session['user_name'] = user.name
+    session['user_email'] = user.email
+    session['user_role'] = user.role
+    session.save()
+
+    return client
+
+
+@pytest.fixture
+def hub_config(db):
+    """HubConfig instance for testing."""
+    from apps.configuration.models import HubConfig
+
+    config = HubConfig.get_solo()
+    config.currency = 'EUR'
+    config.os_language = 'en'
+    config.save()
+    return config
+
+
+@pytest.fixture
+def store_config(db):
+    """StoreConfig instance for testing."""
+    from apps.configuration.models import StoreConfig
+
+    config = StoreConfig.get_solo()
+    config.business_name = 'Test Store'
+    config.business_address = '123 Test Street'
+    config.vat_number = 'ES12345678A'
+    config.tax_rate = Decimal('21.00')
+    config.tax_included = True
+    config.is_configured = True
+    config.save()
+    return config
+
+
+@pytest.fixture
+def unconfigured_store(db):
+    """Unconfigured StoreConfig for wizard tests."""
+    from apps.configuration.models import StoreConfig
+
+    config = StoreConfig.get_solo()
+    config.business_name = ''
+    config.business_address = ''
+    config.vat_number = ''
+    config.is_configured = False
+    config.save()
+    return config
+
+
+# =============================================================================
+# Mock Fixtures (for tests that don't need database)
+# =============================================================================
 
 @pytest.fixture
 def mock_hub_config():

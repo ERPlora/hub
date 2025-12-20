@@ -6,19 +6,24 @@ from apps.configuration.models import StoreConfig
 class StoreConfigCheckMiddleware:
     """
     Middleware to check if store is configured after login.
-    If store is not configured, redirect to settings page.
+    If store is not configured, redirect to setup wizard.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
         # Paths that don't require store configuration
         self.exempt_paths = [
-            reverse('accounts:login'),
-            reverse('accounts:logout'),
-            reverse('configuration:settings'),
+            reverse('auth:login'),
+            reverse('auth:logout'),
+            reverse('auth:cloud_login'),
+            reverse('auth:verify_pin'),
+            reverse('auth:setup_pin'),
+            reverse('setup:wizard'),
+            reverse('main:settings'),
             '/api/',  # API endpoints
             '/static/',  # Static files
             '/media/',  # Media files
+            '/__debug__/',  # Debug toolbar
         ]
 
     def __call__(self, request):
@@ -33,11 +38,9 @@ class StoreConfigCheckMiddleware:
                 if not request.session.get('store_config_checked', False):
                     store_config = StoreConfig.get_config()
 
-                    # If store is not configured, redirect to settings
+                    # If store is not configured, redirect to setup wizard
                     if not store_config.is_complete():
-                        request.session['store_config_checked'] = True
-                        request.session['settings_message'] = 'Please complete store configuration to continue'
-                        return redirect('configuration:settings')
+                        return redirect('setup:wizard')
 
                     # Mark as checked for this session
                     request.session['store_config_checked'] = True
