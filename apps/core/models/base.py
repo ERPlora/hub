@@ -1,7 +1,9 @@
 """
-Base model for all Hub models.
+Base models for all Hub and Plugin models.
 
-Provides UUID primary keys and multi-tenancy support via hub_id.
+Provides:
+- TimeStampedModel: Simple base with created_at/updated_at
+- HubBaseModel: Full features with UUID, multi-tenancy, soft delete
 """
 
 import uuid
@@ -9,6 +11,63 @@ from django.db import models
 from django.utils import timezone
 
 from .managers import HubManager, HubManagerWithDeleted
+
+
+class TimeStampedModel(models.Model):
+    """
+    Simple abstract base model with timestamps.
+
+    Use this for plugins that don't need UUID primary keys or multi-tenancy.
+
+    Features:
+    - created_at: Auto-set on creation
+    - updated_at: Auto-updated on save
+
+    Usage in plugins:
+        from apps.core.models import TimeStampedModel
+
+        class Product(TimeStampedModel):
+            name = models.CharField(max_length=255)
+            price = models.DecimalField(max_digits=10, decimal_places=2)
+
+            class Meta(TimeStampedModel.Meta):
+                db_table = 'inventory_product'
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class ActiveModel(TimeStampedModel):
+    """
+    Abstract base model with is_active flag.
+
+    Use for models that need activation/deactivation without deletion.
+
+    Features:
+    - is_active: Boolean flag for soft activation
+    - created_at, updated_at: From TimeStampedModel
+
+    Usage in plugins:
+        from apps.core.models import ActiveModel
+
+        class Category(ActiveModel):
+            name = models.CharField(max_length=255)
+
+            class Meta(ActiveModel.Meta):
+                db_table = 'inventory_category'
+
+        # Query active only
+        Category.objects.filter(is_active=True)
+    """
+
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        abstract = True
 
 
 class HubBaseModel(models.Model):
