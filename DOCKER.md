@@ -18,7 +18,7 @@ docker run -d \
   -p 8001:8000 \
   -v hub_dev_db:/app/db \
   -v hub_dev_media:/app/media \
-  -v hub_dev_plugins:/app/plugins \
+  -v hub_dev_modules:/app/modules \
   -v $(pwd):/app \
   -e DEBUG=True \
   -e SECRET_KEY=docker-dev-secret-key \
@@ -46,7 +46,7 @@ docker run -d \
   -p 7001:8000 \
   -v hub_{hub-id}_db:/app/db \
   -v hub_{hub-id}_media:/app/media \
-  -v hub_{hub-id}_plugins:/app/plugins \
+  -v hub_{hub-id}_modules:/app/modules \
   -e DEBUG=False \
   -e SECRET_KEY=your-random-secret-key \
   -e CLOUD_API_URL=https://erplora.com \
@@ -71,7 +71,7 @@ docker rm hub-{hub-id}
 |---------|-----------|---------|
 | `/app/db` | Base de datos SQLite | ✅ SÍ - Persistir datos |
 | `/app/media` | Archivos subidos (logos, imágenes) | ✅ SÍ - Persistir archivos |
-| `/app/plugins` | Plugins instalados | ✅ SÍ - Persistir plugins |
+| `/app/modules` | Modules instalados | ✅ SÍ - Persistir modules |
 | `/app/logs` | Logs de la aplicación | ⚠️ Opcional - Debugging |
 
 **IMPORTANTE:** En producción (Dokploy), estos volúmenes deben ser persistentes.
@@ -109,7 +109,7 @@ LOG_LEVEL=INFO
 
 # Development features
 ERPlora_DEV_MODE=false
-PLUGIN_AUTO_RELOAD=false
+MODULE_AUTO_RELOAD=false
 ```
 
 ---
@@ -184,7 +184,7 @@ docker run -d \
   -p 7001:8000 \
   -v hub_abc_123_def_db:/app/db \
   -v hub_abc_123_def_media:/app/media \
-  -v hub_abc_123_def_plugins:/app/plugins \
+  -v hub_abc_123_def_modules:/app/modules \
   -e DEBUG=False \
   -e SECRET_KEY=auto-generated \
   -e CLOUD_API_URL=https://erplora.com \
@@ -237,17 +237,17 @@ docker exec erplora-hub python manage.py migrate
 docker exec erplora-hub python manage.py showmigrations
 ```
 
-### Plugins no cargan
+### Modules no cargan
 
 ```bash
-# Listar plugins instalados
-docker exec erplora-hub ls -la /app/plugins/
+# Listar modules instalados
+docker exec erplora-hub ls -la /app/modules/
 
 # Verificar permisos
-docker exec erplora-hub chown -R 1000:1000 /app/plugins/
+docker exec erplora-hub chown -R 1000:1000 /app/modules/
 
-# Logs de plugins
-docker exec erplora-hub python manage.py shell -c "from apps.core.runtime_manager import PluginRuntimeManager; print(PluginRuntimeManager().list_plugins())"
+# Logs de modules
+docker exec erplora-hub python manage.py shell -c "from apps.core.runtime_manager import ModuleRuntimeManager; print(ModuleRuntimeManager().list_modules())"
 ```
 
 ### Puerto ya en uso

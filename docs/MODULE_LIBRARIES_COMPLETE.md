@@ -96,15 +96,15 @@
 
 ---
 
-### 6️⃣ Pagos & Stripe (Compra de Plugins)
+### 6️⃣ Pagos & Stripe (Compra de Modules)
 ```python
-'stripe>=7.0.0'               # Stripe payments (plugins, suscripciones)
+'stripe>=7.0.0'               # Stripe payments (modules, suscripciones)
 'paypalrestsdk>=1.13.1'       # PayPal payments
 'braintree>=4.24.0'           # Braintree (PayPal/Venmo)
 ```
 
 **Casos de uso:**
-- Compra de plugins desde el Hub
+- Compra de modules desde el Hub
 - Suscripciones mensuales
 - Pagos de clientes (TPV integrado)
 
@@ -128,18 +128,18 @@
 
 ### 8️⃣ Bases de Datos & Almacenamiento
 ```python
-'SQLAlchemy>=2.0.0'           # ORM avanzado (si plugins necesitan BD custom)
-'psycopg2-binary>=2.9.9'      # PostgreSQL (si plugins usan Postgres)
-'pymongo>=4.6.0'              # MongoDB (si plugins necesitan NoSQL)
+'SQLAlchemy>=2.0.0'           # ORM avanzado (si modules necesitan BD custom)
+'psycopg2-binary>=2.9.9'      # PostgreSQL (si modules usan Postgres)
+'pymongo>=4.6.0'              # MongoDB (si modules necesitan NoSQL)
 'redis>=5.0.0'                # Redis client (cache, sessions)
 ```
 
 **Casos de uso:**
-- Plugins con modelos complejos
+- Modules con modelos complejos
 - Cache de datos (Redis)
 - Sincronización con bases externas
 
-**Nota:** Hub usa SQLite, pero algunos plugins enterprise podrían necesitar Postgres.
+**Nota:** Hub usa SQLite, pero algunos modules enterprise podrían necesitar Postgres.
 
 ---
 
@@ -228,7 +228,7 @@
 
 **Casos de uso:**
 - Comprimir backups
-- Descomprimir plugins
+- Descomprimir modules
 - Export masivo de datos
 
 ---
@@ -238,7 +238,7 @@
 'python-slugify>=8.0.0'       # URLs amigables (slug de productos)
 'humanize>=4.9.0'             # Números human-friendly (hace 2 horas)
 'arrow>=1.3.0'                # Fechas human-friendly (alternativa a dateutil)
-'click>=8.1.0'                # CLI tools (si plugins tienen comandos)
+'click>=8.1.0'                # CLI tools (si modules tienen comandos)
 'pydantic>=2.5.0'             # Validación de datos (mejor que forms Django)
 'python-dotenv>=1.0.0'        # .env files (ya usas python-decouple)
 ```
@@ -355,9 +355,9 @@ OPTIONAL_LIBRARIES = [
 **Para CPOS Hub, incluir estas 25 librerías:**
 
 ```python
-# hub/config/plugin_allowed_deps.py
+# hub/config/module_allowed_deps.py
 
-PLUGIN_ALLOWED_DEPENDENCIES = {
+MODULE_ALLOWED_DEPENDENCIES = {
     # === CRÍTICAS (13) ===
     'Pillow': '>=10.0.0',          # Imágenes
     'qrcode': '>=7.4.0',           # QR codes
@@ -426,8 +426,8 @@ Bundle final: ~245MB
 
 Incluiría:
 1. Actualizar `main.spec` con `collect_submodules()` para cada una
-2. Crear `hub/config/plugin_allowed_deps.py` con la whitelist
-3. Crear validador de `plugin.json`
+2. Crear `hub/config/module_allowed_deps.py` con la whitelist
+3. Crear validador de `module.json`
 4. Actualizar documentación en CLAUDE.md
 
 ¿Procedo? ¿O prefieres ajustar la lista primero?

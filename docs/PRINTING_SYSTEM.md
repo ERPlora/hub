@@ -1,10 +1,10 @@
 # Sistema de Impresión Desacoplado
 
-Sistema centralizado de impresión que permite a los plugins emitir eventos de impresión sin conocer la configuración de impresoras.
+Sistema centralizado de impresión que permite a los modules emitir eventos de impresión sin conocer la configuración de impresoras.
 
 ## 🎯 Objetivo
 
-Desacoplar completamente los plugins de la gestión de impresoras. Los plugins solo necesitan emitir un evento de impresión, y el plugin `printers` se encarga de:
+Desacoplar completamente los modules de la gestión de impresoras. Los modules solo necesitan emitir un evento de impresión, y el module `printers` se encarga de:
 
 1. Seleccionar la impresora correcta según el tipo de documento
 2. Formatear el documento con la configuración apropiada
@@ -15,10 +15,10 @@ Desacoplar completamente los plugins de la gestión de impresoras. Los plugins s
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        PLUGINS (Desacoplados)                    │
+│                        MODULES (Desacoplados)                    │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  Sales Plugin          Restaurant Plugin      Inventory Plugin  │
+│  Sales Module          Restaurant Module      Inventory Module  │
 │      │                      │                       │            │
 │      └──────────────────────┴───────────────────────┘            │
 │                             │                                    │
@@ -36,7 +36,7 @@ Desacoplar completamente los plugins de la gestión de impresoras. Los plugins s
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    PRINTERS PLUGIN (Centralizado)                │
+│                    PRINTERS MODULE (Centralizado)                │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  signal_handlers.py                                              │
@@ -60,12 +60,12 @@ Desacoplar completamente los plugins de la gestión de impresoras. Los plugins s
                      └────────────────┘
 ```
 
-## 🚀 Uso desde Plugins
+## 🚀 Uso desde Modules
 
 ### Método 1: Usando Helper Functions (Recomendado)
 
 ```python
-# En cualquier plugin
+# En cualquier module
 from apps.core.print_helper import print_receipt, print_delivery_note
 
 # Imprimir recibo (no necesitas saber qué impresora)
@@ -96,7 +96,7 @@ from apps.core.signals import print_ticket_requested
 
 # Emitir señal personalizada
 print_ticket_requested.send(
-    sender='my_plugin',
+    sender='my_module',
     ticket_type='custom_document',
     data={
         'receipt_id': 'DOC-789',
@@ -210,12 +210,12 @@ def _find_printer_for_document(ticket_type, printer_id=None):
 
 ### `print_ticket_requested` (Entrada)
 
-**Emitida por**: Cualquier plugin que necesite imprimir
-**Escuchada por**: Plugin `printers`
+**Emitida por**: Cualquier module que necesite imprimir
+**Escuchada por**: Module `printers`
 
 ```python
 print_ticket_requested.send(
-    sender='sales',                    # Nombre del plugin
+    sender='sales',                    # Nombre del module
     ticket_type='receipt',             # Tipo de documento
     data={...},                        # Datos del documento
     printer_id=None,                   # Opcional: impresora específica
@@ -225,8 +225,8 @@ print_ticket_requested.send(
 
 ### `print_completed` (Salida)
 
-**Emitida por**: Plugin `printers`
-**Escuchada por**: Plugin que inició la impresión
+**Emitida por**: Module `printers`
+**Escuchada por**: Module que inició la impresión
 
 ```python
 @receiver(print_completed)
@@ -236,8 +236,8 @@ def on_print_success(sender, print_job_id, ticket_type, printer_name, **kwargs):
 
 ### `print_failed` (Salida)
 
-**Emitida por**: Plugin `printers`
-**Escuchada por**: Plugin que inició la impresión
+**Emitida por**: Module `printers`
+**Escuchada por**: Module que inició la impresión
 
 ```python
 @receiver(print_failed)
@@ -248,10 +248,10 @@ def on_print_error(sender, print_job_id, ticket_type, error, **kwargs):
 
 ## 📝 Ejemplos Completos
 
-### Ejemplo 1: Plugin de Ventas
+### Ejemplo 1: Module de Ventas
 
 ```python
-# plugins/sales/views.py
+# modules/sales/views.py
 from apps.core.print_helper import print_receipt
 
 def complete_sale(request):
@@ -271,10 +271,10 @@ def complete_sale(request):
     return JsonResponse({'success': True})
 ```
 
-### Ejemplo 2: Plugin de Restaurante
+### Ejemplo 2: Module de Restaurante
 
 ```python
-# plugins/restaurant/views.py
+# modules/restaurant/views.py
 from apps.core.print_helper import print_kitchen_order
 
 def send_to_kitchen(request, order_id):
@@ -302,7 +302,7 @@ def send_to_kitchen(request, order_id):
 ### Ejemplo 3: Escuchar Resultados de Impresión
 
 ```python
-# plugins/sales/apps.py
+# modules/sales/apps.py
 from django.apps import AppConfig
 from django.dispatch import receiver
 from apps.core.signals import print_completed, print_failed
@@ -366,14 +366,14 @@ printer = Printer.objects.create(
 ## 🔒 Ventajas del Sistema
 
 ### ✅ **Desacoplamiento Total**
-- Los plugins NO necesitan importar código del plugin de impresoras
-- Los plugins NO necesitan saber qué impresora usar
+- Los modules NO necesitan importar código del module de impresoras
+- Los modules NO necesitan saber qué impresora usar
 - Se pueden desactivar/activar impresoras sin tocar código
 
 ### ✅ **Configuración Centralizada**
 - Un solo lugar para configurar impresoras
 - Fácil reasignar impresoras a diferentes tipos de documento
-- UI de configuración en el plugin de impresoras
+- UI de configuración en el module de impresoras
 
 ### ✅ **Escalabilidad**
 - Múltiples impresoras para el mismo tipo de documento
@@ -381,13 +381,13 @@ printer = Printer.objects.create(
 - Preparado para cola de impresión futura
 
 ### ✅ **Mantenibilidad**
-- Cambios en impresión no afectan a otros plugins
+- Cambios en impresión no afectan a otros modules
 - Helper functions simplifican el uso
 - Logging centralizado de impresiones
 
 ### ✅ **Flexibilidad**
 - Nuevos tipos de documento sin modificar código
-- Plugins custom pueden definir sus propios tipos
+- Modules custom pueden definir sus propios tipos
 - Sistema de señales permite extensiones
 
 ## 📊 Casos de Uso Reales
@@ -409,7 +409,7 @@ kitchen_printer = Printer.objects.create(
     priority=2  # Fallback si barra falla
 )
 
-# El plugin solo hace:
+# El module solo hace:
 print_kitchen_order(order_number='#42', items=[...])
 # → Se imprime automáticamente en barra (priority=1)
 ```
@@ -433,7 +433,7 @@ invoice_printer = Printer.objects.create(
     priority=1
 )
 
-# El plugin usa:
+# El module usa:
 print_receipt(...)      # → Térmica 58mm
 print_invoice(...)      # → Láser A4
 ```
@@ -442,10 +442,10 @@ print_invoice(...)      # → Láser A4
 
 ### No se imprime nada
 
-1. **Verificar que el plugin de impresoras está activo**
+1. **Verificar que el module de impresoras está activo**
    ```bash
    # En logs debe aparecer:
-   [PRINTERS] ✓ Plugin loaded with signal handlers
+   [PRINTERS] ✓ Module loaded with signal handlers
    ```
 
 2. **Verificar que hay impresoras configuradas**

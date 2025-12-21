@@ -9,7 +9,7 @@ Guía para ejecutar tests en el Hub usando pytest.
 ### Dependencias instaladas
 
 - `pytest` - Framework de testing
-- `pytest-django` - Plugin para Django
+- `pytest-django` - Module para Django
 - `pytest-cov` - Coverage reports
 - `faker` - Generación de datos fake para tests
 
@@ -27,7 +27,7 @@ hub/
     ├── pos/tests/
     ├── products/tests/
     ├── sales/tests/
-    ├── plugins/tests/
+    ├── modules/tests/
     ├── hardware/tests/
     └── sync/tests/
 ```
@@ -105,7 +105,7 @@ Markers configurados en `pytest.ini`:
 - `@pytest.mark.pos` - Tests de pos app
 - `@pytest.mark.products` - Tests de products app
 - `@pytest.mark.sales` - Tests de sales app
-- `@pytest.mark.plugins` - Tests de plugins app
+- `@pytest.mark.modules` - Tests de modules app
 - `@pytest.mark.hardware` - Tests de hardware app
 - `@pytest.mark.sync` - Tests de sync app
 - `@pytest.mark.slow` - Tests lentos

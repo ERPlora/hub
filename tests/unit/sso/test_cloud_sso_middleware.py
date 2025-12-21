@@ -53,9 +53,9 @@ class TestCloudSSOMiddlewareExemptUrls(TestCase):
         """Dashboard should require authentication."""
         assert self.middleware._is_exempt_url('/dashboard/') is False
 
-    def test_plugins_are_not_exempt(self):
-        """Plugin pages should require authentication."""
-        assert self.middleware._is_exempt_url('/plugins/products/') is False
+    def test_modules_are_not_exempt(self):
+        """Module pages should require authentication."""
+        assert self.middleware._is_exempt_url('/modules/products/') is False
 
     def test_settings_is_not_exempt(self):
         """Settings should require authentication."""

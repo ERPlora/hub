@@ -49,8 +49,8 @@ cd /Users/ioan/Desktop/code/cpos/hub
 # Extract translatable strings to .po files
 .venv/bin/python manage.py makemessages -l es --ignore=.venv
 
-# For plugins
-cd plugins/my_plugin
+# For modules
+cd modules/my_module
 ../../.venv/bin/python ../../manage.py makemessages -l es
 ```
 
@@ -60,7 +60,7 @@ Edit the `.po` files manually:
 
 **Hub translations:** `locale/es/LC_MESSAGES/django.po`
 
-**Plugin translations:** `plugins/<plugin_name>/locale/es/LC_MESSAGES/django.po`
+**Module translations:** `modules/<module_name>/locale/es/LC_MESSAGES/django.po`
 
 Example entry:
 ```po
@@ -104,12 +104,12 @@ Or use the language selector in the UI.
 # 5. Test by changing LANGUAGE_CODE or using language selector
 ```
 
-### For Plugins
+### For Modules
 
-Plugins should include their own translation files:
+Modules should include their own translation files:
 
 ```
-plugins/my_plugin/
+modules/my_module/
 ├── locale/
 │   ├── en/
 │   │   └── LC_MESSAGES/
@@ -124,10 +124,10 @@ plugins/my_plugin/
 └── views.py
 ```
 
-Generate translations for a plugin:
+Generate translations for a module:
 
 ```bash
-cd plugins/my_plugin
+cd modules/my_module
 ../../.venv/bin/python ../../manage.py makemessages -l es
 ../../.venv/bin/python ../../manage.py makemessages -l en
 ../../.venv/bin/python ../../manage.py compilemessages
@@ -172,12 +172,12 @@ cd plugins/my_plugin
 3. **Use variables for dynamic content**: `{% blocktrans with name=user.name %}`
 4. **Don't concatenate translated strings** - use one full string instead
 5. **Test translations** before committing
-6. **Document new translatable strings** in plugin documentation
+6. **Document new translatable strings** in module documentation
 
 ## Auto-Generated Files
 
 - `locale/es/LC_MESSAGES/django.mo` - Compiled translations (binary)
-- `plugins/*/locale/*/LC_MESSAGES/django.mo` - Plugin compiled translations
+- `modules/*/locale/*/LC_MESSAGES/django.mo` - Module compiled translations
 
 ⚠️ **Do not edit `.mo` files manually** - they are auto-generated from `.po` files.
 

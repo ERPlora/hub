@@ -76,9 +76,9 @@ class TestHeartbeatServiceInit:
             from apps.sync.services.heartbeat import HeartbeatService
             service = HeartbeatService(cloud_api=mock_cloud_api)
 
-            assert 'install_plugin' in service._command_handlers
-            assert 'update_plugin' in service._command_handlers
-            assert 'remove_plugin' in service._command_handlers
+            assert 'install_module' in service._command_handlers
+            assert 'update_module' in service._command_handlers
+            assert 'remove_module' in service._command_handlers
             assert 'sync_config' in service._command_handlers
 
 
@@ -156,8 +156,8 @@ class TestHeartbeatLoop:
         assert mock_cloud_api.send_heartbeat.called
 
     def test_heartbeat_includes_metadata(self, heartbeat_service, mock_cloud_api):
-        """Test heartbeat includes version and plugins."""
-        with patch.object(heartbeat_service, '_get_installed_plugins', return_value=['plugin1', 'plugin2']):
+        """Test heartbeat includes version and modules."""
+        with patch.object(heartbeat_service, '_get_installed_modules', return_value=['module1', 'module2']):
             heartbeat_service._send_heartbeat()
 
             call_args = mock_cloud_api.send_heartbeat.call_args
@@ -189,8 +189,8 @@ class TestCommandPolling:
         mock_cloud_api.get_pending_commands.return_value = [
             {
                 'id': 'cmd-1',
-                'type': 'install_plugin',
-                'payload': {'plugin_id': 'test'},
+                'type': 'install_module',
+                'payload': {'module_id': 'test'},
                 'command_jwt': 'valid.jwt'
             }
         ]
@@ -217,8 +217,8 @@ class TestCommandExecution:
         """Test successful command execution."""
         command = {
             'id': 'cmd-1',
-            'type': 'install_plugin',
-            'payload': {'plugin_id': 'inventory'},
+            'type': 'install_module',
+            'payload': {'module_id': 'inventory'},
             'command_jwt': 'valid.jwt'
         }
 
@@ -255,7 +255,7 @@ class TestCommandExecution:
 
         command = {
             'id': 'cmd-1',
-            'type': 'install_plugin',
+            'type': 'install_module',
             'payload': {},
             'command_jwt': 'invalid.jwt'
         }
@@ -293,35 +293,35 @@ class TestCommandExecution:
 class TestCommandHandlers:
     """Tests for default command handlers."""
 
-    def test_handle_install_plugin(self, heartbeat_service):
-        """Test install_plugin handler."""
-        success, result, error = heartbeat_service._handle_install_plugin({
-            'plugin_id': 'inventory',
+    def test_handle_install_module(self, heartbeat_service):
+        """Test install_module handler."""
+        success, result, error = heartbeat_service._handle_install_module({
+            'module_id': 'inventory',
             'version': '1.0.0'
         })
 
         assert success is True
         assert 'installed' in result
 
-    def test_handle_install_plugin_missing_id(self, heartbeat_service):
-        """Test install_plugin handler with missing plugin_id."""
-        success, result, error = heartbeat_service._handle_install_plugin({})
+    def test_handle_install_module_missing_id(self, heartbeat_service):
+        """Test install_module handler with missing module_id."""
+        success, result, error = heartbeat_service._handle_install_module({})
 
         assert success is False
-        assert 'Missing plugin_id' in error
+        assert 'Missing module_id' in error
 
-    def test_handle_update_plugin(self, heartbeat_service):
-        """Test update_plugin handler."""
-        success, result, error = heartbeat_service._handle_update_plugin({
-            'plugin_id': 'inventory'
+    def test_handle_update_module(self, heartbeat_service):
+        """Test update_module handler."""
+        success, result, error = heartbeat_service._handle_update_module({
+            'module_id': 'inventory'
         })
 
         assert success is True
 
-    def test_handle_remove_plugin(self, heartbeat_service):
-        """Test remove_plugin handler."""
-        success, result, error = heartbeat_service._handle_remove_plugin({
-            'plugin_id': 'inventory'
+    def test_handle_remove_module(self, heartbeat_service):
+        """Test remove_module handler."""
+        success, result, error = heartbeat_service._handle_remove_module({
+            'module_id': 'inventory'
         })
 
         assert success is True

@@ -1,34 +1,34 @@
-# Plugin Activation Flow - WordPress-Style System
+# Module Activation Flow - WordPress-Style System
 
 ## Overview
 
-ERPlora Hub uses a **filesystem-based plugin system** similar to WordPress. Plugins are activated/deactivated by renaming folders, and registration happens automatically on server restart.
+ERPlora Hub uses a **filesystem-based module system** similar to WordPress. Modules are activated/deactivated by renaming folders, and registration happens automatically on server restart.
 
 ## Key Concepts
 
-### 1. Plugin States (Filesystem-Based)
+### 1. Module States (Filesystem-Based)
 
-- **Inactive Plugin**: Folder starts with underscore `_inventory/`
-- **Active Plugin**: Folder WITHOUT underscore `inventory/`
-- **Hidden Plugin**: Folder starts with dot `.template/` (never loaded)
+- **Inactive Module**: Folder starts with underscore `_inventory/`
+- **Active Module**: Folder WITHOUT underscore `inventory/`
+- **Hidden Module**: Folder starts with dot `.template/` (never loaded)
 
 ### 2. Automatic Registration
 
-When Django starts, `apps.plugins_runtime` automatically:
-1. Scans `plugins/` directory
-2. Loads active plugins (no `_` prefix)
+When Django starts, `apps.modules_runtime` automatically:
+1. Scans `modules/` directory
+2. Loads active modules (no `_` prefix)
 3. Registers in INSTALLED_APPS
 4. Runs migrations
 5. Registers URLs dynamically
-6. Generates menu items from plugin.json
+6. Generates menu items from module.json
 
 ### 3. No Database Dependency
 
-Plugin state is determined **only from folder name**, NOT from database. This ensures:
+Module state is determined **only from folder name**, NOT from database. This ensures:
 - ✅ Simple and reliable
 - ✅ Easy to backup/restore
 - ✅ No sync issues
-- ✅ Visual inspection of active plugins
+- ✅ Visual inspection of active modules
 
 ---
 
@@ -37,23 +37,23 @@ Plugin state is determined **only from folder name**, NOT from database. This en
 ### Step 1: Purchase & Download (Marketplace)
 
 ```
-User → Cloud Marketplace → Purchase Plugin → Download ZIP
+User → Cloud Marketplace → Purchase Module → Download ZIP
                                                   ↓
                                     Hub receives: inventory.zip
                                                   ↓
-                                    Hub extracts to: plugins/_inventory/
+                                    Hub extracts to: modules/_inventory/
 ```
 
 **Folder Structure:**
 ```
-hub/plugins/
+hub/modules/
 ├── _inventory/           ← Downloaded as INACTIVE (with underscore)
-│   ├── plugin.json
+│   ├── module.json
 │   ├── models.py
 │   ├── views.py
 │   ├── urls.py
 │   └── templates/
-└── products/            ← Example active plugin (no underscore)
+└── products/            ← Example active module (no underscore)
 ```
 
 **Why `_inventory/`?**
@@ -63,44 +63,44 @@ hub/plugins/
 
 ---
 
-### Step 2: Activate Plugin (UI Action)
+### Step 2: Activate Module (UI Action)
 
 **User Action:**
-1. Navigate to `/plugins/` page
-2. Find inactive plugin card
+1. Navigate to `/modules/` page
+2. Find inactive module card
 3. Click **"Activate"** button
 
-**Backend Action (`plugin_activate` view):**
+**Backend Action (`module_activate` view):**
 ```python
-# apps/configuration/views_plugins.py
+# apps/configuration/views_modules.py
 
 @require_http_methods(["POST"])
-def plugin_activate(request, plugin_id):
-    plugins_dir = Path(django_settings.PLUGINS_DIR)
-    disabled_folder = plugins_dir / f"_{plugin_id}"  # _inventory/
-    active_folder = plugins_dir / plugin_id          # inventory/
+def module_activate(request, module_id):
+    modules_dir = Path(django_settings.MODULES_DIR)
+    disabled_folder = modules_dir / f"_{module_id}"  # _inventory/
+    active_folder = modules_dir / module_id          # inventory/
 
     if not disabled_folder.exists():
-        return JsonResponse({'success': False, 'error': 'Plugin not found'}, status=404)
+        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
 
     try:
         # CRITICAL: Just rename the folder (remove underscore)
         disabled_folder.rename(active_folder)
-        return JsonResponse({'success': True, 'message': 'Plugin activated. Restart required.'})
+        return JsonResponse({'success': True, 'message': 'Module activated. Restart required.'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 ```
 
 **Result:**
 ```
-plugins/_inventory/  →  plugins/inventory/
+modules/_inventory/  →  modules/inventory/
 ```
 
 **Important Notes:**
 - ✅ Operation is instant (just folder rename)
-- ✅ Plugin NOT loaded yet (needs restart)
+- ✅ Module NOT loaded yet (needs restart)
 - ✅ User sees "Restart required" message
-- ⚠️ Plugin won't work until restart
+- ⚠️ Module won't work until restart
 
 ---
 
@@ -118,73 +118,73 @@ python manage.py runserver 8001
 
 **Why Manual Restart?**
 - Django loads INSTALLED_APPS only at startup
-- New plugins = new Django apps
+- New modules = new Django apps
 - Cannot hot-reload without complexity
 - Simple, reliable, clear to user
 
 ---
 
-### Step 4: Automatic Plugin Registration (On Startup)
+### Step 4: Automatic Module Registration (On Startup)
 
-**Entry Point:** `apps/plugins_runtime/apps.py`
+**Entry Point:** `apps/modules_runtime/apps.py`
 
 ```python
-class PluginsRuntimeConfig(AppConfig):
+class ModulesRuntimeConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'apps.plugins_runtime'
-    verbose_name = 'Plugins Runtime'
+    name = 'apps.modules_runtime'
+    verbose_name = 'Modules Runtime'
 
     def ready(self):
         """
         Django calls this ONCE during startup.
-        This is where ALL plugin loading happens.
+        This is where ALL module loading happens.
         """
         print("\n" + "="*80)
-        print("[PLUGINS_RUNTIME] Loading active plugins from filesystem...")
+        print("[MODULES_RUNTIME] Loading active modules from filesystem...")
         print("="*80)
 
-        from .loader import plugin_loader
-        from apps.core.runtime_manager import register_plugin_urls
+        from .loader import module_loader
+        from apps.core.runtime_manager import register_module_urls
 
-        # 1️⃣ Load all active plugins from filesystem
-        loaded_count = plugin_loader.load_all_active_plugins()
-        print(f"[PLUGINS_RUNTIME] Loaded {loaded_count} active plugins")
+        # 1️⃣ Load all active modules from filesystem
+        loaded_count = module_loader.load_all_active_modules()
+        print(f"[MODULES_RUNTIME] Loaded {loaded_count} active modules")
 
-        # 2️⃣ Register URLs for each loaded plugin
-        for plugin_id, plugin_info in plugin_loader.loaded_plugins.items():
-            register_plugin_urls(plugin_id, plugin_id, f'/plugins/{plugin_id}/')
+        # 2️⃣ Register URLs for each loaded module
+        for module_id, module_info in module_loader.loaded_modules.items():
+            register_module_urls(module_id, module_id, f'/modules/{module_id}/')
 
         print("="*80 + "\n")
 ```
 
 ---
 
-### Step 5: Plugin Loading Process
+### Step 5: Module Loading Process
 
-**Code:** `apps/plugins_runtime/loader.py`
+**Code:** `apps/modules_runtime/loader.py`
 
 #### 5.1 Scan Filesystem
 
 ```python
-def load_all_active_plugins(self) -> int:
+def load_all_active_modules(self) -> int:
     """
-    Scans plugins/ directory and loads active plugins.
+    Scans modules/ directory and loads active modules.
     Active = folder does NOT start with _ or .
     """
     loaded_count = 0
 
-    for plugin_dir in self.plugins_dir.iterdir():
-        if not plugin_dir.is_dir():
+    for module_dir in self.modules_dir.iterdir():
+        if not module_dir.is_dir():
             continue
 
-        # Skip disabled plugins (_ prefix) and hidden (. prefix)
-        if plugin_dir.name.startswith('.') or plugin_dir.name.startswith('_'):
-            print(f"[SKIP] Plugin '{plugin_dir.name}' is disabled")
+        # Skip disabled modules (_ prefix) and hidden (. prefix)
+        if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
+            print(f"[SKIP] Module '{module_dir.name}' is disabled")
             continue
 
-        plugin_id = plugin_dir.name  # Example: "inventory"
+        module_id = module_dir.name  # Example: "inventory"
 
-        if self.load_plugin(plugin_id):
+        if self.load_module(module_id):
             loaded_count += 1
 
     return loaded_count
@@ -192,77 +192,77 @@ def load_all_active_plugins(self) -> int:
 
 **Example:**
 ```
-plugins/
+modules/
 ├── .template/        ← SKIP (hidden)
 ├── _inventory/       ← SKIP (disabled with underscore)
 ├── products/         ← LOAD ✅ (active)
 └── reports/          ← LOAD ✅ (active)
 
-Result: 2 plugins loaded (products, reports)
+Result: 2 modules loaded (products, reports)
 ```
 
 ---
 
-#### 5.2 Load Individual Plugin
+#### 5.2 Load Individual Module
 
 ```python
-def load_plugin(self, plugin_id: str) -> bool:
+def load_module(self, module_id: str) -> bool:
     """
-    Loads a single plugin:
-    1. Read plugin.json metadata
+    Loads a single module:
+    1. Read module.json metadata
     2. Add to Django's INSTALLED_APPS
     3. Import models (triggers migrations)
-    4. Store in loaded_plugins dict
+    4. Store in loaded_modules dict
     """
-    plugin_path = self.plugins_dir / plugin_id
+    module_path = self.modules_dir / module_id
 
-    if not plugin_path.exists():
-        print(f"[ERROR] Plugin '{plugin_id}' not found")
+    if not module_path.exists():
+        print(f"[ERROR] Module '{module_id}' not found")
         return False
 
-    # Read plugin.json
-    plugin_json = plugin_path / 'plugin.json'
-    if not plugin_json.exists():
-        print(f"[ERROR] Plugin '{plugin_id}' missing plugin.json")
+    # Read module.json
+    module_json = module_path / 'module.json'
+    if not module_json.exists():
+        print(f"[ERROR] Module '{module_id}' missing module.json")
         return False
 
     try:
-        with open(plugin_json, 'r', encoding='utf-8') as f:
+        with open(module_json, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
 
         # Add to INSTALLED_APPS (so Django recognizes it as an app)
-        app_name = plugin_id
+        app_name = module_id
         if app_name not in django_settings.INSTALLED_APPS:
             django_settings.INSTALLED_APPS.append(app_name)
             print(f"[✓] Added '{app_name}' to INSTALLED_APPS")
 
         # Import models (Django auto-runs migrations)
         try:
-            importlib.import_module(f'{plugin_id}.models')
-            print(f"[✓] Imported models for '{plugin_id}'")
+            importlib.import_module(f'{module_id}.models')
+            print(f"[✓] Imported models for '{module_id}'")
         except ImportError:
-            print(f"[INFO] Plugin '{plugin_id}' has no models")
+            print(f"[INFO] Module '{module_id}' has no models")
 
-        # Store plugin info
-        self.loaded_plugins[plugin_id] = {
-            'path': plugin_path,
+        # Store module info
+        self.loaded_modules[module_id] = {
+            'path': module_path,
             'metadata': metadata,
             'is_active': True
         }
 
-        print(f"[✓] Plugin '{plugin_id}' loaded successfully")
+        print(f"[✓] Module '{module_id}' loaded successfully")
         return True
 
     except Exception as e:
-        print(f"[ERROR] Failed to load plugin '{plugin_id}': {e}")
+        print(f"[ERROR] Failed to load module '{module_id}': {e}")
         return False
 ```
 
 **What Happens:**
-1. ✅ Django recognizes plugin as an app
+1. ✅ Django recognizes module as an app
 2. ✅ Models are imported
 3. ✅ Migrations run automatically (if models changed)
-4. ✅ Plugin stored in `plugin_loader.loaded_plugins` dict
+4. ✅ Module stored in `module_loader.loaded_modules` dict
 
 ---
 
@@ -271,47 +271,47 @@ def load_plugin(self, plugin_id: str) -> bool:
 ```python
 # apps/core/runtime_manager.py
 
-def register_plugin_urls(plugin_id: str, app_name: str, prefix: str):
+def register_module_urls(module_id: str, app_name: str, prefix: str):
     """
-    Registers plugin URLs dynamically with namespace.
+    Registers module URLs dynamically with namespace.
 
     Example:
-        plugin_id = "inventory"
+        module_id = "inventory"
         app_name = "inventory"
-        prefix = "/plugins/inventory/"
+        prefix = "/modules/inventory/"
 
     Result:
-        /plugins/inventory/ → inventory.urls with namespace 'inventory'
+        /modules/inventory/ → inventory.urls with namespace 'inventory'
     """
     try:
-        # Import plugin's urls.py
-        plugin_urls = importlib.import_module(f'{plugin_id}.urls')
+        # Import module's urls.py
+        module_urls = importlib.import_module(f'{module_id}.urls')
 
         # Create URL pattern with namespace
-        plugin_urlpatterns.append(
-            path(prefix.lstrip('/'), include((plugin_urls, app_name), namespace=app_name))
+        module_urlpatterns.append(
+            path(prefix.lstrip('/'), include((module_urls, app_name), namespace=app_name))
         )
 
-        print(f"[✓] Registered URLs for '{plugin_id}' at '{prefix}'")
+        print(f"[✓] Registered URLs for '{module_id}' at '{prefix}'")
 
     except ImportError:
-        print(f"[INFO] Plugin '{plugin_id}' has no urls.py")
+        print(f"[INFO] Module '{module_id}' has no urls.py")
     except Exception as e:
-        print(f"[ERROR] Failed to register URLs for '{plugin_id}': {e}")
+        print(f"[ERROR] Failed to register URLs for '{module_id}': {e}")
 ```
 
 **Example URLs:**
 ```python
-# plugins/inventory/urls.py
+# modules/inventory/urls.py
 
 urlpatterns = [
-    path('', views.index, name='index'),           # /plugins/inventory/
-    path('add/', views.add_product, name='add'),   # /plugins/inventory/add/
+    path('', views.index, name='index'),           # /modules/inventory/
+    path('add/', views.add_product, name='add'),   # /modules/inventory/add/
 ]
 
 # After registration, accessible via:
-{% url 'inventory:index' %}  # → /plugins/inventory/
-{% url 'inventory:add' %}    # → /plugins/inventory/add/
+{% url 'inventory:index' %}  # → /modules/inventory/
+{% url 'inventory:add' %}    # → /modules/inventory/add/
 ```
 
 ---
@@ -321,36 +321,36 @@ urlpatterns = [
 **Code:** `apps/core/context_processors.py`
 
 ```python
-def plugin_menu_items(request):
+def module_menu_items(request):
     """
-    Generates menu items from loaded plugins' plugin.json
+    Generates menu items from loaded modules' module.json
 
-    Each plugin can define:
+    Each module can define:
     {
         "menu": {
             "label": "Inventory",
             "icon": "cube-outline",
             "order": 10,
             "items": [
-                {"label": "Products", "url": "/plugins/inventory/", "icon": "list-outline"},
-                {"label": "Categories", "url": "/plugins/inventory/categories/", "icon": "folder-outline"}
+                {"label": "Products", "url": "/modules/inventory/", "icon": "list-outline"},
+                {"label": "Categories", "url": "/modules/inventory/categories/", "icon": "folder-outline"}
             ]
         }
     }
     """
-    from apps.plugins_runtime.loader import plugin_loader
+    from apps.modules_runtime.loader import module_loader
 
     menu_items = []
 
-    for plugin_id, plugin_info in plugin_loader.loaded_plugins.items():
-        metadata = plugin_info.get('metadata', {})
+    for module_id, module_info in module_loader.loaded_modules.items():
+        metadata = module_info.get('metadata', {})
         menu_config = metadata.get('menu', {})
 
         if not menu_config:
             continue
 
         menu_item = {
-            'label': menu_config.get('label', plugin_id.title()),
+            'label': menu_config.get('label', module_id.title()),
             'icon': menu_config.get('icon', 'cube-outline'),
             'order': menu_config.get('order', 100),
             'items': menu_config.get('items', []),
@@ -362,16 +362,16 @@ def plugin_menu_items(request):
     # Sort by order
     menu_items.sort(key=lambda x: x['order'])
 
-    return {'PLUGIN_MENU_ITEMS': menu_items}
+    return {'MODULE_MENU_ITEMS': menu_items}
 ```
 
 **Template Usage:**
 ```django
 <!-- apps/core/templates/core/app_base.html -->
 
-{% for item in PLUGIN_MENU_ITEMS %}
+{% for item in MODULE_MENU_ITEMS %}
     {% if item.has_submenu %}
-    <!-- Accordion menu for plugins with multiple items -->
+    <!-- Accordion menu for modules with multiple items -->
     <ion-accordion-group>
         <ion-accordion>
             <ion-item slot="header" class="nav-item">
@@ -400,14 +400,14 @@ def plugin_menu_items(request):
 
 ---
 
-### Step 6: Plugin Fully Active ✅
+### Step 6: Module Fully Active ✅
 
-After restart completes, the plugin is fully functional:
+After restart completes, the module is fully functional:
 
 - ✅ Added to INSTALLED_APPS
 - ✅ Models imported
 - ✅ Migrations applied
-- ✅ URLs registered at `/plugins/inventory/`
+- ✅ URLs registered at `/modules/inventory/`
 - ✅ Menu items visible in sidebar
 - ✅ Ready to use!
 
@@ -416,29 +416,29 @@ After restart completes, the plugin is fully functional:
 ## Deactivation Flow
 
 ### User Action:
-1. Navigate to `/plugins/`
-2. Click **"Deactivate"** on active plugin
+1. Navigate to `/modules/`
+2. Click **"Deactivate"** on active module
 3. Restart server
 
 ### Backend Action:
 ```python
 @require_http_methods(["POST"])
-def plugin_deactivate(request, plugin_id):
-    plugins_dir = Path(django_settings.PLUGINS_DIR)
-    active_folder = plugins_dir / plugin_id        # inventory/
-    disabled_folder = plugins_dir / f"_{plugin_id}" # _inventory/
+def module_deactivate(request, module_id):
+    modules_dir = Path(django_settings.MODULES_DIR)
+    active_folder = modules_dir / module_id        # inventory/
+    disabled_folder = modules_dir / f"_{module_id}" # _inventory/
 
     try:
         # Rename to add underscore prefix
         active_folder.rename(disabled_folder)
-        return JsonResponse({'success': True, 'message': 'Plugin deactivated. Restart required.'})
+        return JsonResponse({'success': True, 'message': 'Module deactivated. Restart required.'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 ```
 
 **Result:**
 ```
-plugins/inventory/  →  plugins/_inventory/
+modules/inventory/  →  modules/_inventory/
 ```
 
 **After Restart:**
@@ -453,19 +453,19 @@ plugins/inventory/  →  plugins/_inventory/
 ## Deletion Flow
 
 ### User Action:
-1. Navigate to `/plugins/`
+1. Navigate to `/modules/`
 2. Click **"Delete"** button (trash icon)
 3. Confirm deletion
 
 ### Backend Action:
 ```python
 @require_http_methods(["POST"])
-def plugin_delete(request, plugin_id):
-    plugins_dir = Path(django_settings.PLUGINS_DIR)
+def module_delete(request, module_id):
+    modules_dir = Path(django_settings.MODULES_DIR)
 
     # Try both active and disabled folders
-    active_folder = plugins_dir / plugin_id
-    disabled_folder = plugins_dir / f"_{plugin_id}"
+    active_folder = modules_dir / module_id
+    disabled_folder = modules_dir / f"_{module_id}"
 
     folder_to_delete = None
     if active_folder.exists():
@@ -474,35 +474,35 @@ def plugin_delete(request, plugin_id):
         folder_to_delete = disabled_folder
 
     if not folder_to_delete:
-        return JsonResponse({'success': False, 'error': 'Plugin not found'}, status=404)
+        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
 
     try:
         # Delete folder completely
         shutil.rmtree(folder_to_delete)
-        return JsonResponse({'success': True, 'message': 'Plugin deleted successfully.'})
+        return JsonResponse({'success': True, 'message': 'Module deleted successfully.'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 ```
 
 **Result:**
 ```
-plugins/inventory/  →  DELETED (folder removed)
+modules/inventory/  →  DELETED (folder removed)
 ```
 
 **After Restart:**
-- ⚠️ Plugin completely removed
+- ⚠️ Module completely removed
 - ⚠️ Cannot be recovered (unless re-download from marketplace)
 - ✅ Clean uninstall
 
 ---
 
-## Plugin Structure Example
+## Module Structure Example
 
-### Minimal Plugin (No Database)
+### Minimal Module (No Database)
 
 ```
-plugins/inventory/
-├── plugin.json          # Required metadata
+modules/inventory/
+├── module.json          # Required metadata
 ├── __init__.py          # Empty (makes it a Python package)
 ├── views.py             # Django views
 ├── urls.py              # URL patterns
@@ -511,10 +511,10 @@ plugins/inventory/
         └── index.html
 ```
 
-**plugin.json:**
+**module.json:**
 ```json
 {
-    "plugin_id": "inventory",
+    "module_id": "inventory",
     "name": "Inventory Manager",
     "version": "1.0.0",
     "description": "Manage product inventory",
@@ -526,7 +526,7 @@ plugins/inventory/
         "items": [
             {
                 "label": "Products",
-                "url": "/plugins/inventory/",
+                "url": "/modules/inventory/",
                 "icon": "list-outline"
             }
         ]
@@ -534,11 +534,11 @@ plugins/inventory/
 }
 ```
 
-### Full Plugin (With Database)
+### Full Module (With Database)
 
 ```
-plugins/inventory/
-├── plugin.json
+modules/inventory/
+├── module.json
 ├── __init__.py
 ├── models.py            # Django models
 ├── views.py
@@ -561,42 +561,42 @@ class Product(models.Model):
     stock = models.IntegerField(default=0)
 
     class Meta:
-        db_table = 'inventory_product'  # Recommended: prefix with plugin_id
+        db_table = 'inventory_product'  # Recommended: prefix with module_id
 ```
 
 **Important:**
-- ✅ Use `db_table` with plugin_id prefix to avoid conflicts
-- ✅ Migrations run automatically when plugin loads
-- ✅ Database tables persist even if plugin is deactivated
+- ✅ Use `db_table` with module_id prefix to avoid conflicts
+- ✅ Migrations run automatically when module loads
+- ✅ Database tables persist even if module is deactivated
 
 ---
 
 ## Troubleshooting
 
-### Plugin Not Loading After Activation
+### Module Not Loading After Activation
 
 **Check:**
 1. Folder name has NO underscore: `inventory/` ✅ NOT `_inventory/` ❌
 2. Server was restarted after activation
-3. `plugin.json` exists and is valid JSON
+3. `module.json` exists and is valid JSON
 4. Check console logs for errors during startup
 
 **Console Output:**
 ```
-[PLUGINS_RUNTIME] Loading active plugins from filesystem...
+[MODULES_RUNTIME] Loading active modules from filesystem...
 [✓] Added 'inventory' to INSTALLED_APPS
 [✓] Imported models for 'inventory'
-[✓] Plugin 'inventory' loaded successfully
-[✓] Registered URLs for 'inventory' at '/plugins/inventory/'
-[PLUGINS_RUNTIME] Loaded 1 active plugins
+[✓] Module 'inventory' loaded successfully
+[✓] Registered URLs for 'inventory' at '/modules/inventory/'
+[MODULES_RUNTIME] Loaded 1 active modules
 ```
 
 ### URLs Not Working (404)
 
 **Check:**
-1. Plugin has `urls.py` file
+1. Module has `urls.py` file
 2. URLs registered correctly (check console logs)
-3. URL includes plugin prefix: `/plugins/inventory/` NOT `/inventory/`
+3. URL includes module prefix: `/modules/inventory/` NOT `/inventory/`
 
 **Common mistake:**
 ```python
@@ -604,21 +604,21 @@ class Product(models.Model):
 {% url 'inventory:index' %}  # → /inventory/ (404)
 
 # ✅ CORRECT (includes prefix)
-# URLs are auto-registered with /plugins/{plugin_id}/ prefix
-/plugins/inventory/  # Works!
+# URLs are auto-registered with /modules/{module_id}/ prefix
+/modules/inventory/  # Works!
 ```
 
 ### Menu Items Not Showing
 
 **Check:**
-1. `plugin.json` has valid `menu` section
-2. Plugin is loaded (check console logs)
+1. `module.json` has valid `menu` section
+2. Module is loaded (check console logs)
 3. Context processor is registered in settings.py:
    ```python
    TEMPLATES = [{
        'OPTIONS': {
            'context_processors': [
-               'apps.core.context_processors.plugin_menu_items',
+               'apps.core.context_processors.module_menu_items',
            ],
        },
    }]
@@ -626,25 +626,25 @@ class Product(models.Model):
 
 ### Migration Errors
 
-**Issue:** Plugin models changed but migrations not applied.
+**Issue:** Module models changed but migrations not applied.
 
 **Fix:**
 ```bash
-# Generate migrations for specific plugin
+# Generate migrations for specific module
 python manage.py makemigrations inventory
 
 # Apply migrations
 python manage.py migrate inventory
 ```
 
-### Plugin Won't Deactivate (Folder Rename Fails)
+### Module Won't Deactivate (Folder Rename Fails)
 
 **Check:**
 1. No other process has folder open (close IDEs, file explorers)
 2. Folder permissions are correct
 3. Try manual rename:
    ```bash
-   cd plugins/
+   cd modules/
    mv inventory/ _inventory/
    ```
 
@@ -654,10 +654,10 @@ python manage.py migrate inventory
 
 ### ✅ Advantages
 
-1. **Simple**: Folder name = plugin state
-2. **Visual**: Can see active plugins at a glance
+1. **Simple**: Folder name = module state
+2. **Visual**: Can see active modules at a glance
 3. **Reliable**: No database sync issues
-4. **Portable**: Copy folder = backup plugin
+4. **Portable**: Copy folder = backup module
 5. **Django-native**: Uses built-in INSTALLED_APPS
 6. **Zero downtime**: Activation is instant (just rename)
 7. **Safe**: Deactivation preserves files
@@ -665,7 +665,7 @@ python manage.py migrate inventory
 ### ⚠️ Trade-offs
 
 1. **Manual restart**: Required after activate/deactivate
-2. **No hot-reload**: Cannot load plugins without restart
+2. **No hot-reload**: Cannot load modules without restart
 3. **Naming convention**: Must use `_` prefix correctly
 
 ### 🎯 WordPress Comparison
@@ -683,8 +683,8 @@ python manage.py migrate inventory
 
 ## Related Documentation
 
-- [PLUGIN_DEPENDENCIES.md](./PLUGIN_DEPENDENCIES.md) - Allowed libraries
-- [PLUGIN_DATABASE_CONFLICTS.md](./PLUGIN_DATABASE_CONFLICTS.md) - Avoiding table conflicts
+- [MODULE_DEPENDENCIES.md](./MODULE_DEPENDENCIES.md) - Allowed libraries
+- [MODULE_DATABASE_CONFLICTS.md](./MODULE_DATABASE_CONFLICTS.md) - Avoiding table conflicts
 - [CLAUDE.md](../../CLAUDE.md) - System architecture overview
 
 ---

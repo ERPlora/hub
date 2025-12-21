@@ -1,7 +1,7 @@
 """
 System Modules Views
 
-Module management and marketplace - similar to WordPress plugins page.
+Module management and marketplace - similar to WordPress modules page.
 All views support SPA navigation via HTMX.
 """
 import json

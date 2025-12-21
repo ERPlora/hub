@@ -12,14 +12,14 @@
             <ion-label>{% trans "Dashboard" %}</ion-label>
         </ion-tab-button>
 
-        <!-- Dynamic Plugin Tabs -->
-        {% for plugin in PLUGIN_TAB_ITEMS %}
+        <!-- Dynamic Module Tabs -->
+        {% for module in MODULE_TAB_ITEMS %}
         <ion-tab-button
-            hx-get="{{ plugin.url }}"
+            hx-get="{{ module.url }}"
             hx-target="#dashboard-content"
             hx-push-url="true">
-            <ion-icon name="{{ plugin.icon }}"></ion-icon>
-            <ion-label>{{ plugin.label }}</ion-label>
+            <ion-icon name="{{ module.icon }}"></ion-icon>
+            <ion-label>{{ module.label }}</ion-label>
         </ion-tab-button>
         {% endfor %}
 

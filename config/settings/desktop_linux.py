@@ -34,8 +34,8 @@ DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
 MEDIA_ROOT = DATA_DIR / 'media'
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
-# Plugins - uses base.py config (PLUGINS_DIR from DataPaths)
-# In desktop: ~/.erplora-hub/plugins/
+# Modules - uses base.py config (MODULES_DIR from DataPaths)
+# In desktop: ~/.erplora-hub/modules/
 
 # Logs
 LOGS_DIR = DATA_DIR / 'logs'
@@ -54,11 +54,11 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_DIR = DATA_DIR / 'temp'
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-# Plugin data (outside PLUGINS_DIR to avoid being detected as a plugin)
-PLUGIN_DATA_ROOT = DATA_DIR / 'plugin_data'
-PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
-PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
-PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+# Module data (outside MODULES_DIR to avoid being detected as a module)
+MODULE_DATA_ROOT = DATA_DIR / 'module_data'
+MODULE_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+MODULE_MEDIA_ROOT = MEDIA_ROOT / 'modules'
+MODULE_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
 # SECURITY - Relaxed for local desktop

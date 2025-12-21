@@ -1,25 +1,25 @@
-# Plugin Subscription Usage Guide
+# Module Subscription Usage Guide
 
-Guía para desarrolladores de plugins sobre cómo implementar verificación de compra y suscripciones.
+Guía para desarrolladores de modules sobre cómo implementar verificación de compra y suscripciones.
 
-## Tipos de Plugins
+## Tipos de Modules
 
-ERPlora soporta 3 tipos de plugins:
+ERPlora soporta 3 tipos de modules:
 
 1. **Free** - Gratis, sin verificación
 2. **Paid** - Pago único, verificado en instalación
 3. **Subscription** - Suscripción mensual, verificado en runtime
 
-## Configuración en plugin.json
+## Configuración en module.json
 
 ```json
 {
-  "plugin_id": "analytics",
+  "module_id": "analytics",
   "name": "Advanced Analytics",
   "version": "1.0.0",
-  "plugin_type": "subscription",
+  "module_type": "subscription",
   "price": 9.99,
-  "cloud_plugin_id": 123,  // ID del plugin en Cloud
+  "cloud_module_id": 123,  // ID del module en Cloud
   ...
 }
 ```
@@ -29,8 +29,8 @@ ERPlora soporta 3 tipos de plugins:
 ### Opción 1: Decorator (Recomendado)
 
 ```python
-# plugins/analytics/views.py
-from apps.plugins_runtime.decorators import require_active_subscription
+# modules/analytics/views.py
+from apps.modules_runtime.decorators import require_active_subscription
 from django.shortcuts import render
 
 @require_active_subscription
@@ -46,8 +46,8 @@ def dashboard(request):
 ### Opción 2: Verificación Manual
 
 ```python
-# plugins/my_plugin/views.py
-from apps.plugins_runtime.subscription_checker import get_subscription_checker
+# modules/my_module/views.py
+from apps.modules_runtime.subscription_checker import get_subscription_checker
 from django.shortcuts import render
 from django.http import JsonResponse
 
@@ -55,9 +55,9 @@ def premium_feature(request):
     checker = get_subscription_checker()
 
     # Verificar acceso
-    has_access = checker.verify_plugin_access(
-        plugin_slug='analytics',
-        plugin_type='subscription'
+    has_access = checker.verify_module_access(
+        module_slug='analytics',
+        module_type='subscription'
     )
 
     if not has_access:
@@ -67,21 +67,21 @@ def premium_feature(request):
         }, status=402)
 
     # Feature está disponible
-    return render(request, 'my_plugin/premium.html')
+    return render(request, 'my_module/premium.html')
 ```
 
 ### Opción 3: Verificación Detallada
 
 ```python
-# plugins/my_plugin/views.py
-from apps.plugins_runtime.subscription_checker import get_subscription_checker
+# modules/my_module/views.py
+from apps.modules_runtime.subscription_checker import get_subscription_checker
 from django.shortcuts import render
 
 def advanced_feature(request):
     checker = get_subscription_checker()
 
     # Obtener estado detallado de suscripción
-    status = checker.check_subscription_status(plugin_id=123)
+    status = checker.check_subscription_status(module_id=123)
 
     if not status.get('has_active_subscription'):
         context = {
@@ -89,26 +89,26 @@ def advanced_feature(request):
             'status': status.get('subscription_status'),
             'period_end': status.get('current_period_end')
         }
-        return render(request, 'my_plugin/subscription_error.html', context)
+        return render(request, 'my_module/subscription_error.html', context)
 
     # Suscripción activa
-    return render(request, 'my_plugin/feature.html')
+    return render(request, 'my_module/feature.html')
 ```
 
 ## Verificación en API Endpoints
 
 ```python
-# plugins/my_plugin/api.py
+# modules/my_module/api.py
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from apps.plugins_runtime.subscription_checker import get_subscription_checker
+from apps.modules_runtime.subscription_checker import get_subscription_checker
 
 @api_view(['POST'])
 def api_premium_action(request):
     checker = get_subscription_checker()
 
-    has_access = checker.verify_plugin_access('my_plugin', 'subscription')
+    has_access = checker.verify_module_access('my_module', 'subscription')
 
     if not has_access:
         return Response({
@@ -126,12 +126,12 @@ El sistema cachea el estado de suscripciones por **5 minutos** para evitar reque
 ### Limpiar Cache Manualmente
 
 ```python
-from apps.plugins_runtime.subscription_checker import get_subscription_checker
+from apps.modules_runtime.subscription_checker import get_subscription_checker
 
 checker = get_subscription_checker()
 
-# Limpiar cache de un plugin específico
-checker.clear_cache(plugin_id=123)
+# Limpiar cache de un module específico
+checker.clear_cache(module_id=123)
 
 # Limpiar todo el cache
 checker.clear_cache()
@@ -173,13 +173,13 @@ checker.clear_cache()
 
 El sistema incluye templates por defecto para errores de suscripción:
 
-- `plugins/subscription_required.html` - Suscripción requerida
-- `plugins/purchase_required.html` - Compra requerida
+- `modules/subscription_required.html` - Suscripción requerida
+- `modules/purchase_required.html` - Compra requerida
 
-Puedes sobrescribirlos en tu plugin:
+Puedes sobrescribirlos en tu module:
 
 ```django
-<!-- plugins/my_plugin/templates/plugins/subscription_required.html -->
+<!-- modules/my_module/templates/modules/subscription_required.html -->
 {% extends "core/app_base.html" %}
 
 {% block content %}
@@ -187,7 +187,7 @@ Puedes sobrescribirlos en tu plugin:
     <ion-icon name="lock-closed-outline" style="font-size: 64px; color: var(--ion-color-warning);"></ion-icon>
     <h2>Subscription Required</h2>
     <p>{{ message }}</p>
-    <ion-button href="/plugins/marketplace/">
+    <ion-button href="/modules/marketplace/">
         Subscribe Now
     </ion-button>
 </div>
@@ -196,21 +196,21 @@ Puedes sobrescribirlos en tu plugin:
 
 ## Flujo Completo de Suscripción
 
-1. **Usuario navega a marketplace** → `/plugins/marketplace/`
-2. **Click en plugin de suscripción** → Muestra precio mensual
+1. **Usuario navega a marketplace** → `/modules/marketplace/`
+2. **Click en module de suscripción** → Muestra precio mensual
 3. **Click "Subscribe"** → Crea Stripe Checkout session
 4. **Redirect a Stripe** → Usuario completa pago
-5. **Webhook procesa pago** → Cloud crea PluginPurchase
-6. **Usuario retorna a Hub** → Puede instalar plugin
-7. **Plugin instalado** → Features requieren verificación online
+5. **Webhook procesa pago** → Cloud crea ModulePurchase
+6. **Usuario retorna a Hub** → Puede instalar module
+7. **Module instalado** → Features requieren verificación online
 8. **Usuario usa feature** → Decorator verifica suscripción
 9. **Cache por 5 min** → Reduce latencia en requests subsecuentes
 
-## Ejemplo Completo: Analytics Plugin
+## Ejemplo Completo: Analytics Module
 
 ```python
-# plugins/analytics/views.py
-from apps.plugins_runtime.decorators import require_active_subscription
+# modules/analytics/views.py
+from apps.modules_runtime.decorators import require_active_subscription
 from django.shortcuts import render
 from django.http import JsonResponse
 import json
@@ -232,10 +232,10 @@ def export_data(request):
 
 def check_status(request):
     """Endpoint público para verificar estado"""
-    from apps.plugins_runtime.subscription_checker import get_subscription_checker
+    from apps.modules_runtime.subscription_checker import get_subscription_checker
 
     checker = get_subscription_checker()
-    status = checker.check_subscription_status(plugin_id=123)
+    status = checker.check_subscription_status(module_id=123)
 
     return JsonResponse(status)
 ```
@@ -254,8 +254,8 @@ def check_status(request):
 ### "Subscription not active" aunque pagué
 
 - Verificar que el webhook de Stripe se procesó correctamente
-- Limpiar cache: `checker.clear_cache(plugin_id=X)`
-- Verificar en Cloud admin que existe `PluginPurchase` con status='completed'
+- Limpiar cache: `checker.clear_cache(module_id=X)`
+- Verificar en Cloud admin que existe `ModulePurchase` con status='completed'
 
 ### "No internet connection" constante
 
@@ -272,9 +272,9 @@ def check_status(request):
 ## Testing
 
 ```python
-# plugins/my_plugin/tests.py
+# modules/my_module/tests.py
 from django.test import TestCase
-from apps.plugins_runtime.subscription_checker import get_subscription_checker
+from apps.modules_runtime.subscription_checker import get_subscription_checker
 from unittest.mock import patch
 
 class SubscriptionTests(TestCase):
@@ -289,7 +289,7 @@ class SubscriptionTests(TestCase):
         mock_get.return_value.ok = True
 
         checker = get_subscription_checker()
-        has_access = checker.verify_plugin_access('my_plugin', 'subscription')
+        has_access = checker.verify_module_access('my_module', 'subscription')
 
         self.assertTrue(has_access)
 
@@ -303,15 +303,15 @@ class SubscriptionTests(TestCase):
         mock_get.return_value.ok = True
 
         checker = get_subscription_checker()
-        has_access = checker.verify_plugin_access('my_plugin', 'subscription')
+        has_access = checker.verify_module_access('my_module', 'subscription')
 
         self.assertFalse(has_access)
 ```
 
 ## Referencias
 
-- **Cloud API**: `/api/plugins/{id}/subscription-status/`
-- **Hub Checker**: `apps.plugins_runtime.subscription_checker`
-- **Decorators**: `apps.plugins_runtime.decorators`
+- **Cloud API**: `/api/modules/{id}/subscription-status/`
+- **Hub Checker**: `apps.modules_runtime.subscription_checker`
+- **Decorators**: `apps.modules_runtime.decorators`
 - **Cache**: Django cache framework
 - **Stripe**: webhooks procesados en Cloud

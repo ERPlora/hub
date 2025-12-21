@@ -1,12 +1,12 @@
 """
-Librerías permitidas para plugins de CPOS Hub
+Librerías permitidas para modules de CPOS Hub
 
-Este archivo define las dependencias Python que los plugins pueden usar.
+Este archivo define las dependencias Python que los modules pueden usar.
 Las librerías están pre-empaquetadas en la aplicación PyInstaller.
 
 Arquitectura: Opción 2 (Pre-bundled Dependencies)
-- Plugins solo pueden usar estas librerías
-- Validación estricta en plugin.json
+- Modules solo pueden usar estas librerías
+- Validación estricta en module.json
 - Instalación instantánea (sin pip)
 - Bundle total: ~245MB
 """
@@ -45,7 +45,7 @@ IMPORTANT_DEPENDENCIES = {
     'phonenumbers': '>=8.13.0',    # Validar teléfonos internacionales
 
     # Pagos
-    'stripe': '>=7.0.0',           # Stripe payments (plugins, suscripciones)
+    'stripe': '>=7.0.0',           # Stripe payments (modules, suscripciones)
 
     # Data & Analysis
     'pandas': '>=2.1.0',           # Análisis de datos (reportes avanzados)
@@ -75,7 +75,7 @@ USEFUL_DEPENDENCIES = {
 }
 
 # === TODAS LAS DEPENDENCIAS PERMITIDAS (28 total) ===
-PLUGIN_ALLOWED_DEPENDENCIES = {
+MODULE_ALLOWED_DEPENDENCIES = {
     **CRITICAL_DEPENDENCIES,
     **IMPORTANT_DEPENDENCIES,
     **USEFUL_DEPENDENCIES,
@@ -119,7 +119,7 @@ def get_pyinstaller_imports() -> list[str]:
     """
     return [
         normalize_package_name(pkg)
-        for pkg in PLUGIN_ALLOWED_DEPENDENCIES.keys()
+        for pkg in MODULE_ALLOWED_DEPENDENCIES.keys()
     ]
 
 
@@ -141,7 +141,7 @@ def is_dependency_allowed(package_name: str) -> bool:
     """
     # Extraer nombre sin versión
     pkg_name = package_name.split('>=')[0].split('==')[0].split('[')[0].strip()
-    return pkg_name in PLUGIN_ALLOWED_DEPENDENCIES
+    return pkg_name in MODULE_ALLOWED_DEPENDENCIES
 
 
 def get_allowed_dependencies_list() -> list[str]:
@@ -151,7 +151,7 @@ def get_allowed_dependencies_list() -> list[str]:
     Returns:
         list: ['Pillow>=10.0.0', 'qrcode>=7.4.0', ...]
     """
-    return [f"{pkg}{version}" for pkg, version in PLUGIN_ALLOWED_DEPENDENCIES.items()]
+    return [f"{pkg}{version}" for pkg, version in MODULE_ALLOWED_DEPENDENCIES.items()]
 
 
 def get_dependencies_by_category() -> dict:
@@ -169,12 +169,12 @@ def get_dependencies_by_category() -> dict:
 
 
 # === METADATA ===
-TOTAL_DEPENDENCIES = len(PLUGIN_ALLOWED_DEPENDENCIES)
+TOTAL_DEPENDENCIES = len(MODULE_ALLOWED_DEPENDENCIES)
 ESTIMATED_BUNDLE_SIZE_MB = 245
 
 
 if __name__ == '__main__':
-    print(f"[INFO] CPOS Hub - Plugin Allowed Dependencies")
+    print(f"[INFO] CPOS Hub - Module Allowed Dependencies")
     print(f"Total: {TOTAL_DEPENDENCIES} librerias")
     print(f"Bundle estimado: ~{ESTIMATED_BUNDLE_SIZE_MB}MB")
     print()

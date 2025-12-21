@@ -43,16 +43,16 @@
                     </ion-item>
                 </ion-item-group>
 
-                <!-- Plugins Group (Dynamic) -->
-                {% if PLUGIN_MENU_ITEMS %}
+                <!-- Modules Group (Dynamic) -->
+                {% if MODULE_MENU_ITEMS %}
                 <ion-item-group>
                     <ion-item-divider>
-                        <ion-label>{% trans "Plugins" %}</ion-label>
+                        <ion-label>{% trans "Modules" %}</ion-label>
                     </ion-item-divider>
 
-                    {% for item in PLUGIN_MENU_ITEMS %}
+                    {% for item in MODULE_MENU_ITEMS %}
                         {% if item.has_submenu %}
-                        <!-- Plugin with submenu -->
+                        <!-- Module with submenu -->
                         <ion-accordion-group>
                             <ion-accordion>
                                 <ion-item slot="header" class="nav-item">
@@ -74,7 +74,7 @@
                             </ion-accordion>
                         </ion-accordion-group>
                         {% else %}
-                        <!-- Simple plugin menu item -->
+                        <!-- Simple module menu item -->
                         <ion-item class="nav-item"
                             hx-get="{{ item.url }}"
                             hx-target="#dashboard-content"
@@ -95,15 +95,15 @@
                         <ion-label>{% trans "Marketplace" %}</ion-label>
                     </ion-item-divider>
 
-                    <ion-item id="nav-plugins"
-                              class="nav-item {% if current_section == 'plugins' or current_section == 'marketplace' %}active{% endif %}"
-                              hx-get="{% url 'system:plugins' %}"
+                    <ion-item id="nav-modules"
+                              class="nav-item {% if current_section == 'modules' or current_section == 'marketplace' %}active{% endif %}"
+                              hx-get="{% url 'system:modules' %}"
                               hx-target="#dashboard-content"
                               hx-push-url="true"
                               detail="false"
                               lines="none">
                         <ion-icon name="extension-puzzle-outline" slot="start"></ion-icon>
-                        <ion-label>{% trans "Plugins" %}</ion-label>
+                        <ion-label>{% trans "Modules" %}</ion-label>
                     </ion-item>
                 </ion-item-group>
             </ion-list>

@@ -23,10 +23,10 @@ ERPlora Hub es una aplicación Django que funciona como punto de venta (POS). Pu
 
 **Características comunes:**
 - 💾 Base de datos local SQLite (funciona offline)
-- 🔌 Sistema de plugins extensible
+- 🔌 Sistema de modules extensible
 - 🖨️ Impresión 100% web (window.print)
 - 🔄 Sincronización opcional con Cloud vía HTTP API
-- 📦 Marketplace único de plugins
+- 📦 Marketplace único de modules
 
 **Stack tecnológico:**
 - Django 5.1
@@ -45,17 +45,17 @@ hub/
 │   ├── accounts/             # Autenticación local (LocalUser, PIN)
 │   ├── configuration/        # Configuración global (HubConfig, StoreConfig)
 │   ├── core/                 # Utilidades core (sin modelos)
-│   ├── plugins_runtime/      # Sistema de plugins, loader dinámico
+│   ├── modules_runtime/      # Sistema de modules, loader dinámico
 │   └── sync/                 # Sincronización con Cloud
 │
 ├── config/                    # Configuración Django
 │   ├── settings.py           # Settings (SQLite)
 │   ├── urls.py
-│   └── plugin_allowed_deps.py # Whitelist de librerías de plugins
+│   └── module_allowed_deps.py # Whitelist de librerías de modules
 │
-├── plugins/                   # Plugins instalados (dinámico)
-│   ├── .template/            # Template para nuevos plugins
-│   └── ...                   # Plugins activos/inactivos
+├── modules/                   # Modules instalados (dinámico)
+│   ├── .template/            # Template para nuevos modules
+│   └── ...                   # Modules activos/inactivos
 │
 ├── templates/                 # Templates Ionic + HTMX
 ├── static/                    # Archivos estáticos
@@ -137,17 +137,17 @@ Ver documentación completa: [CLOUD.md](CLOUD.md)
 
 ---
 
-## 🔌 Sistema de Plugins
+## 🔌 Sistema de Modules
 
-Los plugins son Django apps que se cargan dinámicamente. El Hub incluye **25 librerías Python pre-empaquetadas**.
+Los modules son Django apps que se cargan dinámicamente. El Hub incluye **25 librerías Python pre-empaquetadas**.
 
 ### Activación por Filesystem
 
 | Prefijo | Estado | Descripción |
 |---------|--------|-------------|
-| `plugin_name/` | **Activo** | Se carga automáticamente |
-| `_plugin_name/` | **Inactivo** | Visible pero no se carga |
-| `.plugin_name/` | **Oculto** | No se muestra en UI |
+| `module_name/` | **Activo** | Se carga automáticamente |
+| `_module_name/` | **Inactivo** | Visible pero no se carga |
+| `.module_name/` | **Oculto** | No se muestra en UI |
 
 ### Librerías Pre-empaquetadas (25)
 
@@ -167,7 +167,7 @@ Los plugins son Django apps que se cargan dinámicamente. El Hub incluye **25 li
 
 **Utils:** python-dateutil, pytz, phonenumbers, email-validator, python-slugify, pydantic, beautifulsoup4
 
-Ver documentación completa: [PLUGIN_LIBRARIES_COMPLETE.md](PLUGIN_LIBRARIES_COMPLETE.md)
+Ver documentación completa: [MODULE_LIBRARIES_COMPLETE.md](MODULE_LIBRARIES_COMPLETE.md)
 
 ---
 
@@ -266,7 +266,7 @@ Ver documentación completa: [PRINTING_SYSTEM.md](PRINTING_SYSTEM.md)
 - **Base de datos local**: SQLite con permisos restrictivos
 - **Modo offline**: Funciona sin conexión después de setup
 - **Tokens JWT**: Temporales, NO se guardan permanentemente
-- **Plugins**: Solo librerías whitelisted permitidas
+- **Modules**: Solo librerías whitelisted permitidas
 
 ---
 
@@ -276,11 +276,11 @@ Ver documentación completa: [PRINTING_SYSTEM.md](PRINTING_SYSTEM.md)
 |-----------|-------------|
 | [CLOUD.md](CLOUD.md) | Comunicación Hub ↔ Cloud |
 | [GLOBAL_CONFIGURATION.md](GLOBAL_CONFIGURATION.md) | Sistema de configuración |
-| [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md) | Arquitectura de plugins |
-| [PLUGIN_LIBRARIES_COMPLETE.md](PLUGIN_LIBRARIES_COMPLETE.md) | 25 librerías permitidas |
-| [PLUGIN_ACTIVATION_FLOW.md](PLUGIN_ACTIVATION_FLOW.md) | Flujo de activación |
-| [PLUGIN_RUNTIME_ANALYSIS.md](PLUGIN_RUNTIME_ANALYSIS.md) | Análisis del runtime |
-| [PLUGIN_SUBSCRIPTION_USAGE.md](PLUGIN_SUBSCRIPTION_USAGE.md) | Sistema de suscripciones |
+| [MODULE_DEPENDENCIES.md](MODULE_DEPENDENCIES.md) | Arquitectura de modules |
+| [MODULE_LIBRARIES_COMPLETE.md](MODULE_LIBRARIES_COMPLETE.md) | 25 librerías permitidas |
+| [MODULE_ACTIVATION_FLOW.md](MODULE_ACTIVATION_FLOW.md) | Flujo de activación |
+| [MODULE_RUNTIME_ANALYSIS.md](MODULE_RUNTIME_ANALYSIS.md) | Análisis del runtime |
+| [MODULE_SUBSCRIPTION_USAGE.md](MODULE_SUBSCRIPTION_USAGE.md) | Sistema de suscripciones |
 | [PRINTING_SYSTEM.md](PRINTING_SYSTEM.md) | Sistema de impresión |
 | [TESTING.md](TESTING.md) | Guía de testing |
 | [TRANSLATIONS.md](TRANSLATIONS.md) | Sistema i18n |
@@ -295,7 +295,7 @@ ERPlora Hub está licenciado bajo **Business Source License 1.1 (BUSL-1.1)**.
 ### ✅ Usos Permitidos (GRATIS)
 - Uso interno en negocios
 - Uso personal y educativo
-- Crear plugins para el ecosistema
+- Crear modules para el ecosistema
 - Servicios de consultoría
 
 ### ❌ Usos Prohibidos

@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Plugin system with dynamic loading from ZIP files
-- Automatic dependency installation for plugins
-- Database conflict validation for plugins
+- Module system with dynamic loading from ZIP files
+- Automatic dependency installation for modules
+- Database conflict validation for modules
 - PyInstaller build system for Windows/macOS/Linux
 - Automated release management (release.py)
 - GitHub Actions CI/CD for multi-platform builds
@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Cross-platform temporary directory handling using tempfile.gettempdir()
-- Simplified plugin installation by deleting ZIP immediately after extraction
+- Simplified module installation by deleting ZIP immediately after extraction
 
 ### Fixed
 - Windows compatibility for temporary file paths
