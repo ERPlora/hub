@@ -1,7 +1,7 @@
 """
 Integration tests for Hub APIs.
 
-Tests the REST API endpoints for configuration and plugins.
+Tests the REST API endpoints for configuration and modules.
 """
 import pytest
 import json
@@ -66,28 +66,27 @@ class TestStoreConfigAPI:
         assert data['business_name'] == 'Updated Store'
 
 
-class TestPluginAPI:
-    """Tests for Plugin Management API."""
+class TestModuleAPI:
+    """Tests for Module Management API."""
 
-    def test_list_plugins(self, authenticated_client):
-        """Test listing installed plugins."""
-        response = authenticated_client.get('/api/v1/plugins/')
+    def test_list_modules(self, authenticated_client):
+        """Test listing installed modules."""
+        response = authenticated_client.get('/api/v1/modules/')
 
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
 
-    def test_list_plugins_includes_active(self, authenticated_client):
-        """Test that active plugins are listed."""
-        response = authenticated_client.get('/api/v1/plugins/')
+    def test_list_modules_includes_active(self, authenticated_client):
+        """Test that active modules are listed."""
+        response = authenticated_client.get('/api/v1/modules/')
 
         assert response.status_code == 200
         data = response.json()
 
-        # Should include some plugins (inventory, sales are active)
-        plugin_ids = [p['plugin_id'] for p in data]
-        # At least one plugin should exist
-        assert len(data) >= 0  # May be empty in test environment
+        # Should include some modules (inventory, sales are active)
+        # May be empty in test environment
+        assert isinstance(data, list)
 
 
 class TestSystemAPI:

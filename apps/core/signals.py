@@ -18,7 +18,7 @@ Example:
     # Module B listens (if active)
     from apps.core.signals import print_ticket_requested
 
-    @receiver(print_ticket_requested)
+    @receiver(print_ticket_requested)  # noqa: F821
     def handle_print(sender, ticket_type, data, **kwargs):
         # Handle printing
         pass
@@ -36,8 +36,8 @@ print_ticket_requested = Signal()
 Request printing of a ticket/receipt/document.
 
 This is a Hub-level signal that any module can emit to request printing.
-If a printer module (like 'printers') is active, it will handle the request.
-If no printer module is active, the signal is safely ignored.
+If the printers module is active, it will handle the request.
+If the printers module is not active, the signal is safely ignored.
 
 Emitted by:
     - sales (receipts)
@@ -159,7 +159,7 @@ Arguments:
 # Emitted when a cash session is closed.
 #
 # Emitted by: cash_register
-# Can be listened by: analytics, accounting plugins
+# Can be listened by: analytics, accounting modules
 # """
 
 # user_login = Signal()

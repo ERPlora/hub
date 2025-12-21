@@ -1,20 +1,20 @@
 """
-Management command para firmar digitalmente un plugin.
+Management command para firmar digitalmente un module.
 
-Crea firma RSA-SHA256 del plugin para verificación en producción.
+Crea firma RSA-SHA256 del module para verificación en producción.
 
 Uso:
-    python manage.py sign_plugin <plugin_id> [--key-file path/to/private.pem]
+    python manage.py sign_module <module_id> [--key-file path/to/private.pem]
 
 Ejemplos:
-    python manage.py sign_plugin products
-    python manage.py sign_plugin restaurant-pos --key-file ~/.cpos-dev/signing-key.pem
+    python manage.py sign_module products
+    python manage.py sign_module restaurant-pos --key-file ~/.cpos-dev/signing-key.pem
 
 Notas:
-    - En desarrollo, la firma es opcional (REQUIRE_PLUGIN_SIGNATURE=False)
+    - En desarrollo, la firma es opcional (REQUIRE_MODULE_SIGNATURE=False)
     - En producción, la firma es obligatoria
-    - La clave privada debe mantenerse segura y NO incluirse en el plugin
-    - La firma se guarda en el plugin como .signature
+    - La clave privada debe mantenerse segura y NO incluirse en el module
+    - La firma se guarda en el module como .signature
 """
 
 from django.core.management.base import BaseCommand, CommandError
@@ -29,13 +29,13 @@ import base64
 
 
 class Command(BaseCommand):
-    help = 'Firma digitalmente un plugin para distribución'
+    help = 'Firma digitalmente un module para distribución'
 
     def add_arguments(self, parser):
         parser.add_argument(
-            'plugin_id',
+            'module_id',
             type=str,
-            help='ID del plugin a firmar'
+            help='ID del module a firmar'
         )
         parser.add_argument(
             '--key-file',
@@ -50,33 +50,33 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        plugin_id = options['plugin_id']
+        module_id = options['module_id']
         key_file = options['key_file']
         force = options['force']
 
-        # Buscar plugin en rutas de desarrollo
+        # Buscar module en rutas de desarrollo
         base_dir = Path(settings.BASE_DIR)
-        plugin_dir = None
+        module_dir = None
 
-        for discovery_path in settings.PLUGIN_DISCOVERY_PATHS:
-            potential_path = Path(discovery_path) / plugin_id
+        for discovery_path in settings.MODULE_DISCOVERY_PATHS:
+            potential_path = Path(discovery_path) / module_id
             if potential_path.exists():
-                plugin_dir = potential_path
+                module_dir = potential_path
                 break
 
-        if not plugin_dir:
-            raise CommandError(f'Plugin {plugin_id} no encontrado en rutas de desarrollo')
+        if not module_dir:
+            raise CommandError(f'Module {module_id} no encontrado en rutas de desarrollo')
 
-        signature_file = plugin_dir / '.signature'
+        signature_file = module_dir / '.signature'
 
         if signature_file.exists() and not force:
             raise CommandError(
-                f'Plugin ya tiene firma. Usa --force para re-firmar\n'
+                f'Module ya tiene firma. Usa --force para re-firmar\n'
                 f'   Archivo: {signature_file}'
             )
 
-        self.stdout.write(self.style.SUCCESS(f'\n🔐 Firmando plugin: {plugin_id}'))
-        self.stdout.write(f'   Ubicación: {plugin_dir}\n')
+        self.stdout.write(self.style.SUCCESS(f'\n🔐 Firmando module: {module_id}'))
+        self.stdout.write(f'   Ubicación: {module_dir}\n')
 
         # 1. Cargar o generar clave privada
         self.stdout.write('🔑 Cargando clave privada...')
@@ -98,7 +98,7 @@ class Command(BaseCommand):
                 # Generar nueva clave privada
                 private_key = rsa.generate_private_key(
                     public_exponent=65537,
-                    key_size=settings.PLUGIN_SIGNATURE_KEY_SIZE,
+                    key_size=settings.MODULE_SIGNATURE_KEY_SIZE,
                     backend=default_backend()
                 )
 
@@ -123,7 +123,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f'   ✅ Clave pública guardada: {public_key_path}'))
                 self.stdout.write(self.style.WARNING('\n   ⚠️  IMPORTANTE:'))
                 self.stdout.write(self.style.WARNING('   - Guarda la clave privada en lugar seguro'))
-                self.stdout.write(self.style.WARNING('   - NO incluyas la clave privada en el plugin'))
+                self.stdout.write(self.style.WARNING('   - NO incluyas la clave privada en el module'))
                 self.stdout.write(self.style.WARNING('   - La clave pública se incluirá en la firma'))
                 self.stdout.write('')
 
@@ -140,13 +140,13 @@ class Command(BaseCommand):
         except Exception as e:
             raise CommandError(f'Error al cargar clave privada: {e}')
 
-        # 2. Calcular hash del plugin
-        self.stdout.write('🔐 Calculando hash del plugin...')
+        # 2. Calcular hash del module
+        self.stdout.write('🔐 Calculando hash del module...')
 
         files_to_hash = []
         exclude_patterns = ['.signature', '__pycache__', '.pyc', '.git', '.DS_Store', 'Thumbs.db']
 
-        for file_path in sorted(plugin_dir.rglob('*')):
+        for file_path in sorted(module_dir.rglob('*')):
             if file_path.is_file():
                 # Excluir archivos
                 if any(pattern in str(file_path) for pattern in exclude_patterns):
@@ -166,20 +166,20 @@ class Command(BaseCommand):
                     file_data = f.read()
                     hasher.update(file_data)
 
-                rel_path = file_path.relative_to(plugin_dir)
+                rel_path = file_path.relative_to(module_dir)
                 self.stdout.write(f'   ✓ {rel_path} ({len(file_data)} bytes)')
             except Exception as e:
                 self.stdout.write(self.style.WARNING(f'   ⚠️  Error leyendo {file_path}: {e}'))
 
-        plugin_hash = hasher.hexdigest()
-        self.stdout.write(f'\n   📝 Hash del plugin: {plugin_hash}\n')
+        module_hash = hasher.hexdigest()
+        self.stdout.write(f'\n   📝 Hash del module: {module_hash}\n')
 
         # 3. Firmar hash
         self.stdout.write('✍️  Firmando hash...')
 
         try:
             signature = private_key.sign(
-                plugin_hash.encode('utf-8'),
+                module_hash.encode('utf-8'),
                 padding.PSS(
                     mgf=padding.MGF1(hashes.SHA256()),
                     salt_length=padding.PSS.MAX_LENGTH
@@ -201,15 +201,15 @@ class Command(BaseCommand):
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         ).decode('utf-8')
 
-        # Leer plugin.json para metadata
-        with open(plugin_dir / 'plugin.json', 'r') as f:
-            plugin_data = json.load(f)
+        # Leer module.json para metadata
+        with open(module_dir / 'module.json', 'r') as f:
+            module_data = json.load(f)
 
         signature_data = {
-            'plugin_id': plugin_id,
-            'version': plugin_data.get('version', '0.0.0'),
-            'hash': plugin_hash,
-            'algorithm': settings.PLUGIN_SIGNATURE_ALGORITHM,
+            'module_id': module_id,
+            'version': module_data.get('version', '0.0.0'),
+            'hash': module_hash,
+            'algorithm': settings.MODULE_SIGNATURE_ALGORITHM,
             'signature': signature_b64,
             'public_key': public_key_pem,
             'signed_at': None  # Se llena al empaquetar
@@ -222,16 +222,16 @@ class Command(BaseCommand):
 
         # Resumen
         self.stdout.write('='*60)
-        self.stdout.write(self.style.SUCCESS('✅ PLUGIN FIRMADO EXITOSAMENTE\n'))
-        self.stdout.write(f'   Plugin: {plugin_id} v{plugin_data.get("version")}')
-        self.stdout.write(f'   Hash: {plugin_hash[:32]}...')
-        self.stdout.write(f'   Algoritmo: {settings.PLUGIN_SIGNATURE_ALGORITHM}')
+        self.stdout.write(self.style.SUCCESS('✅ MODULE FIRMADO EXITOSAMENTE\n'))
+        self.stdout.write(f'   Module: {module_id} v{module_data.get("version")}')
+        self.stdout.write(f'   Hash: {module_hash[:32]}...')
+        self.stdout.write(f'   Algoritmo: {settings.MODULE_SIGNATURE_ALGORITHM}')
         self.stdout.write(f'   Archivos firmados: {len(files_to_hash)}')
         self.stdout.write(f'   Firma: {signature_file}')
         self.stdout.write('')
         self.stdout.write('📋 Próximos pasos:')
-        self.stdout.write(f'   1. python manage.py package_plugin {plugin_id}')
-        self.stdout.write(f'   2. Sube el ZIP a Cloud o GitHub')
+        self.stdout.write(f'   1. python manage.py package_module {module_id}')
+        self.stdout.write('   2. Sube el ZIP a Cloud o GitHub')
         self.stdout.write('')
         self.stdout.write(self.style.WARNING('⚠️  Recuerda:'))
         self.stdout.write(self.style.WARNING(f'   - NO incluyas {key_path} en el repositorio'))

@@ -319,7 +319,7 @@ API completa para gestionar el Hub de ERPlora:
 - **Authentication**: Login con PIN o Cloud, setup de PIN, logout
 - **Employees**: CRUD de empleados, reset de PIN
 - **Configuration**: Configuración del Hub y tienda
-- **Plugins**: Gestión de plugins, marketplace
+- **Modules**: Gestión de modules, marketplace
 - **System**: Health check, actualizaciones
 
 ### Autenticación
@@ -343,8 +343,8 @@ Después del login, las cookies de sesión se incluyen automáticamente en las p
         {'name': 'Authentication', 'description': 'Login, logout, PIN setup'},
         {'name': 'Employees', 'description': 'Employee/user management'},
         {'name': 'Configuration', 'description': 'Hub and store settings'},
-        {'name': 'Plugins', 'description': 'Plugin management'},
-        {'name': 'Marketplace', 'description': 'Plugin marketplace'},
+        {'name': 'Modules', 'description': 'Module management'},
+        {'name': 'Marketplace', 'description': 'Module marketplace'},
         {'name': 'System', 'description': 'Health check, updates, language'},
     ],
     'COMPONENT_SPLIT_REQUEST': True,

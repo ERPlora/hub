@@ -98,9 +98,9 @@ backups/
 # Lock files (not needed, we install from pyproject.toml)
 uv.lock
 
-# Plugins in development (underscore prefix = disabled)
-plugins/_*
-plugins/.template/
+# Modules in development (underscore prefix = disabled)
+modules/_*
+modules/.template/
 
 # Logs (will be generated in volume)
 logs/

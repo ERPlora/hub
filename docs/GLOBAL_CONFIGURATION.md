@@ -9,7 +9,7 @@ Sistema de configuración global del Hub usando patrón Singleton + Cache.
 - [Configuraciones Disponibles](#configuraciones-disponibles)
   - [HubConfig](#hubconfig)
   - [StoreConfig](#storeconfig)
-- [Uso en Plugins](#uso-en-plugins)
+- [Uso en Modules](#uso-en-modules)
   - [En Views (Python)](#en-views-python)
   - [En Templates (HTML)](#en-templates-html)
   - [En Modelos](#en-modelos)
@@ -105,12 +105,12 @@ tax_included = StoreConfig.get_value('tax_included', True)
 
 ---
 
-## Uso en Plugins
+## Uso en Modules
 
 ### En Views (Python)
 
 ```python
-# plugins/your_plugin/views.py
+# modules/your_module/views.py
 from apps.configuration.models import HubConfig, StoreConfig
 from apps.accounts.decorators import login_required
 from django.shortcuts import render
@@ -133,12 +133,12 @@ def product_list(request):
         'tax_rate': tax_rate,
     }
 
-    return render(request, 'your_plugin/list.html', context)
+    return render(request, 'your_module/list.html', context)
 ```
 
 **Ejemplo completo - Dashboard de Inventario:**
 ```python
-# plugins/_inventory/views.py
+# modules/_inventory/views.py
 from apps.configuration.models import HubConfig
 from django.db.models import Sum, F
 
@@ -171,7 +171,7 @@ Las configuraciones están disponibles **automáticamente** en todos los templat
 - `{{ STORE_CONFIG }}` - Instancia completa de StoreConfig
 
 ```django
-<!-- plugins/your_plugin/templates/your_plugin/list.html -->
+<!-- modules/your_module/templates/your_module/list.html -->
 {% extends "app_base.html" %}
 
 {% block content %}
@@ -221,7 +221,7 @@ Las configuraciones están disponibles **automáticamente** en todos los templat
 
 **Ejemplo con Alpine.js:**
 ```django
-<!-- plugins/your_plugin/templates/your_plugin/checkout.html -->
+<!-- modules/your_module/templates/your_module/checkout.html -->
 {% extends "app_base.html" %}
 
 {% block content %}
@@ -301,7 +301,7 @@ function checkoutData() {
 ### En Modelos
 
 ```python
-# plugins/your_plugin/models.py
+# modules/your_module/models.py
 from django.db import models
 from apps.configuration.models import HubConfig, StoreConfig
 
@@ -351,7 +351,7 @@ class Product(models.Model):
 Crear helpers reutilizables para formateo y cálculos:
 
 ```python
-# plugins/your_plugin/utils.py
+# modules/your_module/utils.py
 from apps.configuration.models import HubConfig, StoreConfig
 from decimal import Decimal
 
@@ -423,7 +423,7 @@ def get_business_info():
 
 **Uso de utilidades:**
 ```python
-# plugins/your_plugin/views.py
+# modules/your_module/views.py
 from .utils import format_currency, calculate_tax, get_business_info
 
 @login_required
@@ -445,7 +445,7 @@ def invoice(request, invoice_id):
         'business_info': business_info,
     }
 
-    return render(request, 'your_plugin/invoice.html', context)
+    return render(request, 'your_module/invoice.html', context)
 ```
 
 ---
@@ -455,7 +455,7 @@ def invoice(request, invoice_id):
 ### Ejemplo 1: Dashboard de Ventas
 
 ```python
-# plugins/sales/views.py
+# modules/sales/views.py
 from apps.configuration.models import HubConfig, StoreConfig
 from django.db.models import Sum, Count, F
 from datetime import date
@@ -484,7 +484,7 @@ def sales_dashboard(request):
 ```
 
 ```django
-<!-- plugins/sales/templates/sales/dashboard.html -->
+<!-- modules/sales/templates/sales/dashboard.html -->
 {% extends "app_base.html" %}
 
 {% block content %}
@@ -519,7 +519,7 @@ def sales_dashboard(request):
 ### Ejemplo 2: Recibo de Venta
 
 ```python
-# plugins/pos/views.py
+# modules/pos/views.py
 from apps.configuration.models import StoreConfig
 
 @login_required
@@ -540,7 +540,7 @@ def print_receipt(request, sale_id):
 ```
 
 ```django
-<!-- plugins/pos/templates/pos/receipt.html -->
+<!-- modules/pos/templates/pos/receipt.html -->
 <div class="receipt">
     <!-- Header con logo y datos del negocio -->
     <div class="receipt-header">
@@ -704,7 +704,7 @@ if currency in valid_currencies:
 - Implementación completa: [`apps/configuration/models.py`](../apps/configuration/models.py)
 - Documentación detallada: [`apps/configuration/README.md`](../apps/configuration/README.md)
 - Context processor: [`apps/configuration/context_processors.py`](../apps/configuration/context_processors.py)
-- Ejemplo en plugin: [`plugins/_inventory/views.py`](../plugins/_inventory/views.py)
+- Ejemplo en module: [`modules/_inventory/views.py`](../modules/_inventory/views.py)
 
 ---
 

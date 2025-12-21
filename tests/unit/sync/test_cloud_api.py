@@ -230,7 +230,7 @@ class TestHeartbeatMethods:
 
         metadata = {
             'version': '2.0.0',
-            'plugins': ['inventory'],
+            'modules': ['inventory'],
             'status': 'healthy'
         }
         cloud_api.send_heartbeat(metadata)
@@ -239,7 +239,7 @@ class TestHeartbeatMethods:
         import json
         request_body = json.loads(responses.calls[0].request.body)
         assert request_body['version'] == '2.0.0'
-        assert request_body['plugins'] == ['inventory']
+        assert request_body['modules'] == ['inventory']
 
     @responses.activate
     def test_get_hub_info(self, cloud_api):
@@ -288,8 +288,8 @@ class TestCommandMethods:
                 'commands': [
                     {
                         'id': 'cmd-1',
-                        'type': 'install_plugin',
-                        'payload': {'plugin_id': 'inventory'}
+                        'type': 'install_module',
+                        'payload': {'module_id': 'inventory'}
                     },
                     {
                         'id': 'cmd-2',
@@ -344,13 +344,13 @@ class TestCommandMethods:
         cloud_api.acknowledge_command(
             command_id='cmd-456',
             status='failed',
-            error='Plugin not found'
+            error='Module not found'
         )
 
         import json
         request_body = json.loads(responses.calls[0].request.body)
         assert request_body['status'] == 'failed'
-        assert request_body['error'] == 'Plugin not found'
+        assert request_body['error'] == 'Module not found'
 
 
 class TestJWTVerification:
@@ -365,14 +365,14 @@ class TestJWTVerification:
             mock_decode.return_value = {
                 'type': 'hub_command',
                 'hub_id': 'test-hub-id',
-                'command': 'install_plugin'
+                'command': 'install_module'
             }
 
             result = cloud_api.verify_command_jwt('valid.jwt.token')
 
             assert result is not None
             assert result['type'] == 'hub_command'
-            assert result['command'] == 'install_plugin'
+            assert result['command'] == 'install_module'
 
     def test_verify_command_jwt_wrong_type(self, cloud_api, mock_hub_config):
         """Test verifying JWT with wrong type returns None."""

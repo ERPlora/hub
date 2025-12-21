@@ -222,16 +222,16 @@ venv
 /Users/testuser/
 
 # ==============================================================================
-# PLUGIN DEVELOPMENT
+# MODULE DEVELOPMENT
 # ==============================================================================
-# Ignorar todos los plugins en desarrollo (cada uno tiene su propio repo)
-# Solo mantener archivos de documentación en plugins/
-plugins/*/
-!plugins/.gitignore
-!plugins/README.md
-!plugins/PLUGIN_DEVELOPMENT.md
-!plugins/PLUGIN_API.md
-!plugins/.template/
+# Ignorar todos los modules en desarrollo (cada uno tiene su propio repo)
+# Solo mantener archivos de documentación en modules/
+modules/*/
+!modules/.gitignore
+!modules/README.md
+!modules/MODULE_DEVELOPMENT.md
+!modules/MODULE_API.md
+!modules/.template/
 
 # ==============================================================================
 # CACHE AND BACKUP FILES

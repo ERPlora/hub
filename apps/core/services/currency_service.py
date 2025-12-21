@@ -2,7 +2,7 @@
 Currency formatting service for ERPlora Hub.
 
 Provides currency formatting based on HubConfig settings.
-All plugins should use this service for consistent currency display.
+All modules should use this service for consistent currency display.
 """
 
 from decimal import Decimal

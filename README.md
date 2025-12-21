@@ -9,7 +9,7 @@ Sistema POS (Point of Sale) modular Django con **dos modos de despliegue**.
 - **100% GRATUITA** - sin costo de licencia
 - SQLite local en la maquina del cliente
 - **Funciona 100% offline** despues de setup inicial
-- Extensible con plugins (gratuitos o de pago)
+- Extensible con modules (gratuitos o de pago)
 
 ### 2. Cloud Hub (SaaS)
 - Contenedor Docker desplegado via Dokploy
@@ -57,18 +57,18 @@ hub/
 ├── apps/                      # Aplicaciones Django
 │   ├── accounts/             # LocalUser, autenticacion con PIN
 │   ├── configuration/        # HubConfig, StoreConfig (singleton)
-│   ├── plugins/              # Plugin model, runtime manager
+│   ├── modules/              # Module model, runtime manager
 │   ├── sync/                 # Cloud API client (HTTP)
 │   └── core/                 # Utilidades compartidas
 │
 ├── config/                   # Configuracion Django
 │   ├── settings.py
 │   ├── urls.py
-│   └── plugin_allowed_deps.py
+│   └── module_allowed_deps.py
 │
-├── plugins/                  # Plugins instalados
-│   ├── .template/           # Template base para nuevos plugins
-│   └── ...                  # Plugins activos
+├── modules/                  # Modules instalados
+│   ├── .template/           # Template base para nuevos modules
+│   └── ...                  # Modules activos
 │
 ├── templates/               # Django templates (Ionic + HTMX)
 ├── static/                  # CSS/JS
@@ -142,9 +142,9 @@ docker run -d -p 8001:8000 -e HUB_ID=test-hub-123 erplora/hub:latest
 
 ---
 
-## Sistema de Plugins
+## Sistema de Modules
 
-El Hub soporta plugins dinamicos con dependencias pre-aprobadas.
+El Hub soporta modules dinamicos con dependencias pre-aprobadas.
 
 **Dependencias permitidas**:
 - `Pillow` - Imagenes
@@ -154,12 +154,12 @@ El Hub soporta plugins dinamicos con dependencias pre-aprobadas.
 - `reportlab` - PDFs
 - Y mas...
 
-Ver lista completa en [config/plugin_allowed_deps.py](config/plugin_allowed_deps.py).
+Ver lista completa en [config/module_allowed_deps.py](config/module_allowed_deps.py).
 
-**Gestion de plugins**:
-- Activar: mover de `_plugin_name/` a `plugin_name/`
-- Desactivar: mover de `plugin_name/` a `_plugin_name/`
-- Ocultar: prefijar con `.` (`.plugin_name/`)
+**Gestion de modules**:
+- Activar: mover de `_module_name/` a `module_name/`
+- Desactivar: mover de `module_name/` a `_module_name/`
+- Ocultar: prefijar con `.` (`.module_name/`)
 
 ---
 

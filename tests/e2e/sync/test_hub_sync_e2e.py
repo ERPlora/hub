@@ -96,12 +96,12 @@ class TestHubStartupSync:
         assert commands[0]['type'] == 'sync_config'
 
 
-class TestPluginInstallationFlow:
-    """E2E tests for plugin installation via Cloud commands."""
+class TestModuleInstallationFlow:
+    """E2E tests for module installation via Cloud commands."""
 
     @responses.activate
-    def test_install_plugin_flow(self, hub_config, mock_settings):
-        """Test complete plugin installation flow."""
+    def test_install_module_flow(self, hub_config, mock_settings):
+        """Test complete module installation flow."""
         # 1. Hub polls commands
         responses.add(
             responses.GET,
@@ -110,11 +110,11 @@ class TestPluginInstallationFlow:
                 'commands': [
                     {
                         'id': 'install-1',
-                        'type': 'install_plugin',
+                        'type': 'install_module',
                         'payload': {
-                            'plugin_id': 'inventory',
+                            'module_id': 'inventory',
                             'version': '1.0.0',
-                            'download_url': 'https://cloud.erplora.com/plugins/inventory/1.0.0.zip'
+                            'download_url': 'https://cloud.erplora.com/modules/inventory/1.0.0.zip'
                         },
                         'command_jwt': 'install.cmd.jwt'
                     }
@@ -138,20 +138,20 @@ class TestPluginInstallationFlow:
         # Poll commands
         commands = service.get_pending_commands()
         assert len(commands) == 1
-        assert commands[0]['type'] == 'install_plugin'
+        assert commands[0]['type'] == 'install_module'
 
         # Simulate installation and ack
         result = service.acknowledge_command(
             command_id='install-1',
             status='completed',
-            result={'installed': True, 'plugin_id': 'inventory', 'version': '1.0.0'}
+            result={'installed': True, 'module_id': 'inventory', 'version': '1.0.0'}
         )
 
         assert result['success'] is True
 
     @responses.activate
-    def test_plugin_installation_failure_flow(self, hub_config, mock_settings):
-        """Test plugin installation failure handling."""
+    def test_module_installation_failure_flow(self, hub_config, mock_settings):
+        """Test module installation failure handling."""
         responses.add(
             responses.GET,
             'https://cloud.erplora.com/api/hubs/me/commands/',
@@ -159,8 +159,8 @@ class TestPluginInstallationFlow:
                 'commands': [
                     {
                         'id': 'install-fail-1',
-                        'type': 'install_plugin',
-                        'payload': {'plugin_id': 'nonexistent'},
+                        'type': 'install_module',
+                        'payload': {'module_id': 'nonexistent'},
                         'command_jwt': 'fail.cmd.jwt'
                     }
                 ]
@@ -184,7 +184,7 @@ class TestPluginInstallationFlow:
         service.acknowledge_command(
             command_id='install-fail-1',
             status='failed',
-            error='Plugin not found in marketplace'
+            error='Module not found in marketplace'
         )
 
         # Verify error was sent
@@ -318,14 +318,14 @@ class TestMultipleCommandsFlow:
                     },
                     {
                         'id': 'cmd-2',
-                        'type': 'install_plugin',
-                        'payload': {'plugin_id': 'sales'},
+                        'type': 'install_module',
+                        'payload': {'module_id': 'sales'},
                         'command_jwt': 'jwt2'
                     },
                     {
                         'id': 'cmd-3',
-                        'type': 'install_plugin',
-                        'payload': {'plugin_id': 'inventory'},
+                        'type': 'install_module',
+                        'payload': {'module_id': 'inventory'},
                         'command_jwt': 'jwt3'
                     }
                 ]

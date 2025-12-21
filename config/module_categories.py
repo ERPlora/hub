@@ -1,13 +1,13 @@
 """
-Plugin Categories Configuration
+Module Categories Configuration
 
-Defines all available categories for ERPlora plugins.
-This file is shared between Cloud (marketplace) and Hub (plugin management).
+Defines all available categories for ERPlora modules.
+This file is shared between Cloud (marketplace) and Hub (module management).
 
-Based on: hub/plugins/PLUGIN_CATALOG.md
+Based on: hub/modules/MODULE_CATALOG.md
 """
 
-PLUGIN_CATEGORIES = {
+MODULE_CATEGORIES = {
     'pos': {
         'name': 'Point of Sale (POS)',
         'name_es': 'Punto de Venta (POS)',
@@ -211,7 +211,7 @@ PLUGIN_CATEGORIES = {
 # Django model choices
 CATEGORY_CHOICES = [
     (key, value['name']) for key, value in sorted(
-        PLUGIN_CATEGORIES.items(),
+        MODULE_CATEGORIES.items(),
         key=lambda x: x[1]['order']
     )
 ]
@@ -228,10 +228,10 @@ def get_category_info(category_id: str, language: str = 'en') -> dict:
     Returns:
         Dictionary with category info
     """
-    if category_id not in PLUGIN_CATEGORIES:
+    if category_id not in MODULE_CATEGORIES:
         return None
 
-    category = PLUGIN_CATEGORIES[category_id].copy()
+    category = MODULE_CATEGORIES[category_id].copy()
 
     # Replace name and description with localized versions
     if language == 'es':
@@ -254,7 +254,7 @@ def get_all_categories(language: str = 'en') -> list:
     """
     categories = []
     for category_id, category_data in sorted(
-        PLUGIN_CATEGORIES.items(),
+        MODULE_CATEGORIES.items(),
         key=lambda x: x[1]['order']
     ):
         category = get_category_info(category_id, language)

@@ -12,25 +12,25 @@
             <ion-label>{% trans "Dashboard" %}</ion-label>
         </ion-tab-button>
 
-        <!-- Dynamic Plugin Tabs -->
-        {% for plugin in PLUGIN_TAB_ITEMS %}
+        <!-- Dynamic Module Tabs -->
+        {% for module in MODULE_TAB_ITEMS %}
         <ion-tab-button
-            hx-get="{{ plugin.url }}"
+            hx-get="{{ module.url }}"
             hx-target="#dashboard-content"
             hx-push-url="true">
-            <ion-icon name="{{ plugin.icon }}"></ion-icon>
-            <ion-label>{{ plugin.label }}</ion-label>
+            <ion-icon name="{{ module.icon }}"></ion-icon>
+            <ion-label>{{ module.label }}</ion-label>
         </ion-tab-button>
         {% endfor %}
 
-        <!-- Plugins -->
+        <!-- Modules -->
         <ion-tab-button
-            hx-get="{% url 'system:plugins' %}"
+            hx-get="{% url 'system:modules' %}"
             hx-target="#dashboard-content"
             hx-push-url="true"
-            :class="currentSection === 'plugins' ? 'tab-selected' : ''">
+            :class="currentSection === 'modules' ? 'tab-selected' : ''">
             <ion-icon name="extension-puzzle-outline"></ion-icon>
-            <ion-label>{% trans "Plugins" %}</ion-label>
+            <ion-label>{% trans "Modules" %}</ion-label>
         </ion-tab-button>
 
         <!-- Settings -->

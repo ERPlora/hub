@@ -440,7 +440,7 @@ Añadir más flags en `launch-kiosk.sh`:
     --disable-features=Translate \
     --disable-infobars \              # Sin barra de info
     --disable-extensions \            # Sin extensiones
-    --disable-plugins \               # Sin plugins
+    --disable-modules \               # Sin modules
     --disable-dev-tools \             # Sin DevTools
     --disable-translate \             # Sin traducción
     --disable-sync \                  # Sin sincronización

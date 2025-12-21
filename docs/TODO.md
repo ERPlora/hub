@@ -23,7 +23,7 @@
 ### Infraestructura
 - ✅ Redeploy automático via Dokploy API
 - ✅ WhiteNoise staticfiles funcionando correctamente
-- ✅ Volúmenes Docker persistentes para SQLite, media, plugins
+- ✅ Volúmenes Docker persistentes para SQLite, media, modules
 
 ---
 
@@ -37,11 +37,11 @@
 - [ ] Configurar impuestos (tax_rate, tax_included)
 - [ ] Upload de logo de negocio
 
-#### 2. Plugin Store desde Hub
-- [ ] Vista de catálogo de plugins desde Hub
-- [ ] Instalación de plugins via API Cloud
+#### 2. Module Store desde Hub
+- [ ] Vista de catálogo de modules desde Hub
+- [ ] Instalación de modules via API Cloud
 - [ ] Verificación de licencias/compras
-- [ ] Actualización de plugins
+- [ ] Actualización de modules
 
 #### 3. Gestión de Empleados
 - [ ] CRUD completo de empleados (LocalUser)
@@ -57,11 +57,11 @@
 - [ ] Sincronización de usuarios
 - [ ] Logs de actividad hacia Cloud
 
-#### 5. Plugins de Negocio
-- [ ] Plugin POS (Point of Sale)
-- [ ] Plugin Inventory
-- [ ] Plugin Sales
-- [ ] Plugin Customers
+#### 5. Modules de Negocio
+- [ ] Module POS (Point of Sale)
+- [ ] Module Inventory
+- [ ] Module Sales
+- [ ] Module Customers
 
 #### 6. Impresión
 - [ ] Configuración de impresoras

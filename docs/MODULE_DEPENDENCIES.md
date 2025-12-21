@@ -1,11 +1,11 @@
-# Sistema de Dependencias para Plugins
+# Sistema de Dependencias para Modules
 
 ## 🎯 Problema
 
 PyInstaller crea un ejecutable congelado donde:
 - ❌ No hay `pip` disponible
 - ❌ No se pueden instalar paquetes nuevos después de empaquetar
-- ❌ Los plugins NO pueden instalar sus propias dependencias
+- ❌ Los modules NO pueden instalar sus propias dependencias
 
 ## 💡 Soluciones Posibles
 
@@ -14,7 +14,7 @@ PyInstaller crea un ejecutable congelado donde:
 Empaquetar un Python completo (no congelado) junto con la aplicación.
 
 **Ventajas:**
-- ✅ Los plugins pueden instalar dependencias con pip
+- ✅ Los modules pueden instalar dependencias con pip
 - ✅ Máxima flexibilidad
 - ✅ Experiencia similar a desarrollo
 
@@ -35,8 +35,8 @@ CPOS Hub.app/
 │       │   │   ├── python3
 │       │   │   └── pip
 │       │   └── lib/
-│       └── plugins/
-│           ├── .venv/ (virtualenv para plugins)
+│       └── modules/
+│           ├── .venv/ (virtualenv para modules)
 │           └── installed/
 │               ├── products/
 │               └── inventory/
@@ -68,41 +68,41 @@ datas.extend(python_files)
 ```python
 # En main.py
 def setup_embedded_python():
-    """Configura Python embebido para plugins"""
+    """Configura Python embebido para modules"""
     if getattr(sys, 'frozen', False):
         python_home = bundle_dir / 'python'
         os.environ['PYTHONHOME'] = str(python_home)
         os.environ['PATH'] = f"{python_home / 'bin'}:{os.environ['PATH']}"
 
-        # Crear venv para plugins si no existe
-        plugins_venv = app_dir / 'plugins' / '.venv'
-        if not plugins_venv.exists():
+        # Crear venv para modules si no existe
+        modules_venv = app_dir / 'modules' / '.venv'
+        if not modules_venv.exists():
             subprocess.run([
                 str(python_home / 'bin' / 'python3'),
                 '-m', 'venv',
-                str(plugins_venv)
+                str(modules_venv)
             ])
 ```
 
-3. **Sistema de instalación de plugins:**
+3. **Sistema de instalación de modules:**
 ```python
-# En hub/apps/plugins/installer.py
-class PluginInstaller:
-    def install_plugin(self, plugin_path):
-        """Instala un plugin y sus dependencias"""
-        # 1. Leer plugin.json
-        plugin_json = self.read_plugin_json(plugin_path)
+# En hub/apps/modules/installer.py
+class ModuleInstaller:
+    def install_module(self, module_path):
+        """Instala un module y sus dependencias"""
+        # 1. Leer module.json
+        module_json = self.read_module_json(module_path)
 
         # 2. Instalar dependencias Python
-        dependencies = plugin_json.get('dependencies', {}).get('python', [])
+        dependencies = module_json.get('dependencies', {}).get('python', [])
         if dependencies:
             self.install_dependencies(dependencies)
 
-        # 3. Instalar plugin
-        self.copy_plugin_files(plugin_path)
+        # 3. Instalar module
+        self.copy_module_files(module_path)
 
         # 4. Ejecutar migraciones
-        self.run_migrations(plugin_json['plugin_id'])
+        self.run_migrations(module_json['module_id'])
 
     def install_dependencies(self, dependencies):
         """Instala dependencias usando pip del venv embebido"""
@@ -117,7 +117,7 @@ class PluginInstaller:
     def get_embedded_pip(self):
         """Retorna path al pip del Python embebido"""
         if getattr(sys, 'frozen', False):
-            return bundle_dir / 'plugins' / '.venv' / 'bin' / 'pip'
+            return bundle_dir / 'modules' / '.venv' / 'bin' / 'pip'
         else:
             return 'pip'  # Desarrollo local
 ```
@@ -132,15 +132,15 @@ Incluir las dependencias más comunes pre-empaquetadas en la app.
 - ✅ Más rápido
 
 **Desventajas:**
-- ⚠️ Plugins limitados a dependencias pre-empaquetadas
+- ⚠️ Modules limitados a dependencias pre-empaquetadas
 - ⚠️ Menos flexible
 
 **Implementación:**
 
 1. **Definir lista de librerías comunes permitidas:**
 ```python
-# En hub/config/plugin_allowed_deps.py
-ALLOWED_PLUGIN_DEPENDENCIES = {
+# En hub/config/module_allowed_deps.py
+ALLOWED_MODULE_DEPENDENCIES = {
     'Pillow': '>=10.0.0',
     'openpyxl': '>=3.1.0',
     'requests': '>=2.31.0',
@@ -167,20 +167,20 @@ hiddenimports=[
 ]
 ```
 
-3. **Validación en plugin.json:**
+3. **Validación en module.json:**
 ```python
-# En hub/apps/plugins/validator.py
-class PluginValidator:
-    def validate_dependencies(self, plugin_json):
-        """Valida que las dependencias del plugin estén permitidas"""
-        dependencies = plugin_json.get('dependencies', {}).get('python', [])
+# En hub/apps/modules/validator.py
+class ModuleValidator:
+    def validate_dependencies(self, module_json):
+        """Valida que las dependencias del module estén permitidas"""
+        dependencies = module_json.get('dependencies', {}).get('python', [])
 
         for dep in dependencies:
             pkg_name = dep.split('>=')[0].split('==')[0]
-            if pkg_name not in ALLOWED_PLUGIN_DEPENDENCIES:
-                raise PluginValidationError(
+            if pkg_name not in ALLOWED_MODULE_DEPENDENCIES:
+                raise ModuleValidationError(
                     f"Dependency '{pkg_name}' is not allowed. "
-                    f"Allowed: {list(ALLOWED_PLUGIN_DEPENDENCIES.keys())}"
+                    f"Allowed: {list(ALLOWED_MODULE_DEPENDENCIES.keys())}"
                 )
 ```
 
@@ -189,8 +189,8 @@ class PluginValidator:
 Combinar ambas: Python embebido minimal + lista de dependencias pre-empaquetadas.
 
 **Ventajas:**
-- ✅ Plugins comunes funcionan out-of-the-box (pre-bundled)
-- ✅ Plugins avanzados pueden instalar dependencias (embedded Python)
+- ✅ Modules comunes funcionan out-of-the-box (pre-bundled)
+- ✅ Modules avanzados pueden instalar dependencias (embedded Python)
 - ✅ Mejor experiencia de usuario
 
 **Implementación:**
@@ -198,7 +198,7 @@ Combinar ambas: Python embebido minimal + lista de dependencias pre-empaquetadas
 1. **Pre-empaquetar dependencias comunes** (Opción 2)
 2. **Incluir pip embebido** para casos especiales:
 ```python
-# En plugin installer
+# En module installer
 def install_dependencies(self, dependencies):
     """Intenta usar pre-bundled, si no existe usa pip"""
     for dep in dependencies:
@@ -214,7 +214,7 @@ def install_dependencies(self, dependencies):
             logger.info(f"📦 Instalando {dep} con pip...")
             self.install_with_pip(dep)
         else:
-            raise PluginError(
+            raise ModuleError(
                 f"Dependency '{dep}' not available. "
                 f"Please contact CPOS support."
             )
@@ -226,11 +226,11 @@ def install_dependencies(self, dependencies):
 
 1. **Fase 1 (AHORA):** Implementar Opción 2 (Pre-bundled)
    - Lista curada de 10-15 librerías más comunes
-   - Validación estricta en plugin.json
+   - Validación estricta en module.json
    - Documentar librerías disponibles
 
 2. **Fase 2 (FUTURO):** Agregar Python embebido (Opción 1)
-   - Para plugins enterprise/avanzados
+   - Para modules enterprise/avanzados
    - Requiere aprobación del owner
    - Con sandboxing de seguridad
 
@@ -238,7 +238,7 @@ def install_dependencies(self, dependencies):
 
 ```python
 # Para incluir en main.spec
-PLUGIN_COMMON_DEPENDENCIES = [
+MODULE_COMMON_DEPENDENCIES = [
     # Images & Media
     'Pillow',           # Manipulación de imágenes
     'qrcode',           # QR codes
@@ -266,19 +266,19 @@ PLUGIN_COMMON_DEPENDENCIES = [
 
 **Consideraciones importantes:**
 
-1. **Sandboxing:** Plugins NO deben poder ejecutar código arbitrario
+1. **Sandboxing:** Modules NO deben poder ejecutar código arbitrario
 2. **Whitelist:** Solo dependencias aprobadas
-3. **Validación:** Verificar plugin.json antes de instalar
+3. **Validación:** Verificar module.json antes de instalar
 4. **Checksums:** Verificar integridad de paquetes
 
 ## 📖 Documentación para Desarrolladores
 
 ```markdown
-# Desarrollo de Plugins - Dependencias
+# Desarrollo de Modules - Dependencias
 
 ## Dependencias Disponibles
 
-Tu plugin puede usar las siguientes librerías:
+Tu module puede usar las siguientes librerías:
 
 - `Pillow>=10.0.0` - Manipulación de imágenes
 - `openpyxl>=3.1.0` - Lectura/escritura de Excel
@@ -288,11 +288,11 @@ Tu plugin puede usar las siguientes librerías:
 
 ## Cómo declarar dependencias
 
-En tu `plugin.json`:
+En tu `module.json`:
 
 ```json
 {
-  "plugin_id": "mi-plugin",
+  "module_id": "mi-module",
   "dependencies": {
     "python": [
       "Pillow>=10.0.0",
@@ -316,9 +316,9 @@ Si necesitas una librería que no está en la lista:
 
 Los cambios necesarios serían:
 
-1. Crear `hub/config/plugin_allowed_deps.py`
+1. Crear `hub/config/module_allowed_deps.py`
 2. Actualizar `main.spec` con las dependencias comunes
-3. Crear `hub/apps/plugins/validator.py`
+3. Crear `hub/apps/modules/validator.py`
 4. Actualizar documentación en CLAUDE.md
 
 ¿Procedo con la implementación?

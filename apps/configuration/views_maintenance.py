@@ -1,5 +1,5 @@
 """
-Database and filesystem maintenance views for orphaned plugin data
+Database and filesystem maintenance views for orphaned module data
 """
 import json
 import shutil
@@ -15,7 +15,7 @@ from django.urls import reverse
 
 def scan_orphaned_data(request):
     """
-    Scan for orphaned database tables and media files from deleted plugins
+    Scan for orphaned database tables and media files from deleted modules
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
@@ -24,21 +24,21 @@ def scan_orphaned_data(request):
     try:
         from config.paths import get_database_path, get_media_dir
 
-        # Get active plugins from filesystem
-        plugins_dir = Path(django_settings.PLUGINS_DIR)
-        active_plugins = set()
+        # Get active modules from filesystem
+        modules_dir = Path(django_settings.MODULES_DIR)
+        active_modules = set()
 
-        if plugins_dir.exists():
-            for plugin_dir in plugins_dir.iterdir():
-                if plugin_dir.is_dir() and not plugin_dir.name.startswith('_') and not plugin_dir.name.startswith('.'):
-                    active_plugins.add(plugin_dir.name)
+        if modules_dir.exists():
+            for module_dir in modules_dir.iterdir():
+                if module_dir.is_dir() and not module_dir.name.startswith('_') and not module_dir.name.startswith('.'):
+                    active_modules.add(module_dir.name)
 
         # Connect to database
         db_path = get_database_path()
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Find orphaned tables (tables that don't belong to active plugins or Django)
+        # Find orphaned tables (tables that don't belong to active modules or Django)
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         all_tables = [row[0] for row in cursor.fetchall()]
 
@@ -55,7 +55,7 @@ def scan_orphaned_data(request):
             'configuration_',  # apps.configuration
             'accounts_',       # apps.accounts
             'sync_',          # apps.sync
-            'plugins_admin_', # apps.plugins_admin
+            'modules_admin_', # apps.modules_admin
             'core_',          # Legacy core app tables (before refactoring)
         ]
 
@@ -74,14 +74,14 @@ def scan_orphaned_data(request):
             if is_core:
                 continue
 
-            # Check if table belongs to an active plugin
-            table_plugin = None
-            for plugin in active_plugins:
-                if table.startswith(f'{plugin}_'):
-                    table_plugin = plugin
+            # Check if table belongs to an active module
+            table_module = None
+            for module in active_modules:
+                if table.startswith(f'{module}_'):
+                    table_module = module
                     break
 
-            if not table_plugin:
+            if not table_module:
                 orphaned_tables.append(table)
 
         # Find orphaned migrations
@@ -90,16 +90,16 @@ def scan_orphaned_data(request):
 
         # Core apps (whitelist)
         core_apps = {
-            'configuration', 'accounts', 'sync', 'plugins_admin',
+            'configuration', 'accounts', 'sync', 'modules_admin',
             'contenttypes', 'auth', 'sessions', 'admin',
-            'core', 'plugins'  # Legacy apps (before refactoring)
+            'core', 'modules'  # Legacy apps (before refactoring)
         }
 
         orphaned_migrations = []
         for app, name in all_migrations:
             if app in core_apps:
                 continue
-            if app not in active_plugins:
+            if app not in active_modules:
                 orphaned_migrations.append({'app': app, 'name': name})
 
         conn.close()
@@ -110,7 +110,7 @@ def scan_orphaned_data(request):
 
         if media_dir.exists():
             for folder in media_dir.iterdir():
-                if folder.is_dir() and folder.name not in active_plugins:
+                if folder.is_dir() and folder.name not in active_modules:
                     # Skip common media folders
                     if folder.name in ['avatars', 'uploads', 'temp', 'products']:
                         continue
@@ -158,7 +158,7 @@ def scan_orphaned_data(request):
 
 def clean_orphaned_data(request):
     """
-    Clean orphaned database tables and media files from deleted plugins
+    Clean orphaned database tables and media files from deleted modules
     """
     # Only allow POST
     if request.method != 'POST':
@@ -171,14 +171,14 @@ def clean_orphaned_data(request):
     try:
         from config.paths import get_database_path, get_media_dir
 
-        # Get active plugins from filesystem
-        plugins_dir = Path(django_settings.PLUGINS_DIR)
-        active_plugins = set()
+        # Get active modules from filesystem
+        modules_dir = Path(django_settings.MODULES_DIR)
+        active_modules = set()
 
-        if plugins_dir.exists():
-            for plugin_dir in plugins_dir.iterdir():
-                if plugin_dir.is_dir() and not plugin_dir.name.startswith('_') and not plugin_dir.name.startswith('.'):
-                    active_plugins.add(plugin_dir.name)
+        if modules_dir.exists():
+            for module_dir in modules_dir.iterdir():
+                if module_dir.is_dir() and not module_dir.name.startswith('_') and not module_dir.name.startswith('.'):
+                    active_modules.add(module_dir.name)
 
         # Connect to database
         db_path = get_database_path()
@@ -202,7 +202,7 @@ def clean_orphaned_data(request):
             'configuration_',  # apps.configuration
             'accounts_',       # apps.accounts
             'sync_',          # apps.sync
-            'plugins_admin_', # apps.plugins_admin
+            'modules_admin_', # apps.modules_admin
             'core_',          # Legacy core app tables (before refactoring)
         ]
 
@@ -221,14 +221,14 @@ def clean_orphaned_data(request):
             if is_core:
                 continue
 
-            # Check if table belongs to an active plugin
-            table_plugin = None
-            for plugin in active_plugins:
-                if table.startswith(f'{plugin}_'):
-                    table_plugin = plugin
+            # Check if table belongs to an active module
+            table_module = None
+            for module in active_modules:
+                if table.startswith(f'{module}_'):
+                    table_module = module
                     break
 
-            if not table_plugin:
+            if not table_module:
                 orphaned_tables.append(table)
 
         # Find orphaned migrations
@@ -237,16 +237,16 @@ def clean_orphaned_data(request):
 
         # Core apps (whitelist)
         core_apps = {
-            'configuration', 'accounts', 'sync', 'plugins_admin',
+            'configuration', 'accounts', 'sync', 'modules_admin',
             'contenttypes', 'auth', 'sessions', 'admin',
-            'core', 'plugins'  # Legacy apps (before refactoring)
+            'core', 'modules'  # Legacy apps (before refactoring)
         }
 
         orphaned_migrations = []
         for app, name in all_migrations:
             if app in core_apps:
                 continue
-            if app not in active_plugins:
+            if app not in active_modules:
                 orphaned_migrations.append({'app': app, 'name': name})
 
         # Delete orphaned tables
@@ -275,7 +275,7 @@ def clean_orphaned_data(request):
 
         if media_dir.exists():
             for folder in media_dir.iterdir():
-                if folder.is_dir() and folder.name not in active_plugins:
+                if folder.is_dir() and folder.name not in active_modules:
                     # Skip common media folders
                     if folder.name in ['avatars', 'uploads', 'temp', 'products']:
                         continue

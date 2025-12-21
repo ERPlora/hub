@@ -1,5 +1,5 @@
 """
-Base models for all Hub and Plugin models.
+Base models for all Hub and Module models.
 
 Provides:
 - TimeStampedModel: Simple base with created_at/updated_at
@@ -17,13 +17,13 @@ class TimeStampedModel(models.Model):
     """
     Simple abstract base model with timestamps.
 
-    Use this for plugins that don't need UUID primary keys or multi-tenancy.
+    Use this for modules that don't need UUID primary keys or multi-tenancy.
 
     Features:
     - created_at: Auto-set on creation
     - updated_at: Auto-updated on save
 
-    Usage in plugins:
+    Usage in modules:
         from apps.core.models import TimeStampedModel
 
         class Product(TimeStampedModel):
@@ -51,7 +51,7 @@ class ActiveModel(TimeStampedModel):
     - is_active: Boolean flag for soft activation
     - created_at, updated_at: From TimeStampedModel
 
-    Usage in plugins:
+    Usage in modules:
         from apps.core.models import ActiveModel
 
         class Category(ActiveModel):

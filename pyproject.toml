@@ -35,8 +35,8 @@ dependencies = [
     "django-money>=3.0.0", # Currency handling
     "django-htmx>=1.17.0", # HTMX integration for Django
     "django-health-check>=3.18.0", # Health check endpoint for monitoring
-    # === LIBRERÍAS PARA PLUGINS (25 pre-empaquetadas) ===
-    # Ver: config/plugin_allowed_deps.py para casos de uso
+    # === LIBRERÍAS PARA MODULES (25 pre-empaquetadas) ===
+    # Ver: config/module_allowed_deps.py para casos de uso
     # Imágenes & Media
     "Pillow>=10.0.0",
     "qrcode>=7.4.0",
@@ -156,7 +156,7 @@ markers = [
     "unit: Unit tests",
     "integration: Integration tests",
     "pos: POS tests",
-    "plugins: Plugin system tests",
+    "modules: Module system tests",
     "hardware: Hardware integration tests",
     "slow: Slow running tests",
 ]

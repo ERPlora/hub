@@ -10,7 +10,7 @@ All other views have been moved to their respective apps:
 - Authentication → apps/auth/login/views.py
 - Employees → apps/main/employees/views.py
 - Settings → apps/configuration/views.py
-- Plugins → apps/system/plugins/views.py
+- Modules → apps/system/modules/views.py
 - PWA → apps/configuration/views.py
 """
 from django.shortcuts import render

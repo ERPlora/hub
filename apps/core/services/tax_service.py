@@ -2,7 +2,7 @@
 Tax calculation service for ERPlora Hub.
 
 Provides tax calculations based on StoreConfig settings.
-All plugins should use this service for consistent tax handling.
+All modules should use this service for consistent tax handling.
 """
 
 from decimal import Decimal, ROUND_HALF_UP

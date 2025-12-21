@@ -1,5 +1,5 @@
 """
-Django management command for plugin operations
+Django management command for module operations
 """
 import os
 import json
@@ -8,207 +8,207 @@ import zipfile
 from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
-from apps.plugins_runtime.loader import plugin_loader
+from apps.modules_runtime.loader import module_loader
 
 
 class Command(BaseCommand):
-    help = 'Manage CPOS Hub plugins'
+    help = 'Manage CPOS Hub modules'
 
     def add_arguments(self, parser):
-        subparsers = parser.add_subparsers(dest='subcommand', help='Plugin commands')
+        subparsers = parser.add_subparsers(dest='subcommand', help='Module commands')
 
-        # Create new plugin
-        create_parser = subparsers.add_parser('create', help='Create a new plugin from template')
-        create_parser.add_argument('plugin_id', type=str, help='Plugin ID (e.g., my-plugin)')
-        create_parser.add_argument('--name', type=str, help='Plugin display name')
+        # Create new module
+        create_parser = subparsers.add_parser('create', help='Create a new module from template')
+        create_parser.add_argument('module_id', type=str, help='Module ID (e.g., my-module)')
+        create_parser.add_argument('--name', type=str, help='Module display name')
         create_parser.add_argument('--author', type=str, help='Author name')
         create_parser.add_argument('--email', type=str, help='Author email')
 
-        # List plugins
-        subparsers.add_parser('list', help='List all plugins')
+        # List modules
+        subparsers.add_parser('list', help='List all modules')
 
-        # Sync plugins from filesystem to database
-        subparsers.add_parser('sync', help='Sync plugins from filesystem to database')
+        # Sync modules from filesystem to database
+        subparsers.add_parser('sync', help='Sync modules from filesystem to database')
 
-        # Package plugin
-        package_parser = subparsers.add_parser('package', help='Package plugin as ZIP')
-        package_parser.add_argument('plugin_id', type=str, help='Plugin ID to package')
+        # Package module
+        package_parser = subparsers.add_parser('package', help='Package module as ZIP')
+        package_parser.add_argument('module_id', type=str, help='Module ID to package')
         package_parser.add_argument('--output', type=str, help='Output directory', default='dist')
 
-        # Validate plugin
-        validate_parser = subparsers.add_parser('validate', help='Validate plugin structure')
-        validate_parser.add_argument('plugin_id', type=str, help='Plugin ID to validate')
+        # Validate module
+        validate_parser = subparsers.add_parser('validate', help='Validate module structure')
+        validate_parser.add_argument('module_id', type=str, help='Module ID to validate')
 
-        # Install plugin from ZIP
-        install_parser = subparsers.add_parser('install', help='Install plugin from ZIP')
-        install_parser.add_argument('zip_file', type=str, help='Path to plugin ZIP file')
+        # Install module from ZIP
+        install_parser = subparsers.add_parser('install', help='Install module from ZIP')
+        install_parser.add_argument('zip_file', type=str, help='Path to module ZIP file')
 
     def handle(self, *args, **options):
         subcommand = options.get('subcommand')
 
         if not subcommand:
-            self.print_help('manage.py', 'plugin')
+            self.print_help('manage.py', 'module')
             return
 
         if subcommand == 'create':
-            self.create_plugin(options)
+            self.create_module(options)
         elif subcommand == 'list':
-            self.list_plugins()
+            self.list_modules()
         elif subcommand == 'sync':
-            self.sync_plugins()
+            self.sync_modules()
         elif subcommand == 'package':
-            self.package_plugin(options)
+            self.package_module(options)
         elif subcommand == 'validate':
-            self.validate_plugin(options)
+            self.validate_module(options)
         elif subcommand == 'install':
-            self.install_plugin(options)
+            self.install_module(options)
 
-    def create_plugin(self, options):
-        """Create a new plugin from template"""
-        plugin_id = options['plugin_id']
-        plugin_name = options.get('name') or plugin_id.replace('-', ' ').title()
+    def create_module(self, options):
+        """Create a new module from template"""
+        module_id = options['module_id']
+        module_name = options.get('name') or module_id.replace('-', ' ').title()
         author = options.get('author') or 'Your Name'
         email = options.get('email') or 'your.email@example.com'
 
-        plugins_dir = Path(settings.BASE_DIR) / 'plugins'
-        plugin_dir = plugins_dir / plugin_id
+        modules_dir = Path(settings.BASE_DIR) / 'modules'
+        module_dir = modules_dir / module_id
 
-        if plugin_dir.exists():
-            raise CommandError(f'Plugin directory already exists: {plugin_dir}')
+        if module_dir.exists():
+            raise CommandError(f'Module directory already exists: {module_dir}')
 
-        self.stdout.write(f'Creating plugin: {plugin_id}')
+        self.stdout.write(f'Creating module: {module_id}')
 
         # Create directory structure
-        plugin_dir.mkdir(parents=True)
-        (plugin_dir / 'templates' / plugin_id).mkdir(parents=True)
-        (plugin_dir / 'static' / plugin_id / 'css').mkdir(parents=True)
-        (plugin_dir / 'static' / plugin_id / 'js').mkdir(parents=True)
-        (plugin_dir / 'migrations').mkdir(parents=True)
+        module_dir.mkdir(parents=True)
+        (module_dir / 'templates' / module_id).mkdir(parents=True)
+        (module_dir / 'static' / module_id / 'css').mkdir(parents=True)
+        (module_dir / 'static' / module_id / 'js').mkdir(parents=True)
+        (module_dir / 'migrations').mkdir(parents=True)
 
-        # Create plugin.json
-        plugin_json = {
-            'plugin_id': plugin_id,
-            'name': plugin_name,
+        # Create module.json
+        module_json = {
+            'module_id': module_id,
+            'name': module_name,
             'version': '1.0.0',
-            'description': f'{plugin_name} plugin for CPOS Hub',
+            'description': f'{module_name} module for CPOS Hub',
             'author': author,
             'author_email': email,
             'license': 'MIT',
             'icon': 'cube-outline',
             'category': 'general',
             'menu': {
-                'label': plugin_name,
+                'label': module_name,
                 'icon': 'cube-outline',
                 'order': 100,
                 'show': True
             },
-            'main_url': f'{plugin_id}:index',
+            'main_url': f'{module_id}:index',
             'dependencies': [],
             'min_hub_version': '1.0.0'
         }
 
-        with open(plugin_dir / 'plugin.json', 'w') as f:
-            json.dump(plugin_json, f, indent=4)
+        with open(module_dir / 'module.json', 'w') as f:
+            json.dump(module_json, f, indent=4)
 
         # Create __init__.py
-        with open(plugin_dir / '__init__.py', 'w') as f:
-            f.write(f'"""\n{plugin_name}\n"""\n')
-            f.write(f"default_app_config = '{plugin_id}.apps.{plugin_id.replace('-', '').title()}Config'\n")
+        with open(module_dir / '__init__.py', 'w') as f:
+            f.write(f'"""\n{module_name}\n"""\n')
+            f.write(f"default_app_config = '{module_id}.apps.{module_id.replace('-', '').title()}Config'\n")
 
         # Create apps.py
-        app_config_class = plugin_id.replace('-', '').title() + 'Config'
-        with open(plugin_dir / 'apps.py', 'w') as f:
+        app_config_class = module_id.replace('-', '').title() + 'Config'
+        with open(module_dir / 'apps.py', 'w') as f:
             f.write('from django.apps import AppConfig\n\n\n')
             f.write(f'class {app_config_class}(AppConfig):\n')
             f.write("    default_auto_field = 'django.db.models.BigAutoField'\n")
-            f.write(f"    name = '{plugin_id}'\n")
-            f.write(f"    verbose_name = '{plugin_name}'\n")
+            f.write(f"    name = '{module_id}'\n")
+            f.write(f"    verbose_name = '{module_name}'\n")
 
         # Create models.py
-        with open(plugin_dir / 'models.py', 'w') as f:
+        with open(module_dir / 'models.py', 'w') as f:
             f.write('from django.db import models\n\n')
             f.write('# Create your models here\n')
 
         # Create views.py
-        with open(plugin_dir / 'views.py', 'w') as f:
+        with open(module_dir / 'views.py', 'w') as f:
             f.write('from django.shortcuts import render\n\n\n')
             f.write('def index(request):\n')
-            f.write('    """Main view for plugin"""\n')
-            f.write(f"    return render(request, '{plugin_id}/index.html')\n")
+            f.write('    """Main view for module"""\n')
+            f.write(f"    return render(request, '{module_id}/index.html')\n")
 
         # Create urls.py
-        with open(plugin_dir / 'urls.py', 'w') as f:
+        with open(module_dir / 'urls.py', 'w') as f:
             f.write('from django.urls import path\n')
             f.write('from . import views\n\n')
-            f.write(f"app_name = '{plugin_id}'\n\n")
+            f.write(f"app_name = '{module_id}'\n\n")
             f.write('urlpatterns = [\n')
             f.write("    path('', views.index, name='index'),\n")
             f.write(']\n')
 
         # Create template
-        with open(plugin_dir / 'templates' / plugin_id / 'index.html', 'w') as f:
+        with open(module_dir / 'templates' / module_id / 'index.html', 'w') as f:
             f.write('{% extends "core/app_base.html" %}\n\n')
-            f.write(f'{{% block page_title %}}{plugin_name}{{% endblock %}}\n\n')
+            f.write(f'{{% block page_title %}}{module_name}{{% endblock %}}\n\n')
             f.write('{% block content %}\n')
             f.write('<div style="padding: 24px;">\n')
-            f.write(f'    <h1>{plugin_name}</h1>\n')
-            f.write(f'    <p>Welcome to {plugin_name} plugin!</p>\n')
+            f.write(f'    <h1>{module_name}</h1>\n')
+            f.write(f'    <p>Welcome to {module_name} module!</p>\n')
             f.write('</div>\n')
             f.write('{% endblock %}\n')
 
         # Create migrations __init__.py
-        (plugin_dir / 'migrations' / '__init__.py').touch()
+        (module_dir / 'migrations' / '__init__.py').touch()
 
         # Create README.md
-        with open(plugin_dir / 'README.md', 'w') as f:
-            f.write(f'# {plugin_name}\n\n')
-            f.write(f'{plugin_json["description"]}\n\n')
+        with open(module_dir / 'README.md', 'w') as f:
+            f.write(f'# {module_name}\n\n')
+            f.write(f'{module_json["description"]}\n\n')
             f.write('## Installation\n\n')
-            f.write('This plugin can be installed via CPOS Cloud marketplace.\n\n')
+            f.write('This module can be installed via CPOS Cloud marketplace.\n\n')
             f.write('## Development\n\n')
             f.write('```bash\n')
-            f.write('python manage.py plugin sync\n')
+            f.write('python manage.py module sync\n')
             f.write('```\n')
 
-        self.stdout.write(self.style.SUCCESS(f'Plugin created successfully: {plugin_dir}'))
+        self.stdout.write(self.style.SUCCESS(f'Module created successfully: {module_dir}'))
         self.stdout.write('Next steps:')
-        self.stdout.write(f'  1. cd plugins/{plugin_id}')
+        self.stdout.write(f'  1. cd modules/{module_id}')
         self.stdout.write('  2. Edit your models, views, and templates')
-        self.stdout.write('  3. Run: python manage.py plugin sync')
-        self.stdout.write('  4. Run: python manage.py plugin package ' + plugin_id)
+        self.stdout.write('  3. Run: python manage.py module sync')
+        self.stdout.write('  4. Run: python manage.py module package ' + module_id)
 
-    def list_plugins(self):
-        """List all plugins from filesystem"""
-        plugins_dir = Path(settings.PLUGINS_DIR)
+    def list_modules(self):
+        """List all modules from filesystem"""
+        modules_dir = Path(settings.MODULES_DIR)
 
-        if not plugins_dir.exists():
-            self.stdout.write('No plugins directory found')
+        if not modules_dir.exists():
+            self.stdout.write('No modules directory found')
             return
 
-        plugins = []
+        modules = []
 
-        # Scan filesystem for plugins
-        for plugin_dir in plugins_dir.iterdir():
-            if not plugin_dir.is_dir():
+        # Scan filesystem for modules
+        for module_dir in modules_dir.iterdir():
+            if not module_dir.is_dir():
                 continue
 
             # Skip hidden directories
-            if plugin_dir.name.startswith('.'):
+            if module_dir.name.startswith('.'):
                 continue
 
-            plugin_id = plugin_dir.name
-            is_active = not plugin_id.startswith('_')
-            clean_id = plugin_id.lstrip('_')
+            module_id = module_dir.name
+            is_active = not module_id.startswith('_')
+            clean_id = module_id.lstrip('_')
 
-            # Read plugin.json
-            plugin_json_path = plugin_dir / 'plugin.json'
-            if plugin_json_path.exists():
+            # Read module.json
+            module_json_path = module_dir / 'module.json'
+            if module_json_path.exists():
                 try:
-                    with open(plugin_json_path, 'r', encoding='utf-8') as f:
+                    with open(module_json_path, 'r', encoding='utf-8') as f:
                         metadata = json.load(f)
                         name = metadata.get('name', clean_id.title())
                         version = metadata.get('version', '1.0.0')
-                        plugins.append({
+                        modules.append({
                             'id': clean_id,
                             'name': name,
                             'version': version,
@@ -216,69 +216,69 @@ class Command(BaseCommand):
                         })
                 except Exception as e:
                     self.stdout.write(self.style.WARNING(
-                        f'Warning: Error reading plugin.json for {plugin_id}: {e}'
+                        f'Warning: Error reading module.json for {module_id}: {e}'
                     ))
 
-        if not plugins:
-            self.stdout.write('No plugins found')
+        if not modules:
+            self.stdout.write('No modules found')
             return
 
         # Sort by name
-        plugins.sort(key=lambda x: x['name'])
+        modules.sort(key=lambda x: x['name'])
 
-        self.stdout.write(self.style.SUCCESS('Installed Plugins:'))
+        self.stdout.write(self.style.SUCCESS('Installed Modules:'))
         self.stdout.write('-' * 80)
 
-        for plugin in plugins:
-            status = '✓' if plugin['is_active'] else '✗'
+        for module in modules:
+            status = '✓' if module['is_active'] else '✗'
             self.stdout.write(
-                f"{status} {plugin['id']:20} {plugin['name']:30} v{plugin['version']}"
+                f"{status} {module['id']:20} {module['name']:30} v{module['version']}"
             )
 
-    def sync_plugins(self):
-        """Sync plugins from filesystem to database"""
-        self.stdout.write('Syncing plugins...')
+    def sync_modules(self):
+        """Sync modules from filesystem to database"""
+        self.stdout.write('Syncing modules...')
 
-        installed, updated = plugin_loader.sync_plugins()
+        installed, updated = module_loader.sync_modules()
 
         self.stdout.write(self.style.SUCCESS(
             f'Sync complete: {installed} installed, {updated} updated'
         ))
 
-        # Load active plugins
-        loaded = plugin_loader.load_all_active_plugins()
-        self.stdout.write(self.style.SUCCESS(f'Loaded {loaded} active plugins'))
+        # Load active modules
+        loaded = module_loader.load_all_active_modules()
+        self.stdout.write(self.style.SUCCESS(f'Loaded {loaded} active modules'))
 
-    def package_plugin(self, options):
-        """Package plugin as ZIP file"""
-        plugin_id = options['plugin_id']
+    def package_module(self, options):
+        """Package module as ZIP file"""
+        module_id = options['module_id']
         output_dir = Path(options['output'])
 
-        plugins_dir = Path(settings.BASE_DIR) / 'plugins'
-        plugin_dir = plugins_dir / plugin_id
+        modules_dir = Path(settings.BASE_DIR) / 'modules'
+        module_dir = modules_dir / module_id
 
-        if not plugin_dir.exists():
-            raise CommandError(f'Plugin not found: {plugin_id}')
+        if not module_dir.exists():
+            raise CommandError(f'Module not found: {module_id}')
 
         # Validate first
-        if not self._validate_plugin_structure(plugin_dir):
-            raise CommandError('Plugin validation failed')
+        if not self._validate_module_structure(module_dir):
+            raise CommandError('Module validation failed')
 
         # Create output directory
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Read version from plugin.json
-        with open(plugin_dir / 'plugin.json', 'r') as f:
+        # Read version from module.json
+        with open(module_dir / 'module.json', 'r') as f:
             metadata = json.load(f)
             version = metadata.get('version', '1.0.0')
 
         # Create ZIP file
-        zip_filename = output_dir / f'{plugin_id}-{version}.zip'
+        zip_filename = output_dir / f'{module_id}-{version}.zip'
 
-        self.stdout.write(f'Packaging {plugin_id}...')
+        self.stdout.write(f'Packaging {module_id}...')
 
         with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(plugin_dir):
+            for root, dirs, files in os.walk(module_dir):
                 # Skip __pycache__ and .pyc files
                 dirs[:] = [d for d in dirs if d != '__pycache__']
 
@@ -287,95 +287,95 @@ class Command(BaseCommand):
                         continue
 
                     file_path = Path(root) / file
-                    arcname = file_path.relative_to(plugins_dir)
+                    arcname = file_path.relative_to(modules_dir)
                     zipf.write(file_path, arcname)
 
-        self.stdout.write(self.style.SUCCESS(f'Plugin packaged: {zip_filename}'))
+        self.stdout.write(self.style.SUCCESS(f'Module packaged: {zip_filename}'))
         self.stdout.write(f'Size: {zip_filename.stat().st_size / 1024:.2f} KB')
 
-    def validate_plugin(self, options):
-        """Validate plugin structure"""
-        plugin_id = options['plugin_id']
-        plugins_dir = Path(settings.BASE_DIR) / 'plugins'
-        plugin_dir = plugins_dir / plugin_id
+    def validate_module(self, options):
+        """Validate module structure"""
+        module_id = options['module_id']
+        modules_dir = Path(settings.BASE_DIR) / 'modules'
+        module_dir = modules_dir / module_id
 
-        if not plugin_dir.exists():
-            raise CommandError(f'Plugin not found: {plugin_id}')
+        if not module_dir.exists():
+            raise CommandError(f'Module not found: {module_id}')
 
-        self.stdout.write(f'Validating plugin: {plugin_id}')
+        self.stdout.write(f'Validating module: {module_id}')
 
-        if self._validate_plugin_structure(plugin_dir):
-            self.stdout.write(self.style.SUCCESS('✓ Plugin validation passed'))
+        if self._validate_module_structure(module_dir):
+            self.stdout.write(self.style.SUCCESS('✓ Module validation passed'))
         else:
-            raise CommandError('Plugin validation failed')
+            raise CommandError('Module validation failed')
 
-    def _validate_plugin_structure(self, plugin_dir):
-        """Validate plugin structure"""
-        required_files = ['plugin.json', '__init__.py', 'apps.py']
+    def _validate_module_structure(self, module_dir):
+        """Validate module structure"""
+        required_files = ['module.json', '__init__.py', 'apps.py']
 
         valid = True
         for file in required_files:
-            file_path = plugin_dir / file
+            file_path = module_dir / file
             if not file_path.exists():
                 self.stdout.write(self.style.ERROR(f'✗ Missing required file: {file}'))
                 valid = False
             else:
                 self.stdout.write(self.style.SUCCESS(f'✓ Found: {file}'))
 
-        # Validate plugin.json
-        plugin_json = plugin_dir / 'plugin.json'
-        if plugin_json.exists():
+        # Validate module.json
+        module_json = module_dir / 'module.json'
+        if module_json.exists():
             try:
-                with open(plugin_json, 'r') as f:
+                with open(module_json, 'r') as f:
                     metadata = json.load(f)
 
-                required_fields = ['plugin_id', 'name', 'version']
+                required_fields = ['module_id', 'name', 'version']
                 for field in required_fields:
                     if field not in metadata:
                         self.stdout.write(self.style.ERROR(
-                            f'✗ plugin.json missing required field: {field}'
+                            f'✗ module.json missing required field: {field}'
                         ))
                         valid = False
                     else:
                         self.stdout.write(self.style.SUCCESS(
-                            f'✓ plugin.json has {field}: {metadata[field]}'
+                            f'✓ module.json has {field}: {metadata[field]}'
                         ))
             except json.JSONDecodeError:
-                self.stdout.write(self.style.ERROR('✗ Invalid JSON in plugin.json'))
+                self.stdout.write(self.style.ERROR('✗ Invalid JSON in module.json'))
                 valid = False
 
         return valid
 
-    def install_plugin(self, options):
-        """Install plugin from ZIP file"""
+    def install_module(self, options):
+        """Install module from ZIP file"""
         zip_file = Path(options['zip_file'])
 
         if not zip_file.exists():
             raise CommandError(f'ZIP file not found: {zip_file}')
 
-        plugins_dir = Path(settings.BASE_DIR) / 'plugins'
+        modules_dir = Path(settings.BASE_DIR) / 'modules'
 
-        self.stdout.write(f'Installing plugin from: {zip_file}')
+        self.stdout.write(f'Installing module from: {zip_file}')
 
         # Extract ZIP
         with zipfile.ZipFile(zip_file, 'r') as zipf:
-            # Get plugin_id from first directory
+            # Get module_id from first directory
             first_file = zipf.namelist()[0]
-            plugin_id = first_file.split('/')[0]
+            module_id = first_file.split('/')[0]
 
-            plugin_dir = plugins_dir / plugin_id
+            module_dir = modules_dir / module_id
 
-            if plugin_dir.exists():
+            if module_dir.exists():
                 self.stdout.write(self.style.WARNING(
-                    f'Plugin directory exists: {plugin_id}. Overwriting...'
+                    f'Module directory exists: {module_id}. Overwriting...'
                 ))
-                shutil.rmtree(plugin_dir)
+                shutil.rmtree(module_dir)
 
-            zipf.extractall(plugins_dir)
+            zipf.extractall(modules_dir)
 
-        self.stdout.write(self.style.SUCCESS(f'Plugin extracted to: {plugin_dir}'))
+        self.stdout.write(self.style.SUCCESS(f'Module extracted to: {module_dir}'))
 
         # Sync to database
-        self.sync_plugins()
+        self.sync_modules()
 
-        self.stdout.write(self.style.SUCCESS(f'Plugin installed: {plugin_id}'))
+        self.stdout.write(self.style.SUCCESS(f'Module installed: {module_id}'))
