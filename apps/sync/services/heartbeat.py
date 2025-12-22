@@ -74,9 +74,9 @@ class HeartbeatService:
 
     def _register_default_handlers(self):
         """Register default command handlers."""
-        self.register_handler('install_plugin', self._handle_install_plugin)
-        self.register_handler('update_plugin', self._handle_update_plugin)
-        self.register_handler('remove_plugin', self._handle_remove_plugin)
+        self.register_handler('install_module', self._handle_install_module)
+        self.register_handler('update_module', self._handle_update_module)
+        self.register_handler('remove_module', self._handle_remove_module)
         self.register_handler('sync_config', self._handle_sync_config)
 
     def register_handler(self, command_type: str, handler: Callable):
@@ -188,22 +188,22 @@ class HeartbeatService:
 
         config = HubConfig.get_solo()
 
-        # Get installed plugins
-        installed_plugins = self._get_installed_plugins()
+        # Get installed modules
+        installed_modules = self._get_installed_modules()
 
         return {
             'version': getattr(settings, 'HUB_VERSION', '1.0.0'),
-            'plugins': installed_plugins,
+            'modules': installed_modules,
             'status': 'healthy',
             'configured': config.is_configured,
         }
 
-    def _get_installed_plugins(self) -> list:
-        """Get list of installed plugin IDs."""
+    def _get_installed_modules(self) -> list:
+        """Get list of installed module IDs."""
         try:
-            from apps.plugins_runtime.plugin_loader import discover_plugins
-            plugins = discover_plugins(include_inactive=False)
-            return [p['plugin_id'] for p in plugins]
+            from apps.modules_runtime.module_loader import discover_modules
+            modules = discover_modules(include_inactive=False)
+            return [m['module_id'] for m in modules]
         except Exception:
             return []
 
@@ -297,49 +297,49 @@ class HeartbeatService:
     # Default Command Handlers
     # =========================================================================
 
-    def _handle_install_plugin(self, payload: Dict) -> tuple:
-        """Handle install_plugin command."""
-        plugin_id = payload.get('plugin_id')
+    def _handle_install_module(self, payload: Dict) -> tuple:
+        """Handle install_module command."""
+        module_id = payload.get('module_id')
         version = payload.get('version')
 
-        if not plugin_id:
-            return False, None, "Missing plugin_id"
+        if not module_id:
+            return False, None, "Missing module_id"
 
-        # TODO: Implement plugin installation
-        logger.info(f"[COMMAND] Install plugin: {plugin_id} v{version}")
+        # TODO: Implement module installation
+        logger.info(f"[COMMAND] Install module: {module_id} v{version}")
 
         # For now, return success placeholder
-        return True, {'installed': plugin_id}, None
+        return True, {'installed': module_id}, None
 
-    def _handle_update_plugin(self, payload: Dict) -> tuple:
-        """Handle update_plugin command."""
-        plugin_id = payload.get('plugin_id')
+    def _handle_update_module(self, payload: Dict) -> tuple:
+        """Handle update_module command."""
+        module_id = payload.get('module_id')
         version = payload.get('version')
 
-        if not plugin_id:
-            return False, None, "Missing plugin_id"
+        if not module_id:
+            return False, None, "Missing module_id"
 
-        # TODO: Implement plugin update
-        logger.info(f"[COMMAND] Update plugin: {plugin_id} v{version}")
+        # TODO: Implement module update
+        logger.info(f"[COMMAND] Update module: {module_id} v{version}")
 
-        return True, {'updated': plugin_id}, None
+        return True, {'updated': module_id}, None
 
-    def _handle_remove_plugin(self, payload: Dict) -> tuple:
-        """Handle remove_plugin command."""
-        plugin_id = payload.get('plugin_id')
+    def _handle_remove_module(self, payload: Dict) -> tuple:
+        """Handle remove_module command."""
+        module_id = payload.get('module_id')
 
-        if not plugin_id:
-            return False, None, "Missing plugin_id"
+        if not module_id:
+            return False, None, "Missing module_id"
 
-        # TODO: Implement plugin removal
-        logger.info(f"[COMMAND] Remove plugin: {plugin_id}")
+        # TODO: Implement module removal
+        logger.info(f"[COMMAND] Remove module: {module_id}")
 
-        return True, {'removed': plugin_id}, None
+        return True, {'removed': module_id}, None
 
     def _handle_sync_config(self, payload: Dict) -> tuple:
         """Handle sync_config command."""
         # TODO: Implement config sync
-        logger.info(f"[COMMAND] Sync config")
+        logger.info("[COMMAND] Sync config")
 
         return True, {'synced': True}, None
 

@@ -21,4 +21,7 @@ urlpatterns = [
 
     # Update notification (HTMX partial)
     path('update-notification/', views.update_notification, name='update_notification'),
+
+    # Sidebar refresh (HTMX partial - for module changes)
+    path('sidebar/', views.sidebar_partial, name='sidebar'),
 ]

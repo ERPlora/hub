@@ -31,9 +31,9 @@ msgstr "Panel"
 
 #: apps/core/templates/core/app_base.html:295
 #: apps/core/templates/core/app_base.html:342
-#: apps/core/templates/core/plugins.html:5
-#: apps/core/templates/core/plugins.html:6
-msgid "Plugins"
+#: apps/core/templates/core/modules.html:5
+#: apps/core/templates/core/modules.html:6
+msgid "Modules"
 msgstr ""
 
 #: apps/core/templates/core/app_base.html:331
@@ -48,7 +48,7 @@ msgid "Employees"
 msgstr "Empleados"
 
 #: apps/core/templates/core/app_base.html:348
-msgid "Plugin Store"
+msgid "Module Store"
 msgstr ""
 
 #: apps/core/templates/core/app_base.html:354
@@ -70,10 +70,10 @@ msgstr "Ir a CPOS Cloud"
 #: apps/core/templates/core/app_base.html:529
 #: apps/core/templates/core/employees.html:150
 #: apps/core/templates/core/employees.html:191
-#: apps/core/templates/core/plugins.html:220
-#: apps/core/templates/core/plugins.html:330
-#: apps/core/templates/core/plugins.html:373
-#: apps/core/templates/core/plugins.html:416
+#: apps/core/templates/core/modules.html:220
+#: apps/core/templates/core/modules.html:330
+#: apps/core/templates/core/modules.html:373
+#: apps/core/templates/core/modules.html:416
 msgid "Cancel"
 msgstr "Cancelar"
 
@@ -360,7 +360,7 @@ msgid "Show:"
 msgstr ""
 
 #: apps/core/templates/core/partials/data_table.html:147
-#: apps/core/templates/plugins/marketplace.html:72
+#: apps/core/templates/modules/marketplace.html:72
 msgid "All"
 msgstr ""
 
@@ -376,148 +376,148 @@ msgstr ""
 msgid "of"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:13
-msgid "Plugin Management"
+#: apps/core/templates/core/modules.html:13
+msgid "Module Management"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:15
-msgid "Extend your POS with plugins"
+#: apps/core/templates/core/modules.html:15
+msgid "Extend your POS with modules"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:20
-#: apps/core/templates/core/plugins.html:141
-msgid "Install Plugin"
+#: apps/core/templates/core/modules.html:20
+#: apps/core/templates/core/modules.html:141
+msgid "Install Module"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:32
+#: apps/core/templates/core/modules.html:32
 msgid "Installed"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:43
-#: apps/core/templates/core/plugins.html:81
+#: apps/core/templates/core/modules.html:43
+#: apps/core/templates/core/modules.html:81
 msgid "Active"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:54
+#: apps/core/templates/core/modules.html:54
 msgid "Discovered"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:81
+#: apps/core/templates/core/modules.html:81
 msgid "Inactive"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:100
-#: apps/core/templates/core/plugins.html:377
+#: apps/core/templates/core/modules.html:100
+#: apps/core/templates/core/modules.html:377
 msgid "Deactivate"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:105
-#: apps/core/templates/core/plugins.html:334
+#: apps/core/templates/core/modules.html:105
+#: apps/core/templates/core/modules.html:334
 msgid "Activate"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:112
+#: apps/core/templates/core/modules.html:112
 msgid "Open"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:127
-msgid "No plugins installed"
+#: apps/core/templates/core/modules.html:127
+msgid "No modules installed"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:130
-msgid "Install Your First Plugin"
+#: apps/core/templates/core/modules.html:130
+msgid "Install Your First Module"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:154
-msgid "Plugin ZIP File"
+#: apps/core/templates/core/modules.html:154
+msgid "Module ZIP File"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:162
-msgid "Select a .zip file containing the plugin"
+#: apps/core/templates/core/modules.html:162
+msgid "Select a .zip file containing the module"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:194
+#: apps/core/templates/core/modules.html:194
 msgid "Installation Failed"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:209
+#: apps/core/templates/core/modules.html:209
 msgid "Installation Successful"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:210
-msgid "Plugin has been installed and activated"
+#: apps/core/templates/core/modules.html:210
+msgid "Module has been installed and activated"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:224
+#: apps/core/templates/core/modules.html:224
 msgid "Installing..."
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:224
-#: apps/core/templates/plugins/marketplace.html:155
+#: apps/core/templates/core/modules.html:224
+#: apps/core/templates/modules/marketplace.html:155
 msgid "Install"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:288
+#: apps/core/templates/core/modules.html:288
 #, fuzzy
 #| msgid "Logging in..."
-msgid "Uploading plugin..."
+msgid "Uploading module..."
 msgstr "Iniciando sesión..."
 
-#: apps/core/templates/core/plugins.html:309
+#: apps/core/templates/core/modules.html:309
 msgid "Installation complete!"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:311
+#: apps/core/templates/core/modules.html:311
 msgid "Unknown error occurred"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:318
-#: apps/core/templates/core/plugins.html:358
-#: apps/core/templates/core/plugins.html:401
-#: apps/core/templates/core/plugins.html:444
+#: apps/core/templates/core/modules.html:318
+#: apps/core/templates/core/modules.html:358
+#: apps/core/templates/core/modules.html:401
+#: apps/core/templates/core/modules.html:444
 msgid "Network error: "
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:326
-msgid "Activate Plugin"
+#: apps/core/templates/core/modules.html:326
+msgid "Activate Module"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:327
+#: apps/core/templates/core/modules.html:327
 msgid "Do you want to activate"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:355
-#: apps/core/templates/core/plugins.html:398
-#: apps/core/templates/core/plugins.html:441
+#: apps/core/templates/core/modules.html:355
+#: apps/core/templates/core/modules.html:398
+#: apps/core/templates/core/modules.html:441
 msgid "Error: "
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:369
-msgid "Deactivate Plugin"
+#: apps/core/templates/core/modules.html:369
+msgid "Deactivate Module"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:370
+#: apps/core/templates/core/modules.html:370
 msgid "Do you want to deactivate"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:412
-msgid "Uninstall Plugin"
+#: apps/core/templates/core/modules.html:412
+msgid "Uninstall Module"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:413
+#: apps/core/templates/core/modules.html:413
 msgid "Do you want to uninstall"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:413
-msgid "This will remove all plugin files."
+#: apps/core/templates/core/modules.html:413
+msgid "This will remove all module files."
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:420
+#: apps/core/templates/core/modules.html:420
 msgid "Uninstall"
 msgstr ""
 
-#: apps/core/templates/core/plugins.html:455
-#: apps/core/templates/plugins/marketplace.html:31
+#: apps/core/templates/core/modules.html:455
+#: apps/core/templates/modules/marketplace.html:31
 msgid "Error"
 msgstr ""
 
@@ -758,115 +758,115 @@ msgstr "Auto-impresión activada"
 msgid "Auto-print disabled"
 msgstr "Auto-impresión desactivada"
 
-#: apps/core/templates/plugins/marketplace.html:5
-#: apps/core/templates/plugins/marketplace.html:6
-#: apps/core/templates/plugins/marketplace.html:13
-msgid "Plugin Marketplace"
+#: apps/core/templates/modules/marketplace.html:5
+#: apps/core/templates/modules/marketplace.html:6
+#: apps/core/templates/modules/marketplace.html:13
+msgid "Module Marketplace"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:15
-msgid "Browse and purchase plugins from Cloud"
+#: apps/core/templates/modules/marketplace.html:15
+msgid "Browse and purchase modules from Cloud"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:20
-msgid "My Plugins"
+#: apps/core/templates/modules/marketplace.html:20
+msgid "My Modules"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:46
+#: apps/core/templates/modules/marketplace.html:46
 #, fuzzy
 #| msgid "PIN configured successfully!"
 msgid "Purchase Successful!"
 msgstr "¡PIN configurado correctamente!"
 
-#: apps/core/templates/plugins/marketplace.html:47
-msgid "You can now download and install the plugin."
+#: apps/core/templates/modules/marketplace.html:47
+msgid "You can now download and install the module."
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:60
+#: apps/core/templates/modules/marketplace.html:60
 msgid "Purchase Cancelled"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:61
+#: apps/core/templates/modules/marketplace.html:61
 msgid "Your purchase was cancelled."
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:83
+#: apps/core/templates/modules/marketplace.html:83
 msgid "All Types"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:86
+#: apps/core/templates/modules/marketplace.html:86
 msgid "Free"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:89
+#: apps/core/templates/modules/marketplace.html:89
 msgid "Paid"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:92
+#: apps/core/templates/modules/marketplace.html:92
 msgid "Subscription"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:137
+#: apps/core/templates/modules/marketplace.html:137
 msgid "Purchased"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:161
+#: apps/core/templates/modules/marketplace.html:161
 msgid "Install Free"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:167
+#: apps/core/templates/modules/marketplace.html:167
 msgid "Purchase"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:181
-msgid "No Plugins Available"
+#: apps/core/templates/modules/marketplace.html:181
+msgid "No Modules Available"
 msgstr ""
 
-#: apps/core/templates/plugins/marketplace.html:182
+#: apps/core/templates/modules/marketplace.html:182
 msgid "Check your internet connection or try again later."
 msgstr ""
 
-#: apps/core/templates/plugins/purchase_required.html:5
-#: apps/core/templates/plugins/purchase_required.html:6
-#: apps/core/templates/plugins/purchase_required.html:19
+#: apps/core/templates/modules/purchase_required.html:5
+#: apps/core/templates/modules/purchase_required.html:6
+#: apps/core/templates/modules/purchase_required.html:19
 msgid "Purchase Required"
 msgstr ""
 
-#: apps/core/templates/plugins/purchase_required.html:24
+#: apps/core/templates/modules/purchase_required.html:24
 msgid ""
-"This is a premium feature that requires purchasing the plugin. Purchase it "
+"This is a premium feature that requires purchasing the module. Purchase it "
 "once and use it forever."
 msgstr ""
 
-#: apps/core/templates/plugins/purchase_required.html:31
-#: apps/core/templates/plugins/subscription_required.html:31
-msgid "Plugin"
+#: apps/core/templates/modules/purchase_required.html:31
+#: apps/core/templates/modules/subscription_required.html:31
+msgid "Module"
 msgstr ""
 
-#: apps/core/templates/plugins/purchase_required.html:48
+#: apps/core/templates/modules/purchase_required.html:48
 msgid "Browse Marketplace"
 msgstr ""
 
-#: apps/core/templates/plugins/purchase_required.html:53
-#: apps/core/templates/plugins/subscription_required.html:48
-msgid "Back to My Plugins"
+#: apps/core/templates/modules/purchase_required.html:53
+#: apps/core/templates/modules/subscription_required.html:48
+msgid "Back to My Modules"
 msgstr ""
 
-#: apps/core/templates/plugins/purchase_required.html:59
-msgid "Already purchased? Try reinstalling the plugin or contact support."
+#: apps/core/templates/modules/purchase_required.html:59
+msgid "Already purchased? Try reinstalling the module or contact support."
 msgstr ""
 
-#: apps/core/templates/plugins/subscription_required.html:5
-#: apps/core/templates/plugins/subscription_required.html:6
-#: apps/core/templates/plugins/subscription_required.html:19
+#: apps/core/templates/modules/subscription_required.html:5
+#: apps/core/templates/modules/subscription_required.html:6
+#: apps/core/templates/modules/subscription_required.html:19
 msgid "Subscription Required"
 msgstr ""
 
-#: apps/core/templates/plugins/subscription_required.html:43
+#: apps/core/templates/modules/subscription_required.html:43
 msgid "Go to Marketplace"
 msgstr ""
 
-#: apps/core/templates/plugins/subscription_required.html:54
+#: apps/core/templates/modules/subscription_required.html:54
 msgid ""
 "Already subscribed? Try refreshing the page or contact support if the issue "
 "persists."

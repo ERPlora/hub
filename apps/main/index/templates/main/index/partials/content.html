@@ -54,8 +54,8 @@
                     <ion-icon name="extension-puzzle-outline" class="text-2xl text-tertiary"></ion-icon>
                 </div>
                 <div>
-                    <p class="text-sm text-medium m-0">{% trans "Plugins" %}</p>
-                    <p class="text-2xl font-bold m-0">{{ PLUGIN_MENU_ITEMS|length|default:0 }}</p>
+                    <p class="text-sm text-medium m-0">{% trans "Modules" %}</p>
+                    <p class="text-2xl font-bold m-0">{{ MODULE_MENU_ITEMS|length|default:0 }}</p>
                 </div>
             </ion-card-content>
         </ion-card>
@@ -73,7 +73,7 @@
                     hx-target="#dashboard-content"
                     hx-push-url="true">
                     <ion-icon slot="start" name="storefront-outline"></ion-icon>
-                    {% trans "Plugin Store" %}
+                    {% trans "Module Store" %}
                 </ion-button>
 
                 <ion-button expand="block" fill="outline"
@@ -93,11 +93,11 @@
                 </ion-button>
 
                 <ion-button expand="block" fill="outline"
-                    hx-get="{% url 'system:plugins' %}"
+                    hx-get="{% url 'system:modules' %}"
                     hx-target="#dashboard-content"
                     hx-push-url="true">
                     <ion-icon slot="start" name="extension-puzzle-outline"></ion-icon>
-                    {% trans "Plugins" %}
+                    {% trans "Modules" %}
                 </ion-button>
             </div>
         </ion-card-content>
@@ -121,8 +121,8 @@
                 <ion-item>
                     <ion-icon name="ellipse-outline" slot="start" color="medium"></ion-icon>
                     <ion-label>
-                        <h3>{% trans "Install plugins" %}</h3>
-                        <p>{% trans "Visit the Plugin Store to add functionality" %}</p>
+                        <h3>{% trans "Install modules" %}</h3>
+                        <p>{% trans "Visit the Module Store to add functionality" %}</p>
                     </ion-label>
                     <ion-button slot="end" fill="clear"
                         hx-get="{% url 'system:marketplace' %}"

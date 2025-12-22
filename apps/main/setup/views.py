@@ -22,8 +22,8 @@ def wizard(request):
     """
     store_config = StoreConfig.get_config()
 
-    # If already configured, redirect to dashboard
-    if store_config.is_complete():
+    # If already configured (wizard completed), redirect to dashboard
+    if store_config.is_configured:
         return redirect('main:index')
 
     if request.method == 'POST':
@@ -54,17 +54,6 @@ def wizard(request):
                 store_config.tax_rate = Decimal('0')
 
             store_config.tax_included = request.POST.get('tax_included') == 'true'
-            store_config.save()
-
-            return JsonResponse({
-                'success': True,
-                'next_step': 3
-            })
-
-        # Step 3: Receipt Config
-        if action == 'save_receipt':
-            store_config.receipt_header = request.POST.get('receipt_header', '').strip()
-            store_config.receipt_footer = request.POST.get('receipt_footer', '').strip()
             store_config.save()
 
             return JsonResponse({

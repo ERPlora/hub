@@ -1,8 +1,8 @@
 """
 Core services for ERPlora Hub.
 
-These services are shared across all plugins and provide common functionality.
-Import them in your plugin like:
+These services are shared across all modules and provide common functionality.
+Import them in your module like:
 
     from apps.core.services import format_currency, calculate_tax, export_to_csv
 """

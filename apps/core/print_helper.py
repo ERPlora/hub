@@ -1,13 +1,13 @@
 """
 Print Helper
 
-Utility functions to make it easy for plugins to request printing
+Utility functions to make it easy for modules to request printing
 without knowing anything about printers configuration.
 
-Usage example in any plugin:
+Usage example in any module:
     from apps.core.print_helper import print_receipt, print_kitchen_order
 
-    # Print a receipt (plugin doesn't care which printer)
+    # Print a receipt (module doesn't care which printer)
     print_receipt(
         receipt_id='SALE-123',
         items=[...],
@@ -30,7 +30,7 @@ def print_receipt(receipt_id, items, total, **kwargs):
     """
     Print a sales receipt.
 
-    The printers plugin will automatically route this to the configured
+    The printers module will automatically route this to the configured
     receipt printer (or default printer if none configured).
 
     Args:
@@ -175,7 +175,7 @@ def print_kitchen_order(order_number, items, **kwargs):
     }
 
     print_ticket_requested.send(
-        sender='restaurant',  # Or 'sales' depending on plugin
+        sender='restaurant',  # Or 'sales' depending on module
         ticket_type='kitchen_order',
         data=data,
         priority=10  # Highest priority
@@ -263,14 +263,14 @@ def print_custom(sender, ticket_type, data, priority=5):
     Use this for custom document types not covered by the helper functions above.
 
     Args:
-        sender (str): Plugin name emitting the signal
+        sender (str): Module name emitting the signal
         ticket_type (str): Custom document type
         data (dict): Document data
         priority (int): Priority 1-10 (10=highest, 1=lowest)
 
     Example:
         print_custom(
-            sender='my_plugin',
+            sender='my_module',
             ticket_type='gift_certificate',
             data={'certificate_id': 'GC-123', 'amount': 50.00},
             priority=6

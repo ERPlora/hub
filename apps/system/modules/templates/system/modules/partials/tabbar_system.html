@@ -1,0 +1,25 @@
+{% load i18n %}
+
+<ion-footer>
+    <ion-tab-bar>
+        <!-- Modules -->
+        <ion-tab-button
+            hx-get="{% url 'system:modules' %}"
+            hx-target="#dashboard-content"
+            hx-push-url="true"
+            :class="currentSection === 'modules' ? 'tab-selected' : ''">
+            <ion-icon name="extension-puzzle-outline"></ion-icon>
+            <ion-label>{% trans "Modules" %}</ion-label>
+        </ion-tab-button>
+
+        <!-- Module Store -->
+        <ion-tab-button
+            hx-get="{% url 'system:marketplace' %}"
+            hx-target="#dashboard-content"
+            hx-push-url="true"
+            :class="currentSection === 'marketplace' ? 'tab-selected' : ''">
+            <ion-icon name="storefront-outline"></ion-icon>
+            <ion-label>{% trans "Module Store" %}</ion-label>
+        </ion-tab-button>
+    </ion-tab-bar>
+</ion-footer>

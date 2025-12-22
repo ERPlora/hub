@@ -1,7 +1,7 @@
 """
 Local Files Views - File Browser and Database Download.
 
-Provides file browser for local Hub data (media, plugins, reports, backups)
+Provides file browser for local Hub data (media, modules, reports, backups)
 and database download functionality.
 """
 import os
@@ -65,7 +65,7 @@ def get_allowed_directories() -> dict:
     paths = get_data_paths()
     return {
         'media': {'path': paths.media_dir, 'name': 'Media Files', 'icon': 'images'},
-        'plugins': {'path': paths.plugins_dir, 'name': 'Plugins', 'icon': 'extension-puzzle'},
+        'modules': {'path': paths.modules_dir, 'name': 'Modules', 'icon': 'extension-puzzle'},
         'reports': {'path': paths.reports_dir, 'name': 'Reports', 'icon': 'document-text'},
         'backups': {'path': paths.backups_dir, 'name': 'Backups', 'icon': 'cloud-download'},
         'logs': {'path': paths.logs_dir, 'name': 'Logs', 'icon': 'list'},
@@ -108,7 +108,7 @@ def file_browser(request):
     HTMX endpoint: Browse local files.
 
     Query params:
-        - dir: Directory key (media, plugins, reports, backups, logs)
+        - dir: Directory key (media, modules, reports, backups, logs)
         - path: Relative path within the directory
     """
     dir_key = request.GET.get('dir', 'media')
@@ -276,12 +276,12 @@ def get_storage_info(request):
             'size_bytes': get_dir_size(paths.media_dir),
             'files': count_files(paths.media_dir),
         },
-        'plugins': {
-            'name': 'Plugins',
+        'modules': {
+            'name': 'Modules',
             'icon': 'extension-puzzle',
-            'size': format_file_size(get_dir_size(paths.plugins_dir)),
-            'size_bytes': get_dir_size(paths.plugins_dir),
-            'files': count_files(paths.plugins_dir),
+            'size': format_file_size(get_dir_size(paths.modules_dir)),
+            'size_bytes': get_dir_size(paths.modules_dir),
+            'files': count_files(paths.modules_dir),
         },
         'reports': {
             'name': 'Reports',

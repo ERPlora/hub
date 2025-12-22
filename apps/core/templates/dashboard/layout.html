@@ -392,7 +392,7 @@
 
             updateCurrentSection(path) {
                 if (path.includes('/settings')) this.currentSection = 'settings';
-                else if (path.includes('/plugins') || path.includes('/marketplace')) this.currentSection = 'plugins';
+                else if (path.includes('/modules') || path.includes('/marketplace')) this.currentSection = 'modules';
                 else if (path.includes('/employees')) this.currentSection = 'employees';
                 else this.currentSection = 'dashboard';
 

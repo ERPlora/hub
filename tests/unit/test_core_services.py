@@ -1,7 +1,7 @@
 """
 Unit tests for core services.
 
-Tests the shared services that plugins use:
+Tests the shared services that modules use:
 - Currency service
 - Tax service
 - Export service

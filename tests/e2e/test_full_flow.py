@@ -130,23 +130,23 @@ class TestConfigurationFlow:
         assert tax == Decimal('10.00')
 
 
-class TestPluginFlow:
-    """E2E tests for plugin management."""
+class TestModuleFlow:
+    """E2E tests for module management."""
 
-    def test_view_plugins_list(self, authenticated_client, store_config):
-        """Test viewing installed plugins."""
-        response = authenticated_client.get('/plugins/')
+    def test_view_modules_list(self, authenticated_client, store_config):
+        """Test viewing installed modules."""
+        response = authenticated_client.get('/modules/')
 
         assert response.status_code == 200
-        # Should show plugins page
-        assert b'Plugins' in response.content or b'plugins' in response.content
+        # Should show modules page
+        assert b'Modules' in response.content or b'modules' in response.content
 
-    def test_access_active_plugin(self, authenticated_client, store_config):
-        """Test accessing an active plugin (inventory)."""
-        response = authenticated_client.get('/plugins/inventory/')
+    def test_access_active_module(self, authenticated_client, store_config):
+        """Test accessing an active module (inventory)."""
+        response = authenticated_client.get('/modules/inventory/')
 
         # Should either work (200) or redirect to another page
-        # If plugin is active, should be accessible
+        # If module is active, should be accessible
         assert response.status_code in [200, 302]
 
 

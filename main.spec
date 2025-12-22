@@ -9,15 +9,15 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 # Determinar la ruta del proyecto hub (ahora desde el root)
 hub_root = Path('.').resolve()  # Estamos en el root del proyecto
 
-# Importar dependencias permitidas de plugins
+# Importar dependencias permitidas de modules
 sys.path.insert(0, str(hub_root))
 try:
-    from config.plugin_allowed_deps import get_pyinstaller_imports, TOTAL_DEPENDENCIES
-    plugin_imports = get_pyinstaller_imports()
-    print(f"[INFO] Cargadas {TOTAL_DEPENDENCIES} librerias para plugins")
+    from config.module_allowed_deps import get_pyinstaller_imports, TOTAL_DEPENDENCIES
+    module_imports = get_pyinstaller_imports()
+    print(f"[INFO] Cargadas {TOTAL_DEPENDENCIES} librerias para modules")
 except ImportError as e:
-    print(f"[WARNING] No se pudo cargar plugin_allowed_deps: {e}")
-    plugin_imports = []
+    print(f"[WARNING] No se pudo cargar module_allowed_deps: {e}")
+    module_imports = []
 
 # Leer dependencias del pyproject.toml automáticamente
 def get_dependencies_from_pyproject():
@@ -64,9 +64,9 @@ datas = [
     # - Windows: C:\Users\<user>\AppData\Local\ERPloraHub\db\
     # - macOS: ~/Library/Application Support/ERPloraHub/db/
     # - Linux: ~/.erplora-hub/db/
-    # NOTA: plugins/ NO se incluye - se cargan desde ubicaciones externas:
-    # - Development: ./plugins/ (repo local)
-    # - Production: ~/.erplora-hub/plugins/ (instalados por usuario)
+    # NOTA: modules/ NO se incluye - se cargan desde ubicaciones externas:
+    # - Development: ./modules/ (repo local)
+    # - Production: ~/.erplora-hub/modules/ (instalados por usuario)
 ]
 
 a = Analysis(
@@ -83,9 +83,9 @@ a = Analysis(
         # Auto-collect submodules from pyproject.toml dependencies (excepto django que ya está)
         *[submod for pkg in pyproject_packages if pkg != 'django' for submod in collect_submodules(pkg)],
 
-        # === LIBRERÍAS PARA PLUGINS (25 librerías) ===
+        # === LIBRERÍAS PARA MODULES (25 librerías) ===
         # Collect submodules para cada librería permitida
-        *[submod for pkg in plugin_imports for submod in collect_submodules(pkg)],
+        *[submod for pkg in module_imports for submod in collect_submodules(pkg)],
 
         # === PLATFORM-SPECIFIC ===
         'webview.platforms.cocoa',  # macOS

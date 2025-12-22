@@ -13,20 +13,20 @@ def cloud_url(request):
     }
 
 
-def plugin_menu_items(request):
+def module_menu_items(request):
     """
-    Add plugin menu items to template context
+    Add module menu items to template context
     """
-    from apps.plugins_runtime.loader import plugin_loader
+    from apps.modules_runtime.loader import module_loader
 
-    # Only load plugins if user is authenticated
+    # Only load modules if user is authenticated
     if 'local_user_id' in request.session:
-        menu_items = plugin_loader.get_menu_items()
+        menu_items = module_loader.get_menu_items()
     else:
         menu_items = []
 
     return {
-        'PLUGIN_MENU_ITEMS': menu_items
+        'MODULE_MENU_ITEMS': menu_items
     }
 
 

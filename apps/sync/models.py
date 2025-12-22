@@ -98,8 +98,8 @@ class SyncQueue(HubBaseModel):
         ('user_register', 'Register User'),
         ('user_remove', 'Remove User'),
         ('user_update', 'Update User'),
-        ('plugin_install', 'Plugin Install'),
-        ('plugin_uninstall', 'Plugin Uninstall'),
+        ('module_install', 'Module Install'),
+        ('module_uninstall', 'Module Uninstall'),
         ('sale_sync', 'Sale Sync'),
     ]
 

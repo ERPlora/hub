@@ -26,7 +26,7 @@ Storage structure (automatic via HUB_ID):
 
   S3 hubs/{HUB_ID}/:
     - backups/     - Database backups
-    - plugin_data/ - Plugin data
+    - module_data/ - Module data
     - reports/     - Generated reports
     - media/       - Uploaded files (Django media)
 
@@ -88,8 +88,8 @@ else:
         DATABASE_DIR.mkdir(parents=True, exist_ok=True)
         DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
 
-# Plugins - uses base.py config (PLUGINS_DIR from DataPaths or env var)
-# In Docker: /app/plugins/ by default, can be overridden via PLUGINS_DIR env var
+# Modules - uses base.py config (MODULES_DIR from DataPaths or env var)
+# In Docker: /app/modules/ by default, can be overridden via MODULES_DIR env var
 
 # =============================================================================
 # S3 STORAGE - Hetzner Object Storage (hubs/{HUB_ID}/)
@@ -121,7 +121,7 @@ MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 # Note: logs go to Docker stdout/stderr, not S3
 S3_BACKUPS_PREFIX = 'backups'
 S3_TEMP_PREFIX = 'temp'
-S3_PLUGIN_DATA_PREFIX = 'plugin_data'
+S3_MODULE_DATA_PREFIX = 'module_data'
 S3_REPORTS_PREFIX = 'reports'
 
 # Local temp paths for code that needs filesystem access
@@ -129,8 +129,8 @@ BACKUPS_DIR = MEDIA_ROOT / 'backups'
 BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_DIR = MEDIA_ROOT / 'temp'
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
-PLUGIN_DATA_ROOT = MEDIA_ROOT / 'plugin_data'
-PLUGIN_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+MODULE_DATA_ROOT = MEDIA_ROOT / 'module_data'
+MODULE_DATA_ROOT.mkdir(parents=True, exist_ok=True)
 REPORTS_DIR = MEDIA_ROOT / 'reports'
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -146,9 +146,9 @@ LOGGING['root']['handlers'] = ['console']
 LOGGING['loggers']['django']['handlers'] = ['console']
 LOGGING['loggers']['apps']['handlers'] = ['console']
 
-# Plugin media
-PLUGIN_MEDIA_ROOT = MEDIA_ROOT / 'plugins'
-PLUGIN_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+# Module media
+MODULE_MEDIA_ROOT = MEDIA_ROOT / 'modules'
+MODULE_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
 # SECURITY - PARENT_DOMAIN based configuration for SSO
@@ -256,12 +256,12 @@ STORAGES = {
 }
 
 # =============================================================================
-# PLUGIN SECURITY - Strict for web
+# MODULE SECURITY - Strict for web
 # =============================================================================
 
-REQUIRE_PLUGIN_SIGNATURE = True
-PLUGIN_AUTO_RELOAD = False
-PLUGIN_STRICT_VALIDATION = True
+REQUIRE_MODULE_SIGNATURE = True
+MODULE_AUTO_RELOAD = False
+MODULE_STRICT_VALIDATION = True
 DEVELOPMENT_MODE = False
 
 # =============================================================================
