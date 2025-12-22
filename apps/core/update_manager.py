@@ -289,15 +289,15 @@ class UpdateManager:
                 shutil.copy2(db_path, backup_path / 'db.sqlite3')
                 logger.info(f"Backed up database: {db_path}")
 
-            # Backup plugins directory
-            plugins_dir = self.hub_dir / 'plugins'
-            if plugins_dir.exists():
+            # Backup modules directory
+            modules_dir = self.hub_dir / 'modules'
+            if modules_dir.exists():
                 shutil.copytree(
-                    plugins_dir,
-                    backup_path / 'plugins',
+                    modules_dir,
+                    backup_path / 'modules',
                     dirs_exist_ok=True
                 )
-                logger.info(f"Backed up plugins: {plugins_dir}")
+                logger.info(f"Backed up modules: {modules_dir}")
 
             # Backup configuration files
             config_files = ['config.json', '.env', 'hub_config.json']
@@ -819,14 +819,14 @@ exit 0
                     shutil.copy2(db_backup, db_path)
                     logger.info(f"Restored database from backup")
 
-            # Restore plugins
-            plugins_backup = backup_path / 'plugins'
-            if plugins_backup.exists():
-                plugins_dir = self.hub_dir / 'plugins'
-                if plugins_dir.exists():
-                    shutil.rmtree(plugins_dir)
-                shutil.copytree(plugins_backup, plugins_dir)
-                logger.info(f"Restored plugins from backup")
+            # Restore modules
+            modules_backup = backup_path / 'modules'
+            if modules_backup.exists():
+                modules_dir = self.hub_dir / 'modules'
+                if modules_dir.exists():
+                    shutil.rmtree(modules_dir)
+                shutil.copytree(modules_backup, modules_dir)
+                logger.info("Restored modules from backup")
 
             # Restore configuration files
             for config_file in ['config.json', '.env', 'hub_config.json']:

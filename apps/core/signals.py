@@ -1,12 +1,12 @@
 """
 Hub Core Signals
 
-Global events that any plugin can emit or listen to.
-This provides loose coupling between plugins - plugins can communicate
+Global events that any module can emit or listen to.
+This provides loose coupling between modules - modules can communicate
 without direct dependencies on each other.
 
 Example:
-    # Plugin A emits a signal
+    # Module A emits a signal
     from apps.core.signals import print_ticket_requested
 
     print_ticket_requested.send(
@@ -15,10 +15,10 @@ Example:
         data={...}
     )
 
-    # Plugin B listens (if active)
+    # Module B listens (if active)
     from apps.core.signals import print_ticket_requested
 
-    @receiver(print_ticket_requested)
+    @receiver(print_ticket_requested)  # noqa: F821
     def handle_print(sender, ticket_type, data, **kwargs):
         # Handle printing
         pass
@@ -35,9 +35,9 @@ print_ticket_requested = Signal()
 """
 Request printing of a ticket/receipt/document.
 
-This is a Hub-level signal that any plugin can emit to request printing.
-If a printer plugin (like 'printers') is active, it will handle the request.
-If no printer plugin is active, the signal is safely ignored.
+This is a Hub-level signal that any module can emit to request printing.
+If the printers module is active, it will handle the request.
+If the printers module is not active, the signal is safely ignored.
 
 Emitted by:
     - sales (receipts)
@@ -47,10 +47,10 @@ Emitted by:
     - etc.
 
 Handled by:
-    - printers plugin (if active)
+    - printers module (if active)
 
 Arguments:
-    sender (str): Name of the plugin emitting the signal
+    sender (str): Name of the module emitting the signal
     ticket_type (str): Type of ticket to print:
         - 'receipt': Sales receipt
         - 'invoice': Invoice
@@ -91,10 +91,10 @@ print_completed = Signal()
 Notification that a print job completed successfully.
 
 Emitted by:
-    - printers plugin
+    - printers module
 
 Can be listened by:
-    - Any plugin that needs to know when printing completed
+    - Any module that needs to know when printing completed
     - sales (to show confirmation)
     - analytics (to track print volume)
 
@@ -110,10 +110,10 @@ print_failed = Signal()
 Notification that a print job failed after all retry attempts.
 
 Emitted by:
-    - printers plugin
+    - printers module
 
 Can be listened by:
-    - Any plugin that needs to know when printing failed
+    - Any module that needs to know when printing failed
     - sales (to show error and offer alternatives)
     - monitoring (to alert admin)
 
@@ -159,7 +159,7 @@ Arguments:
 # Emitted when a cash session is closed.
 #
 # Emitted by: cash_register
-# Can be listened by: analytics, accounting plugins
+# Can be listened by: analytics, accounting modules
 # """
 
 # user_login = Signal()

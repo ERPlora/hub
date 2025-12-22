@@ -5,7 +5,7 @@ Only PWA (Progressive Web App) views.
 All other views have been migrated to:
 - Dashboard: apps.main.index.views
 - Settings: apps.main.settings.views
-- Plugins: apps.system.plugins.views
+- Modules: apps.system.modules.views
 """
 import json
 from pathlib import Path

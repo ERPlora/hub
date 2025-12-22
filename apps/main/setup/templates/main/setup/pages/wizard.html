@@ -68,12 +68,12 @@
         <ion-card-header class="text-center">
             <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 48px; height: 48px; margin: 0 auto 0.5rem;">
             <ion-card-title class="text-2xl">{% trans "Welcome to ERPlora" %}</ion-card-title>
-            <ion-card-subtitle>{% trans "Let's configure your store" %}</ion-card-subtitle>
+            <ion-card-subtitle>{% trans "Let's configure your hub" %}</ion-card-subtitle>
         </ion-card-header>
 
         <!-- Step Indicator -->
         <div class="step-indicator">
-            <template x-for="i in 3" :key="i">
+            <template x-for="i in 2" :key="i">
                 <div
                     class="step-dot"
                     :class="{
@@ -91,7 +91,7 @@
                     <ion-icon name="business-outline" class="mr-2"></ion-icon>
                     {% trans "Business Information" %}
                 </h2>
-                <p class="text-medium text-center mb-6">{% trans "Enter your business details for invoices and receipts" %}</p>
+                <p class="text-medium text-center mb-6">{% trans "Enter your business details" %}</p>
 
                 <ion-list>
                     <ion-item>
@@ -157,13 +157,13 @@
                     <ion-icon name="calculator-outline" class="mr-2"></ion-icon>
                     {% trans "Tax Configuration" %}
                 </h2>
-                <p class="text-medium text-center mb-6">{% trans "Configure how taxes are handled in your store" %}</p>
+                <p class="text-medium text-center mb-6">{% trans "Configure how taxes are handled" %}</p>
 
                 <ion-list>
                     <ion-item>
                         <ion-input
                             type="number"
-                            label="{% trans 'Tax Rate (%)' %}"
+                            label="{% trans 'Default Tax Rate (%)' %}"
                             label-placement="floating"
                             x-model="tax.rate"
                             placeholder="21"
@@ -174,13 +174,8 @@
                     </ion-item>
 
                     <ion-item>
-                        <ion-toggle
-                            x-model="tax.included"
-                            :checked="tax.included"
-                            @ionChange="tax.included = $event.detail.checked"
-                        >
-                            {% trans "Tax included in prices" %}
-                        </ion-toggle>
+                        <ion-label>{% trans "Tax included in prices" %}</ion-label>
+                        <ion-toggle slot="end" :checked="tax.included" :color="tax.included ? 'success' : 'warning'" @ionChange="tax.included = $event.detail.checked"></ion-toggle>
                     </ion-item>
                 </ion-list>
 
@@ -189,47 +184,6 @@
                         <ion-icon :name="tax.included ? 'checkmark-circle' : 'add-circle'" slot="start"></ion-icon>
                         <ion-label x-text="tax.included ? '{% trans 'Prices include tax' %}' : '{% trans 'Tax will be added at checkout' %}'"></ion-label>
                     </ion-chip>
-                </div>
-            </div>
-
-            <!-- Step 3: Receipt Configuration -->
-            <div x-show="currentStep === 3" x-transition:enter="fade-enter" x-transition:enter-start="fade-enter" x-transition:enter-end="fade-enter-active" class="step-content">
-                <h2 class="text-xl font-semibold mb-4 text-center">
-                    <ion-icon name="receipt-outline" class="mr-2"></ion-icon>
-                    {% trans "Receipt Configuration" %}
-                </h2>
-                <p class="text-medium text-center mb-6">{% trans "Customize your receipt appearance" %}</p>
-
-                <ion-list>
-                    <ion-item>
-                        <ion-textarea
-                            label="{% trans 'Receipt Header' %}"
-                            label-placement="floating"
-                            x-model="receipt.header"
-                            rows="2"
-                            placeholder="{% trans 'Welcome message or promotional text' %}"
-                        ></ion-textarea>
-                    </ion-item>
-
-                    <ion-item>
-                        <ion-textarea
-                            label="{% trans 'Receipt Footer' %}"
-                            label-placement="floating"
-                            x-model="receipt.footer"
-                            rows="2"
-                            placeholder="{% trans 'Thank you message or return policy' %}"
-                        ></ion-textarea>
-                    </ion-item>
-                </ion-list>
-
-                <div class="ion-padding">
-                    <ion-card class="m-0" style="background: var(--ion-color-light);">
-                        <ion-card-content class="text-center text-sm" style="font-family: monospace;">
-                            <div x-show="receipt.header" x-text="receipt.header" class="mb-2"></div>
-                            <div class="text-medium">--- {% trans "Receipt Preview" %} ---</div>
-                            <div x-show="receipt.footer" x-text="receipt.footer" class="mt-2"></div>
-                        </ion-card-content>
-                    </ion-card>
                 </div>
             </div>
 
@@ -249,18 +203,9 @@
 
                 <div class="flex gap-2">
                     <ion-button
-                        fill="clear"
-                        x-show="currentStep > 1 && canFinish"
-                        @click="skipToFinish()"
-                        :disabled="loading"
-                    >
-                        {% trans "Skip & Finish" %}
-                    </ion-button>
-
-                    <ion-button
-                        x-show="currentStep < 3"
+                        x-show="currentStep === 1"
                         @click="nextStep()"
-                        :disabled="loading || (currentStep === 1 && !isStep1Valid)"
+                        :disabled="loading || !isStep1Valid"
                     >
                         <span x-show="!loading">{% trans "Next" %}</span>
                         <ion-spinner x-show="loading" name="crescent"></ion-spinner>
@@ -269,7 +214,7 @@
 
                     <ion-button
                         color="success"
-                        x-show="currentStep === 3"
+                        x-show="currentStep === 2"
                         @click="finish()"
                         :disabled="loading"
                     >
@@ -290,7 +235,6 @@
         return {
             currentStep: 1,
             loading: false,
-            canFinish: false,
 
             // Step 1: Business Info
             business: {
@@ -298,20 +242,13 @@
                 address: '{{ store_config.business_address|escapejs }}',
                 vat: '{{ store_config.vat_number|escapejs }}',
                 phone: '{{ store_config.phone|escapejs }}',
-                email: '{{ store_config.email|escapejs }}',
-                website: '{{ store_config.website|escapejs }}'
+                email: '{{ store_config.email|escapejs }}'
             },
 
             // Step 2: Tax Config
             tax: {
                 rate: '{{ store_config.tax_rate|default:"21" }}',
                 included: {{ store_config.tax_included|yesno:"true,false" }}
-            },
-
-            // Step 3: Receipt Config
-            receipt: {
-                header: '{{ store_config.receipt_header|escapejs }}',
-                footer: '{{ store_config.receipt_footer|escapejs }}'
             },
 
             get isStep1Valid() {
@@ -326,27 +263,14 @@
                 this.loading = true;
 
                 try {
-                    let action, body;
-
-                    if (this.currentStep === 1) {
-                        action = 'save_business';
-                        body = new URLSearchParams({
-                            action: action,
-                            business_name: this.business.name,
-                            business_address: this.business.address,
-                            vat_number: this.business.vat,
-                            phone: this.business.phone,
-                            email: this.business.email,
-                            website: this.business.website
-                        });
-                    } else if (this.currentStep === 2) {
-                        action = 'save_tax';
-                        body = new URLSearchParams({
-                            action: action,
-                            tax_rate: this.tax.rate,
-                            tax_included: this.tax.included
-                        });
-                    }
+                    const body = new URLSearchParams({
+                        action: 'save_business',
+                        business_name: this.business.name,
+                        business_address: this.business.address,
+                        vat_number: this.business.vat,
+                        phone: this.business.phone,
+                        email: this.business.email
+                    });
 
                     const response = await fetch('{% url "setup:wizard" %}', {
                         method: 'POST',
@@ -360,10 +284,7 @@
                     const data = await response.json();
 
                     if (data.success) {
-                        this.currentStep = data.next_step;
-                        if (data.can_finish !== undefined) {
-                            this.canFinish = data.can_finish;
-                        }
+                        this.currentStep = 2;
                     } else {
                         await this.showToast(data.error || 'Error saving', 'danger');
                     }
@@ -387,7 +308,7 @@
                 this.loading = true;
 
                 try {
-                    // Save step 3 first
+                    // Save tax config first
                     await fetch('{% url "setup:wizard" %}', {
                         method: 'POST',
                         headers: {
@@ -395,9 +316,9 @@
                             'X-CSRFToken': '{{ csrf_token }}'
                         },
                         body: new URLSearchParams({
-                            action: 'save_receipt',
-                            receipt_header: this.receipt.header,
-                            receipt_footer: this.receipt.footer
+                            action: 'save_tax',
+                            tax_rate: this.tax.rate,
+                            tax_included: this.tax.included
                         })
                     });
 
@@ -424,38 +345,6 @@
                 } catch (error) {
                     console.error('Error:', error);
                     await this.showToast('{% trans "Connection error" %}', 'danger');
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            async skipToFinish() {
-                if (this.loading || !this.canFinish) return;
-
-                this.loading = true;
-
-                try {
-                    const response = await fetch('{% url "setup:wizard" %}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        },
-                        body: new URLSearchParams({ action: 'skip' })
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        await this.showToast('{% trans "Setup complete!" %}', 'success');
-                        setTimeout(() => {
-                            window.location.href = data.redirect;
-                        }, 500);
-                    } else {
-                        await this.showToast(data.error || 'Error', 'danger');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
                 } finally {
                     this.loading = false;
                 }

@@ -2,7 +2,7 @@
 Export service for ERPlora Hub.
 
 Provides CSV and Excel export functionality for querysets and data.
-All plugins should use this service for consistent data export.
+All modules should use this service for consistent data export.
 """
 
 import csv

@@ -34,7 +34,7 @@ class CloudAPIService:
     Handles:
     - Heartbeat requests
     - Command polling
-    - Plugin marketplace access
+    - Module marketplace access
     - Configuration sync
 
     All requests use JWT authentication.
@@ -155,7 +155,7 @@ class CloudAPIService:
         Send heartbeat to Cloud.
 
         Args:
-            metadata: Optional metadata (version, plugins, status)
+            metadata: Optional metadata (version, modules, status)
 
         Returns:
             Response from Cloud
@@ -301,30 +301,30 @@ class CloudAPIService:
         return None
 
     # =========================================================================
-    # Plugin Marketplace
+    # Module Marketplace
     # =========================================================================
 
-    def get_marketplace_plugins(self) -> List[Dict[str, Any]]:
-        """Get available plugins from marketplace."""
-        response = self._request('GET', '/api/plugins/')
-        return response.get('plugins', [])
+    def get_marketplace_modules(self) -> List[Dict[str, Any]]:
+        """Get available modules from marketplace."""
+        response = self._request('GET', '/api/modules/')
+        return response.get('modules', [])
 
-    def download_plugin(self, plugin_id: str, version: str = None) -> Dict[str, Any]:
+    def download_module(self, module_id: str, version: str = None) -> Dict[str, Any]:
         """
-        Request plugin download URL.
+        Request module download URL.
 
         Args:
-            plugin_id: Plugin identifier
+            module_id: Module identifier
             version: Specific version (optional)
 
         Returns:
             Response with download URL and metadata
         """
-        data = {'plugin_id': plugin_id}
+        data = {'module_id': module_id}
         if version:
             data['version'] = version
 
-        return self._request('POST', '/api/plugins/download/', data=data)
+        return self._request('POST', '/api/modules/download/', data=data)
 
 
 # Singleton instance for convenience

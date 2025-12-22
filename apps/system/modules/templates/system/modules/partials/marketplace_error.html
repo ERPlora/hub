@@ -1,0 +1,17 @@
+{% load i18n %}
+
+<ion-card class="bg-danger-50">
+    <ion-card-content class="text-center py-8">
+        <ion-icon name="cloud-offline-outline" class="text-6xl text-danger mb-4"></ion-icon>
+        <h3 class="text-lg font-semibold text-danger mb-2">{% trans "Connection Error" %}</h3>
+        <p class="text-medium mb-4">{{ error }}</p>
+        <ion-button
+            hx-get="{% url 'system:marketplace_modules_list' %}"
+            hx-target="#marketplace-modules-grid"
+            hx-swap="innerHTML"
+            hx-indicator="#loading-spinner">
+            <ion-icon slot="start" name="refresh-outline"></ion-icon>
+            {% trans "Try Again" %}
+        </ion-button>
+    </ion-card-content>
+</ion-card>

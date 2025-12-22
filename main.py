@@ -32,8 +32,8 @@ class WindowAPI:
         """Obtiene la instancia del servicio de impresión (lazy loading)"""
         if self._print_service is None:
             try:
-                # Importar el servicio de impresión del plugin
-                from plugins.printers.print_service import print_service
+                # Importar el servicio de impresión del module
+                from modules.printers.print_service import print_service
                 self._print_service = print_service
             except ImportError as e:
                 print(f"[WARNING] Print service not available: {e}")
@@ -103,7 +103,7 @@ class WindowAPI:
         if not print_service:
             return {
                 'success': False,
-                'message': 'Print service not available. Make sure printers plugin is installed.'
+                'message': 'Print service not available. Make sure printers module is installed.'
             }
 
         try:
@@ -306,7 +306,7 @@ def initialize_data_directories():
         print(f"[INFO] Base data directory: {paths.base_dir}")
         print(f"[INFO] Database: {paths.database_path}")
         print(f"[INFO] Media: {paths.media_dir}")
-        print(f"[INFO] Plugins: {paths.plugins_dir}")
+        print(f"[INFO] Modules: {paths.modules_dir}")
         print(f"[INFO] Reports: {paths.reports_dir}")
         print(f"[INFO] Logs: {paths.logs_dir}")
         print(f"[INFO] Backups: {paths.backups_dir}")
@@ -339,18 +339,18 @@ def initialize_data_directories():
                         shutil.copy2(item, dest)
             print(f"[OK] Media migrated to {paths.media_dir}")
 
-        # Migrar plugins legacy si existe
-        legacy_plugins = hub_dir / 'plugins'
-        if legacy_plugins.exists() and legacy_plugins.is_dir():
-            print(f"\n[INFO] Migrating legacy plugins from {legacy_plugins}")
-            for item in legacy_plugins.rglob('*'):
+        # Migrar modules legacy si existe
+        legacy_modules = hub_dir / 'modules'
+        if legacy_modules.exists() and legacy_modules.is_dir():
+            print(f"\n[INFO] Migrating legacy modules from {legacy_modules}")
+            for item in legacy_modules.rglob('*'):
                 if item.is_file():
-                    rel_path = item.relative_to(legacy_plugins)
-                    dest = paths.plugins_dir / rel_path
+                    rel_path = item.relative_to(legacy_modules)
+                    dest = paths.modules_dir / rel_path
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     if not dest.exists():
                         shutil.copy2(item, dest)
-            print(f"[OK] Plugins migrated to {paths.plugins_dir}")
+            print(f"[OK] Modules migrated to {paths.modules_dir}")
 
         print("\n[OK] Data directories initialized successfully")
 

@@ -1,7 +1,7 @@
 """
 Core app models.
 
-Contains the Plugin model for tracking installed plugins.
+Contains the Module model for tracking installed modules.
 Other models have been refactored to their respective apps:
 
 - LocalUser → apps.accounts.models
@@ -13,15 +13,15 @@ from django.db import models
 from django.utils import timezone
 
 
-class Plugin(models.Model):
+class Module(models.Model):
     """
-    Tracks installed plugins in the Hub.
+    Tracks installed modules in the Hub.
 
-    Each plugin is a Django app that can be dynamically loaded/unloaded.
-    Plugin metadata is stored here after installation.
+    Each module is a Django app that can be dynamically loaded/unloaded.
+    Module metadata is stored here after installation.
     """
 
-    plugin_id = models.CharField(max_length=100, unique=True)
+    module_id = models.CharField(max_length=100, unique=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default='')
     version = models.CharField(max_length=50, default='1.0.0')
@@ -47,15 +47,15 @@ class Plugin(models.Model):
 
     class Meta:
         ordering = ['menu_order', 'name']
-        verbose_name = 'Plugin'
-        verbose_name_plural = 'Plugins'
+        verbose_name = 'Module'
+        verbose_name_plural = 'Modules'
 
     def __str__(self):
         status = "active" if self.is_active else "inactive"
         return f"{self.name} v{self.version} ({status})"
 
     def get_menu_url(self):
-        """Returns the main URL for this plugin."""
+        """Returns the main URL for this module."""
         if self.main_url:
             return self.main_url
-        return f"/plugins/{self.plugin_id}/"
+        return f"/modules/{self.module_id}/"

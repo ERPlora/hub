@@ -16,7 +16,7 @@ PATHS POR ENTORNO:
         Base:     /app/
         DB:       /app/db/db.sqlite3
         Media:    /app/media/
-        Plugins:  /app/plugins/
+        Modules:  /app/modules/
         Logs:     /app/logs/
         Backups:  /app/backups/
 
@@ -42,7 +42,7 @@ PATHS POR ENTORNO:
 Subdirectorios (comunes a todos los entornos):
     - db/              Base de datos SQLite
     - media/           Archivos subidos (imágenes, logos, etc.)
-    - plugins/         Plugins instalados y sus datos
+    - modules/         Modules instalados y sus datos
     - reports/         Reportes generados (PDF, Excel)
     - logs/            Logs de la aplicación
     - backups/         Backups automáticos de la DB
@@ -150,9 +150,9 @@ class DataPaths:
         return self.base_dir / "media"
 
     @property
-    def plugins_dir(self) -> Path:
-        """Directorio de plugins instalados"""
-        return self.base_dir / "plugins"
+    def modules_dir(self) -> Path:
+        """Directorio de modules instalados"""
+        return self.base_dir / "modules"
 
     @property
     def reports_dir(self) -> Path:
@@ -186,7 +186,7 @@ class DataPaths:
             "database": self.database_path,
             "database_dir": self.database_dir,
             "media": self.media_dir,
-            "plugins": self.plugins_dir,
+            "modules": self.modules_dir,
             "reports": self.reports_dir,
             "logs": self.logs_dir,
             "backups": self.backups_dir,
@@ -201,7 +201,7 @@ class DataPaths:
             self.base_dir,
             self.database_dir,
             self.media_dir,
-            self.plugins_dir,
+            self.modules_dir,
             self.reports_dir,
             self.logs_dir,
             self.backups_dir,
@@ -235,33 +235,33 @@ class DataPaths:
             shutil.rmtree(self.temp_dir)
             self.temp_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_plugin_data_dir(self, plugin_id: str) -> Path:
+    def get_module_data_dir(self, module_id: str) -> Path:
         """
-        Retorna el directorio de datos de un plugin específico.
+        Retorna el directorio de datos de un module específico.
 
         Args:
-            plugin_id: ID del plugin
+            module_id: ID del module
 
         Returns:
-            Path: Directorio de datos del plugin
+            Path: Directorio de datos del module
         """
-        plugin_data_dir = self.plugins_dir / plugin_id / "data"
-        plugin_data_dir.mkdir(parents=True, exist_ok=True)
-        return plugin_data_dir
+        module_data_dir = self.modules_dir / module_id / "data"
+        module_data_dir.mkdir(parents=True, exist_ok=True)
+        return module_data_dir
 
-    def get_plugin_media_dir(self, plugin_id: str) -> Path:
+    def get_module_media_dir(self, module_id: str) -> Path:
         """
-        Retorna el directorio de media de un plugin específico.
+        Retorna el directorio de media de un module específico.
 
         Args:
-            plugin_id: ID del plugin
+            module_id: ID del module
 
         Returns:
-            Path: Directorio de media del plugin
+            Path: Directorio de media del module
         """
-        plugin_media_dir = self.media_dir / "plugins" / plugin_id
-        plugin_media_dir.mkdir(parents=True, exist_ok=True)
-        return plugin_media_dir
+        module_media_dir = self.media_dir / "modules" / module_id
+        module_media_dir.mkdir(parents=True, exist_ok=True)
+        return module_media_dir
 
     def __repr__(self):
         return f"<DataPaths platform={self.platform} base={self.base_dir}>"
@@ -292,9 +292,9 @@ def get_media_dir() -> Path:
     return data_paths.media_dir
 
 
-def get_plugins_dir() -> Path:
-    """Retorna el directorio de plugins"""
-    return data_paths.plugins_dir
+def get_modules_dir() -> Path:
+    """Retorna el directorio de modules"""
+    return data_paths.modules_dir
 
 
 def get_reports_dir() -> Path:
@@ -343,7 +343,7 @@ if __name__ == "__main__":
         print("  Ensure volumes are mounted:")
         print("    -v hub_db:/app/db")
         print("    -v hub_media:/app/media")
-        print("    -v hub_plugins:/app/plugins")
+        print("    -v hub_modules:/app/modules")
     else:
         print("  Running on DESKTOP - using OS-specific user directory")
         print(f"  Data will persist in: {paths.base_dir}")

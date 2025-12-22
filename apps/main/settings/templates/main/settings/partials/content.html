@@ -135,29 +135,7 @@
                                 <!-- Tax Included -->
                                 <ion-item>
                                     <ion-label>{% trans "Tax included in prices" %}</ion-label>
-                                    <ion-toggle slot="end" :checked="store.tax_included" @ionChange="store.tax_included = $event.detail.checked"></ion-toggle>
-                                </ion-item>
-
-                                <!-- Receipt Header -->
-                                <ion-item>
-                                    <ion-textarea
-                                        label="{% trans 'Receipt Header' %}"
-                                        label-placement="floating"
-                                        x-model="store.receipt_header"
-                                        rows="2"
-                                        placeholder="{% trans 'Text shown at the top of receipts' %}"
-                                    ></ion-textarea>
-                                </ion-item>
-
-                                <!-- Receipt Footer -->
-                                <ion-item>
-                                    <ion-textarea
-                                        label="{% trans 'Receipt Footer' %}"
-                                        label-placement="floating"
-                                        x-model="store.receipt_footer"
-                                        rows="2"
-                                        placeholder="{% trans 'Thank you for your purchase!' %}"
-                                    ></ion-textarea>
+                                    <ion-toggle slot="end" :checked="store.tax_included" :color="store.tax_included ? 'success' : 'warning'" @ionChange="store.tax_included = $event.detail.checked"></ion-toggle>
                                 </ion-item>
                             </ion-list>
                         </div>
@@ -248,7 +226,7 @@
                         <!-- Dark Mode -->
                         <ion-item>
                             <ion-label>{% trans "Dark Mode" %}</ion-label>
-                            <ion-toggle slot="end" :checked="isDark" @ionChange="toggleTheme($event)"></ion-toggle>
+                            <ion-toggle slot="end" :checked="isDark" :color="isDark ? 'success' : 'warning'" @ionChange="toggleTheme($event)"></ion-toggle>
                         </ion-item>
                     </ion-list>
 
@@ -326,11 +304,11 @@
                     <ion-icon name="build-outline" class="align-middle mr-2"></ion-icon>
                     {% trans "Database Maintenance" %}
                 </ion-card-title>
-                <ion-card-subtitle>{% trans "Clean up orphaned data from deleted plugins" %}</ion-card-subtitle>
+                <ion-card-subtitle>{% trans "Clean up orphaned data from deleted modules" %}</ion-card-subtitle>
             </ion-card-header>
             <ion-card-content>
                 <p class="text-sm text-medium mb-4">
-                    {% trans "Scan for and remove orphaned database tables, migration records, and media files left behind by deleted plugins." %}
+                    {% trans "Scan for and remove orphaned database tables, migration records, and media files left behind by deleted modules." %}
                 </p>
 
                 <ion-button
@@ -368,6 +346,7 @@
                                     <ion-toggle
                                         slot="end"
                                         :checked="backup.enabled"
+                                        :color="backup.enabled ? 'success' : 'warning'"
                                         @ionChange="backup.enabled = $event.detail.checked"
                                     ></ion-toggle>
                                 </ion-item>
@@ -514,8 +493,6 @@
                 website: '{{ store_config.website|escapejs }}',
                 tax_rate: '{{ store_config.tax_rate }}',
                 tax_included: {{ store_config.tax_included|yesno:"true,false" }},
-                receipt_header: '{{ store_config.receipt_header|escapejs }}',
-                receipt_footer: '{{ store_config.receipt_footer|escapejs }}',
             },
 
             init() {
@@ -565,8 +542,6 @@
                     formData.append('website', this.store.website);
                     formData.append('tax_rate', this.store.tax_rate);
                     formData.append('tax_included', this.store.tax_included);
-                    formData.append('receipt_header', this.store.receipt_header);
-                    formData.append('receipt_footer', this.store.receipt_footer);
 
                     if (this.logoFile) {
                         formData.append('logo', this.logoFile);
