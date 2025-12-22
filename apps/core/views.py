@@ -153,3 +153,28 @@ def update_notification(request):
     """Render update notification banner (HTMX partial)."""
     # TODO: Implement actual update check logic
     return render(request, 'core/update_notification_empty.html')
+
+
+# =============================================================================
+# Sidebar (HTMX partial)
+# =============================================================================
+
+def sidebar_partial(request):
+    """
+    HTMX endpoint - Returns sidebar nav list for module menu updates.
+
+    Called after module activation/deactivation to refresh the menu
+    without a full page reload. Only returns the nav list content,
+    not the entire sidebar structure.
+    """
+    from apps.modules_runtime.loader import module_loader
+
+    # Get fresh menu items
+    if 'local_user_id' in request.session:
+        menu_items = module_loader.get_menu_items()
+    else:
+        menu_items = []
+
+    return render(request, 'dashboard/partials/sidebar_nav.html', {
+        'MODULE_MENU_ITEMS': menu_items,
+    })

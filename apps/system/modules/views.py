@@ -213,82 +213,199 @@ def marketplace_modules_list(request):
 
 
 
-# API endpoints (no HTMX, just JSON)
+# Helper function for HTMX responses
+
+def _render_modules_page(request, error=None):
+    """Render modules page as HTMX partial response"""
+    from django.shortcuts import render
+
+    modules_dir = Path(django_settings.MODULES_DIR)
+    all_modules = []
+
+    if modules_dir.exists():
+        for module_dir in modules_dir.iterdir():
+            if not module_dir.is_dir() or module_dir.name.startswith('.'):
+                continue
+
+            module_id = module_dir.name
+            is_active = not module_id.startswith('_')
+            display_id = module_id.lstrip('_')
+
+            module_data = {
+                'module_id': display_id,
+                'folder_name': module_id,
+                'name': display_id.title(),
+                'description': '',
+                'version': '1.0.0',
+                'author': '',
+                'icon': 'cube-outline',
+                'is_active': is_active,
+            }
+
+            module_json_path = module_dir / 'module.json'
+            if module_json_path.exists():
+                try:
+                    with open(module_json_path, 'r', encoding='utf-8') as f:
+                        json_data = json.load(f)
+                        module_data['name'] = json_data.get('name', module_data['name'])
+                        module_data['description'] = json_data.get('description', '')
+                        module_data['version'] = json_data.get('version', '1.0.0')
+                        module_data['author'] = json_data.get('author', '')
+                        menu_config = json_data.get('menu', {})
+                        module_data['icon'] = menu_config.get('icon', 'cube-outline')
+                except Exception:
+                    pass
+
+            all_modules.append(module_data)
+
+    all_modules.sort(key=lambda x: (not x['is_active'], x['name']))
+
+    active_count = sum(1 for p in all_modules if p['is_active'])
+    inactive_count = sum(1 for p in all_modules if not p['is_active'])
+
+    modules_pending_restart = request.session.get('modules_pending_restart', [])
+    requires_restart = len(modules_pending_restart) > 0
+
+    # Get menu items for sidebar OOB update
+    from apps.modules_runtime.loader import module_loader
+    menu_items = module_loader.get_menu_items() if 'local_user_id' in request.session else []
+
+    context = {
+        'current_section': 'modules',
+        'page_title': 'Modules',
+        'modules': all_modules,
+        'active_count': active_count,
+        'inactive_count': inactive_count,
+        'requires_restart': requires_restart,
+        'modules_pending_restart': modules_pending_restart,
+        'error': error,
+        'MODULE_MENU_ITEMS': menu_items,
+    }
+
+    return render(request, 'system/modules/partials/installed_content.html', context)
+
+
+# API endpoints (support both HTMX and JSON)
+
+def _trigger_server_reload():
+    """Touch a file to trigger Django's auto-reload in development"""
+    if django_settings.DEBUG:
+        # Touch wsgi.py to trigger reload
+        wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
+        if wsgi_file.exists():
+            wsgi_file.touch()
+
+
+def _render_reload_response(message="Applying changes..."):
+    """Return HTML that shows a loading state and reloads the page after server restarts"""
+    html = f'''
+    <div class="ion-padding" style="text-align: center; padding-top: 100px;">
+        <ion-spinner name="crescent" style="width: 48px; height: 48px;"></ion-spinner>
+        <h2 style="margin-top: 24px;">{message}</h2>
+        <p class="text-medium">The page will reload automatically.</p>
+    </div>
+    <script>
+        (function() {{
+            let attempts = 0;
+            const maxAttempts = 30;
+            const checkServer = async () => {{
+                attempts++;
+                try {{
+                    const response = await fetch('/ht/', {{ method: 'HEAD' }});
+                    if (response.ok) {{
+                        window.location.href = '/modules/';
+                    }} else if (attempts < maxAttempts) {{
+                        setTimeout(checkServer, 500);
+                    }}
+                }} catch (e) {{
+                    if (attempts < maxAttempts) {{
+                        setTimeout(checkServer, 500);
+                    }}
+                }}
+            }};
+            setTimeout(checkServer, 1000);
+        }})();
+    </script>
+    '''
+    return HttpResponse(html)
+
 
 @require_http_methods(["POST"])
+@login_required
 def module_activate(request, module_id):
     """Activate a module by renaming folder"""
-    if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
-
     modules_dir = Path(django_settings.MODULES_DIR)
     disabled_folder = modules_dir / f"_{module_id}"
     active_folder = modules_dir / module_id
 
     if not disabled_folder.exists():
+        if request.htmx:
+            return _render_modules_page(request, error='Module not found')
         return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
 
     if active_folder.exists():
+        if request.htmx:
+            return _render_modules_page(request, error='Module already active')
         return JsonResponse({'success': False, 'error': 'Module already active'}, status=400)
 
     try:
         disabled_folder.rename(active_folder)
 
-        from apps.modules_runtime.loader import module_loader
-        module_loaded = module_loader.load_module(module_id)
+        # Trigger server reload to register new URLs
+        _trigger_server_reload()
 
-        if not module_loaded:
-            active_folder.rename(disabled_folder)
-            return JsonResponse({
-                'success': False,
-                'error': f'Failed to load module {module_id}'
-            }, status=500)
-
-        if 'modules_pending_restart' not in request.session:
-            request.session['modules_pending_restart'] = []
-
-        if module_id not in request.session['modules_pending_restart']:
-            request.session['modules_pending_restart'].append(module_id)
-            request.session.modified = True
+        if request.htmx:
+            return _render_reload_response(f"Activating {module_id}...")
 
         return JsonResponse({
             'success': True,
-            'message': 'Module activated. Restart required for URLs.',
+            'message': 'Module activated. Server restarting.',
             'requires_restart': True
         })
     except Exception as e:
+        if request.htmx:
+            return _render_modules_page(request, error=str(e))
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 @require_http_methods(["POST"])
+@login_required
 def module_deactivate(request, module_id):
     """Deactivate a module by renaming folder"""
-    if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
-
     modules_dir = Path(django_settings.MODULES_DIR)
     active_folder = modules_dir / module_id
     disabled_folder = modules_dir / f"_{module_id}"
 
     if not active_folder.exists():
+        if request.htmx:
+            return _render_modules_page(request, error='Module not found')
         return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
 
     if disabled_folder.exists():
+        if request.htmx:
+            return _render_modules_page(request, error='Module already disabled')
         return JsonResponse({'success': False, 'error': 'Module already disabled'}, status=400)
 
     try:
         active_folder.rename(disabled_folder)
-        return JsonResponse({'success': True, 'message': 'Module deactivated. Restart required.'})
+
+        # Trigger server reload to unregister URLs
+        _trigger_server_reload()
+
+        if request.htmx:
+            return _render_reload_response(f"Deactivating {module_id}...")
+
+        return JsonResponse({'success': True, 'message': 'Module deactivated. Server restarting.'})
     except Exception as e:
+        if request.htmx:
+            return _render_modules_page(request, error=str(e))
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 @require_http_methods(["POST"])
+@login_required
 def module_delete(request, module_id):
     """Delete a module completely"""
-    if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
-
     modules_dir = Path(django_settings.MODULES_DIR)
     active_folder = modules_dir / module_id
     disabled_folder = modules_dir / f"_{module_id}"
@@ -296,12 +413,20 @@ def module_delete(request, module_id):
     folder_to_delete = active_folder if active_folder.exists() else (disabled_folder if disabled_folder.exists() else None)
 
     if not folder_to_delete:
+        if request.htmx:
+            return _render_modules_page(request, error='Module not found')
         return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
 
     try:
         shutil.rmtree(folder_to_delete)
+
+        if request.htmx:
+            return _render_modules_page(request)
+
         return JsonResponse({'success': True, 'message': 'Module deleted successfully.'})
     except Exception as e:
+        if request.htmx:
+            return _render_modules_page(request, error=str(e))
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 

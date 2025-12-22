@@ -1,0 +1,10 @@
+#!/bin/sh
+# Remove Claude Code footer from commit messages
+# This hook is shared across all developers
+
+# Remove the emoji line and any Co-Authored-By Claude lines
+sed -i '' '/🤖 Generated with \[Claude Code\]/d' "$1"
+sed -i '' '/Co-Authored-By: Claude/d' "$1"
+
+# Remove trailing empty lines
+sed -i '' -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$1"

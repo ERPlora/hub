@@ -38,8 +38,8 @@ class StoreConfigCheckMiddleware:
                 if not request.session.get('store_config_checked', False):
                     store_config = StoreConfig.get_config()
 
-                    # If store is not configured, redirect to setup wizard
-                    if not store_config.is_complete():
+                    # If store is not configured (wizard not completed), redirect to setup wizard
+                    if not store_config.is_configured:
                         return redirect('setup:wizard')
 
                     # Mark as checked for this session
