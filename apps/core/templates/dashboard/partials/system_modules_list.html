@@ -1,0 +1,45 @@
+{% load i18n %}
+
+{% if MODULE_MENU_ITEMS %}
+    {% for item in MODULE_MENU_ITEMS %}
+        {% if item.has_submenu %}
+        <!-- Module with submenu -->
+        <ion-accordion-group>
+            <ion-accordion>
+                <ion-item slot="header" class="nav-item">
+                    <ion-icon name="{{ item.icon }}" slot="start"></ion-icon>
+                    <ion-label>{{ item.label }}</ion-label>
+                </ion-item>
+                <div slot="content" class="submenu-content">
+                    {% for subitem in item.items %}
+                    <ion-item class="submenu-item"
+                        hx-get="{{ subitem.url }}"
+                        hx-target="#dashboard-content"
+                        hx-push-url="true"
+                        detail="false">
+                        <ion-icon name="{{ subitem.icon }}" slot="start" style="font-size: 1rem;"></ion-icon>
+                        <ion-label>{{ subitem.label }}</ion-label>
+                    </ion-item>
+                    {% endfor %}
+                </div>
+            </ion-accordion>
+        </ion-accordion-group>
+        {% else %}
+        <!-- Simple module menu item -->
+        <ion-item class="nav-item"
+            hx-get="{{ item.url }}"
+            hx-target="#dashboard-content"
+            hx-push-url="true"
+            detail="false"
+            {% if forloop.last %}lines="none"{% endif %}>
+            <ion-icon name="{{ item.icon }}" slot="start"></ion-icon>
+            <ion-label>{{ item.label }}</ion-label>
+        </ion-item>
+        {% endif %}
+    {% endfor %}
+{% else %}
+<ion-item lines="none" class="text-medium">
+    <ion-icon name="information-circle-outline" slot="start" class="text-medium"></ion-icon>
+    <ion-label class="text-sm">{% trans "No active modules" %}</ion-label>
+</ion-item>
+{% endif %}

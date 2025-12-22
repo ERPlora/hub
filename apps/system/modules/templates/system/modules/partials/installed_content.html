@@ -5,9 +5,13 @@
 <div id="dashboard-tabbar" hx-swap-oob="innerHTML">
 {% include "system/modules/partials/tabbar_system.html" %}
 </div>
+<!-- System modules list update via OOB swap -->
+<div id="system-modules-list" hx-swap-oob="innerHTML">
+{% include "dashboard/partials/system_modules_list.html" %}
+</div>
 {% endif %}
 
-<div class="ion-padding" x-data="modulesApp()">
+<div class="ion-padding" x-data="modulesPage()">
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
@@ -36,7 +40,7 @@
     <!-- Modules Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for module in modules %}
-        <ion-card>
+        <ion-card style="display: flex; flex-direction: column; height: 100%;">
             <ion-card-header>
                 <div class="flex items-center gap-3">
                     <ion-icon name="{{ module.icon }}" class="text-2xl text-primary"></ion-icon>
@@ -44,18 +48,18 @@
                         <ion-card-title class="truncate">{{ module.name }}</ion-card-title>
                         <ion-card-subtitle>v{{ module.version }}</ion-card-subtitle>
                     </div>
-                    <ion-chip :color="'{{ module.is_active }}'==='True' ? 'success' : 'medium'">
+                    <ion-chip color="{% if module.is_active %}success{% else %}medium{% endif %}">
                         {% if module.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}
                     </ion-chip>
                 </div>
             </ion-card-header>
-            <ion-card-content>
+            <ion-card-content style="flex: 1;">
                 <p class="text-sm text-medium mb-4">{{ module.description|default:"-" }}</p>
                 {% if module.author %}
                 <p class="text-xs text-medium">{% trans "By" %} {{ module.author }}</p>
                 {% endif %}
             </ion-card-content>
-            <div class="flex border-t border-gray-200 dark:border-gray-700">
+            <div class="flex border-t border-gray-200 dark:border-gray-700" style="margin-top: auto;">
                 {% if module.is_active %}
                 <ion-button
                     fill="clear"
@@ -72,7 +76,9 @@
                     size="small"
                     color="success"
                     class="flex-1"
-                    @click="activateModule('{{ module.module_id }}')">
+                    hx-post="{% url 'system:module_activate' module_id=module.module_id %}"
+                    hx-target="#dashboard-content"
+                    hx-swap="innerHTML">
                     <ion-icon slot="start" name="play-outline"></ion-icon>
                     {% trans "Activate" %}
                 </ion-button>
@@ -108,40 +114,9 @@
 </div>
 
 <script>
-function modulesApp() {
+function modulesPage() {
     return {
-        loading: false,
-
-        async activateModule(moduleId) {
-            if (this.loading) return;
-            this.loading = true;
-
-            try {
-                const response = await fetch(`{% url 'system:module_activate' module_id='__ID__' %}`.replace('__ID__', moduleId), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    await this.showToast(data.message || '{% trans "Module activated" %}', 'success');
-                    htmx.ajax('GET', '{% url "system:modules" %}', {
-                        target: '#dashboard-content',
-                        swap: 'innerHTML'
-                    });
-                } else {
-                    await this.showToast(data.error || '{% trans "Error activating module" %}', 'danger');
-                }
-            } catch (error) {
-                await this.showToast('{% trans "Error activating module" %}', 'danger');
-            } finally {
-                this.loading = false;
-            }
-        },
-
         async deactivateModule(moduleId) {
-            if (this.loading) return;
-
             const alert = document.createElement('ion-alert');
             alert.header = '{% trans "Deactivate Module" %}';
             alert.message = '{% trans "Are you sure you want to deactivate this module?" %}';
@@ -149,29 +124,11 @@ function modulesApp() {
                 { text: '{% trans "Cancel" %}', role: 'cancel' },
                 {
                     text: '{% trans "Deactivate" %}',
-                    handler: async () => {
-                        this.loading = true;
-                        try {
-                            const response = await fetch(`{% url 'system:module_deactivate' module_id='__ID__' %}`.replace('__ID__', moduleId), {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' }
-                            });
-                            const data = await response.json();
-
-                            if (data.success) {
-                                await this.showToast('{% trans "Module deactivated" %}', 'success');
-                                htmx.ajax('GET', '{% url "system:modules" %}', {
-                                    target: '#dashboard-content',
-                                    swap: 'innerHTML'
-                                });
-                            } else {
-                                await this.showToast(data.error, 'danger');
-                            }
-                        } catch (error) {
-                            await this.showToast('{% trans "Error deactivating module" %}', 'danger');
-                        } finally {
-                            this.loading = false;
-                        }
+                    handler: () => {
+                        htmx.ajax('POST', `/modules/api/deactivate/${moduleId}/`, {
+                            target: '#dashboard-content',
+                            swap: 'innerHTML'
+                        });
                     }
                 }
             ];
@@ -180,8 +137,6 @@ function modulesApp() {
         },
 
         async deleteModule(moduleId) {
-            if (this.loading) return;
-
             const alert = document.createElement('ion-alert');
             alert.header = '{% trans "Delete Module" %}';
             alert.message = '{% trans "This will permanently delete the module and all its data. Are you sure?" %}';
@@ -190,29 +145,11 @@ function modulesApp() {
                 {
                     text: '{% trans "Delete" %}',
                     role: 'destructive',
-                    handler: async () => {
-                        this.loading = true;
-                        try {
-                            const response = await fetch(`{% url 'system:module_delete' module_id='__ID__' %}`.replace('__ID__', moduleId), {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' }
-                            });
-                            const data = await response.json();
-
-                            if (data.success) {
-                                await this.showToast('{% trans "Module deleted" %}', 'success');
-                                htmx.ajax('GET', '{% url "system:modules" %}', {
-                                    target: '#dashboard-content',
-                                    swap: 'innerHTML'
-                                });
-                            } else {
-                                await this.showToast(data.error, 'danger');
-                            }
-                        } catch (error) {
-                            await this.showToast('{% trans "Error deleting module" %}', 'danger');
-                        } finally {
-                            this.loading = false;
-                        }
+                    handler: () => {
+                        htmx.ajax('POST', `/modules/api/delete/${moduleId}/`, {
+                            target: '#dashboard-content',
+                            swap: 'innerHTML'
+                        });
                     }
                 }
             ];
@@ -229,14 +166,12 @@ function modulesApp() {
                 {
                     text: '{% trans "Restart" %}',
                     handler: async () => {
-                        this.loading = true;
                         try {
-                            const response = await fetch('{% url "system:module_restart" %}', {
+                            const response = await fetch('/modules/api/restart/', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' }
                             });
                             const data = await response.json();
-
                             if (data.success) {
                                 await this.showToast('{% trans "Server restarting..." %}', 'success');
                                 setTimeout(() => window.location.reload(), 2000);
@@ -245,8 +180,6 @@ function modulesApp() {
                             }
                         } catch (error) {
                             await this.showToast('{% trans "Error restarting server" %}', 'danger');
-                        } finally {
-                            this.loading = false;
                         }
                     }
                 }
@@ -265,4 +198,12 @@ function modulesApp() {
         }
     }
 }
+
+// Initialize Alpine for HTMX-loaded content
+setTimeout(() => {
+    const container = document.querySelector('[x-data="modulesPage()"]');
+    if (container && typeof Alpine !== 'undefined' && !container._x_dataStack) {
+        Alpine.initTree(container);
+    }
+}, 0);
 </script>
