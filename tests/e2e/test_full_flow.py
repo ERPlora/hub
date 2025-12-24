@@ -22,13 +22,14 @@ class TestNewUserSetup:
             name='Admin User',
             email='admin@example.com',
             role='admin',
-            pin='1234',
+            pin_hash='',
             is_active=True
         )
+        user.set_pin('1234')
 
         # 2. Login
         session = client.session
-        session['local_user_id'] = user.id
+        session['local_user_id'] = str(user.id)  # Convert UUID to string
         session['user_name'] = user.name
         session['user_email'] = user.email
         session['user_role'] = user.role

@@ -149,6 +149,123 @@
             </ion-card-content>
         </ion-card>
 
+        <!-- Tax Classes (Full Width) -->
+        <ion-card class="lg:col-span-2">
+            <ion-card-header>
+                <ion-card-title>
+                    <ion-icon name="receipt-outline" class="align-middle mr-2"></ion-icon>
+                    {% trans "Tax Classes" %}
+                </ion-card-title>
+                <ion-card-subtitle>{% trans "Configure tax rates according to your country's legislation" %}</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content>
+                <!-- Tax Classes List -->
+                <div class="mb-4">
+                    <template x-if="taxClasses.length === 0">
+                        <div class="text-center py-8" style="color: var(--ion-color-medium);">
+                            <ion-icon name="alert-circle-outline" class="text-4xl mb-2"></ion-icon>
+                            <p class="mb-2">{% trans "No tax classes configured" %}</p>
+                            <p class="text-sm">{% trans "Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)" %}</p>
+                        </div>
+                    </template>
+
+                    <ion-list x-show="taxClasses.length > 0">
+                        <template x-for="tc in taxClasses" :key="tc.id">
+                            <ion-item>
+                                <ion-label>
+                                    <h2 x-text="tc.name"></h2>
+                                    <p>
+                                        <span x-text="tc.rate + '%'"></span>
+                                        <template x-if="tc.description">
+                                            <span x-text="' - ' + tc.description"></span>
+                                        </template>
+                                    </p>
+                                </ion-label>
+                                <ion-chip slot="end" color="success" x-show="tc.is_default">
+                                    {% trans "Default" %}
+                                </ion-chip>
+                                <ion-button slot="end" fill="clear" @click="editTaxClass(tc)">
+                                    <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+                                </ion-button>
+                                <ion-button slot="end" fill="clear" color="danger" @click="deleteTaxClass(tc)">
+                                    <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+                                </ion-button>
+                            </ion-item>
+                        </template>
+                    </ion-list>
+                </div>
+
+                <!-- Add Tax Class Form -->
+                <div class="border-t pt-4" style="border-color: var(--ion-color-light);">
+                    <h3 class="font-medium mb-3" x-text="editingTaxClass ? '{% trans "Edit Tax Class" %}' : '{% trans "Add Tax Class" %}'"></h3>
+                    <form @submit.prevent="saveTaxClass()">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <ion-item>
+                                <ion-input
+                                    type="text"
+                                    label="{% trans 'Name' %} *"
+                                    label-placement="floating"
+                                    x-model="taxForm.name"
+                                    placeholder="{% trans 'e.g., Standard 21%' %}"
+                                    required
+                                ></ion-input>
+                            </ion-item>
+
+                            <ion-item>
+                                <ion-input
+                                    type="number"
+                                    label="{% trans 'Rate (%)' %} *"
+                                    label-placement="floating"
+                                    x-model="taxForm.rate"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    placeholder="21.00"
+                                    required
+                                ></ion-input>
+                            </ion-item>
+
+                            <ion-item>
+                                <ion-input
+                                    type="text"
+                                    label="{% trans 'Description' %}"
+                                    label-placement="floating"
+                                    x-model="taxForm.description"
+                                    placeholder="{% trans 'Optional notes' %}"
+                                ></ion-input>
+                            </ion-item>
+
+                            <ion-item>
+                                <ion-label>{% trans "Set as default" %}</ion-label>
+                                <ion-toggle slot="end" x-model="taxForm.is_default"></ion-toggle>
+                            </ion-item>
+                        </div>
+
+                        <div class="flex gap-2 mt-4">
+                            <ion-button type="submit" :disabled="savingTax || !taxForm.name">
+                                <ion-spinner x-show="savingTax" name="crescent" class="mr-2"></ion-spinner>
+                                <span x-text="editingTaxClass ? '{% trans "Update" %}' : '{% trans "Add Tax Class" %}'"></span>
+                            </ion-button>
+                            <ion-button fill="outline" x-show="editingTaxClass" @click="cancelEditTaxClass()">
+                                {% trans "Cancel" %}
+                            </ion-button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Examples -->
+                <div class="mt-4 p-3 rounded-lg text-sm" style="background: var(--ion-color-light);">
+                    <p class="font-medium mb-1">{% trans "Examples by country:" %}</p>
+                    <ul class="list-disc list-inside" style="color: var(--ion-color-medium);">
+                        <li>Spain: General 21%, Reduced 10%, Super-reduced 4%, Exempt 0%</li>
+                        <li>Germany: Standard 19%, Reduced 7%</li>
+                        <li>France: Normal 20%, Intermediate 10%, Reduced 5.5%</li>
+                        <li>UK: Standard 20%, Reduced 5%, Zero 0%</li>
+                    </ul>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
         <!-- User Settings -->
         <ion-card>
             <ion-card-header>
@@ -495,6 +612,27 @@
                 tax_included: {{ store_config.tax_included|yesno:"true,false" }},
             },
 
+            // Tax Classes
+            taxClasses: [
+                {% for tc in tax_classes %}
+                {
+                    id: {{ tc.id }},
+                    name: '{{ tc.name|escapejs }}',
+                    rate: '{{ tc.rate }}',
+                    description: '{{ tc.description|escapejs }}',
+                    is_default: {{ tc.is_default|yesno:"true,false" }},
+                },
+                {% endfor %}
+            ],
+            taxForm: {
+                name: '',
+                rate: '',
+                description: '',
+                is_default: false,
+            },
+            editingTaxClass: null,
+            savingTax: false,
+
             init() {
                 // Listen to theme changes from parent
                 document.addEventListener('theme-changed', (e) => {
@@ -707,6 +845,129 @@
                 } finally {
                     this.runningBackup = false;
                 }
+            },
+
+            // Tax Class Methods
+            editTaxClass(tc) {
+                this.editingTaxClass = tc;
+                this.taxForm = {
+                    name: tc.name,
+                    rate: tc.rate,
+                    description: tc.description,
+                    is_default: tc.is_default,
+                };
+            },
+
+            cancelEditTaxClass() {
+                this.editingTaxClass = null;
+                this.taxForm = { name: '', rate: '', description: '', is_default: false };
+            },
+
+            async saveTaxClass() {
+                this.savingTax = true;
+                try {
+                    const formData = new FormData();
+                    formData.append('action', this.editingTaxClass ? 'update_tax_class' : 'create_tax_class');
+                    formData.append('name', this.taxForm.name);
+                    formData.append('rate', this.taxForm.rate);
+                    formData.append('description', this.taxForm.description);
+                    formData.append('is_default', this.taxForm.is_default);
+
+                    if (this.editingTaxClass) {
+                        formData.append('tax_class_id', this.editingTaxClass.id);
+                    }
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        if (this.editingTaxClass) {
+                            // Update in array
+                            const idx = this.taxClasses.findIndex(tc => tc.id === this.editingTaxClass.id);
+                            if (idx >= 0) {
+                                this.taxClasses[idx] = data.tax_class;
+                            }
+                            // If this one is default, unset others
+                            if (data.tax_class.is_default) {
+                                this.taxClasses.forEach(tc => {
+                                    if (tc.id !== data.tax_class.id) tc.is_default = false;
+                                });
+                            }
+                        } else {
+                            // Add to array
+                            this.taxClasses.push(data.tax_class);
+                            // If this one is default, unset others
+                            if (data.tax_class.is_default) {
+                                this.taxClasses.forEach(tc => {
+                                    if (tc.id !== data.tax_class.id) tc.is_default = false;
+                                });
+                            }
+                        }
+                        this.cancelEditTaxClass();
+                        await this.showToast('{% trans "Tax class saved" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error saving tax class" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Error saving tax class" %}', 'danger');
+                } finally {
+                    this.savingTax = false;
+                }
+            },
+
+            async deleteTaxClass(tc) {
+                const confirmed = await this.showAlert(
+                    '{% trans "Delete Tax Class" %}',
+                    `{% trans "Are you sure you want to delete" %} "${tc.name}"?`
+                );
+
+                if (!confirmed) return;
+
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'delete_tax_class');
+                    formData.append('tax_class_id', tc.id);
+
+                    const response = await fetch('{% url "main:settings" %}', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        this.taxClasses = this.taxClasses.filter(t => t.id !== tc.id);
+                        await this.showToast('{% trans "Tax class deleted" %}', 'success');
+                    } else {
+                        await this.showToast(data.error || '{% trans "Error deleting tax class" %}', 'danger');
+                    }
+                } catch (error) {
+                    await this.showToast('{% trans "Error deleting tax class" %}', 'danger');
+                }
+            },
+
+            async showAlert(header, message) {
+                return new Promise((resolve) => {
+                    const alert = document.createElement('ion-alert');
+                    alert.header = header;
+                    alert.message = message;
+                    alert.buttons = [
+                        {
+                            text: '{% trans "Cancel" %}',
+                            role: 'cancel',
+                            handler: () => resolve(false)
+                        },
+                        {
+                            text: '{% trans "Delete" %}',
+                            role: 'destructive',
+                            handler: () => resolve(true)
+                        }
+                    ];
+                    document.body.appendChild(alert);
+                    alert.present();
+                });
             },
 
             // Use global Toast helper from toast-helper.js

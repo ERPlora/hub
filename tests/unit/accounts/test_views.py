@@ -60,7 +60,7 @@ class TestVerifyPinView(TestCase):
         """Correct PIN should authenticate user."""
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
@@ -72,7 +72,7 @@ class TestVerifyPinView(TestCase):
         """Incorrect PIN should fail."""
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': self.user.id, 'pin': '9999'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '9999'}),
             content_type='application/json'
         )
 
@@ -82,9 +82,11 @@ class TestVerifyPinView(TestCase):
 
     def test_verify_nonexistent_user(self):
         """Non-existent user should fail."""
+        import uuid
+        fake_uuid = str(uuid.uuid4())
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': 99999, 'pin': '1234'}),
+            data=json.dumps({'user_id': fake_uuid, 'pin': '1234'}),
             content_type='application/json'
         )
 
@@ -99,7 +101,7 @@ class TestVerifyPinView(TestCase):
 
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
@@ -111,7 +113,7 @@ class TestVerifyPinView(TestCase):
         """Missing PIN should fail."""
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': self.user.id}),
+            data=json.dumps({'user_id': str(self.user.id)}),
             content_type='application/json'
         )
 
@@ -123,12 +125,12 @@ class TestVerifyPinView(TestCase):
         """Successful verify should set session data."""
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
         assert response.status_code == 200
-        assert self.client.session.get('local_user_id') == self.user.id
+        assert self.client.session.get('local_user_id') == str(self.user.id)
 
 
 class TestSetupPinView(TestCase):
@@ -148,12 +150,12 @@ class TestSetupPinView(TestCase):
     def test_setup_pin_post_valid(self):
         """POST with valid PIN should set it."""
         session = self.client.session
-        session['pending_user_id'] = self.user.id
+        session['pending_user_id'] = str(self.user.id)
         session.save()
 
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': self.user.id, 'pin': '5678'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '5678'}),
             content_type='application/json'
         )
 
@@ -168,12 +170,12 @@ class TestSetupPinView(TestCase):
     def test_setup_pin_invalid_length(self):
         """PIN must be 4 digits."""
         session = self.client.session
-        session['pending_user_id'] = self.user.id
+        session['pending_user_id'] = str(self.user.id)
         session.save()
 
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': self.user.id, 'pin': '123'}),  # Only 3 digits
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '123'}),  # Only 3 digits
             content_type='application/json'
         )
 
@@ -184,12 +186,12 @@ class TestSetupPinView(TestCase):
     def test_setup_pin_non_numeric(self):
         """PIN must be numeric."""
         session = self.client.session
-        session['pending_user_id'] = self.user.id
+        session['pending_user_id'] = str(self.user.id)
         session.save()
 
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': self.user.id, 'pin': 'abcd'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': 'abcd'}),
             content_type='application/json'
         )
 
@@ -200,18 +202,18 @@ class TestSetupPinView(TestCase):
     def test_setup_pin_sets_user_session(self):
         """After setup, user session should be established."""
         session = self.client.session
-        session['pending_user_id'] = self.user.id
+        session['pending_user_id'] = str(self.user.id)
         session.save()
 
         response = self.client.post(
             self.url,
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
         assert response.status_code == 200
         # local_user_id should be set after successful setup
-        assert self.client.session.get('local_user_id') == self.user.id
+        assert self.client.session.get('local_user_id') == str(self.user.id)
 
 
 class TestLogoutView(TestCase):
@@ -233,7 +235,7 @@ class TestLogoutView(TestCase):
         """Logout should clear user session."""
         # First login
         session = self.client.session
-        session['local_user_id'] = self.user.id
+        session['local_user_id'] = str(self.user.id)
         session['user_email'] = self.user.email
         session.save()
 
@@ -266,20 +268,46 @@ class TestEmployeeAPIViews(TestCase):
 
         # Login as admin
         session = self.client.session
-        session['local_user_id'] = self.admin.id
+        session['local_user_id'] = str(self.admin.id)
         session['user_role'] = 'admin'
         session.save()
 
     def test_create_employee(self):
         """Admin should be able to create employee."""
         response = self.client.post(
-            '/api/employees/create/',
+            '/api/v1/employees/',
             data=json.dumps({
                 'name': 'New Employee',
                 'email': 'newemployee@example.com',
-                'role': 'cashier',
+                'role': 'employee',
                 'pin': '5678'
             }),
+            content_type='application/json'
+        )
+
+        # DRF returns 201 for successful creation
+        assert response.status_code == 201
+        data = response.json()
+        assert data['name'] == 'New Employee'
+
+        # Verify employee was created
+        employee = LocalUser.objects.get(email='newemployee@example.com')
+        assert employee.name == 'New Employee'
+        assert employee.role == 'employee'
+
+    def test_delete_employee(self):
+        """Admin should be able to delete (deactivate) employee."""
+        employee = LocalUser.objects.create(
+            email='todelete@example.com',
+            name='To Delete',
+            role='employee',
+            pin_hash='',
+            is_active=True
+        )
+
+        # DRF uses DELETE method on detail endpoint
+        response = self.client.delete(
+            f'/api/v1/employees/{employee.id}/',
             content_type='application/json'
         )
 
@@ -287,68 +315,43 @@ class TestEmployeeAPIViews(TestCase):
         data = response.json()
         assert data['success'] is True
 
-        # Verify employee was created
-        employee = LocalUser.objects.get(email='newemployee@example.com')
-        assert employee.name == 'New Employee'
-        assert employee.role == 'cashier'
-
-    def test_delete_employee(self):
-        """Admin should be able to delete (deactivate) employee."""
-        employee = LocalUser.objects.create(
-            email='todelete@example.com',
-            name='To Delete',
-            role='cashier',
-            pin_hash='',
-            is_active=True
-        )
-
-        response = self.client.post(
-            '/api/employees/delete/',
-            data=json.dumps({'user_id': employee.id}),
-            content_type='application/json'
-        )
-
-        assert response.status_code == 200
-
-        # Verify employee was deactivated
+        # Verify employee was deactivated (soft delete)
         employee.refresh_from_db()
         assert employee.is_active is False
 
     def test_create_employee_duplicate_email(self):
         """Creating employee with existing email should fail."""
         response = self.client.post(
-            '/api/employees/create/',
+            '/api/v1/employees/',
             data=json.dumps({
                 'name': 'Duplicate',
                 'email': 'admin@example.com',  # Already exists
-                'role': 'cashier',
+                'role': 'employee',
                 'pin': '1234'
             }),
             content_type='application/json'
         )
 
-        assert response.status_code == 200
+        # DRF returns 400 for validation errors
+        assert response.status_code == 400
         data = response.json()
-        assert data['success'] is False
-        assert 'already exists' in data.get('error', '').lower()
+        assert 'email' in data  # Validation error on email field
 
     def test_reset_employee_pin(self):
         """Admin should be able to reset employee PIN."""
         employee = LocalUser.objects.create(
             email='resetpin@example.com',
             name='Reset PIN',
-            role='cashier',
+            role='employee',
             pin_hash='',
             is_active=True
         )
         employee.set_pin('1111')
 
+        # DRF action is at detail endpoint: /api/v1/employees/{id}/reset-pin/
         response = self.client.post(
-            '/api/employees/reset-pin/',
-            data=json.dumps({
-                'user_id': employee.id,
-                'pin': '9999'  # API uses 'pin', not 'new_pin'
-            }),
+            f'/api/v1/employees/{employee.id}/reset-pin/',
+            data=json.dumps({'pin': '9999'}),
             content_type='application/json'
         )
 

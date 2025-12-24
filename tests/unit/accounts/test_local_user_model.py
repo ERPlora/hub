@@ -17,13 +17,13 @@ class TestLocalUserModel(TestCase):
         user = LocalUser.objects.create(
             email='test@example.com',
             name='Test User',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
         assert user.email == 'test@example.com'
         assert user.name == 'Test User'
-        assert user.role == 'cashier'
+        assert user.role == 'employee'
         assert user.is_active is True
 
     def test_cloud_user_id_nullable(self):
@@ -50,23 +50,30 @@ class TestLocalUserModel(TestCase):
 
         assert user.cloud_user_id == 12345
 
-    def test_cloud_user_id_unique(self):
-        """cloud_user_id should be unique when set."""
+    def test_cloud_user_id_unique_per_hub(self):
+        """cloud_user_id should be unique per hub when set."""
+        import uuid
+        from django.db import IntegrityError
+
+        shared_hub_id = uuid.uuid4()
+
         LocalUser.objects.create(
             email='first@example.com',
             name='First',
             role='admin',
             pin_hash='',
-            cloud_user_id=100
+            cloud_user_id=100,
+            hub_id=shared_hub_id
         )
 
-        with pytest.raises(Exception):  # IntegrityError
+        with pytest.raises(IntegrityError):
             LocalUser.objects.create(
                 email='second@example.com',
                 name='Second',
                 role='admin',
                 pin_hash='',
-                cloud_user_id=100  # Same cloud_user_id
+                cloud_user_id=100,  # Same cloud_user_id
+                hub_id=shared_hub_id  # Same hub
             )
 
 
@@ -78,7 +85,7 @@ class TestLocalUserPIN(TestCase):
         user = LocalUser.objects.create(
             email='pin@example.com',
             name='PIN User',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -93,7 +100,7 @@ class TestLocalUserPIN(TestCase):
         user = LocalUser.objects.create(
             email='check@example.com',
             name='Check User',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
         user.set_pin('5678')
@@ -105,7 +112,7 @@ class TestLocalUserPIN(TestCase):
         user = LocalUser.objects.create(
             email='wrong@example.com',
             name='Wrong User',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
         user.set_pin('1111')
@@ -119,7 +126,7 @@ class TestLocalUserPIN(TestCase):
         user = LocalUser.objects.create(
             email='nopin@example.com',
             name='No PIN',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -134,7 +141,7 @@ class TestLocalUserInitials(TestCase):
         user = LocalUser.objects.create(
             email='two@example.com',
             name='John Doe',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -145,7 +152,7 @@ class TestLocalUserInitials(TestCase):
         user = LocalUser.objects.create(
             email='single@example.com',
             name='Alice',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -156,7 +163,7 @@ class TestLocalUserInitials(TestCase):
         user = LocalUser.objects.create(
             email='three@example.com',
             name='John Michael Doe',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -167,7 +174,7 @@ class TestLocalUserInitials(TestCase):
         user = LocalUser.objects.create(
             email='empty@example.com',
             name='',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -188,27 +195,27 @@ class TestLocalUserRoleColors(TestCase):
 
         assert user.get_role_color() == 'primary'
 
-    def test_cashier_role_color(self):
-        """Cashier should have success color."""
+    def test_manager_role_color(self):
+        """Manager should have tertiary color."""
         user = LocalUser.objects.create(
-            email='cashier@example.com',
-            name='Cashier',
-            role='cashier',
+            email='manager@example.com',
+            name='Manager',
+            role='manager',
+            pin_hash=''
+        )
+
+        assert user.get_role_color() == 'tertiary'
+
+    def test_employee_role_color(self):
+        """Employee should have success color."""
+        user = LocalUser.objects.create(
+            email='employee@example.com',
+            name='Employee',
+            role='employee',
             pin_hash=''
         )
 
         assert user.get_role_color() == 'success'
-
-    def test_seller_role_color(self):
-        """Seller should have warning color."""
-        user = LocalUser.objects.create(
-            email='seller@example.com',
-            name='Seller',
-            role='seller',
-            pin_hash=''
-        )
-
-        assert user.get_role_color() == 'warning'
 
     def test_unknown_role_color(self):
         """Unknown role should have medium color."""
@@ -230,7 +237,7 @@ class TestLocalUserDjangoCompatibility(TestCase):
         user = LocalUser.objects.create(
             email='auth@example.com',
             name='Auth User',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -241,7 +248,7 @@ class TestLocalUserDjangoCompatibility(TestCase):
         user = LocalUser.objects.create(
             email='anon@example.com',
             name='Anon User',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -252,7 +259,7 @@ class TestLocalUserDjangoCompatibility(TestCase):
         user = LocalUser.objects.create(
             email='fname@example.com',
             name='John Doe',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -263,7 +270,7 @@ class TestLocalUserDjangoCompatibility(TestCase):
         user = LocalUser.objects.create(
             email='lname@example.com',
             name='John Michael Doe',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -274,7 +281,7 @@ class TestLocalUserDjangoCompatibility(TestCase):
         user = LocalUser.objects.create(
             email='username@example.com',
             name='Username User',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -286,7 +293,7 @@ class TestLocalUserDjangoCompatibility(TestCase):
         user = LocalUser.objects.create(
             email='fullname@example.com',
             name='Full Name User',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -301,7 +308,7 @@ class TestLocalUserStr(TestCase):
         user = LocalUser.objects.create(
             email='str@example.com',
             name='String Test',
-            role='cashier',
+            role='employee',
             pin_hash=''
         )
 
@@ -311,15 +318,15 @@ class TestLocalUserStr(TestCase):
 class TestLocalUserDefaults(TestCase):
     """Test default values."""
 
-    def test_default_role_is_cashier(self):
-        """Default role should be cashier."""
+    def test_default_role_is_employee(self):
+        """Default role should be employee."""
         user = LocalUser.objects.create(
             email='default@example.com',
             name='Default',
             pin_hash=''
         )
 
-        assert user.role == 'cashier'
+        assert user.role == 'employee'
 
     def test_default_is_active_true(self):
         """Default is_active should be True."""
