@@ -5,6 +5,18 @@ import pytest
 import shutil
 from pathlib import Path
 from django.contrib.auth import get_user_model
+from django.conf import settings
+
+# Disable debug toolbar during tests to avoid djdt URL namespace errors
+if 'debug_toolbar' in settings.INSTALLED_APPS:
+    settings.INSTALLED_APPS = [
+        app for app in settings.INSTALLED_APPS if app != 'debug_toolbar'
+    ]
+if hasattr(settings, 'MIDDLEWARE'):
+    settings.MIDDLEWARE = [
+        m for m in settings.MIDDLEWARE
+        if 'debug_toolbar' not in m
+    ]
 
 User = get_user_model()
 
