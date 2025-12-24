@@ -3,10 +3,16 @@
  *
  * Incluido globalmente en base.html
  *
- * Toast:
+ * Toast (simple):
  *   showToast('Message', 'success');
  *   Toast.success('Saved!');
  *   Toast.error('Failed!');
+ *
+ * Notification (con título):
+ *   Notify.success('Guardado', 'El producto se guardó correctamente');
+ *   Notify.error('Error', 'No se pudo conectar al servidor');
+ *   Notify.warning('Atención', 'Stock bajo en 5 productos');
+ *   Notify.info('Info', 'Procesando...');
  *
  * Alert:
  *   showAlert('Title', 'Message');
@@ -50,6 +56,79 @@ const Toast = {
     error: (message, duration) => showToast(message, 'danger', duration),
     warning: (message, duration) => showToast(message, 'warning', duration),
     info: (message, duration) => showToast(message, 'primary', duration),
+};
+
+// ============================================================================
+// NOTIFICATION (TOAST CON TÍTULO)
+// ============================================================================
+
+/**
+ * Muestra una notificación toast con título y mensaje
+ *
+ * @param {Object} options - Opciones de la notificación
+ * @param {string} options.title - Título de la notificación
+ * @param {string} options.message - Mensaje de la notificación
+ * @param {string} options.type - Tipo: 'success', 'warning', 'danger', 'info'
+ * @param {number} options.duration - Duración en ms (default: 3000, 0 si showClose)
+ * @param {string} options.position - Posición: 'top', 'bottom', 'middle'
+ * @param {boolean} options.showClose - Mostrar botón de cerrar (default: true)
+ * @returns {Promise<HTMLIonToastElement>}
+ */
+async function showNotification({
+    title = '',
+    message = '',
+    type = 'info',
+    duration = 3000,
+    position = 'top',
+    showClose = true
+} = {}) {
+    const colorMap = {
+        success: 'success',
+        warning: 'warning',
+        danger: 'danger',
+        error: 'danger',
+        info: 'primary'
+    };
+
+    const iconMap = {
+        success: 'checkmark-circle-outline',
+        warning: 'warning-outline',
+        danger: 'alert-circle-outline',
+        error: 'alert-circle-outline',
+        info: 'information-circle-outline'
+    };
+
+    const toast = document.createElement('ion-toast');
+    toast.header = title;
+    toast.message = message;
+    toast.duration = showClose ? 0 : duration;
+    toast.color = colorMap[type] || 'primary';
+    toast.position = position;
+    toast.icon = iconMap[type];
+
+    if (showClose) {
+        toast.buttons = [{
+            icon: 'close-outline',
+            role: 'cancel'
+        }];
+    }
+
+    document.body.appendChild(toast);
+    await toast.present();
+
+    toast.addEventListener('didDismiss', () => toast.remove());
+
+    return toast;
+}
+
+/**
+ * Shortcuts para notificaciones con título
+ */
+const Notify = {
+    success: (title, message, opts = {}) => showNotification({ title, message, type: 'success', ...opts }),
+    error: (title, message, opts = {}) => showNotification({ title, message, type: 'danger', ...opts }),
+    warning: (title, message, opts = {}) => showNotification({ title, message, type: 'warning', ...opts }),
+    info: (title, message, opts = {}) => showNotification({ title, message, type: 'info', ...opts }),
 };
 
 // ============================================================================
@@ -173,5 +252,5 @@ async function hideLoading() {
 
 // Export para uso en módulos ES6 (opcional)
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { showToast, Toast, showAlert, showConfirm, Dialog, showLoading, hideLoading };
+    module.exports = { showToast, Toast, showNotification, Notify, showAlert, showConfirm, Dialog, showLoading, hideLoading };
 }

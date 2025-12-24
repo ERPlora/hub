@@ -19,7 +19,15 @@ def scan_orphaned_data(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return HttpResponse('<p style="color: var(--ion-color-danger);">Not authenticated</p>', status=401)
+        html = '''
+            <ion-card class="border-l-4 border-danger">
+                <ion-card-content class="flex items-center gap-3">
+                    <ion-icon name="alert-circle-outline" class="text-2xl text-danger"></ion-icon>
+                    <ion-label class="text-danger">Not authenticated</ion-label>
+                </ion-card-content>
+            </ion-card>
+        '''
+        return HttpResponse(html, status=401)
 
     try:
         from config.paths import get_database_path, get_media_dir
@@ -121,39 +129,59 @@ def scan_orphaned_data(request):
 
         if total_orphans == 0:
             html = '''
-                <div style="padding: 12px; background: var(--ion-color-success-tint); border-radius: 8px; border-left: 4px solid var(--ion-color-success);">
-                    <ion-label style="color: var(--ion-color-success-shade);">
-                        No orphaned data found
-                    </ion-label>
-                </div>
+                <ion-card class="border-l-4 border-success">
+                    <ion-card-content class="flex items-center gap-3">
+                        <ion-icon name="checkmark-circle-outline" class="text-2xl text-success"></ion-icon>
+                        <ion-label class="text-success">
+                            No orphaned data found
+                        </ion-label>
+                    </ion-card-content>
+                </ion-card>
             '''
         else:
             clean_url = reverse('configuration:clean_orphaned_data')
+            items = []
+            if orphaned_tables:
+                items.append(f'<li>{len(orphaned_tables)} orphaned database tables</li>')
+            if orphaned_migrations:
+                items.append(f'<li>{len(orphaned_migrations)} orphaned migration records</li>')
+            if orphaned_media:
+                items.append(f'<li>{len(orphaned_media)} orphaned media folders</li>')
+
             html = f'''
-                <div style="padding: 12px; background: var(--ion-color-light); border-radius: 8px;">
-                    <ion-label style="font-weight: 600; display: block; margin-bottom: 8px;">
-                        Orphaned Data Found:
-                    </ion-label>
-                    <ul style="margin: 0; padding-left: 20px; color: var(--ion-color-medium); font-size: 0.875rem;">
-                        {'<li>' + str(len(orphaned_tables)) + ' orphaned database tables</li>' if orphaned_tables else ''}
-                        {'<li>' + str(len(orphaned_migrations)) + ' orphaned migration records</li>' if orphaned_migrations else ''}
-                        {'<li>' + str(len(orphaned_media)) + ' orphaned media folders</li>' if orphaned_media else ''}
-                    </ul>
-                </div>
-                <ion-button
-                    color="danger"
-                    hx-post="{clean_url}"
-                    hx-target="#scan-results"
-                    style="margin-top: 12px;">
-                    <ion-icon slot="start" name="trash-outline"></ion-icon>
-                    Clean Orphaned Data
-                </ion-button>
+                <ion-card class="border-l-4 border-warning">
+                    <ion-card-content>
+                        <ion-label class="font-semibold text-warning block mb-2">
+                            Orphaned Data Found:
+                        </ion-label>
+                        <ul class="m-0 pl-5 text-medium text-sm">
+                            {''.join(items)}
+                        </ul>
+                        <ion-button
+                            color="danger"
+                            size="small"
+                            hx-post="{clean_url}"
+                            hx-target="#scan-results"
+                            class="mt-3">
+                            <ion-icon slot="start" name="trash-outline"></ion-icon>
+                            Clean Orphaned Data
+                        </ion-button>
+                    </ion-card-content>
+                </ion-card>
             '''
 
         return HttpResponse(html)
 
     except Exception as e:
-        return HttpResponse(f'<p style="color: var(--ion-color-danger);">Error: {str(e)}</p>', status=500)
+        html = f'''
+            <ion-card class="border-l-4 border-danger">
+                <ion-card-content class="flex items-center gap-3">
+                    <ion-icon name="alert-circle-outline" class="text-2xl text-danger"></ion-icon>
+                    <ion-label class="text-danger">Error: {str(e)}</ion-label>
+                </ion-card-content>
+            </ion-card>
+        '''
+        return HttpResponse(html, status=500)
 
 
 def clean_orphaned_data(request):
@@ -162,11 +190,27 @@ def clean_orphaned_data(request):
     """
     # Only allow POST
     if request.method != 'POST':
-        return HttpResponse('<p style="color: var(--ion-color-danger);">Method not allowed</p>', status=405)
+        html = '''
+            <ion-card class="border-l-4 border-danger">
+                <ion-card-content class="flex items-center gap-3">
+                    <ion-icon name="alert-circle-outline" class="text-2xl text-danger"></ion-icon>
+                    <ion-label class="text-danger">Method not allowed</ion-label>
+                </ion-card-content>
+            </ion-card>
+        '''
+        return HttpResponse(html, status=405)
 
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return HttpResponse('<p style="color: var(--ion-color-danger);">Not authenticated</p>', status=401)
+        html = '''
+            <ion-card class="border-l-4 border-danger">
+                <ion-card-content class="flex items-center gap-3">
+                    <ion-icon name="alert-circle-outline" class="text-2xl text-danger"></ion-icon>
+                    <ion-label class="text-danger">Not authenticated</ion-label>
+                </ion-card-content>
+            </ion-card>
+        '''
+        return HttpResponse(html, status=401)
 
     try:
         from config.paths import get_database_path, get_media_dir
@@ -293,19 +337,32 @@ def clean_orphaned_data(request):
 
         # Return HTML for HTMX
         html = f'''
-            <div style="padding: 12px; background: var(--ion-color-success-tint); border-radius: 8px; border-left: 4px solid var(--ion-color-success);">
-                <ion-label style="color: var(--ion-color-success-shade); font-weight: 600;">
-                    Successfully cleaned {total_cleaned} orphaned items
-                </ion-label>
-                <ul style="margin: 8px 0 0 0; padding-left: 20px; color: var(--ion-color-success-shade); font-size: 0.875rem;">
-                    <li>{len(orphaned_tables)} database tables deleted</li>
-                    <li>{len(orphaned_migrations)} migration records deleted</li>
-                    <li>{len(orphaned_media)} media folders deleted</li>
-                </ul>
-            </div>
+            <ion-card class="border-l-4 border-success">
+                <ion-card-content>
+                    <div class="flex items-center gap-3 mb-2">
+                        <ion-icon name="checkmark-circle-outline" class="text-2xl text-success"></ion-icon>
+                        <ion-label class="font-semibold text-success">
+                            Successfully cleaned {total_cleaned} orphaned items
+                        </ion-label>
+                    </div>
+                    <ul class="m-0 pl-5 text-medium text-sm">
+                        <li>{len(orphaned_tables)} database tables deleted</li>
+                        <li>{len(orphaned_migrations)} migration records deleted</li>
+                        <li>{len(orphaned_media)} media folders deleted</li>
+                    </ul>
+                </ion-card-content>
+            </ion-card>
         '''
 
         return HttpResponse(html)
 
     except Exception as e:
-        return HttpResponse(f'<p style="color: var(--ion-color-danger);">Error: {str(e)}</p>', status=500)
+        html = f'''
+            <ion-card class="border-l-4 border-danger">
+                <ion-card-content class="flex items-center gap-3">
+                    <ion-icon name="alert-circle-outline" class="text-2xl text-danger"></ion-icon>
+                    <ion-label class="text-danger">Error: {str(e)}</ion-label>
+                </ion-card-content>
+            </ion-card>
+        '''
+        return HttpResponse(html, status=500)
