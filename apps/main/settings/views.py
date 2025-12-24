@@ -8,7 +8,7 @@ from django.utils import translation
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 from apps.accounts.models import LocalUser
-from apps.configuration.models import HubConfig, StoreConfig, BackupConfig
+from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass
 
 
 @login_required
@@ -129,12 +129,93 @@ def index(request):
             else:
                 return JsonResponse({'success': False, 'error': path}, status=500)
 
+        # Handle TaxClass actions
+        if action == 'create_tax_class':
+            name = request.POST.get('name', '').strip()
+            rate = request.POST.get('rate', '0')
+            description = request.POST.get('description', '').strip()
+            is_default = request.POST.get('is_default') == 'true'
+
+            if not name:
+                return JsonResponse({'success': False, 'error': 'Name is required'}, status=400)
+
+            try:
+                tax_class = TaxClass.objects.create(
+                    name=name,
+                    rate=Decimal(rate) if rate else Decimal('0'),
+                    description=description,
+                    is_default=is_default,
+                )
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Tax class created',
+                    'tax_class': {
+                        'id': tax_class.id,
+                        'name': tax_class.name,
+                        'rate': str(tax_class.rate),
+                        'description': tax_class.description,
+                        'is_default': tax_class.is_default,
+                    }
+                })
+            except (InvalidOperation, Exception) as e:
+                return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+        if action == 'update_tax_class':
+            tax_class_id = request.POST.get('tax_class_id')
+            try:
+                tax_class = TaxClass.objects.get(id=tax_class_id)
+                tax_class.name = request.POST.get('name', tax_class.name).strip()
+                tax_class.rate = Decimal(request.POST.get('rate', tax_class.rate))
+                tax_class.description = request.POST.get('description', '').strip()
+                tax_class.is_default = request.POST.get('is_default') == 'true'
+                tax_class.save()
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Tax class updated',
+                    'tax_class': {
+                        'id': tax_class.id,
+                        'name': tax_class.name,
+                        'rate': str(tax_class.rate),
+                        'description': tax_class.description,
+                        'is_default': tax_class.is_default,
+                    }
+                })
+            except TaxClass.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Tax class not found'}, status=404)
+            except (InvalidOperation, Exception) as e:
+                return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+        if action == 'delete_tax_class':
+            tax_class_id = request.POST.get('tax_class_id')
+            try:
+                tax_class = TaxClass.objects.get(id=tax_class_id)
+                tax_class.delete()
+                return JsonResponse({'success': True, 'message': 'Tax class deleted'})
+            except TaxClass.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Tax class not found'}, status=404)
+
+        if action == 'set_default_tax_class':
+            tax_class_id = request.POST.get('tax_class_id')
+            try:
+                if tax_class_id:
+                    tax_class = TaxClass.objects.get(id=tax_class_id)
+                    store_config.default_tax_class = tax_class
+                else:
+                    store_config.default_tax_class = None
+                store_config.save()
+                return JsonResponse({'success': True, 'message': 'Default tax class updated'})
+            except TaxClass.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Tax class not found'}, status=404)
+
         return JsonResponse({'success': True})
 
     # Get backup config and scheduler status
     backup_config = BackupConfig.get_solo()
     from apps.configuration.scheduler import get_scheduler_status
     scheduler_status = get_scheduler_status()
+
+    # Get all tax classes
+    tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
 
     # Use POPULAR_CURRENCY_CHOICES for the UI (24 most common currencies)
     return {
@@ -145,6 +226,7 @@ def index(request):
         'store_config': store_config,
         'backup_config': backup_config,
         'scheduler_status': scheduler_status,
+        'tax_classes': tax_classes,
         'language_choices': django_settings.LANGUAGES,
         'currency_choices': django_settings.POPULAR_CURRENCY_CHOICES,
         'backup_frequency_choices': BackupConfig.Frequency.choices,

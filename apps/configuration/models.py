@@ -239,6 +239,78 @@ class HubConfig(SingletonConfigMixin, models.Model):
         return f"Hub Config (Configured: {self.is_configured})"
 
 
+class TaxClass(models.Model):
+    """
+    Tax class configurable by the user.
+    Users create their own tax types according to their country/region.
+
+    Examples:
+    - Spain: General 21%, Reduced 10%, Super-reduced 4%, Exempt 0%
+    - Germany: Standard 19%, Reduced 7%
+    - France: Normal 20%, Intermediate 10%, Reduced 5.5%
+    - UK: Standard 20%, Reduced 5%, Zero 0%
+    """
+    name = models.CharField(
+        max_length=100,
+        verbose_name='Name',
+        help_text='Display name for this tax class (e.g., "General 21%")'
+    )
+    rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name='Tax Rate (%)',
+        help_text='Tax rate as percentage (e.g., 21.00 for 21%)'
+    )
+    description = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name='Description',
+        help_text='Optional description or notes'
+    )
+    is_default = models.BooleanField(
+        default=False,
+        verbose_name='Default',
+        help_text='Use this tax class as default for new products'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='Active',
+        help_text='Inactive tax classes are hidden from selection'
+    )
+    order = models.IntegerField(
+        default=0,
+        verbose_name='Sort Order',
+        help_text='Lower numbers appear first in lists'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Tax Class'
+        verbose_name_plural = 'Tax Classes'
+        db_table = 'core_taxclass'
+        ordering = ['order', 'rate']
+
+    def __str__(self):
+        return f"{self.name} ({self.rate}%)"
+
+    @classmethod
+    def get_default(cls):
+        """Get the default tax class, or None if not set."""
+        return cls.objects.filter(is_default=True, is_active=True).first()
+
+    @classmethod
+    def get_active(cls):
+        """Get all active tax classes ordered by sort order."""
+        return cls.objects.filter(is_active=True).order_by('order', 'rate')
+
+    def save(self, *args, **kwargs):
+        # Ensure only one default tax class
+        if self.is_default:
+            TaxClass.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
 class StoreConfig(SingletonConfigMixin, models.Model):
     """
     Store configuration for receipts and business information.
@@ -246,6 +318,17 @@ class StoreConfig(SingletonConfigMixin, models.Model):
     """
     # Business Information
     business_name = models.CharField(max_length=255, blank=True)
+
+    # Default Tax Class (for products without category or category without tax_class)
+    default_tax_class = models.ForeignKey(
+        'TaxClass',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stores_as_default',
+        verbose_name='Default Tax Class',
+        help_text='Default tax class for products without category tax assignment'
+    )
     business_address = models.TextField(blank=True)
     vat_number = models.CharField(max_length=100, blank=True, verbose_name='VAT/Tax ID')
     phone = models.CharField(max_length=50, blank=True)
