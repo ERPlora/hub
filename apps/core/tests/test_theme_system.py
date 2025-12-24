@@ -38,7 +38,7 @@ def local_user(db):
 def authenticated_client(client, local_user):
     """Client with authenticated session."""
     session = client.session
-    session['local_user_id'] = local_user.id
+    session['local_user_id'] = str(local_user.id)  # Convert UUID to string
     session['user_name'] = local_user.name
     session['user_email'] = local_user.email
     session['user_role'] = local_user.role
