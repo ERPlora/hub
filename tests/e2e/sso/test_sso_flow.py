@@ -39,7 +39,7 @@ class TestHubLocalLoginFlow(TestCase):
         # Step 2: Verify PIN (AJAX call)
         response = self.client.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
@@ -48,13 +48,13 @@ class TestHubLocalLoginFlow(TestCase):
         assert data['success'] is True
 
         # Step 3: Session should be established
-        assert self.client.session.get('local_user_id') == self.user.id
+        assert self.client.session.get('local_user_id') == str(self.user.id)
 
     def test_wrong_pin_denies_access(self):
         """Test that wrong PIN denies access."""
         response = self.client.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '9999'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '9999'}),
             content_type='application/json'
         )
 
@@ -72,7 +72,7 @@ class TestHubLocalLoginFlow(TestCase):
 
         response = self.client.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
@@ -91,7 +91,7 @@ class TestHubPinSetupFlow(TestCase):
         self.user = LocalUser.objects.create(
             email='newuser@example.com',
             name='New User',
-            role='cashier',
+            role='employee',
             pin_hash='',  # No PIN set
             is_active=True
         )
@@ -100,14 +100,14 @@ class TestHubPinSetupFlow(TestCase):
         """Test complete flow: setup-pin page -> enter PIN -> login."""
         # Set pending user in session (simulates SSO redirect)
         session = self.client.session
-        session['pending_user_id'] = self.user.id
+        session['pending_user_id'] = str(self.user.id)
         session['pending_user_email'] = self.user.email
         session.save()
 
         # Submit PIN via POST (setup-pin only accepts POST for JSON)
         response = self.client.post(
             '/setup-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '5678'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '5678'}),
             content_type='application/json'
         )
 
@@ -120,18 +120,18 @@ class TestHubPinSetupFlow(TestCase):
         assert self.user.check_pin('5678') is True
 
         # Session should be established
-        assert self.client.session.get('local_user_id') == self.user.id
+        assert self.client.session.get('local_user_id') == str(self.user.id)
 
     def test_invalid_pin_format_rejected(self):
         """Test that invalid PIN format is rejected."""
         session = self.client.session
-        session['pending_user_id'] = self.user.id
+        session['pending_user_id'] = str(self.user.id)
         session.save()
 
         # Try with too short PIN
         response = self.client.post(
             '/setup-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '123'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '123'}),
             content_type='application/json'
         )
 
@@ -142,7 +142,7 @@ class TestHubPinSetupFlow(TestCase):
         # Try with non-numeric PIN
         response = self.client.post(
             '/setup-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': 'abcd'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': 'abcd'}),
             content_type='application/json'
         )
 
@@ -168,14 +168,14 @@ class TestHubLogoutFlow(TestCase):
         # Login the user
         self.client.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
     def test_logout_clears_session(self):
         """Test that logout clears session data."""
         # Verify logged in
-        assert self.client.session.get('local_user_id') == self.user.id
+        assert self.client.session.get('local_user_id') == str(self.user.id)
 
         # Logout
         response = self.client.get('/logout/')
@@ -211,7 +211,7 @@ class TestHubEmployeeManagementFlow(TestCase):
 
         # Login as admin
         session = self.client.session
-        session['local_user_id'] = self.admin.id
+        session['local_user_id'] = str(self.admin.id)
         session['user_role'] = 'admin'
         session.save()
 
@@ -243,7 +243,7 @@ class TestHubEmployeeManagementFlow(TestCase):
         client2 = Client()
         response = client2.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': employee.id, 'pin': '5678'}),
+            data=json.dumps({'user_id': str(employee.id), 'pin': '5678'}),
             content_type='application/json'
         )
 
@@ -257,7 +257,7 @@ class TestHubEmployeeManagementFlow(TestCase):
         employee = LocalUser.objects.create(
             email='todelete@example.com',
             name='To Delete',
-            role='cashier',
+            role='employee',
             is_active=True
         )
         employee.set_pin('9999')
@@ -265,7 +265,7 @@ class TestHubEmployeeManagementFlow(TestCase):
         # Delete (deactivate) the employee
         response = self.client.post(
             '/api/employees/delete/',
-            data=json.dumps({'user_id': employee.id}),
+            data=json.dumps({'user_id': str(employee.id)}),
             content_type='application/json'
         )
 
@@ -281,7 +281,7 @@ class TestHubEmployeeManagementFlow(TestCase):
         client2 = Client()
         response = client2.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': employee.id, 'pin': '9999'}),
+            data=json.dumps({'user_id': str(employee.id), 'pin': '9999'}),
             content_type='application/json'
         )
 
@@ -295,7 +295,7 @@ class TestHubEmployeeManagementFlow(TestCase):
         employee = LocalUser.objects.create(
             email='resetpin@example.com',
             name='Reset PIN',
-            role='cashier',
+            role='employee',
             is_active=True
         )
         employee.set_pin('1111')
@@ -303,7 +303,7 @@ class TestHubEmployeeManagementFlow(TestCase):
         # Reset PIN
         response = self.client.post(
             '/api/employees/reset-pin/',
-            data=json.dumps({'user_id': employee.id, 'pin': '2222'}),
+            data=json.dumps({'user_id': str(employee.id), 'pin': '2222'}),
             content_type='application/json'
         )
 
@@ -315,7 +315,7 @@ class TestHubEmployeeManagementFlow(TestCase):
         client2 = Client()
         response = client2.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': employee.id, 'pin': '1111'}),
+            data=json.dumps({'user_id': str(employee.id), 'pin': '1111'}),
             content_type='application/json'
         )
         data = response.json()
@@ -324,7 +324,7 @@ class TestHubEmployeeManagementFlow(TestCase):
         # Verify new PIN works
         response = client2.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': employee.id, 'pin': '2222'}),
+            data=json.dumps({'user_id': str(employee.id), 'pin': '2222'}),
             content_type='application/json'
         )
         data = response.json()
@@ -450,7 +450,7 @@ class TestHubProtectedRoutesFlow(TestCase):
         # Login
         self.client.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
@@ -491,7 +491,7 @@ class TestHubSessionPersistenceFlow(TestCase):
         # Login
         self.client.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
@@ -501,14 +501,14 @@ class TestHubSessionPersistenceFlow(TestCase):
         # Make multiple requests
         for _ in range(5):
             self.client.get('/dashboard/')
-            assert self.client.session.get('local_user_id') == self.user.id
+            assert self.client.session.get('local_user_id') == str(self.user.id)
 
     def test_session_contains_user_data(self):
         """Test that session contains all required user data after login."""
         # Login
         self.client.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
