@@ -1,11 +1,12 @@
 {% load i18n %}
 
-<ion-card class="bg-danger-50">
+<ion-card class="border-l-4 border-danger">
     <ion-card-content class="text-center py-8">
         <ion-icon name="cloud-offline-outline" class="text-6xl text-danger mb-4"></ion-icon>
         <h3 class="text-lg font-semibold text-danger mb-2">{% trans "Connection Error" %}</h3>
-        <p class="text-medium mb-4">{{ error }}</p>
+        <p class="mb-4 text-medium">{{ error }}</p>
         <ion-button
+            color="danger"
             hx-get="{% url 'system:marketplace_modules_list' %}"
             hx-target="#marketplace-modules-grid"
             hx-swap="innerHTML"
