@@ -189,7 +189,8 @@ class CloudSSOMiddleware:
             # Verificar si tiene PIN configurado
             if not local_user.pin_hash:
                 # Guardar user_id en sesión temporalmente para setup-pin
-                request.session['pending_user_id'] = local_user.id
+                # IMPORTANT: Convert UUID to string for JSON serialization
+                request.session['pending_user_id'] = str(local_user.id)
                 request.session['pending_user_email'] = user_email
                 logger.info(f"[SSO] User {user_email} needs to setup PIN, redirecting...")
                 return redirect('/setup-pin/')
@@ -198,7 +199,8 @@ class CloudSSOMiddleware:
             local_user.last_login = timezone.now()
             local_user.save(update_fields=['last_login'])
 
-            request.session['local_user_id'] = local_user.id
+            # IMPORTANT: Convert UUID to string for JSON serialization
+            request.session['local_user_id'] = str(local_user.id)
             request.session['user_name'] = local_user.name
             request.session['user_email'] = local_user.email
             request.session['user_role'] = local_user.role

@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load module_icons %}
 
 <ion-footer>
     <ion-tab-bar>
@@ -18,7 +19,7 @@
             hx-get="{{ module.url }}"
             hx-target="#dashboard-content"
             hx-push-url="true">
-            <ion-icon name="{{ module.icon }}"></ion-icon>
+            {% module_icon module_id=module.module_id icon=module.icon %}
             <ion-label>{{ module.label }}</ion-label>
         </ion-tab-button>
         {% endfor %}
