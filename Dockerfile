@@ -36,15 +36,12 @@ LABEL org.opencontainers.image.source="https://github.com/ERPlora/hub"
 WORKDIR /app
 
 # Install system dependencies
-# gosu is used for proper privilege dropping in entrypoint
-# Retry logic added for transient network issues
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         libusb-1.0-0 \
         cups \
         curl \
-        gosu \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -72,16 +69,6 @@ ENV DJANGO_SETTINGS_MODULE=config.settings.web \
     AWS_LOCATION=dummy
 RUN python manage.py collectstatic --noinput --clear
 
-# Create non-root user for security
-# Note: We don't switch to hubuser here - entrypoint handles privilege dropping
-# This is necessary because /app/data is a bind mount with host permissions
-RUN useradd --create-home --shell /bin/bash hubuser \
-    && chown -R hubuser:hubuser /app
-
-# Move entrypoint script to /usr/local/bin and make executable
-# (script is copied to /app with COPY . .)
-RUN mv docker-entrypoint.sh /usr/local/bin/ && chmod +x /usr/local/bin/docker-entrypoint.sh
-
 # =============================================================================
 # ENVIRONMENT VARIABLES
 # =============================================================================
@@ -100,8 +87,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health/ || exit 1
 
 # =============================================================================
-# ENTRYPOINT
+# DEFAULT COMMAND
 # =============================================================================
-# Entrypoint runs as root to set up /app/data permissions,
-# then drops privileges to hubuser for the application
-ENTRYPOINT ["docker-entrypoint.sh"]
+# Command is defined in docker-compose.yml for flexibility
+# This is a fallback for running the container directly
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
