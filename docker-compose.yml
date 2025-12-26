@@ -40,6 +40,9 @@ services:
       - PARENT_DOMAIN=${PARENT_DOMAIN}
       - SERVER_DOMAIN=${SERVER_DOMAIN}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      # Database configuration (SQLite for Starter, PostgreSQL for Business)
+      - DATABASE_PATH=${DATABASE_PATH:-/app/data/db/db.sqlite3}
+      - DATABASE_URL=${DATABASE_URL:-}
       # S3 configuration
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
