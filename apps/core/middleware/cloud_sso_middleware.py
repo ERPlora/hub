@@ -49,10 +49,13 @@ class CloudSSOMiddleware:
         '/static/',  # Static files
         '/media/',   # Media files
         '/favicon.ico',  # Favicon
+        '/manifest.json',  # PWA manifest
+        '/serviceworker.js',  # Service worker
         '/login/',   # Login page (handled by SSO)
         '/cloud-login/',  # Cloud login endpoint
         '/setup-pin/',  # PIN setup endpoint
         '/verify-pin/',  # PIN verification endpoint
+        '/set-language/',  # Language switcher (can be called during setup)
         '/logout/',  # Logout endpoint
         '/api/backup/',  # Backup API (called by Cloud)
     ]
