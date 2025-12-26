@@ -1,23 +1,14 @@
 # ERPlora Hub
 
-Sistema POS (Point of Sale) modular Django con **dos modos de despliegue**.
+Sistema POS (Point of Sale) modular basado en Django.
 
-## Modos de Despliegue
+## Caracteristicas
 
-### 1. Desktop Hub (On-Premise) - GRATIS
 - Aplicacion empaquetada con **PyInstaller**
 - **100% GRATUITA** - sin costo de licencia
-- SQLite local en la maquina del cliente
+- SQLite local
 - **Funciona 100% offline** despues de setup inicial
 - Extensible con modules (gratuitos o de pago)
-
-### 2. Cloud Hub (SaaS)
-- Contenedor Docker desplegado via Dokploy
-- SQLite en volumen Docker persistente
-- Acceso via subdominio: `{subdomain}.erplora.com` (ej: `mi-tienda.erplora.com`)
-- Planes de suscripcion (definidos en base de datos)
-
-**Nota:** Ambos modos usan el mismo codigo Django. La unica diferencia es el metodo de despliegue.
 
 ---
 
@@ -46,8 +37,6 @@ python manage.py migrate
 python manage.py runserver 8001
 ```
 
-El Hub corre en puerto **8001** por defecto (Cloud Portal usa 8000).
-
 ---
 
 ## Estructura del Proyecto
@@ -58,7 +47,7 @@ hub/
 │   ├── accounts/             # LocalUser, autenticacion con PIN
 │   ├── configuration/        # HubConfig, StoreConfig (singleton)
 │   ├── modules/              # Module model, runtime manager
-│   ├── sync/                 # Cloud API client (HTTP)
+│   ├── sync/                 # Sincronizacion con Cloud
 │   └── core/                 # Utilidades compartidas
 │
 ├── config/                   # Configuracion Django
@@ -72,18 +61,15 @@ hub/
 │
 ├── templates/               # Django templates (Ionic + HTMX)
 ├── static/                  # CSS/JS
-├── Dockerfile               # Build para Cloud Hub (Dokploy)
-├── main.py                  # Entry point para Desktop Hub (PyInstaller)
+├── main.py                  # Entry point para PyInstaller
 ├── main.spec                # Configuracion PyInstaller
-├── build.py                 # Script de build Desktop
+├── build.py                 # Script de build
 └── pyproject.toml           # Dependencias (uv)
 ```
 
 ---
 
-## Desktop Hub (PyInstaller)
-
-### Build
+## Build (PyInstaller)
 
 ```bash
 cd hub
@@ -95,50 +81,6 @@ python build.py
 - **Windows:** `dist/ERPlora Hub/ERPlora Hub.exe`
 - **macOS:** `dist/ERPlora Hub.app`
 - **Linux:** `dist/ERPlora Hub/ERPlora Hub`
-
-### GitHub Actions
-
-- Push a `staging` → build automatico de RC
-- Merge a `main` → build de release final
-
----
-
-## Cloud Hub (Docker)
-
-### Variables de Entorno
-
-```bash
-# Identificacion (inyectadas por Dokploy)
-HUB_ID=a1b2c3d4-e5f6-7890-abcd-ef1234567890
-
-# Conexion con Cloud
-CLOUD_API_URL=https://erplora.com/api
-CLOUD_API_TOKEN=jwt_token_del_hub
-
-# Django
-DEBUG=false
-SECRET_KEY=auto_generated_or_from_env
-ALLOWED_HOSTS=erplora.com
-```
-
-### Build Local (Docker)
-
-```bash
-docker build -t erplora/hub:latest .
-docker run -d -p 8001:8000 -e HUB_ID=test-hub-123 erplora/hub:latest
-```
-
-### Volumenes Persistentes
-
-```
-/app/data/{HUB_ID}/
-├── db/
-│   └── db.sqlite3        # Base de datos
-├── media/                # Archivos subidos
-├── logs/                 # Logs
-├── backups/              # Backups automaticos
-└── temp/                 # Archivos temporales
-```
 
 ---
 
@@ -181,18 +123,9 @@ pytest --cov=apps --cov-report=html
 | Backend | Django 5.1 |
 | Database | SQLite |
 | Frontend | Ionic 8 (iOS mode) + Alpine.js + HTMX |
-| Autenticacion | LocalUser con PIN + JWT (Cloud API) |
-| Deployment Cloud | Docker + Dokploy |
-| Deployment Desktop | PyInstaller |
+| Autenticacion | LocalUser con PIN |
+| Build | PyInstaller |
 
 ---
 
-## Enlaces
-
-- **Arquitectura**: [/docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
-- **CLAUDE.md Hub**: [CLAUDE.md](CLAUDE.md)
-- **CLAUDE.md principal**: [/CLAUDE.md](../CLAUDE.md)
-
----
-
-**Ultima actualizacion:** 2025-12-09
+**Ultima actualizacion:** 2025-12-26
