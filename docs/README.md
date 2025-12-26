@@ -8,12 +8,12 @@ ERPlora Hub es el sistema Point of Sale (POS) de ERPlora, disponible en dos moda
 
 ERPlora Hub es una aplicación Django que funciona como punto de venta (POS). Puede desplegarse de dos formas:
 
-### Opción 1: Cloud Hub (PAGO)
-- Contenedor Docker desplegado en Cloud
+### Opcion 1: Cloud Hub (PAGO)
+- Contenedor Docker desplegado via Dokploy
 - SQLite en volumen Docker persistente
-- Acceso vía navegador web
-- URL única: `erplora.com/hubs/{hub-id}`
-- Suscripción mensual
+- Acceso via navegador web
+- URL unica: `{subdomain}.erplora.com` (ej: `mi-tienda.erplora.com`)
+- Suscripcion mensual
 
 ### Opción 2: Desktop Hub (GRATUITO)
 - App descargable empaquetada con PyInstaller

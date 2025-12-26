@@ -14,7 +14,7 @@ Sistema POS (Point of Sale) modular Django con **dos modos de despliegue**.
 ### 2. Cloud Hub (SaaS)
 - Contenedor Docker desplegado via Dokploy
 - SQLite en volumen Docker persistente
-- Acceso via navegador: `erplora.com/hubs/{hub-id}`
+- Acceso via subdominio: `{subdomain}.erplora.com` (ej: `mi-tienda.erplora.com`)
 - Planes de suscripcion (definidos en base de datos)
 
 **Nota:** Ambos modos usan el mismo codigo Django. La unica diferencia es el metodo de despliegue.
