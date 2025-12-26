@@ -31,34 +31,47 @@
         </ion-card-content>
         <div class="flex border-t border-gray-200 dark:border-gray-700">
             {% if module.is_installed %}
+            {# Already installed locally #}
             <ion-button fill="clear" size="small" color="medium" class="flex-1" disabled>
                 <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
                 {% trans "Installed" %}
             </ion-button>
+            {% elif module.is_owned %}
+            {# Owned (purchased or free) but not installed - show Download #}
+            <ion-button
+                fill="clear"
+                size="small"
+                color="success"
+                class="flex-1"
+                onclick="downloadAndInstall('{{ module.slug }}', '{{ module.download_url }}', this)">
+                <ion-spinner name="crescent" class="install-spinner mr-2" style="display: none;"></ion-spinner>
+                <ion-icon slot="start" name="download-outline" class="install-icon"></ion-icon>
+                {% trans "Download" %}
+            </ion-button>
+            {% elif module.is_free %}
+            {# Free module not yet acquired - acquire and install #}
+            <ion-button
+                fill="clear"
+                size="small"
+                color="primary"
+                class="flex-1"
+                onclick="installFreeModule('{{ module.id }}', '{{ module.slug }}', '{{ module.download_url|default:'' }}', this)">
+                <ion-spinner name="crescent" class="install-spinner mr-2" style="display: none;"></ion-spinner>
+                <ion-icon slot="start" name="download-outline" class="install-icon"></ion-icon>
+                {% trans "Download" %}
+            </ion-button>
             {% else %}
-                {% if module.is_free %}
-                <ion-button
-                    fill="clear"
-                    size="small"
-                    color="primary"
-                    class="flex-1"
-                    onclick="installFreeModule('{{ module.id }}', '{{ module.slug }}', '{{ module.download_url|default:'' }}', this)">
-                    <ion-spinner name="crescent" class="install-spinner mr-2" style="display: none;"></ion-spinner>
-                    <ion-icon slot="start" name="download-outline" class="install-icon"></ion-icon>
-                    {% trans "Install" %}
-                </ion-button>
-                {% else %}
-                <ion-button
-                    fill="clear"
-                    size="small"
-                    color="primary"
-                    class="flex-1"
-                    onclick="purchaseModule('{{ module.id }}', this)">
-                    <ion-spinner name="crescent" class="install-spinner mr-2" style="display: none;"></ion-spinner>
-                    <ion-icon slot="start" name="cart-outline" class="install-icon"></ion-icon>
-                    {% trans "Purchase" %}
-                </ion-button>
-                {% endif %}
+            {# Paid module not owned - show Purchase #}
+            <ion-button
+                fill="clear"
+                size="small"
+                color="primary"
+                class="flex-1"
+                onclick="purchaseModule('{{ module.id }}', this)">
+                <ion-spinner name="crescent" class="install-spinner mr-2" style="display: none;"></ion-spinner>
+                <ion-icon slot="start" name="cart-outline" class="install-icon"></ion-icon>
+                {% trans "Purchase" %}
+            </ion-button>
             {% endif %}
         </div>
     </ion-card>

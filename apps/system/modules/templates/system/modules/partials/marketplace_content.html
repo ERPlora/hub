@@ -142,8 +142,9 @@ async function purchaseModule(moduleId, button) {
     }
 }
 
-// Download and install module
-async function downloadAndInstall(moduleSlug, downloadUrl) {
+// Download and install module (for owned modules)
+async function downloadAndInstall(moduleSlug, downloadUrl, button) {
+    if (button) setButtonLoading(button, true);
     try {
         const response = await fetch('{% url "system:install_from_marketplace" %}', {
             method: 'POST',
@@ -174,6 +175,8 @@ async function downloadAndInstall(moduleSlug, downloadUrl) {
         }
     } catch (error) {
         Toast.error('{% trans "Error downloading module" %}');
+    } finally {
+        if (button) setButtonLoading(button, false);
     }
 }
 
