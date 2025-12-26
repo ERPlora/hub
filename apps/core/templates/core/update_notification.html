@@ -1,24 +1,25 @@
+{% load i18n %}
 <!-- Update notification banner (Ionic + Alpine.js) -->
-<ion-card color="warning" x-data="{ dismissed: false }" x-show="!dismissed" x-cloak>
+<ion-card class="border-l-4 border-warning" x-data="{ dismissed: false }" x-show="!dismissed" x-cloak>
     <ion-card-content>
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <ion-icon name="cloud-download-outline" style="font-size: 24px;"></ion-icon>
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center gap-3">
+                <ion-icon name="cloud-download-outline" class="text-2xl text-warning"></ion-icon>
                 <div>
-                    <strong>🔔 Nueva versión disponible</strong><br>
-                    <small>
-                        Versión actual: {{ current_version }} → Nueva versión: {{ latest_version }}
+                    <strong class="text-warning">{% trans "New version available" %}</strong><br>
+                    <small class="text-medium">
+                        {% trans "Current" %}: {{ current_version }} → {% trans "New" %}: {{ latest_version }}
                         ({{ update_type|title }})
                     </small>
                 </div>
             </div>
 
-            <div style="display: flex; gap: 8px;">
-                <ion-button size="large" fill="solid" color="light" onclick="window.location.href='/settings/updates'">
-                    Ver detalles
+            <div class="flex gap-2">
+                <ion-button size="small" fill="solid" color="warning" onclick="window.location.href='/dashboard/settings/'">
+                    {% trans "View details" %}
                 </ion-button>
-                <ion-button size="large" fill="clear" @click="dismissed = true">
-                    <ion-icon name="close-outline"></ion-icon>
+                <ion-button size="small" fill="clear" @click="dismissed = true">
+                    <ion-icon name="close-outline" slot="icon-only"></ion-icon>
                 </ion-button>
             </div>
         </div>
