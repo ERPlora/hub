@@ -99,7 +99,8 @@
                             type="text"
                             label="{% trans 'Business Name' %} *"
                             label-placement="floating"
-                            x-model="business.name"
+                            :value="business.name"
+                            @ionInput="business.name = $event.target.value"
                             placeholder="{% trans 'Your business name' %}"
                             required
                         ></ion-input>
@@ -109,7 +110,8 @@
                         <ion-textarea
                             label="{% trans 'Address' %} *"
                             label-placement="floating"
-                            x-model="business.address"
+                            :value="business.address"
+                            @ionInput="business.address = $event.target.value"
                             rows="2"
                             placeholder="{% trans 'Street, City, Postal Code' %}"
                             required
@@ -121,7 +123,8 @@
                             type="text"
                             label="{% trans 'VAT/Tax ID' %} *"
                             label-placement="floating"
-                            x-model="business.vat"
+                            :value="business.vat"
+                            @ionInput="business.vat = $event.target.value"
                             placeholder="{% trans 'e.g., ES12345678A' %}"
                             required
                         ></ion-input>
@@ -132,7 +135,8 @@
                             type="tel"
                             label="{% trans 'Phone' %}"
                             label-placement="floating"
-                            x-model="business.phone"
+                            :value="business.phone"
+                            @ionInput="business.phone = $event.target.value"
                             placeholder="+34 600 000 000"
                         ></ion-input>
                     </ion-item>
@@ -142,7 +146,8 @@
                             type="email"
                             label="{% trans 'Email' %}"
                             label-placement="floating"
-                            x-model="business.email"
+                            :value="business.email"
+                            @ionInput="business.email = $event.target.value"
                             placeholder="info@business.com"
                         ></ion-input>
                     </ion-item>
@@ -165,7 +170,8 @@
                             type="number"
                             label="{% trans 'Default Tax Rate (%)' %}"
                             label-placement="floating"
-                            x-model="tax.rate"
+                            :value="tax.rate"
+                            @ionInput="tax.rate = $event.target.value"
                             placeholder="21"
                             min="0"
                             max="100"

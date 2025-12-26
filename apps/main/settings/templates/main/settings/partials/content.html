@@ -130,7 +130,8 @@
                                         type="number"
                                         label="{% trans 'Tax Rate (%)' %}"
                                         label-placement="floating"
-                                        x-model="store.tax_rate"
+                                        :value="store.tax_rate"
+                                        @ionInput="store.tax_rate = $event.target.value"
                                         step="0.01"
                                         min="0"
                                         max="100"
@@ -211,7 +212,8 @@
                                     type="text"
                                     label="{% trans 'Name' %} *"
                                     label-placement="floating"
-                                    x-model="taxForm.name"
+                                    :value="taxForm.name"
+                                    @ionInput="taxForm.name = $event.target.value"
                                     placeholder="{% trans 'e.g., Standard 21%' %}"
                                     required
                                 ></ion-input>
@@ -222,7 +224,8 @@
                                     type="number"
                                     label="{% trans 'Rate (%)' %} *"
                                     label-placement="floating"
-                                    x-model="taxForm.rate"
+                                    :value="taxForm.rate"
+                                    @ionInput="taxForm.rate = $event.target.value"
                                     step="0.01"
                                     min="0"
                                     max="100"
@@ -236,14 +239,15 @@
                                     type="text"
                                     label="{% trans 'Description' %}"
                                     label-placement="floating"
-                                    x-model="taxForm.description"
+                                    :value="taxForm.description"
+                                    @ionInput="taxForm.description = $event.target.value"
                                     placeholder="{% trans 'Optional notes' %}"
                                 ></ion-input>
                             </ion-item>
 
                             <ion-item>
                                 <ion-label>{% trans "Set as default" %}</ion-label>
-                                <ion-toggle slot="end" x-model="taxForm.is_default"></ion-toggle>
+                                <ion-toggle slot="end" :checked="taxForm.is_default" @ionChange="taxForm.is_default = $event.detail.checked"></ion-toggle>
                             </ion-item>
                         </div>
 
