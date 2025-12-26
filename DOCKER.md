@@ -167,7 +167,7 @@ POST /api/hubs/deploy/
   "hub_id": "abc-123-def",
   "docker_container_id": "container_xyz",
   "assigned_port": 7001,
-  "url": "https://erplora.com/hubs/abc-123-def",
+  "url": "https://mi-tienda.erplora.com",
   "credentials": {
     "cloud_api_token": "token-secret"
   }
