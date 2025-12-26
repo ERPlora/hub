@@ -130,14 +130,18 @@ def marketplace_modules_list(request):
     """
     HTMX endpoint: Fetch and render modules from Cloud API.
     Returns HTML partial with module cards.
+    Supports filters: q (search), category, type, page
     """
     from django.template.loader import render_to_string
     from django.http import HttpResponse
+    from django.core.paginator import Paginator
     from apps.configuration.models import HubConfig
 
     # Get filters from query params
     search_query = request.GET.get('q', '').strip()
     category_filter = request.GET.get('category', '').strip()
+    type_filter = request.GET.get('type', '').strip()  # free, one_time, subscription
+    page_number = request.GET.get('page', 1)
 
     # Get installed modules
     modules_dir = Path(django_settings.MODULES_DIR)
@@ -193,14 +197,23 @@ def marketplace_modules_list(request):
         if category_filter:
             modules = [p for p in modules if p.get('category') == category_filter]
 
+        if type_filter:
+            modules = [p for p in modules if p.get('module_type') == type_filter]
+
         # Mark installed modules
         for module in modules:
             module['is_installed'] = module.get('slug', '') in installed_module_ids
 
+        # Pagination (12 modules per page)
+        paginator = Paginator(modules, 12)
+        page_obj = paginator.get_page(page_number)
+
         html = render_to_string('system/modules/partials/marketplace_modules_grid.html', {
-            'modules': modules,
+            'modules': page_obj.object_list,
+            'page_obj': page_obj,
             'search_query': search_query,
             'category_filter': category_filter,
+            'type_filter': type_filter,
         })
         return HttpResponse(html)
 
@@ -209,6 +222,98 @@ def marketplace_modules_list(request):
             'error': f'Failed to connect to Cloud: {str(e)}'
         })
         return HttpResponse(html)
+
+
+@login_required
+@htmx_view('system/modules/pages/module_detail.html', 'system/modules/partials/module_detail_content.html')
+def module_detail(request, slug):
+    """
+    Module detail page - fetches full module info from Cloud API.
+    """
+    from apps.configuration.models import HubConfig
+
+    # Check if module is installed locally
+    modules_dir = Path(django_settings.MODULES_DIR)
+    installed_module_ids = []
+    if modules_dir.exists():
+        for module_dir in modules_dir.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith('.'):
+                installed_module_ids.append(module_dir.name.lstrip('_'))
+
+    is_installed = slug in installed_module_ids
+
+    # Fetch module details from Cloud API
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return {
+            'current_section': 'marketplace',
+            'page_title': 'Module Not Found',
+            'error': 'Hub not connected to Cloud. Please connect in Settings.',
+            'module': None,
+        }
+
+    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+    headers = {
+        'Accept': 'application/json',
+        'X-Hub-Token': auth_token,
+    }
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/modules/{slug}/",
+            headers=headers,
+            timeout=30
+        )
+
+        if response.status_code != 200:
+            return {
+                'current_section': 'marketplace',
+                'page_title': 'Module Not Found',
+                'error': f'Module not found (status {response.status_code})',
+                'module': None,
+            }
+
+        module = response.json()
+        module['is_installed'] = is_installed
+
+        # Fetch related modules (same category)
+        related_modules = []
+        try:
+            all_response = requests.get(
+                f"{cloud_api_url}/api/marketplace/modules/",
+                headers=headers,
+                timeout=10
+            )
+            if all_response.status_code == 200:
+                all_data = all_response.json()
+                all_modules = all_data.get('results', all_data) if isinstance(all_data, dict) else all_data
+                if isinstance(all_modules, list):
+                    related_modules = [
+                        m for m in all_modules
+                        if m.get('category') == module.get('category') and m.get('slug') != slug
+                    ][:4]
+        except Exception:
+            pass
+
+        return {
+            'current_section': 'marketplace',
+            'page_title': module.get('name', 'Module'),
+            'module': module,
+            'is_installed': is_installed,
+            'is_owned': module.get('is_owned', False),
+            'is_free': module.get('is_free', False),
+            'related_modules': related_modules,
+        }
+
+    except requests.exceptions.RequestException as e:
+        return {
+            'current_section': 'marketplace',
+            'page_title': 'Error',
+            'error': f'Failed to connect to Cloud: {str(e)}',
+            'module': None,
+        }
 
 
 

@@ -13,6 +13,7 @@ urlpatterns = [
     # Pages (HTMX SPA)
     path('', views.modules_index, name='modules'),
     path('marketplace/', views.marketplace, name='marketplace'),
+    path('marketplace/<slug:slug>/', views.module_detail, name='module_detail'),
 
     # HTMX partials (HTML responses)
     path('htmx/modules-list/', views.marketplace_modules_list, name='marketplace_modules_list'),

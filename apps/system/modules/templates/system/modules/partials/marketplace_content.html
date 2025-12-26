@@ -7,26 +7,30 @@
 </div>
 {% endif %}
 
-<div class="ion-padding">
+<div class="ion-padding" x-data="marketplaceFilters()">
     <!-- Header -->
     <div class="mb-6">
         <h1 class="text-2xl font-bold">{% trans "Module Store" %}</h1>
         <p class="text-medium">{% trans "Extend your Hub with powerful modules" %}</p>
     </div>
 
-    <!-- Search and Filters -->
-    <div class="flex flex-wrap gap-4 mb-6">
+    <!-- Search and Filters Row -->
+    <div class="flex flex-wrap gap-4 mb-4 items-center">
         <ion-searchbar
             id="search-input"
             placeholder="{% trans 'Search modules...' %}"
             class="flex-1 min-w-64"
-            debounce="300">
+            debounce="300"
+            x-model="searchQuery"
+            @ionInput="debouncedFetch()">
         </ion-searchbar>
 
         <ion-select
             id="category-select"
             placeholder="{% trans 'All Categories' %}"
-            interface="popover">
+            interface="popover"
+            x-model="categoryFilter"
+            @ionChange="fetchModules()">
             <ion-select-option value="">{% trans "All Categories" %}</ion-select-option>
             {% for category in categories %}
             <ion-select-option value="{{ category.slug }}">{{ category.name }}</ion-select-option>
@@ -34,37 +38,62 @@
         </ion-select>
     </div>
 
-    <script>
-    // Ionic components need event listeners for HTMX integration
-    (function() {
-        const searchInput = document.getElementById('search-input');
-        const categorySelect = document.getElementById('category-select');
-        const modulesGrid = document.getElementById('marketplace-modules-grid');
-        let searchTimeout = null;
+    <!-- Type Filter Chips -->
+    <div class="flex flex-wrap gap-2 mb-6">
+        <ion-chip
+            :color="typeFilter === '' ? 'primary' : 'medium'"
+            @click="setTypeFilter('')"
+            class="cursor-pointer">
+            <ion-label>{% trans "All" %}</ion-label>
+        </ion-chip>
+        <ion-chip
+            :color="typeFilter === 'free' ? 'success' : 'medium'"
+            @click="setTypeFilter('free')"
+            class="cursor-pointer">
+            <ion-icon name="gift-outline" class="mr-1"></ion-icon>
+            <ion-label>{% trans "Free" %}</ion-label>
+        </ion-chip>
+        <ion-chip
+            :color="typeFilter === 'one_time' ? 'primary' : 'medium'"
+            @click="setTypeFilter('one_time')"
+            class="cursor-pointer">
+            <ion-icon name="card-outline" class="mr-1"></ion-icon>
+            <ion-label>{% trans "One-time" %}</ion-label>
+        </ion-chip>
+        <ion-chip
+            :color="typeFilter === 'subscription' ? 'tertiary' : 'medium'"
+            @click="setTypeFilter('subscription')"
+            class="cursor-pointer">
+            <ion-icon name="sync-outline" class="mr-1"></ion-icon>
+            <ion-label>{% trans "Subscription" %}</ion-label>
+        </ion-chip>
+    </div>
 
-        function fetchModules() {
-            const searchValue = searchInput?.value || '';
-            const categoryValue = categorySelect?.value || '';
-            const params = new URLSearchParams();
-            if (searchValue) params.set('q', searchValue);
-            if (categoryValue) params.set('category', categoryValue);
-
-            const url = '{% url "system:marketplace_modules_list" %}' + (params.toString() ? '?' + params.toString() : '');
-            htmx.ajax('GET', url, { target: '#marketplace-modules-grid', swap: 'innerHTML', indicator: '#loading-spinner' });
-        }
-
-        if (searchInput) {
-            searchInput.addEventListener('ionInput', function() {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(fetchModules, 300);
-            });
-        }
-
-        if (categorySelect) {
-            categorySelect.addEventListener('ionChange', fetchModules);
-        }
-    })();
-    </script>
+    <!-- Active Filters Display -->
+    <div class="flex flex-wrap gap-2 mb-4" x-show="hasActiveFilters()">
+        <span class="text-medium text-sm py-2">{% trans "Active filters:" %}</span>
+        <template x-if="searchQuery">
+            <ion-chip color="light" class="cursor-pointer" @click="clearSearch()">
+                <ion-label x-text="'{{ _("Search") }}: ' + searchQuery"></ion-label>
+                <ion-icon name="close-circle"></ion-icon>
+            </ion-chip>
+        </template>
+        <template x-if="categoryFilter">
+            <ion-chip color="light" class="cursor-pointer" @click="clearCategory()">
+                <ion-label x-text="'{{ _("Category") }}: ' + categoryFilter"></ion-label>
+                <ion-icon name="close-circle"></ion-icon>
+            </ion-chip>
+        </template>
+        <template x-if="typeFilter">
+            <ion-chip color="light" class="cursor-pointer" @click="clearType()">
+                <ion-label x-text="'{{ _("Type") }}: ' + getTypeLabel(typeFilter)"></ion-label>
+                <ion-icon name="close-circle"></ion-icon>
+            </ion-chip>
+        </template>
+        <ion-button size="small" fill="clear" @click="clearAllFilters()">
+            {% trans "Clear all" %}
+        </ion-button>
+    </div>
 
     <!-- Loading Spinner -->
     <div id="loading-spinner" class="htmx-indicator flex justify-center py-12">
@@ -83,6 +112,91 @@
         </div>
     </div>
 </div>
+
+<!-- Alpine.js Filter Logic -->
+<script>
+function marketplaceFilters() {
+    return {
+        searchQuery: '',
+        categoryFilter: '',
+        typeFilter: '',
+        searchTimeout: null,
+
+        init() {
+            // Sync with existing DOM elements after Alpine initializes
+            this.$nextTick(() => {
+                const searchInput = document.getElementById('search-input');
+                const categorySelect = document.getElementById('category-select');
+                if (searchInput) this.searchQuery = searchInput.value || '';
+                if (categorySelect) this.categoryFilter = categorySelect.value || '';
+            });
+        },
+
+        setTypeFilter(type) {
+            this.typeFilter = type;
+            this.fetchModules();
+        },
+
+        hasActiveFilters() {
+            return this.searchQuery || this.categoryFilter || this.typeFilter;
+        },
+
+        clearSearch() {
+            this.searchQuery = '';
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) searchInput.value = '';
+            this.fetchModules();
+        },
+
+        clearCategory() {
+            this.categoryFilter = '';
+            const categorySelect = document.getElementById('category-select');
+            if (categorySelect) categorySelect.value = '';
+            this.fetchModules();
+        },
+
+        clearType() {
+            this.typeFilter = '';
+            this.fetchModules();
+        },
+
+        clearAllFilters() {
+            this.searchQuery = '';
+            this.categoryFilter = '';
+            this.typeFilter = '';
+            const searchInput = document.getElementById('search-input');
+            const categorySelect = document.getElementById('category-select');
+            if (searchInput) searchInput.value = '';
+            if (categorySelect) categorySelect.value = '';
+            this.fetchModules();
+        },
+
+        getTypeLabel(type) {
+            const labels = {
+                'free': '{% trans "Free" %}',
+                'one_time': '{% trans "One-time" %}',
+                'subscription': '{% trans "Subscription" %}'
+            };
+            return labels[type] || type;
+        },
+
+        debouncedFetch() {
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(() => this.fetchModules(), 300);
+        },
+
+        fetchModules() {
+            const params = new URLSearchParams();
+            if (this.searchQuery) params.set('q', this.searchQuery);
+            if (this.categoryFilter) params.set('category', this.categoryFilter);
+            if (this.typeFilter) params.set('type', this.typeFilter);
+
+            const url = '{% url "system:marketplace_modules_list" %}' + (params.toString() ? '?' + params.toString() : '');
+            htmx.ajax('GET', url, { target: '#marketplace-modules-grid', swap: 'innerHTML', indicator: '#loading-spinner' });
+        }
+    }
+}
+</script>
 
 <!-- Marketplace module actions (uses global UI helpers from toast-helper.js) -->
 <script>
@@ -203,5 +317,8 @@ function setButtonLoading(button, loading) {
 }
 .htmx-request .install-spinner {
     display: block !important;
+}
+.cursor-pointer {
+    cursor: pointer;
 }
 </style>
