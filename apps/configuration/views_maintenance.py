@@ -92,23 +92,25 @@ def scan_orphaned_data(request):
             if not table_module:
                 orphaned_tables.append(table)
 
-        # Find orphaned migrations
-        cursor.execute("SELECT app, name FROM django_migrations ORDER BY app, name")
-        all_migrations = cursor.fetchall()
-
-        # Core apps (whitelist)
-        core_apps = {
-            'configuration', 'accounts', 'sync', 'modules_admin',
-            'contenttypes', 'auth', 'sessions', 'admin',
-            'core', 'modules'  # Legacy apps (before refactoring)
-        }
-
+        # Find orphaned migrations (if table exists)
         orphaned_migrations = []
-        for app, name in all_migrations:
-            if app in core_apps:
-                continue
-            if app not in active_modules:
-                orphaned_migrations.append({'app': app, 'name': name})
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='django_migrations'")
+        if cursor.fetchone():
+            cursor.execute("SELECT app, name FROM django_migrations ORDER BY app, name")
+            all_migrations = cursor.fetchall()
+
+            # Core apps (whitelist)
+            core_apps = {
+                'configuration', 'accounts', 'sync', 'modules_admin',
+                'contenttypes', 'auth', 'sessions', 'admin',
+                'core', 'modules'  # Legacy apps (before refactoring)
+            }
+
+            for app, name in all_migrations:
+                if app in core_apps:
+                    continue
+                if app not in active_modules:
+                    orphaned_migrations.append({'app': app, 'name': name})
 
         conn.close()
 
@@ -275,23 +277,25 @@ def clean_orphaned_data(request):
             if not table_module:
                 orphaned_tables.append(table)
 
-        # Find orphaned migrations
-        cursor.execute("SELECT app, name FROM django_migrations ORDER BY app, name")
-        all_migrations = cursor.fetchall()
-
-        # Core apps (whitelist)
-        core_apps = {
-            'configuration', 'accounts', 'sync', 'modules_admin',
-            'contenttypes', 'auth', 'sessions', 'admin',
-            'core', 'modules'  # Legacy apps (before refactoring)
-        }
-
+        # Find orphaned migrations (if table exists)
         orphaned_migrations = []
-        for app, name in all_migrations:
-            if app in core_apps:
-                continue
-            if app not in active_modules:
-                orphaned_migrations.append({'app': app, 'name': name})
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='django_migrations'")
+        if cursor.fetchone():
+            cursor.execute("SELECT app, name FROM django_migrations ORDER BY app, name")
+            all_migrations = cursor.fetchall()
+
+            # Core apps (whitelist)
+            core_apps = {
+                'configuration', 'accounts', 'sync', 'modules_admin',
+                'contenttypes', 'auth', 'sessions', 'admin',
+                'core', 'modules'  # Legacy apps (before refactoring)
+            }
+
+            for app, name in all_migrations:
+                if app in core_apps:
+                    continue
+                if app not in active_modules:
+                    orphaned_migrations.append({'app': app, 'name': name})
 
         # Delete orphaned tables
         for table in orphaned_tables:

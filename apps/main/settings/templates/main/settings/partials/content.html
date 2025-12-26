@@ -35,7 +35,8 @@
                                         type="text"
                                         label="{% trans 'Business Name' %} *"
                                         label-placement="floating"
-                                        x-model="store.business_name"
+                                        :value="store.business_name"
+                                        @ionInput="store.business_name = $event.target.value"
                                         placeholder="{% trans 'Your business name' %}"
                                     ></ion-input>
                                 </ion-item>
@@ -45,7 +46,8 @@
                                     <ion-textarea
                                         label="{% trans 'Address' %} *"
                                         label-placement="floating"
-                                        x-model="store.business_address"
+                                        :value="store.business_address"
+                                        @ionInput="store.business_address = $event.target.value"
                                         rows="2"
                                         placeholder="{% trans 'Street, City, Postal Code' %}"
                                     ></ion-textarea>
@@ -57,7 +59,8 @@
                                         type="text"
                                         label="{% trans 'VAT/Tax ID' %} *"
                                         label-placement="floating"
-                                        x-model="store.vat_number"
+                                        :value="store.vat_number"
+                                        @ionInput="store.vat_number = $event.target.value"
                                         placeholder="{% trans 'e.g., ES12345678A' %}"
                                     ></ion-input>
                                 </ion-item>
@@ -68,7 +71,8 @@
                                         type="tel"
                                         label="{% trans 'Phone' %}"
                                         label-placement="floating"
-                                        x-model="store.phone"
+                                        :value="store.phone"
+                                        @ionInput="store.phone = $event.target.value"
                                         placeholder="+34 600 000 000"
                                     ></ion-input>
                                 </ion-item>
@@ -79,7 +83,8 @@
                                         type="email"
                                         label="{% trans 'Email' %}"
                                         label-placement="floating"
-                                        x-model="store.email"
+                                        :value="store.email"
+                                        @ionInput="store.email = $event.target.value"
                                         placeholder="info@business.com"
                                     ></ion-input>
                                 </ion-item>
@@ -90,7 +95,8 @@
                                         type="url"
                                         label="{% trans 'Website' %}"
                                         label-placement="floating"
-                                        x-model="store.website"
+                                        :value="store.website"
+                                        @ionInput="store.website = $event.target.value"
                                         placeholder="https://www.business.com"
                                     ></ion-input>
                                 </ion-item>
