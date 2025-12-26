@@ -185,8 +185,8 @@ class PinLoginView(APIView):
             user.last_login = timezone.now()
             user.save()
 
-            # Store session
-            request.session['local_user_id'] = user.id
+            # Store session (convert UUID to string for JSON serialization)
+            request.session['local_user_id'] = str(user.id)
             request.session['user_name'] = user.name
             request.session['user_email'] = user.email
             request.session['user_role'] = user.role
@@ -195,7 +195,7 @@ class PinLoginView(APIView):
             return Response({
                 'success': True,
                 'user': {
-                    'id': user.id,
+                    'id': str(user.id),
                     'name': user.name,
                     'email': user.email,
                     'role': user.role,
@@ -308,10 +308,10 @@ class CloudLoginView(APIView):
 
                     first_time = not local_user.pin_hash
 
-                    # Store session
+                    # Store session (convert UUID to string for JSON serialization)
                     request.session['jwt_token'] = access_token
                     request.session['jwt_refresh'] = refresh_token
-                    request.session['local_user_id'] = local_user.id
+                    request.session['local_user_id'] = str(local_user.id)
                     request.session['user_name'] = local_user.name
                     request.session['user_email'] = local_user.email
                     request.session['user_role'] = local_user.role
@@ -323,7 +323,7 @@ class CloudLoginView(APIView):
                         'access': access_token,
                         'refresh': refresh_token,
                         'user': {
-                            'id': local_user.id,
+                            'id': str(local_user.id),
                             'name': local_user.name,
                             'email': local_user.email,
                             'role': local_user.role,
@@ -386,8 +386,8 @@ class SetupPinView(APIView):
         user.last_login = timezone.now()
         user.save()
 
-        # Update session
-        request.session['local_user_id'] = user.id
+        # Update session (convert UUID to string for JSON serialization)
+        request.session['local_user_id'] = str(user.id)
         request.session['user_name'] = user.name
         request.session['user_email'] = user.email
         request.session['user_role'] = user.role

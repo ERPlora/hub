@@ -12,10 +12,10 @@ Sistema POS (Point of Sale) modular Django con **dos modos de despliegue**.
 - Extensible con modules (gratuitos o de pago)
 
 ### 2. Cloud Hub (SaaS)
-- Contenedor Docker desplegado via Dokploy
-- SQLite en volumen Docker persistente
-- Acceso via subdominio: `{subdomain}.erplora.com` (ej: `mi-tienda.erplora.com`)
-- Planes de suscripcion (definidos en base de datos)
+- Contenedor Docker
+- SQLite en volumen persistente
+- Acceso via subdominio: `{subdomain}.erplora.com`
+- Planes de suscripcion
 
 **Nota:** Ambos modos usan el mismo codigo Django. La unica diferencia es el metodo de despliegue.
 
@@ -58,7 +58,7 @@ hub/
 │   ├── accounts/             # LocalUser, autenticacion con PIN
 │   ├── configuration/        # HubConfig, StoreConfig (singleton)
 │   ├── modules/              # Module model, runtime manager
-│   ├── sync/                 # Cloud API client (HTTP)
+│   ├── sync/                 # Sincronizacion con Cloud
 │   └── core/                 # Utilidades compartidas
 │
 ├── config/                   # Configuracion Django
@@ -72,7 +72,7 @@ hub/
 │
 ├── templates/               # Django templates (Ionic + HTMX)
 ├── static/                  # CSS/JS
-├── Dockerfile               # Build para Cloud Hub (Dokploy)
+├── Dockerfile               # Build para Cloud Hub
 ├── main.py                  # Entry point para Desktop Hub (PyInstaller)
 ├── main.spec                # Configuracion PyInstaller
 ├── build.py                 # Script de build Desktop
@@ -108,7 +108,7 @@ python build.py
 ### Variables de Entorno
 
 ```bash
-# Identificacion (inyectadas por Dokploy)
+# Identificacion
 HUB_ID=a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 # Conexion con Cloud
@@ -182,17 +182,9 @@ pytest --cov=apps --cov-report=html
 | Database | SQLite |
 | Frontend | Ionic 8 (iOS mode) + Alpine.js + HTMX |
 | Autenticacion | LocalUser con PIN + JWT (Cloud API) |
-| Deployment Cloud | Docker + Dokploy |
+| Deployment Cloud | Docker |
 | Deployment Desktop | PyInstaller |
 
 ---
 
-## Enlaces
-
-- **Arquitectura**: [/docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
-- **CLAUDE.md Hub**: [CLAUDE.md](CLAUDE.md)
-- **CLAUDE.md principal**: [/CLAUDE.md](../CLAUDE.md)
-
----
-
-**Ultima actualizacion:** 2025-12-09
+**Ultima actualizacion:** 2025-12-26
