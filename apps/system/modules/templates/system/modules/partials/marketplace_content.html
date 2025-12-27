@@ -7,39 +7,65 @@
 </div>
 {% endif %}
 
-<div class="ion-padding" x-data="marketplaceFilters()">
+<div class="ion-padding" x-data="marketplaceFilters()" x-init="init()">
     <!-- Header -->
     <div class="mb-6">
         <h1 class="text-2xl font-bold">{% trans "Module Store" %}</h1>
         <p class="text-medium">{% trans "Extend your Hub with powerful modules" %}</p>
     </div>
 
-    <!-- Search and Filters Row -->
-    <div class="flex flex-wrap gap-4 mb-4 items-center">
-        <ion-searchbar
-            id="search-input"
-            placeholder="{% trans 'Search modules...' %}"
-            class="flex-1 min-w-64"
-            debounce="300"
-            x-model="searchQuery"
-            @ionInput="debouncedFetch()">
-        </ion-searchbar>
+    <!-- Search & Filters (matching Cloud design) -->
+    <ion-grid class="ion-no-padding ion-margin-bottom">
+        <!-- Search Row -->
+        <ion-row>
+            <ion-col size="12">
+                <ion-searchbar
+                    id="search-input"
+                    placeholder="{% trans 'Search modules...' %}"
+                    debounce="300"
+                    show-cancel-button="focus"
+                    @ionInput="onSearchInput($event)"
+                    @ionCancel="clearSearch()">
+                </ion-searchbar>
+            </ion-col>
+        </ion-row>
 
-        <ion-select
-            id="category-select"
-            placeholder="{% trans 'All Categories' %}"
-            interface="popover"
-            x-model="categoryFilter"
-            @ionChange="fetchModules()">
-            <ion-select-option value="">{% trans "All Categories" %}</ion-select-option>
-            {% for category in categories %}
-            <ion-select-option value="{{ category.slug }}">{{ category.name }}</ion-select-option>
-            {% endfor %}
-        </ion-select>
-    </div>
+        <!-- Filters Row: stacked on small, side by side on large -->
+        <ion-row class="ion-align-items-center">
+            <!-- Category Filter -->
+            <ion-col size="12" size-lg="6">
+                <ion-select
+                    id="category-select"
+                    aria-label="{% trans 'Categories' %}"
+                    placeholder="{% trans 'Filter by category' %}"
+                    :value="categoryFilter"
+                    @ionChange="onCategoryChange($event)">
+                    <ion-select-option value="">{% trans "All Categories" %}</ion-select-option>
+                    {% for category in categories %}
+                    <ion-select-option value="{{ category.id }}">{{ category.name }}</ion-select-option>
+                    {% endfor %}
+                </ion-select>
+            </ion-col>
+
+            <!-- Industry Filter -->
+            <ion-col size="12" size-lg="6">
+                <ion-select
+                    id="industry-select"
+                    aria-label="{% trans 'Industries' %}"
+                    placeholder="{% trans 'Filter by industry' %}"
+                    :value="industryFilter"
+                    @ionChange="onIndustryChange($event)">
+                    <ion-select-option value="">{% trans "All Industries" %}</ion-select-option>
+                    {% for industry in industries %}
+                    <ion-select-option value="{{ industry.id }}">{{ industry.name }}</ion-select-option>
+                    {% endfor %}
+                </ion-select>
+            </ion-col>
+        </ion-row>
+    </ion-grid>
 
     <!-- Type Filter Chips -->
-    <div class="flex flex-wrap gap-2 mb-6">
+    <div class="flex flex-wrap gap-2 mb-4 items-center">
         <ion-chip
             :color="typeFilter === '' ? 'primary' : 'medium'"
             @click="setTypeFilter('')"
@@ -69,28 +95,36 @@
         </ion-chip>
     </div>
 
-    <!-- Active Filters Display -->
-    <div class="flex flex-wrap gap-2 mb-4" x-show="hasActiveFilters()">
-        <span class="text-medium text-sm py-2">{% trans "Active filters:" %}</span>
+    <!-- Active Filters Summary -->
+    <div class="flex flex-wrap gap-2 mb-4 items-center" x-show="hasActiveFilters()" x-cloak>
+        <span class="text-sm text-gray-500">{% trans "Active:" %}</span>
         <template x-if="searchQuery">
-            <ion-chip color="light" class="cursor-pointer" @click="clearSearch()">
-                <ion-label x-text="'{{ _("Search") }}: ' + searchQuery"></ion-label>
-                <ion-icon name="close-circle"></ion-icon>
+            <ion-chip color="warning" class="cursor-pointer" @click="clearSearch()">
+                <ion-icon name="search" class="mr-1"></ion-icon>
+                <ion-label x-text="searchQuery"></ion-label>
+                <ion-icon name="close-circle" class="ml-1"></ion-icon>
             </ion-chip>
         </template>
         <template x-if="categoryFilter">
-            <ion-chip color="light" class="cursor-pointer" @click="clearCategory()">
-                <ion-label x-text="'{{ _("Category") }}: ' + categoryFilter"></ion-label>
-                <ion-icon name="close-circle"></ion-icon>
+            <ion-chip color="warning" class="cursor-pointer" @click="setCategory('')">
+                <ion-label x-text="getCategoryName(categoryFilter)"></ion-label>
+                <ion-icon name="close-circle" class="ml-1"></ion-icon>
+            </ion-chip>
+        </template>
+        <template x-if="industryFilter">
+            <ion-chip color="warning" class="cursor-pointer" @click="setIndustry('')">
+                <ion-label x-text="getIndustryName(industryFilter)"></ion-label>
+                <ion-icon name="close-circle" class="ml-1"></ion-icon>
             </ion-chip>
         </template>
         <template x-if="typeFilter">
-            <ion-chip color="light" class="cursor-pointer" @click="clearType()">
-                <ion-label x-text="'{{ _("Type") }}: ' + getTypeLabel(typeFilter)"></ion-label>
-                <ion-icon name="close-circle"></ion-icon>
+            <ion-chip color="warning" class="cursor-pointer" @click="setTypeFilter('')">
+                <ion-label x-text="getTypeLabel(typeFilter)"></ion-label>
+                <ion-icon name="close-circle" class="ml-1"></ion-icon>
             </ion-chip>
         </template>
-        <ion-button size="small" fill="clear" @click="clearAllFilters()">
+        <ion-button size="small" fill="clear" color="danger" @click="clearAllFilters()">
+            <ion-icon name="trash-outline" slot="start"></ion-icon>
             {% trans "Clear all" %}
         </ion-button>
     </div>
@@ -119,17 +153,56 @@ function marketplaceFilters() {
     return {
         searchQuery: '',
         categoryFilter: '',
+        industryFilter: '',
         typeFilter: '',
         searchTimeout: null,
 
+        // Maps for displaying filter names
+        categoryMap: {
+            {% for category in categories %}
+            '{{ category.id }}': '{{ category.name }}',
+            {% endfor %}
+        },
+        industryMap: {
+            {% for industry in industries %}
+            '{{ industry.id }}': '{{ industry.name }}',
+            {% endfor %}
+        },
+
         init() {
-            // Sync with existing DOM elements after Alpine initializes
-            this.$nextTick(() => {
-                const searchInput = document.getElementById('search-input');
-                const categorySelect = document.getElementById('category-select');
-                if (searchInput) this.searchQuery = searchInput.value || '';
-                if (categorySelect) this.categoryFilter = categorySelect.value || '';
-            });
+            // Nothing to sync on init - start fresh
+        },
+
+        onSearchInput(event) {
+            // Get value from Ionic's custom event
+            this.searchQuery = event.target.value || '';
+            this.debouncedFetch();
+        },
+
+        onCategoryChange(event) {
+            this.categoryFilter = event.detail.value || '';
+            this.fetchModules();
+        },
+
+        onIndustryChange(event) {
+            this.industryFilter = event.detail.value || '';
+            this.fetchModules();
+        },
+
+        setCategory(category) {
+            this.categoryFilter = category;
+            // Update the select element
+            const select = document.getElementById('category-select');
+            if (select) select.value = category;
+            this.fetchModules();
+        },
+
+        setIndustry(industry) {
+            this.industryFilter = industry;
+            // Update the select element
+            const select = document.getElementById('industry-select');
+            if (select) select.value = industry;
+            this.fetchModules();
         },
 
         setTypeFilter(type) {
@@ -138,7 +211,7 @@ function marketplaceFilters() {
         },
 
         hasActiveFilters() {
-            return this.searchQuery || this.categoryFilter || this.typeFilter;
+            return this.searchQuery || this.categoryFilter || this.industryFilter || this.typeFilter;
         },
 
         clearSearch() {
@@ -148,27 +221,26 @@ function marketplaceFilters() {
             this.fetchModules();
         },
 
-        clearCategory() {
-            this.categoryFilter = '';
-            const categorySelect = document.getElementById('category-select');
-            if (categorySelect) categorySelect.value = '';
-            this.fetchModules();
-        },
-
-        clearType() {
-            this.typeFilter = '';
-            this.fetchModules();
-        },
-
         clearAllFilters() {
             this.searchQuery = '';
             this.categoryFilter = '';
+            this.industryFilter = '';
             this.typeFilter = '';
             const searchInput = document.getElementById('search-input');
-            const categorySelect = document.getElementById('category-select');
             if (searchInput) searchInput.value = '';
+            const categorySelect = document.getElementById('category-select');
             if (categorySelect) categorySelect.value = '';
+            const industrySelect = document.getElementById('industry-select');
+            if (industrySelect) industrySelect.value = '';
             this.fetchModules();
+        },
+
+        getCategoryName(catId) {
+            return this.categoryMap[catId] || catId;
+        },
+
+        getIndustryName(indId) {
+            return this.industryMap[indId] || indId;
         },
 
         getTypeLabel(type) {
@@ -189,6 +261,7 @@ function marketplaceFilters() {
             const params = new URLSearchParams();
             if (this.searchQuery) params.set('q', this.searchQuery);
             if (this.categoryFilter) params.set('category', this.categoryFilter);
+            if (this.industryFilter) params.set('industry', this.industryFilter);
             if (this.typeFilter) params.set('type', this.typeFilter);
 
             const url = '{% url "system:marketplace_modules_list" %}' + (params.toString() ? '?' + params.toString() : '');

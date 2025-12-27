@@ -64,14 +64,16 @@ def get_png_base64(png_path: Path) -> str | None:
         return None
 
 
-def add_svg_classes(svg_content: str, classes: str) -> str:
+def add_svg_classes(svg_content: str, classes: str, size_px: int = 24) -> str:
     """
-    Add CSS classes to SVG element.
+    Add CSS classes and fixed size to SVG element.
     Preserves existing classes if present.
-    """
-    if not classes:
-        return svg_content
 
+    Args:
+        svg_content: The SVG content as string
+        classes: CSS classes to add
+        size_px: Size in pixels for width/height (default 24px)
+    """
     # Find the opening <svg tag
     svg_tag_match = re.search(r'<svg([^>]*)>', svg_content, re.IGNORECASE)
     if not svg_tag_match:
@@ -79,18 +81,26 @@ def add_svg_classes(svg_content: str, classes: str) -> str:
 
     tag_attrs = svg_tag_match.group(1)
 
-    # Check if class attribute exists
-    class_match = re.search(r'class=["\']([^"\']*)["\']', tag_attrs)
-    if class_match:
-        # Append to existing classes
-        existing_classes = class_match.group(1)
-        new_classes = f'{existing_classes} {classes}'
-        new_attrs = tag_attrs.replace(class_match.group(0), f'class="{new_classes}"')
-    else:
-        # Add new class attribute
-        new_attrs = f'{tag_attrs} class="{classes}"'
+    # Remove existing width/height to override
+    tag_attrs = re.sub(r'\s*width=["\'][^"\']*["\']', '', tag_attrs)
+    tag_attrs = re.sub(r'\s*height=["\'][^"\']*["\']', '', tag_attrs)
 
-    return svg_content.replace(svg_tag_match.group(0), f'<svg{new_attrs}>')
+    # Add fixed size
+    tag_attrs = f'{tag_attrs} width="{size_px}" height="{size_px}"'
+
+    # Check if class attribute exists
+    if classes:
+        class_match = re.search(r'class=["\']([^"\']*)["\']', tag_attrs)
+        if class_match:
+            # Append to existing classes
+            existing_classes = class_match.group(1)
+            new_classes = f'{existing_classes} {classes}'
+            tag_attrs = tag_attrs.replace(class_match.group(0), f'class="{new_classes}"')
+        else:
+            # Add new class attribute
+            tag_attrs = f'{tag_attrs} class="{classes}"'
+
+    return svg_content.replace(svg_tag_match.group(0), f'<svg{tag_attrs}>')
 
 
 def find_module_icon(module_id: str) -> dict | None:
@@ -129,6 +139,42 @@ def find_module_icon(module_id: str) -> dict | None:
     return None
 
 
+def size_to_px(size: str) -> int:
+    """
+    Convert Tailwind/Ionic size classes to pixels.
+
+    Args:
+        size: Size class like 'text-2xl', 'text-3xl', 'w-6', etc.
+
+    Returns:
+        Size in pixels (default 24)
+    """
+    size_map = {
+        'text-xs': 12,
+        'text-sm': 14,
+        'text-base': 16,
+        'text-lg': 18,
+        'text-xl': 20,
+        'text-2xl': 24,
+        'text-3xl': 30,
+        'text-4xl': 36,
+        'text-5xl': 48,
+        'text-6xl': 60,
+        'w-4': 16,
+        'w-5': 20,
+        'w-6': 24,
+        'w-8': 32,
+        'w-10': 40,
+        'w-12': 48,
+    }
+
+    for key, px in size_map.items():
+        if key in size:
+            return px
+
+    return 24  # Default
+
+
 @register.simple_tag
 def module_icon(module_id: str = None, icon: str = None, css_class: str = '', size: str = ''):
     """
@@ -150,6 +196,7 @@ def module_icon(module_id: str = None, icon: str = None, css_class: str = '', si
         Safe HTML string with inline SVG, img tag, or ion-icon element
     """
     all_classes = f'{css_class} {size}'.strip()
+    size_px = size_to_px(size)
 
     # Try to find icon in module directory
     if module_id:
@@ -157,13 +204,14 @@ def module_icon(module_id: str = None, icon: str = None, css_class: str = '', si
 
         if icon_info:
             if icon_info['type'] == 'svg':
-                svg_with_classes = add_svg_classes(icon_info['content'], all_classes)
+                svg_with_classes = add_svg_classes(icon_info['content'], all_classes, size_px)
                 return mark_safe(svg_with_classes)
 
             elif icon_info['type'] == 'png':
                 class_attr = f'class="{escape(all_classes)}"' if all_classes else ''
                 return mark_safe(
                     f'<img src="data:image/png;base64,{icon_info["data"]}" '
+                    f'width="{size_px}" height="{size_px}" '
                     f'{class_attr} alt="Module icon" />'
                 )
 
@@ -187,6 +235,7 @@ def svg_icon(path: str, css_class: str = '', size: str = ''):
         Safe HTML string with inline SVG or empty string if not found
     """
     all_classes = f'{css_class} {size}'.strip()
+    size_px = size_to_px(size)
 
     # Handle relative paths
     if not os.path.isabs(path):
@@ -200,7 +249,7 @@ def svg_icon(path: str, css_class: str = '', size: str = ''):
 
     svg_content = get_svg_content(svg_path)
     if svg_content:
-        svg_with_classes = add_svg_classes(svg_content, all_classes)
+        svg_with_classes = add_svg_classes(svg_content, all_classes, size_px)
         return mark_safe(svg_with_classes)
 
     return ''
@@ -232,6 +281,7 @@ def module_icon_component(module=None, module_id: str = None, icon: str = None,
         icon = icon or module.get('icon')
 
     all_classes = f'{css_class} {size}'.strip()
+    size_px = size_to_px(size)
 
     # Try to find icon
     icon_info = find_module_icon(module_id) if module_id else None
@@ -241,6 +291,7 @@ def module_icon_component(module=None, module_id: str = None, icon: str = None,
         'icon_name': icon or fallback_icon,
         'css_class': css_class,
         'size': size,
+        'size_px': size_px,
         'all_classes': all_classes,
         'has_svg': False,
         'has_png': False,
@@ -251,7 +302,7 @@ def module_icon_component(module=None, module_id: str = None, icon: str = None,
     if icon_info:
         if icon_info['type'] == 'svg':
             context['has_svg'] = True
-            context['svg_content'] = add_svg_classes(icon_info['content'], all_classes)
+            context['svg_content'] = add_svg_classes(icon_info['content'], all_classes, size_px)
         elif icon_info['type'] == 'png':
             context['has_png'] = True
             context['png_data'] = icon_info['data']

@@ -8,13 +8,13 @@
    ======================================== */
 
 :root {
-  /* Primary color - main brand color */
-  --ion-color-primary: #030213;
-  --ion-color-primary-rgb: 3, 2, 19;
+  /* Primary color - ERPlora brand blue (darker) for light mode */
+  --ion-color-primary: #4F5BD5;
+  --ion-color-primary-rgb: 79, 91, 213;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #030111;
-  --ion-color-primary-tint: #1c1c2b;
+  --ion-color-primary-shade: #4650bb;
+  --ion-color-primary-tint: #616bd9;
 
   /* Secondary color */
   --ion-color-secondary: #ececf0;
@@ -143,13 +143,13 @@
    ======================================== */
 
 body.dark {
-  /* Primary color - inverted for dark mode */
-  --ion-color-primary: #ffffff;
-  --ion-color-primary-rgb: 255, 255, 255;
-  --ion-color-primary-contrast: #030213;
-  --ion-color-primary-contrast-rgb: 3, 2, 19;
-  --ion-color-primary-shade: #e0e0e0;
-  --ion-color-primary-tint: #ffffff;
+  /* Primary color - ERPlora brand blue (lighter) for dark mode */
+  --ion-color-primary: #7B8CE8;
+  --ion-color-primary-rgb: 123, 140, 232;
+  --ion-color-primary-contrast: #000000;
+  --ion-color-primary-contrast-rgb: 0, 0, 0;
+  --ion-color-primary-shade: #6c7bcc;
+  --ion-color-primary-tint: #8898ea;
 
   /* Secondary color */
   --ion-color-secondary: #3a3a3a;

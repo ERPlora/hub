@@ -89,6 +89,7 @@ def modules_index(request):
 def marketplace(request):
     """Marketplace view - shows modules from ERPlora Cloud"""
     from apps.configuration.models import HubConfig
+    from config.module_categories import get_all_categories, get_all_industries
 
     modules_dir = Path(django_settings.MODULES_DIR)
     installed_module_ids = []
@@ -99,8 +100,14 @@ def marketplace(request):
                 module_id = module_dir.name.lstrip('_')
                 installed_module_ids.append(module_id)
 
-    # Fetch categories for the select dropdown
-    categories = []
+    # Get language for localized names
+    language = getattr(request, 'LANGUAGE_CODE', 'en')[:2]
+
+    # Get categories and industries from local config (fallback)
+    categories = get_all_categories(language)
+    industries = get_all_industries(language)
+
+    # Fetch from Cloud API (source of truth for multi-language support)
     hub_config = HubConfig.get_solo()
     auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
@@ -108,13 +115,27 @@ def marketplace(request):
         cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
         headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
         try:
-            response = requests.get(
+            # Fetch categories from Cloud
+            cat_response = requests.get(
                 f"{cloud_api_url}/api/marketplace/categories/",
-                headers=headers, timeout=10
+                headers=headers, params={'language': language}, timeout=10
             )
-            if response.status_code == 200:
-                categories = response.json()
+            if cat_response.status_code == 200:
+                cloud_categories = cat_response.json()
+                if cloud_categories:
+                    categories = cloud_categories
+
+            # Fetch industries from Cloud
+            ind_response = requests.get(
+                f"{cloud_api_url}/api/marketplace/industries/",
+                headers=headers, params={'language': language}, timeout=10
+            )
+            if ind_response.status_code == 200:
+                cloud_industries = ind_response.json()
+                if cloud_industries:
+                    industries = cloud_industries
         except Exception:
+            # Fallback to local config if Cloud is unreachable
             pass
 
     return {
@@ -122,6 +143,7 @@ def marketplace(request):
         'page_title': 'Module Store',
         'installed_module_ids': installed_module_ids,
         'categories': categories,
+        'industries': industries,
     }
 
 
@@ -130,7 +152,7 @@ def marketplace_modules_list(request):
     """
     HTMX endpoint: Fetch and render modules from Cloud API.
     Returns HTML partial with module cards.
-    Supports filters: q (search), category, type, page
+    Supports filters: q (search), category, industry, type, page
     """
     from django.template.loader import render_to_string
     from django.http import HttpResponse
@@ -140,6 +162,7 @@ def marketplace_modules_list(request):
     # Get filters from query params
     search_query = request.GET.get('q', '').strip()
     category_filter = request.GET.get('category', '').strip()
+    industry_filter = request.GET.get('industry', '').strip()
     type_filter = request.GET.get('type', '').strip()  # free, one_time, subscription
     page_number = request.GET.get('page', 1)
 
@@ -188,14 +211,35 @@ def marketplace_modules_list(request):
         # Apply filters
         if search_query:
             query_lower = search_query.lower()
-            modules = [
-                p for p in modules
-                if query_lower in p.get('name', '').lower()
-                or query_lower in p.get('description', '').lower()
-            ]
+            filtered_modules = []
+            for p in modules:
+                # Search in name
+                if query_lower in p.get('name', '').lower():
+                    filtered_modules.append(p)
+                    continue
+                # Search in description
+                if query_lower in p.get('description', '').lower():
+                    filtered_modules.append(p)
+                    continue
+                # Search in tags (list of strings)
+                tags = p.get('tags', [])
+                if isinstance(tags, list):
+                    for tag in tags:
+                        if query_lower in str(tag).lower():
+                            filtered_modules.append(p)
+                            break
+            modules = filtered_modules
 
         if category_filter:
             modules = [p for p in modules if p.get('category') == category_filter]
+
+        if industry_filter:
+            filtered_modules = []
+            for p in modules:
+                industries = p.get('industries', [])
+                if isinstance(industries, list) and industry_filter in industries:
+                    filtered_modules.append(p)
+            modules = filtered_modules
 
         if type_filter:
             modules = [p for p in modules if p.get('module_type') == type_filter]
@@ -213,6 +257,7 @@ def marketplace_modules_list(request):
             'page_obj': page_obj,
             'search_query': search_query,
             'category_filter': category_filter,
+            'industry_filter': industry_filter,
             'type_filter': type_filter,
         })
         return HttpResponse(html)
@@ -591,6 +636,7 @@ def fetch_marketplace(request):
             modules = data.get('results', data) if isinstance(data, dict) else data
 
             categories = []
+            industries = []
             try:
                 cat_response = requests.get(
                     f"{cloud_api_url}/api/marketplace/categories/",
@@ -598,13 +644,21 @@ def fetch_marketplace(request):
                 )
                 if cat_response.status_code == 200:
                     categories = cat_response.json()
+
+                ind_response = requests.get(
+                    f"{cloud_api_url}/api/marketplace/industries/",
+                    headers=headers, timeout=10
+                )
+                if ind_response.status_code == 200:
+                    industries = ind_response.json()
             except Exception:
                 pass
 
             return JsonResponse({
                 'success': True,
                 'modules': modules if isinstance(modules, list) else [],
-                'categories': categories
+                'categories': categories,
+                'industries': industries
             })
         else:
             return JsonResponse({

@@ -195,6 +195,20 @@ class MarketplaceClient:
         response.raise_for_status()
         return response.json()
 
+    def get_industries(self, language: str = 'en') -> list:
+        """
+        Get all module industries.
+
+        Args:
+            language: Language code for industry names ('en', 'es', etc.)
+
+        Returns:
+            List of industry dicts with 'id', 'name', 'description'
+        """
+        response = self._request('GET', 'industries/', params={'language': language})
+        response.raise_for_status()
+        return response.json()
+
     def get_featured(self) -> list:
         """
         Get featured modules.
