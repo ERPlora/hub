@@ -23,9 +23,8 @@
                     id="search-input"
                     placeholder="{% trans 'Search modules...' %}"
                     debounce="300"
-                    show-cancel-button="focus"
-                    @ionInput="onSearchInput($event)"
-                    @ionCancel="clearSearch()">
+                    show-cancel-button="never"
+                    @ionInput="onSearchInput($event)">
                 </ion-searchbar>
             </ion-col>
         </ion-row>
