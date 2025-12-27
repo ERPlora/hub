@@ -219,3 +219,142 @@ body.dark .shadow-ionic-lg {
 .bg-danger\/10 {
   background-color: rgba(var(--ion-color-danger-rgb), 0.1) !important;
 }
+
+/* ========================================
+   iOS-STYLE SCROLLBAR
+   Elegant, thin scrollbar that appears on scroll
+   ======================================== */
+
+/* Container with custom scrollbar - use class .scroll-ios */
+.scroll-ios {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--ion-color-medium-rgb), 0.3) transparent;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+.scroll-ios::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scroll-ios::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scroll-ios::-webkit-scrollbar-thumb {
+  background-color: rgba(var(--ion-color-medium-rgb), 0.3);
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.scroll-ios::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(var(--ion-color-medium-rgb), 0.5);
+}
+
+/* Hide scrollbar by default, show on hover/scroll */
+.scroll-ios-auto {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroll-ios-auto::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scroll-ios-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-ios-auto::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+}
+
+.scroll-ios-auto:hover::-webkit-scrollbar-thumb,
+.scroll-ios-auto:focus::-webkit-scrollbar-thumb,
+.scroll-ios-auto:focus-within::-webkit-scrollbar-thumb {
+  background-color: rgba(var(--ion-color-medium-rgb), 0.3);
+}
+
+.scroll-ios-auto:hover::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(var(--ion-color-medium-rgb), 0.5);
+}
+
+/* Horizontal scroll variant */
+.scroll-ios-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--ion-color-medium-rgb), 0.3) transparent;
+}
+
+.scroll-ios-x::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scroll-ios-x::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-ios-x::-webkit-scrollbar-thumb {
+  background-color: rgba(var(--ion-color-medium-rgb), 0.3);
+  border-radius: 3px;
+}
+
+/* ========================================
+   INFINITE SCROLL COMPONENTS
+   ======================================== */
+
+/* Loading indicator for infinite scroll */
+.infinite-scroll-loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  min-height: 60px;
+}
+
+.infinite-scroll-loader ion-spinner {
+  --color: var(--ion-color-primary);
+}
+
+/* End of list indicator */
+.infinite-scroll-end {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  color: var(--ion-color-medium);
+  font-size: 0.875rem;
+}
+
+/* Scroll container with max height for lists */
+.scroll-list {
+  max-height: calc(100vh - 300px);
+  min-height: 200px;
+}
+
+.scroll-list-sm {
+  max-height: 300px;
+}
+
+.scroll-list-md {
+  max-height: 500px;
+}
+
+.scroll-list-lg {
+  max-height: calc(100vh - 200px);
+}
+
+.scroll-list-full {
+  max-height: calc(100vh - 150px);
+}

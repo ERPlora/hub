@@ -187,6 +187,27 @@ INTERNAL_IPS = [
     'localhost',
 ]
 
+def show_toolbar_callback(request):
+    """Show debug toolbar only for HTML requests, not AJAX/JSON."""
+    if not DEBUG:
+        return False
+    # Skip for AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return False
+    # Skip for JSON requests
+    if 'application/json' in request.headers.get('Accept', ''):
+        return False
+    if 'application/json' in request.headers.get('Content-Type', ''):
+        return False
+    # Skip for API endpoints
+    if request.path.startswith('/api/'):
+        return False
+    # Skip for verify-pin endpoint
+    if request.path.startswith('/verify-pin/'):
+        return False
+    return True
+
+
 DEBUG_TOOLBAR_CONFIG = {
-    'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
+    'SHOW_TOOLBAR_CALLBACK': show_toolbar_callback,
 }
