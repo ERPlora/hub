@@ -2,13 +2,25 @@
 Main Settings Views
 """
 from decimal import Decimal, InvalidOperation
-from django.http import JsonResponse
+from django.http import HttpResponse
+from django.shortcuts import render
 from django.conf import settings as django_settings
 from django.utils import translation
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 from apps.accounts.models import LocalUser
 from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass
+
+
+def render_message(message, color='success'):
+    """Render a simple message HTML snippet"""
+    icon = 'checkmark-circle-outline' if color == 'success' else 'alert-circle-outline'
+    return f'''
+    <div class="flex items-center gap-2 p-3 rounded-lg" style="background: var(--ion-color-{color}-tint); color: var(--ion-color-{color}-shade);">
+        <ion-icon name="{icon}"></ion-icon>
+        <span>{message}</span>
+    </div>
+    '''
 
 
 @login_required
@@ -21,14 +33,6 @@ def index(request):
 
     if request.method == 'POST':
         action = request.POST.get('action')
-
-        # Handle dark mode toggle (instant save)
-        if action == 'update_theme':
-            dark_mode = request.POST.get('dark_mode') == 'true'
-            hub_config.dark_mode = dark_mode
-            hub_config.dark_mode_auto = False  # User chose manually, disable auto
-            hub_config.save()
-            return JsonResponse({'success': True})
 
         # Handle store settings form
         if action == 'update_store':
@@ -46,11 +50,8 @@ def index(request):
             except InvalidOperation:
                 store_config.tax_rate = Decimal('0')
 
-            store_config.tax_included = request.POST.get('tax_included') == 'true'
-
-            # Receipt configuration
-            store_config.receipt_header = request.POST.get('receipt_header', '').strip()
-            store_config.receipt_footer = request.POST.get('receipt_footer', '').strip()
+            # Checkbox sends value only when checked
+            store_config.tax_included = 'tax_included' in request.POST
 
             # Handle logo upload
             if 'logo' in request.FILES:
@@ -60,46 +61,54 @@ def index(request):
             store_config.is_configured = store_config.is_complete()
             store_config.save()
 
-            return JsonResponse({'success': True, 'message': 'Store settings saved'})
+            return HttpResponse(render_message('Store settings saved'))
 
-        # Handle user preferences form (language + avatar)
-        language = request.POST.get('language')
-        avatar = request.FILES.get('avatar')
+        # Handle user preferences form
+        if action == 'update_user':
+            language = request.POST.get('language')
+            avatar = request.FILES.get('avatar')
 
-        if language or avatar:
-            # Update language
             if language:
                 valid_languages = [code for code, name in django_settings.LANGUAGES]
                 if language in valid_languages:
                     user.language = language
-                    # Activate language in Django session
                     translation.activate(language)
                     request.session['_language'] = language
                     request.session['user_language'] = language
 
-            # Handle avatar upload
             if avatar:
                 user.avatar = avatar
 
             user.save()
-            return JsonResponse({'success': True, 'message': 'User preferences saved'})
 
-        # Handle hub settings form (currency)
-        currency = request.POST.get('currency')
-        if currency:
-            # Validate against POPULAR_CURRENCY_CHOICES (used in UI)
-            valid_currencies = [code for code, name in django_settings.POPULAR_CURRENCY_CHOICES]
-            if currency in valid_currencies:
-                hub_config.currency = currency
-                hub_config.save()
-                return JsonResponse({'success': True, 'message': 'Hub settings saved'})
-            else:
-                return JsonResponse({'success': False, 'error': 'Invalid currency'}, status=400)
+            # If language changed, trigger page reload
+            if language and language != request.session.get('user_language'):
+                response = HttpResponse(render_message('Preferences saved'))
+                response['HX-Refresh'] = 'true'
+                return response
+
+            return HttpResponse(render_message('Preferences saved'))
+
+        # Handle hub settings form
+        if action == 'update_hub':
+            currency = request.POST.get('currency')
+            dark_mode = 'dark_mode' in request.POST
+
+            if currency:
+                valid_currencies = [code for code, name in django_settings.POPULAR_CURRENCY_CHOICES]
+                if currency in valid_currencies:
+                    hub_config.currency = currency
+
+            hub_config.dark_mode = dark_mode
+            hub_config.dark_mode_auto = False
+            hub_config.save()
+
+            return HttpResponse(render_message('Hub settings saved'))
 
         # Handle backup settings form
         if action == 'update_backup':
             backup_config = BackupConfig.get_solo()
-            backup_config.enabled = request.POST.get('backup_enabled') == 'true'
+            backup_config.enabled = 'backup_enabled' in request.POST
             backup_config.frequency = request.POST.get('backup_frequency', 'daily')
             try:
                 backup_config.time_hour = int(request.POST.get('backup_hour', 3))
@@ -113,101 +122,57 @@ def index(request):
             from apps.configuration.services import backup_service
             backup_service.reschedule()
 
-            return JsonResponse({'success': True, 'message': 'Backup settings saved'})
+            return HttpResponse(render_message('Backup settings saved'))
 
         # Handle manual backup trigger
         if action == 'run_backup':
             from apps.configuration.services import backup_service
             success, path, size = backup_service.run_backup()
             if success:
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Backup completed',
-                    'path': path,
-                    'size': size
-                })
+                size_kb = round(size / 1024) if size else 0
+                return HttpResponse(render_message(f'Backup completed ({size_kb} KB)'))
             else:
-                return JsonResponse({'success': False, 'error': path}, status=500)
+                return HttpResponse(render_message(f'Backup failed: {path}', 'danger'), status=500)
 
         # Handle TaxClass actions
         if action == 'create_tax_class':
             name = request.POST.get('name', '').strip()
             rate = request.POST.get('rate', '0')
             description = request.POST.get('description', '').strip()
-            is_default = request.POST.get('is_default') == 'true'
+            is_default = 'is_default' in request.POST
 
             if not name:
-                return JsonResponse({'success': False, 'error': 'Name is required'}, status=400)
+                return HttpResponse(render_message('Name is required', 'danger'), status=400)
 
             try:
-                tax_class = TaxClass.objects.create(
+                TaxClass.objects.create(
                     name=name,
                     rate=Decimal(rate) if rate else Decimal('0'),
                     description=description,
                     is_default=is_default,
                 )
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Tax class created',
-                    'tax_class': {
-                        'id': tax_class.id,
-                        'name': tax_class.name,
-                        'rate': str(tax_class.rate),
-                        'description': tax_class.description,
-                        'is_default': tax_class.is_default,
-                    }
+                # Return updated tax classes list
+                tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
+                return render(request, 'main/settings/partials/tax_classes_list.html', {
+                    'tax_classes': tax_classes
                 })
             except (InvalidOperation, Exception) as e:
-                return JsonResponse({'success': False, 'error': str(e)}, status=400)
-
-        if action == 'update_tax_class':
-            tax_class_id = request.POST.get('tax_class_id')
-            try:
-                tax_class = TaxClass.objects.get(id=tax_class_id)
-                tax_class.name = request.POST.get('name', tax_class.name).strip()
-                tax_class.rate = Decimal(request.POST.get('rate', tax_class.rate))
-                tax_class.description = request.POST.get('description', '').strip()
-                tax_class.is_default = request.POST.get('is_default') == 'true'
-                tax_class.save()
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Tax class updated',
-                    'tax_class': {
-                        'id': tax_class.id,
-                        'name': tax_class.name,
-                        'rate': str(tax_class.rate),
-                        'description': tax_class.description,
-                        'is_default': tax_class.is_default,
-                    }
-                })
-            except TaxClass.DoesNotExist:
-                return JsonResponse({'success': False, 'error': 'Tax class not found'}, status=404)
-            except (InvalidOperation, Exception) as e:
-                return JsonResponse({'success': False, 'error': str(e)}, status=400)
+                return HttpResponse(render_message(str(e), 'danger'), status=400)
 
         if action == 'delete_tax_class':
             tax_class_id = request.POST.get('tax_class_id')
             try:
                 tax_class = TaxClass.objects.get(id=tax_class_id)
                 tax_class.delete()
-                return JsonResponse({'success': True, 'message': 'Tax class deleted'})
+                # Return updated tax classes list
+                tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
+                return render(request, 'main/settings/partials/tax_classes_list.html', {
+                    'tax_classes': tax_classes
+                })
             except TaxClass.DoesNotExist:
-                return JsonResponse({'success': False, 'error': 'Tax class not found'}, status=404)
+                return HttpResponse(render_message('Tax class not found', 'danger'), status=404)
 
-        if action == 'set_default_tax_class':
-            tax_class_id = request.POST.get('tax_class_id')
-            try:
-                if tax_class_id:
-                    tax_class = TaxClass.objects.get(id=tax_class_id)
-                    store_config.default_tax_class = tax_class
-                else:
-                    store_config.default_tax_class = None
-                store_config.save()
-                return JsonResponse({'success': True, 'message': 'Default tax class updated'})
-            except TaxClass.DoesNotExist:
-                return JsonResponse({'success': False, 'error': 'Tax class not found'}, status=404)
-
-        return JsonResponse({'success': True})
+        return HttpResponse(render_message('Settings saved'))
 
     # Get backup config and scheduler status
     backup_config = BackupConfig.get_solo()
@@ -217,7 +182,6 @@ def index(request):
     # Get all tax classes
     tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
 
-    # Use POPULAR_CURRENCY_CHOICES for the UI (24 most common currencies)
     return {
         'current_section': 'settings',
         'page_title': 'Settings',

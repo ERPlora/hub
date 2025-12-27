@@ -1,0 +1,37 @@
+{% load i18n %}
+
+{% if tax_classes %}
+<ion-list>
+    {% for tc in tax_classes %}
+    <ion-item>
+        <ion-label>
+            <h2>{{ tc.name }}</h2>
+            <p>
+                {{ tc.rate }}%
+                {% if tc.description %} - {{ tc.description }}{% endif %}
+            </p>
+        </ion-label>
+        {% if tc.is_default %}
+        <ion-chip slot="end" color="success">{% trans "Default" %}</ion-chip>
+        {% endif %}
+        <ion-button
+            slot="end"
+            fill="clear"
+            color="danger"
+            hx-post="{% url 'main:settings' %}"
+            hx-vals='{"action": "delete_tax_class", "tax_class_id": "{{ tc.id }}"}'
+            hx-target="#tax-classes-list"
+            hx-swap="innerHTML"
+            hx-confirm="{% trans 'Are you sure you want to delete this tax class?' %}">
+            <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+        </ion-button>
+    </ion-item>
+    {% endfor %}
+</ion-list>
+{% else %}
+<div class="text-center py-8" style="color: var(--ion-color-medium);">
+    <ion-icon name="alert-circle-outline" class="text-4xl mb-2"></ion-icon>
+    <p class="mb-2">{% trans "No tax classes configured" %}</p>
+    <p class="text-sm">{% trans "Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)" %}</p>
+</div>
+{% endif %}
