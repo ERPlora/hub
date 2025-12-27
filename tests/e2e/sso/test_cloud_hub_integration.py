@@ -343,11 +343,11 @@ class TestSSOExemptURLs(TestCase):
         self.client = Client()
 
     def test_health_endpoint_accessible_without_auth(self):
-        """Test that /health/ is accessible without authentication."""
-        response = self.client.get('/health/')
+        """Test that /api/v1/system/health/ is accessible without authentication."""
+        response = self.client.get('/api/v1/system/health/')
 
-        # Should be accessible (200 or at least not redirect to login)
-        assert response.status_code in [200, 404]  # 404 if not implemented
+        # Should be accessible - API endpoints are exempt from JWT middleware
+        assert response.status_code == 200
 
     def test_static_files_accessible_without_auth(self):
         """Test that static files are accessible without authentication."""

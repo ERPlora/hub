@@ -37,10 +37,15 @@ class TestPublicKeyFetcher:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = "-----BEGIN PUBLIC KEY-----\nMOCK_KEY\n-----END PUBLIC KEY-----"
-        mock_response.raise_for_status = Mock()  # Add this method
+        mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
 
         fetcher = PublicKeyFetcher(cloud_url='http://localhost:8000')
+
+        # Clear any cached key to force fetch from Cloud
+        fetcher._cached_key = None
+        fetcher._cache_timestamp = None
+
         public_key = fetcher.fetch()
 
         assert public_key is not None
@@ -340,30 +345,89 @@ class TestJWTMiddleware:
         assert response.status_code == 200
         get_response.assert_called_once()
 
-    @pytest.mark.skip(reason="JWTMiddleware EXEMPT_PATHS includes '/' which makes all paths exempt. Needs middleware fix.")
     @pytest.mark.django_db
     def test_shows_warning_with_valid_jwt_offline(self, rf, rsa_keys, valid_jwt_token):
         """
         GIVEN: Offline mode with valid (non-expired) JWT
-        WHEN: Making request
-        THEN: Should pass through with offline warning
-
-        NOTE: This test is skipped because the JWTMiddleware has '/' in EXEMPT_PATHS,
-        which causes all paths to be considered exempt (since all paths start with '/').
-        This is a middleware bug that needs to be fixed separately.
+        WHEN: Making request to a protected path
+        THEN: Should pass through with offline warning flag
         """
-        pass
+        from apps.accounts.middleware.jwt_middleware import JWTMiddleware
+        from django.contrib.sessions.middleware import SessionMiddleware
 
-    @pytest.mark.skip(reason="JWTMiddleware EXEMPT_PATHS includes '/' which makes all paths exempt. Needs middleware fix.")
+        mock_response = HttpResponse("OK")
+        get_response = Mock(return_value=mock_response)
+
+        # Use a protected path (not in EXEMPT_EXACT or EXEMPT_PREFIXES)
+        request = rf.get('/dashboard/')
+        session_middleware = SessionMiddleware(get_response)
+        session_middleware.process_request(request)
+        request.session['jwt_token'] = valid_jwt_token
+        request.session.save()
+
+        middleware = JWTMiddleware(get_response=get_response)
+
+        with patch('apps.accounts.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
+            with patch('apps.accounts.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
+                with patch('apps.accounts.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
+                    mock_checker = Mock()
+                    mock_checker.is_online.return_value = False  # Offline
+                    mock_get_checker.return_value = mock_checker
+
+                    mock_fetcher = Mock()
+                    mock_fetcher.fetch.return_value = rsa_keys['public']
+                    mock_get_fetcher.return_value = mock_fetcher
+
+                    mock_validator = Mock()
+                    mock_validator.validate.return_value = {'user_id': 1}
+                    mock_get_validator.return_value = mock_validator
+
+                    response = middleware(request)
+
+        assert response.status_code == 200
+        assert request.is_offline is True
+        get_response.assert_called_once()
+
     @pytest.mark.django_db
-    def test_redirects_to_pin_with_expired_jwt_offline(self, rf, rsa_keys, expired_jwt_token):
+    def test_redirects_to_login_with_expired_jwt_offline(self, rf, rsa_keys, expired_jwt_token):
         """
         GIVEN: Offline mode with expired JWT
-        WHEN: Making request
-        THEN: Should redirect to PIN login
-
-        NOTE: This test is skipped because the JWTMiddleware has '/' in EXEMPT_PATHS,
-        which causes all paths to be considered exempt (since all paths start with '/').
-        This is a middleware bug that needs to be fixed separately.
+        WHEN: Making request to a protected path
+        THEN: Should redirect to login page
         """
-        pass
+        from apps.accounts.middleware.jwt_middleware import JWTMiddleware
+        from apps.core.services.jwt_validator import TokenExpired
+        from django.contrib.sessions.middleware import SessionMiddleware
+
+        mock_response = HttpResponse("OK")
+        get_response = Mock(return_value=mock_response)
+
+        # Use a protected path
+        request = rf.get('/dashboard/')
+        session_middleware = SessionMiddleware(get_response)
+        session_middleware.process_request(request)
+        request.session['jwt_token'] = expired_jwt_token
+        request.session.save()
+
+        middleware = JWTMiddleware(get_response=get_response)
+
+        with patch('apps.accounts.middleware.jwt_middleware.get_connectivity_checker') as mock_get_checker:
+            with patch('apps.accounts.middleware.jwt_middleware.get_public_key_fetcher') as mock_get_fetcher:
+                with patch('apps.accounts.middleware.jwt_middleware.get_jwt_validator') as mock_get_validator:
+                    mock_checker = Mock()
+                    mock_checker.is_online.return_value = False  # Offline
+                    mock_get_checker.return_value = mock_checker
+
+                    mock_fetcher = Mock()
+                    mock_fetcher.fetch.return_value = rsa_keys['public']
+                    mock_get_fetcher.return_value = mock_fetcher
+
+                    mock_validator = Mock()
+                    mock_validator.validate.side_effect = TokenExpired("Token expired")
+                    mock_get_validator.return_value = mock_validator
+
+                    response = middleware(request)
+
+        # Should redirect to login
+        assert response.status_code == 302
+        assert '/login/' in response.url

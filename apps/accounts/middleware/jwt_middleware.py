@@ -26,14 +26,18 @@ class JWTMiddleware:
     4. If offline + expired JWT: Redirect to PIN login
     """
 
-    # Paths that don't require authentication
-    EXEMPT_PATHS = [
-        '/',  # Login page
+    # Paths that require exact match (no prefix matching)
+    EXEMPT_EXACT = ['/login/']
+
+    # Paths that use prefix matching (any path starting with these)
+    EXEMPT_PREFIXES = [
         '/verify-pin/',
         '/cloud-login/',
         '/setup-pin/',
+        '/setup/',  # Setup wizard (before first login)
         '/static/',
         '/media/',
+        '/api/',  # API endpoints handle their own auth
     ]
 
     def __init__(self, get_response):
@@ -58,11 +62,16 @@ class JWTMiddleware:
         if self._is_exempt_path(request.path):
             return self.get_response(request)
 
+        # Check if already authenticated via local PIN login
+        # (local_user_id in session means authenticated via PIN)
+        if request.session.get('local_user_id'):
+            return self.get_response(request)
+
         # Get JWT token from session
         jwt_token = request.session.get('jwt_token')
 
         if not jwt_token:
-            # No token - redirect to login
+            # No token and no local session - redirect to login
             return redirect(reverse('auth:login'))
 
         # Check connectivity
@@ -115,7 +124,13 @@ class JWTMiddleware:
         Returns:
             bool: True if exempt, False otherwise
         """
-        for exempt_path in self.EXEMPT_PATHS:
-            if path.startswith(exempt_path):
+        # Check exact matches first
+        if path in self.EXEMPT_EXACT:
+            return True
+
+        # Check prefix matches
+        for prefix in self.EXEMPT_PREFIXES:
+            if path.startswith(prefix):
                 return True
+
         return False

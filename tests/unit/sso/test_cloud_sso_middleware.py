@@ -237,6 +237,7 @@ class TestCloudSSOMiddlewareDesktopMode(TestCase):
         assert response.content == b'Desktop OK'
 
 
+@override_settings(CLOUD_API_URL='https://int.erplora.com')
 class TestCloudSSOMiddlewareCloudAPIVerification(TestCase):
     """Test Cloud API session verification."""
 
@@ -244,7 +245,6 @@ class TestCloudSSOMiddlewareCloudAPIVerification(TestCase):
         self.factory = RequestFactory()
         self.get_response = Mock(return_value=HttpResponse())
         self.middleware = CloudSSOMiddleware(self.get_response)
-        self.middleware.cloud_api_url = 'https://int.erplora.com'
 
     @patch('apps.core.middleware.cloud_sso_middleware.requests.get')
     def test_successful_session_verification(self, mock_get):
@@ -399,7 +399,7 @@ class TestCloudSSOMiddlewareLocalUserCreation(TestCase):
         result = self.middleware._ensure_local_user_and_session(request, user_data)
 
         assert result is None  # No redirect
-        assert request.session['local_user_id'] == user.id
+        assert request.session['local_user_id'] == str(user.id)  # Stored as string
         assert request.session['user_email'] == 'haspin@example.com'
         assert request.session['user_role'] == 'admin'
 

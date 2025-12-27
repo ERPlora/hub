@@ -46,47 +46,25 @@ class TestNewUserSetup:
         # Either loads wizard or redirects to setup
         assert response.status_code == 200
 
-        # 4. Complete wizard step 1
+        # 4. Complete wizard (single form with HTMX)
         response = client.post('/setup/', {
-            'action': 'save_business',
             'business_name': 'My New Store',
             'business_address': '456 Commerce Ave',
             'vat_number': 'ES98765432B',
             'phone': '+34 611 222 333',
             'email': 'store@example.com',
-            'website': ''
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
-
-        # 5. Complete wizard step 2
-        response = client.post('/setup/', {
-            'action': 'save_tax',
             'tax_rate': '21',
-            'tax_included': 'true'
+            'tax_included': 'on'
         })
+        # Success returns 200 with HX-Redirect header
         assert response.status_code == 200
+        assert response.get('HX-Redirect') == '/dashboard/'
 
-        # 6. Complete wizard step 3
-        response = client.post('/setup/', {
-            'action': 'save_receipt',
-            'receipt_header': 'Welcome to My Store!',
-            'receipt_footer': 'Thanks for your purchase!'
-        })
-        assert response.status_code == 200
-
-        # 7. Finish wizard
-        response = client.post('/setup/', {'action': 'finish'})
-        assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
-
-        # 8. Verify store is configured
+        # 5. Verify store is configured
         store_config = StoreConfig.get_solo()
         assert store_config.is_configured is True
         assert store_config.business_name == 'My New Store'
-        assert store_config.tax_rate == Decimal('21')
+        assert store_config.tax_rate == 21
 
 
 class TestConfigurationFlow:

@@ -18,7 +18,8 @@ pytestmark = pytest.mark.e2e
 @pytest.fixture
 def hub_config():
     """Setup HubConfig with test data."""
-    with patch('apps.configuration.models.HubConfig') as mock_class:
+    # Patch where HubConfig is imported/used, not where it's defined
+    with patch('apps.sync.services.cloud_api.HubConfig') as mock_class:
         config = MagicMock()
         config.hub_id = 'e2e-test-hub-id'
         config.hub_jwt = 'e2e.test.jwt.token'
@@ -276,6 +277,7 @@ class TestOfflineMode:
         # Heartbeat loop should handle errors gracefully
         heartbeat._send_heartbeat()  # Should not raise
 
+    @pytest.mark.django_db
     def test_offline_mode_with_no_jwt(self, mock_settings):
         """Test Hub works without JWT (offline mode)."""
         with patch('apps.configuration.models.HubConfig') as mock_config:
