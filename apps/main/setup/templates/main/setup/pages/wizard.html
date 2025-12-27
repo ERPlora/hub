@@ -20,87 +20,57 @@
         margin: 0;
     }
 
-    .step-indicator {
+    .section-title {
         display: flex;
-        justify-content: center;
+        align-items: center;
         gap: 0.5rem;
-        margin-bottom: 2rem;
+        margin: 1.5rem 0 1rem 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--ion-color-primary);
     }
 
-    .step-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: var(--ion-color-medium);
-        transition: all 0.3s;
-    }
-
-    .step-dot.active {
-        background: var(--ion-color-primary);
-        transform: scale(1.2);
-    }
-
-    .step-dot.completed {
-        background: var(--ion-color-success);
-    }
-
-    .step-content {
-        min-height: 300px;
-    }
-
-    .fade-enter {
-        opacity: 0;
-        transform: translateX(20px);
-    }
-
-    .fade-enter-active {
-        opacity: 1;
-        transform: translateX(0);
-        transition: all 0.3s ease;
+    .section-title:first-child {
+        margin-top: 0;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="setup-container" x-data="setupWizard()">
+<div class="setup-container">
     <ion-card class="setup-card">
         <!-- Header -->
         <ion-card-header class="text-center">
             <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 48px; height: 48px; margin: 0 auto 0.5rem;">
             <ion-card-title class="text-2xl">{% trans "Welcome to ERPlora" %}</ion-card-title>
-            <ion-card-subtitle>{% trans "Let's configure your hub" %}</ion-card-subtitle>
+            <ion-card-subtitle>{% trans "Configure your store to get started" %}</ion-card-subtitle>
         </ion-card-header>
 
-        <!-- Step Indicator -->
-        <div class="step-indicator">
-            <template x-for="i in 2" :key="i">
-                <div
-                    class="step-dot"
-                    :class="{
-                        'active': currentStep === i,
-                        'completed': currentStep > i
-                    }"
-                ></div>
-            </template>
-        </div>
-
         <ion-card-content>
-            <!-- Step 1: Business Info -->
-            <div x-show="currentStep === 1" x-transition:enter="fade-enter" x-transition:enter-start="fade-enter" x-transition:enter-end="fade-enter-active" class="step-content">
-                <h2 class="text-xl font-semibold mb-4 text-center">
-                    <ion-icon name="business-outline" class="mr-2"></ion-icon>
+            <form hx-post="{% url 'setup:wizard' %}"
+                  hx-target="#form-errors"
+                  hx-swap="innerHTML"
+                  hx-indicator="#submit-spinner">
+
+                {% csrf_token %}
+
+                <!-- Error container -->
+                <div id="form-errors"></div>
+
+                <!-- Business Information Section -->
+                <h3 class="section-title">
+                    <ion-icon name="business-outline"></ion-icon>
                     {% trans "Business Information" %}
-                </h2>
-                <p class="text-medium text-center mb-6">{% trans "Enter your business details" %}</p>
+                </h3>
 
                 <ion-list>
                     <ion-item>
                         <ion-input
                             type="text"
+                            name="business_name"
                             label="{% trans 'Business Name' %} *"
                             label-placement="floating"
-                            :value="business.name"
-                            @ionInput="business.name = $event.detail.value || ''"
+                            value="{{ store_config.business_name }}"
                             placeholder="{% trans 'Your business name' %}"
                             required
                         ></ion-input>
@@ -108,10 +78,10 @@
 
                     <ion-item>
                         <ion-textarea
+                            name="business_address"
                             label="{% trans 'Address' %} *"
                             label-placement="floating"
-                            :value="business.address"
-                            @ionInput="business.address = $event.detail.value || ''"
+                            value="{{ store_config.business_address }}"
                             rows="2"
                             placeholder="{% trans 'Street, City, Postal Code' %}"
                             required
@@ -121,10 +91,10 @@
                     <ion-item>
                         <ion-input
                             type="text"
+                            name="vat_number"
                             label="{% trans 'VAT/Tax ID' %} *"
                             label-placement="floating"
-                            :value="business.vat"
-                            @ionInput="business.vat = $event.detail.value || ''"
+                            value="{{ store_config.vat_number }}"
                             placeholder="{% trans 'e.g., ES12345678A' %}"
                             required
                         ></ion-input>
@@ -133,10 +103,10 @@
                     <ion-item>
                         <ion-input
                             type="tel"
+                            name="phone"
                             label="{% trans 'Phone' %}"
                             label-placement="floating"
-                            :value="business.phone"
-                            @ionInput="business.phone = $event.detail.value || ''"
+                            value="{{ store_config.phone }}"
                             placeholder="+34 600 000 000"
                         ></ion-input>
                     </ion-item>
@@ -144,34 +114,29 @@
                     <ion-item>
                         <ion-input
                             type="email"
+                            name="email"
                             label="{% trans 'Email' %}"
                             label-placement="floating"
-                            :value="business.email"
-                            @ionInput="business.email = $event.detail.value || ''"
+                            value="{{ store_config.email }}"
                             placeholder="info@business.com"
                         ></ion-input>
                     </ion-item>
                 </ion-list>
 
-                <p class="text-sm text-medium mt-4 text-center">* {% trans "Required fields" %}</p>
-            </div>
-
-            <!-- Step 2: Tax Configuration -->
-            <div x-show="currentStep === 2" x-transition:enter="fade-enter" x-transition:enter-start="fade-enter" x-transition:enter-end="fade-enter-active" class="step-content">
-                <h2 class="text-xl font-semibold mb-4 text-center">
-                    <ion-icon name="calculator-outline" class="mr-2"></ion-icon>
+                <!-- Tax Configuration Section -->
+                <h3 class="section-title">
+                    <ion-icon name="calculator-outline"></ion-icon>
                     {% trans "Tax Configuration" %}
-                </h2>
-                <p class="text-medium text-center mb-6">{% trans "Configure how taxes are handled" %}</p>
+                </h3>
 
                 <ion-list>
                     <ion-item>
                         <ion-input
                             type="number"
+                            name="tax_rate"
                             label="{% trans 'Default Tax Rate (%)' %}"
                             label-placement="floating"
-                            :value="tax.rate"
-                            @ionInput="tax.rate = $event.detail.value || '21'"
+                            value="{{ store_config.tax_rate|default:'21' }}"
                             placeholder="21"
                             min="0"
                             max="100"
@@ -181,190 +146,26 @@
 
                     <ion-item>
                         <ion-label>{% trans "Tax included in prices" %}</ion-label>
-                        <ion-toggle slot="end" :checked="tax.included" :color="tax.included ? 'success' : 'warning'" @ionChange="tax.included = $event.detail.checked"></ion-toggle>
+                        <ion-checkbox
+                            slot="end"
+                            name="tax_included"
+                            {% if store_config.tax_included %}checked{% endif %}
+                        ></ion-checkbox>
                     </ion-item>
                 </ion-list>
 
-                <div class="ion-padding text-center">
-                    <ion-chip :color="tax.included ? 'success' : 'warning'">
-                        <ion-icon :name="tax.included ? 'checkmark-circle' : 'add-circle'" slot="start"></ion-icon>
-                        <ion-label x-text="tax.included ? '{% trans 'Prices include tax' %}' : '{% trans 'Tax will be added at checkout' %}'"></ion-label>
-                    </ion-chip>
-                </div>
-            </div>
+                <p class="text-sm text-medium mt-4 text-center">* {% trans "Required fields" %}</p>
 
-            <!-- Navigation Buttons -->
-            <div class="flex justify-between items-center mt-6 gap-4">
-                <ion-button
-                    fill="outline"
-                    x-show="currentStep > 1"
-                    @click="prevStep()"
-                    :disabled="loading"
-                >
-                    <ion-icon name="arrow-back-outline" slot="start"></ion-icon>
-                    {% trans "Back" %}
-                </ion-button>
-
-                <div x-show="currentStep === 1" class="flex-1"></div>
-
-                <div class="flex gap-2">
-                    <ion-button
-                        x-show="currentStep === 1"
-                        @click="nextStep()"
-                        :disabled="loading || !isStep1Valid"
-                    >
-                        <span x-show="!loading">{% trans "Next" %}</span>
-                        <ion-spinner x-show="loading" name="crescent"></ion-spinner>
-                        <ion-icon name="arrow-forward-outline" slot="end" x-show="!loading"></ion-icon>
-                    </ion-button>
-
-                    <ion-button
-                        color="success"
-                        x-show="currentStep === 2"
-                        @click="finish()"
-                        :disabled="loading"
-                    >
-                        <span x-show="!loading">{% trans "Finish Setup" %}</span>
-                        <ion-spinner x-show="loading" name="crescent"></ion-spinner>
-                        <ion-icon name="checkmark-circle-outline" slot="end" x-show="!loading"></ion-icon>
+                <!-- Submit Button -->
+                <div class="ion-padding-top">
+                    <ion-button type="submit" expand="block" size="large">
+                        <ion-spinner id="submit-spinner" name="crescent" class="htmx-indicator" style="margin-right: 8px;"></ion-spinner>
+                        <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                        {% trans "Complete Setup" %}
                     </ion-button>
                 </div>
-            </div>
+            </form>
         </ion-card-content>
     </ion-card>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    function setupWizard() {
-        return {
-            currentStep: 1,
-            loading: false,
-
-            // Step 1: Business Info
-            business: {
-                name: '{{ store_config.business_name|escapejs }}',
-                address: '{{ store_config.business_address|escapejs }}',
-                vat: '{{ store_config.vat_number|escapejs }}',
-                phone: '{{ store_config.phone|escapejs }}',
-                email: '{{ store_config.email|escapejs }}'
-            },
-
-            // Step 2: Tax Config
-            tax: {
-                rate: '{{ store_config.tax_rate|default:"21" }}',
-                included: {{ store_config.tax_included|yesno:"true,false" }}
-            },
-
-            get isStep1Valid() {
-                return (this.business.name || '').trim().length > 0 &&
-                       (this.business.address || '').trim().length > 0 &&
-                       (this.business.vat || '').trim().length > 0;
-            },
-
-            async nextStep() {
-                if (this.loading) return;
-
-                this.loading = true;
-
-                try {
-                    const body = new URLSearchParams({
-                        action: 'save_business',
-                        business_name: this.business.name,
-                        business_address: this.business.address,
-                        vat_number: this.business.vat,
-                        phone: this.business.phone,
-                        email: this.business.email
-                    });
-
-                    const response = await fetch('{% url "setup:wizard" %}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        },
-                        body: body
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        this.currentStep = 2;
-                    } else {
-                        await this.showToast(data.error || 'Error saving', 'danger');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    await this.showToast('{% trans "Connection error" %}', 'danger');
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            prevStep() {
-                if (this.currentStep > 1) {
-                    this.currentStep--;
-                }
-            },
-
-            async finish() {
-                if (this.loading) return;
-
-                this.loading = true;
-
-                try {
-                    // Save tax config first
-                    await fetch('{% url "setup:wizard" %}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        },
-                        body: new URLSearchParams({
-                            action: 'save_tax',
-                            tax_rate: this.tax.rate,
-                            tax_included: this.tax.included
-                        })
-                    });
-
-                    // Then finish
-                    const response = await fetch('{% url "setup:wizard" %}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        },
-                        body: new URLSearchParams({ action: 'finish' })
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        await this.showToast('{% trans "Setup complete!" %}', 'success');
-                        setTimeout(() => {
-                            window.location.href = data.redirect;
-                        }, 500);
-                    } else {
-                        await this.showToast(data.error || 'Error', 'danger');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    await this.showToast('{% trans "Connection error" %}', 'danger');
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            async showToast(message, color = 'primary') {
-                const toast = document.createElement('ion-toast');
-                toast.message = message;
-                toast.duration = 2000;
-                toast.color = color;
-                document.body.appendChild(toast);
-                await toast.present();
-            }
-        }
-    }
-</script>
 {% endblock %}
