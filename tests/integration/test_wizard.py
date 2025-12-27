@@ -27,84 +27,127 @@ class TestWizardFlow:
         assert response.status_code == 200
         assert b'Welcome' in response.content or b'ERPlora' in response.content
 
-    def test_wizard_step1_save_business(self, authenticated_client, unconfigured_store):
-        """Test saving business info in step 1."""
+    def test_wizard_complete_form_submission(self, authenticated_client, unconfigured_store):
+        """Test submitting the complete wizard form with all required fields."""
+        from apps.configuration.models import StoreConfig
+
         response = authenticated_client.post('/setup/', {
-            'action': 'save_business',
             'business_name': 'Test Business',
             'business_address': '123 Main St',
             'vat_number': 'ES12345678A',
             'phone': '+34 600 000 000',
             'email': 'test@example.com',
-            'website': 'https://example.com'
-        })
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
-        assert data['next_step'] == 2
-
-    def test_wizard_step2_save_tax(self, authenticated_client, store_config):
-        """Test saving tax config in step 2."""
-        response = authenticated_client.post('/setup/', {
-            'action': 'save_tax',
             'tax_rate': '21',
-            'tax_included': 'true'
+            'tax_included': 'on'
         })
 
+        # Success returns 200 with HX-Redirect header
         assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
-        assert data['next_step'] == 3
+        assert response.get('HX-Redirect') == '/dashboard/'
 
-    def test_wizard_step3_save_receipt(self, authenticated_client, store_config):
-        """Test saving receipt config in step 3."""
+        # Verify config was saved
+        config = StoreConfig.get_solo()
+        assert config.is_configured is True
+        assert config.business_name == 'Test Business'
+        assert config.business_address == '123 Main St'
+        assert config.vat_number == 'ES12345678A'
+
+    def test_wizard_fails_without_business_name(self, authenticated_client, unconfigured_store):
+        """Test that wizard fails without business name."""
         response = authenticated_client.post('/setup/', {
-            'action': 'save_receipt',
-            'receipt_header': 'Welcome!',
-            'receipt_footer': 'Thank you!'
+            'business_address': '123 Main St',
+            'vat_number': 'ES12345678A',
         })
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
+        # Should return 400 with error HTML
+        assert response.status_code == 400
+        assert b'Business name is required' in response.content
 
-    def test_wizard_finish(self, authenticated_client, store_config):
-        """Test finishing the wizard."""
+    def test_wizard_fails_without_address(self, authenticated_client, unconfigured_store):
+        """Test that wizard fails without address."""
         response = authenticated_client.post('/setup/', {
-            'action': 'finish'
-        })
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
-        assert 'redirect' in data
-        assert '/dashboard/' in data['redirect']
-
-    def test_wizard_skip_when_complete(self, authenticated_client, store_config):
-        """Test skipping to finish when required fields are complete."""
-        response = authenticated_client.post('/setup/', {
-            'action': 'skip'
-        })
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
-        assert 'redirect' in data
-
-    def test_wizard_finish_fails_without_required(self, authenticated_client, unconfigured_store):
-        """Test that finish fails without required fields."""
-        response = authenticated_client.post('/setup/', {
-            'action': 'finish'
+            'business_name': 'Test Business',
+            'vat_number': 'ES12345678A',
         })
 
         assert response.status_code == 400
-        data = response.json()
-        assert data['success'] is False
+        assert b'Address is required' in response.content
 
-    def test_configured_store_redirects_from_wizard(self, authenticated_client, store_config):
+    def test_wizard_fails_without_vat_number(self, authenticated_client, unconfigured_store):
+        """Test that wizard fails without VAT number."""
+        response = authenticated_client.post('/setup/', {
+            'business_name': 'Test Business',
+            'business_address': '123 Main St',
+        })
+
+        assert response.status_code == 400
+        assert b'VAT/Tax ID is required' in response.content
+
+    def test_wizard_saves_optional_fields(self, authenticated_client, unconfigured_store):
+        """Test that wizard saves optional fields correctly."""
+        from apps.configuration.models import StoreConfig
+
+        response = authenticated_client.post('/setup/', {
+            'business_name': 'Test Business',
+            'business_address': '123 Main St',
+            'vat_number': 'ES12345678A',
+            'phone': '+34 600 000 000',
+            'email': 'test@example.com',
+            'tax_rate': '10',
+            'tax_included': 'on'
+        })
+
+        assert response.status_code == 200
+
+        config = StoreConfig.get_solo()
+        assert config.phone == '+34 600 000 000'
+        assert config.email == 'test@example.com'
+        assert config.tax_rate == 10
+        assert config.tax_included is True
+
+    def test_wizard_defaults_tax_rate(self, authenticated_client, unconfigured_store):
+        """Test that wizard defaults tax rate to 21 if not provided."""
+        from apps.configuration.models import StoreConfig
+
+        response = authenticated_client.post('/setup/', {
+            'business_name': 'Test Business',
+            'business_address': '123 Main St',
+            'vat_number': 'ES12345678A',
+        })
+
+        assert response.status_code == 200
+
+        config = StoreConfig.get_solo()
+        assert config.tax_rate == 21
+
+    def test_configured_store_redirects_from_wizard(self, client, db):
         """Test that configured store redirects away from wizard."""
-        response = authenticated_client.get('/setup/')
+        from apps.accounts.models import LocalUser
+        from apps.configuration.models import StoreConfig
+
+        # Configure store
+        store_config = StoreConfig.get_solo()
+        store_config.is_configured = True
+        store_config.business_name = 'Test Store'
+        store_config.save()
+
+        # Create and login user
+        user = LocalUser.objects.create(
+            name='Test User',
+            email='test@example.com',
+            role='admin',
+            is_active=True
+        )
+        user.set_pin('1234')
+
+        session = client.session
+        session['local_user_id'] = str(user.id)
+        session['user_name'] = user.name
+        session['user_email'] = user.email
+        session['user_role'] = user.role
+        session.save()
+
+        response = client.get('/setup/')
 
         # Should redirect to dashboard
         assert response.status_code == 302

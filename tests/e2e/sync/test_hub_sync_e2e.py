@@ -282,6 +282,7 @@ class TestOfflineMode:
             config = MagicMock()
             config.hub_id = 'offline-hub'
             config.hub_jwt = ''  # No JWT
+            config.is_configured = True
             mock_config.get_solo.return_value = config
 
             from apps.sync.services.cloud_api import CloudAPIService

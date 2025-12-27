@@ -92,7 +92,7 @@ class TestModuleAPI:
 class TestSystemAPI:
     """Tests for System API endpoints."""
 
-    def test_health_check(self, client):
+    def test_health_check(self, client, db):
         """Test health check endpoint (no auth required)."""
         response = client.get('/api/v1/system/health/')
 

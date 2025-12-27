@@ -16,10 +16,18 @@ def htmx_view(full_template, partial_template):
     template is rendered. For direct browser requests (refresh, deep links),
     the full template with layout is rendered.
 
+    Supports ?partial=true query parameter for testing/debugging fragments
+    directly in the browser without HTMX headers.
+
     Usage:
         @htmx_view('main/index/pages/index.html', 'main/index/partials/content.html')
         def dashboard_index(request):
             return {'stats': get_stats()}  # Return context dict
+
+    Testing fragments:
+        - Browser: /my-view/ → full page
+        - Browser: /my-view/?partial=true → fragment only
+        - HTMX: /my-view/ with HX-Request header → fragment only
 
     Args:
         full_template: Template path for full page (with layout)
@@ -41,8 +49,10 @@ def htmx_view(full_template, partial_template):
             # Otherwise, result should be context dict
             context = result if isinstance(result, dict) else {}
 
-            # Check if HTMX request
-            if request.headers.get('HX-Request'):
+            # Check if partial requested via HTMX or ?partial=true query param
+            is_partial = request.headers.get('HX-Request') or request.GET.get('partial') == 'true'
+
+            if is_partial:
                 return render(request, partial_template, context)
 
             # Full page request
@@ -53,8 +63,8 @@ def htmx_view(full_template, partial_template):
 
 
 def is_htmx_request(request):
-    """Check if request is from HTMX"""
-    return request.headers.get('HX-Request') == 'true'
+    """Check if request is from HTMX or has ?partial=true"""
+    return request.headers.get('HX-Request') == 'true' or request.GET.get('partial') == 'true'
 
 
 def htmx_redirect(url):

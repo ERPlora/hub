@@ -105,6 +105,20 @@ def index(request):
 
             return HttpResponse(render_message('Hub settings saved'))
 
+        # Handle theme update form (color_theme, dark_mode, auto_print)
+        if action == 'update_theme':
+            color_theme = request.POST.get('color_theme')
+            dark_mode = request.POST.get('dark_mode') == 'true'
+            auto_print = request.POST.get('auto_print') == 'true'
+
+            if color_theme:
+                hub_config.color_theme = color_theme
+            hub_config.dark_mode = dark_mode
+            hub_config.auto_print = auto_print
+            hub_config.save()
+
+            return HttpResponse(render_message('Theme settings saved'))
+
         # Handle backup settings form
         if action == 'update_backup':
             backup_config = BackupConfig.get_solo()

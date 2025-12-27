@@ -17,9 +17,9 @@ class MarketplaceViewsTest(TestCase):
         # Mock session for login_required decorator
         self.session = {'local_user_id': 'test-user-id'}
 
-    def _get_request(self, path, **kwargs):
+    def _get_request(self, path, data=None, **kwargs):
         """Helper to create a request with session."""
-        request = self.factory.get(path, **kwargs)
+        request = self.factory.get(path, data=data or {}, **kwargs)
         request.session = self.session
         return request
 
@@ -148,24 +148,25 @@ class MarketplaceViewsTest(TestCase):
 
 
 class ModuleDetailViewTest(TestCase):
-    """Tests for module detail view."""
+    """Tests for module detail view.
+
+    Note: module_detail uses @htmx_view decorator which returns HttpResponse,
+    so we test the rendered content rather than the context dict.
+    """
 
     def setUp(self):
         self.factory = RequestFactory()
         self.session = {'local_user_id': 'test-user-id'}
 
-    def _get_request(self, path, **kwargs):
-        request = self.factory.get(path, **kwargs)
+    def _get_request(self, path, data=None, **kwargs):
+        request = self.factory.get(path, data=data or {}, **kwargs)
         request.session = self.session
-        # Mock htmx attribute
-        request.htmx = MagicMock()
-        request.htmx.__bool__ = MagicMock(return_value=True)
         return request
 
     @patch('apps.system.modules.views.requests.get')
     @patch('apps.configuration.models.HubConfig.get_solo')
     def test_module_detail_success(self, mock_hub_config, mock_requests_get):
-        """Test module detail returns module info."""
+        """Test module detail returns module info in rendered HTML."""
         from apps.system.modules.views import module_detail
 
         mock_config = MagicMock()
@@ -194,10 +195,11 @@ class ModuleDetailViewTest(TestCase):
         mock_requests_get.side_effect = [mock_detail_response, mock_list_response]
 
         request = self._get_request('/modules/marketplace/test-module/')
-        result = module_detail(request, slug='test-module')
+        response = module_detail(request, slug='test-module')
 
-        assert result['module']['name'] == 'Test Module'
-        assert result['is_free'] == True
+        # @htmx_view returns HttpResponse, check status and content
+        assert response.status_code == 200
+        assert b'Test Module' in response.content
 
     @patch('apps.system.modules.views.requests.get')
     @patch('apps.configuration.models.HubConfig.get_solo')
@@ -214,10 +216,11 @@ class ModuleDetailViewTest(TestCase):
         mock_requests_get.return_value = mock_response
 
         request = self._get_request('/modules/marketplace/nonexistent/')
-        result = module_detail(request, slug='nonexistent')
+        response = module_detail(request, slug='nonexistent')
 
-        assert result['error'] is not None
-        assert 'not found' in result['error'].lower()
+        # @htmx_view returns HttpResponse with error message
+        assert response.status_code == 200  # Page renders, but shows error
+        assert b'not found' in response.content.lower() or b'Module Not Found' in response.content
 
 
 class MarketplaceAPITest(TestCase):

@@ -19,8 +19,8 @@ def client():
 
 
 @pytest.fixture
-def authenticated_client(db, client):
-    """Client with authenticated session."""
+def authenticated_client(db, client, store_config):
+    """Client with authenticated session and configured store."""
     from apps.accounts.models import LocalUser
 
     # Create test user

@@ -17,6 +17,12 @@ class TestNewUserSetup:
         from apps.accounts.models import LocalUser
         from apps.configuration.models import StoreConfig
 
+        # Ensure StoreConfig is unconfigured initially
+        store_config = StoreConfig.get_solo()
+        store_config.is_configured = False
+        store_config.business_name = ''
+        store_config.save()
+
         # 1. Create admin user (first run scenario)
         user = LocalUser.objects.create(
             name='Admin User',

@@ -21,6 +21,13 @@ class TestHubLocalLoginFlow(TestCase):
 
     def setUp(self):
         self.client = Client()
+
+        # Configure store to avoid setup redirects
+        store_config = StoreConfig.get_solo()
+        store_config.is_configured = True
+        store_config.business_name = 'Test Store'
+        store_config.save()
+
         # Create a user with PIN
         self.user = LocalUser.objects.create(
             email='local@example.com',
@@ -87,6 +94,13 @@ class TestHubPinSetupFlow(TestCase):
 
     def setUp(self):
         self.client = Client()
+
+        # Configure store to avoid setup redirects
+        store_config = StoreConfig.get_solo()
+        store_config.is_configured = True
+        store_config.business_name = 'Test Store'
+        store_config.save()
+
         # Create a user without PIN
         self.user = LocalUser.objects.create(
             email='newuser@example.com',
@@ -157,6 +171,13 @@ class TestHubLogoutFlow(TestCase):
 
     def setUp(self):
         self.client = Client()
+
+        # Configure store to avoid setup redirects
+        store_config = StoreConfig.get_solo()
+        store_config.is_configured = True
+        store_config.business_name = 'Test Store'
+        store_config.save()
+
         self.user = LocalUser.objects.create(
             email='logout@example.com',
             name='Logout User',
@@ -200,6 +221,13 @@ class TestHubEmployeeManagementFlow(TestCase):
 
     def setUp(self):
         self.client = Client()
+
+        # Configure store to avoid setup redirects
+        store_config = StoreConfig.get_solo()
+        store_config.is_configured = True
+        store_config.business_name = 'Test Store'
+        store_config.save()
+
         # Create admin user
         self.admin = LocalUser.objects.create(
             email='admin@example.com',
@@ -429,6 +457,13 @@ class TestHubProtectedRoutesFlow(TestCase):
 
     def setUp(self):
         self.client = Client()
+
+        # Configure store to avoid setup redirects
+        store_config = StoreConfig.get_solo()
+        store_config.is_configured = True
+        store_config.business_name = 'Test Store'
+        store_config.save()
+
         self.user = LocalUser.objects.create(
             email='protected@example.com',
             name='Protected User',
@@ -478,6 +513,13 @@ class TestHubSessionPersistenceFlow(TestCase):
 
     def setUp(self):
         self.client = Client()
+
+        # Configure store to avoid setup redirects
+        store_config = StoreConfig.get_solo()
+        store_config.is_configured = True
+        store_config.business_name = 'Test Store'
+        store_config.save()
+
         self.user = LocalUser.objects.create(
             email='session@example.com',
             name='Session User',

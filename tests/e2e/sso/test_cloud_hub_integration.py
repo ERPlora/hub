@@ -219,6 +219,13 @@ class TestHubSessionCookieIsolation(TestCase):
 
     def setUp(self):
         self.client = Client()
+
+        # Configure store to avoid setup redirects
+        store_config = StoreConfig.get_solo()
+        store_config.is_configured = True
+        store_config.business_name = 'Test Store'
+        store_config.save()
+
         self.user = LocalUser.objects.create(
             email='isolated@example.com',
             name='Isolated User',
@@ -232,7 +239,7 @@ class TestHubSessionCookieIsolation(TestCase):
         # Login to Hub
         self.client.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
@@ -250,7 +257,7 @@ class TestHubSessionCookieIsolation(TestCase):
         # Login to Hub
         response = self.client.post(
             '/verify-pin/',
-            data=json.dumps({'user_id': self.user.id, 'pin': '1234'}),
+            data=json.dumps({'user_id': str(self.user.id), 'pin': '1234'}),
             content_type='application/json'
         )
 
@@ -259,7 +266,7 @@ class TestHubSessionCookieIsolation(TestCase):
         assert data['success'] is True
 
         # Hub should have its own session
-        assert self.client.session.get('local_user_id') == self.user.id
+        assert self.client.session.get('local_user_id') == str(self.user.id)
 
 
 @pytest.mark.e2e

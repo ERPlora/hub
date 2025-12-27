@@ -4,7 +4,7 @@ Tests for theme system (color themes and dark mode).
 import pytest
 from django.test import Client
 from django.urls import reverse
-from apps.configuration.models import HubConfig
+from apps.configuration.models import HubConfig, StoreConfig
 from apps.accounts.models import LocalUser
 
 
@@ -16,8 +16,15 @@ def client():
 
 @pytest.fixture
 def hub_config(db):
-    """Create HubConfig instance."""
-    return HubConfig.get_config()
+    """Create HubConfig instance with is_configured=True to skip setup wizard."""
+    config = HubConfig.get_config()
+    config.is_configured = True
+    config.save()
+    # Also configure StoreConfig to skip the setup wizard middleware
+    store_config = StoreConfig.get_config()
+    store_config.is_configured = True
+    store_config.save()
+    return config
 
 
 @pytest.fixture
@@ -174,7 +181,7 @@ class TestThemeAPI:
         assert hub_config.dark_mode is True
         assert hub_config.auto_print is True
 
-    def test_theme_update_requires_authentication(self, client):
+    def test_theme_update_requires_authentication(self, client, hub_config):
         """Test that theme update requires authentication."""
         response = client.post(
             reverse('main:settings'),
@@ -186,9 +193,9 @@ class TestThemeAPI:
             }
         )
 
-        # Should redirect to login
+        # Should redirect to login (with next parameter)
         assert response.status_code == 302
-        assert response.url == reverse('auth:login')
+        assert '/login/' in response.url
 
 
 @pytest.mark.django_db
@@ -200,7 +207,8 @@ class TestThemeTemplateRendering:
         response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         content = response.content.decode()
-        assert 'ionic-theme-default.css' in content
+        # Theme CSS is now named ionic-theme.css inside theme folder
+        assert '/themes/default/ionic-theme.css' in content
 
     def test_blue_theme_rendered(self, authenticated_client, hub_config):
         """Test that blue theme is loaded when selected."""
@@ -210,7 +218,8 @@ class TestThemeTemplateRendering:
         response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         content = response.content.decode()
-        assert 'ionic-theme-blue.css' in content
+        # Theme CSS is now named ionic-theme.css inside theme folder
+        assert '/themes/blue/ionic-theme.css' in content
 
     def test_dark_mode_class_applied(self, authenticated_client, hub_config):
         """Test that dark class is applied when dark mode is enabled."""
