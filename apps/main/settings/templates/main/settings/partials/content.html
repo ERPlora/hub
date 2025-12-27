@@ -36,7 +36,7 @@
                                         label="{% trans 'Business Name' %} *"
                                         label-placement="floating"
                                         :value="store.business_name"
-                                        @ionInput="store.business_name = $event.target.value"
+                                        @ionInput="store.business_name = $event.detail.value || ''"
                                         placeholder="{% trans 'Your business name' %}"
                                     ></ion-input>
                                 </ion-item>
@@ -47,7 +47,7 @@
                                         label="{% trans 'Address' %} *"
                                         label-placement="floating"
                                         :value="store.business_address"
-                                        @ionInput="store.business_address = $event.target.value"
+                                        @ionInput="store.business_address = $event.detail.value || ''"
                                         rows="2"
                                         placeholder="{% trans 'Street, City, Postal Code' %}"
                                     ></ion-textarea>
@@ -60,7 +60,7 @@
                                         label="{% trans 'VAT/Tax ID' %} *"
                                         label-placement="floating"
                                         :value="store.vat_number"
-                                        @ionInput="store.vat_number = $event.target.value"
+                                        @ionInput="store.vat_number = $event.detail.value || ''"
                                         placeholder="{% trans 'e.g., ES12345678A' %}"
                                     ></ion-input>
                                 </ion-item>
@@ -72,7 +72,7 @@
                                         label="{% trans 'Phone' %}"
                                         label-placement="floating"
                                         :value="store.phone"
-                                        @ionInput="store.phone = $event.target.value"
+                                        @ionInput="store.phone = $event.detail.value || ''"
                                         placeholder="+34 600 000 000"
                                     ></ion-input>
                                 </ion-item>
@@ -84,7 +84,7 @@
                                         label="{% trans 'Email' %}"
                                         label-placement="floating"
                                         :value="store.email"
-                                        @ionInput="store.email = $event.target.value"
+                                        @ionInput="store.email = $event.detail.value || ''"
                                         placeholder="info@business.com"
                                     ></ion-input>
                                 </ion-item>
@@ -96,7 +96,7 @@
                                         label="{% trans 'Website' %}"
                                         label-placement="floating"
                                         :value="store.website"
-                                        @ionInput="store.website = $event.target.value"
+                                        @ionInput="store.website = $event.detail.value || ''"
                                         placeholder="https://www.business.com"
                                     ></ion-input>
                                 </ion-item>
@@ -131,7 +131,7 @@
                                         label="{% trans 'Tax Rate (%)' %}"
                                         label-placement="floating"
                                         :value="store.tax_rate"
-                                        @ionInput="store.tax_rate = $event.target.value"
+                                        @ionInput="store.tax_rate = $event.detail.value || ''"
                                         step="0.01"
                                         min="0"
                                         max="100"
@@ -213,7 +213,7 @@
                                     label="{% trans 'Name' %} *"
                                     label-placement="floating"
                                     :value="taxForm.name"
-                                    @ionInput="taxForm.name = $event.target.value"
+                                    @ionInput="taxForm.name = $event.detail.value || ''"
                                     placeholder="{% trans 'e.g., Standard 21%' %}"
                                     required
                                 ></ion-input>
@@ -225,7 +225,7 @@
                                     label="{% trans 'Rate (%)' %} *"
                                     label-placement="floating"
                                     :value="taxForm.rate"
-                                    @ionInput="taxForm.rate = $event.target.value"
+                                    @ionInput="taxForm.rate = $event.detail.value || ''"
                                     step="0.01"
                                     min="0"
                                     max="100"
@@ -240,7 +240,7 @@
                                     label="{% trans 'Description' %}"
                                     label-placement="floating"
                                     :value="taxForm.description"
-                                    @ionInput="taxForm.description = $event.target.value"
+                                    @ionInput="taxForm.description = $event.detail.value || ''"
                                     placeholder="{% trans 'Optional notes' %}"
                                 ></ion-input>
                             </ion-item>
