@@ -1,0 +1,23 @@
+<ion-card class="ui-form-card{% if css_class %} {{ css_class }}{% endif %}">
+    {% if title %}
+    <ion-card-header>
+        <ion-card-title>{{ title }}</ion-card-title>
+        {% if subtitle %}
+        <ion-card-subtitle>{{ subtitle }}</ion-card-subtitle>
+        {% endif %}
+    </ion-card-header>
+    {% endif %}
+    <ion-card-content>
+        <form
+            {% if action %}action="{{ action }}"{% endif %}
+            method="{{ method }}"
+            {% if hx_post %}hx-post="{{ hx_post }}"{% endif %}
+            {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
+            {% if hx_swap %}hx-swap="{{ hx_swap }}"{% endif %}
+            {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
+        >
+            {% csrf_token %}
+            {{ slot }}
+        </form>
+    </ion-card-content>
+</ion-card>

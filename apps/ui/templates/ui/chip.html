@@ -1,0 +1,14 @@
+<ion-chip
+    color="{{ color }}"
+    {% if outline %}outline="true"{% endif %}
+    {% if css_class %}class="{{ css_class }}"{% endif %}
+    {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
+>
+    {% if icon %}
+    <ion-icon name="{{ icon }}"></ion-icon>
+    {% endif %}
+    <ion-label>{{ label }}</ion-label>
+    {% if closable %}
+    <ion-icon name="close-circle"></ion-icon>
+    {% endif %}
+</ion-chip>

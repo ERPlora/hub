@@ -1,0 +1,24 @@
+<ion-header {% if css_class %}class="{{ css_class }}"{% endif %}>
+    <ion-toolbar {% if color %}color="{{ color }}"{% endif %}>
+        <ion-buttons slot="start">
+            {% if show_back_button %}
+            <ion-button
+                {% if back_url %}href="{{ back_url }}"{% endif %}
+                {% if back_hx_get %}hx-get="{{ back_hx_get }}"{% endif %}
+                {% if back_hx_target %}hx-target="{{ back_hx_target }}"{% endif %}
+                {% if back_hx_get %}hx-push-url="true"{% endif %}
+            >
+                <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+            </ion-button>
+            {% elif show_menu_button %}
+            <ion-menu-button></ion-menu-button>
+            {% endif %}
+        </ion-buttons>
+        {% if title %}
+        <ion-title>{{ title }}</ion-title>
+        {% endif %}
+        <ion-buttons slot="end">
+            {{ slot }}
+        </ion-buttons>
+    </ion-toolbar>
+</ion-header>

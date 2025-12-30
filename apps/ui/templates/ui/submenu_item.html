@@ -1,0 +1,12 @@
+<ion-item
+    class="submenu-item{% if active %} active{% endif %}{% if css_class %} {{ css_class }}{% endif %}"
+    {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
+    {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
+    {% if hx_push_url %}hx-push-url="true"{% endif %}
+    {% if url %}href="{{ url }}"{% endif %}
+    detail="false"
+    {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
+>
+    {% if icon %}<ion-icon name="{{ icon }}" slot="start"></ion-icon>{% endif %}
+    <ion-label>{{ label }}</ion-label>
+</ion-item>

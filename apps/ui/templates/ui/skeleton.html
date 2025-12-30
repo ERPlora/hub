@@ -1,0 +1,22 @@
+{% if type == "text" %}
+<div class="ui-skeleton-text">
+    {% for i in "x"|ljust:lines %}
+    <ion-skeleton-text {% if animated %}animated{% endif %} style="width: {% widthratio forloop.counter 1 100|add:"-20" %}%"></ion-skeleton-text>
+    {% endfor %}
+</div>
+{% elif type == "avatar" %}
+<ion-skeleton-text {% if animated %}animated{% endif %} style="width: 48px; height: 48px; border-radius: 50%"></ion-skeleton-text>
+{% elif type == "image" %}
+<ion-skeleton-text {% if animated %}animated{% endif %} style="width: 100%; height: 200px"></ion-skeleton-text>
+{% elif type == "card" %}
+<ion-card>
+    <ion-card-header>
+        <ion-skeleton-text {% if animated %}animated{% endif %} style="width: 60%"></ion-skeleton-text>
+    </ion-card-header>
+    <ion-card-content>
+        <ion-skeleton-text {% if animated %}animated{% endif %} style="width: 100%"></ion-skeleton-text>
+        <ion-skeleton-text {% if animated %}animated{% endif %} style="width: 80%"></ion-skeleton-text>
+        <ion-skeleton-text {% if animated %}animated{% endif %} style="width: 60%"></ion-skeleton-text>
+    </ion-card-content>
+</ion-card>
+{% endif %}

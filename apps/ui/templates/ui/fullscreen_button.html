@@ -1,0 +1,7 @@
+<ion-button
+    fill="clear"
+    @click="toggleFullscreen()"
+    class="ui-fullscreen-btn{% if css_class %} {{ css_class }}{% endif %}"
+>
+    <ion-icon slot="icon-only" :name="isFullscreen ? 'contract-outline' : 'expand-outline'"></ion-icon>
+</ion-button>

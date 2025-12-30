@@ -1,151 +1,206 @@
 {% load i18n %}
+{% load ui %}
 
 {% if request.htmx %}
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-{% include "dashboard/partials/tabbar_main.html" %}
-</div>
+<!-- Clear tab bar for home - home doesn't have module tabs -->
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML"></div>
 {% endif %}
 
-<div class="ion-padding">
-    <h1 class="text-2xl font-bold mb-6">{% trans "Welcome to ERPlora Hub" %}</h1>
+<div class="ion-padding" x-data="moduleGrid()">
+    {% ui_page_header title=_("Home") subtitle=_("Welcome to ERPlora Hub") %}
 
-    <!-- Quick Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <ion-card>
-            <ion-card-content class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <ion-icon name="cube-outline" class="text-2xl text-primary"></ion-icon>
-                </div>
-                <div>
-                    <p class="text-sm text-medium m-0">{% trans "Products" %}</p>
-                    <p class="text-2xl font-bold m-0">0</p>
-                </div>
-            </ion-card-content>
-        </ion-card>
-
-        <ion-card>
-            <ion-card-content class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center">
-                    <ion-icon name="cart-outline" class="text-2xl text-success"></ion-icon>
-                </div>
-                <div>
-                    <p class="text-sm text-medium m-0">{% trans "Sales Today" %}</p>
-                    <p class="text-2xl font-bold m-0">0</p>
-                </div>
-            </ion-card-content>
-        </ion-card>
-
-        <ion-card>
-            <ion-card-content class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-lg bg-warning/10 flex items-center justify-center">
-                    <ion-icon name="people-outline" class="text-2xl text-warning"></ion-icon>
-                </div>
-                <div>
-                    <p class="text-sm text-medium m-0">{% trans "Customers" %}</p>
-                    <p class="text-2xl font-bold m-0">0</p>
-                </div>
-            </ion-card-content>
-        </ion-card>
-
-        <ion-card>
-            <ion-card-content class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-lg bg-tertiary/10 flex items-center justify-center">
-                    <ion-icon name="extension-puzzle-outline" class="text-2xl text-tertiary"></ion-icon>
-                </div>
-                <div>
-                    <p class="text-sm text-medium m-0">{% trans "Modules" %}</p>
-                    <p class="text-2xl font-bold m-0">{{ MODULE_MENU_ITEMS|length|default:0 }}</p>
-                </div>
-            </ion-card-content>
-        </ion-card>
+    <!-- Search Bar -->
+    <div class="module-searchbar">
+        <ion-searchbar
+            placeholder="{% trans 'Search modules...' %}"
+            @ionInput="filterModules($event)"
+            debounce="300">
+        </ion-searchbar>
     </div>
 
-    <!-- Quick Actions -->
-    <ion-card>
-        <ion-card-header>
-            <ion-card-title>{% trans "Quick Actions" %}</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <ion-button expand="block" fill="outline"
-                    hx-get="{% url 'system:marketplace' %}"
-                    hx-target="#dashboard-content"
-                    hx-push-url="true">
-                    <ion-icon slot="start" name="storefront-outline"></ion-icon>
-                    {% trans "Module Store" %}
-                </ion-button>
-
-                <ion-button expand="block" fill="outline"
-                    hx-get="{% url 'main:settings' %}"
-                    hx-target="#dashboard-content"
-                    hx-push-url="true">
-                    <ion-icon slot="start" name="settings-outline"></ion-icon>
-                    {% trans "Settings" %}
-                </ion-button>
-
-                <ion-button expand="block" fill="outline"
-                    hx-get="{% url 'main:employees' %}"
-                    hx-target="#dashboard-content"
-                    hx-push-url="true">
-                    <ion-icon slot="start" name="people-outline"></ion-icon>
-                    {% trans "Employees" %}
-                </ion-button>
-
-                <ion-button expand="block" fill="outline"
-                    hx-get="{% url 'system:modules' %}"
-                    hx-target="#dashboard-content"
-                    hx-push-url="true">
-                    <ion-icon slot="start" name="extension-puzzle-outline"></ion-icon>
-                    {% trans "Modules" %}
-                </ion-button>
+    <!-- Favorites Section (only if there are favorites) -->
+    <template x-if="favoritesData.length > 0">
+        <div class="module-section">
+            <div class="module-section__header">
+                <ion-icon name="star" class="module-section__icon"></ion-icon>
+                <h3 class="module-section__title">{% trans "Favorites" %}</h3>
             </div>
-        </ion-card-content>
-    </ion-card>
+            <div class="module-grid">
+                <template x-for="mod in favoritesData" :key="'fav-' + mod.id">
+                    <div class="module-app-icon"
+                         :hx-get="mod.url"
+                         hx-target="#main-content-area"
+                         hx-push-url="true"
+                         @click="trackRecent(mod.id)">
+                        <div class="module-app-icon__image"
+                             :class="'module-app-icon__image--' + mod.color">
+                            <ion-icon :name="mod.icon"></ion-icon>
+                        </div>
+                        <span class="module-app-icon__label" x-text="mod.label"></span>
+                        <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
 
-    <!-- Getting Started -->
-    <ion-card class="mt-4">
-        <ion-card-header>
-            <ion-card-title>{% trans "Getting Started" %}</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-            <ion-list>
-                <ion-item>
-                    <ion-icon name="checkmark-circle" slot="start" color="success"></ion-icon>
-                    <ion-label>
-                        <h3>{% trans "Hub configured" %}</h3>
-                        <p>{% trans "Your Hub is connected to ERPlora Cloud" %}</p>
-                    </ion-label>
-                </ion-item>
+    <!-- Recent Section (only if there are recent modules) -->
+    <template x-if="recentData.length > 0">
+        <div class="module-section">
+            <div class="module-section__header">
+                <ion-icon name="time-outline" class="module-section__icon"></ion-icon>
+                <h3 class="module-section__title">{% trans "Recent" %}</h3>
+            </div>
+            <div class="module-grid">
+                <template x-for="mod in recentData" :key="'recent-' + mod.id">
+                    <div class="module-app-icon"
+                         :hx-get="mod.url"
+                         hx-target="#main-content-area"
+                         hx-push-url="true"
+                         @click="trackRecent(mod.id)">
+                        <div class="module-app-icon__image"
+                             :class="'module-app-icon__image--' + mod.color">
+                            <ion-icon :name="mod.icon"></ion-icon>
+                        </div>
+                        <span class="module-app-icon__label" x-text="mod.label"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
 
-                <ion-item>
-                    <ion-icon name="ellipse-outline" slot="start" color="medium"></ion-icon>
-                    <ion-label>
-                        <h3>{% trans "Install modules" %}</h3>
-                        <p>{% trans "Visit the Module Store to add functionality" %}</p>
-                    </ion-label>
-                    <ion-button slot="end" fill="clear"
-                        hx-get="{% url 'system:marketplace' %}"
-                        hx-target="#dashboard-content"
-                        hx-push-url="true">
-                        {% trans "Browse" %}
-                    </ion-button>
-                </ion-item>
+    <!-- All Modules Section -->
+    <div class="module-section">
+        <div class="module-section__header">
+            <ion-icon name="apps-outline" class="module-section__icon"></ion-icon>
+            <h3 class="module-section__title">{% trans "All Modules" %}</h3>
+        </div>
+        <div class="module-grid">
+            <!-- Dynamic modules from Alpine.js -->
+            <template x-for="mod in filteredModules" :key="mod.id">
+                <div class="module-app-icon"
+                     :hx-get="mod.url"
+                     hx-target="#main-content-area"
+                     hx-push-url="true"
+                     :data-module-id="mod.id"
+                     @click="trackRecent(mod.id)"
+                     @contextmenu.prevent="toggleFavorite(mod.id)">
+                    <div class="module-app-icon__image"
+                         :class="'module-app-icon__image--' + mod.color">
+                        <ion-icon :name="mod.icon"></ion-icon>
+                    </div>
+                    <span class="module-app-icon__label" x-text="mod.label"></span>
+                    <template x-if="isFavorite(mod.id)">
+                        <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
+                    </template>
+                </div>
+            </template>
 
-                <ion-item>
-                    <ion-icon name="ellipse-outline" slot="start" color="medium"></ion-icon>
-                    <ion-label>
-                        <h3>{% trans "Configure your store" %}</h3>
-                        <p>{% trans "Set up your business information" %}</p>
-                    </ion-label>
-                    <ion-button slot="end" fill="clear"
-                        hx-get="{% url 'main:settings' %}"
-                        hx-target="#dashboard-content"
-                        hx-push-url="true">
-                        {% trans "Settings" %}
-                    </ion-button>
-                </ion-item>
-            </ion-list>
-        </ion-card-content>
-    </ion-card>
+            <!-- Add More Modules button -->
+            <div class="module-app-icon module-app-icon--add"
+                 hx-get="/store/modules/marketplace/"
+                 hx-target="#main-content-area"
+                 hx-push-url="true">
+                <div class="module-app-icon__image">
+                    <ion-icon name="add"></ion-icon>
+                </div>
+                <span class="module-app-icon__label">{% trans "Get More" %}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty state when no modules and no search -->
+    <template x-if="modules.length === 0">
+        <div class="ui-empty-state">
+            <ion-icon name="extension-puzzle-outline" class="ui-empty-state-icon"></ion-icon>
+            <h3 class="ui-empty-state-title">{% trans "No modules installed" %}</h3>
+            <p class="ui-empty-state-description">{% trans "Visit the Module Store to add functionality to your Hub." %}</p>
+            <ion-button
+                hx-get="/store/modules/marketplace/"
+                hx-target="#main-content-area"
+                hx-push-url="true">
+                <ion-icon slot="start" name="storefront-outline"></ion-icon>
+                {% trans "Browse Module Store" %}
+            </ion-button>
+        </div>
+    </template>
 </div>
+
+<!-- Alpine.js Module Grid Logic -->
+<script>
+(function() {
+    const modulesData = {{ modules_json|safe }};
+
+    // Define moduleGrid function globally FIRST
+    window.moduleGrid = function() {
+        return {
+            modules: modulesData,
+            favorites: JSON.parse(localStorage.getItem('erplora_favorite_modules') || '[]'),
+            recent: JSON.parse(localStorage.getItem('erplora_recent_modules') || '[]'),
+            searchQuery: '',
+
+            get filteredModules() {
+                if (!this.searchQuery) {
+                    return this.modules;
+                }
+                const query = this.searchQuery.toLowerCase();
+                return this.modules.filter(mod =>
+                    mod.label.toLowerCase().includes(query)
+                );
+            },
+
+            get favoritesData() {
+                return this.modules.filter(mod => this.favorites.includes(mod.id));
+            },
+
+            get recentData() {
+                // Get last 4 recent modules that exist and are not in favorites
+                return this.recent
+                    .filter(id => !this.favorites.includes(id))
+                    .map(id => this.modules.find(mod => mod.id === id))
+                    .filter(mod => mod !== undefined)
+                    .slice(0, 4);
+            },
+
+            filterModules(event) {
+                this.searchQuery = event.target.value || '';
+            },
+
+            isFavorite(moduleId) {
+                return this.favorites.includes(moduleId);
+            },
+
+            toggleFavorite(moduleId) {
+                const index = this.favorites.indexOf(moduleId);
+                if (index === -1) {
+                    this.favorites.push(moduleId);
+                } else {
+                    this.favorites.splice(index, 1);
+                }
+                localStorage.setItem('erplora_favorite_modules', JSON.stringify(this.favorites));
+            },
+
+            trackRecent(moduleId) {
+                // Remove if already in recent
+                const index = this.recent.indexOf(moduleId);
+                if (index !== -1) {
+                    this.recent.splice(index, 1);
+                }
+                // Add to beginning
+                this.recent.unshift(moduleId);
+                // Keep only last 8
+                this.recent = this.recent.slice(0, 8);
+                localStorage.setItem('erplora_recent_modules', JSON.stringify(this.recent));
+            }
+        };
+    };
+
+    // Initialize Alpine on the element after script loads (for HTMX partial loads)
+    requestAnimationFrame(() => {
+        const el = document.querySelector('[x-data="moduleGrid()"]');
+        if (el && typeof Alpine !== 'undefined' && !el._x_dataStack) {
+            Alpine.initTree(el);
+        }
+    });
+})();
+</script>

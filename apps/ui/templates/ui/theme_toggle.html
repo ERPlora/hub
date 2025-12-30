@@ -1,0 +1,7 @@
+<ion-button
+    fill="clear"
+    @click="toggleTheme()"
+    class="ui-theme-toggle{% if css_class %} {{ css_class }}{% endif %}"
+>
+    <ion-icon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
+</ion-button>

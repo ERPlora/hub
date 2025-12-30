@@ -1,0 +1,30 @@
+{% load i18n %}
+{% load ui %}
+<!-- Update notification banner -->
+<div id="update-notification" class="ui-alert-banner ui-alert-banner--warning">
+    <ion-card>
+        <ion-card-content>
+            <div class="ui-alert-content">
+                <div class="ui-alert-icon">
+                    <ion-icon name="cloud-download-outline"></ion-icon>
+                </div>
+                <div class="ui-alert-body">
+                    <strong>{% trans "New version available" %}</strong>
+                    <small>
+                        {% trans "Current" %}: {{ current_version }} → {% trans "New" %}: {{ latest_version }}
+                        ({{ update_type|title }})
+                    </small>
+                </div>
+                <div class="ui-alert-actions">
+                    {% ui_button label=_("View details") size="small" color="warning" hx_get="/settings/" hx_target="#main-content-area" hx_push_url="true" %}
+                    <ion-button size="small" fill="clear"
+                                hx-get="/htmx/update-notification/dismiss/"
+                                hx-target="#update-notification"
+                                hx-swap="outerHTML">
+                        <ion-icon name="close-outline" slot="icon-only"></ion-icon>
+                    </ion-button>
+                </div>
+            </div>
+        </ion-card-content>
+    </ion-card>
+</div>

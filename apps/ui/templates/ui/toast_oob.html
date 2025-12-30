@@ -1,0 +1,10 @@
+<!-- Toast notification via HTMX OOB swap -->
+<!-- Usage: Include this template and pass message, color (success/danger/warning/primary), duration -->
+<div id="toast-container" hx-swap-oob="innerHTML">
+    <ion-toast
+        message="{{ message }}"
+        color="{{ color|default:'primary' }}"
+        duration="{{ duration|default:'2000' }}"
+        is-open="true"
+    ></ion-toast>
+</div>

@@ -1,0 +1,39 @@
+<ion-header>
+    <ion-toolbar>
+        {% if back_url or back_hx_get %}
+        <ion-buttons slot="start">
+            <ion-button
+                {% if back_url %}href="{{ back_url }}"{% endif %}
+                {% if back_hx_get %}hx-get="{{ back_hx_get }}"{% endif %}
+                {% if back_hx_target %}hx-target="{{ back_hx_target }}"{% endif %}
+                {% if back_hx_push_url %}hx-push-url="{{ back_hx_push_url }}"{% endif %}
+            >
+                <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+            </ion-button>
+        </ion-buttons>
+        {% endif %}
+        <ion-title>{{ title }}</ion-title>
+        {% if action_icon or action_label %}
+        <ion-buttons slot="end">
+            <ion-button
+                {% if action_color %}color="{{ action_color }}"{% endif %}
+                {% if action_href %}href="{{ action_href }}"{% endif %}
+                {% if action_hx_get %}hx-get="{{ action_hx_get }}"{% endif %}
+                {% if action_hx_post %}hx-post="{{ action_hx_post }}"{% endif %}
+                {% if action_hx_target %}hx-target="{{ action_hx_target }}"{% endif %}
+                {% if action_hx_push_url %}hx-push-url="{{ action_hx_push_url }}"{% endif %}
+                {% if action_x_click %}@click="{{ action_x_click }}"{% endif %}
+            >
+                {% if action_icon and action_label %}
+                <ion-icon slot="start" name="{{ action_icon }}"></ion-icon>
+                {{ action_label }}
+                {% elif action_icon %}
+                <ion-icon slot="icon-only" name="{{ action_icon }}"></ion-icon>
+                {% else %}
+                {{ action_label }}
+                {% endif %}
+            </ion-button>
+        </ion-buttons>
+        {% endif %}
+    </ion-toolbar>
+</ion-header>

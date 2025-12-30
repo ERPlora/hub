@@ -1,0 +1,99 @@
+/* Data Table Styles */
+.data-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-color-secondary);
+}
+
+.data-table th,
+.data-table td {
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--text-color-secondary);
+    white-space: nowrap;
+}
+
+.data-table td {
+    font-size: var(--font-size-sm);
+    color: var(--text-color);
+}
+
+.data-table tbody tr:hover {
+    background: var(--bg-color-hover);
+}
+
+/* Sortable columns */
+.data-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+}
+
+.data-table th.sortable:hover {
+    background: var(--bg-color-hover);
+}
+
+.data-table .sort-icon {
+    font-size: 14px;
+    vertical-align: middle;
+    margin-left: var(--space-xs);
+}
+
+/* Cell alignment */
+.data-table .cell-right {
+    text-align: right;
+}
+
+.data-table .cell-center {
+    text-align: center;
+}
+
+.data-table .cell-narrow {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.data-table .cell-actions {
+    width: 1%;
+    white-space: nowrap;
+    text-align: center;
+}
+
+/* Responsive: hide on mobile */
+@media (max-width: 768px) {
+    .data-table .hide-mobile {
+        display: none;
+    }
+}
+
+/* Infinite scroll loader */
+.infinite-scroll-loader {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-lg);
+}
+
+.infinite-scroll-end {
+    text-align: center;
+    padding: var(--space-md);
+    font-size: var(--font-size-sm);
+    color: var(--text-color-secondary);
+}

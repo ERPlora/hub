@@ -1,30 +1,12 @@
-{% load static %}
 {% load i18n %}
+{% load ui %}
 
-<!-- Sidebar Menu Content -->
-<ion-content id="sidebar-content">
-    <div id="sidebar-wrapper" style="display: flex; flex-direction: column; height: 100%;">
-        <!-- Menu Header -->
-        <div id="sidebar-header" class="menu-header ion-padding">
-            <div class="menu-logo" style="text-decoration: none; color: inherit;">
-                <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 2rem; height: 2rem;">
-                <span style="font-weight: 500;">ERPlora Hub</span>
-            </div>
-        </div>
+{% ui_sidebar_content %}
+    {% ui_sidebar_header logo_static="img/logo.png" logo_alt="ERPlora" logo_text="ERPlora Hub" %}
 
-        <!-- Menu Content - Grouped Navigation -->
-        <nav id="sidebar-nav" class="menu-content" style="flex: 1; overflow-y: auto;">
-            <ion-list id="sidebar-nav-list">
-                {% include "dashboard/partials/sidebar_nav.html" %}
-            </ion-list>
-        </nav>
+    {% ui_sidebar_nav %}
+        {% include "dashboard/partials/sidebar_nav.html" %}
+    {% endui_sidebar_nav %}
 
-        <!-- Menu Footer -->
-        <div id="sidebar-footer" class="menu-footer ion-padding">
-            <ion-item id="btn-signout" button href="{% url 'auth:logout' %}" detail="false" lines="none">
-                <ion-icon slot="start" name="log-out-outline"></ion-icon>
-                {% trans "Sign Out" %}
-            </ion-item>
-        </div>
-    </div>
-</ion-content>
+    {% ui_sidebar_footer %}
+{% endui_sidebar_content %}

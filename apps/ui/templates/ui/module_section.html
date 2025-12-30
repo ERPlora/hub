@@ -1,0 +1,21 @@
+{# Module Section - Section header for the module grid (Favorites, Recent, All Modules) #}
+{# Usage: {% ui_module_section title="Favorites" icon="star" %}...{% endui_module_section %} #}
+
+<div class="module-section{% if css_class %} {{ css_class }}{% endif %}">
+    <div class="module-section__header">
+        {% if icon %}
+        <ion-icon name="{{ icon }}" class="module-section__icon"></ion-icon>
+        {% endif %}
+        <h3 class="module-section__title">{{ title }}</h3>
+        {% if action_label %}
+        <ion-button fill="clear" size="small"
+            {% if action_url %}href="{{ action_url }}"{% endif %}
+            {% if action_hx_get %}hx-get="{{ action_hx_get }}" hx-target="#main-content-area" hx-push-url="true"{% endif %}>
+            {{ action_label }}
+        </ion-button>
+        {% endif %}
+    </div>
+    <div class="module-grid">
+        {{ content|safe }}
+    </div>
+</div>

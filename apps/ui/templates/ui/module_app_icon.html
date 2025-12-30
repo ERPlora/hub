@@ -1,0 +1,26 @@
+{# Module App Icon - iOS-style icon for the home grid #}
+{# Usage: {% ui_module_app_icon module_id="inventory" label="Inventory" icon="cube-outline" url="/modules/inventory/" color="primary" %} #}
+
+<div class="module-app-icon{% if css_class %} {{ css_class }}{% endif %}"
+     {% if url %}
+     hx-get="{{ url }}"
+     hx-target="#main-content-area"
+     hx-push-url="true"
+     {% endif %}
+     {% if module_id %}data-module-id="{{ module_id }}"{% endif %}
+     @click="trackRecent && trackRecent('{{ module_id }}')">
+    <div class="module-app-icon__image module-app-icon__image--{{ color|default:'primary' }}">
+        {% if icon_svg %}
+        {{ icon_svg|safe }}
+        {% else %}
+        <ion-icon name="{{ icon|default:'cube-outline' }}"></ion-icon>
+        {% endif %}
+    </div>
+    <span class="module-app-icon__label">{{ label }}</span>
+    {% if badge %}
+    <ion-badge class="module-app-icon__badge" color="{{ badge_color|default:'danger' }}">{{ badge }}</ion-badge>
+    {% endif %}
+    {% if is_favorite %}
+    <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
+    {% endif %}
+</div>

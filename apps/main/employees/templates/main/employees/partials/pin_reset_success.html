@@ -1,0 +1,26 @@
+{% load i18n ui %}
+
+{% ui_toast_oob message=_("PIN reset successfully") color="success" %}
+
+<!-- Reset the form (replaces pin-form-container content) -->
+<form hx-post="{% url 'main:employee_reset_pin' employee.id %}"
+      hx-target="#pin-form-container"
+      hx-swap="innerHTML">
+    {% csrf_token %}
+    {% ui_list_start %}
+        <ion-item>
+            <ion-input
+                name="pin"
+                label="{% trans 'New PIN (4 digits)' %}"
+                label-placement="floating"
+                type="password"
+                maxlength="4"
+                pattern="[0-9]{4}"
+                required
+            ></ion-input>
+        </ion-item>
+    {% ui_list_end %}
+    <div class="ion-padding-top">
+        {% ui_button type="submit" expand="block" fill="outline" color="warning" label=_("Reset PIN") icon="key-outline" %}
+    </div>
+</form>

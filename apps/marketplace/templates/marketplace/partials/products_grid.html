@@ -1,0 +1,267 @@
+{% load i18n ui %}
+
+{% if products %}
+<ion-grid class="p-0">
+    <ion-row>
+        {% for product in products %}
+        <ion-col size="12" size-md="6" size-lg="4">
+            <ion-card class="module-card m-0">
+                <ion-card-content>
+                    <div class="d-flex align-center gap-md">
+                        {# Module Icon #}
+                        <div class="module-icon-box module-icon-box--{{ product.category|default:'default' }}">
+                            <ion-icon name="{{ product.icon|default:'cube-outline' }}"></ion-icon>
+                        </div>
+
+                        <div class="flex-1 min-w-0">
+                            <div class="d-flex align-center gap-sm flex-wrap">
+                                <a href="{% url 'marketplace:module_detail' product.slug %}"
+                                   hx-get="{% url 'marketplace:module_detail' product.slug %}"
+                                   hx-target="#main-content-area"
+                                   hx-push-url="true"
+                                   class="fw-semibold text-truncate m-0 fs-base module-card-title">{{ product.name }}</a>
+                                {% if product.is_featured %}
+                                <ion-badge color="warning" class="fs-xxs">{% trans "Featured" %}</ion-badge>
+                                {% endif %}
+                            </div>
+                            <p class="fs-sm text-medium m-0 mt-xxs">
+                                {% if product.author %}{% trans "by" %} {{ product.author }} • {% endif %}v{{ product.version|default:"1.0" }}
+                            </p>
+                        </div>
+
+                        {# Status Badge #}
+                        <div class="flex-shrink-0">
+                            {% if product.is_installed %}
+                            <ion-chip color="success">
+                                <ion-icon name="checkmark-circle-outline"></ion-icon>
+                                <ion-label>{% trans "Installed" %}</ion-label>
+                            </ion-chip>
+                            {% elif product.is_owned %}
+                            <ion-chip color="tertiary">
+                                <ion-icon name="bag-check-outline"></ion-icon>
+                                <ion-label>{% trans "Owned" %}</ion-label>
+                            </ion-chip>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <p class="fs-sm text-medium mb-md mt-md module-description">{{ product.description|default:"-"|truncatewords:20 }}</p>
+
+                    {# Stats Row #}
+                    <div class="d-flex align-center gap-md fs-sm text-medium mb-md">
+                        {% if product.rating %}
+                        <span class="d-inline-flex align-center gap-xs">
+                            <ion-icon name="star" class="text-warning"></ion-icon>
+                            {{ product.rating|floatformat:1 }}
+                        </span>
+                        {% endif %}
+                        {% if product.downloads %}
+                        <span class="d-inline-flex align-center gap-xs">
+                            <ion-icon name="download-outline"></ion-icon>
+                            {{ product.downloads }}
+                        </span>
+                        {% endif %}
+                        {% if product.category_name %}
+                        <span class="d-inline-flex align-center gap-xs">
+                            <ion-icon name="pricetag-outline"></ion-icon>
+                            {{ product.category_name }}
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    {# Price Display #}
+                    <div class="d-flex justify-between align-center mb-md">
+                        <span class="fw-semibold fs-base">
+                            {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
+                            <span class="text-success">{% trans "Free" %}</span>
+                            {% elif product.module_type == 'subscription' %}
+                            <span class="text-primary">€{{ product.price }}/{% trans "mo" %}</span>
+                            {% else %}
+                            <span class="text-primary">€{{ product.price }}</span>
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    {# Action Button #}
+                    <div class="module-card-actions">
+                        {% if product.is_installed %}
+                        <ion-button fill="clear" size="small" color="medium" disabled expand="block">
+                            <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                            {% trans "Installed" %}
+                        </ion-button>
+                        {% elif product.is_owned %}
+                        <ion-button fill="clear" size="small" color="success" expand="block"
+                            data-action="download"
+                            data-module-slug="{{ product.slug }}"
+                            data-download-url="{{ product.download_url }}">
+                            <ion-icon name="download-outline" slot="start"></ion-icon>
+                            {% trans "Install" %}
+                        </ion-button>
+                        {% elif product.is_free or product.module_type == 'free' or product.price == 0 %}
+                        <ion-button fill="clear" size="small" color="primary" expand="block"
+                            data-action="install-free"
+                            data-module-id="{{ product.id }}"
+                            data-module-slug="{{ product.slug }}"
+                            data-download-url="{{ product.download_url|default:'' }}">
+                            <ion-icon name="download-outline" slot="start"></ion-icon>
+                            {% trans "Install" %}
+                        </ion-button>
+                        {% else %}
+                        <ion-button fill="clear" size="small" color="primary" expand="block"
+                            data-action="purchase"
+                            data-module-id="{{ product.id }}">
+                            <ion-icon name="cart-outline" slot="start"></ion-icon>
+                            {% trans "Purchase" %}
+                        </ion-button>
+                        {% endif %}
+                    </div>
+                </ion-card-content>
+            </ion-card>
+        </ion-col>
+        {% endfor %}
+    </ion-row>
+</ion-grid>
+
+{% if has_more %}
+<!-- Infinite Scroll Trigger -->
+<div id="infinite-scroll-trigger"
+     hx-get="{% url 'marketplace:products_list' store_type %}?cursor={{ next_cursor }}{% if search_query %}&q={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if industry_filter %}&industry={{ industry_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}"
+     hx-trigger="intersect once threshold:0.1"
+     hx-swap="outerHTML"
+     hx-indicator="#load-more-spinner"
+     class="d-flex justify-center py-lg">
+    <ion-spinner id="load-more-spinner" name="crescent" class="htmx-indicator"></ion-spinner>
+</div>
+{% endif %}
+
+{% else %}
+<!-- No Results -->
+<div class="ion-padding ion-text-center no-results">
+    <ion-icon name="search-outline" style="font-size: 64px; color: var(--ion-color-medium);"></ion-icon>
+    <h3>{% trans "No products found" %}</h3>
+    <p class="text-medium">{% trans "Try adjusting your search or filters" %}</p>
+</div>
+{% endif %}
+
+<!-- Module action handlers -->
+<script>
+document.addEventListener('click', function(e) {
+    const button = e.target.closest('ion-button[data-action]');
+    if (!button) return;
+
+    const action = button.dataset.action;
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (action === 'download') {
+        downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button);
+    } else if (action === 'install-free') {
+        installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button);
+    } else if (action === 'purchase') {
+        purchaseModule(button.dataset.moduleId, button);
+    }
+});
+
+// Install free module
+async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
+    setButtonLoading(button, true);
+    try {
+        const purchaseResponse = await fetch('{% url "store:modules:api_purchase" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ module_id: moduleId })
+        });
+        const purchaseData = await purchaseResponse.json();
+
+        if (!purchaseData.success && !purchaseData.is_free && !purchaseData.already_owned) {
+            Toast.error(purchaseData.error || '{% trans "Error acquiring module" %}');
+            return;
+        }
+
+        if (downloadUrl) {
+            await downloadAndInstall(moduleSlug, downloadUrl);
+        } else {
+            Toast.warning('{% trans "Module acquired. Download not available yet." %}');
+            setTimeout(() => window.location.reload(), 1500);
+        }
+    } catch (error) {
+        Toast.error('{% trans "Error acquiring module" %}');
+    } finally {
+        setButtonLoading(button, false);
+    }
+}
+
+// Purchase paid module
+async function purchaseModule(moduleId, button) {
+    setButtonLoading(button, true);
+    try {
+        const response = await fetch('{% url "store:modules:api_purchase" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ module_id: moduleId })
+        });
+        const data = await response.json();
+
+        if (data.success && data.checkout_url) {
+            window.open(data.checkout_url, '_blank');
+            Toast.info('{% trans "Complete payment in the opened window" %}');
+        } else if (data.already_owned) {
+            Toast.warning('{% trans "You already own this module" %}');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            Toast.error(data.error || '{% trans "Error starting purchase" %}');
+        }
+    } catch (error) {
+        Toast.error('{% trans "Error processing purchase" %}');
+    } finally {
+        setButtonLoading(button, false);
+    }
+}
+
+// Download and install module
+async function downloadAndInstall(moduleSlug, downloadUrl, button) {
+    if (button) setButtonLoading(button, true);
+    try {
+        const response = await fetch('{% url "store:modules:api_install" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ module_slug: moduleSlug, download_url: downloadUrl })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            Toast.success('{% trans "Module installed successfully!" %}');
+
+            if (data.requires_restart) {
+                showConfirm(
+                    '{% trans "Restart Required" %}',
+                    '{% trans "The server needs to restart to complete module setup. Restart now?" %}',
+                    () => {
+                        fetch('{% url "store:modules:api_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+                            .then(() => setTimeout(() => window.location.reload(), 2000));
+                    },
+                    '{% trans "Restart" %}',
+                    '{% trans "Later" %}'
+                );
+            } else {
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        } else {
+            Toast.error(data.error || '{% trans "Error installing module" %}');
+        }
+    } catch (error) {
+        Toast.error('{% trans "Error downloading module" %}');
+    } finally {
+        if (button) setButtonLoading(button, false);
+    }
+}
+
+// Button loading state helper
+function setButtonLoading(button, loading) {
+    if (!button) return;
+    button.disabled = loading;
+    if (loading) {
+        button.innerHTML = '<ion-spinner name="crescent"></ion-spinner>';
+    }
+}
+</script>

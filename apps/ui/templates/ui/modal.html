@@ -1,0 +1,18 @@
+<ion-modal id="{{ modal_id }}" {% if css_class %}class="{{ css_class }}"{% endif %}>
+    <ion-header>
+        <ion-toolbar>
+            {% if title %}
+            <ion-title>{{ title }}</ion-title>
+            {% endif %}
+            <ion-buttons slot="end">
+                <ion-button onclick="document.getElementById('{{ modal_id }}').dismiss()">
+                    <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+                </ion-button>
+            </ion-buttons>
+        </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+        <!-- Modal content is loaded dynamically or via slots -->
+        <div id="{{ modal_id }}-content"></div>
+    </ion-content>
+</ion-modal>

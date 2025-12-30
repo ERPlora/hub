@@ -1,0 +1,153 @@
+/* ==========================================================================
+   1. BASE - Fundacion del sistema de diseno
+   ========================================================================== */
+
+/* Variables CSS globales - colores, spacing, typography, touch targets */
+@import 'base/variables.css';
+
+/* Reset y normalize - estilos base coherentes */
+@import 'base/reset.css';
+
+/* Sistema tipografico - headings, body text, labels */
+@import 'base/typography.css';
+
+/* Utility classes - flex, spacing, text, etc */
+@import 'base/utilities.css';
+
+/* Animaciones estilo iOS */
+@import 'base/animations.css';
+
+/* ==========================================================================
+   2. LAYOUT - Layout templates
+   ========================================================================== */
+
+/* POS screen layout */
+@import 'layout/pos.css';
+
+/* Offline page layout */
+@import 'layout/offline.css';
+
+/* ==========================================================================
+   3. COMPONENTS - Componentes reutilizables
+   ========================================================================== */
+
+/* Módulos y marketplace */
+@import 'components/modules.css';
+
+/* UI Components (stat cards, empty states, etc) */
+@import 'components/ui-components.css';
+
+/* Data tables */
+@import 'components/tables.css';
+
+/* Toast notifications */
+@import 'components/toast.css';
+
+/* Action sheets */
+@import 'components/action-sheet.css';
+
+/* ==========================================================================
+   4. PAGES - Estilos especificos de paginas
+   ========================================================================== */
+
+/* Login page */
+@import 'pages/login.css';
+
+/* Setup wizard page */
+@import 'pages/setup.css';
+
+/* ==========================================================================
+   DARK MODE SUPPORT
+   Note: Dark mode variables are defined in base/variables.css using body.dark class.
+   The base.html template manages the .dark class based on HubConfig settings
+   (either auto via prefers-color-scheme or manual override).
+   ========================================================================== */
+
+/* ==========================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+@media print {
+
+  .sidebar,
+  ion-header,
+  ion-footer,
+  ion-tab-bar,
+  .no-print {
+    display: none !important;
+  }
+
+  ion-content,
+  .main-content {
+    --padding-start: 0;
+    --padding-end: 0;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* ==========================================================================
+   SAFE AREA INSETS (iOS)
+   ========================================================================== */
+
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+}
+
+ion-tab-bar {
+  padding-bottom: var(--safe-area-bottom);
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   HTMX LOADING INDICATOR
+   ========================================================================== */
+
+.htmx-request .htmx-indicator {
+  display: inline-block;
+}
+
+.htmx-request .htmx-indicator.justify-center {
+  display: flex;
+}
+
+.htmx-indicator {
+  display: none !important;
+}
+
+.htmx-request .htmx-indicator {
+  display: inline-block !important;
+}
+
+.htmx-request .htmx-indicator.justify-center {
+  display: flex !important;
+}
+
+/* ==========================================================================
+   ALPINE.JS CLOAK
+   ========================================================================== */
+
+[x-cloak] {
+  display: none !important;
+}

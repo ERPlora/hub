@@ -1,0 +1,26 @@
+<ion-item {% if css_class %}class="{{ css_class }}"{% endif %}{% if error_text %} class="ion-invalid"{% endif %}>
+    <ion-select
+        name="{{ name }}"
+        {% if label %}label="{{ label }}{% if required %}*{% endif %}"{% endif %}
+        {% if label_placement %}label-placement="{{ label_placement }}"{% endif %}
+        {% if value %}value="{{ value }}"{% endif %}
+        {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+        {% if required %}required{% endif %}
+        {% if disabled %}disabled{% endif %}
+        {% if multiple %}multiple{% endif %}
+        interface="{{ interface|default:'popover' }}"
+        {% for key, val in extra_attrs.items %}{{ key }}="{{ val }}"{% endfor %}
+    >
+        {% for option in options %}
+        <ion-select-option value="{{ option.value }}"{% if option.value == value %} selected{% endif %}>
+            {{ option.label }}
+        </ion-select-option>
+        {% endfor %}
+    </ion-select>
+</ion-item>
+{% if helper_text and not error_text %}
+<ion-note class="ui-helper-text">{{ helper_text }}</ion-note>
+{% endif %}
+{% if error_text %}
+<ion-note class="ui-error-text" color="danger">{{ error_text }}</ion-note>
+{% endif %}

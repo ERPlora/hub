@@ -1,0 +1,209 @@
+{% load i18n %}
+
+<div x-data="filtersMenu()" x-init="init()">
+    <ion-list lines="none">
+
+        {% if store_type == 'modules' %}
+        <!-- Category Filter -->
+        <ion-item-group>
+            <ion-item-divider>
+                <ion-label>{% trans "Category" %}</ion-label>
+            </ion-item-divider>
+
+            <ion-radio-group
+                :value="categoryFilter"
+                @ionChange="setCategory($event.detail.value)">
+                <ion-item>
+                    <ion-radio value="" slot="start"></ion-radio>
+                    <ion-label>{% trans "All Categories" %}</ion-label>
+                </ion-item>
+                {% for category in filters.categories %}
+                <ion-item>
+                    <ion-radio value="{{ category.id }}" slot="start"></ion-radio>
+                    <ion-label>{{ category.name }}</ion-label>
+                </ion-item>
+                {% endfor %}
+            </ion-radio-group>
+        </ion-item-group>
+
+        <!-- Industry Filter -->
+        <ion-item-group>
+            <ion-item-divider>
+                <ion-label>{% trans "Industry" %}</ion-label>
+            </ion-item-divider>
+
+            <ion-radio-group
+                :value="industryFilter"
+                @ionChange="setIndustry($event.detail.value)">
+                <ion-item>
+                    <ion-radio value="" slot="start"></ion-radio>
+                    <ion-label>{% trans "All Industries" %}</ion-label>
+                </ion-item>
+                {% for industry in filters.industries %}
+                <ion-item>
+                    <ion-radio value="{{ industry.id }}" slot="start"></ion-radio>
+                    <ion-label>{{ industry.name }}</ion-label>
+                </ion-item>
+                {% endfor %}
+            </ion-radio-group>
+        </ion-item-group>
+
+        <!-- Type Filter -->
+        <ion-item-group>
+            <ion-item-divider>
+                <ion-label>{% trans "Pricing" %}</ion-label>
+            </ion-item-divider>
+
+            <ion-radio-group
+                :value="typeFilter"
+                @ionChange="setType($event.detail.value)">
+                <ion-item>
+                    <ion-radio value="" slot="start"></ion-radio>
+                    <ion-label>{% trans "All Types" %}</ion-label>
+                </ion-item>
+                {% for type in filters.types %}
+                <ion-item>
+                    <ion-radio value="{{ type.id }}" slot="start"></ion-radio>
+                    <ion-icon name="{{ type.icon }}" slot="start" class="ion-margin-end"></ion-icon>
+                    <ion-label>{{ type.name }}</ion-label>
+                </ion-item>
+                {% endfor %}
+            </ion-radio-group>
+        </ion-item-group>
+
+        {% elif store_type == 'hubs' %}
+        <!-- Region Filter -->
+        <ion-item-group>
+            <ion-item-divider>
+                <ion-label>{% trans "Region" %}</ion-label>
+            </ion-item-divider>
+
+            <ion-radio-group
+                :value="regionFilter"
+                @ionChange="setRegion($event.detail.value)">
+                <ion-item>
+                    <ion-radio value="" slot="start"></ion-radio>
+                    <ion-label>{% trans "All Regions" %}</ion-label>
+                </ion-item>
+                {% for region in filters.regions %}
+                <ion-item>
+                    <ion-radio value="{{ region.id }}" slot="start"></ion-radio>
+                    <ion-label>{{ region.name }}</ion-label>
+                </ion-item>
+                {% endfor %}
+            </ion-radio-group>
+        </ion-item-group>
+
+        <!-- Plan Filter -->
+        <ion-item-group>
+            <ion-item-divider>
+                <ion-label>{% trans "Plan" %}</ion-label>
+            </ion-item-divider>
+
+            <ion-radio-group
+                :value="planFilter"
+                @ionChange="setPlan($event.detail.value)">
+                <ion-item>
+                    <ion-radio value="" slot="start"></ion-radio>
+                    <ion-label>{% trans "All Plans" %}</ion-label>
+                </ion-item>
+                {% for plan in filters.plans %}
+                <ion-item>
+                    <ion-radio value="{{ plan.id }}" slot="start"></ion-radio>
+                    <ion-label>{{ plan.name }}</ion-label>
+                </ion-item>
+                {% endfor %}
+            </ion-radio-group>
+        </ion-item-group>
+        {% endif %}
+
+    </ion-list>
+
+    <!-- Apply Button (mobile friendly) -->
+    <div class="ion-padding">
+        <ion-button expand="block" @click="applyAndClose()">
+            <ion-icon name="checkmark-outline" slot="start"></ion-icon>
+            {% trans "Apply Filters" %}
+        </ion-button>
+    </div>
+</div>
+
+<script>
+(function() {
+    const filtersMenuData = () => ({
+        // Module filters
+        categoryFilter: '',
+        industryFilter: '',
+        typeFilter: '',
+        // Hub filters
+        regionFilter: '',
+        planFilter: '',
+
+        init() {
+            // Listen for clear events from main store
+            window.addEventListener('marketplace:clear-filter', (e) => {
+                const { filterType } = e.detail;
+                if (filterType === 'category') this.categoryFilter = '';
+                if (filterType === 'industry') this.industryFilter = '';
+                if (filterType === 'type') this.typeFilter = '';
+                if (filterType === 'region') this.regionFilter = '';
+                if (filterType === 'plan') this.planFilter = '';
+            });
+
+            window.addEventListener('marketplace:clear-all-filters', () => {
+                this.categoryFilter = '';
+                this.industryFilter = '';
+                this.typeFilter = '';
+                this.regionFilter = '';
+                this.planFilter = '';
+            });
+        },
+
+        setCategory(value) {
+            this.categoryFilter = value;
+            this.emitFilterChange('category', value);
+        },
+
+        setIndustry(value) {
+            this.industryFilter = value;
+            this.emitFilterChange('industry', value);
+        },
+
+        setType(value) {
+            this.typeFilter = value;
+            this.emitFilterChange('type', value);
+        },
+
+        setRegion(value) {
+            this.regionFilter = value;
+            this.emitFilterChange('region', value);
+        },
+
+        setPlan(value) {
+            this.planFilter = value;
+            this.emitFilterChange('plan', value);
+        },
+
+        emitFilterChange(filterType, value) {
+            window.dispatchEvent(new CustomEvent('marketplace:filter-changed', {
+                detail: { filterType, value }
+            }));
+        },
+
+        applyAndClose() {
+            menuController.close('filters-menu');
+        }
+    });
+
+    // Register with Alpine
+    if (typeof Alpine !== 'undefined' && Alpine.data) {
+        Alpine.data('filtersMenu', filtersMenuData);
+    } else {
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('filtersMenu', filtersMenuData);
+        }, { once: true });
+    }
+
+    window.filtersMenu = filtersMenuData;
+})();
+</script>

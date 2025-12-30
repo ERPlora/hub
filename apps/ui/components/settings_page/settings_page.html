@@ -1,0 +1,38 @@
+{% load i18n component_tags %}
+
+{# Tabbar OOB swap for HTMX navigation #}
+{% if request.htmx and tabbar_template %}
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+<ion-footer>
+{% include tabbar_template with current_view=tabbar_view %}
+</ion-footer>
+</div>
+{% endif %}
+
+{# CSRF token for JavaScript/HTMX #}
+{% csrf_token %}
+
+{# Page Header - matches the standard page pattern #}
+<ion-header>
+    <ion-toolbar>
+        <ion-title>{{ title }}</ion-title>
+    </ion-toolbar>
+</ion-header>
+
+<div {% if alpine_app %}x-data="{{ alpine_app }}()" x-init="init()"{% endif %} class="ion-padding">
+    {# Info slot - for read-only global config sections #}
+    {% slot "info" %}{% endslot %}
+
+    {# Main settings content #}
+    <ion-card class="m-0">
+        <ion-card-content>
+            {% slot "settings" %}{% endslot %}
+
+            {# Actions slot - for reset/save buttons #}
+            {% slot "actions" %}{% endslot %}
+        </ion-card-content>
+    </ion-card>
+
+    {# Footer info slot - for help text #}
+    {% slot "footer" %}{% endslot %}
+</div>

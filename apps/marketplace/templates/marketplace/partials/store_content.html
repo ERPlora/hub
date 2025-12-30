@@ -1,0 +1,375 @@
+{% load i18n static ui %}
+
+{% if request.htmx %}
+<!-- Tab bar update via OOB swap -->
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+<ion-footer>
+    <ion-tab-bar slot="bottom" color="light">
+        <ion-tab-button
+            hx-get="{% url 'marketplace:index' %}"
+            hx-target="#main-content-area"
+            hx-push-url="true"
+            {% if store_type == 'modules' %}class="tab-selected"{% endif %}>
+            <ion-icon name="cube-outline"></ion-icon>
+            <ion-label>{% trans "Modules" %}</ion-label>
+        </ion-tab-button>
+
+        <ion-tab-button
+            hx-get="{% url 'marketplace:store_hubs' %}"
+            hx-target="#main-content-area"
+            hx-push-url="true"
+            {% if store_type == 'hubs' %}class="tab-selected"{% endif %}>
+            <ion-icon name="server-outline"></ion-icon>
+            <ion-label>{% trans "Hubs" %}</ion-label>
+        </ion-tab-button>
+
+        <ion-tab-button disabled>
+            <ion-icon name="hardware-chip-outline"></ion-icon>
+            <ion-label>{% trans "Components" %}</ion-label>
+            <ion-badge color="medium" style="font-size: 8px;">{% trans "Soon" %}</ion-badge>
+        </ion-tab-button>
+
+        <ion-tab-button
+            hx-get="{% url 'marketplace:cart_page' %}"
+            hx-target="#main-content-area"
+            hx-push-url="true"
+            {% if current_view == 'cart' %}class="tab-selected"{% endif %}>
+            <ion-icon name="cart-outline"></ion-icon>
+            <ion-label>{% trans "Cart" %}</ion-label>
+            {% if cart_count > 0 %}
+            <ion-badge color="danger">{{ cart_count }}</ion-badge>
+            {% endif %}
+        </ion-tab-button>
+    </ion-tab-bar>
+</ion-footer>
+</div>
+{% endif %}
+
+{% ui_page_header title=page_title %}
+
+<div class="ion-padding">
+    <!-- Search Bar with Filter Button -->
+    <form id="marketplace-filters-form"
+          hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
+          hx-target="#products-grid"
+          hx-swap="innerHTML"
+          hx-trigger="submit, change from:input[type=hidden], ionInput from:#search-input delay:300ms"
+          hx-indicator="#loading-spinner">
+
+        <div class="d-flex gap-sm mb-md align-center">
+            <ion-searchbar
+                id="search-input"
+                name="q"
+                placeholder="{% trans 'Search...' %}"
+                debounce="300"
+                show-cancel-button="never"
+                class="flex-1 m-0"
+                value="{{ request.GET.q|default:'' }}">
+            </ion-searchbar>
+            <ion-button id="filter-toggle-btn" fill="outline" type="button" onclick="toggleFilters()">
+                <ion-icon name="options-outline" slot="icon-only"></ion-icon>
+                {% if active_filters_count %}
+                <ion-badge color="danger" style="position: absolute; top: -4px; right: -4px; font-size: 10px; min-width: 18px; height: 18px; border-radius: 50%;">
+                    {{ active_filters_count }}
+                </ion-badge>
+                {% endif %}
+            </ion-button>
+        </div>
+
+        <!-- Hidden inputs for filters -->
+        <input type="hidden" name="category" id="filter-category" value="{{ request.GET.category|default:'' }}">
+        <input type="hidden" name="industry" id="filter-industry" value="{{ request.GET.industry|default:'' }}">
+        <input type="hidden" name="type" id="filter-type" value="{{ request.GET.type|default:'' }}">
+        <input type="hidden" name="region" id="filter-region" value="{{ request.GET.region|default:'' }}">
+        <input type="hidden" name="plan" id="filter-plan" value="{{ request.GET.plan|default:'' }}">
+
+        <!-- Filters Panel (collapsible) -->
+        <ion-card id="filters-panel" class="m-0 mb-md" style="display: none;">
+            <ion-card-content>
+                {% if store_type == 'modules' %}
+                <!-- Category Filter -->
+                <div class="mb-md">
+                    <h4 class="fw-semibold fs-sm mb-sm">{% trans "Category" %}</h4>
+                    <div class="d-flex flex-wrap gap-xs">
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="category"
+                            data-value=""
+                            color="{% if not request.GET.category %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('category', '')">
+                            <ion-label>{% trans "All" %}</ion-label>
+                        </ion-chip>
+                        {% for category in filters.categories %}
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="category"
+                            data-value="{{ category.id }}"
+                            color="{% if request.GET.category == category.id %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('category', '{{ category.id }}')">
+                            <ion-label>{{ category.name }}</ion-label>
+                        </ion-chip>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Industry Filter -->
+                <div class="mb-md">
+                    <h4 class="fw-semibold fs-sm mb-sm">{% trans "Industry" %}</h4>
+                    <div class="d-flex flex-wrap gap-xs">
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="industry"
+                            data-value=""
+                            color="{% if not request.GET.industry %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('industry', '')">
+                            <ion-label>{% trans "All" %}</ion-label>
+                        </ion-chip>
+                        {% for industry in filters.industries %}
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="industry"
+                            data-value="{{ industry.id }}"
+                            color="{% if request.GET.industry == industry.id %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('industry', '{{ industry.id }}')">
+                            <ion-label>{{ industry.name }}</ion-label>
+                        </ion-chip>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Pricing Type Filter -->
+                <div>
+                    <h4 class="fw-semibold fs-sm mb-sm">{% trans "Pricing" %}</h4>
+                    <div class="d-flex flex-wrap gap-xs">
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="type"
+                            data-value=""
+                            color="{% if not request.GET.type %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('type', '')">
+                            <ion-label>{% trans "All" %}</ion-label>
+                        </ion-chip>
+                        {% for type in filters.types %}
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="type"
+                            data-value="{{ type.id }}"
+                            color="{% if request.GET.type == type.id %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('type', '{{ type.id }}')">
+                            {% if type.icon %}<ion-icon name="{{ type.icon }}"></ion-icon>{% endif %}
+                            <ion-label>{{ type.name }}</ion-label>
+                        </ion-chip>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% elif store_type == 'hubs' %}
+                <!-- Region Filter -->
+                <div class="mb-md">
+                    <h4 class="fw-semibold fs-sm mb-sm">{% trans "Region" %}</h4>
+                    <div class="d-flex flex-wrap gap-xs">
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="region"
+                            data-value=""
+                            color="{% if not request.GET.region %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('region', '')">
+                            <ion-label>{% trans "All" %}</ion-label>
+                        </ion-chip>
+                        {% for region in filters.regions %}
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="region"
+                            data-value="{{ region.id }}"
+                            color="{% if request.GET.region == region.id %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('region', '{{ region.id }}')">
+                            <ion-label>{{ region.name }}</ion-label>
+                        </ion-chip>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Plan Filter -->
+                <div>
+                    <h4 class="fw-semibold fs-sm mb-sm">{% trans "Plan" %}</h4>
+                    <div class="d-flex flex-wrap gap-xs">
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="plan"
+                            data-value=""
+                            color="{% if not request.GET.plan %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('plan', '')">
+                            <ion-label>{% trans "All" %}</ion-label>
+                        </ion-chip>
+                        {% for plan in filters.plans %}
+                        <ion-chip
+                            class="cursor-pointer filter-chip"
+                            data-filter="plan"
+                            data-value="{{ plan.id }}"
+                            color="{% if request.GET.plan == plan.id %}primary{% else %}medium{% endif %}"
+                            onclick="setFilter('plan', '{{ plan.id }}')">
+                            <ion-label>{{ plan.name }}</ion-label>
+                        </ion-chip>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Clear Filters -->
+                <div id="clear-filters-section" class="mt-md pt-md" style="border-top: 1px solid var(--border-color); display: none;">
+                    <ion-button size="small" fill="clear" color="danger" type="button" onclick="clearAllFilters()">
+                        <ion-icon name="trash-outline" slot="start"></ion-icon>
+                        {% trans "Clear all filters" %}
+                    </ion-button>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <!-- Active Filters Display -->
+        <div id="active-filters" class="d-flex flex-wrap gap-sm mb-md align-center" style="display: none;">
+            <span class="fs-sm text-medium">{% trans "Active:" %}</span>
+            <div id="active-filters-chips"></div>
+        </div>
+    </form>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="htmx-indicator justify-center py-xl">
+        <ion-spinner name="crescent"></ion-spinner>
+    </div>
+
+    <!-- Products Grid (loaded via HTMX with infinite scroll) -->
+    <div id="products-grid"
+         hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
+         hx-trigger="load"
+         hx-swap="innerHTML"
+         hx-indicator="#loading-spinner">
+        <div class="d-flex justify-center py-xl">
+            <ion-spinner name="crescent"></ion-spinner>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Toggle filters panel
+    window.toggleFilters = function() {
+        const panel = document.getElementById('filters-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    };
+
+    // Set a filter value and trigger HTMX request
+    window.setFilter = function(filterName, value) {
+        const input = document.getElementById('filter-' + filterName);
+        if (input) {
+            input.value = value;
+            // Update chip colors
+            updateChipColors(filterName, value);
+            // Trigger HTMX by dispatching change event
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            // Update active filters display
+            updateActiveFilters();
+        }
+    };
+
+    // Update chip colors for a filter
+    function updateChipColors(filterName, activeValue) {
+        document.querySelectorAll('.filter-chip[data-filter="' + filterName + '"]').forEach(function(chip) {
+            var chipValue = chip.dataset.value;
+            chip.color = chipValue === activeValue ? 'primary' : 'medium';
+        });
+    }
+
+    // Clear all filters
+    window.clearAllFilters = function() {
+        ['category', 'industry', 'type', 'region', 'plan'].forEach(function(filter) {
+            var input = document.getElementById('filter-' + filter);
+            if (input) {
+                input.value = '';
+                updateChipColors(filter, '');
+            }
+        });
+        // Clear search
+        var searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.value = '';
+        // Trigger HTMX
+        document.getElementById('filter-category').dispatchEvent(new Event('change', { bubbles: true }));
+        updateActiveFilters();
+    };
+
+    // Update active filters display
+    window.updateActiveFilters = function() {
+        var container = document.getElementById('active-filters');
+        var chipsContainer = document.getElementById('active-filters-chips');
+        var clearSection = document.getElementById('clear-filters-section');
+        var filterToggleBtn = document.getElementById('filter-toggle-btn');
+
+        var chips = [];
+        var count = 0;
+
+        // Check search
+        var searchInput = document.getElementById('search-input');
+        var searchValue = searchInput ? searchInput.value : '';
+        if (searchValue) {
+            chips.push('<ion-chip color="warning" class="cursor-pointer" onclick="clearSearch()">' +
+                '<ion-icon name="search"></ion-icon>' +
+                '<ion-label>' + searchValue + '</ion-label>' +
+                '<ion-icon name="close-circle"></ion-icon>' +
+            '</ion-chip>');
+            count++;
+        }
+
+        // Check filters
+        ['category', 'industry', 'type', 'region', 'plan'].forEach(function(filter) {
+            var input = document.getElementById('filter-' + filter);
+            if (input && input.value) {
+                chips.push('<ion-chip color="warning" class="cursor-pointer" onclick="setFilter(\'' + filter + '\', \'\')">' +
+                    '<ion-label>' + input.value + '</ion-label>' +
+                    '<ion-icon name="close-circle"></ion-icon>' +
+                '</ion-chip>');
+                count++;
+            }
+        });
+
+        // Update UI
+        if (chips.length > 0) {
+            chipsContainer.innerHTML = chips.join('');
+            container.style.display = 'flex';
+            if (clearSection) clearSection.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+            if (clearSection) clearSection.style.display = 'none';
+        }
+
+        // Update badge on filter button
+        if (filterToggleBtn) {
+            var badge = filterToggleBtn.querySelector('ion-badge');
+            if (count > 0) {
+                if (!badge) {
+                    badge = document.createElement('ion-badge');
+                    badge.color = 'danger';
+                    badge.style.cssText = 'position: absolute; top: -4px; right: -4px; font-size: 10px; min-width: 18px; height: 18px; border-radius: 50%;';
+                    filterToggleBtn.appendChild(badge);
+                }
+                badge.textContent = count;
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+    };
+
+    // Clear search only
+    window.clearSearch = function() {
+        var searchInput = document.getElementById('search-input');
+        if (searchInput) {
+            searchInput.value = '';
+            document.getElementById('filter-category').dispatchEvent(new Event('change', { bubbles: true }));
+            updateActiveFilters();
+        }
+    };
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', updateActiveFilters);
+    // Also run immediately for HTMX loads
+    updateActiveFilters();
+})();
+</script>

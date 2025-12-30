@@ -1,0 +1,8 @@
+<div id="sidebar-footer" class="menu-footer ion-padding{% if css_class %} {{ css_class }}{% endif %}">
+    {% if signout_url %}
+    <ion-item id="btn-signout" button href="{{ signout_url }}" detail="false" lines="none">
+        <ion-icon slot="start" name="log-out-outline"></ion-icon>
+        {{ signout_label }}
+    </ion-item>
+    {% endif %}
+</div>

@@ -1,0 +1,52 @@
+{% load i18n component_tags %}
+
+<ion-card class="m-0">
+    <ion-card-content class="p-0">
+        <div id="{{ table_id }}">
+            <div class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            {% slot "columns" %}{% endslot %}
+                        </tr>
+                    </thead>
+                    <tbody id="{{ tbody_id }}">
+                        {% slot "rows" %}{% endslot %}
+                    </tbody>
+                </table>
+
+                {# Infinite scroll trigger #}
+                {% if has_next and next_page_url %}
+                <div class="infinite-scroll-loader"
+                     hx-get="{{ next_page_url }}"
+                     hx-trigger="revealed"
+                     hx-target="#{{ tbody_id }}"
+                     hx-swap="beforeend"
+                     hx-select="#{{ tbody_id }} > tr, .infinite-scroll-loader, .infinite-scroll-end">
+                    <ion-spinner name="crescent"></ion-spinner>
+                </div>
+                {% elif total_count > 0 %}
+                <div class="infinite-scroll-end">
+                    {% blocktrans count count=total_count %}
+                        {{ count }} {{ entity_name }}
+                    {% plural %}
+                        {{ count }} {{ entity_name_plural }}
+                    {% endblocktrans %}
+                </div>
+                {% endif %}
+
+                {# Empty state when no items #}
+                {% if total_count == 0 and show_empty %}
+                <div class="p-xl text-center">
+                    {% slot "empty" %}
+                    <ion-icon name="file-tray-outline" style="font-size: 64px; color: var(--text-color-secondary);"></ion-icon>
+                    <p class="mt-md" style="color: var(--text-color-secondary);">
+                        {% blocktrans %}No {{ entity_name_plural }} found{% endblocktrans %}
+                    </p>
+                    {% endslot %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </ion-card-content>
+</ion-card>

@@ -1,0 +1,21 @@
+<ion-card class="ui-stat-card {{ css_class }}">
+    <ion-card-content>
+        <div class="ui-stat-content">
+            {% if icon %}
+            <div class="ui-stat-icon ui-stat-icon--{{ color }}">
+                <ion-icon name="{{ icon }}"></ion-icon>
+            </div>
+            {% endif %}
+            <div class="ui-stat-info">
+                <div class="ui-stat-value">{{ value }}</div>
+                <div class="ui-stat-label">{{ label }}</div>
+                {% if trend %}
+                <div class="ui-stat-trend ui-stat-trend--{{ trend }}">
+                    <ion-icon name="{% if trend == 'up' %}trending-up{% else %}trending-down{% endif %}"></ion-icon>
+                    {{ trend_value }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </ion-card-content>
+</ion-card>

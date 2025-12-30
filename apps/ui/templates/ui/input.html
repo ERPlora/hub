@@ -1,0 +1,28 @@
+<ion-item {% if css_class %}class="{{ css_class }}"{% endif %}{% if error_text %} class="ion-invalid"{% endif %}>
+    {% if icon and icon_slot == "start" %}
+    <ion-icon slot="start" name="{{ icon }}"></ion-icon>
+    {% endif %}
+    <ion-input
+        name="{{ name }}"
+        type="{{ type }}"
+        {% if label %}label="{{ label }}{% if required %}*{% endif %}"{% endif %}
+        {% if label_placement %}label-placement="{{ label_placement }}"{% endif %}
+        {% if value %}value="{{ value }}"{% endif %}
+        {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+        {% if required %}required{% endif %}
+        {% if disabled %}disabled{% endif %}
+        {% if readonly %}readonly{% endif %}
+        {% if maxlength %}maxlength="{{ maxlength }}"{% endif %}
+        {% if pattern %}pattern="{{ pattern }}"{% endif %}
+        {% for key, val in extra_attrs.items %}{{ key }}="{{ val }}"{% endfor %}
+    ></ion-input>
+    {% if icon and icon_slot == "end" %}
+    <ion-icon slot="end" name="{{ icon }}"></ion-icon>
+    {% endif %}
+</ion-item>
+{% if helper_text and not error_text %}
+<ion-note class="ui-helper-text">{{ helper_text }}</ion-note>
+{% endif %}
+{% if error_text %}
+<ion-note class="ui-error-text" color="danger">{{ error_text }}</ion-note>
+{% endif %}

@@ -1,46 +1,13 @@
 {% load i18n %}
+{% load ui %}
 
-<ion-footer>
-    <ion-tab-bar>
-        <!-- Dashboard -->
-        <ion-tab-button
-            hx-get="{% url 'main:index' %}"
-            hx-target="#dashboard-content"
-            hx-push-url="true"
-            :class="currentSection === 'dashboard' ? 'tab-selected' : ''">
-            <ion-icon name="grid-outline"></ion-icon>
-            <ion-label>{% trans "Dashboard" %}</ion-label>
-        </ion-tab-button>
+{% ui_tabbar %}
+    {% ui_tab_button label=_("Home") icon="grid-outline" hx_get="/home/" hx_target="#main-content-area" %}
 
-        <!-- Dynamic Module Tabs -->
-        {% for module in MODULE_TAB_ITEMS %}
-        <ion-tab-button
-            hx-get="{{ module.url }}"
-            hx-target="#dashboard-content"
-            hx-push-url="true">
-            <ion-icon name="{{ module.icon }}"></ion-icon>
-            <ion-label>{{ module.label }}</ion-label>
-        </ion-tab-button>
-        {% endfor %}
+    {% for module in MODULE_TAB_ITEMS %}
+    {% ui_tab_button label=module.label icon=module.icon hx_get=module.url hx_target="#main-content-area" %}
+    {% endfor %}
 
-        <!-- Modules -->
-        <ion-tab-button
-            hx-get="{% url 'system:modules' %}"
-            hx-target="#dashboard-content"
-            hx-push-url="true"
-            :class="currentSection === 'modules' ? 'tab-selected' : ''">
-            <ion-icon name="extension-puzzle-outline"></ion-icon>
-            <ion-label>{% trans "Modules" %}</ion-label>
-        </ion-tab-button>
-
-        <!-- Settings -->
-        <ion-tab-button
-            hx-get="{% url 'main:settings' %}"
-            hx-target="#dashboard-content"
-            hx-push-url="true"
-            :class="currentSection === 'settings' ? 'tab-selected' : ''">
-            <ion-icon name="settings-outline"></ion-icon>
-            <ion-label>{% trans "Settings" %}</ion-label>
-        </ion-tab-button>
-    </ion-tab-bar>
-</ion-footer>
+    {% ui_tab_button label=_("Store") icon="storefront-outline" hx_get="/store/" hx_target="#main-content-area" %}
+    {% ui_tab_button label=_("Settings") icon="settings-outline" hx_get="/settings/" hx_target="#main-content-area" %}
+{% endui_tabbar %}

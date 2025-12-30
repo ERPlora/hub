@@ -1,0 +1,17 @@
+{% load i18n %}
+
+<div class="ion-padding ion-text-center error-state">
+    <ion-icon name="cloud-offline-outline" style="font-size: 64px; color: var(--ion-color-danger);"></ion-icon>
+    <h3>{% trans "Connection Error" %}</h3>
+    <p class="text-medium">{{ error }}</p>
+    <ion-button onclick="location.reload()">
+        <ion-icon name="refresh-outline" slot="start"></ion-icon>
+        {% trans "Retry" %}
+    </ion-button>
+</div>
+
+<style>
+.error-state {
+    padding: 60px 20px;
+}
+</style>

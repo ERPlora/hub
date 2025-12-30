@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n ui %}
 
 {% if tax_classes %}
 <ion-list>
@@ -12,26 +12,12 @@
             </p>
         </ion-label>
         {% if tc.is_default %}
-        <ion-chip slot="end" color="success">{% trans "Default" %}</ion-chip>
+        {% ui_chip label=_("Default") color="success" slot="end" %}
         {% endif %}
-        <ion-button
-            slot="end"
-            fill="clear"
-            color="danger"
-            hx-post="{% url 'main:settings' %}"
-            hx-vals='{"action": "delete_tax_class", "tax_class_id": "{{ tc.id }}"}'
-            hx-target="#tax-classes-list"
-            hx-swap="innerHTML"
-            hx-confirm="{% trans 'Are you sure you want to delete this tax class?' %}">
-            <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-        </ion-button>
+        {% ui_icon_button icon="trash-outline" slot="end" fill="clear" color="danger" hx_post="/settings/" hx_vals='{"action": "delete_tax_class", "tax_class_id": "'|add:tc.id|add:'"}' hx_target="#tax-classes-list" hx_swap="innerHTML" hx_confirm=_("Are you sure you want to delete this tax class?") %}
     </ion-item>
     {% endfor %}
 </ion-list>
 {% else %}
-<div class="text-center py-8" style="color: var(--ion-color-medium);">
-    <ion-icon name="alert-circle-outline" class="text-4xl mb-2"></ion-icon>
-    <p class="mb-2">{% trans "No tax classes configured" %}</p>
-    <p class="text-sm">{% trans "Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)" %}</p>
-</div>
+{% ui_empty_state title=_("No tax classes configured") description=_("Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)") icon="alert-circle-outline" %}
 {% endif %}

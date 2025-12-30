@@ -1,59 +1,17 @@
 {% load static %}
 {% load i18n %}
+{% load ui %}
 
-<!-- Main Group -->
-<ion-item-group>
-    <ion-item-divider>
-        <ion-label>&nbsp;&nbsp;</ion-label>
-    </ion-item-divider>
+<!-- Main Group - 6 fixed items for Hub functions -->
+{% with is_home_active=current_section|default:"home" %}
+{% ui_nav_item label=_("Main") icon="home-outline" hx_get="/" hx_target="#main-content-area" active=is_home_active %}
+{% endwith %}
 
-    <ion-item id="nav-dashboard"
-              class="nav-item {% if current_section == 'dashboard' or current_section == 'employees' or current_section == 'settings' %}active{% endif %}"
-              hx-get="{% url 'main:index' %}"
-              hx-target="#dashboard-content"
-              hx-push-url="true"
-              detail="false">
-        <ion-icon name="grid-outline" slot="start"></ion-icon>
-        <ion-label>{% trans "Dashboard" %}</ion-label>
-    </ion-item>
+{% ui_nav_item label=_("Files") icon="folder-outline" hx_get="/files/" hx_target="#main-content-area" %}
+{% ui_nav_item label=_("Employees") icon="people-outline" hx_get="/employees/" hx_target="#main-content-area" %}
+{% ui_nav_item label=_("My Modules") icon="apps-outline" hx_get="/store/modules/" hx_target="#main-content-area" %}
+{% ui_nav_item label=_("Settings") icon="settings-outline" hx_get="/settings/" hx_target="#main-content-area" %}
 
-    <ion-item id="nav-files"
-              class="nav-item {% if current_section == 'files' %}active{% endif %}"
-              hx-get="{% url 'main:files' %}"
-              hx-target="#dashboard-content"
-              hx-push-url="true"
-              detail="false"
-              lines="none">
-        <ion-icon name="folder-outline" slot="start"></ion-icon>
-        <ion-label>{% trans "Files" %}</ion-label>
-    </ion-item>
-</ion-item-group>
+<ion-item-divider></ion-item-divider>
 
-<!-- Marketplace Group -->
-<ion-item-group>
-    <ion-item-divider>
-        <ion-label>{% trans "Marketplace" %}</ion-label>
-    </ion-item-divider>
-
-    <ion-item id="nav-marketplace"
-              class="nav-item {% if current_section == 'modules' or current_section == 'marketplace' %}active{% endif %}"
-              hx-get="{% url 'system:modules' %}"
-              hx-target="#dashboard-content"
-              hx-push-url="true"
-              detail="false"
-              lines="none">
-        <ion-icon name="storefront-outline" slot="start"></ion-icon>
-        <ion-label>{% trans "Modules" %}</ion-label>
-    </ion-item>
-</ion-item-group>
-
-<!-- System Group (Dynamic - Active modules) -->
-<ion-item-group>
-    <ion-item-divider>
-        <ion-label>{% trans "System" %}</ion-label>
-    </ion-item-divider>
-
-    <div id="system-modules-list">
-        {% include "dashboard/partials/system_modules_list.html" %}
-    </div>
-</ion-item-group>
+{% ui_nav_item label=_("Marketplace") icon="storefront-outline" hx_get="/marketplace/modules/" hx_target="#main-content-area" %}

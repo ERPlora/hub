@@ -1,0 +1,10 @@
+<div class="ui-form-section{% if css_class %} {{ css_class }}{% endif %}">
+    {% if title %}
+    <div class="ui-form-section-header">
+        <h3 class="ui-form-section-title">{{ title }}</h3>
+        {% if description %}
+        <p class="ui-form-section-description">{{ description }}</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>

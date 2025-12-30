@@ -1,0 +1,19 @@
+<div class="ui-empty-state {{ css_class }}">
+    {% if icon %}
+    <ion-icon name="{{ icon }}" class="ui-empty-state-icon"></ion-icon>
+    {% endif %}
+    <h3 class="ui-empty-state-title">{{ title }}</h3>
+    {% if description %}
+    <p class="ui-empty-state-description">{{ description }}</p>
+    {% endif %}
+    {% if action_label %}
+    <ion-button
+        color="primary"
+        {% if action_url %}href="{{ action_url }}"{% endif %}
+        {% if action_hx_get %}hx-get="{{ action_hx_get }}"{% endif %}
+        {% if action_hx_target %}hx-target="{{ action_hx_target }}"{% endif %}
+    >
+        {{ action_label }}
+    </ion-button>
+    {% endif %}
+</div>

@@ -1,0 +1,38 @@
+{% load i18n component_tags %}
+
+<div class="table-actions d-flex gap-xs justify-center"
+     x-data="{ deleting: false }"
+     x-init="$el._deleteConfig = { url: '{{ delete_url }}', name: '{{ delete_name|escapejs }}', method: '{{ delete_method }}' }">
+    {# View Button #}
+    {% if show_view %}
+    <ion-button size="small" fill="clear"
+                hx-get="{{ view_url }}"
+                hx-target="{{ hx_target }}"
+                hx-push-url="true"
+                title="{% trans 'View' %}">
+        <ion-icon slot="icon-only" name="eye-outline"></ion-icon>
+    </ion-button>
+    {% endif %}
+
+    {# Edit Button #}
+    {% if show_edit %}
+    <ion-button size="small" fill="clear"
+                hx-get="{{ edit_url }}"
+                hx-target="{{ hx_target }}"
+                hx-push-url="true"
+                title="{% trans 'Edit' %}">
+        <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+    </ion-button>
+    {% endif %}
+
+    {# Delete Button #}
+    {% if show_delete %}
+    <ion-button size="small" fill="clear" color="danger"
+                :disabled="deleting"
+                @click="$store.ui.confirmDelete($el._deleteConfig.url, $el._deleteConfig.name, $el._deleteConfig.method, $el)"
+                title="{% trans 'Delete' %}">
+        <ion-spinner x-show="deleting" name="crescent" style="width: 16px; height: 16px;"></ion-spinner>
+        <ion-icon x-show="!deleting" slot="icon-only" name="trash-outline"></ion-icon>
+    </ion-button>
+    {% endif %}
+</div>

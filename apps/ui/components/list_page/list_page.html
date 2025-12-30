@@ -1,0 +1,44 @@
+{% load i18n component_tags %}
+
+{# Tab bar update via OOB swap (only on HTMX navigation) #}
+{% if request.htmx and tabbar_template %}
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+<ion-footer>
+{% include tabbar_template with current_view=tabbar_view %}
+</ion-footer>
+</div>
+{% endif %}
+
+{# CSRF token for JavaScript #}
+{% csrf_token %}
+
+<div class="ion-padding">
+    {# Page Header #}
+    <div class="d-flex justify-between align-center mb-md flex-wrap gap-sm">
+        <div>
+            <h1 class="fs-xl fw-bold" style="color: var(--text-color); margin: 0;">{{ title }}</h1>
+            {% if subtitle %}
+            <p class="fs-sm mt-xs" style="color: var(--text-color-secondary); margin: 0;">{{ subtitle }}</p>
+            {% endif %}
+        </div>
+        {% if action_label and action_url %}
+        <ion-button
+            color="success"
+            hx-get="{{ action_url }}"
+            hx-target="{{ action_hx_target }}"
+            hx-push-url="true">
+            <ion-icon slot="start" name="{{ action_icon }}"></ion-icon>
+            {{ action_label }}
+        </ion-button>
+        {% endif %}
+    </div>
+
+    {# Optional Stats Section #}
+    {% slot "stats" %}{% endslot %}
+
+    {# Filters Card #}
+    {% slot "filters" %}{% endslot %}
+
+    {# Main Content (Table/List) #}
+    {% slot "content" %}{% endslot %}
+</div>
