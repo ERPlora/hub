@@ -1,23 +1,15 @@
-{% load i18n component_tags %}
+{% load i18n ui component_tags %}
 
 {# Tabbar OOB swap for HTMX navigation #}
 {% if request.htmx and tabbar_template %}
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
-{% include tabbar_template with current_view=tabbar_view %}
-</ion-footer>
-</div>
+{% include tabbar_template with current_view=tabbar_view oob=True %}
 {% endif %}
 
 {# CSRF token for JavaScript/HTMX #}
 {% csrf_token %}
 
-{# Page Header - matches the standard page pattern #}
-<ion-header>
-    <ion-toolbar>
-        <ion-title>{{ title }}</ion-title>
-    </ion-toolbar>
-</ion-header>
+{# Page Header with back button #}
+{% ui_page_header title=title %}
 
 <div {% if alpine_app %}x-data="{{ alpine_app }}()" x-init="init()"{% endif %} class="ion-padding">
     {# Info slot - for read-only global config sections #}
