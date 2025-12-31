@@ -86,6 +86,7 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',
     'djmoney',
     'django_htmx',
+    'django_components',
     # Health Check
     'health_check',
     'health_check.db',
@@ -97,6 +98,8 @@ INSTALLED_APPS = [
     'apps.sync.apps.SyncConfig',
     'apps.core.apps.CoreConfig',
     'apps.modules_runtime',
+    # Hub apps - UI Components
+    'apps.ui.apps.UiConfig',
     # Hub apps - Auth
     'apps.auth.login.apps.AuthLoginConfig',
     # Hub apps - Main
@@ -107,6 +110,8 @@ INSTALLED_APPS = [
     'apps.main.setup.apps.SetupConfig',
     # Hub apps - System
     'apps.system.modules.apps.SystemModulesConfig',
+    # Hub apps - Marketplace
+    'apps.marketplace.apps.MarketplaceConfig',
 ]
 
 MIDDLEWARE = [
@@ -134,7 +139,6 @@ TEMPLATES = [
         'DIRS': [
             BASE_DIR / 'templates',  # Global templates (base.html)
         ],
-        'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -147,7 +151,22 @@ TEMPLATES = [
                 'apps.core.context_processors.module_menu_items',
                 'apps.core.context_processors.hub_config_context',
                 'apps.core.context_processors.deployment_config',
+                'apps.core.context_processors.navigation_context',
+                'apps.core.context_processors.module_context',
                 'apps.configuration.context_processors.global_config',
+            ],
+            'loaders': [
+                (
+                    'django.template.loaders.cached.Loader',
+                    [
+                        'django.template.loaders.filesystem.Loader',
+                        'django.template.loaders.app_directories.Loader',
+                        'django_components.template_loader.Loader',
+                    ],
+                ),
+            ],
+            'builtins': [
+                'django_components.templatetags.component_tags',
             ],
         },
     },
@@ -419,6 +438,20 @@ LOGGING = {
             'propagate': False,
         },
     },
+}
+
+# =============================================================================
+# DJANGO COMPONENTS
+# =============================================================================
+
+COMPONENTS = {
+    "dirs": [
+        BASE_DIR / "apps" / "ui" / "components",
+    ],
+    "autodiscover": True,
+    "libraries": [],
+    "template_cache_size": 128,
+    "context_behavior": "django",  # or "isolated"
 }
 
 

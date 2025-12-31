@@ -18,7 +18,8 @@ class SettingsPage(Component):
         self,
         title="",
         subtitle="",
-        tabbar_template="",
+        module_id="",
+        tabbar_template="",  # Legacy - kept for backwards compatibility
         tabbar_view="settings",
         save_url="",
         alpine_app="",
@@ -28,7 +29,8 @@ class SettingsPage(Component):
         Args:
             title: Page title (e.g., "Inventory Settings")
             subtitle: Page subtitle description
-            tabbar_template: Path to tabbar template for OOB swap
+            module_id: Module ID for tabbar component (new system)
+            tabbar_template: Path to tabbar template for OOB swap (legacy)
             tabbar_view: Current view name for tabbar highlighting
             save_url: URL for saving settings (used by Alpine.js)
             alpine_app: Name of Alpine.js app function (e.g., "settingsApp")
@@ -36,6 +38,7 @@ class SettingsPage(Component):
         return {
             "title": title,
             "subtitle": subtitle,
+            "module_id": module_id,
             "tabbar_template": tabbar_template,
             "tabbar_view": tabbar_view,
             "save_url": save_url,

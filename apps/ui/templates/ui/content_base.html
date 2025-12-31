@@ -1,36 +1,45 @@
 {% extends "ui/app_base.html" %}
-{% load i18n component_tags %}
+{% load i18n component_tags ui %}
 {#
     Content Base Template - Base para TODAS las páginas dentro del dashboard
 
     Este template proporciona:
-    - Contenedor para page_header (con id para OOB swap)
-    - Contenedor para tabs (heredado de app_base)
+    - Tabbar automático desde module.json (si module_id disponible)
     - Bloque para contenido principal
 
-    Uso:
-    ====
+    Context processors automáticos:
+    - module_id: ID del módulo actual (extraído de la URL /m/{module_id}/...)
+    - current_view: Vista actual para marcar tab activo
+    - back_url: URL para botón back (navigation_context)
+
+    Uso típico (módulos):
+    =====================
     {% extends "ui/content_base.html" %}
 
-    {% block page_title %}{% trans "My Page" %}{% endblock %}
+    {% block page_title %}{% trans "Products" %}{% endblock %}
 
     {% block page_content %}
-    {% include "myapp/partials/content.html" %}
+    {% include "mymodule/partials/content.html" %}
     {% endblock %}
 
-    El parcial debe manejar los OOB swaps para HTMX:
-    - page-header-container para el header
-    - dashboard-tabbar para los tabs
+    El tabbar se renderiza automáticamente desde module.json si existe.
+    El header se renderiza en los partials de contenido usando ui_page_header
+    o los componentes list_page/settings_page que ya lo incluyen.
 #}
 
 {% block dashboard_content %}
-{# Contenido de la página #}
+{# Contenido de la página - incluye su propio header #}
 {% block page_content %}{% endblock %}
 {% endblock %}
 
 {% block section_tabbar %}
 {% block module_tabbar %}
-{# Default: inherit the empty tabbar from app_base.html #}
+{# Render tabbar from module.json if module_id is available #}
+{# Otherwise, inherit empty tabbar from app_base.html #}
+{% if module_id %}
+{% component "tabbar" module_id=module_id current_view=current_view|default:"" %}{% endcomponent %}
+{% else %}
 {{ block.super }}
+{% endif %}
 {% endblock %}
 {% endblock %}

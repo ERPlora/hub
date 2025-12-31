@@ -1,0 +1,12 @@
+{% load i18n %}
+{% load ui %}
+
+{% ui_sidebar_content %}
+    {% ui_sidebar_header logo_static="img/logo.png" logo_alt="ERPlora" logo_text="ERPlora Hub" %}
+
+    {% ui_sidebar_nav %}
+        {% include "ui/partials/sidebar_nav.html" %}
+    {% endui_sidebar_nav %}
+
+    {% ui_sidebar_footer %}
+{% endui_sidebar_content %}

@@ -1,8 +1,14 @@
 {% load i18n ui component_tags %}
 
 {# Tab bar update via OOB swap (only on HTMX navigation) #}
-{% if request.htmx and tabbar_template %}
-{% include tabbar_template with current_view=tabbar_view oob=True %}
+{% if request.htmx %}
+    {% if module_id %}
+        {# New system: use tabbar component with module_id #}
+        {% component "tabbar" module_id=module_id current_view=tabbar_view oob=True %}{% endcomponent %}
+    {% elif tabbar_template %}
+        {# Legacy: include template directly #}
+        {% include tabbar_template with current_view=tabbar_view oob=True %}
+    {% endif %}
 {% endif %}
 
 {# CSRF token for JavaScript #}

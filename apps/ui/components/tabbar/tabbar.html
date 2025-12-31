@@ -1,0 +1,91 @@
+{% load i18n static component_tags %}
+{# Tab Bar Component #}
+{# ion-footer must be a direct child of ion-page for proper Ionic positioning #}
+
+{# If no tabs to render, output nothing #}
+{% if not render %}
+{# Empty - no tabs configured in module.json #}
+{% elif use_slots %}
+{# Legacy mode: use slots for custom tabs #}
+<ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+    <ion-tab-bar slot="bottom" color="{{ color }}">
+        {% slot "tabs" %}{% endslot %}
+    </ion-tab-bar>
+</ion-footer>
+{% else %}
+{# Automatic mode: render tabs from module.json #}
+<ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+    <ion-tab-bar slot="bottom" color="{{ color }}">
+        {# Visible tabs (first 4 if >5 total, otherwise all) #}
+        {% for tab in visible_tabs %}
+        <ion-tab-button
+            hx-get="{% url tab.url %}"
+            hx-target="#main-content-area"
+            hx-push-url="true"
+            {% if tab.disabled %}disabled{% endif %}
+            class="{% if current_view == tab.id %}tab-selected{% endif %}">
+            {# Support 3 icon types: ionicon name, svg src, or inline svg #}
+            {% if tab.icon_svg %}
+                {{ tab.icon_svg|safe }}
+            {% elif tab.icon_src %}
+                <ion-icon src="{% static tab.icon_src %}"></ion-icon>
+            {% else %}
+                <ion-icon name="{{ tab.icon }}"></ion-icon>
+            {% endif %}
+            <ion-label>{% trans tab.label %}</ion-label>
+            {% if tab.badge %}
+            <ion-badge color="{{ tab.badge_color|default:'danger' }}">{{ tab.badge }}</ion-badge>
+            {% endif %}
+        </ion-tab-button>
+        {% endfor %}
+
+        {# "More" button if there are overflow tabs #}
+        {% if overflow_tabs %}
+        <ion-tab-button
+            id="tabbar-more-btn-{{ module_id }}"
+            class="{% if current_view_in_overflow %}tab-selected{% endif %}">
+            <ion-icon name="ellipsis-horizontal"></ion-icon>
+            <ion-label>{% trans "More" %}</ion-label>
+        </ion-tab-button>
+        {% endif %}
+    </ion-tab-bar>
+</ion-footer>
+
+{# Action Sheet script for overflow tabs #}
+{% if overflow_tabs %}
+<script>
+(function() {
+    const btn = document.getElementById('tabbar-more-btn-{{ module_id }}');
+    if (btn) {
+        btn.addEventListener('click', async function() {
+            const actionSheet = document.createElement('ion-action-sheet');
+            actionSheet.header = '{% trans "More Options" %}';
+            actionSheet.buttons = [
+                {% for tab in overflow_tabs %}
+                {
+                    text: '{% trans tab.label %}',
+                    icon: '{{ tab.icon }}',
+                    cssClass: {% if current_view == tab.id %}'action-sheet-selected'{% else %}''{% endif %},
+                    handler: function() {
+                        htmx.ajax('GET', '{% url tab.url %}', {
+                            target: '#main-content-area',
+                            swap: 'innerHTML'
+                        });
+                        history.pushState({}, '', '{% url tab.url %}');
+                    }
+                },
+                {% endfor %}
+                {
+                    text: '{% trans "Cancel" %}',
+                    role: 'cancel',
+                    icon: 'close'
+                }
+            ];
+            document.body.appendChild(actionSheet);
+            await actionSheet.present();
+        });
+    }
+})();
+</script>
+{% endif %}
+{% endif %}

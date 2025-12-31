@@ -1,14 +1,14 @@
 """
 list_page component - Complete list page structure with tabbar OOB swap.
 
-Usage:
+Usage (new - recommended):
     {% component "list_page"
         title="Products"
         subtitle="Manage your inventory"
         action_label="New Product"
         action_url="/products/create/"
         action_hx_target="#main-content-area"
-        tabbar_template="inventory/partials/tabbar.html"
+        module_id="inventory"
         tabbar_view="products" %}
 
         {% fill "stats" %}
@@ -22,6 +22,13 @@ Usage:
         {% fill "content" %}
             {% component "data_table" ... %}{% endcomponent %}
         {% endfill %}
+    {% endcomponent %}
+
+Usage (legacy - for backwards compatibility):
+    {% component "list_page"
+        tabbar_template="inventory/partials/tabbar.html"
+        tabbar_view="products" %}
+        ...
     {% endcomponent %}
 """
 
@@ -40,7 +47,8 @@ class ListPage(Component):
         action_url: str = "",
         action_icon: str = "add-outline",
         action_hx_target: str = "#main-content-area",
-        tabbar_template: str = "",
+        module_id: str = "",
+        tabbar_template: str = "",  # Legacy - kept for backwards compatibility
         tabbar_view: str = "",
         **kwargs
     ):
@@ -51,6 +59,7 @@ class ListPage(Component):
             "action_url": action_url,
             "action_icon": action_icon,
             "action_hx_target": action_hx_target,
+            "module_id": module_id,
             "tabbar_template": tabbar_template,
             "tabbar_view": tabbar_view,
             **kwargs,

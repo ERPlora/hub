@@ -859,8 +859,9 @@ def ui_empty_state(
 # LAYOUT COMPONENTS
 # =============================================================================
 
-@register.inclusion_tag("ui/page_header.html")
+@register.inclusion_tag("ui/content_header.html", takes_context=True)
 def ui_page_header(
+    context,
     title,
     subtitle=None,
     back_url=None,
@@ -870,43 +871,63 @@ def ui_page_header(
     action_icon=None,
     action_label=None,
     action_color=None,
+    action_badge=None,
+    action_badge_color="danger",
     action_href=None,
     action_hx_get=None,
     action_hx_post=None,
     action_hx_target=None,
     action_hx_push_url=None,
     action_x_click=None,
+    show_back=True,
 ):
     """
     Render a page header with optional back button and action button.
 
+    The back button is automatically shown using the back_url from the
+    navigation_context processor, unless explicitly disabled with show_back=False
+    or overridden with back_url/back_hx_get.
+
     Args:
         title: Page title
         subtitle: Optional subtitle
-        back_url: URL for back button (regular link)
-        back_hx_get: HTMX URL for back button
-        back_hx_target: HTMX target for back button
-        back_hx_push_url: HTMX push-url for back button
+        back_url: URL for back button (regular link) - overrides auto back_url
+        back_hx_get: HTMX URL for back button - overrides auto back_url
+        back_hx_target: HTMX target for back button (default: #main-content-area)
+        back_hx_push_url: HTMX push-url for back button (default: true)
         action_icon: Icon for action button (e.g., "add-outline")
         action_label: Text label for action button
         action_color: Color for action button
+        action_badge: Badge count/text for action button
+        action_badge_color: Badge color (default: danger)
         action_href: URL for action button (regular link)
         action_hx_get: HTMX GET URL for action button
         action_hx_post: HTMX POST URL for action button
         action_hx_target: HTMX target for action button
         action_hx_push_url: HTMX push-url for action button
         action_x_click: Alpine.js click handler for action button
+        show_back: If False, never show back button (default: True)
     """
+    # Auto-detect back URL from context if not explicitly provided
+    auto_back_url = context.get("back_url") if show_back else None
+
+    # Use explicit back_hx_get if provided, otherwise use auto back_url for HTMX nav
+    final_back_hx_get = back_hx_get
+    if not final_back_hx_get and not back_url and auto_back_url:
+        final_back_hx_get = auto_back_url
+
     return {
         "title": title,
         "subtitle": subtitle,
         "back_url": back_url,
-        "back_hx_get": back_hx_get,
-        "back_hx_target": back_hx_target,
-        "back_hx_push_url": back_hx_push_url,
+        "back_hx_get": final_back_hx_get,
+        "back_hx_target": back_hx_target or "#main-content-area",
+        "back_hx_push_url": back_hx_push_url if back_hx_push_url is not None else "true",
         "action_icon": action_icon,
         "action_label": action_label,
         "action_color": action_color,
+        "action_badge": action_badge,
+        "action_badge_color": action_badge_color,
         "action_href": action_href,
         "action_hx_get": action_hx_get,
         "action_hx_post": action_hx_post,
@@ -1088,6 +1109,23 @@ def ui_menu_button(menu_id="main-menu", css_class=""):
     """
     return {
         "menu_id": menu_id,
+        "css_class": css_class,
+    }
+
+
+@register.inclusion_tag("ui/back_button.html", takes_context=True)
+def ui_back_button(context, css_class=""):
+    """
+    Render a back button that navigates to the appropriate parent page.
+
+    Uses the back_url from navigation_context processor.
+    Only renders if back_url is available (not on home page).
+
+    Args:
+        css_class: Additional CSS classes
+    """
+    return {
+        "back_url": context.get("back_url"),
         "css_class": css_class,
     }
 
@@ -1657,3 +1695,93 @@ def do_ui_module_grid(parser, token):
     nodelist = parser.parse(('endui_module_grid',))
     parser.delete_first_token()
     return ModuleGridNode(nodelist, args, kwargs)
+
+
+# =============================================================================
+# TAB BAR COMPONENT
+# =============================================================================
+
+@register.inclusion_tag('ui/tabbar.html', takes_context=True)
+def ui_tabbar(context, tabs=None, current_view=None):
+    """
+    Renders an ion-tab-bar with the given tabs.
+
+    Usage:
+        {% ui_tabbar tabs=module_tabs current_view=current_view %}
+
+    Where tabs is a list of dicts:
+        [
+            {"url": "inventory:dashboard", "icon": "grid-outline", "label": "Overview", "view": "dashboard"},
+            {"url": "inventory:products", "icon": "cube-outline", "label": "Products", "view": "products"},
+            {"url": "inventory:settings", "icon": "settings-outline", "label": "Settings", "view": "settings", "disabled": False},
+        ]
+
+    Each tab dict can have:
+        - url: Django URL name (required) - will be resolved with {% url %}
+        - icon: Ionicon name (required)
+        - label: Tab label text (required)
+        - view: View identifier to match current_view for active state (optional)
+        - disabled: If True, tab is disabled (optional)
+        - badge: Badge text to show (optional)
+        - badge_color: Badge color (optional, default: "danger")
+    """
+    return {
+        'tabs': tabs or [],
+        'current_view': current_view or '',
+        'request': context.get('request'),
+    }
+
+
+@register.simple_tag(takes_context=True)
+def ui_tabbar_oob(context, tabs=None, current_view=None):
+    """
+    Renders an ion-tab-bar with OOB swap for HTMX navigation.
+
+    Usage in content partials:
+        {% if request.htmx %}
+        {% ui_tabbar_oob tabs=module_tabs current_view=current_view %}
+        {% endif %}
+
+    This renders the tabbar wrapped in an OOB swap div for HTMX updates.
+    """
+    from django.template.loader import render_to_string
+
+    html = render_to_string('ui/tabbar_oob.html', {
+        'tabs': tabs or [],
+        'current_view': current_view or '',
+        'request': context.get('request'),
+    }, request=context.get('request'))
+
+    return mark_safe(html)
+
+
+@register.inclusion_tag('ui/tab.html', takes_context=True)
+def ui_tab(context, url, icon, label, active=False, disabled=False, badge=None, badge_color='danger'):
+    """
+    Renders a single ion-tab-button for use in module layouts.
+
+    Usage:
+        {% ui_tab url="inventory:dashboard" icon="grid-outline" label=_("Overview") active=True %}
+        {% ui_tab url="inventory:products" icon="cube-outline" label=_("Products") %}
+        {% ui_tab url="inventory:settings" icon="settings-outline" label=_("Settings") disabled=True %}
+        {% ui_tab url="marketplace:cart" icon="cart-outline" label=_("Cart") badge=cart_count badge_color="danger" %}
+
+    Args:
+        url: Django URL name (required) - will be resolved with {% url %}
+        icon: Ionicon name (required)
+        label: Tab label text (required) - use _("text") for translation
+        active: If True, tab is marked as selected (optional)
+        disabled: If True, tab is disabled (optional)
+        badge: Badge text to show (optional)
+        badge_color: Badge color (optional, default: "danger")
+    """
+    return {
+        'url': url,
+        'icon': icon,
+        'label': label,
+        'active': active,
+        'disabled': disabled,
+        'badge': badge,
+        'badge_color': badge_color,
+        'request': context.get('request'),
+    }

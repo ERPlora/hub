@@ -1,0 +1,13 @@
+{% load i18n %}
+{% load ui %}
+
+{% ui_tabbar %}
+    {% ui_tab_button label=_("Home") icon="grid-outline" hx_get="/home/" hx_target="#main-content-area" %}
+
+    {% for module in MODULE_TAB_ITEMS %}
+    {% ui_tab_button label=module.label icon=module.icon hx_get=module.url hx_target="#main-content-area" %}
+    {% endfor %}
+
+    {% ui_tab_button label=_("Marketplace") icon="storefront-outline" hx_get="/marketplace/" hx_target="#main-content-area" %}
+    {% ui_tab_button label=_("Settings") icon="settings-outline" hx_get="/settings/" hx_target="#main-content-area" %}
+{% endui_tabbar %}
