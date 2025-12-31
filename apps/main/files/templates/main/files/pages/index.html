@@ -1,11 +1,7 @@
-{% extends "ui/content_base.html" %}
+{% extends "ui/app_base.html" %}
 {% load i18n %}
 
 {% block page_title %}{% trans "Files" %}{% endblock %}
-
-{% block module_tabbar %}
-<!-- Files page doesn't need tabbar -->
-{% endblock %}
 
 {% block page_content %}
 {% include "main/files/partials/content.html" %}

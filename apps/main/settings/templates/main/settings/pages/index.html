@@ -1,11 +1,7 @@
-{% extends "ui/content_base.html" %}
+{% extends "ui/app_base.html" %}
 {% load i18n %}
 
 {% block page_title %}{% trans "Settings" %}{% endblock %}
-
-{% block module_tabbar %}
-<!-- Settings page doesn't need tabbar -->
-{% endblock %}
 
 {% block page_content %}
 {% include "main/settings/partials/content.html" %}

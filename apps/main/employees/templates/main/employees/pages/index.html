@@ -1,11 +1,7 @@
-{% extends "ui/content_base.html" %}
+{% extends "ui/app_base.html" %}
 {% load i18n %}
 
 {% block page_title %}{% trans "Employees" %}{% endblock %}
-
-{% block module_tabbar %}
-<!-- Employees page doesn't need tabbar -->
-{% endblock %}
 
 {% block page_content %}
 {% include "main/employees/partials/content.html" %}

@@ -1,11 +1,7 @@
-{% extends "ui/content_base.html" %}
+{% extends "ui/app_base.html" %}
 {% load i18n %}
 
 {% block page_title %}{% trans "Modules" %}{% endblock %}
-
-{% block module_tabbar %}
-{% include "system/modules/partials/tabbar_system.html" %}
-{% endblock %}
 
 {% block page_content %}
 {% include "system/modules/partials/installed_content.html" %}
