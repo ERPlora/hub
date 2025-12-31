@@ -1,20 +1,23 @@
 {% load i18n static component_tags %}
 {# Tab Bar Component #}
-{# ion-footer must be a direct child of ion-page for proper Ionic positioning #}
+{# When wrapper=True (default): outputs ion-footer > ion-tab-bar #}
+{# When wrapper=False: outputs only ion-tab-bar (for use inside existing ion-footer) #}
 
-{# If no tabs to render, output nothing #}
+{# If no tabs to render, output empty footer to clear previous tabbar #}
 {% if not render %}
-{# Empty - no tabs configured in module.json #}
+{% if wrapper %}
+{% if oob %}<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML"></ion-footer>{% endif %}
+{% endif %}
 {% elif use_slots %}
 {# Legacy mode: use slots for custom tabs #}
-<ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+{% if wrapper %}<ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>{% endif %}
     <ion-tab-bar color="{{ color }}">
         {% slot "tabs" %}{% endslot %}
     </ion-tab-bar>
-</ion-footer>
+{% if wrapper %}</ion-footer>{% endif %}
 {% else %}
 {# Automatic mode: render tabs from module.json #}
-<ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+{% if wrapper %}<ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>{% endif %}
     <ion-tab-bar id="module-tabbar" color="{{ color }}">
         {# Visible tabs (first 4 if >5 total, otherwise all) #}
         {% for tab in visible_tabs %}
@@ -49,7 +52,7 @@
         </ion-tab-button>
         {% endif %}
     </ion-tab-bar>
-</ion-footer>
+{% if wrapper %}</ion-footer>{% endif %}
 
 {# Remove hidden attribute that Ionic adds to ion-tab-bar outside ion-tabs #}
 <script>

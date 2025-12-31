@@ -37,6 +37,7 @@ class TabBar(Component):
         module_id: str = "",
         current_view: str = "",
         oob: bool = False,
+        wrapper: bool = True,
         color: str = "light",
         max_visible: int = 5,
         **kwargs
@@ -46,6 +47,7 @@ class TabBar(Component):
             module_id: Module identifier to load tabs from module.json
             current_view: Current view identifier to highlight active tab
             oob: If True, adds hx-swap-oob for HTMX
+            wrapper: If True, wraps in ion-footer (default). If False, outputs only ion-tab-bar
             color: Tab bar color (default: light)
             max_visible: Maximum visible tabs before showing "More" (default: 5)
         """
@@ -61,6 +63,7 @@ class TabBar(Component):
                 "use_slots": False,
                 "active_view": current_view,
                 "oob": oob,
+                "wrapper": wrapper,
                 "color": color,
             }
 
@@ -71,6 +74,7 @@ class TabBar(Component):
                 "use_slots": True,
                 "active_view": current_view,
                 "oob": oob,
+                "wrapper": wrapper,
                 "color": color,
                 **kwargs,
             }
@@ -97,6 +101,7 @@ class TabBar(Component):
             "overflow_tabs": overflow_tabs,
             "active_view_in_overflow": active_view_in_overflow,
             "oob": oob,
+            "wrapper": wrapper,
             "color": color,
             **kwargs,
         }

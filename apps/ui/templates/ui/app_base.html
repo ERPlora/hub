@@ -43,16 +43,20 @@
 
             <!-- Content (SPA target) -->
             <ion-content id="main-content-area" class="ion-padding">
-                {% block dashboard_content %}
+                {% block page_content %}
                 <!-- Page content loaded here via HTMX -->
                 {% endblock %}
             </ion-content>
 
             <!-- Tab Bar (ion-footer must be direct child of ion-page) -->
-            <!-- Rendered by tabbar component if module has tabs in module.json -->
-            {% block section_tabbar %}
-            {# Empty by default - content_base.html renders tabbar if module_id exists #}
-            {% endblock %}
+            <!-- Always present, content updated via OOB swap on navigation -->
+            <ion-footer id="dashboard-tabbar">
+                {# Initial render from context processor's module_id #}
+                {# wrapper=False because ion-footer is already here #}
+                {% if module_id %}
+                {% component "tabbar" module_id=module_id current_view=current_view|default:"" wrapper=False %}{% endcomponent %}
+                {% endif %}
+            </ion-footer>
         </div>
     </ion-split-pane>
 

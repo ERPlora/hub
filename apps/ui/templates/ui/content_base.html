@@ -1,43 +1,15 @@
 {% extends "ui/app_base.html" %}
-{% load i18n component_tags ui %}
 {#
-    Content Base Template - Base para TODAS las páginas dentro del dashboard
+    Content Base Template - Alias para compatibilidad
 
-    Este template proporciona:
-    - Tabbar automático desde module.json (si module_id disponible)
-    - Bloque para contenido principal
+    Este template existe solo para mantener compatibilidad con templates existentes.
+    Nuevos templates pueden extender directamente ui/app_base.html
 
-    Context processors automáticos:
-    - module_id: ID del módulo actual (extraído de la URL /m/{module_id}/...)
-    - current_view: Vista actual para marcar tab activo
-    - back_url: URL para botón back (navigation_context)
+    Uso:
+        {% extends "ui/content_base.html" %}
+        {% block page_content %}...{% endblock %}
 
-    Uso típico (módulos):
-    =====================
-    {% extends "ui/content_base.html" %}
-
-    {% block page_title %}{% trans "Products" %}{% endblock %}
-
-    {% block page_content %}
-    {% include "mymodule/partials/content.html" %}
-    {% endblock %}
-
-    El tabbar se renderiza automáticamente desde module.json si existe.
-    El header se renderiza en los partials de contenido usando ui_page_header
-    o los componentes list_page/settings_page que ya lo incluyen.
+    Equivalente a:
+        {% extends "ui/app_base.html" %}
+        {% block page_content %}...{% endblock %}
 #}
-
-{% block dashboard_content %}
-{# Contenido de la página - incluye su propio header #}
-{% block page_content %}{% endblock %}
-{% endblock %}
-
-{% block section_tabbar %}
-{% block module_tabbar %}
-{# Render tabbar from module.json if module_id is available #}
-{# Component returns empty if module has no tabs configured #}
-{% if module_id %}
-{% component "tabbar" module_id=module_id current_view=current_view|default:"" %}{% endcomponent %}
-{% endif %}
-{% endblock %}
-{% endblock %}
