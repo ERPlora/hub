@@ -23,7 +23,7 @@
             hx-target="#main-content-area"
             hx-push-url="true"
             {% if tab.disabled %}disabled{% endif %}
-            class="{% if current_view == tab.id %}tab-selected{% endif %}">
+            class="{% if active_view == tab.id %}tab-selected{% endif %}">
             {# Support 3 icon types: ionicon name, svg src, or inline svg #}
             {% if tab.icon_svg %}
                 {{ tab.icon_svg|safe }}
@@ -42,8 +42,8 @@
         {# "More" button if there are overflow tabs #}
         {% if overflow_tabs %}
         <ion-tab-button
-            id="tabbar-more-btn-{{ module_id }}"
-            class="{% if current_view_in_overflow %}tab-selected{% endif %}">
+            id="tabbar-more-btn-{{ tabbar_module_id }}"
+            class="{% if active_view_in_overflow %}tab-selected{% endif %}">
             <ion-icon name="ellipsis-horizontal"></ion-icon>
             <ion-label>{% trans "More" %}</ion-label>
         </ion-tab-button>
@@ -55,7 +55,7 @@
 {% if overflow_tabs %}
 <script>
 (function() {
-    const btn = document.getElementById('tabbar-more-btn-{{ module_id }}');
+    const btn = document.getElementById('tabbar-more-btn-{{ tabbar_module_id }}');
     if (btn) {
         btn.addEventListener('click', async function() {
             const actionSheet = document.createElement('ion-action-sheet');
@@ -65,7 +65,7 @@
                 {
                     text: '{% trans tab.label %}',
                     icon: '{{ tab.icon }}',
-                    cssClass: {% if current_view == tab.id %}'action-sheet-selected'{% else %}''{% endif %},
+                    cssClass: {% if active_view == tab.id %}'action-sheet-selected'{% else %}''{% endif %},
                     handler: function() {
                         htmx.ajax('GET', '{% url tab.url %}', {
                             target: '#main-content-area',

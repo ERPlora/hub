@@ -59,7 +59,7 @@ class TabBar(Component):
             return {
                 "render": False,
                 "use_slots": False,
-                "current_view": current_view,
+                "active_view": current_view,
                 "oob": oob,
                 "color": color,
             }
@@ -69,7 +69,7 @@ class TabBar(Component):
             return {
                 "render": True,
                 "use_slots": True,
-                "current_view": current_view,
+                "active_view": current_view,
                 "oob": oob,
                 "color": color,
                 **kwargs,
@@ -84,18 +84,18 @@ class TabBar(Component):
             overflow_tabs = []
 
         # Check if current view is in overflow
-        current_view_in_overflow = any(
+        active_view_in_overflow = any(
             t.get("id") == current_view for t in overflow_tabs
         )
 
         return {
             "render": True,
             "use_slots": False,
-            "module_id": module_id,
-            "current_view": current_view,
+            "tabbar_module_id": module_id,
+            "active_view": current_view,
             "visible_tabs": visible_tabs,
             "overflow_tabs": overflow_tabs,
-            "current_view_in_overflow": current_view_in_overflow,
+            "active_view_in_overflow": active_view_in_overflow,
             "oob": oob,
             "color": color,
             **kwargs,
