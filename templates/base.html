@@ -402,7 +402,7 @@
     <!-- Automatic Language Detection -->
     <script>
         (function() {
-            // Check if user already has a language preference (cookie)
+            // Check if user already has a language preference (cookie or session flag)
             function getCookie(name) {
                 const value = `; ${document.cookie}`;
                 const parts = value.split(`; ${name}=`);
@@ -411,24 +411,28 @@
             }
 
             const hasPreference = getCookie('django_language');
+            const autoLangSet = sessionStorage.getItem('erplora_lang_auto_set');
 
-            if (!hasPreference) {
-                // Detect browser language
-                const browserLang = navigator.language || navigator.userLanguage;
-                const langCode = browserLang.toLowerCase().split('-')[0]; // Get 'es' from 'es-ES'
+            // Skip if already has preference OR we've already tried to set it this session
+            if (hasPreference || autoLangSet) {
+                return;
+            }
 
-                // Supported languages
-                const supportedLangs = ['en', 'es'];
-                const selectedLang = supportedLangs.includes(langCode) ? langCode : 'en';
+            // Detect browser language
+            const browserLang = navigator.language || navigator.userLanguage;
+            const langCode = browserLang.toLowerCase().split('-')[0]; // Get 'es' from 'es-ES'
 
-                // Set language preference automatically (only if not English, which is default)
-                if (selectedLang !== 'en') {
-                    fetch('/set-language/?language=' + selectedLang + '&next=' + encodeURIComponent(window.location.pathname))
-                        .then(() => {
-                            // Reload page to apply language
-                            window.location.reload();
-                        });
-                }
+            // Supported languages
+            const supportedLangs = ['en', 'es'];
+            const selectedLang = supportedLangs.includes(langCode) ? langCode : 'en';
+
+            // Mark that we've attempted auto-detection (prevent infinite loops)
+            sessionStorage.setItem('erplora_lang_auto_set', 'true');
+
+            // Set language preference automatically (only if not English, which is default)
+            if (selectedLang !== 'en') {
+                // Navigate directly instead of fetch + reload (avoids redirect issues)
+                window.location.href = '/set-language/?language=' + selectedLang + '&next=' + encodeURIComponent(window.location.pathname);
             }
         })();
     </script>
