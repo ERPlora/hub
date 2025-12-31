@@ -126,8 +126,8 @@ class TestSalesModule:
         page.goto(f"{self.live_server.url}/m/sales/")
         page.wait_for_load_state('networkidle')
 
-        # Verify page loads (check for tabbar or main content)
-        expect(page.locator('ion-tab-bar, .ion-padding')).to_be_visible()
+        # Verify page loads (check for main content area)
+        expect(page.locator('#main-content-area')).to_be_visible()
 
     @pytest.mark.django_db(transaction=True)
     def test_sales_dashboard_has_kpi_cards(self, page: Page):
@@ -137,8 +137,8 @@ class TestSalesModule:
         page.goto(f"{self.live_server.url}/m/sales/")
         page.wait_for_load_state('networkidle')
 
-        # Verify page loads with proper content
-        expect(page.locator('.ion-padding')).to_be_visible()
+        # Verify main content area is visible
+        expect(page.locator('#main-content-area')).to_be_visible()
 
     @pytest.mark.django_db(transaction=True)
     def test_sales_tabbar_visible(self, page: Page):
