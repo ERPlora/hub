@@ -4,13 +4,22 @@
     UI Base Template - Base para todas las páginas del dashboard
 
     Este template provee:
-    - Estructura ion-app con split-pane
+    - Estructura ion-app con ion-menu
     - Sidebar con navegación
-    - Header con controles
-    - Área de contenido principal
-    - Contenedor para tabbar (vacío por defecto)
+    - Global header (siempre visible)
+    - Área de contenido principal (#main-content-area) dentro de ion-content
     - Alpine.js dashboard app
-    - Dynamic Tab Bar Manager
+
+    Estructura:
+    ion-app
+    ├── ion-menu (sidebar)
+    └── div.ion-page#main-content
+        ├── ion-header (GLOBAL - "ERPlora", hamburger, theme, user)
+        └── ion-content#main-content-area (HTMX target)
+            └── [partial content: page-header + page-content + tabbar]
+
+    Los partials NO generan ion-page porque están dentro de ion-content.
+    El tabbar se renderiza inline dentro del partial.
 
     Templates que extienden este:
     - ui/base_module.html - Para módulos (con tabbar)
@@ -24,41 +33,88 @@
 {% endblock %}
 
 {% block content %}
+<!-- Global tabbar update function - must be defined before page_content executes -->
+<script>
+    /**
+     * Global function to update the tabbar via JavaScript
+     * Called by the tabbar component in page_content
+     * @param {Array} tabs - Array of tab objects with url, icon, label, active
+     */
+    function updateGlobalTabBar(tabs) {
+        const tabBar = document.getElementById('global-tabbar');
+        if (!tabBar) return;
+
+        const footer = tabBar.closest('ion-footer');
+
+        if (!tabs || tabs.length === 0) {
+            tabBar.innerHTML = '';
+            if (footer) footer.style.display = 'none';
+            return;
+        }
+
+        const html = tabs.map(tab => `
+            <ion-tab-button
+                hx-get="${tab.url}"
+                hx-target="#main-content-area"
+                hx-push-url="true"
+                class="${tab.active ? 'tab-selected' : ''}">
+                <ion-icon name="${tab.icon}"></ion-icon>
+                <ion-label>${tab.label}</ion-label>
+            </ion-tab-button>
+        `).join('');
+
+        tabBar.innerHTML = html;
+
+        if (footer) footer.style.display = '';
+        tabBar.removeAttribute('hidden');
+
+        if (typeof htmx !== 'undefined') {
+            htmx.process(tabBar);
+        }
+    }
+    window.updateGlobalTabBar = updateGlobalTabBar;
+</script>
+
 <!-- HTMX Loading Indicator -->
 <div id="htmx-indicator"></div>
 
 <ion-app id="dashboard-app" x-data="dashboardApp()" x-init="init()" :class="isDark ? 'dark' : ''">
-    <ion-split-pane content-id="main-content" when="false">
-        <!-- Sidebar Menu -->
-        <ion-menu content-id="main-content" menu-id="main-menu" type="push">
-            {% include "ui/partials/sidebar.html" %}
-        </ion-menu>
+    <!-- Sidebar Menu -->
+    <ion-menu content-id="main-content" menu-id="main-menu" type="reveal">
+        {% include "ui/partials/sidebar.html" %}
+    </ion-menu>
 
-        <!-- Main Content Area -->
-        <div class="ion-page" id="main-content">
-            <!-- Global Header -->
-            <div id="dashboard-header">
-                {% include "ui/partials/app_header.html" %}
-            </div>
-
-            <!-- Content (SPA target) -->
-            <ion-content id="main-content-area" class="ion-padding">
-                {% block page_content %}
-                <!-- Page content loaded here via HTMX -->
-                {% endblock %}
-            </ion-content>
-
-            <!-- Tab Bar (ion-footer must be direct child of ion-page) -->
-            <!-- Always present, content updated via OOB swap on navigation -->
-            <ion-footer id="dashboard-tabbar">
-                {# Initial render from context processor's module_id #}
-                {# wrapper=False because ion-footer is already here #}
-                {% if module_id %}
-                {% component "tabbar" module_id=module_id current_view=current_view|default:"" wrapper=False %}{% endcomponent %}
-                {% endif %}
-            </ion-footer>
+    <!-- Main Content -->
+    <div class="ion-page" id="main-content">
+        <!-- Global Header -->
+        <ion-header>
+            <ion-toolbar>
+                <ion-buttons slot="start">
+                    <ion-menu-button></ion-menu-button>
+                </ion-buttons>
+                <ion-title>ERPlora</ion-title>
+                <ion-buttons slot="end">
+                    <ion-button @click="toggleTheme()">
+                        <ion-icon :name="isDark ? 'sunny-outline' : 'moon-outline'" slot="icon-only"></ion-icon>
+                    </ion-button>
+                    <ion-button @click="handleUserMenu()">
+                        <ion-icon name="person-circle-outline" slot="icon-only"></ion-icon>
+                    </ion-button>
+                </ion-buttons>
+            </ion-toolbar>
+        </ion-header>
+        <!-- Page Content (HTMX target) -->
+        <!-- Cada partial genera: content-header + page-content (sin tabbar) -->
+        <div id="main-content-area" class="ion-padding">
+            {% block page_content %}{% endblock %}
         </div>
-    </ion-split-pane>
+        <!-- Global Tabbar (updated via JavaScript) -->
+        <ion-footer style="display: none;">
+            <ion-tab-bar id="global-tabbar">
+                {# Initially hidden, shown via updateGlobalTabBar() when module has tabs #}
+            </ion-tab-bar>
+        </ion-footer>
+    </div>
 
     <!-- Action Sheet (reusable) -->
     <ion-action-sheet class="custom-action-sheet"></ion-action-sheet>
@@ -72,7 +128,6 @@
             isDark: window.ERPlora?.isDark || false,
             darkModeAuto: window.ERPlora?.darkModeAuto ?? true,
             isFullscreen: false,
-            sidebarOpen: localStorage.getItem('sidebarOpen') !== 'false',
             currentSection: '{{ current_section|default:"dashboard" }}',
             userName: '{{ request.session.user_name|default:"" }}',
             userEmail: '{{ request.session.user_email|default:"" }}',
@@ -81,9 +136,6 @@
 
             init() {
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
-
-                // Initialize split-pane state
-                this.$nextTick(() => this.updateSplitPane());
 
                 document.body.addEventListener('htmx:pushedIntoHistory', (e) => {
                     this.updateCurrentSection(e.detail.path);
@@ -129,16 +181,10 @@
                 });
             },
 
-            toggleSidebar() {
-                this.sidebarOpen = !this.sidebarOpen;
-                localStorage.setItem('sidebarOpen', this.sidebarOpen);
-                this.updateSplitPane();
-            },
-
-            updateSplitPane() {
-                const splitPane = document.querySelector('ion-split-pane');
-                if (splitPane) {
-                    splitPane.when = this.sidebarOpen ? 'xs' : false;
+            async toggleSidebar() {
+                const menu = document.querySelector('ion-menu');
+                if (menu) {
+                    await menu.toggle();
                 }
             },
 
@@ -253,9 +299,8 @@
             }
         }
     }
-</script>
 
-{% include "ui/_tabbar_manager.html" %}
+</script>
 
 {% block section_scripts %}{% endblock %}
 {% endblock %}

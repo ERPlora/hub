@@ -1,4 +1,6 @@
-<ion-header>
+{# Content Header - styled as secondary header inside ion-content #}
+{# Note: Uses div instead of ion-header because it's placed inside ion-content #}
+<div class="content-header">
     <ion-toolbar>
         {% if back_url or back_hx_get %}
         <ion-buttons slot="start">
@@ -41,4 +43,4 @@
         </ion-buttons>
         {% endif %}
     </ion-toolbar>
-</ion-header>
+</div>

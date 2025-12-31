@@ -163,3 +163,66 @@ ion-tab-bar {
     --min-height: auto;
   }
 }
+
+/* ==========================================================================
+   MAIN CONTENT AREA LAYOUT
+   - #main-content-area: HTMX target (div in app_base.html)
+   - Los partials generan: content-header + page-content (sin ion-page)
+   ========================================================================== */
+
+#main-content-area {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 56px; /* Espacio para el tabbar */
+}
+
+/* Content header - secondary header inside ion-content */
+.content-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--ion-background-color, #fff);
+}
+
+.content-header ion-toolbar {
+  --background: var(--ion-toolbar-background, var(--ion-background-color, #fff));
+  --border-width: 0 0 0.55px 0;
+  --border-color: var(--ion-toolbar-border-color, var(--ion-border-color, rgba(0, 0, 0, 0.2)));
+}
+
+body.dark .content-header {
+  background: var(--ion-background-color, #1e1e1e);
+}
+
+body.dark .content-header ion-toolbar {
+  --border-color: var(--ion-toolbar-border-color, var(--ion-border-color, rgba(255, 255, 255, 0.1)));
+}
+
+/* Page content container - scrollable area between header and tabbar */
+.page-content {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Global tabbar - siempre visible, fijo en la parte de abajo */
+#main-content > ion-footer {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 100 !important;
+  background: var(--ion-tab-bar-background, var(--ion-background-color, #fff));
+}
+
+body.dark #main-content > ion-footer {
+  background: var(--ion-tab-bar-background, var(--ion-background-color-dark, #1e1e1e));
+}
+
+#global-tabbar {
+  --background: transparent;
+}
+
+#global-tabbar:empty {
+  display: none;
+}
