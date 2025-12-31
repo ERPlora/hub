@@ -7,7 +7,7 @@
         <p class="mb-4 text-medium">{{ error }}</p>
         <ion-button
             color="danger"
-            hx-get="{% url 'system:marketplace_modules_list' %}"
+            hx-get="{% url 'store:modules_list' %}"
             hx-target="#marketplace-modules-grid"
             hx-swap="innerHTML"
             hx-indicator="#loading-spinner">

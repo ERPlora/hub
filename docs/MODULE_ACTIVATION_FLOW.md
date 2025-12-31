@@ -152,7 +152,7 @@ class ModulesRuntimeConfig(AppConfig):
 
         # 2️⃣ Register URLs for each loaded module
         for module_id, module_info in module_loader.loaded_modules.items():
-            register_module_urls(module_id, module_id, f'/modules/{module_id}/')
+            register_module_urls(module_id, module_id, f'/m/{module_id}/')
 
         print("="*80 + "\n")
 ```
@@ -278,10 +278,10 @@ def register_module_urls(module_id: str, app_name: str, prefix: str):
     Example:
         module_id = "inventory"
         app_name = "inventory"
-        prefix = "/modules/inventory/"
+        prefix = "/m/inventory/"
 
     Result:
-        /modules/inventory/ → inventory.urls with namespace 'inventory'
+        /m/inventory/ → inventory.urls with namespace 'inventory'
     """
     try:
         # Import module's urls.py
@@ -305,13 +305,13 @@ def register_module_urls(module_id: str, app_name: str, prefix: str):
 # modules/inventory/urls.py
 
 urlpatterns = [
-    path('', views.index, name='index'),           # /modules/inventory/
-    path('add/', views.add_product, name='add'),   # /modules/inventory/add/
+    path('', views.index, name='index'),           # /m/inventory/
+    path('add/', views.add_product, name='add'),   # /m/inventory/add/
 ]
 
 # After registration, accessible via:
-{% url 'inventory:index' %}  # → /modules/inventory/
-{% url 'inventory:add' %}    # → /modules/inventory/add/
+{% url 'inventory:index' %}  # → /m/inventory/
+{% url 'inventory:add' %}    # → /m/inventory/add/
 ```
 
 ---
@@ -407,7 +407,7 @@ After restart completes, the module is fully functional:
 - ✅ Added to INSTALLED_APPS
 - ✅ Models imported
 - ✅ Migrations applied
-- ✅ URLs registered at `/modules/inventory/`
+- ✅ URLs registered at `/m/inventory/`
 - ✅ Menu items visible in sidebar
 - ✅ Ready to use!
 
@@ -526,7 +526,7 @@ modules/inventory/
         "items": [
             {
                 "label": "Products",
-                "url": "/modules/inventory/",
+                "url": "/m/inventory/",
                 "icon": "list-outline"
             }
         ]
@@ -587,7 +587,7 @@ class Product(models.Model):
 [✓] Added 'inventory' to INSTALLED_APPS
 [✓] Imported models for 'inventory'
 [✓] Module 'inventory' loaded successfully
-[✓] Registered URLs for 'inventory' at '/modules/inventory/'
+[✓] Registered URLs for 'inventory' at '/m/inventory/'
 [MODULES_RUNTIME] Loaded 1 active modules
 ```
 
@@ -596,7 +596,7 @@ class Product(models.Model):
 **Check:**
 1. Module has `urls.py` file
 2. URLs registered correctly (check console logs)
-3. URL includes module prefix: `/modules/inventory/` NOT `/inventory/`
+3. URL includes module prefix: `/m/inventory/` NOT `/inventory/`
 
 **Common mistake:**
 ```python
@@ -604,8 +604,8 @@ class Product(models.Model):
 {% url 'inventory:index' %}  # → /inventory/ (404)
 
 # ✅ CORRECT (includes prefix)
-# URLs are auto-registered with /modules/{module_id}/ prefix
-/modules/inventory/  # Works!
+# URLs are auto-registered with /m/{module_id}/ prefix
+/m/inventory/  # Works!
 ```
 
 ### Menu Items Not Showing
@@ -689,4 +689,4 @@ python manage.py migrate inventory
 
 ---
 
-**Last Updated:** 2025-01-22
+**Last Updated:** 2025-12-30

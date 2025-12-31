@@ -5,10 +5,8 @@ from . import views
 
 urlpatterns = [
     path('', views.index, name='employees'),
-
-    # Employee API endpoints
-    path('api/create/', views.api_create, name='employee_create'),
-    path('api/update/', views.api_update, name='employee_update'),
-    path('api/delete/', views.api_delete, name='employee_delete'),
-    path('api/reset-pin/', views.api_reset_pin, name='employee_reset_pin'),
+    path('add/', views.add, name='employee_add'),
+    path('<uuid:employee_id>/', views.edit, name='employee_edit'),
+    path('<uuid:employee_id>/reset-pin/', views.reset_pin, name='employee_reset_pin'),
+    path('<uuid:employee_id>/delete/', views.delete, name='employee_delete'),
 ]

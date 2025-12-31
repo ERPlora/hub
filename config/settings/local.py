@@ -8,6 +8,7 @@ Modules desde ./modules/ del proyecto (para desarrollo).
 
 from .base import *
 from pathlib import Path
+import os
 import sys
 from config.paths import get_data_paths
 
@@ -175,39 +176,44 @@ print(f"[LOCAL] Data: {DATA_DIR}")
 # =============================================================================
 # DJANGO DEBUG TOOLBAR
 # =============================================================================
+# Disabled by default. Set DEBUG_TOOLBAR=true in .env to enable.
 
-INSTALLED_APPS += ['debug_toolbar']
+DEBUG_TOOLBAR_ENABLED = os.environ.get('DEBUG_TOOLBAR', 'false').lower() == 'true'
 
-MIDDLEWARE = [
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
-] + MIDDLEWARE
+if DEBUG_TOOLBAR_ENABLED:
+    INSTALLED_APPS += ['debug_toolbar']
 
-INTERNAL_IPS = [
-    '127.0.0.1',
-    'localhost',
-]
+    MIDDLEWARE = [
+        'debug_toolbar.middleware.DebugToolbarMiddleware',
+    ] + MIDDLEWARE
 
-def show_toolbar_callback(request):
-    """Show debug toolbar only for HTML requests, not AJAX/JSON."""
-    if not DEBUG:
-        return False
-    # Skip for AJAX requests
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return False
-    # Skip for JSON requests
-    if 'application/json' in request.headers.get('Accept', ''):
-        return False
-    if 'application/json' in request.headers.get('Content-Type', ''):
-        return False
-    # Skip for API endpoints
-    if request.path.startswith('/api/'):
-        return False
-    # Skip for verify-pin endpoint
-    if request.path.startswith('/verify-pin/'):
-        return False
-    return True
+    INTERNAL_IPS = [
+        '127.0.0.1',
+        'localhost',
+    ]
 
+    def show_toolbar_callback(request):
+        """Show debug toolbar only for HTML requests, not AJAX/JSON."""
+        if not DEBUG:
+            return False
+        # Skip for AJAX requests
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return False
+        # Skip for JSON requests
+        if 'application/json' in request.headers.get('Accept', ''):
+            return False
+        if 'application/json' in request.headers.get('Content-Type', ''):
+            return False
+        # Skip for API endpoints
+        if request.path.startswith('/api/'):
+            return False
+        # Skip for verify-pin endpoint
+        if request.path.startswith('/verify-pin/'):
+            return False
+        return True
 
-DEBUG_TOOLBAR_CONFIG = {
-    'SHOW_TOOLBAR_CALLBACK': show_toolbar_callback,
-}
+    DEBUG_TOOLBAR_CONFIG = {
+        'SHOW_TOOLBAR_CALLBACK': show_toolbar_callback,
+    }
+
+    print(f"[LOCAL] Debug Toolbar: ENABLED")

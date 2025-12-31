@@ -1,0 +1,180 @@
+{% load i18n %}
+<!-- Dynamic Tab Bar Manager -->
+<script>
+    if (typeof DynamicTabBar === 'undefined') {
+    class DynamicTabBar {
+        constructor() {
+            this.TAB_MIN_WIDTH = 72;
+            this.moreModalOpen = false;
+            this.hiddenTabs = [];
+            this.init();
+        }
+
+        init() {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.setup());
+            } else {
+                setTimeout(() => this.setup(), 100);
+            }
+        }
+
+        setup() {
+            const tabBar = document.querySelector('ion-tab-bar');
+            if (!tabBar) return;
+
+            this.tabBar = tabBar;
+            this.originalTabs = Array.from(tabBar.querySelectorAll('ion-tab-button:not(.tab-more)'));
+
+            this.originalTabs.forEach(tab => {
+                if (!tab.hasAttribute('hx-get')) return;
+
+                tab.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+
+            if (this.originalTabs.length <= 3) return;
+
+            this.createMoreButton();
+            this.calculateWithRetry();
+
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => this.calculateVisibleTabs(), 100);
+            });
+        }
+
+        createMoreButton() {
+            if (this.tabBar.querySelector('.tab-more')) return;
+
+            this.moreButton = document.createElement('ion-tab-button');
+            this.moreButton.className = 'tab-more tab-hidden';
+            this.moreButton.innerHTML = `
+                <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
+                <ion-label>{% trans "More" %}</ion-label>
+            `;
+            this.moreButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showMoreModal();
+            });
+            this.tabBar.appendChild(this.moreButton);
+        }
+
+        calculateWithRetry(attempts = 0) {
+            const availableWidth = this.tabBar.offsetWidth;
+            if (availableWidth === 0 && attempts < 5) {
+                setTimeout(() => this.calculateWithRetry(attempts + 1), 100);
+                return;
+            }
+            this.calculateVisibleTabs();
+        }
+
+        calculateVisibleTabs() {
+            const availableWidth = this.tabBar.offsetWidth;
+            const totalTabs = this.originalTabs.length;
+
+            if (availableWidth < 100) {
+                this.originalTabs.forEach(tab => tab.classList.remove('tab-hidden'));
+                if (this.moreButton) this.moreButton.classList.add('tab-hidden');
+                this.hiddenTabs = [];
+                return;
+            }
+
+            const maxVisibleTabs = Math.floor(availableWidth / this.TAB_MIN_WIDTH);
+
+            if (maxVisibleTabs >= totalTabs) {
+                this.originalTabs.forEach(tab => tab.classList.remove('tab-hidden'));
+                this.moreButton.classList.add('tab-hidden');
+                this.hiddenTabs = [];
+                return;
+            }
+
+            const visibleCount = Math.max(1, maxVisibleTabs - 1);
+            this.hiddenTabs = [];
+
+            this.originalTabs.forEach((tab, index) => {
+                if (index < visibleCount) {
+                    tab.classList.remove('tab-hidden');
+                } else {
+                    tab.classList.add('tab-hidden');
+                    this.hiddenTabs.push({
+                        href: tab.getAttribute('hx-get') || tab.getAttribute('href'),
+                        icon: tab.querySelector('ion-icon')?.getAttribute('name') || 'ellipse',
+                        label: tab.querySelector('ion-label')?.textContent?.trim() || '',
+                        isActive: tab.classList.contains('tab-selected')
+                    });
+                }
+            });
+
+            this.moreButton.classList.remove('tab-hidden');
+            const hasActiveHidden = this.hiddenTabs.some(t => t.isActive);
+            this.moreButton.classList.toggle('has-active', hasActiveHidden);
+            this.moreButton.classList.toggle('tab-selected', hasActiveHidden);
+        }
+
+        async showMoreModal() {
+            if (this.moreModalOpen || this.hiddenTabs.length === 0) return;
+            this.moreModalOpen = true;
+
+            const modal = document.createElement('ion-modal');
+            modal.initialBreakpoint = 0.5;
+            modal.breakpoints = [0, 0.5, 0.75, 1];
+            modal.handleBehavior = 'cycle';
+            modal.showBackdrop = true;
+            modal.backdropDismiss = true;
+
+            modal.innerHTML = `
+                <ion-header>
+                    <ion-toolbar>
+                        <ion-title>{% trans "More Options" %}</ion-title>
+                        <ion-buttons slot="end">
+                            <ion-button id="close-more-modal">
+                                <ion-icon name="close"></ion-icon>
+                            </ion-button>
+                        </ion-buttons>
+                    </ion-toolbar>
+                </ion-header>
+                <ion-content class="ion-padding">
+                    <div class="more-tabs-grid">
+                        ${this.hiddenTabs.map(tab => `
+                            <div class="more-tab-item ${tab.isActive ? 'active' : ''}"
+                                 hx-get="${tab.href}"
+                                 hx-target="#main-content-area"
+                                 hx-push-url="true"
+                                 onclick="this.closest('ion-modal').dismiss()">
+                                <div class="more-tab-icon">
+                                    <ion-icon name="${tab.icon}"></ion-icon>
+                                </div>
+                                <span class="more-tab-label">${tab.label}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </ion-content>
+            `;
+
+            document.body.appendChild(modal);
+
+            modal.querySelector('#close-more-modal').addEventListener('click', () => {
+                modal.dismiss();
+            });
+
+            modal.addEventListener('didDismiss', () => {
+                this.moreModalOpen = false;
+                modal.remove();
+            });
+
+            await modal.present();
+            htmx.process(modal);
+        }
+    }
+
+    window.DynamicTabBar = DynamicTabBar;
+    }
+
+    // Only create new instance if not already exists
+    if (!window._dynamicTabBarInstance) {
+        window._dynamicTabBarInstance = new DynamicTabBar();
+    }
+</script>

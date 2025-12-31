@@ -24,7 +24,7 @@ class ModulesRuntimeConfig(AppConfig):
             # 2) Registrar URLs de cada módulo cargado
             for module_id, module_info in module_loader.loaded_modules.items():
                 # Registrar URLs del módulo
-                register_module_urls(module_id, module_id, f'/modules/{module_id}/')
+                register_module_urls(module_id, module_id, f'/m/{module_id}/')
 
         except Exception as e:
             print(f"[MODULES_RUNTIME] Error loading modules: {e}")

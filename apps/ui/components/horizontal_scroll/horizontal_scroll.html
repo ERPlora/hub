@@ -1,0 +1,25 @@
+{# Horizontal Scroll Component - Wrapper for Swiper Element Web Components #}
+{# Two modes: 1) Pass items list for automatic rendering, 2) Use slot for custom content #}
+<swiper-container
+    {% if css_class %}class="{{ css_class }}"{% endif %}
+    slides-per-view="{{ slides_per_view|default:'auto' }}"
+    space-between="{{ space_between|default:12 }}"
+    {% if navigation %}navigation="true"{% endif %}
+    {% if pagination %}pagination="true"{% endif %}
+    {% if free_mode %}free-mode="true"{% endif %}
+    grab-cursor="true"
+    {% if responsive %}
+    breakpoints='{"320": {"slidesPerView": {{ bp_sm|default:2 }}}, "480": {"slidesPerView": {{ bp_md|default:3 }}}, "768": {"slidesPerView": {{ bp_lg|default:3 }}}, "1024": {"slidesPerView": {{ bp_xl|default:4 }}}}'
+    {% endif %}>
+    {% if items %}
+        {# Automatic rendering from items list #}
+        {% for item in items %}
+        <swiper-slide>
+            {% include item_template with item=item %}
+        </swiper-slide>
+        {% endfor %}
+    {% else %}
+        {# Custom content via slot #}
+        {% slot "slides" %}{% endslot %}
+    {% endif %}
+</swiper-container>

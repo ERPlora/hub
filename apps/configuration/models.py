@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.core.cache import cache
 from typing import Any, Optional
+from zoneinfo import available_timezones
 
 
 class SingletonConfigMixin:
@@ -213,6 +214,21 @@ class HubConfig(SingletonConfigMixin, models.Model):
     def CURRENCY_CHOICES(self):
         """Compatibility property for existing code"""
         return settings.CURRENCY_CHOICES
+
+    # Timezone configuration
+    timezone = models.CharField(
+        max_length=50,
+        default='UTC',
+        help_text='Timezone for this Hub (e.g., Europe/Madrid, America/New_York)'
+    )
+
+    # System language (user-selected, overrides os_language)
+    language = models.CharField(
+        max_length=10,
+        choices=settings.LANGUAGES,
+        default='en',
+        help_text='System language for this Hub'
+    )
 
     # Theme preferences
     color_theme = models.CharField(max_length=20, default='default', choices=[

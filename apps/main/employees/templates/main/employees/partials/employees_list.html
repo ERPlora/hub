@@ -1,0 +1,36 @@
+{% load i18n ui %}
+
+{% ui_grid_start padding=False %}
+    {% ui_row_start %}
+        {% for user in local_users %}
+        {% ui_col_start size="12" size_md="6" size_lg="4" %}
+            {% ui_card css_class="employee-card cursor-pointer" %}
+                <div class="d-flex align-center gap-md"
+                     hx-get="{% url 'main:employee_edit' user.id %}"
+                     hx-target="#main-content-area"
+                     hx-push-url="true">
+                    {% if user.avatar %}
+                    {% ui_avatar initials=user.get_initials src=user.avatar.url size="lg" %}
+                    {% else %}
+                    {% ui_avatar initials=user.get_initials size="lg" %}
+                    {% endif %}
+                    <div class="flex-1 min-w-0">
+                        <h3 class="fw-semibold text-truncate m-0">{{ user.name }}</h3>
+                        <p class="fs-sm text-medium text-truncate m-0">{{ user.email }}</p>
+                        {% ui_chip label=user.role color=user.get_role_color css_class="ion-margin-top" %}
+                    </div>
+                    <ion-icon name="chevron-forward-outline" class="text-medium"></ion-icon>
+                </div>
+            {% endui_card %}
+        {% ui_col_end %}
+        {% empty %}
+        {% ui_col_start size="12" %}
+            {% if search_query %}
+            {% ui_empty_state title=_("No employees found") description=_("Try a different search term") icon="search-outline" %}
+            {% else %}
+            {% ui_empty_state title=_("No employees yet") description=_("Add your first employee to get started") icon="people-outline" action_label=_("Add First Employee") action_hx_get="/employees/add/" action_hx_target="#main-content-area" %}
+            {% endif %}
+        {% ui_col_end %}
+        {% endfor %}
+    {% ui_row_end %}
+{% ui_grid_end %}

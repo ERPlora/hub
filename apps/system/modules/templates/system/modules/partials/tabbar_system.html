@@ -1,25 +1,40 @@
 {% load i18n %}
+{# oob can be passed to enable HTMX OOB swap #}
 
-<ion-footer>
-    <ion-tab-bar>
-        <!-- Modules -->
+<ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+    <ion-tab-bar slot="bottom" color="light">
+        <!-- My Modules (Installed) -->
         <ion-tab-button
-            hx-get="{% url 'system:modules' %}"
-            hx-target="#dashboard-content"
+            hx-get="{% url 'mymodules:index' %}"
+            hx-target="#main-content-area"
             hx-push-url="true"
-            :class="currentSection === 'modules' ? 'tab-selected' : ''">
-            <ion-icon name="extension-puzzle-outline"></ion-icon>
+            {% if current_tab == 'installed' %}class="tab-selected"{% endif %}>
+            <ion-icon name="apps-outline"></ion-icon>
+            <ion-label>{% trans "My Modules" %}</ion-label>
+        </ion-tab-button>
+
+        <!-- Marketplace -->
+        <ion-tab-button
+            hx-get="{% url 'mymodules:marketplace' %}"
+            hx-target="#main-content-area"
+            hx-push-url="true"
+            {% if current_tab == 'marketplace' %}class="tab-selected"{% endif %}>
+            <ion-icon name="cube-outline"></ion-icon>
             <ion-label>{% trans "Modules" %}</ion-label>
         </ion-tab-button>
 
-        <!-- Module Store -->
-        <ion-tab-button
-            hx-get="{% url 'system:marketplace' %}"
-            hx-target="#dashboard-content"
-            hx-push-url="true"
-            :class="currentSection === 'marketplace' ? 'tab-selected' : ''">
-            <ion-icon name="storefront-outline"></ion-icon>
-            <ion-label>{% trans "Module Store" %}</ion-label>
+        <!-- Components (Coming Soon) -->
+        <ion-tab-button disabled>
+            <ion-icon name="hardware-chip-outline"></ion-icon>
+            <ion-label>{% trans "Components" %}</ion-label>
+            <ion-badge color="medium" style="font-size: 0.5rem;">{% trans "Soon" %}</ion-badge>
+        </ion-tab-button>
+
+        <!-- Product Catalog (Coming Soon) -->
+        <ion-tab-button disabled>
+            <ion-icon name="pricetag-outline"></ion-icon>
+            <ion-label>{% trans "Products" %}</ion-label>
+            <ion-badge color="medium" style="font-size: 0.5rem;">{% trans "Soon" %}</ion-badge>
         </ion-tab-button>
     </ion-tab-bar>
 </ion-footer>

@@ -317,11 +317,12 @@ class ModuleLoader:
         for module in active_modules:
             menu_config = module.get('menu', {})
             if menu_config:
+                module_id = module.get('module_id')
                 menu_items.append({
-                    'module_id': module.get('module_id'),
+                    'module_id': module_id,
                     'label': menu_config.get('label', module.get('name', '')),
                     'icon': menu_config.get('icon', module.get('icon', 'cube-outline')),
-                    'url': menu_config.get('url', f"/modules/{module.get('module_id')}/"),
+                    'url': f'/m/{module_id}/',  # Always use /m/ prefix
                     'order': menu_config.get('order', 100),
                 })
 

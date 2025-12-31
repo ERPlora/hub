@@ -1,897 +1,947 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the PACKAGE package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# ERPlora Hub Spanish Translations
+# Copyright (C) 2025 ERPlora
+# This file is distributed under the same license as the ERPlora package.
+# ERPlora Team <info@erplora.com>, 2025.
 #
-#, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: ERPlora Hub 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-21 23:35+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"POT-Creation-Date: 2025-12-29 11:06+0000\n"
+"PO-Revision-Date: 2025-12-29 11:30+0000\n"
+"Last-Translator: ERPlora Team <info@erplora.com>\n"
+"Language-Team: Spanish <es@erplora.com>\n"
+"Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
-"1 : 2;\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: apps/core/templates/core/app_base.html:260
-msgid "Business Management"
-msgstr ""
+# =============================================================================
+# AUTH / LOGIN
+# =============================================================================
 
-#: apps/core/templates/core/app_base.html:289
-#: apps/core/templates/core/dashboard.html:5
-#: apps/core/templates/core/dashboard.html:6
-msgid "Dashboard"
-msgstr "Panel"
-
-#: apps/core/templates/core/app_base.html:295
-#: apps/core/templates/core/app_base.html:342
-#: apps/core/templates/core/modules.html:5
-#: apps/core/templates/core/modules.html:6
-msgid "Modules"
-msgstr ""
-
-#: apps/core/templates/core/app_base.html:331
-msgid "System"
-msgstr ""
-
-#: apps/core/templates/core/app_base.html:336
-#: apps/core/templates/core/app_base.html:516
-#: apps/core/templates/core/employees.html:5
-#: apps/core/templates/core/employees.html:6
-msgid "Employees"
-msgstr "Empleados"
-
-#: apps/core/templates/core/app_base.html:348
-msgid "Module Store"
-msgstr ""
-
-#: apps/core/templates/core/app_base.html:354
-#: apps/core/templates/core/app_base.html:510
-#: apps/core/templates/core/settings.html:5
-#: apps/core/templates/core/settings.html:6
-msgid "Settings"
-msgstr "Configuración"
-
-#: apps/core/templates/core/app_base.html:363
-#: apps/core/templates/core/app_base.html:522
-msgid "Sign Out"
-msgstr "Cerrar Sesión"
-
-#: apps/core/templates/core/app_base.html:373
-msgid "Go to CPOS Cloud"
-msgstr "Ir a CPOS Cloud"
-
-#: apps/core/templates/core/app_base.html:529
-#: apps/core/templates/core/employees.html:150
-#: apps/core/templates/core/employees.html:191
-#: apps/core/templates/core/modules.html:220
-#: apps/core/templates/core/modules.html:330
-#: apps/core/templates/core/modules.html:373
-#: apps/core/templates/core/modules.html:416
-msgid "Cancel"
-msgstr "Cancelar"
-
-#: apps/core/templates/core/dashboard.html:13
-#: apps/core/templates/core/login.html:158
-#: apps/core/templates/core/login.html:288
-#: apps/core/templates/core/login.html:350
-msgid "Welcome"
-msgstr "Bienvenido"
-
-#: apps/core/templates/core/dashboard.html:14
-#, fuzzy
-#| msgid "Hub is configured and ready!"
-msgid "Hub is configured and ready"
-msgstr "¡Hub configurado y listo!"
-
-#: apps/core/templates/core/dashboard.html:17
-#: apps/core/templates/core/employees.html:107
-#: apps/core/templates/core/login.html:114
-#: apps/core/templates/core/settings.html:159
-msgid "Email"
-msgstr "Correo"
-
-#: apps/core/templates/core/dashboard.html:18
-#: apps/core/templates/core/employees.html:118
-msgid "Role"
-msgstr ""
-
-#: apps/core/templates/core/dashboard.html:30
-msgid "Today's Sales"
-msgstr ""
-
-#: apps/core/templates/core/dashboard.html:42
-msgid "Today's Revenue"
-msgstr ""
-
-#: apps/core/templates/core/dashboard.html:54
-msgid "Products"
-msgstr ""
-
-#: apps/core/templates/core/dashboard.html:64
-msgid "Quick Actions"
-msgstr ""
-
-#: apps/core/templates/core/dashboard.html:70
-msgid "New Sale"
-msgstr ""
-
-#: apps/core/templates/core/dashboard.html:74
-msgid "Add Product"
-msgstr ""
-
-#: apps/core/templates/core/dashboard.html:78
-msgid "Manage Employees"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:13
-msgid "Employee Management"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:15
-msgid "Manage employee accounts and roles"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:20
-#: apps/core/templates/core/employees.html:221
-msgid "Add Employee"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:55
-msgid "Edit"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:59
-#: apps/core/templates/core/employees.html:165
-#: apps/core/templates/core/employees.html:195
-msgid "Reset PIN"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:74
-msgid "No employees found"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:97
-msgid "Name"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:100
-msgid "Enter employee name"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:111
-msgid "Enter email address"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:121
-#, fuzzy
-#| msgid "Select your profile"
-msgid "Select role"
-msgstr "Selecciona tu perfil"
-
-#: apps/core/templates/core/employees.html:123
-msgid "Cashier"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:124
-msgid "Manager"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:125
-msgid "Admin"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:131
-msgid "PIN"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:135
-#: apps/core/templates/core/employees.html:181
-msgid "4-digit PIN"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:142
-msgid "This will be the employee's login PIN"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:154
-msgid "Save"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:174
-msgid "Reset PIN for"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:177
-msgid "New PIN"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:233
-msgid "Edit Employee"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:261
-msgid "Employee saved successfully"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:271
-msgid "Failed to save employee"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:309
-#, fuzzy
-#| msgid "PIN configured successfully!"
-msgid "PIN reset successfully"
-msgstr "¡PIN configurado correctamente!"
-
-#: apps/core/templates/core/employees.html:318
-msgid "Failed to reset PIN"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:331
-msgid "Are you sure you want to delete"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:346
-msgid "Employee deleted successfully"
-msgstr ""
-
-#: apps/core/templates/core/employees.html:356
-msgid "Failed to delete employee"
-msgstr ""
-
-#: apps/core/templates/core/login.html:5
-#: apps/core/templates/core/login.html:139
 msgid "Login"
 msgstr "Iniciar Sesión"
 
-#: apps/core/templates/core/login.html:21
 msgid "Business Management System"
-msgstr ""
+msgstr "Sistema de Gestión Empresarial"
 
-#: apps/core/templates/core/login.html:28
 msgid "Local Login"
-msgstr "Login Local"
+msgstr "Acceso Local"
 
-#: apps/core/templates/core/login.html:31
 msgid "Cloud Login"
-msgstr "Login Cloud"
+msgstr "Acceso Cloud"
 
-#: apps/core/templates/core/login.html:39
 msgid "Select your profile"
 msgstr "Selecciona tu perfil"
 
-#: apps/core/templates/core/login.html:71
 msgid "Enter your PIN"
 msgstr "Ingresa tu PIN"
 
-#: apps/core/templates/core/login.html:86
 msgid "Incorrect PIN"
 msgstr "PIN incorrecto"
 
-#: apps/core/templates/core/login.html:118
+msgid "Email"
+msgstr "Correo electrónico"
+
 msgid "your@email.com"
 msgstr "tu@email.com"
 
-#: apps/core/templates/core/login.html:126
 msgid "Password"
 msgstr "Contraseña"
 
-#: apps/core/templates/core/login.html:139
 msgid "Logging in..."
 msgstr "Iniciando sesión..."
 
-#: apps/core/templates/core/login.html:151
 msgid "Setup your PIN"
 msgstr "Configura tu PIN"
 
-#: apps/core/templates/core/login.html:159
+msgid "Welcome"
+msgstr "Bienvenido"
+
 msgid "Setup a 4-digit PIN for quick access"
 msgstr "Configura un PIN de 4 dígitos para acceso rápido"
 
-#: apps/core/templates/core/login.html:171
 msgid "Confirm your PIN"
 msgstr "Confirma tu PIN"
 
-#: apps/core/templates/core/login.html:178
 msgid "PINs don't match"
 msgstr "Los PINs no coinciden"
 
-#: apps/core/templates/core/login.html:318
 msgid "Please complete all fields"
 msgstr "Por favor completa todos los campos"
 
-#: apps/core/templates/core/login.html:362
 msgid "Login failed"
 msgstr "Error al iniciar sesión"
 
-#: apps/core/templates/core/login.html:371
 msgid "Connection error. Please check your internet."
-msgstr "Error de conexión. Verifica tu internet."
+msgstr "Error de conexión. Verifica tu conexión a internet."
 
-#: apps/core/templates/core/login.html:427
 msgid "PIN configured successfully!"
 msgstr "¡PIN configurado correctamente!"
 
-#: apps/core/templates/core/partials/data_table.html:56
-msgid "Search..."
-msgstr ""
+# =============================================================================
+# NAVIGATION / COMMON
+# =============================================================================
 
-#: apps/core/templates/core/partials/data_table.html:68
-msgid "Desktop View"
-msgstr "Vista de Escritorio"
+msgid "Back"
+msgstr "Volver"
 
-#: apps/core/templates/core/partials/data_table.html:68
-#, fuzzy
-#| msgid "Table View"
-msgid "Mobile View"
-msgstr "Vista Móvil"
+msgid "Home"
+msgstr "Inicio"
 
-#: apps/core/templates/core/partials/data_table.html:78
-msgid "Import"
-msgstr ""
+msgid "Dashboard"
+msgstr "Panel"
 
-#: apps/core/templates/core/partials/data_table.html:88
-msgid "Export"
-msgstr ""
+msgid "Settings"
+msgstr "Configuración"
 
-#: apps/core/templates/core/partials/data_table.html:97
-msgid "New"
-msgstr ""
+msgid "Employees"
+msgstr "Empleados"
 
-#: apps/core/templates/core/partials/data_table.html:121
-#: apps/core/templates/core/partials/data_table.html:154
-msgid "items"
-msgstr ""
+msgid "Files"
+msgstr "Archivos"
 
-#: apps/core/templates/core/partials/data_table.html:121
-#, python-format
-msgid "No %(name)s to display"
-msgstr ""
+msgid "Store"
+msgstr "Tienda"
 
-#: apps/core/templates/core/partials/data_table.html:141
-msgid "Show:"
-msgstr ""
+msgid "Modules"
+msgstr "Módulos"
 
-#: apps/core/templates/core/partials/data_table.html:147
-#: apps/core/templates/modules/marketplace.html:72
-msgid "All"
-msgstr ""
+msgid "Sign Out"
+msgstr "Cerrar Sesión"
 
-#: apps/core/templates/core/partials/data_table.html:149
-msgid "per page"
-msgstr ""
+msgid "Cancel"
+msgstr "Cancelar"
 
-#: apps/core/templates/core/partials/data_table.html:154
-msgid "Showing"
-msgstr ""
+msgid "Save"
+msgstr "Guardar"
 
-#: apps/core/templates/core/partials/data_table.html:154
-msgid "of"
-msgstr ""
+msgid "Delete"
+msgstr "Eliminar"
 
-#: apps/core/templates/core/modules.html:13
-msgid "Module Management"
-msgstr ""
+msgid "Edit"
+msgstr "Editar"
 
-#: apps/core/templates/core/modules.html:15
-msgid "Extend your POS with modules"
-msgstr ""
+msgid "Add"
+msgstr "Añadir"
 
-#: apps/core/templates/core/modules.html:20
-#: apps/core/templates/core/modules.html:141
-msgid "Install Module"
-msgstr ""
+msgid "More"
+msgstr "Más"
 
-#: apps/core/templates/core/modules.html:32
-msgid "Installed"
-msgstr ""
+msgid "More Options"
+msgstr "Más Opciones"
 
-#: apps/core/templates/core/modules.html:43
-#: apps/core/templates/core/modules.html:81
-msgid "Active"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:54
-msgid "Discovered"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:81
-msgid "Inactive"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:100
-#: apps/core/templates/core/modules.html:377
-msgid "Deactivate"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:105
-#: apps/core/templates/core/modules.html:334
-msgid "Activate"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:112
-msgid "Open"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:127
-msgid "No modules installed"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:130
-msgid "Install Your First Module"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:154
-msgid "Module ZIP File"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:162
-msgid "Select a .zip file containing the module"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:194
-msgid "Installation Failed"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:209
-msgid "Installation Successful"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:210
-msgid "Module has been installed and activated"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:224
-msgid "Installing..."
-msgstr ""
-
-#: apps/core/templates/core/modules.html:224
-#: apps/core/templates/modules/marketplace.html:155
 msgid "Install"
-msgstr ""
+msgstr "Instalar"
 
-#: apps/core/templates/core/modules.html:288
-#, fuzzy
-#| msgid "Logging in..."
-msgid "Uploading module..."
-msgstr "Iniciando sesión..."
+msgid "Active"
+msgstr "Activo"
 
-#: apps/core/templates/core/modules.html:309
-msgid "Installation complete!"
-msgstr ""
+msgid "Inactive"
+msgstr "Inactivo"
 
-#: apps/core/templates/core/modules.html:311
-msgid "Unknown error occurred"
-msgstr ""
+msgid "By"
+msgstr "Por"
 
-#: apps/core/templates/core/modules.html:318
-#: apps/core/templates/core/modules.html:358
-#: apps/core/templates/core/modules.html:401
-#: apps/core/templates/core/modules.html:444
-msgid "Network error: "
-msgstr ""
+msgid "by"
+msgstr "por"
 
-#: apps/core/templates/core/modules.html:326
-msgid "Activate Module"
-msgstr ""
+msgid "of"
+msgstr "de"
 
-#: apps/core/templates/core/modules.html:327
-msgid "Do you want to activate"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:355
-#: apps/core/templates/core/modules.html:398
-#: apps/core/templates/core/modules.html:441
-msgid "Error: "
-msgstr ""
-
-#: apps/core/templates/core/modules.html:369
-msgid "Deactivate Module"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:370
-msgid "Do you want to deactivate"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:412
-msgid "Uninstall Module"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:413
-msgid "Do you want to uninstall"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:413
-msgid "This will remove all module files."
-msgstr ""
-
-#: apps/core/templates/core/modules.html:420
-msgid "Uninstall"
-msgstr ""
-
-#: apps/core/templates/core/modules.html:455
-#: apps/core/templates/modules/marketplace.html:31
 msgid "Error"
-msgstr ""
+msgstr "Error"
 
-#: apps/core/templates/core/pos.html:5 apps/core/templates/core/pos.html:6
-#: apps/core/templates/core/pos.html:12
-#, fuzzy
-#| msgid "Point of Sale System"
-msgid "Point of Sale"
-msgstr "Sistema de Punto de Venta"
+msgid "Download"
+msgstr "Descargar"
 
-#: apps/core/templates/core/pos.html:13
-#, fuzzy
-#| msgid "Logging in..."
-msgid "Coming soon..."
-msgstr "Iniciando sesión..."
+msgid "Default"
+msgstr "Predeterminado"
 
-#: apps/core/templates/core/pos.html:16
-msgid "The POS interface will be implemented here."
-msgstr ""
+# =============================================================================
+# FILES
+# =============================================================================
 
-#: apps/core/templates/core/settings.html:27
-msgid "Hub Configuration"
-msgstr ""
+msgid "No files in this directory"
+msgstr "No hay archivos en este directorio"
 
-#: apps/core/templates/core/settings.html:28
-msgid "General hub settings and information"
-msgstr ""
+msgid "Total Storage"
+msgstr "Almacenamiento Total"
 
-#: apps/core/templates/core/settings.html:33
-msgid "Hub ID"
-msgstr ""
+msgid "files"
+msgstr "archivos"
 
-#: apps/core/templates/core/settings.html:42
-msgid "System Language"
-msgstr ""
+msgid "Data location"
+msgstr "Ubicación de datos"
 
-#: apps/core/templates/core/settings.html:53
-msgid "Currency"
-msgstr ""
+msgid "Download your Hub database"
+msgstr "Descarga tu base de datos del Hub"
 
-#: apps/core/templates/core/settings.html:77
-msgid "Hub Status"
-msgstr ""
+msgid "Database"
+msgstr "Base de Datos"
 
-#: apps/core/templates/core/settings.html:81
-msgid "Configured"
-msgstr ""
+msgid "Download a backup of your SQLite database containing all your data."
+msgstr "Descarga una copia de seguridad de tu base de datos SQLite con todos tus datos."
 
-#: apps/core/templates/core/settings.html:83
-msgid "Not Configured"
-msgstr ""
+msgid "Download Database"
+msgstr "Descargar Base de Datos"
 
-#: apps/core/templates/core/settings.html:90
-msgid "Tunnel Port"
-msgstr ""
+msgid "Disk usage by category"
+msgstr "Uso de disco por categoría"
 
-#: apps/core/templates/core/settings.html:104
-msgid "Store Configuration"
-msgstr ""
+msgid "Storage"
+msgstr "Almacenamiento"
 
-#: apps/core/templates/core/settings.html:105
-msgid "Business information for receipts and invoices"
-msgstr ""
+msgid "Browse and download local files"
+msgstr "Navega y descarga archivos locales"
 
-#: apps/core/templates/core/settings.html:113
+msgid "File Browser"
+msgstr "Explorador de Archivos"
+
+# =============================================================================
+# EMPLOYEES
+# =============================================================================
+
+msgid "Add Employee"
+msgstr "Añadir Empleado"
+
+msgid "Edit Employee"
+msgstr "Editar Empleado"
+
+msgid "Delete Employee"
+msgstr "Eliminar Empleado"
+
+msgid "No employees yet"
+msgstr "Aún no hay empleados"
+
+msgid "Add your first employee to get started"
+msgstr "Añade tu primer empleado para comenzar"
+
+msgid "Add First Employee"
+msgstr "Añadir Primer Empleado"
+
+msgid "Name"
+msgstr "Nombre"
+
+msgid "Role"
+msgstr "Rol"
+
+msgid "PIN (4 digits)"
+msgstr "PIN (4 dígitos)"
+
+msgid "New PIN (4 digits)"
+msgstr "Nuevo PIN (4 dígitos)"
+
+msgid "Save Changes"
+msgstr "Guardar Cambios"
+
+msgid "Security"
+msgstr "Seguridad"
+
+msgid "Reset PIN"
+msgstr "Restablecer PIN"
+
+msgid "PIN reset successfully"
+msgstr "PIN restablecido correctamente"
+
+msgid "Danger Zone"
+msgstr "Zona de Peligro"
+
+msgid "Deleting an employee will deactivate their account. This action can be undone by an admin."
+msgstr "Eliminar un empleado desactivará su cuenta. Esta acción puede ser revertida por un administrador."
+
+msgid "Are you sure you want to delete this employee?"
+msgstr "¿Estás seguro de que quieres eliminar este empleado?"
+
+msgid "Yes, Delete"
+msgstr "Sí, Eliminar"
+
+msgid "Admin"
+msgstr "Administrador"
+
+msgid "Manager"
+msgstr "Gerente"
+
+msgid "Employee"
+msgstr "Empleado"
+
+# =============================================================================
+# DASHBOARD
+# =============================================================================
+
+msgid "Products"
+msgstr "Productos"
+
+msgid "Sales Today"
+msgstr "Ventas Hoy"
+
+msgid "Customers"
+msgstr "Clientes"
+
+msgid "Quick Actions"
+msgstr "Acciones Rápidas"
+
+msgid "Module Store"
+msgstr "Tienda de Módulos"
+
+msgid "Getting Started"
+msgstr "Primeros Pasos"
+
+msgid "Hub configured"
+msgstr "Hub configurado"
+
+msgid "Your Hub is connected to ERPlora Cloud"
+msgstr "Tu Hub está conectado a ERPlora Cloud"
+
+msgid "Install modules"
+msgstr "Instalar módulos"
+
+msgid "Visit the Module Store to add functionality"
+msgstr "Visita la Tienda de Módulos para añadir funcionalidad"
+
+msgid "Configure your store"
+msgstr "Configura tu tienda"
+
+msgid "Set up your business information"
+msgstr "Configura la información de tu negocio"
+
+# =============================================================================
+# SETTINGS
+# =============================================================================
+
+msgid "Store Information"
+msgstr "Información de la Tienda"
+
+msgid "Required"
+msgstr "Requerido"
+
+msgid "Business details for invoices and receipts"
+msgstr "Datos del negocio para facturas y recibos"
+
 msgid "Business Name"
-msgstr ""
+msgstr "Nombre del Negocio"
 
-#: apps/core/templates/core/settings.html:117
-msgid "Enter business name"
-msgstr ""
+msgid "Your business name"
+msgstr "Nombre de tu negocio"
 
-#: apps/core/templates/core/settings.html:124
-msgid "Business Address"
-msgstr ""
+msgid "Business Information"
+msgstr "Información del Negocio"
 
-#: apps/core/templates/core/settings.html:127
-msgid "Enter complete address"
-msgstr ""
+msgid "Address"
+msgstr "Dirección"
 
-#: apps/core/templates/core/settings.html:135
+msgid "Street, City, Postal Code"
+msgstr "Calle, Ciudad, Código Postal"
+
 msgid "VAT/Tax ID"
-msgstr ""
+msgstr "NIF/CIF"
 
-#: apps/core/templates/core/settings.html:139
-msgid "VAT or Tax ID"
-msgstr ""
+msgid "e.g., ES12345678A"
+msgstr "ej., ES12345678A"
 
-#: apps/core/templates/core/settings.html:146
 msgid "Phone"
-msgstr ""
+msgstr "Teléfono"
 
-#: apps/core/templates/core/settings.html:151
-msgid "Phone number"
-msgstr ""
-
-#: apps/core/templates/core/settings.html:164
-msgid "Business email"
-msgstr ""
-
-#: apps/core/templates/core/settings.html:170
 msgid "Website"
-msgstr ""
+msgstr "Sitio Web"
 
-#: apps/core/templates/core/settings.html:175
-msgid "Website URL"
-msgstr ""
+msgid "Logo"
+msgstr "Logo"
 
-#: apps/core/templates/core/settings.html:182
-msgid "Tax Rate"
-msgstr ""
+msgid "Tax Rate (%%)"
+msgstr "Tasa de Impuesto (%%)"
 
-#: apps/core/templates/core/settings.html:192
-#, python-format
-msgid "Tax rate in percentage (e.g., 21.00 for 21%%)"
-msgstr ""
+msgid "Tax included in prices"
+msgstr "Impuestos incluidos en precios"
 
-#: apps/core/templates/core/settings.html:198
-msgid "Tax Included in Prices"
-msgstr ""
+msgid "Save Store Settings"
+msgstr "Guardar Configuración de Tienda"
 
-#: apps/core/templates/core/settings.html:200
-msgid "Prices include tax"
-msgstr ""
+msgid "Tax Classes"
+msgstr "Clases de Impuestos"
 
-#: apps/core/templates/core/settings.html:207
-msgid "Business Logo"
-msgstr ""
+msgid "Configure tax rates according to your country's legislation"
+msgstr "Configura las tasas de impuestos según la legislación de tu país"
 
-#: apps/core/templates/core/settings.html:212
-msgid "Logo will be displayed on receipts (optional)"
-msgstr ""
+msgid "Add Tax Class"
+msgstr "Añadir Clase de Impuesto"
 
-#: apps/core/templates/core/settings.html:233
-msgid "Receipt Header"
-msgstr ""
+msgid "e.g., Standard 21%%"
+msgstr "ej., Estándar 21%%"
 
-#: apps/core/templates/core/settings.html:236
-msgid "Additional text for receipt header (optional)"
-msgstr ""
+msgid "Rate (%%)"
+msgstr "Tasa (%%)"
 
-#: apps/core/templates/core/settings.html:240
-msgid "Text displayed at the top of receipts"
-msgstr ""
+msgid "Description"
+msgstr "Descripción"
 
-#: apps/core/templates/core/settings.html:245
-msgid "Receipt Footer"
-msgstr ""
+msgid "Optional notes"
+msgstr "Notas opcionales"
 
-#: apps/core/templates/core/settings.html:248
-msgid "Additional text for receipt footer (optional)"
-msgstr ""
+msgid "Set as default"
+msgstr "Establecer como predeterminado"
 
-#: apps/core/templates/core/settings.html:252
-msgid "Text displayed at the bottom of receipts (e.g., thank you message)"
-msgstr ""
+msgid "Examples by country:"
+msgstr "Ejemplos por país:"
 
-#: apps/core/templates/core/settings.html:259
-msgid "Save Store Config"
-msgstr ""
+msgid "User Preferences"
+msgstr "Preferencias de Usuario"
 
-#: apps/core/templates/core/settings.html:270
-msgid "Display Settings"
-msgstr "Configuración de Pantalla"
+msgid "Language"
+msgstr "Idioma"
 
-#: apps/core/templates/core/settings.html:271
-msgid "Customize the appearance and printing"
-msgstr "Personalizar apariencia e impresión"
+msgid "Avatar"
+msgstr "Avatar"
 
-#: apps/core/templates/core/settings.html:277
-msgid "Color Palette"
-msgstr ""
+msgid "Save Preferences"
+msgstr "Guardar Preferencias"
 
-#: apps/core/templates/core/settings.html:282
-msgid "Default (Gray)"
-msgstr ""
+msgid "Hub Settings"
+msgstr "Configuración del Hub"
 
-#: apps/core/templates/core/settings.html:283
-msgid "Blue"
-msgstr ""
+msgid "Currency"
+msgstr "Moneda"
 
-#: apps/core/templates/core/settings.html:286
-msgid ""
-"Choose your preferred color palette. Works with both light and dark modes."
-msgstr ""
+msgid "Select currency"
+msgstr "Selecciona moneda"
 
-#: apps/core/templates/core/settings.html:295
-msgid "Current Mode"
-msgstr ""
-
-#: apps/core/templates/core/settings.html:295
-#, fuzzy
-#| msgid "Dark Mode"
-msgid "Dark"
+msgid "Dark Mode"
 msgstr "Modo Oscuro"
 
-#: apps/core/templates/core/settings.html:295
-msgid "Light"
-msgstr ""
+msgid "Save Hub Settings"
+msgstr "Guardar Configuración del Hub"
 
-#: apps/core/templates/core/settings.html:299
-msgid "Toggle between light and dark modes using the"
-msgstr ""
+msgid "Hub Information"
+msgstr "Información del Hub"
 
-#: apps/core/templates/core/settings.html:301
-msgid "icon in the header"
-msgstr ""
+msgid "Hub ID"
+msgstr "ID del Hub"
 
-#: apps/core/templates/core/settings.html:307
-msgid "Auto-print Receipts"
-msgstr "Auto-imprimir Recibos"
+msgid "Status"
+msgstr "Estado"
 
-#: apps/core/templates/core/settings.html:309
-msgid "Automatically print after each sale"
-msgstr "Imprimir automáticamente después de cada venta"
+msgid "Connected"
+msgstr "Conectado"
 
-#: apps/core/templates/core/settings.html:387
-msgid "Language updated. Reloading..."
-msgstr ""
+msgid "Not configured"
+msgstr "No configurado"
 
-#: apps/core/templates/core/settings.html:406
-msgid "Failed to update language"
-msgstr ""
+msgid "Version"
+msgstr "Versión"
 
-#: apps/core/templates/core/settings.html:432
-msgid "Currency updated"
-msgstr ""
+msgid "Cloud Connection"
+msgstr "Conexión Cloud"
 
-#: apps/core/templates/core/settings.html:446
-msgid "Failed to update currency"
-msgstr ""
+msgid "Cloud URL"
+msgstr "URL del Cloud"
 
-#: apps/core/templates/core/settings.html:512
-msgid "Auto-print enabled"
-msgstr "Auto-impresión activada"
+msgid "Open Cloud Portal"
+msgstr "Abrir Portal Cloud"
 
-#: apps/core/templates/core/settings.html:513
-msgid "Auto-print disabled"
-msgstr "Auto-impresión desactivada"
+msgid "Database Maintenance"
+msgstr "Mantenimiento de Base de Datos"
 
-#: apps/core/templates/modules/marketplace.html:5
-#: apps/core/templates/modules/marketplace.html:6
-#: apps/core/templates/modules/marketplace.html:13
-msgid "Module Marketplace"
-msgstr ""
+msgid "Clean up orphaned data from deleted modules"
+msgstr "Limpiar datos huérfanos de módulos eliminados"
 
-#: apps/core/templates/modules/marketplace.html:15
-msgid "Browse and purchase modules from Cloud"
-msgstr ""
+msgid "Scan for and remove orphaned database tables, migration records, and media files left behind by deleted modules."
+msgstr "Buscar y eliminar tablas de base de datos huérfanas, registros de migración y archivos multimedia dejados por módulos eliminados."
 
-#: apps/core/templates/modules/marketplace.html:20
-msgid "My Modules"
-msgstr ""
+msgid "Scan for Orphaned Data"
+msgstr "Buscar Datos Huérfanos"
 
-#: apps/core/templates/modules/marketplace.html:46
-#, fuzzy
-#| msgid "PIN configured successfully!"
-msgid "Purchase Successful!"
-msgstr "¡PIN configurado correctamente!"
+msgid "Automatic Backups"
+msgstr "Copias de Seguridad Automáticas"
 
-#: apps/core/templates/modules/marketplace.html:47
-msgid "You can now download and install the module."
-msgstr ""
+msgid "Schedule automatic database backups"
+msgstr "Programar copias de seguridad automáticas de la base de datos"
 
-#: apps/core/templates/modules/marketplace.html:60
-msgid "Purchase Cancelled"
-msgstr ""
+msgid "Enable automatic backups"
+msgstr "Habilitar copias de seguridad automáticas"
 
-#: apps/core/templates/modules/marketplace.html:61
-msgid "Your purchase was cancelled."
-msgstr ""
+msgid "Frequency"
+msgstr "Frecuencia"
 
-#: apps/core/templates/modules/marketplace.html:83
-msgid "All Types"
-msgstr ""
+msgid "Backup Time"
+msgstr "Hora de Copia"
 
-#: apps/core/templates/modules/marketplace.html:86
-msgid "Free"
-msgstr ""
+msgid "Keep backups for (days)"
+msgstr "Mantener copias por (días)"
 
-#: apps/core/templates/modules/marketplace.html:89
-msgid "Paid"
-msgstr ""
+msgid "Maximum backups to keep"
+msgstr "Máximo de copias a mantener"
 
-#: apps/core/templates/modules/marketplace.html:92
-msgid "Subscription"
-msgstr ""
+msgid "Last Backup"
+msgstr "Última Copia"
 
-#: apps/core/templates/modules/marketplace.html:137
-msgid "Purchased"
-msgstr ""
+msgid "No backups yet"
+msgstr "Sin copias aún"
 
-#: apps/core/templates/modules/marketplace.html:161
-msgid "Install Free"
-msgstr ""
+msgid "Save Backup Settings"
+msgstr "Guardar Configuración de Copias"
 
-#: apps/core/templates/modules/marketplace.html:167
-msgid "Purchase"
-msgstr ""
+msgid "Backup Now"
+msgstr "Hacer Copia Ahora"
 
-#: apps/core/templates/modules/marketplace.html:181
-msgid "No Modules Available"
-msgstr ""
+msgid "Are you sure you want to delete this tax class?"
+msgstr "¿Estás seguro de que quieres eliminar esta clase de impuesto?"
 
-#: apps/core/templates/modules/marketplace.html:182
-msgid "Check your internet connection or try again later."
-msgstr ""
+msgid "No tax classes configured"
+msgstr "No hay clases de impuestos configuradas"
 
-#: apps/core/templates/modules/purchase_required.html:5
-#: apps/core/templates/modules/purchase_required.html:6
-#: apps/core/templates/modules/purchase_required.html:19
-msgid "Purchase Required"
-msgstr ""
+msgid "Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)"
+msgstr "Crea tipos de impuestos según tu país (ej., Estándar 21%, Reducido 10%, Exento 0%)"
 
-#: apps/core/templates/modules/purchase_required.html:24
-msgid ""
-"This is a premium feature that requires purchasing the module. Purchase it "
-"once and use it forever."
-msgstr ""
+# =============================================================================
+# SETUP WIZARD
+# =============================================================================
 
-#: apps/core/templates/modules/purchase_required.html:31
-#: apps/core/templates/modules/subscription_required.html:31
+msgid "Setup"
+msgstr "Configuración"
+
+msgid "Welcome to ERPlora"
+msgstr "Bienvenido a ERPlora"
+
+msgid "Configure your store to get started"
+msgstr "Configura tu tienda para comenzar"
+
+msgid "Tax Configuration"
+msgstr "Configuración de Impuestos"
+
+msgid "Default Tax Rate (%%)"
+msgstr "Tasa de Impuesto Predeterminada (%%)"
+
+msgid "Required fields"
+msgstr "Campos requeridos"
+
+msgid "Complete Setup"
+msgstr "Completar Configuración"
+
+# =============================================================================
+# MODULES / MARKETPLACE
+# =============================================================================
+
+msgid "Marketplace"
+msgstr "Tienda"
+
 msgid "Module"
-msgstr ""
+msgstr "Módulo"
 
-#: apps/core/templates/modules/purchase_required.html:48
-msgid "Browse Marketplace"
-msgstr ""
+msgid "No active modules"
+msgstr "Sin módulos activos"
 
-#: apps/core/templates/modules/purchase_required.html:53
-#: apps/core/templates/modules/subscription_required.html:48
-msgid "Back to My Modules"
-msgstr ""
+msgid "No modules installed"
+msgstr "No hay módulos instalados"
 
-#: apps/core/templates/modules/purchase_required.html:59
-msgid "Already purchased? Try reinstalling the module or contact support."
-msgstr ""
+msgid "Explore the Module Store to extend your Hub"
+msgstr "Explora la Tienda de Módulos para ampliar tu Hub"
 
-#: apps/core/templates/modules/subscription_required.html:5
-#: apps/core/templates/modules/subscription_required.html:6
-#: apps/core/templates/modules/subscription_required.html:19
-msgid "Subscription Required"
-msgstr ""
+msgid "Browse Module Store"
+msgstr "Explorar Tienda de Módulos"
 
-#: apps/core/templates/modules/subscription_required.html:43
-msgid "Go to Marketplace"
-msgstr ""
+msgid "Extend your Hub with powerful modules"
+msgstr "Amplía tu Hub con potentes módulos"
 
-#: apps/core/templates/modules/subscription_required.html:54
-msgid ""
-"Already subscribed? Try refreshing the page or contact support if the issue "
-"persists."
-msgstr ""
+msgid "Search modules..."
+msgstr "Buscar módulos..."
 
-#~ msgid "Point of Sale System"
-#~ msgstr "Sistema de Punto de Venta"
+msgid "Categories"
+msgstr "Categorías"
 
-#~ msgid "Enable dark theme"
-#~ msgstr "Activar tema oscuro"
+msgid "Filter by category"
+msgstr "Filtrar por categoría"
 
-#, fuzzy
-#~| msgid "Enter your PIN"
-#~ msgid "Enter tax ID"
-#~ msgstr "Ingresa tu PIN"
+msgid "All Categories"
+msgstr "Todas las Categorías"
 
-#, fuzzy
-#~| msgid "PIN configured successfully!"
-#~ msgid "Settings saved successfully"
-#~ msgstr "¡PIN configurado correctamente!"
+msgid "Industries"
+msgstr "Industrias"
 
-#, fuzzy
-#~| msgid "PIN configured successfully!"
-#~ msgid "Settings reset successfully"
-#~ msgstr "¡PIN configurado correctamente!"
+msgid "Filter by industry"
+msgstr "Filtrar por industria"
 
-#~ msgid "Card View"
-#~ msgstr "Vista de Tarjetas"
+msgid "All Industries"
+msgstr "Todas las Industrias"
+
+msgid "All"
+msgstr "Todos"
+
+msgid "Free"
+msgstr "Gratis"
+
+msgid "One-time"
+msgstr "Pago Único"
+
+msgid "Subscription"
+msgstr "Suscripción"
+
+msgid "Active:"
+msgstr "Activos:"
+
+msgid "Clear all"
+msgstr "Limpiar todo"
+
+msgid "Deactivate"
+msgstr "Desactivar"
+
+msgid "Are you sure you want to deactivate this module?"
+msgstr "¿Estás seguro de que quieres desactivar este módulo?"
+
+msgid "Activate"
+msgstr "Activar"
+
+msgid "This will permanently delete the module and all its data. Are you sure?"
+msgstr "Esto eliminará permanentemente el módulo y todos sus datos. ¿Estás seguro?"
+
+msgid "Error acquiring module"
+msgstr "Error al adquirir el módulo"
+
+msgid "Module acquired. Download not available yet."
+msgstr "Módulo adquirido. La descarga aún no está disponible."
+
+msgid "Complete payment in the opened window"
+msgstr "Completa el pago en la ventana abierta"
+
+msgid "You already own this module"
+msgstr "Ya tienes este módulo"
+
+msgid "Error starting purchase"
+msgstr "Error al iniciar la compra"
+
+msgid "Error processing purchase"
+msgstr "Error al procesar la compra"
+
+msgid "Module installed successfully!"
+msgstr "¡Módulo instalado correctamente!"
+
+msgid "App installed successfully!"
+msgstr "¡Aplicación instalada correctamente!"
+
+msgid "Restart Required"
+msgstr "Reinicio Requerido"
+
+msgid "The server needs to restart to complete module setup. Restart now?"
+msgstr "El servidor necesita reiniciarse para completar la configuración del módulo. ¿Reiniciar ahora?"
+
+msgid "Restart"
+msgstr "Reiniciar"
+
+msgid "Later"
+msgstr "Más tarde"
+
+msgid "Error installing module"
+msgstr "Error al instalar el módulo"
+
+msgid "Error downloading module"
+msgstr "Error al descargar el módulo"
+
+msgid "Connection Error"
+msgstr "Error de Conexión"
+
+msgid "Try Again"
+msgstr "Intentar de Nuevo"
+
+msgid "Featured"
+msgstr "Destacados"
+
+msgid "Installed"
+msgstr "Instalado"
+
+msgid "Owned"
+msgstr "Adquirido"
+
+msgid "mo"
+msgstr "mes"
+
+msgid "Get Free"
+msgstr "Obtener Gratis"
+
+msgid "Purchase"
+msgstr "Comprar"
+
+msgid "First"
+msgstr "Primero"
+
+msgid "Page"
+msgstr "Página"
+
+msgid "Last"
+msgstr "Último"
+
+msgid "No modules found"
+msgstr "No se encontraron módulos"
+
+msgid "Try adjusting your search or filters"
+msgstr "Intenta ajustar tu búsqueda o filtros"
+
+msgid "Back to Marketplace"
+msgstr "Volver a la Tienda"
+
+msgid "downloads"
+msgstr "descargas"
+
+msgid "reviews"
+msgstr "reseñas"
+
+msgid "one-time payment"
+msgstr "pago único"
+
+msgid "monthly subscription"
+msgstr "suscripción mensual"
+
+msgid "Download & Install"
+msgstr "Descargar e Instalar"
+
+msgid "Get Free Module"
+msgstr "Obtener Módulo Gratis"
+
+msgid "Screenshots"
+msgstr "Capturas de Pantalla"
+
+msgid "Features"
+msgstr "Características"
+
+msgid "Reviews"
+msgstr "Reseñas"
+
+msgid "Information"
+msgstr "Información"
+
+msgid "Author"
+msgstr "Autor"
+
+msgid "Category"
+msgstr "Categoría"
+
+msgid "Last Updated"
+msgstr "Última Actualización"
+
+msgid "Requires Hub"
+msgstr "Requiere Hub"
+
+msgid "Related Modules"
+msgstr "Módulos Relacionados"
+
+msgid "Support"
+msgstr "Soporte"
+
+msgid "Documentation"
+msgstr "Documentación"
+
+msgid "Get Support"
+msgstr "Obtener Soporte"
+
+msgid "Contact Us"
+msgstr "Contáctanos"
+
+msgid "Screenshot"
+msgstr "Captura de Pantalla"
+
+msgid "New version available"
+msgstr "Nueva versión disponible"
+
+msgid "Current"
+msgstr "Actual"
+
+msgid "New"
+msgstr "Nuevo"
+
+msgid "View details"
+msgstr "Ver detalles"
+
+# =============================================================================
+# SECTIONS MODULE (Tables & Areas)
+# =============================================================================
+
+msgid "Sections (Tables & Areas)"
+msgstr "Secciones (Mesas y Áreas)"
+
+msgid "Sections"
+msgstr "Secciones"
+
+msgid "Please select a table before checkout."
+msgstr "Por favor selecciona una mesa antes de pagar."
+
+msgid "The selected table is no longer available."
+msgstr "La mesa seleccionada ya no está disponible."
+
+msgid "Color"
+msgstr "Color"
+
+msgid "Hex color for floor plan display"
+msgstr "Color hexadecimal para el plano"
+
+msgid "Icon"
+msgstr "Icono"
+
+msgid "Ionicon name for UI display"
+msgstr "Nombre del icono de Ionicons"
+
+msgid "Display Order"
+msgstr "Orden de Visualización"
+
+msgid "Floor Plan X"
+msgstr "Plano X"
+
+msgid "Floor Plan Y"
+msgstr "Plano Y"
+
+msgid "Floor Plan Width"
+msgstr "Ancho en Plano"
+
+msgid "Floor Plan Height"
+msgstr "Alto en Plano"
+
+msgid "Area"
+msgstr "Área"
+
+msgid "Areas"
+msgstr "Áreas"
+
+msgid "Available"
+msgstr "Disponible"
+
+msgid "Occupied"
+msgstr "Ocupado"
+
+msgid "Reserved"
+msgstr "Reservado"
+
+msgid "Cleaning"
+msgstr "Limpieza"
+
+msgid "Blocked"
+msgstr "Bloqueado"
+
+msgid "Square"
+msgstr "Cuadrada"
+
+msgid "Round"
+msgstr "Redonda"
+
+msgid "Rectangle"
+msgstr "Rectangular"
+
+msgid "Number/Name"
+msgstr "Número/Nombre"
+
+msgid "Capacity"
+msgstr "Capacidad"
+
+msgid "Minimum Capacity"
+msgstr "Capacidad Mínima"
+
+msgid "Shape"
+msgstr "Forma"
+
+msgid "Rotation"
+msgstr "Rotación"
+
+msgid "Current Guests"
+msgstr "Comensales Actuales"
+
+msgid "Occupied At"
+msgstr "Ocupada Desde"
+
+msgid "Occupied By"
+msgstr "Ocupada Por"
+
+msgid "Current Sale ID"
+msgstr "ID de Venta Actual"
+
+msgid "Table"
+msgstr "Mesa"
+
+msgid "Tables"
+msgstr "Mesas"
+
+msgid "Add Area"
+msgstr "Añadir Área"
+
+msgid "tables"
+msgstr "mesas"
+
+msgid "No tables in this area"
+msgstr "No hay mesas en esta área"
+
+msgid "No areas yet"
+msgstr "Aún no hay áreas"
+
+msgid "Create your first area to start organizing tables"
+msgstr "Crea tu primera área para empezar a organizar mesas"
+
+msgid "Create Area"
+msgstr "Crear Área"
+
+msgid "Select an area to see tables"
+msgstr "Selecciona un área para ver las mesas"
+
+msgid "Open Table"
+msgstr "Abrir Mesa"
+
+msgid "guests"
+msgstr "comensales"
+
+msgid "Transfer Table"
+msgstr "Transferir Mesa"
+
+msgid "Change Guests"
+msgstr "Cambiar Comensales"
+
+msgid "Close table without payment?"
+msgstr "¿Cerrar mesa sin cobrar?"
+
+msgid "Close Table"
+msgstr "Cerrar Mesa"
+
+msgid "Select a table"
+msgstr "Selecciona una mesa"
+
+msgid "Table is not available"
+msgstr "La mesa no está disponible"
+
+msgid "Invalid table selection"
+msgstr "Selección de mesa inválida"
+
+msgid "No table selected"
+msgstr "No hay mesa seleccionada"
+
+# =============================================================================
+# POS / SALES
+# =============================================================================
+
+msgid "Search products..."
+msgstr "Buscar productos..."
+
+msgid "Cart is empty"
+msgstr "El carrito está vacío"
+
+msgid "Add products to start"
+msgstr "Añade productos para comenzar"
+
+msgid "Subtotal"
+msgstr "Subtotal"
+
+msgid "Tax"
+msgstr "Impuesto"
+
+msgid "Total"
+msgstr "Total"
+
+msgid "Pay"
+msgstr "Pagar"
+
+# =============================================================================
+# OFFLINE
+# =============================================================================
+
+msgid "Offline"
+msgstr "Sin Conexión"
+
+msgid "You're Offline"
+msgstr "Estás Sin Conexión"
+
+msgid "Please check your internet connection and try again."
+msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."

@@ -255,9 +255,13 @@ class TestOfflineMode:
         THEN: Should detect offline mode
         """
         from apps.core.services.connectivity import ConnectivityChecker
+        from django.core.cache import cache
 
-        with patch('requests.head') as mock_head:
-            mock_head.side_effect = Exception("Connection refused")
+        # Clear cache to ensure fresh check
+        cache.clear()
+
+        with patch('apps.core.services.connectivity.requests.get') as mock_get:
+            mock_get.side_effect = Exception("Connection refused")
 
             checker = ConnectivityChecker(cloud_url='http://localhost:8000')
             assert checker.is_online() is False

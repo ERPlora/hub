@@ -38,6 +38,9 @@ class JWTMiddleware:
         '/static/',
         '/media/',
         '/api/',  # API endpoints handle their own auth
+        '/manifest.json',  # PWA manifest
+        '/serviceworker.js',  # Service worker
+        '/ht/',  # Health check
     ]
 
     def __init__(self, get_response):

@@ -2,7 +2,7 @@
 
 {% if request.htmx %}
 <!-- Clear tab bar - Settings doesn't need tabs -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML"></div>
+<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
 {% endif %}
 
 {% csrf_token %}

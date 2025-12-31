@@ -134,13 +134,13 @@ def connection_status(request):
     if checker.is_online():
         # Green - Connected
         return HttpResponse(
-            '<ion-icon name="cloudy-outline" class="text-green-500 text-xl" '
+            '<ion-icon slot="icon-only" name="cloudy-outline" class="text-green-500" '
             'title="Connected to Cloud"></ion-icon>'
         )
     else:
         # Red - No connection
         return HttpResponse(
-            '<ion-icon name="cloud-offline-outline" class="text-red-500 text-xl" '
+            '<ion-icon slot="icon-only" name="cloud-offline-outline" class="text-red-500" '
             'title="No Cloud connection"></ion-icon>'
         )
 
@@ -152,7 +152,12 @@ def connection_status(request):
 def update_notification(request):
     """Render update notification banner (HTMX partial)."""
     # TODO: Implement actual update check logic
-    return render(request, 'core/update_notification_empty.html')
+    return render(request, 'ui/update_notification_empty.html')
+
+
+def update_notification_dismiss(request):
+    """Dismiss update notification (HTMX partial)."""
+    return render(request, 'ui/update_notification_empty.html')
 
 
 # =============================================================================

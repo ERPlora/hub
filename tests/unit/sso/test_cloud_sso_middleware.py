@@ -51,7 +51,7 @@ class TestCloudSSOMiddlewareExemptUrls(TestCase):
 
     def test_dashboard_is_not_exempt(self):
         """Dashboard should require authentication."""
-        assert self.middleware._is_exempt_url('/dashboard/') is False
+        assert self.middleware._is_exempt_url('/home/') is False
 
     def test_modules_are_not_exempt(self):
         """Module pages should require authentication."""
@@ -89,7 +89,7 @@ class TestCloudSSOMiddlewareWebMode(TestCase):
     def test_no_session_cookie_redirects_to_cloud_login(self):
         """Without sessionid cookie, redirect to Cloud login."""
         middleware = self._get_middleware()
-        request = self.factory.get('/dashboard/')
+        request = self.factory.get('/home/')
         self._add_session_to_request(request)
 
         response = middleware(request)
@@ -109,7 +109,7 @@ class TestCloudSSOMiddlewareWebMode(TestCase):
             json=lambda: {'authenticated': False}
         )
 
-        request = self.factory.get('/dashboard/')
+        request = self.factory.get('/home/')
         request.COOKIES['sessionid'] = 'invalid-session-id'
         self._add_session_to_request(request)
 
@@ -129,7 +129,7 @@ class TestCloudSSOMiddlewareWebMode(TestCase):
             json=lambda: {'authenticated': True, 'email': 'test@example.com', 'user_id': 123, 'name': 'Test User'}
         )
 
-        request = self.factory.get('/dashboard/')
+        request = self.factory.get('/home/')
         request.COOKIES['sessionid'] = 'valid-cloud-session'
         self._add_session_to_request(request)
 
@@ -164,7 +164,7 @@ class TestCloudSSOMiddlewareWebMode(TestCase):
             json=lambda: {'authenticated': True, 'email': 'existing@example.com', 'user_id': 456, 'name': 'Existing User'}
         )
 
-        request = self.factory.get('/dashboard/')
+        request = self.factory.get('/home/')
         request.COOKIES['sessionid'] = 'valid-cloud-session'
         self._add_session_to_request(request)
 
@@ -199,7 +199,7 @@ class TestCloudSSOMiddlewareWebMode(TestCase):
             json=lambda: {'authenticated': True, 'email': 'session@example.com', 'user_id': 789, 'name': 'Session User'}
         )
 
-        request = self.factory.get('/dashboard/')
+        request = self.factory.get('/home/')
         request.COOKIES['sessionid'] = 'valid-cloud-session'
         self._add_session_to_request(request)
 
@@ -229,7 +229,7 @@ class TestCloudSSOMiddlewareDesktopMode(TestCase):
         middleware = CloudSSOMiddleware(self.get_response)
         middleware.deployment_mode = 'local'
 
-        request = self.factory.get('/dashboard/')
+        request = self.factory.get('/home/')
 
         response = middleware(request)
 

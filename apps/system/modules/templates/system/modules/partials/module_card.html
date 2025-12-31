@@ -1,0 +1,112 @@
+{% load i18n %}
+{% load ui %}
+
+{# Unified module card for both installed and marketplace views #}
+{# Variables: module, mode (installed|marketplace) #}
+
+{% ui_col_start size="12" size_md="6" size_lg="4" %}
+    {% ui_card css_class="module-card" %}
+        <div class="d-flex align-center gap-md">
+            {# Module Icon - same style for both modes #}
+            <div class="module-icon-box module-icon-box--{{ module.category|default:'default' }}">
+                <ion-icon name="{{ module.icon|default:'cube-outline' }}"></ion-icon>
+            </div>
+
+            <div class="flex-1 min-w-0">
+                <div class="d-flex align-center gap-sm flex-wrap">
+                    <a href="{{ module.detail_url }}"
+                       hx-get="{{ module.detail_url }}"
+                       hx-target="#main-content-area"
+                       hx-push-url="true"
+                       class="fw-semibold text-truncate m-0 fs-base module-card-title">{{ module.name }}</a>
+                    {% if module.is_featured %}
+                    {% ui_badge label=_("Featured") color="warning" css_class="fs-xxs" %}
+                    {% endif %}
+                </div>
+                <p class="fs-sm text-medium m-0 mt-xxs">
+                    {% if module.author %}{% trans "by" %} {{ module.author }} • {% endif %}v{{ module.version }}
+                </p>
+            </div>
+
+            {# Status Badge #}
+            <div class="flex-shrink-0">
+                {% if mode == "installed" %}
+                    {% if module.is_active %}
+                        {% ui_chip label=_("Active") color="success" %}
+                    {% else %}
+                        {% ui_chip label=_("Inactive") color="medium" %}
+                    {% endif %}
+                {% else %}
+                    {% if module.is_installed %}
+                    {% ui_chip label=_("Installed") color="success" icon="checkmark-circle-outline" %}
+                    {% elif module.is_owned %}
+                    {% ui_chip label=_("Owned") color="tertiary" icon="bag-check-outline" %}
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        <p class="fs-sm text-medium mb-md mt-md module-description">{{ module.description|default:"-" }}</p>
+
+        {% if mode == "marketplace" %}
+        {# Stats Row (marketplace only) #}
+        <div class="d-flex align-center gap-md fs-sm text-medium mb-md">
+            {% if module.rating %}
+            <span class="d-inline-flex align-center gap-xs">
+                <ion-icon name="star" class="text-warning"></ion-icon>
+                {{ module.rating|floatformat:1 }}
+            </span>
+            {% endif %}
+            {% if module.downloads %}
+            <span class="d-inline-flex align-center gap-xs">
+                <ion-icon name="download-outline"></ion-icon>
+                {{ module.downloads }}
+            </span>
+            {% endif %}
+            {% if module.category_name %}
+            <span class="d-inline-flex align-center gap-xs">
+                <ion-icon name="pricetag-outline"></ion-icon>
+                {{ module.category_name }}
+            </span>
+            {% endif %}
+        </div>
+
+        {# Price Display #}
+        <div class="d-flex justify-between align-center mb-md">
+            <span class="fw-semibold fs-base">
+                {% if module.is_free or module.module_type == 'free' %}
+                <span class="text-success">{% trans "Free" %}</span>
+                {% elif module.module_type == 'subscription' %}
+                <span class="text-primary">€{{ module.price }}/{% trans "mo" %}</span>
+                {% else %}
+                <span class="text-primary">€{{ module.price }}</span>
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+
+        {# Action Buttons - inside card footer #}
+        <div class="module-card-actions">
+            {% if mode == "installed" %}
+                {# Installed module actions: Activate/Deactivate + Delete #}
+                {% if module.is_active %}
+                {% ui_button label=_("Deactivate") fill="clear" size="small" color="warning" icon="pause-outline" css_class="flex-1" hx_post=module.deactivate_url hx_target="#main-content-area" hx_swap="innerHTML" hx_confirm=_("Are you sure you want to deactivate this module?") %}
+                {% else %}
+                {% ui_button label=_("Activate") fill="clear" size="small" color="success" icon="play-outline" css_class="flex-1" hx_post=module.activate_url hx_target="#main-content-area" hx_swap="innerHTML" %}
+                {% endif %}
+                {% ui_button label=_("Delete") fill="clear" size="small" color="danger" icon="trash-outline" css_class="flex-1" hx_post=module.delete_url hx_target="#main-content-area" hx_swap="innerHTML" hx_confirm=_("This will permanently delete the module and all its data. Are you sure?") %}
+            {% else %}
+                {# Marketplace module actions: Install/Purchase #}
+                {% if module.is_installed %}
+                {% ui_button label=_("Installed") fill="clear" size="small" color="medium" icon="checkmark-circle-outline" disabled=True css_class="flex-1" %}
+                {% elif module.is_owned %}
+                {% ui_button label=_("Install") fill="clear" size="small" color="success" icon="download-outline" css_class="flex-1" data_action="download" data_module_slug=module.slug data_download_url=module.download_url %}
+                {% elif module.is_free or module.module_type == 'free' %}
+                {% ui_button label=_("Install") fill="clear" size="small" color="primary" icon="download-outline" css_class="flex-1" data_action="install-free" data_module_id=module.id data_module_slug=module.slug data_download_url=module.download_url|default:"" %}
+                {% else %}
+                {% ui_button label=_("Purchase") fill="clear" size="small" color="primary" icon="cart-outline" css_class="flex-1" data_action="purchase" data_module_id=module.id %}
+                {% endif %}
+            {% endif %}
+        </div>
+    {% endui_card %}
+{% ui_col_end %}

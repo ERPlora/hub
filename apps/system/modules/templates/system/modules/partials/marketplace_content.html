@@ -1,20 +1,15 @@
-{% load i18n %}
+{% load i18n ui %}
 
 {% if request.htmx %}
 <!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-{% include "system/modules/partials/tabbar_system.html" %}
-</div>
+{% include "system/modules/partials/tabbar_system.html" with current_tab='marketplace' oob=True %}
 {% endif %}
 
-<div class="ion-padding" x-data="marketplaceFilters()" x-init="init()">
-    <!-- Header -->
-    <div class="mb-6">
-        <h1 class="text-2xl font-bold">{% trans "Module Store" %}</h1>
-        <p class="text-medium">{% trans "Extend your Hub with powerful modules" %}</p>
-    </div>
+<div x-data="marketplaceFilters()" x-init="init()">
+    <!-- Header - No back button since this is a main tab -->
+    {% ui_page_header title=_("Marketplace") subtitle=_("Discover and install modules") %}
 
-    <!-- Search & Filters (matching Cloud design) -->
+    <!-- Search & Filters -->
     <ion-grid class="ion-no-padding ion-margin-bottom">
         <!-- Search Row -->
         <ion-row>
@@ -64,7 +59,7 @@
     </ion-grid>
 
     <!-- Type Filter Chips -->
-    <div class="flex flex-wrap gap-2 mb-4 items-center">
+    <div class="d-flex flex-wrap gap-sm mb-md align-center">
         <ion-chip
             :color="typeFilter === '' ? 'primary' : 'medium'"
             @click="setTypeFilter('')"
@@ -75,51 +70,51 @@
             :color="typeFilter === 'free' ? 'success' : 'medium'"
             @click="setTypeFilter('free')"
             class="cursor-pointer">
-            <ion-icon name="gift-outline" class="mr-1"></ion-icon>
+            <ion-icon name="gift-outline" slot="start"></ion-icon>
             <ion-label>{% trans "Free" %}</ion-label>
         </ion-chip>
         <ion-chip
             :color="typeFilter === 'one_time' ? 'primary' : 'medium'"
             @click="setTypeFilter('one_time')"
             class="cursor-pointer">
-            <ion-icon name="card-outline" class="mr-1"></ion-icon>
+            <ion-icon name="card-outline" slot="start"></ion-icon>
             <ion-label>{% trans "One-time" %}</ion-label>
         </ion-chip>
         <ion-chip
             :color="typeFilter === 'subscription' ? 'tertiary' : 'medium'"
             @click="setTypeFilter('subscription')"
             class="cursor-pointer">
-            <ion-icon name="sync-outline" class="mr-1"></ion-icon>
+            <ion-icon name="sync-outline" slot="start"></ion-icon>
             <ion-label>{% trans "Subscription" %}</ion-label>
         </ion-chip>
     </div>
 
     <!-- Active Filters Summary -->
-    <div class="flex flex-wrap gap-2 mb-4 items-center" x-show="hasActiveFilters()" x-cloak>
-        <span class="text-sm text-gray-500">{% trans "Active:" %}</span>
+    <div class="d-flex flex-wrap gap-sm mb-md align-center" x-show="hasActiveFilters()" x-cloak>
+        <span class="fs-sm text-medium">{% trans "Active:" %}</span>
         <template x-if="searchQuery">
             <ion-chip color="warning" class="cursor-pointer" @click="clearSearch()">
-                <ion-icon name="search" class="mr-1"></ion-icon>
+                <ion-icon name="search" slot="start"></ion-icon>
                 <ion-label x-text="searchQuery"></ion-label>
-                <ion-icon name="close-circle" class="ml-1"></ion-icon>
+                <ion-icon name="close-circle" slot="end"></ion-icon>
             </ion-chip>
         </template>
         <template x-if="categoryFilter">
             <ion-chip color="warning" class="cursor-pointer" @click="setCategory('')">
                 <ion-label x-text="getCategoryName(categoryFilter)"></ion-label>
-                <ion-icon name="close-circle" class="ml-1"></ion-icon>
+                <ion-icon name="close-circle" slot="end"></ion-icon>
             </ion-chip>
         </template>
         <template x-if="industryFilter">
             <ion-chip color="warning" class="cursor-pointer" @click="setIndustry('')">
                 <ion-label x-text="getIndustryName(industryFilter)"></ion-label>
-                <ion-icon name="close-circle" class="ml-1"></ion-icon>
+                <ion-icon name="close-circle" slot="end"></ion-icon>
             </ion-chip>
         </template>
         <template x-if="typeFilter">
             <ion-chip color="warning" class="cursor-pointer" @click="setTypeFilter('')">
                 <ion-label x-text="getTypeLabel(typeFilter)"></ion-label>
-                <ion-icon name="close-circle" class="ml-1"></ion-icon>
+                <ion-icon name="close-circle" slot="end"></ion-icon>
             </ion-chip>
         </template>
         <ion-button size="small" fill="clear" color="danger" @click="clearAllFilters()">
@@ -129,51 +124,58 @@
     </div>
 
     <!-- Loading Spinner -->
-    <div id="loading-spinner" class="htmx-indicator flex justify-center py-12">
+    <div id="loading-spinner" class="htmx-indicator d-flex justify-center py-xl">
         <ion-spinner name="crescent"></ion-spinner>
     </div>
 
     <!-- Modules Grid (loaded via HTMX) -->
     <div id="marketplace-modules-grid"
-         hx-get="{% url 'system:marketplace_modules_list' %}"
+         hx-get="{% url 'mymodules:htmx_list' %}"
          hx-trigger="load"
          hx-swap="innerHTML"
          hx-indicator="#loading-spinner">
         <!-- Initial loading state -->
-        <div class="flex justify-center py-12">
+        <div class="d-flex justify-center py-xl">
             <ion-spinner name="crescent"></ion-spinner>
         </div>
     </div>
 </div>
 
-<!-- Alpine.js Filter Logic -->
+<!-- Alpine.js Filter Logic - HTMX compatible registration -->
 <script>
-function marketplaceFilters() {
-    return {
+(function() {
+    // Extract Django context data before the IIFE
+    const categoryMapData = {
+        {% for category in categories %}
+        '{{ category.id }}': '{{ category.name }}',
+        {% endfor %}
+    };
+    const industryMapData = {
+        {% for industry in industries %}
+        '{{ industry.id }}': '{{ industry.name }}',
+        {% endfor %}
+    };
+    const htmxListUrl = '{% url "mymodules:htmx_list" %}';
+    const typeLabels = {
+        'free': '{% trans "Free" %}',
+        'one_time': '{% trans "One-time" %}',
+        'subscription': '{% trans "Subscription" %}'
+    };
+
+    const marketplaceFiltersData = () => ({
         searchQuery: '',
         categoryFilter: '',
         industryFilter: '',
         typeFilter: '',
         searchTimeout: null,
-
-        // Maps for displaying filter names
-        categoryMap: {
-            {% for category in categories %}
-            '{{ category.id }}': '{{ category.name }}',
-            {% endfor %}
-        },
-        industryMap: {
-            {% for industry in industries %}
-            '{{ industry.id }}': '{{ industry.name }}',
-            {% endfor %}
-        },
+        categoryMap: categoryMapData,
+        industryMap: industryMapData,
 
         init() {
             // Nothing to sync on init - start fresh
         },
 
         onSearchInput(event) {
-            // Get value from Ionic's custom event
             this.searchQuery = event.target.value || '';
             this.debouncedFetch();
         },
@@ -190,7 +192,6 @@ function marketplaceFilters() {
 
         setCategory(category) {
             this.categoryFilter = category;
-            // Update the select element
             const select = document.getElementById('category-select');
             if (select) select.value = category;
             this.fetchModules();
@@ -198,7 +199,6 @@ function marketplaceFilters() {
 
         setIndustry(industry) {
             this.industryFilter = industry;
-            // Update the select element
             const select = document.getElementById('industry-select');
             if (select) select.value = industry;
             this.fetchModules();
@@ -243,12 +243,7 @@ function marketplaceFilters() {
         },
 
         getTypeLabel(type) {
-            const labels = {
-                'free': '{% trans "Free" %}',
-                'one_time': '{% trans "One-time" %}',
-                'subscription': '{% trans "Subscription" %}'
-            };
-            return labels[type] || type;
+            return typeLabels[type] || type;
         },
 
         debouncedFetch() {
@@ -263,11 +258,23 @@ function marketplaceFilters() {
             if (this.industryFilter) params.set('industry', this.industryFilter);
             if (this.typeFilter) params.set('type', this.typeFilter);
 
-            const url = '{% url "system:marketplace_modules_list" %}' + (params.toString() ? '?' + params.toString() : '');
+            const url = htmxListUrl + (params.toString() ? '?' + params.toString() : '');
             htmx.ajax('GET', url, { target: '#marketplace-modules-grid', swap: 'innerHTML', indicator: '#loading-spinner' });
         }
+    });
+
+    // Register with Alpine.data() if Alpine is ready
+    if (typeof Alpine !== 'undefined' && Alpine.data) {
+        Alpine.data('marketplaceFilters', marketplaceFiltersData);
+    } else {
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('marketplaceFilters', marketplaceFiltersData);
+        }, { once: true });
     }
-}
+
+    // Also make available as global function for backwards compatibility
+    window.marketplaceFilters = marketplaceFiltersData;
+})();
 </script>
 
 <!-- Marketplace module actions (uses global UI helpers from toast-helper.js) -->
@@ -277,7 +284,7 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
     setButtonLoading(button, true);
     try {
         // First acquire the free module
-        const purchaseResponse = await fetch('{% url "system:purchase_module" %}', {
+        const purchaseResponse = await fetch('{% url "mymodules:api_purchase" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_id: moduleId })
@@ -306,7 +313,7 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
 async function purchaseModule(moduleId, button) {
     setButtonLoading(button, true);
     try {
-        const response = await fetch('{% url "system:purchase_module" %}', {
+        const response = await fetch('{% url "mymodules:api_purchase" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_id: moduleId })
@@ -332,7 +339,7 @@ async function purchaseModule(moduleId, button) {
 async function downloadAndInstall(moduleSlug, downloadUrl, button) {
     if (button) setButtonLoading(button, true);
     try {
-        const response = await fetch('{% url "system:install_from_marketplace" %}', {
+        const response = await fetch('{% url "mymodules:api_install" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_slug: moduleSlug, download_url: downloadUrl })
@@ -342,14 +349,14 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button) {
         if (data.success) {
             Toast.success('{% trans "Module installed successfully!" %}');
             // Refresh the modules grid
-            htmx.ajax('GET', '{% url "system:marketplace_modules_list" %}', { target: '#marketplace-modules-grid', swap: 'innerHTML' });
+            htmx.ajax('GET', '{% url "mymodules:htmx_list" %}', { target: '#marketplace-modules-grid', swap: 'innerHTML' });
 
             if (data.requires_restart) {
                 showConfirm(
                     '{% trans "Restart Required" %}',
                     '{% trans "The server needs to restart to complete module setup. Restart now?" %}',
                     () => {
-                        fetch('{% url "system:module_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+                        fetch('{% url "mymodules:api_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
                             .then(() => setTimeout(() => window.location.reload(), 2000));
                     },
                     '{% trans "Restart" %}',
@@ -376,21 +383,3 @@ function setButtonLoading(button, loading) {
     button.disabled = loading;
 }
 </script>
-
-<style>
-.htmx-indicator {
-    display: none;
-}
-.htmx-request .htmx-indicator {
-    display: flex;
-}
-.htmx-request .install-icon {
-    display: none;
-}
-.htmx-request .install-spinner {
-    display: block !important;
-}
-.cursor-pointer {
-    cursor: pointer;
-}
-</style>

@@ -28,14 +28,14 @@
 <div id="htmx-indicator"></div>
 
 <ion-app id="dashboard-app" x-data="dashboardApp()" x-init="init()" :class="isDark ? 'dark' : ''">
-    <ion-split-pane id="dashboard-split-pane" content-id="main-content">
+    <ion-split-pane content-id="main-content" when="false">
         <!-- Sidebar Menu -->
-        <ion-menu id="dashboard-sidebar" content-id="main-content" menu-id="main-menu" type="push">
+        <ion-menu content-id="main-content" menu-id="main-menu" type="push">
             {% include "ui/partials/sidebar.html" %}
         </ion-menu>
 
         <!-- Main Content Area -->
-        <div class="ion-page section-tabs" id="main-content">
+        <div class="ion-page" id="main-content">
             <!-- Global Header -->
             <div id="dashboard-header">
                 {% include "ui/partials/app_header.html" %}
@@ -49,9 +49,9 @@
             </ion-content>
 
             <!-- Tab Bar (ion-footer must be direct child of ion-page) -->
-            <!-- Default empty tabbar - will be replaced via OOB swap by modules -->
+            <!-- Rendered by tabbar component if module has tabs in module.json -->
             {% block section_tabbar %}
-            <ion-footer id="dashboard-tabbar" style="display: none;"></ion-footer>
+            {# Empty by default - content_base.html renders tabbar if module_id exists #}
             {% endblock %}
         </div>
     </ion-split-pane>
@@ -68,6 +68,7 @@
             isDark: window.ERPlora?.isDark || false,
             darkModeAuto: window.ERPlora?.darkModeAuto ?? true,
             isFullscreen: false,
+            sidebarOpen: localStorage.getItem('sidebarOpen') !== 'false',
             currentSection: '{{ current_section|default:"dashboard" }}',
             userName: '{{ request.session.user_name|default:"" }}',
             userEmail: '{{ request.session.user_email|default:"" }}',
@@ -76,6 +77,9 @@
 
             init() {
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
+
+                // Initialize split-pane state
+                this.$nextTick(() => this.updateSplitPane());
 
                 document.body.addEventListener('htmx:pushedIntoHistory', (e) => {
                     this.updateCurrentSection(e.detail.path);
@@ -121,9 +125,17 @@
                 });
             },
 
-            toggleMenu() {
-                const menu = document.querySelector('ion-menu[menu-id="main-menu"]');
-                if (menu) menu.toggle();
+            toggleSidebar() {
+                this.sidebarOpen = !this.sidebarOpen;
+                localStorage.setItem('sidebarOpen', this.sidebarOpen);
+                this.updateSplitPane();
+            },
+
+            updateSplitPane() {
+                const splitPane = document.querySelector('ion-split-pane');
+                if (splitPane) {
+                    splitPane.when = this.sidebarOpen ? 'xs' : false;
+                }
             },
 
             async toggleTheme() {

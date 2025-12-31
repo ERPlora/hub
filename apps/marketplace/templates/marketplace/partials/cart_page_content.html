@@ -1,49 +1,13 @@
-{% load i18n ui %}
+{% load i18n ui component_tags %}
 
 {% if request.htmx %}
 <!-- Tab bar update via OOB swap -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
-    <ion-tab-bar slot="bottom" color="light">
-        <ion-tab-button
-            hx-get="{% url 'marketplace:index' %}"
-            hx-target="#main-content-area"
-            hx-push-url="true">
-            <ion-icon name="cube-outline"></ion-icon>
-            <ion-label>{% trans "Modules" %}</ion-label>
-        </ion-tab-button>
-
-        <ion-tab-button
-            hx-get="{% url 'marketplace:store_hubs' %}"
-            hx-target="#main-content-area"
-            hx-push-url="true">
-            <ion-icon name="server-outline"></ion-icon>
-            <ion-label>{% trans "Hubs" %}</ion-label>
-        </ion-tab-button>
-
-        <ion-tab-button disabled>
-            <ion-icon name="hardware-chip-outline"></ion-icon>
-            <ion-label>{% trans "Components" %}</ion-label>
-            <ion-badge color="medium" style="font-size: 8px;">{% trans "Soon" %}</ion-badge>
-        </ion-tab-button>
-
-        <ion-tab-button
-            hx-get="{% url 'marketplace:cart_page' %}"
-            hx-target="#main-content-area"
-            hx-push-url="true"
-            class="tab-selected">
-            <ion-icon name="cart-outline"></ion-icon>
-            <ion-label>{% trans "Cart" %}</ion-label>
-            {% if cart.count > 0 %}
-            <ion-badge color="danger">{{ cart.count }}</ion-badge>
-            {% endif %}
-        </ion-tab-button>
-    </ion-tab-bar>
-</ion-footer>
-</div>
+{% include "marketplace/partials/tabbar.html" with store_type=store_type current_view="cart" cart_count=cart.count oob=True %}
+<!-- Clear page header container -->
+<div id="page-header-container" hx-swap-oob="innerHTML"></div>
 {% endif %}
 
-{% ui_page_header title=_("Cart") %}
+{% ui_page_header title=_("Cart") back_hx_get="/marketplace/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
 
 <div class="ion-padding">
     {% if cart.items %}

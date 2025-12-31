@@ -255,7 +255,7 @@ def svg_icon(path: str, css_class: str = '', size: str = ''):
     return ''
 
 
-@register.inclusion_tag('core/components/module_icon.html')
+@register.inclusion_tag('ui/module_icon.html')
 def module_icon_component(module=None, module_id: str = None, icon: str = None,
                           css_class: str = '', size: str = 'text-2xl',
                           fallback_icon: str = 'cube-outline'):

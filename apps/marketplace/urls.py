@@ -5,7 +5,7 @@ Mounted at /marketplace/ in config/urls.py
 
 URL Structure:
 /marketplace/                       -> marketplace:index (modules store - default)
-/marketplace/hubs/                  -> marketplace:store (hubs)
+/marketplace/hubs/                  -> marketplace:store_hubs (hubs store)
 /marketplace/cart/                  -> marketplace:cart_page
 /marketplace/<slug>/                -> marketplace:module_detail (module detail page)
 

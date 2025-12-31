@@ -166,7 +166,7 @@ document.addEventListener('click', function(e) {
 async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
     setButtonLoading(button, true);
     try {
-        const purchaseResponse = await fetch('{% url "store:modules:api_purchase" %}', {
+        const purchaseResponse = await fetch('{% url "mymodules:api_purchase" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_id: moduleId })
@@ -195,7 +195,7 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
 async function purchaseModule(moduleId, button) {
     setButtonLoading(button, true);
     try {
-        const response = await fetch('{% url "store:modules:api_purchase" %}', {
+        const response = await fetch('{% url "mymodules:api_purchase" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_id: moduleId })
@@ -222,7 +222,7 @@ async function purchaseModule(moduleId, button) {
 async function downloadAndInstall(moduleSlug, downloadUrl, button) {
     if (button) setButtonLoading(button, true);
     try {
-        const response = await fetch('{% url "store:modules:api_install" %}', {
+        const response = await fetch('{% url "mymodules:api_install" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_slug: moduleSlug, download_url: downloadUrl })
@@ -237,7 +237,7 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button) {
                     '{% trans "Restart Required" %}',
                     '{% trans "The server needs to restart to complete module setup. Restart now?" %}',
                     () => {
-                        fetch('{% url "store:modules:api_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+                        fetch('{% url "mymodules:api_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
                             .then(() => setTimeout(() => window.location.reload(), 2000));
                     },
                     '{% trans "Restart" %}',

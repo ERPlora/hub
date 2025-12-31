@@ -1,0 +1,145 @@
+/* ==========================================================================
+   RESET CSS - Minimal reset for ERPlora
+   Let Ionic handle most styling natively
+   ========================================================================== */
+
+/* Box sizing */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Prevent font size inflation on mobile */
+html {
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+
+/* Body defaults */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove list styles (when not using ion-list) */
+ul:not([class]),
+ol:not([class]) {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Links */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Images */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
+}
+
+/* Remove focus outline for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Selection color */
+::selection {
+  background-color: rgba(var(--ion-color-primary-rgb), 0.2);
+}
+
+/* Hidden attribute */
+[hidden] {
+  display: none !important;
+}
+
+/* Screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   MINIMAL UTILITIES (only what Ionic doesn't provide)
+   Use ion-padding, ion-margin, ion-text-* when possible
+   ========================================================================== */
+
+/* Flex utilities - Ionic uses ion-justify-content-* but no gap */
+.d-flex { display: flex; }
+.flex-1 { flex: 1; }
+.align-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.flex-wrap { flex-wrap: wrap; }
+
+/* Gap - Ionic doesn't provide */
+.gap-xs { gap: 4px; }
+.gap-sm { gap: 8px; }
+.gap-md { gap: 16px; }
+.gap-lg { gap: 24px; }
+
+/* Min-width for text truncation in flex containers */
+.min-w-0 { min-width: 0; }
+
+/* Cursor pointer for clickable non-button elements */
+.cursor-pointer { cursor: pointer; }
+
+/* Margin reset */
+.m-0 { margin: 0; }
+
+/* Margin utilities - use ion-margin-* when possible */
+.mt-sm { margin-top: 12px; }
+.mt-md { margin-top: 16px; }
+.mb-xxs { margin-bottom: 4px; }
+.mb-sm { margin-bottom: 12px; }
+.mb-md { margin-bottom: 16px; }
+
+/* Padding utilities - use ion-padding-* when possible */
+.py-lg { padding-top: 24px; padding-bottom: 24px; }
+.py-xl { padding-top: 32px; padding-bottom: 32px; }
+
+/* Font size utilities - maps to variables */
+.fs-xxs { font-size: 0.625rem; }  /* 10px */
+.fs-xs { font-size: 0.75rem; }    /* 12px */
+.fs-sm { font-size: 0.875rem; }   /* 14px */
+.fs-lg { font-size: 1.125rem; }   /* 18px */
+.fs-xl { font-size: 1.25rem; }    /* 20px */
+.fs-2xl { font-size: 1.5rem; }    /* 24px */
+
+/* Font weight utilities */
+.fw-medium { font-weight: 500; }
+.fw-semibold { font-weight: 600; }
+.fw-bold { font-weight: 700; }
+
+/* Text color utilities - use ion-text color="" when possible */
+.text-primary { color: var(--ion-color-primary); }
+.text-medium { color: var(--ion-color-medium); }
+.text-danger { color: var(--ion-color-danger); }
+.text-success { color: var(--ion-color-success); }
+.text-warning { color: var(--ion-color-warning); }
+
+/* Text transform */
+.text-uppercase { text-transform: uppercase; }

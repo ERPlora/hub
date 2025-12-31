@@ -1,9 +1,0 @@
-{# Module Icon Component #}
-{# Renders inline SVG, PNG img, or Ionic icon (in priority order) #}
-{% if has_svg %}
-{{ svg_content }}
-{% elif has_png %}
-<img src="data:image/png;base64,{{ png_data }}" class="{{ all_classes }}" alt="Module icon" />
-{% else %}
-<ion-icon name="{{ icon_name }}" class="{{ all_classes }}"></ion-icon>
-{% endif %}

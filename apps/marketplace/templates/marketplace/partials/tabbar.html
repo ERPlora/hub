@@ -1,39 +1,10 @@
-{% load i18n %}
+{% load i18n component_tags %}
 
-<ion-tab-bar slot="bottom" color="light">
-    <ion-tab-button
-        hx-get="{% url 'marketplace:index' %}"
-        hx-target="#main-content-area"
-        hx-push-url="true"
-        {% if store_type == 'modules' %}class="tab-selected"{% endif %}>
-        <ion-icon name="cube-outline"></ion-icon>
-        <ion-label>{% trans "Modules" %}</ion-label>
-    </ion-tab-button>
-
-    <ion-tab-button
-        hx-get="{% url 'marketplace:store_hubs' %}"
-        hx-target="#main-content-area"
-        hx-push-url="true"
-        {% if store_type == 'hubs' %}class="tab-selected"{% endif %}>
-        <ion-icon name="server-outline"></ion-icon>
-        <ion-label>{% trans "Hubs" %}</ion-label>
-    </ion-tab-button>
-
-    <ion-tab-button disabled>
-        <ion-icon name="hardware-chip-outline"></ion-icon>
-        <ion-label>{% trans "Components" %}</ion-label>
-        <ion-badge color="medium" style="font-size: 8px;">{% trans "Soon" %}</ion-badge>
-    </ion-tab-button>
-
-    <ion-tab-button
-        hx-get="{% url 'marketplace:cart_page' %}"
-        hx-target="#main-content-area"
-        hx-push-url="true"
-        {% if current_view == 'cart' %}class="tab-selected"{% endif %}>
-        <ion-icon name="cart-outline"></ion-icon>
-        <ion-label>{% trans "Cart" %}</ion-label>
-        {% if cart_count > 0 %}
-        <ion-badge color="danger">{{ cart_count }}</ion-badge>
-        {% endif %}
-    </ion-tab-button>
-</ion-tab-bar>
+{% component "tabbar" oob=oob %}
+    {% fill "tabs" %}
+    {% component "tab" url="marketplace:index" icon="cube-outline" label=_("Modules") view="modules" current_view=store_type %}{% endcomponent %}
+    {% component "tab" url="marketplace:store_hubs" icon="server-outline" label=_("Hubs") view="hubs" current_view=store_type %}{% endcomponent %}
+    {% component "tab" url="marketplace:index" icon="hardware-chip-outline" label=_("Components") disabled=True badge=_("Soon") badge_color="medium" %}{% endcomponent %}
+    {% component "tab" url="marketplace:cart_page" icon="cart-outline" label=_("Cart") view="cart" current_view=current_view badge=cart_count badge_color="danger" %}{% endcomponent %}
+    {% endfill %}
+{% endcomponent %}

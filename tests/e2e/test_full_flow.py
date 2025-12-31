@@ -41,8 +41,8 @@ class TestNewUserSetup:
         session['user_role'] = user.role
         session.save()
 
-        # 3. Access dashboard - should redirect to wizard
-        response = client.get('/dashboard/', follow=True)
+        # 3. Access home - should redirect to wizard
+        response = client.get('/home/', follow=True)
         # Either loads wizard or redirects to setup
         assert response.status_code == 200
 
@@ -58,7 +58,7 @@ class TestNewUserSetup:
         })
         # Success returns 200 with HX-Redirect header
         assert response.status_code == 200
-        assert response.get('HX-Redirect') == '/dashboard/'
+        assert response.get('HX-Redirect') == '/home/'
 
         # 5. Verify store is configured
         store_config = StoreConfig.get_solo()
@@ -120,7 +120,7 @@ class TestModuleFlow:
 
     def test_view_modules_list(self, authenticated_client, store_config):
         """Test viewing installed modules."""
-        response = authenticated_client.get('/modules/')
+        response = authenticated_client.get('/store/')
 
         assert response.status_code == 200
         # Should show modules page
@@ -138,9 +138,9 @@ class TestModuleFlow:
 class TestDashboardFlow:
     """E2E tests for dashboard functionality."""
 
-    def test_dashboard_loads(self, authenticated_client, store_config):
-        """Test dashboard loads for configured store."""
-        response = authenticated_client.get('/dashboard/')
+    def test_home_loads(self, authenticated_client, store_config):
+        """Test home page loads for configured store."""
+        response = authenticated_client.get('/home/')
 
         assert response.status_code == 200
         # Should contain dashboard content
@@ -148,6 +148,6 @@ class TestDashboardFlow:
 
     def test_settings_page_loads(self, authenticated_client, store_config):
         """Test settings page loads."""
-        response = authenticated_client.get('/dashboard/settings/')
+        response = authenticated_client.get('/settings/')
 
         assert response.status_code == 200

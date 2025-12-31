@@ -1,18 +1,39 @@
 """
-URL configuration for config project.
+URL Configuration for ERPlora Hub
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+URL Structure
+=============
+
+/api/v1/                    REST API (JSON responses)
+├── /auth/                  Authentication (login, logout, PIN)
+├── /employees/             Employee management (DRF ViewSet)
+├── /config/                Hub configuration
+├── /modules/               Module management
+├── /system/                System utilities (updates, notifications)
+└── /sync/                  Cloud sync & backups
+
+/                           Web UI (HTML + HTMX)
+├── /                       Root redirect (→ /home/ or /login/)
+├── /login/, /logout/       Authentication pages
+├── /setup/                 First-time setup wizard
+├── /home/                  Home dashboard
+├── /files/                 File browser
+├── /settings/              Settings page
+├── /employees/             Employee management
+├── /modules/               My Modules (installed)
+├── /marketplace/           Marketplace (modules, hubs, etc.)
+└── /m/<module_id>/         Dynamic module routes (active modules)
+
+/htmx/                      HTMX Partials (HTML fragments)
+├── /sidebar/               Sidebar refresh
+├── /connection-status/     Connection indicator
+├── /update-notification/   Update badge
+└── /health/                Health check
+
+Namespaces
+==========
+API:  api_auth, api_employees, api_config, api_modules, api_system, api_sync
+UI:   auth, main, store, setup, configuration, htmx
 """
 from django.contrib import admin
 from django.urls import path, include
@@ -31,18 +52,20 @@ from apps.accounts.api import api_urlpatterns as employees_api_urls
 from apps.configuration.api import api_urlpatterns as config_api_urls
 from apps.system.modules.api import api_urlpatterns as modules_api_urls
 from apps.core.api import api_urlpatterns as system_api_urls
+from apps.sync.urls import api_urlpatterns as sync_api_urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
     # ==========================================================================
-    # REST API v1
+    # REST API v1 - All JSON endpoints consolidated here
     # ==========================================================================
     path('api/v1/auth/', include((auth_api_urls, 'api_auth'))),
     path('api/v1/employees/', include((employees_api_urls, 'api_employees'))),
     path('api/v1/config/', include((config_api_urls, 'api_config'))),
     path('api/v1/modules/', include((modules_api_urls, 'api_modules'))),
     path('api/v1/system/', include((system_api_urls, 'api_system'))),
+    path('api/v1/sync/', include((sync_api_urls, 'api_sync'))),
 
     # API Documentation (Swagger/OpenAPI)
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
@@ -65,11 +88,8 @@ urlpatterns = [
     path('set-language/', set_language, name='set_language'),
 
     # ==========================================================================
-    # Web UI Routes
+    # Web UI Routes - Clean URLs without /dashboard/ prefix
     # ==========================================================================
-
-    # Root redirect to dashboard (or login if not authenticated)
-    path('', lambda request: redirect('main:index') if 'local_user_id' in request.session else redirect('auth:login'), name='root'),
 
     # Auth routes (login, logout, etc.)
     path('', include('apps.auth.login.urls')),
@@ -77,20 +97,23 @@ urlpatterns = [
     # Setup wizard (initial configuration)
     path('setup/', include('apps.main.setup.urls')),
 
-    # Main routes (dashboard, settings, employees)
-    path('dashboard/', include('apps.main.urls')),
+    # Main UI routes (flat structure for clear active states)
+    path('', include('apps.main.urls')),  # Home at /
 
-    # System routes (modules, marketplace)
+    # Module store (installed modules management)
     path('modules/', include('apps.system.modules.urls')),
 
-    # Configuration (maintenance utilities)
+    # Marketplace (multi-store: modules, hubs, components, products)
+    path('marketplace/', include('apps.marketplace.urls')),
+
+    # ==========================================================================
+    # HTMX Partials - UI fragments for dynamic updates
+    # ==========================================================================
+    # Note: These return HTML fragments, not JSON
+    path('htmx/', include('apps.core.urls')),
+
+    # Configuration (maintenance utilities) - internal use
     path('config/', include('apps.configuration.urls')),
-
-    # Core utilities (health check, update notifications)
-    path('', include('apps.core.urls')),
-
-    # Sync with Cloud
-    path('sync/', include('apps.sync.urls')),
 ]
 
 

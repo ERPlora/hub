@@ -1,0 +1,15 @@
+{# Single tab button for ion-tab-bar #}
+<ion-tab-button
+    {% if not disabled %}
+    hx-get="{% url url %}"
+    hx-target="#main-content-area"
+    hx-push-url="true"
+    {% endif %}
+    {% if disabled %}disabled{% endif %}
+    {% if active %}class="tab-selected"{% endif %}>
+    <ion-icon name="{{ icon }}"></ion-icon>
+    <ion-label>{{ label }}</ion-label>
+    {% if badge %}
+    <ion-badge color="{{ badge_color }}">{{ badge }}</ion-badge>
+    {% endif %}
+</ion-tab-button>

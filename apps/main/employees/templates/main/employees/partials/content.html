@@ -2,39 +2,40 @@
 
 {% if request.htmx %}
 <!-- Clear tab bar - Employees doesn't need tabs -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML"></div>
+<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
 {% endif %}
 
 {% ui_page_header title=_("Employees") action_icon="add-outline" action_label=_("Add") action_hx_get="/employees/add/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
 
-<!-- Employees Grid -->
-{% ui_grid_start padding=False %}
-    {% ui_row_start %}
-        {% for user in local_users %}
-        {% ui_col_start size="12" size_md="6" size_lg="4" %}
-            {% ui_card css_class="employee-card cursor-pointer" %}
-                <div class="d-flex align-center gap-md"
-                     hx-get="{% url 'main:employee_edit' user.id %}"
-                     hx-target="#main-content-area"
-                     hx-push-url="true">
-                    {% if user.avatar %}
-                    {% ui_avatar initials=user.get_initials src=user.avatar.url size="lg" %}
-                    {% else %}
-                    {% ui_avatar initials=user.get_initials size="lg" %}
-                    {% endif %}
-                    <div class="flex-1 min-w-0">
-                        <h3 class="fw-semibold text-truncate m-0">{{ user.name }}</h3>
-                        <p class="fs-sm text-medium text-truncate m-0">{{ user.email }}</p>
-                        {% ui_chip label=user.role color=user.get_role_color css_class="ion-margin-top" %}
-                    </div>
-                    <ion-icon name="chevron-forward-outline" class="text-medium"></ion-icon>
-                </div>
-            {% endui_card %}
-        {% ui_col_end %}
-        {% empty %}
-        {% ui_col_start size="12" %}
-            {% ui_empty_state title=_("No employees yet") description=_("Add your first employee to get started") icon="people-outline" action_label=_("Add First Employee") action_hx_get="/employees/add/" action_hx_target="#main-content-area" %}
-        {% ui_col_end %}
-        {% endfor %}
-    {% ui_row_end %}
-{% ui_grid_end %}
+<div class="ion-padding">
+    <!-- Search Bar -->
+    <form id="employees-search-form"
+        hx-get="{% url 'main:employees' %}"
+        hx-target="#employees-list"
+        hx-swap="innerHTML"
+        hx-trigger="submit, ionInput from:#employees-search delay:300ms"
+        hx-indicator="#employees-loading">
+
+        <ion-searchbar
+            id="employees-search"
+            name="q"
+            placeholder="{% trans 'Search employees...' %}"
+            debounce="300"
+            show-cancel-button="never"
+            class="m-0 mb-md"
+            value="{{ request.GET.q|default:'' }}">
+        </ion-searchbar>
+    </form>
+
+    <!-- Loading Spinner -->
+    <div id="employees-loading" class="htmx-indicator justify-center py-lg">
+        <ion-spinner name="crescent"></ion-spinner>
+    </div>
+
+    <!-- Employees List Container with internal scroll -->
+    <div id="employees-scroll-container" style="height: calc(100vh - 220px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
+        <div id="employees-list">
+            {% include "main/employees/partials/employees_list.html" %}
+        </div>
+    </div>
+</div>

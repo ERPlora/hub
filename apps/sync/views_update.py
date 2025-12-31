@@ -237,7 +237,7 @@ def update_notification(request):
 
     if not state or not state.get('update_available'):
         # No update available - return empty response
-        return render(request, 'core/update_notification_empty.html')
+        return render(request, 'ui/update_notification_empty.html')
 
     context = {
         'current_version': update_manager.current_version,
@@ -245,4 +245,4 @@ def update_notification(request):
         'update_type': 'minor',  # TODO: Get from state
     }
 
-    return render(request, 'core/update_notification.html', context)
+    return render(request, 'ui/update_notification.html', context)

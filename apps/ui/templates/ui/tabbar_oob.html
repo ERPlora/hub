@@ -1,0 +1,30 @@
+{% load i18n %}
+{#
+    Tab Bar Component with OOB Swap for HTMX
+
+    Used in content partials to update the tabbar during HTMX navigation.
+
+    Receives:
+        - tabs: List of tab dicts with url, icon, label, view, disabled, badge, badge_color
+        - current_view: Current view identifier to highlight active tab
+#}
+<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML">
+    <ion-tab-bar slot="bottom" color="light">
+        {% for tab in tabs %}
+        <ion-tab-button
+            {% if not tab.disabled %}
+            hx-get="{% url tab.url %}"
+            hx-target="#main-content-area"
+            hx-push-url="true"
+            {% endif %}
+            {% if tab.disabled %}disabled{% endif %}
+            {% if current_view == tab.view %}class="tab-selected"{% endif %}>
+            <ion-icon name="{{ tab.icon }}"></ion-icon>
+            <ion-label>{% if tab.label_trans %}{% trans tab.label_trans %}{% else %}{{ tab.label }}{% endif %}</ion-label>
+            {% if tab.badge %}
+            <ion-badge color="{{ tab.badge_color|default:'danger' }}">{{ tab.badge }}</ion-badge>
+            {% endif %}
+        </ion-tab-button>
+        {% endfor %}
+    </ion-tab-bar>
+</ion-footer>

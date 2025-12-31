@@ -1,14 +1,12 @@
-{% extends "dashboard/layout.html" %}
-{% load i18n static ui %}
+{% extends "ui/content_base.html" %}
+{% load i18n static %}
 
-{% block title %}{{ page_title }}{% endblock %}
+{% block page_title %}{{ page_title }}{% endblock %}
 
-{% block section_tabbar %}
-<ion-footer>
+{% block module_tabbar %}
 {% include "marketplace/partials/tabbar.html" with store_type=store_type cart_count=cart_count %}
-</ion-footer>
 {% endblock %}
 
-{% block dashboard_content %}
+{% block page_content %}
 {% include "marketplace/partials/store_content.html" %}
 {% endblock %}

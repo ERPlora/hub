@@ -4,6 +4,7 @@ from . import views
 app_name = 'auth'
 
 urlpatterns = [
+    # Auth pages
     path('login/', views.login, name='login'),
     path('logout/', views.logout, name='logout'),
     path('verify-pin/', views.verify_pin, name='verify_pin'),

@@ -1379,7 +1379,15 @@ class SidebarContentNode(BlockTagNode):
 
     def render(self, context):
         content = self.nodelist.render(context)
-        return f'<ion-content id="sidebar-content"><div id="sidebar-wrapper" class="sidebar-wrapper">{content}</div></ion-content>'
+        # Check if content contains ion-footer and extract it
+        # The ion-footer should be rendered outside ion-content for proper positioning
+        import re
+        footer_match = re.search(r'(<ion-footer[^>]*>.*?</ion-footer>)', content, re.DOTALL)
+        footer_html = ''
+        if footer_match:
+            footer_html = footer_match.group(1)
+            content = content.replace(footer_html, '')
+        return f'<ion-content id="sidebar-content"><div id="sidebar-wrapper" class="sidebar-wrapper">{content}</div></ion-content>{footer_html}'
 
 
 @register.tag('ui_sidebar_content')

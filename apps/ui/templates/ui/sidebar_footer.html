@@ -1,8 +1,41 @@
-<div id="sidebar-footer" class="menu-footer ion-padding{% if css_class %} {{ css_class }}{% endif %}">
-    {% if signout_url %}
-    <ion-item id="btn-signout" button href="{{ signout_url }}" detail="false" lines="none">
-        <ion-icon slot="start" name="log-out-outline"></ion-icon>
-        {{ signout_label }}
-    </ion-item>
-    {% endif %}
-</div>
+{% load i18n %}
+<ion-footer class="sidebar-footer{% if css_class %} {{ css_class }}{% endif %}">
+    <ion-list lines="none">
+        <!-- PWA Install Button -->
+        <ion-item
+            x-data="{
+                canInstall: typeof canInstallPWA === 'function' && canInstallPWA(),
+                init() {
+                    document.addEventListener('pwa-installable', () => {
+                        this.canInstall = true;
+                    });
+                    document.addEventListener('pwa-installed', () => {
+                        this.canInstall = false;
+                    });
+                }
+            }"
+            x-show="canInstall"
+            x-cloak
+            button="true"
+            detail="false"
+            lines="none"
+            @click="installPWA()"
+            class="nav-item">
+            <ion-icon slot="start" name="download-outline"></ion-icon>
+            <ion-label>{% trans "Install App" %}</ion-label>
+        </ion-item>
+
+        {% if signout_url %}
+        <ion-item
+            id="btn-signout"
+            button="true"
+            detail="false"
+            lines="none"
+            href="{{ signout_url }}"
+            class="nav-item">
+            <ion-icon slot="start" name="log-out-outline"></ion-icon>
+            <ion-label>{{ signout_label }}</ion-label>
+        </ion-item>
+        {% endif %}
+    </ion-list>
+</ion-footer>

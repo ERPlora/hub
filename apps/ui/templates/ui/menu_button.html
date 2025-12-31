@@ -1,1 +1,3 @@
-<ion-menu-button menu="{{ menu_id }}" {% if css_class %}class="{{ css_class }}"{% endif %}></ion-menu-button>
+<ion-button fill="clear" @click="toggleSidebar()" {% if css_class %}class="{{ css_class }}"{% endif %}>
+    <ion-icon slot="icon-only" :name="sidebarOpen ? 'close-outline' : 'menu-outline'"></ion-icon>
+</ion-button>

@@ -1,48 +1,19 @@
 {% extends "base.html" %}
-{% load static %}
-{% load i18n %}
+{% load static i18n ui %}
 
 {% block title %}ERPlora Hub - {% trans "Setup" %}{% endblock %}
 
 {% block extra_css %}
-<style>
-    .setup-container {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1rem;
-    }
-
-    .setup-card {
-        width: 100%;
-        max-width: 600px;
-        margin: 0;
-    }
-
-    .section-title {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin: 1.5rem 0 1rem 0;
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: var(--ion-color-primary);
-    }
-
-    .section-title:first-child {
-        margin-top: 0;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/setup.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="setup-container">
     <ion-card class="setup-card">
         <!-- Header -->
-        <ion-card-header class="text-center">
-            <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 48px; height: 48px; margin: 0 auto 0.5rem;">
-            <ion-card-title class="text-2xl">{% trans "Welcome to ERPlora" %}</ion-card-title>
+        <ion-card-header class="setup-header">
+            <img src="{% static 'img/logo.png' %}" alt="ERPlora">
+            <ion-card-title>{% trans "Welcome to ERPlora" %}</ion-card-title>
             <ion-card-subtitle>{% trans "Configure your store to get started" %}</ion-card-subtitle>
         </ion-card-header>
 
@@ -56,6 +27,42 @@
 
                 <!-- Error container -->
                 <div id="form-errors"></div>
+
+                <!-- Regional Settings Section -->
+                <h3 class="section-title">
+                    <ion-icon name="globe-outline"></ion-icon>
+                    {% trans "Regional Settings" %}
+                </h3>
+
+                <ion-list>
+                    <ion-item>
+                        <ion-select
+                            name="language"
+                            label="{% trans 'System Language' %} *"
+                            label-placement="floating"
+                            value="{{ hub_config.language|default:'en' }}"
+                            interface="action-sheet"
+                        >
+                            {% for code, name in languages %}
+                            <ion-select-option value="{{ code }}">{{ name }}</ion-select-option>
+                            {% endfor %}
+                        </ion-select>
+                    </ion-item>
+
+                    <ion-item>
+                        <ion-select
+                            name="timezone"
+                            label="{% trans 'Timezone' %} *"
+                            label-placement="floating"
+                            value="{{ hub_config.timezone|default:'UTC' }}"
+                            interface="action-sheet"
+                        >
+                            {% for tz in timezones %}
+                            <ion-select-option value="{{ tz }}">{{ tz }}</ion-select-option>
+                            {% endfor %}
+                        </ion-select>
+                    </ion-item>
+                </ion-list>
 
                 <!-- Business Information Section -->
                 <h3 class="section-title">
@@ -154,14 +161,14 @@
                     </ion-item>
                 </ion-list>
 
-                <p class="text-sm text-medium mt-4 text-center">* {% trans "Required fields" %}</p>
+                <p class="setup-form-note">* {% trans "Required fields" %}</p>
 
                 <!-- Submit Button -->
-                <div class="ion-padding-top">
+                <div class="setup-submit">
                     <ion-button type="submit" expand="block" size="large">
-                        <ion-spinner id="submit-spinner" name="crescent" class="htmx-indicator" style="margin-right: 8px;"></ion-spinner>
-                        <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                        <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
                         {% trans "Complete Setup" %}
+                        <ion-spinner id="submit-spinner" name="crescent" class="htmx-indicator" style="margin-left: 8px;"></ion-spinner>
                     </ion-button>
                 </div>
             </form>

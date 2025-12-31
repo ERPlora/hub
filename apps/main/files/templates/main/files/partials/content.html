@@ -3,7 +3,7 @@
 
 {% if request.htmx %}
 {# Clear tab bar - Files doesn't need tabs #}
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML"></div>
+<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
 {% endif %}
 
 {# Page Header #}

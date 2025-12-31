@@ -8,14 +8,14 @@
 {% elif use_slots %}
 {# Legacy mode: use slots for custom tabs #}
 <ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-    <ion-tab-bar slot="bottom" color="{{ color }}">
+    <ion-tab-bar color="{{ color }}">
         {% slot "tabs" %}{% endslot %}
     </ion-tab-bar>
 </ion-footer>
 {% else %}
 {# Automatic mode: render tabs from module.json #}
 <ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-    <ion-tab-bar slot="bottom" color="{{ color }}">
+    <ion-tab-bar id="module-tabbar" color="{{ color }}">
         {# Visible tabs (first 4 if >5 total, otherwise all) #}
         {% for tab in visible_tabs %}
         <ion-tab-button
@@ -50,6 +50,25 @@
         {% endif %}
     </ion-tab-bar>
 </ion-footer>
+
+{# Remove hidden attribute that Ionic adds to ion-tab-bar outside ion-tabs #}
+<script>
+(function() {
+    const tabBar = document.getElementById('module-tabbar');
+    if (tabBar) {
+        // Remove hidden immediately and after Ionic hydration
+        tabBar.removeAttribute('hidden');
+        requestAnimationFrame(() => tabBar.removeAttribute('hidden'));
+        // Also observe for attribute changes
+        const observer = new MutationObserver(() => {
+            if (tabBar.hasAttribute('hidden')) {
+                tabBar.removeAttribute('hidden');
+            }
+        });
+        observer.observe(tabBar, { attributes: true, attributeFilter: ['hidden'] });
+    }
+})();
+</script>
 
 {# Action Sheet script for overflow tabs #}
 {% if overflow_tabs %}

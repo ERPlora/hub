@@ -24,8 +24,10 @@ from apps.accounts.decorators import login_required
 @htmx_view('system/modules/pages/installed.html', 'system/modules/partials/installed_content.html')
 def modules_index(request):
     """Module management page - shows all installed modules"""
+    from django.shortcuts import render as django_render
     from apps.modules_runtime.loader import module_loader
 
+    search_query = request.GET.get('q', '').strip()
     modules_dir = Path(django_settings.MODULES_DIR)
     all_modules = []
 
@@ -46,6 +48,7 @@ def modules_index(request):
                 'version': '1.0.0',
                 'author': '',
                 'icon': 'cube-outline',
+                'category': 'default',
                 'is_active': is_active,
             }
 
@@ -58,12 +61,24 @@ def modules_index(request):
                         module_data['description'] = json_data.get('description', '')
                         module_data['version'] = json_data.get('version', '1.0.0')
                         module_data['author'] = json_data.get('author', '')
+                        module_data['category'] = json_data.get('category', 'default')
                         menu_config = json_data.get('menu', {})
                         module_data['icon'] = menu_config.get('icon', 'cube-outline')
                 except Exception as e:
                     print(f"[WARNING] Error reading module.json for {module_id}: {e}")
 
             all_modules.append(module_data)
+
+    # Filter by search query
+    if search_query:
+        query_lower = search_query.lower()
+        all_modules = [
+            m for m in all_modules
+            if query_lower in m['name'].lower()
+            or query_lower in m['description'].lower()
+            or query_lower in m['author'].lower()
+            or query_lower in m['module_id'].lower()
+        ]
 
     all_modules.sort(key=lambda x: (not x['is_active'], x['name']))
 
@@ -73,14 +88,35 @@ def modules_index(request):
     modules_pending_restart = request.session.get('modules_pending_restart', [])
     requires_restart = len(modules_pending_restart) > 0
 
+    from django.urls import reverse
+
+    # Add action URLs to each module
+    for module in all_modules:
+        mid = module['module_id']
+        module['activate_url'] = reverse('mymodules:api_activate', kwargs={'module_id': mid})
+        module['deactivate_url'] = reverse('mymodules:api_deactivate', kwargs={'module_id': mid})
+        module['delete_url'] = reverse('mymodules:api_delete', kwargs={'module_id': mid})
+        module['detail_url'] = reverse('mymodules:detail', kwargs={'slug': mid})
+
+    # If HTMX request targeting the modules list, return only the list partial
+    if request.htmx and request.htmx.target == 'modules-list':
+        return django_render(request, 'system/modules/partials/modules_list.html', {
+            'modules': all_modules,
+            'search_query': search_query,
+            'marketplace_url': reverse('marketplace:index'),
+        })
+
     return {
         'current_section': 'modules',
-        'page_title': 'Modules',
+        'current_tab': 'installed',
+        'page_title': 'My Modules',
         'modules': all_modules,
         'active_count': active_count,
         'inactive_count': inactive_count,
         'requires_restart': requires_restart,
         'modules_pending_restart': modules_pending_restart,
+        'marketplace_url': reverse('marketplace:index'),
+        'search_query': search_query,
     }
 
 
@@ -140,6 +176,7 @@ def marketplace(request):
 
     return {
         'current_section': 'marketplace',
+        'current_tab': 'marketplace',
         'page_title': 'Module Store',
         'installed_module_ids': installed_module_ids,
         'categories': categories,
@@ -244,13 +281,30 @@ def marketplace_modules_list(request):
         if type_filter:
             modules = [p for p in modules if p.get('module_type') == type_filter]
 
-        # Mark installed modules
+        # Mark installed modules and add detail URL
+        from django.urls import reverse
         for module in modules:
             module['is_installed'] = module.get('slug', '') in installed_module_ids
+            module['detail_url'] = reverse('mymodules:detail', kwargs={'slug': module.get('slug', '')})
 
         # Pagination (12 modules per page)
         paginator = Paginator(modules, 12)
         page_obj = paginator.get_page(page_number)
+
+        # Build pagination URLs with current filters
+        def build_page_url(page_num):
+            from django.urls import reverse
+            base_url = reverse('mymodules:htmx_list')
+            params = [f'page={page_num}']
+            if search_query:
+                params.append(f'q={search_query}')
+            if category_filter:
+                params.append(f'category={category_filter}')
+            if industry_filter:
+                params.append(f'industry={industry_filter}')
+            if type_filter:
+                params.append(f'type={type_filter}')
+            return f"{base_url}?{'&'.join(params)}"
 
         html = render_to_string('system/modules/partials/marketplace_modules_grid.html', {
             'modules': page_obj.object_list,
@@ -259,6 +313,10 @@ def marketplace_modules_list(request):
             'category_filter': category_filter,
             'industry_filter': industry_filter,
             'type_filter': type_filter,
+            'first_page_url': build_page_url(1),
+            'prev_page_url': build_page_url(page_obj.previous_page_number()) if page_obj.has_previous() else None,
+            'next_page_url': build_page_url(page_obj.next_page_number()) if page_obj.has_next() else None,
+            'last_page_url': build_page_url(page_obj.paginator.num_pages),
         })
         return HttpResponse(html)
 
@@ -352,11 +410,11 @@ def module_detail(request, slug):
             'related_modules': related_modules,
         }
 
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         return {
             'current_section': 'marketplace',
-            'page_title': 'Error',
-            'error': f'Failed to connect to Cloud: {str(e)}',
+            'page_title': 'No Connection',
+            'no_connection': True,
             'module': None,
         }
 
@@ -389,6 +447,7 @@ def _render_modules_page(request, error=None):
                 'version': '1.0.0',
                 'author': '',
                 'icon': 'cube-outline',
+                'category': 'default',
                 'is_active': is_active,
             }
 
@@ -401,6 +460,7 @@ def _render_modules_page(request, error=None):
                         module_data['description'] = json_data.get('description', '')
                         module_data['version'] = json_data.get('version', '1.0.0')
                         module_data['author'] = json_data.get('author', '')
+                        module_data['category'] = json_data.get('category', 'default')
                         menu_config = json_data.get('menu', {})
                         module_data['icon'] = menu_config.get('icon', 'cube-outline')
                 except Exception:
@@ -420,6 +480,15 @@ def _render_modules_page(request, error=None):
     from apps.modules_runtime.loader import module_loader
     menu_items = module_loader.get_menu_items() if 'local_user_id' in request.session else []
 
+    # Add action URLs to each module
+    from django.urls import reverse
+    for module in all_modules:
+        mid = module['module_id']
+        module['activate_url'] = reverse('mymodules:api_activate', kwargs={'module_id': mid})
+        module['deactivate_url'] = reverse('mymodules:api_deactivate', kwargs={'module_id': mid})
+        module['delete_url'] = reverse('mymodules:api_delete', kwargs={'module_id': mid})
+        module['detail_url'] = reverse('mymodules:detail', kwargs={'slug': mid})
+
     context = {
         'current_section': 'modules',
         'page_title': 'Modules',
@@ -430,6 +499,7 @@ def _render_modules_page(request, error=None):
         'modules_pending_restart': modules_pending_restart,
         'error': error,
         'MODULE_MENU_ITEMS': menu_items,
+        'marketplace_url': reverse('marketplace:index'),
     }
 
     return render(request, 'system/modules/partials/installed_content.html', context)

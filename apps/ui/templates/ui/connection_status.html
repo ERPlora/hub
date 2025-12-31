@@ -1,7 +1,9 @@
-<div id="connection-status"
-     hx-get="{{ url }}"
-     hx-trigger="load, every {{ interval }}"
-     hx-swap="innerHTML"
-     class="connection-status{% if css_class %} {{ css_class }}{% endif %}">
-    <ion-icon name="cloud-offline-outline"></ion-icon>
-</div>
+<ion-button
+    id="connection-status"
+    fill="clear"
+    hx-get="{{ url }}"
+    hx-trigger="load, every {{ interval }}"
+    hx-swap="innerHTML"
+    class="connection-status{% if css_class %} {{ css_class }}{% endif %}">
+    <ion-icon slot="icon-only" name="cloud-offline-outline"></ion-icon>
+</ion-button>

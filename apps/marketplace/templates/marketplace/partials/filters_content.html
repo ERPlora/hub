@@ -140,7 +140,7 @@
         planFilter: '',
 
         init() {
-            // Listen for clear events from main store
+            // Listen for clear events from main marketplace
             window.addEventListener('marketplace:clear-filter', (e) => {
                 const { filterType } = e.detail;
                 if (filterType === 'category') this.categoryFilter = '';

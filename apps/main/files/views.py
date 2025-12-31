@@ -3,6 +3,8 @@ Main Files Views
 
 Local file browser and database download page.
 """
+from django.urls import reverse
+
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 from config.paths import get_data_paths
@@ -18,4 +20,5 @@ def index(request):
         'current_section': 'files',
         'page_title': 'Files',
         'base_path': str(paths.base_dir),
+        'download_url': reverse('configuration:download_database'),
     }

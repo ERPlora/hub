@@ -6,10 +6,41 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.conf import settings as django_settings
 from django.utils import translation
+from zoneinfo import available_timezones
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 from apps.accounts.models import LocalUser
 from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass
+
+
+# Common timezones grouped by region (most used first)
+COMMON_TIMEZONES = [
+    # Europe
+    'Europe/Madrid', 'Europe/London', 'Europe/Paris', 'Europe/Berlin',
+    'Europe/Rome', 'Europe/Amsterdam', 'Europe/Brussels', 'Europe/Lisbon',
+    'Europe/Vienna', 'Europe/Warsaw', 'Europe/Prague', 'Europe/Stockholm',
+    'Europe/Helsinki', 'Europe/Athens', 'Europe/Dublin', 'Europe/Zurich',
+    # Americas
+    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+    'America/Toronto', 'America/Mexico_City', 'America/Sao_Paulo', 'America/Buenos_Aires',
+    'America/Bogota', 'America/Lima', 'America/Santiago',
+    # Asia
+    'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Hong_Kong', 'Asia/Singapore',
+    'Asia/Dubai', 'Asia/Mumbai', 'Asia/Seoul', 'Asia/Bangkok',
+    # Pacific
+    'Australia/Sydney', 'Australia/Melbourne', 'Pacific/Auckland',
+    # UTC
+    'UTC',
+]
+
+
+def get_sorted_timezones():
+    """Get timezones sorted with common ones first, then alphabetically."""
+    all_tz = sorted(available_timezones())
+    # Put common timezones first, then the rest
+    common_set = set(COMMON_TIMEZONES)
+    other_tz = [tz for tz in all_tz if tz not in common_set and '/' in tz]
+    return COMMON_TIMEZONES + other_tz
 
 
 def render_message(message, color='success'):
@@ -91,8 +122,22 @@ def index(request):
 
         # Handle hub settings form
         if action == 'update_hub':
+            language = request.POST.get('language')
+            timezone = request.POST.get('timezone')
             currency = request.POST.get('currency')
             dark_mode = 'dark_mode' in request.POST
+
+            # Validate and set system language
+            if language:
+                valid_languages = [code for code, name in django_settings.LANGUAGES]
+                if language in valid_languages:
+                    hub_config.language = language
+
+            # Validate and set timezone
+            if timezone:
+                all_tz = available_timezones()
+                if timezone in all_tz:
+                    hub_config.timezone = timezone
 
             if currency:
                 valid_currencies = [code for code, name in django_settings.POPULAR_CURRENCY_CHOICES]
@@ -206,6 +251,8 @@ def index(request):
         'scheduler_status': scheduler_status,
         'tax_classes': tax_classes,
         'language_choices': django_settings.LANGUAGES,
+        'system_language_choices': django_settings.LANGUAGES,
+        'timezone_choices': get_sorted_timezones(),
         'currency_choices': django_settings.POPULAR_CURRENCY_CHOICES,
         'backup_frequency_choices': BackupConfig.Frequency.choices,
     }

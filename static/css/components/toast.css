@@ -1,0 +1,53 @@
+/* ==========================================================================
+   TOAST NOTIFICATIONS - Styled toasts with colored borders
+   ========================================================================== */
+
+ion-toast {
+    --border-radius: var(--border-radius) !important;
+    --background: var(--ion-card-background) !important;
+    --box-shadow: var(--shadow-md) !important;
+}
+
+ion-toast[color="success"] {
+    --color: var(--ion-color-success) !important;
+    --border-width: 0 0 0 4px !important;
+    --border-style: solid !important;
+    --border-color: var(--ion-color-success) !important;
+}
+
+ion-toast[color="warning"] {
+    --color: var(--ion-color-warning) !important;
+    --border-width: 0 0 0 4px !important;
+    --border-style: solid !important;
+    --border-color: var(--ion-color-warning) !important;
+}
+
+ion-toast[color="danger"] {
+    --color: var(--ion-color-danger) !important;
+    --border-width: 0 0 0 4px !important;
+    --border-style: solid !important;
+    --border-color: var(--ion-color-danger) !important;
+}
+
+ion-toast[color="primary"] {
+    --color: var(--ion-color-primary) !important;
+    --border-width: 0 0 0 4px !important;
+    --border-style: solid !important;
+    --border-color: var(--ion-color-primary) !important;
+}
+
+ion-toast::part(header) {
+    font-weight: var(--font-weight-semibold);
+}
+
+ion-toast::part(message) {
+    opacity: 0.8;
+}
+
+ion-toast::part(icon) {
+    color: inherit;
+}
+
+ion-toast::part(button) {
+    color: var(--ion-text-color);
+}

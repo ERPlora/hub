@@ -197,11 +197,26 @@ class ModuleLoader:
             # Check if module has submenu items
             menu_items_config = menu_config.get('items', [])
             if menu_items_config:
-                menu_item['items'] = menu_items_config
+                # Override URLs in submenu items to use /m/ prefix
+                fixed_items = []
+                for subitem in menu_items_config:
+                    fixed_item = subitem.copy()
+                    # Always use /m/ prefix, ignore module.json URL
+                    if 'url' in fixed_item:
+                        # Extract path after /modules/ or use as-is
+                        url = fixed_item['url']
+                        if url.startswith(f'/modules/{module_id}'):
+                            url = url.replace(f'/modules/{module_id}', f'/m/{module_id}')
+                        elif not url.startswith(f'/m/{module_id}'):
+                            # Relative or other URL, prefix with /m/{module_id}
+                            url = f'/m/{module_id}/' if url == '/' else f'/m/{module_id}{url}'
+                        fixed_item['url'] = url
+                    fixed_items.append(fixed_item)
+                menu_item['items'] = fixed_items
                 menu_item['has_submenu'] = True
             else:
-                # Single menu item, use url from menu.url
-                menu_item['url'] = menu_config.get('url', f'/modules/{module_id}/')
+                # Single menu item, always use /m/ prefix
+                menu_item['url'] = f'/m/{module_id}/'
                 menu_item['has_submenu'] = False
 
             # Only add if show_in_menu is not explicitly False

@@ -69,7 +69,7 @@ class TestCloudToHubSSOFlow(TestCase):
 
         middleware = self._create_middleware()
         request = self._create_request_with_session(
-            '/dashboard/',
+            '/home/',
             cookies={'sessionid': 'valid-cloud-session'}
         )
 
@@ -111,7 +111,7 @@ class TestCloudToHubSSOFlow(TestCase):
 
         middleware = self._create_middleware()
         request = self._create_request_with_session(
-            '/dashboard/',
+            '/home/',
             cookies={'sessionid': 'valid-cloud-session'}
         )
 
@@ -148,7 +148,7 @@ class TestCloudToHubSSOFlow(TestCase):
 
         middleware = self._create_middleware()
         request = self._create_request_with_session(
-            '/dashboard/',
+            '/home/',
             cookies={'sessionid': 'valid-cloud-session'}
         )
 
@@ -173,7 +173,7 @@ class TestCloudToHubSSOFlow(TestCase):
 
         middleware = self._create_middleware()
         request = self._create_request_with_session(
-            '/dashboard/',
+            '/home/',
             cookies={'sessionid': 'invalid-session'}
         )
 
@@ -191,7 +191,7 @@ class TestCloudToHubSSOFlow(TestCase):
 
         middleware = self._create_middleware()
         request = self._create_request_with_session(
-            '/dashboard/',
+            '/home/',
             cookies={'sessionid': 'valid-session'}
         )
 
@@ -203,7 +203,7 @@ class TestCloudToHubSSOFlow(TestCase):
     def test_desktop_mode_bypasses_cloud_sso(self):
         """Test that desktop mode bypasses Cloud SSO completely."""
         middleware = self._create_middleware(deployment_mode='local')
-        request = self._create_request_with_session('/dashboard/')
+        request = self._create_request_with_session('/home/')
 
         response = middleware(request)
 
@@ -295,7 +295,7 @@ class TestMultiUserSSOFlow(TestCase):
             }
         )
 
-        request1 = self.factory.get('/dashboard/')
+        request1 = self.factory.get('/home/')
         SessionMiddleware(lambda r: HttpResponse()).process_request(request1)
         request1.session.save()
 
@@ -308,7 +308,7 @@ class TestMultiUserSSOFlow(TestCase):
         assert first_user.role == 'admin'
 
         # Second user
-        request2 = self.factory.get('/dashboard/')
+        request2 = self.factory.get('/home/')
         SessionMiddleware(lambda r: HttpResponse()).process_request(request2)
         request2.session.save()
 
@@ -321,7 +321,7 @@ class TestMultiUserSSOFlow(TestCase):
         assert second_user.role == 'cashier'
 
         # Third user
-        request3 = self.factory.get('/dashboard/')
+        request3 = self.factory.get('/home/')
         SessionMiddleware(lambda r: HttpResponse()).process_request(request3)
         request3.session.save()
 

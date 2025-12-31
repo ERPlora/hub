@@ -396,7 +396,7 @@ class TestHubCloudSSOIntegrationFlow(TestCase):
         middleware.cloud_api_url = 'https://int.erplora.com'
 
         # Create request with session
-        request = factory.get('/dashboard/')
+        request = factory.get('/home/')
         session_middleware = SessionMiddleware(lambda r: HttpResponse())
         session_middleware.process_request(request)
         request.session.save()
@@ -439,7 +439,7 @@ class TestHubCloudSSOIntegrationFlow(TestCase):
         middleware = CloudSSOMiddleware(get_response)
         middleware.deployment_mode = 'web'
 
-        request = factory.get('/dashboard/')
+        request = factory.get('/home/')
         session_middleware = SessionMiddleware(lambda r: HttpResponse())
         session_middleware.process_request(request)
         request.session.save()
@@ -476,7 +476,7 @@ class TestHubProtectedRoutesFlow(TestCase):
     def test_dashboard_requires_login(self):
         """Test that dashboard redirects when not logged in."""
         # In local mode, dashboard may allow access or redirect
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/home/')
 
         # Response depends on deployment mode
         assert response.status_code in [200, 302]
@@ -491,7 +491,7 @@ class TestHubProtectedRoutesFlow(TestCase):
         )
 
         # Access dashboard - may redirect to settings if not configured
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/home/')
         # 200 or redirect to settings/setup is valid
         assert response.status_code in [200, 302]
 
@@ -544,7 +544,7 @@ class TestHubSessionPersistenceFlow(TestCase):
 
         # Make multiple requests
         for _ in range(5):
-            self.client.get('/dashboard/')
+            self.client.get('/home/')
             assert self.client.session.get('local_user_id') == str(self.user.id)
 
     def test_session_contains_user_data(self):
@@ -610,7 +610,7 @@ class TestHubConfigurationFlow(TestCase):
         session.save()
 
         # Access a page that uses config
-        response = self.client.get('/dashboard/')
+        response = self.client.get('/home/')
 
         # Config should be in context
         if hasattr(response, 'context') and response.context:

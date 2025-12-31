@@ -24,7 +24,7 @@ def register_module_urls(module_id: str, module_name: str, main_url: Optional[st
     if main_url:
         prefix = _normalize_prefix(main_url)
     else:
-        prefix = _normalize_prefix(f"modules/{module_id}/")
+        prefix = _normalize_prefix(f"m/{module_id}/")
 
     app_name = getattr(urls_module, "app_name", module_name)
 

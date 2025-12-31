@@ -85,7 +85,7 @@ def store_index(request, store_type='modules'):
 
     return {
         'current_section': 'marketplace',
-        'page_title': f'{config["name"]} Store',
+        'page_title': 'Marketplace',
         'store_type': store_type,
         'store_config': config,
         'store_types': STORE_TYPES,
@@ -615,7 +615,7 @@ def module_detail(request, slug):
             'is_owned': is_owned,
             'is_free': is_free,
             'related_modules': related_modules,
-            'back_url': reverse('marketplace:store', kwargs={'store_type': 'modules'}),
+            'back_url': reverse('marketplace:index'),
             'cart_count': len(cart.get('items', [])),
         }
 

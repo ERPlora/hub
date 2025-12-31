@@ -29,12 +29,288 @@
     <!-- Theme Colors (from HubConfig) -->
     <link rel="stylesheet" href="{% static 'css/themes/' %}{{ HUB_CONFIG.color_theme|default:'default' }}/ionic-theme.css" id="theme-stylesheet">
 
-    <!-- Tailwind CSS (offline) -->
-    <script src="{% static 'js/tailwind.cdn.js' %}"></script>
-    <link rel="stylesheet" href="{% static 'css/tailwind-ionic.css' %}">
+    <!-- ERPlora Base CSS -->
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+    <!-- UI Components CSS -->
+    <link rel="stylesheet" href="{% static 'ui/ui.css' %}">
 
     <!-- Alpine.js (offline) -->
     <script defer src="{% static 'js/alpine.min.js' %}"></script>
+
+    <!-- Alpine.js Global Stores -->
+    <script>
+        document.addEventListener('alpine:init', () => {
+            // Navigation Store - Tracks current active section/module
+            Alpine.store('nav', {
+                currentPath: window.location.pathname,
+
+                // Update current path and mark active nav items
+                setPath(path) {
+                    this.currentPath = path;
+                    this.updateActiveItems();
+                },
+
+                // Check if a path matches the current active path
+                isActive(itemPath) {
+                    if (!itemPath || !this.currentPath) return false;
+                    // Exact match or starts with (for nested routes)
+                    return this.currentPath === itemPath ||
+                           this.currentPath.startsWith(itemPath + '/');
+                },
+
+                // Update all nav items in sidebar
+                updateActiveItems() {
+                    const navItems = document.querySelectorAll('.ui-nav-item, .nav-item, .submenu-item');
+                    navItems.forEach(item => {
+                        const href = item.getAttribute('hx-get') || item.getAttribute('href');
+                        if (href) {
+                            item.classList.toggle('active', this.isActive(href));
+                        }
+                    });
+
+                    // Also update accordion groups if any submenu is active
+                    document.querySelectorAll('.ui-accordion').forEach(accordion => {
+                        const hasActiveChild = accordion.querySelector('.submenu-item.active');
+                        accordion.classList.toggle('accordion-has-active', !!hasActiveChild);
+                    });
+                },
+
+                // Initialize on page load
+                init() {
+                    // Wait for DOM to be ready
+                    setTimeout(() => this.updateActiveItems(), 100);
+                }
+            });
+
+            // Form Sidebar Store - Controls sliding sidebar for forms
+            Alpine.store('sidebar', {
+                isOpen: false,
+                title: '',
+                open(title = '') {
+                    this.title = title;
+                    this.isOpen = true;
+                },
+                close() {
+                    this.isOpen = false;
+                    this.title = '';
+                },
+                toggle() {
+                    this.isOpen = !this.isOpen;
+                }
+            });
+
+            // Module Grid Component - Used on the home page
+            // Displays installed modules with favorites, recent, and search functionality
+            Alpine.data('moduleGrid', () => ({
+                modules: [],
+                favorites: [],
+                recent: [],
+                searchQuery: '',
+
+                init() {
+                    // Load modules data from the JSON script tag
+                    const dataEl = document.getElementById('modules-data');
+                    if (dataEl) {
+                        try {
+                            this.modules = JSON.parse(dataEl.textContent) || [];
+                        } catch (e) {
+                            console.error('Error parsing modules data:', e);
+                            this.modules = [];
+                        }
+                    }
+                    // Load favorites and recent from localStorage
+                    this.favorites = JSON.parse(localStorage.getItem('erplora_favorite_modules') || '[]');
+                    this.recent = JSON.parse(localStorage.getItem('erplora_recent_modules') || '[]');
+                },
+
+                get filteredModules() {
+                    if (!this.searchQuery) {
+                        return this.modules;
+                    }
+                    const query = this.searchQuery.toLowerCase();
+                    return this.modules.filter(mod =>
+                        mod.label.toLowerCase().includes(query)
+                    );
+                },
+
+                get favoritesData() {
+                    return this.modules.filter(mod => this.favorites.includes(mod.id));
+                },
+
+                get recentData() {
+                    // Get last 4 recent modules that exist and are not in favorites
+                    return this.recent
+                        .filter(id => !this.favorites.includes(id))
+                        .map(id => this.modules.find(mod => mod.id === id))
+                        .filter(mod => mod !== undefined)
+                        .slice(0, 4);
+                },
+
+                filterModules(event) {
+                    this.searchQuery = event.target.value || '';
+                },
+
+                isFavorite(moduleId) {
+                    return this.favorites.includes(moduleId);
+                },
+
+                toggleFavorite(moduleId) {
+                    const index = this.favorites.indexOf(moduleId);
+                    if (index === -1) {
+                        this.favorites.push(moduleId);
+                    } else {
+                        this.favorites.splice(index, 1);
+                    }
+                    localStorage.setItem('erplora_favorite_modules', JSON.stringify(this.favorites));
+                },
+
+                trackRecent(moduleId) {
+                    // Remove if already in recent
+                    const index = this.recent.indexOf(moduleId);
+                    if (index !== -1) {
+                        this.recent.splice(index, 1);
+                    }
+                    // Add to beginning
+                    this.recent.unshift(moduleId);
+                    // Keep only last 8
+                    this.recent = this.recent.slice(0, 8);
+                    localStorage.setItem('erplora_recent_modules', JSON.stringify(this.recent));
+                }
+            }));
+
+            // UI Store - Toast notifications, delete confirmations, etc.
+            Alpine.store('ui', {
+                // Show toast notification
+                async toast(message, color = 'primary', duration = 2000) {
+                    const toast = document.createElement('ion-toast');
+                    toast.message = message;
+                    toast.duration = duration;
+                    toast.color = color;
+                    toast.position = 'top';
+                    document.body.appendChild(toast);
+                    await toast.present();
+                },
+
+                // Show success toast
+                success(message) {
+                    this.toast(message, 'success');
+                },
+
+                // Show error toast
+                error(message) {
+                    this.toast(message, 'danger', 3000);
+                },
+
+                // Get CSRF token
+                getCsrfToken() {
+                    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+                    if (csrfInput) return csrfInput.value;
+                    const cookies = document.cookie.split(';');
+                    for (let cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'csrftoken') return value;
+                    }
+                    return '';
+                },
+
+                // Update table counter after row deletion
+                updateTableCounter() {
+                    const counterEl = document.querySelector('.infinite-scroll-end');
+                    if (!counterEl) return;
+
+                    // Count remaining visible rows in tbody
+                    const tbody = document.querySelector('[id$="-tbody"], .data-table tbody');
+                    if (!tbody) return;
+
+                    const rowCount = tbody.querySelectorAll('tr').length;
+
+                    // Extract entity name from current text (e.g., "5 products" -> "products")
+                    const currentText = counterEl.textContent.trim();
+                    const match = currentText.match(/\d+\s+(.+)/);
+                    const entityName = match ? match[1] : 'items';
+
+                    // Update counter text - handle singular/plural
+                    if (rowCount === 0) {
+                        counterEl.remove();
+                    } else if (rowCount === 1) {
+                        // Remove trailing 's' for singular
+                        const singular = entityName.endsWith('s') ? entityName.slice(0, -1) : entityName;
+                        counterEl.textContent = `1 ${singular}`;
+                    } else {
+                        counterEl.textContent = `${rowCount} ${entityName}`;
+                    }
+                },
+
+                // Confirm delete with Ionic alert
+                async confirmDelete(deleteUrl, itemName, method, buttonElement) {
+                    const self = this;
+                    const alert = document.createElement('ion-alert');
+                    alert.header = '{% trans "Confirm Delete" %}';
+                    alert.message = '{% trans "Are you sure you want to delete" %}' + ` "${itemName}"?`;
+                    alert.buttons = [
+                        {
+                            text: '{% trans "Cancel" %}',
+                            role: 'cancel',
+                            cssClass: 'secondary'
+                        },
+                        {
+                            text: '{% trans "Delete" %}',
+                            role: 'confirm',
+                            cssClass: 'danger',
+                            handler: async () => {
+                                const row = buttonElement.closest('tr');
+                                const actionsDiv = buttonElement.closest('[x-data]');
+
+                                // Set deleting state if Alpine x-data exists
+                                if (actionsDiv && actionsDiv._x_dataStack) {
+                                    actionsDiv._x_dataStack[0].deleting = true;
+                                }
+
+                                try {
+                                    const response = await fetch(deleteUrl, {
+                                        method: method || 'POST',
+                                        headers: {
+                                            'X-CSRFToken': self.getCsrfToken(),
+                                            'Content-Type': 'application/json',
+                                        }
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                        // Animate row removal
+                                        if (row) {
+                                            row.style.transition = 'opacity 0.5s';
+                                            row.style.opacity = '0';
+                                            setTimeout(() => {
+                                                row.remove();
+                                                // Update table counter after row removal
+                                                self.updateTableCounter();
+                                            }, 500);
+                                        }
+                                        self.success(data.message || '{% trans "Deleted successfully" %}');
+                                    } else {
+                                        self.error(data.message || '{% trans "Error deleting" %}');
+                                    }
+                                } catch (error) {
+                                    console.error('Delete error:', error);
+                                    self.error('{% trans "Error deleting" %}');
+                                } finally {
+                                    if (actionsDiv && actionsDiv._x_dataStack) {
+                                        actionsDiv._x_dataStack[0].deleting = false;
+                                    }
+                                }
+                            }
+                        }
+                    ];
+
+                    document.body.appendChild(alert);
+                    await alert.present();
+                }
+            });
+        });
+    </script>
 
     <!-- HTMX (offline) -->
     <script src="{% static 'js/htmx.min.js' %}"></script>
@@ -44,6 +320,9 @@
 
     <!-- Ionic Core (offline) -->
     <script type="module" src="{% static 'js/ionic/ionic.esm.js' %}"></script>
+
+    <!-- Swiper Element (Web Components - offline) -->
+    <script src="{% static 'js/swiper-element-bundle.min.js' %}"></script>
 
     <!-- Ionicons (offline) -->
     <script type="module" src="{% static 'ionicons/dist/esm/ionicons.js' %}"></script>
@@ -79,13 +358,35 @@
                 event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
             });
 
-            // Re-initialize Alpine components after HTMX swaps
-            document.body.addEventListener('htmx:afterSwap', function(event) {
+            // Re-initialize Alpine components after HTMX settles
+            // Using 'afterSettle' instead of 'afterSwap' to ensure scripts have executed
+            document.body.addEventListener('htmx:afterSettle', function(event) {
                 // Let Alpine process any new x-data elements
                 if (typeof Alpine !== 'undefined') {
                     Alpine.initTree(event.detail.target);
                 }
             });
+
+            // Update sidebar active state when URL changes via HTMX
+            document.body.addEventListener('htmx:pushedIntoHistory', function(event) {
+                if (typeof Alpine !== 'undefined' && Alpine.store('nav')) {
+                    Alpine.store('nav').setPath(event.detail.path);
+                }
+            });
+
+            // Also handle back/forward navigation
+            window.addEventListener('popstate', function() {
+                if (typeof Alpine !== 'undefined' && Alpine.store('nav')) {
+                    Alpine.store('nav').setPath(window.location.pathname);
+                }
+            });
+
+            // Initialize nav store on page load
+            setTimeout(function() {
+                if (typeof Alpine !== 'undefined' && Alpine.store('nav')) {
+                    Alpine.store('nav').init();
+                }
+            }, 200);
 
             // Listen for showNotification events from HTMX HX-Trigger headers
             // Usage in Python: response['HX-Trigger'] = json.dumps({'showNotification': {'title': 'Success', 'message': 'Saved!', 'type': 'success'}})
@@ -131,131 +432,6 @@
             }
         })();
     </script>
-
-    <style>
-        /* Global Variables */
-        :root {
-            --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-            --font-size: 16px;
-            --radius: 0.625rem;
-        }
-
-        * {
-            font-family: var(--font-sans);
-        }
-
-        [x-cloak] {
-            display: none !important;
-        }
-
-        /* Ionic Component Customizations */
-        ion-button, ion-card, ion-item, ion-list, ion-menu, ion-toolbar {
-            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-        }
-
-        ion-card {
-            border-radius: var(--radius);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        body.dark ion-card {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        ion-button {
-            --border-radius: var(--radius);
-            text-transform: none;
-            font-weight: 500;
-        }
-
-        ion-input, ion-textarea, ion-select {
-            --border-radius: var(--radius);
-        }
-
-        ion-toolbar {
-            --border-width: 0 0 1px 0;
-        }
-
-        ion-item {
-            --border-radius: var(--radius);
-        }
-
-        ion-list {
-            padding: 0;
-        }
-
-        /* Toast Notifications - Neutral background with colored border and text */
-        ion-toast {
-            --border-radius: var(--radius) !important;
-            --background: var(--ion-card-background) !important;
-            --box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
-        }
-
-        ion-toast[color="success"] {
-            --color: var(--ion-color-success) !important;
-            --border-width: 0 0 0 4px !important;
-            --border-style: solid !important;
-            --border-color: var(--ion-color-success) !important;
-        }
-
-        ion-toast[color="warning"] {
-            --color: var(--ion-color-warning) !important;
-            --border-width: 0 0 0 4px !important;
-            --border-style: solid !important;
-            --border-color: var(--ion-color-warning) !important;
-        }
-
-        ion-toast[color="danger"] {
-            --color: var(--ion-color-danger) !important;
-            --border-width: 0 0 0 4px !important;
-            --border-style: solid !important;
-            --border-color: var(--ion-color-danger) !important;
-        }
-
-        ion-toast[color="primary"] {
-            --color: var(--ion-color-primary) !important;
-            --border-width: 0 0 0 4px !important;
-            --border-style: solid !important;
-            --border-color: var(--ion-color-primary) !important;
-        }
-
-        ion-toast::part(header) {
-            font-weight: 600;
-        }
-
-        ion-toast::part(message) {
-            opacity: 0.8;
-        }
-
-        ion-toast::part(icon) {
-            color: inherit;
-        }
-
-        ion-toast::part(button) {
-            color: var(--ion-text-color);
-        }
-
-        ion-action-sheet {
-            --background: var(--ion-card-background) !important;
-            --color: var(--ion-card-color) !important;
-        }
-
-        ion-action-sheet .action-sheet-button {
-            color: var(--ion-text-color) !important;
-        }
-
-        ion-action-sheet .action-sheet-title {
-            color: var(--ion-text-color) !important;
-        }
-
-        .ion-page {
-            --padding-top: 0;
-            --padding-bottom: 0;
-            --padding-start: 0;
-            --padding-end: 0;
-        }
-    </style>
 
     {% block extra_css %}{% endblock %}
     {% block extra_head %}{% endblock %}
@@ -367,6 +543,9 @@
     <ion-app mode="ios">
         {% block content %}{% endblock %}
     </ion-app>
+
+    <!-- Toast container for HTMX OOB swap -->
+    <div id="toast-container"></div>
 
     {% block scripts %}{% endblock %}
 </body>

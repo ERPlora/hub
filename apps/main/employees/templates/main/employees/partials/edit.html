@@ -2,7 +2,7 @@
 
 {% if request.htmx %}
 <!-- Clear tab bar - Edit Employee doesn't need tabs -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML"></div>
+<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
 {% endif %}
 
 {% ui_page_header title=_("Edit Employee") back_hx_get="/employees/" back_hx_target="#main-content-area" back_hx_push_url="true" %}

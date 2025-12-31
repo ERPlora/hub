@@ -1,7 +1,11 @@
 """
 Main app URLs
 
-Combines all main business area routes under the 'main' namespace.
+Flat URL structure for clear navigation states:
+/               Home (dashboard)
+/files/         File browser
+/settings/      Settings
+/employees/     Employee management
 """
 from django.urls import path, include
 
@@ -12,7 +16,7 @@ from apps.main.files import views as files_views
 app_name = 'main'
 
 urlpatterns = [
-    # Dashboard home
+    # Home (dashboard) at root
     path('', index_views.index, name='index'),
 
     # Files (local file browser & database download)

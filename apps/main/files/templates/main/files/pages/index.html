@@ -1,12 +1,12 @@
-{% extends "dashboard/layout.html" %}
+{% extends "ui/content_base.html" %}
 {% load i18n %}
 
 {% block page_title %}{% trans "Files" %}{% endblock %}
 
-{% block section_tabbar %}
+{% block module_tabbar %}
 <!-- Files page doesn't need tabbar -->
 {% endblock %}
 
-{% block dashboard_content %}
+{% block page_content %}
 {% include "main/files/partials/content.html" %}
 {% endblock %}

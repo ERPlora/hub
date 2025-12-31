@@ -35,11 +35,9 @@
 {% block section_tabbar %}
 {% block module_tabbar %}
 {# Render tabbar from module.json if module_id is available #}
-{# Otherwise, inherit empty tabbar from app_base.html #}
+{# Component returns empty if module has no tabs configured #}
 {% if module_id %}
 {% component "tabbar" module_id=module_id current_view=current_view|default:"" %}{% endcomponent %}
-{% else %}
-{{ block.super }}
 {% endif %}
 {% endblock %}
 {% endblock %}

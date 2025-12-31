@@ -1,0 +1,200 @@
+/* ==========================================================================
+   TABLES - Estilos para tablas de datos
+   ========================================================================== */
+
+/* ==========================================================================
+   DATA TABLE - Tabla con scroll y headers fijos
+   ========================================================================== */
+
+.data-table-container {
+  max-height: calc(100vh - 340px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Header */
+.data-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-color-secondary);
+}
+
+.data-table th {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+}
+
+/* Sortable header */
+.data-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+
+.data-table th.sortable:hover {
+  background: var(--bg-color-tertiary);
+}
+
+.data-table th .sort-icon {
+  font-size: 14px;
+  vertical-align: middle;
+  margin-left: var(--space-xxs);
+}
+
+/* Body */
+.data-table tbody tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: background var(--transition-fast);
+}
+
+.data-table tbody tr:hover {
+  background: rgba(var(--color-primary-rgb), 0.05);
+}
+
+.data-table td {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-color);
+  vertical-align: middle;
+}
+
+/* Cell alignments */
+.data-table .cell-center {
+  text-align: center;
+}
+
+.data-table .cell-right {
+  text-align: right;
+}
+
+/* Cell widths */
+.data-table .cell-narrow {
+  width: 80px;
+}
+
+.data-table .cell-actions {
+  width: 150px;
+  text-align: center;
+}
+
+/* ==========================================================================
+   TABLE CELL COMPONENTS
+   ========================================================================== */
+
+/* Product/entity image in table */
+.table-image {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--border-radius);
+  object-fit: cover;
+  border: 1px solid var(--border-color);
+}
+
+.table-image-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--border-radius);
+  background: var(--bg-color-secondary);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-image-placeholder ion-icon {
+  font-size: 20px;
+  color: var(--text-color-tertiary);
+}
+
+/* Stock badge */
+.table-stock-badge {
+  display: inline-flex;
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--border-radius-round);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.table-stock-badge--low {
+  background: rgba(var(--color-warning-rgb), 0.15);
+  color: var(--color-warning-shade);
+}
+
+.table-stock-badge--out {
+  background: rgba(var(--color-danger-rgb), 0.15);
+  color: var(--color-danger-shade);
+}
+
+/* Action buttons in table */
+.table-actions {
+  display: flex;
+  gap: var(--space-xxs);
+  justify-content: center;
+}
+
+.table-actions ion-button {
+  --padding-start: var(--space-xs);
+  --padding-end: var(--space-xs);
+}
+
+/* ==========================================================================
+   TABLE EMPTY STATE
+   ========================================================================== */
+
+.table-empty {
+  text-align: center;
+  padding: var(--space-xxl) var(--space-md);
+  color: var(--text-color-secondary);
+}
+
+.table-empty-icon {
+  font-size: 48px;
+  margin-bottom: var(--space-sm);
+}
+
+/* ==========================================================================
+   INFINITE SCROLL
+   ========================================================================== */
+
+.infinite-scroll-loader {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+.infinite-scroll-end {
+  text-align: center;
+  padding: var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-color-secondary);
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .data-table-container {
+    max-height: calc(100vh - 300px);
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  /* Hide columns on mobile */
+  .data-table .hide-mobile {
+    display: none;
+  }
+}

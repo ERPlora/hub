@@ -254,3 +254,13 @@ async function hideLoading() {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { showToast, Toast, showNotification, Notify, showAlert, showConfirm, Dialog, showLoading, hideLoading };
 }
+
+// Make available globally for inline handlers
+window.showToast = showToast;
+window.Toast = Toast;
+window.Notify = Notify;
+window.Dialog = Dialog;
+window.showAlert = showAlert;
+window.showConfirm = showConfirm;
+window.showLoading = showLoading;
+window.hideLoading = hideLoading;

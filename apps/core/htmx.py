@@ -19,6 +19,12 @@ def htmx_view(full_template, partial_template):
     Supports ?partial=true query parameter for testing/debugging fragments
     directly in the browser without HTMX headers.
 
+    Views can override the partial template by returning a 'template' key in context:
+        return {
+            'data': my_data,
+            'template': 'alternative/partial.html',  # Overrides partial_template
+        }
+
     Usage:
         @htmx_view('main/index/pages/index.html', 'main/index/partials/content.html')
         def dashboard_index(request):
@@ -49,11 +55,16 @@ def htmx_view(full_template, partial_template):
             # Otherwise, result should be context dict
             context = result if isinstance(result, dict) else {}
 
+            # Check for template override in context
+            template_override = context.pop('template', None)
+
             # Check if partial requested via HTMX or ?partial=true query param
             is_partial = request.headers.get('HX-Request') or request.GET.get('partial') == 'true'
 
             if is_partial:
-                return render(request, partial_template, context)
+                # Use template override if provided, otherwise default partial
+                template = template_override or partial_template
+                return render(request, template, context)
 
             # Full page request
             return render(request, full_template, context)

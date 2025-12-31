@@ -151,3 +151,15 @@ ion-tab-bar {
 [x-cloak] {
   display: none !important;
 }
+
+/* ==========================================================================
+   IONIC MODAL OVERRIDES
+   ========================================================================== */
+
+/* Filters modal - constrain size on large screens */
+@media (min-width: 768px) {
+  ion-modal#filters-modal {
+    --min-width: 80vw;
+    --min-height: auto;
+  }
+}

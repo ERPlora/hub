@@ -1,45 +1,15 @@
-{% load i18n ui %}
+{% load i18n ui component_tags %}
 
 {% if request.htmx %}
 <!-- Tab bar update via OOB swap -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
-    <ion-tab-bar slot="bottom" color="light">
-        <ion-tab-button
-            hx-get="{% url 'marketplace:store' 'modules' %}"
-            hx-target="#main-content-area"
-            hx-push-url="true"
-            class="tab-selected">
-            <ion-icon name="cube-outline"></ion-icon>
-            <ion-label>{% trans "Modules" %}</ion-label>
-        </ion-tab-button>
-
-        <ion-tab-button
-            hx-get="{% url 'marketplace:store' 'hubs' %}"
-            hx-target="#main-content-area"
-            hx-push-url="true">
-            <ion-icon name="server-outline"></ion-icon>
-            <ion-label>{% trans "Hubs" %}</ion-label>
-        </ion-tab-button>
-
-        <ion-tab-button disabled>
-            <ion-icon name="hardware-chip-outline"></ion-icon>
-            <ion-label>{% trans "Components" %}</ion-label>
-            <ion-badge color="medium" style="font-size: 8px;">{% trans "Soon" %}</ion-badge>
-        </ion-tab-button>
-
-        <ion-tab-button
-            hx-get="{% url 'marketplace:cart_page' %}"
-            hx-target="#main-content-area"
-            hx-push-url="true">
-            <ion-icon name="cart-outline"></ion-icon>
-            <ion-label>{% trans "Cart" %}</ion-label>
-            {% if cart_count > 0 %}
-            <ion-badge color="danger">{{ cart_count }}</ion-badge>
-            {% endif %}
-        </ion-tab-button>
-    </ion-tab-bar>
-</ion-footer>
+{% include "marketplace/partials/tabbar.html" with store_type="modules" cart_count=cart_count oob=True %}
+<!-- Page header update via OOB swap -->
+<div id="page-header-container" hx-swap-oob="innerHTML">
+{% if module %}
+{% component "page_header" title=module.name back_url="marketplace:index" %}{% endcomponent %}
+{% else %}
+{% component "page_header" title=_("Module Details") back_url="marketplace:index" %}{% endcomponent %}
+{% endif %}
 </div>
 {% endif %}
 
@@ -60,9 +30,6 @@
     </div>
 
 {% elif module %}
-    <!-- Back Button -->
-    {% ui_page_header title="" back_url="marketplace:store" back_hx_get=back_url back_hx_target="#main-content-area" %}
-
     <div class="ion-padding">
         <!-- Hero Card -->
         <ion-card class="m-0 mb-lg">
@@ -357,7 +324,7 @@ document.addEventListener('click', function(e) {
 async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
     setButtonLoading(button, true);
     try {
-        const purchaseResponse = await fetch('{% url "store:modules:api_purchase" %}', {
+        const purchaseResponse = await fetch('{% url "mymodules:api_purchase" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_id: moduleId })
@@ -386,7 +353,7 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
 async function purchaseModule(moduleId, button) {
     setButtonLoading(button, true);
     try {
-        const response = await fetch('{% url "store:modules:api_purchase" %}', {
+        const response = await fetch('{% url "mymodules:api_purchase" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_id: moduleId })
@@ -413,7 +380,7 @@ async function purchaseModule(moduleId, button) {
 async function downloadAndInstall(moduleSlug, downloadUrl, button) {
     if (button) setButtonLoading(button, true);
     try {
-        const response = await fetch('{% url "store:modules:api_install" %}', {
+        const response = await fetch('{% url "mymodules:api_install" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_slug: moduleSlug, download_url: downloadUrl })
@@ -428,7 +395,7 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button) {
                     '{% trans "Restart Required" %}',
                     '{% trans "The server needs to restart to complete module setup. Restart now?" %}',
                     () => {
-                        fetch('{% url "store:modules:api_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+                        fetch('{% url "mymodules:api_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
                             .then(() => setTimeout(() => window.location.reload(), 2000));
                     },
                     '{% trans "Restart" %}',

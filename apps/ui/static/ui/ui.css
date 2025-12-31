@@ -754,6 +754,18 @@ ion-tab-button ion-icon {
     font-size: 1.25rem;
 }
 
+/* SVG icons in tabs */
+ion-tab-button .tab-icon-svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-bottom: 2px;
+    filter: var(--tab-icon-filter, none);
+}
+
+ion-tab-button.tab-selected .tab-icon-svg {
+    filter: var(--tab-icon-filter-selected, invert(35%) sepia(85%) saturate(2000%) hue-rotate(200deg));
+}
+
 /* Dynamic tab visibility */
 ion-tab-button.tab-hidden {
     display: none !important;
@@ -1359,6 +1371,67 @@ ion-row.row-gap-lg {
 
 .module-app-icon--add:hover .module-app-icon__image ion-icon {
     color: var(--ion-color-primary);
+}
+
+/* =============================================================================
+   Swiper Element Customization
+   ============================================================================= */
+
+/* Navigation buttons - use Ionic theme colors */
+swiper-container::part(button-prev),
+swiper-container::part(button-next) {
+    color: var(--ion-color-primary);
+    background: var(--ion-background-color);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+swiper-container::part(button-prev):hover,
+swiper-container::part(button-next):hover {
+    color: var(--ion-color-primary-shade);
+}
+
+swiper-container::part(button-prev)::after,
+swiper-container::part(button-next)::after {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* Pagination - use Ionic theme colors */
+swiper-container::part(bullet) {
+    background: var(--ion-color-medium);
+    opacity: 0.5;
+}
+
+swiper-container::part(bullet-active) {
+    background: var(--ion-color-primary);
+    opacity: 1;
+}
+
+/* Swiper slides with auto width */
+swiper-container[slides-per-view="auto"] swiper-slide {
+    width: auto;
+}
+
+/* Recent Modules Section */
+.module-section--recent {
+    margin-bottom: var(--ui-space-lg);
+}
+
+.module-section--recent swiper-slide {
+    display: flex;
+    justify-content: center;
+}
+
+.module-section--recent .swiper-slide {
+    display: flex;
+    justify-content: center;
+}
+
+.module-section--recent .swiper-slide .module-app-icon {
+    width: 80px;
 }
 
 /* Home page searchbar */

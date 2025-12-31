@@ -1,92 +1,16 @@
 {% extends "base.html" %}
-{% load static %}
-{% load i18n %}
+{% load static i18n ui %}
 
 {% block title %}ERPlora Hub - {% trans "Login" %}{% endblock %}
 
 {% block extra_css %}
-<style>
-    .login-container {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1rem;
-    }
-
-    .login-card {
-        width: 100%;
-        max-width: 500px;
-        margin: 0;
-    }
-
-    .employee-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: 1rem;
-    }
-
-    .employee-card {
-        cursor: pointer;
-        transition: transform 0.2s;
-    }
-
-    .employee-card:hover {
-        transform: scale(1.05);
-    }
-
-    .pin-dots {
-        display: flex;
-        gap: 0.75rem;
-        justify-content: center;
-        margin-bottom: 1.5rem;
-    }
-
-    .pin-dot {
-        width: 1rem;
-        height: 1rem;
-        border-radius: 50%;
-        border: 2px solid var(--ion-border-color);
-        transition: all 0.2s;
-    }
-
-    .pin-dot.filled {
-        background: var(--ion-color-primary);
-        border-color: var(--ion-color-primary);
-    }
-
-    .keypad {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1rem;
-        max-width: 300px;
-        margin: 0 auto;
-    }
-
-    .keypad ion-button {
-        height: 3.5rem;
-        font-size: 1.25rem;
-        font-weight: 600;
-    }
-
-    .avatar-circle {
-        width: 100%;
-        height: 100%;
-        background: var(--ion-color-primary);
-        color: var(--ion-color-primary-contrast);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.125rem;
-        font-weight: bold;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/pages/login.css' %}">
 {% endblock %}
 
 {% block content %}
 <div x-data="loginApp()" x-init="init()">
     <!-- Theme Toggle -->
-    <ion-button class="fixed top-4 right-4 z-50" fill="clear" @click="toggleTheme()">
+    <ion-button fill="clear" @click="toggleTheme()" class="theme-toggle">
         <ion-icon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
     </ion-button>
 
@@ -94,15 +18,15 @@
     <div class="login-container">
         <ion-card class="login-card">
             <!-- Logo -->
-            <div class="text-center mb-8 pt-8">
-                <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 64px; height: 64px; margin: 0 auto 1rem;">
-                <h1 class="m-0 text-3xl font-bold">ERPlora</h1>
-                <p class="mt-2 mb-0 text-medium">{% trans "Business Management System" %}</p>
+            <div class="login-logo">
+                <img src="{% static 'img/logo.png' %}" alt="ERPlora">
+                <h1>ERPlora</h1>
+                <p>{% trans "Business Management System" %}</p>
             </div>
 
             <ion-card-content>
                 <!-- Login Tabs -->
-                <ion-segment :value="loginMode" class="mb-8">
+                <ion-segment :value="loginMode" class="login-segment">
                     <ion-segment-button value="local" @click="loginMode = 'local'">
                         <ion-label>{% trans "Local Login" %}</ion-label>
                     </ion-segment-button>
@@ -114,22 +38,22 @@
                 <!-- Local Login (Employee Selection + PIN) -->
                 <div x-show="loginMode === 'local'" x-cloak>
                     <!-- Employee Selection -->
-                    <div x-show="!selectedEmployee">
-                        <h2 class="text-xl font-semibold mb-4">{% trans "Select your profile" %}</h2>
+                    <div x-show="!selectedEmployee" class="employee-selection">
+                        <h2>{% trans "Select your profile" %}</h2>
 
-                        <div class="employee-grid mb-4">
+                        <div class="employee-grid">
                             <template x-for="employee in employees" :key="employee.id">
                                 <div class="employee-card" @click="selectEmployee(employee)">
-                                    <ion-card class="m-0">
-                                        <ion-card-content class="p-4 text-center">
-                                            <ion-avatar class="mx-auto mb-2">
+                                    <ion-card>
+                                        <ion-card-content>
+                                            <ion-avatar>
                                                 <div class="avatar-circle">
                                                     <span x-text="employee.initials"></span>
                                                 </div>
                                             </ion-avatar>
-                                            <p class="m-0 text-sm font-medium overflow-hidden text-ellipsis whitespace-nowrap" x-text="employee.name"></p>
-                                            <ion-chip :color="employee.roleColor" class="mt-1 mb-0 h-5">
-                                                <ion-label class="text-[10px]" x-text="employee.role"></ion-label>
+                                            <p class="employee-name" x-text="employee.name"></p>
+                                            <ion-chip :color="employee.roleColor">
+                                                <ion-label x-text="employee.role"></ion-label>
                                             </ion-chip>
                                         </ion-card-content>
                                     </ion-card>
@@ -140,14 +64,14 @@
 
                     <!-- PIN Entry -->
                     <div x-show="selectedEmployee" x-cloak>
-                        <div class="text-center mb-8">
-                            <ion-avatar class="mx-auto mb-2">
+                        <div class="pin-section">
+                            <ion-avatar>
                                 <div class="avatar-circle">
                                     <span x-text="selectedEmployee?.initials"></span>
                                 </div>
                             </ion-avatar>
-                            <h2 class="mt-3 mb-0 text-xl font-semibold" x-text="selectedEmployee?.name"></h2>
-                            <p class="mt-1 mb-0 text-medium">{% trans "Enter your PIN" %}</p>
+                            <h2 x-text="selectedEmployee?.name"></h2>
+                            <p>{% trans "Enter your PIN" %}</p>
                         </div>
 
                         <!-- PIN Dots -->
@@ -158,7 +82,7 @@
                         </div>
 
                         <!-- Error Message -->
-                        <div x-show="pinError" x-cloak class="text-center mb-4">
+                        <div x-show="pinError" x-cloak class="pin-error">
                             <ion-chip color="danger">
                                 <ion-icon name="alert-circle-outline"></ion-icon>
                                 <ion-label>{% trans "Incorrect PIN" %}</ion-label>
@@ -168,18 +92,14 @@
                         <!-- Keypad -->
                         <div class="keypad">
                             <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
-                                <ion-button @click="addPinDigit(num)" expand="block" fill="outline">
-                                    <span x-text="num"></span>
-                                </ion-button>
+                                <ion-button expand="block" fill="outline" @click="addPinDigit(num)" x-text="num"></ion-button>
                             </template>
-                            <ion-button @click="selectedEmployee = null; pinInput = ''; pinError = false;" expand="block" fill="clear">
-                                <ion-icon name="arrow-back-outline" class="text-2xl"></ion-icon>
+                            <ion-button expand="block" fill="clear" @click="selectedEmployee = null; pinInput = ''; pinError = false;">
+                                <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
                             </ion-button>
-                            <ion-button @click="addPinDigit(0)" expand="block" fill="outline">
-                                <span>0</span>
-                            </ion-button>
-                            <ion-button @click="clearPinDigit()" expand="block" fill="clear">
-                                <ion-icon name="backspace-outline" class="text-2xl"></ion-icon>
+                            <ion-button expand="block" fill="outline" @click="addPinDigit(0)">0</ion-button>
+                            <ion-button expand="block" fill="clear" @click="clearPinDigit()">
+                                <ion-icon slot="icon-only" name="backspace-outline"></ion-icon>
                             </ion-button>
                         </div>
                     </div>
@@ -187,34 +107,32 @@
 
                 <!-- Cloud Login (Email/Password) -->
                 <div x-show="loginMode === 'cloud'" x-cloak>
-                    <form @submit.prevent="cloudLogin()" class="flex flex-col gap-6">
-                        <div>
-                            <ion-label class="block mb-2 font-medium">{% trans "Email" %}</ion-label>
+                    <form @submit.prevent="cloudLogin()" class="cloud-login-form">
+                        <div class="form-field">
+                            <ion-label>{% trans "Email" %}</ion-label>
                             <ion-input
                                 x-model="cloudCredentials.email"
                                 type="email"
                                 placeholder="{% trans 'your@email.com' %}"
                                 fill="outline"
-                                required
-                                class="[--background:var(--ion-background-color)]">
+                                required>
                             </ion-input>
                         </div>
 
-                        <div>
-                            <ion-label class="block mb-2 font-medium">{% trans "Password" %}</ion-label>
+                        <div class="form-field">
+                            <ion-label>{% trans "Password" %}</ion-label>
                             <ion-input
                                 x-model="cloudCredentials.password"
                                 type="password"
-                                placeholder="••••••••"
+                                placeholder="********"
                                 fill="outline"
-                                required
-                                class="[--background:var(--ion-background-color)]">
+                                required>
                                 <ion-input-password-toggle slot="end"></ion-input-password-toggle>
                             </ion-input>
                         </div>
 
                         <ion-button type="submit" expand="block" :disabled="cloudLoading">
-                            <ion-spinner x-show="cloudLoading" name="crescent" class="mr-2"></ion-spinner>
+                            <ion-spinner x-show="cloudLoading" name="crescent" style="width: 20px; height: 20px; margin-right: 8px;"></ion-spinner>
                             <span x-text="cloudLoading ? '{% trans "Logging in..." %}' : '{% trans "Login" %}'"></span>
                         </ion-button>
                     </form>
@@ -231,11 +149,11 @@
             </ion-toolbar>
         </ion-header>
         <ion-content class="ion-padding">
-            <div class="max-w-[400px] mx-auto">
-                <div class="text-center mb-8">
-                    <ion-icon name="key-outline" class="text-6xl text-primary"></ion-icon>
-                    <h2 class="mt-4 mb-2">{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
-                    <p class="m-0 text-medium">{% trans "Setup a 4-digit PIN for quick access" %}</p>
+            <div class="pin-setup-content">
+                <div class="pin-setup-header">
+                    <ion-icon name="key-outline"></ion-icon>
+                    <h2>{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
+                    <p>{% trans "Setup a 4-digit PIN for quick access" %}</p>
                 </div>
 
                 <!-- PIN Setup Dots -->
@@ -245,12 +163,12 @@
                     </template>
                 </div>
 
-                <div x-show="setupPinConfirm" x-cloak class="text-center my-4">
-                    <p class="text-medium">{% trans "Confirm your PIN" %}</p>
+                <div x-show="setupPinConfirm" x-cloak class="pin-confirm-message">
+                    <p>{% trans "Confirm your PIN" %}</p>
                 </div>
 
                 <!-- Error Message -->
-                <div x-show="setupPinError" x-cloak class="text-center mb-4">
+                <div x-show="setupPinError" x-cloak class="pin-error">
                     <ion-chip color="danger">
                         <ion-icon name="alert-circle-outline"></ion-icon>
                         <ion-label>{% trans "PINs don't match" %}</ion-label>
@@ -260,16 +178,12 @@
                 <!-- Keypad -->
                 <div class="keypad">
                     <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
-                        <ion-button @click="addSetupPinDigit(num)" expand="block" fill="outline">
-                            <span x-text="num"></span>
-                        </ion-button>
+                        <ion-button expand="block" fill="outline" @click="addSetupPinDigit(num)" x-text="num"></ion-button>
                     </template>
                     <div></div>
-                    <ion-button @click="addSetupPinDigit(0)" expand="block" fill="outline">
-                        <span>0</span>
-                    </ion-button>
-                    <ion-button @click="clearSetupPinDigit()" expand="block" fill="clear">
-                        <ion-icon name="backspace-outline" class="text-2xl"></ion-icon>
+                    <ion-button expand="block" fill="outline" @click="addSetupPinDigit(0)">0</ion-button>
+                    <ion-button expand="block" fill="clear" @click="clearSetupPinDigit()">
+                        <ion-icon slot="icon-only" name="backspace-outline"></ion-icon>
                     </ion-button>
                 </div>
             </div>

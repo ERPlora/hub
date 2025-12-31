@@ -119,9 +119,9 @@ class TestModuleURLPatterns:
     def test_module_url_format(self):
         """Test that module URLs follow expected format."""
         module_id = 'inventory'
-        expected_url = f'/modules/{module_id}/'
+        expected_url = f'/m/{module_id}/'
 
-        assert expected_url.startswith('/modules/')
+        assert expected_url.startswith('/m/')
         assert expected_url.endswith('/')
 
     def test_module_api_url_format(self):

@@ -22,11 +22,11 @@ MODULE_CATEGORIES = {
         'order': 1,
         'color': '#3880ff',  # primary
     },
-    'hospitality': {
-        'name': 'Hospitality',
-        'name_es': 'Hostelería',
-        'description': 'Solutions for bars, restaurants, hotels, and hospitality businesses',
-        'description_es': 'Soluciones para bares, restaurantes, hoteles y negocios de hostelería',
+    'horeca': {
+        'name': 'HoReCa',
+        'name_es': 'HoReCa',
+        'description': 'Solutions for hotels, restaurants, cafés, bars, fast food, and catering',
+        'description_es': 'Soluciones para hoteles, restaurantes, cafés, bares, fast food y catering',
         'icon': 'restaurant-outline',
         'order': 2,
         'color': '#ff6b35',
@@ -476,7 +476,7 @@ def get_categories_grouped(language: str = 'en') -> dict:
     return {
         'core_operations': {
             'name': 'Core Operations' if language == 'en' else 'Operaciones Principales',
-            'categories': ['pos', 'hospitality', 'sales', 'inventory', 'purchasing', 'accounting']
+            'categories': ['pos', 'horeca', 'sales', 'inventory', 'purchasing', 'accounting']
         },
         'production': {
             'name': 'Production' if language == 'en' else 'Producción',
@@ -576,8 +576,8 @@ def get_industries_grouped(language: str = 'en') -> dict:
             'name': 'Commerce' if language == 'en' else 'Comercio',
             'industries': ['retail', 'wholesale', 'ecommerce']
         },
-        'food_hospitality': {
-            'name': 'Food & Hospitality' if language == 'en' else 'Alimentación y Hostelería',
+        'horeca': {
+            'name': 'HoReCa' if language == 'en' else 'HoReCa',
             'industries': ['restaurant', 'bar', 'cafe', 'fast_food', 'hotel', 'catering']
         },
         'services': {

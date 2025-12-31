@@ -1,0 +1,20 @@
+{% load static %}
+{# Single Tab Button #}
+<ion-tab-button
+    {% if not disabled %}
+    hx-get="{% url url %}"
+    hx-target="#main-content-area"
+    hx-push-url="true"
+    {% endif %}
+    {% if disabled %}disabled{% endif %}
+    {% if is_active %}class="tab-selected"{% endif %}>
+    {% if icon_svg %}
+    <img src="{% static icon_svg %}" alt="" class="tab-icon-svg" />
+    {% elif icon %}
+    <ion-icon name="{{ icon }}"></ion-icon>
+    {% endif %}
+    <ion-label>{{ label }}</ion-label>
+    {% if badge %}
+    <ion-badge color="{{ badge_color }}">{{ badge }}</ion-badge>
+    {% endif %}
+</ion-tab-button>

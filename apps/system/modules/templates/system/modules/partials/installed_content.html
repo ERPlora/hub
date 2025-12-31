@@ -1,210 +1,43 @@
 {% load i18n %}
-{% load module_icons %}
+{% load ui %}
 
 {% if request.htmx %}
 <!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-{% include "system/modules/partials/tabbar_system.html" %}
-</div>
-<!-- System modules list update via OOB swap -->
-<div id="system-modules-list" hx-swap-oob="innerHTML">
-{% include "dashboard/partials/system_modules_list.html" %}
-</div>
+{% include "system/modules/partials/tabbar_system.html" with current_tab='installed' oob=True %}
 {% endif %}
 
-<div class="ion-padding" x-data="modulesPage()">
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <h1 class="text-2xl font-bold">{% trans "Modules" %}</h1>
-            <p class="text-medium">
-                {{ active_count }} {% trans "active" %}, {{ inactive_count }} {% trans "inactive" %}
-            </p>
-        </div>
-        <div class="flex gap-2">
-            {% if requires_restart %}
-            <ion-button color="warning" @click="restartServer()">
-                <ion-icon slot="start" name="refresh-outline"></ion-icon>
-                {% trans "Restart Required" %}
-            </ion-button>
-            {% endif %}
-            <ion-button
-                hx-get="{% url 'system:marketplace' %}"
-                hx-target="#dashboard-content"
-                hx-push-url="true">
-                <ion-icon slot="start" name="storefront-outline"></ion-icon>
-                {% trans "Module Store" %}
-            </ion-button>
-        </div>
+<!-- Header -->
+{% ui_page_header title=_("My Modules") subtitle=_("Installed modules in your Hub") %}
+
+<div class="ion-padding">
+    <!-- Search Bar -->
+    <form id="modules-search-form"
+        hx-get="{% url 'mymodules:index' %}"
+        hx-target="#modules-list"
+        hx-swap="innerHTML"
+        hx-trigger="submit, ionInput from:#modules-search delay:300ms"
+        hx-indicator="#modules-loading">
+
+        <ion-searchbar
+            id="modules-search"
+            name="q"
+            placeholder="{% trans 'Search modules...' %}"
+            debounce="300"
+            show-cancel-button="never"
+            class="m-0 mb-md"
+            value="{{ request.GET.q|default:'' }}">
+        </ion-searchbar>
+    </form>
+
+    <!-- Loading Spinner -->
+    <div id="modules-loading" class="htmx-indicator justify-center py-lg">
+        <ion-spinner name="crescent"></ion-spinner>
     </div>
 
-    <!-- Modules Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {% for module in modules %}
-        <ion-card style="display: flex; flex-direction: column; height: 100%;">
-            <ion-card-header>
-                <div class="flex items-center gap-3">
-                    {% module_icon module_id=module.module_id icon=module.icon css_class="text-primary" size="text-2xl" %}
-                    <div class="flex-1 min-w-0">
-                        <ion-card-title class="truncate">{{ module.name }}</ion-card-title>
-                        <ion-card-subtitle>v{{ module.version }}</ion-card-subtitle>
-                    </div>
-                    <ion-chip color="{% if module.is_active %}success{% else %}medium{% endif %}">
-                        {% if module.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}
-                    </ion-chip>
-                </div>
-            </ion-card-header>
-            <ion-card-content style="flex: 1;">
-                <p class="text-sm text-medium mb-4">{{ module.description|default:"-" }}</p>
-                {% if module.author %}
-                <p class="text-xs text-medium">{% trans "By" %} {{ module.author }}</p>
-                {% endif %}
-            </ion-card-content>
-            <div class="flex border-t border-gray-200 dark:border-gray-700" style="margin-top: auto;">
-                {% if module.is_active %}
-                <ion-button
-                    fill="clear"
-                    size="small"
-                    color="warning"
-                    class="flex-1"
-                    @click="deactivateModule('{{ module.module_id }}')">
-                    <ion-icon slot="start" name="pause-outline"></ion-icon>
-                    {% trans "Deactivate" %}
-                </ion-button>
-                {% else %}
-                <ion-button
-                    fill="clear"
-                    size="small"
-                    color="success"
-                    class="flex-1"
-                    hx-post="{% url 'system:module_activate' module_id=module.module_id %}"
-                    hx-target="#dashboard-content"
-                    hx-swap="innerHTML">
-                    <ion-icon slot="start" name="play-outline"></ion-icon>
-                    {% trans "Activate" %}
-                </ion-button>
-                {% endif %}
-                <ion-button
-                    fill="clear"
-                    size="small"
-                    color="danger"
-                    class="flex-1"
-                    @click="deleteModule('{{ module.module_id }}')">
-                    <ion-icon slot="start" name="trash-outline"></ion-icon>
-                    {% trans "Delete" %}
-                </ion-button>
-            </div>
-        </ion-card>
-        {% empty %}
-        <ion-card class="col-span-full">
-            <ion-card-content class="text-center py-8">
-                <ion-icon name="extension-puzzle-outline" class="text-6xl text-medium mb-4"></ion-icon>
-                <h3 class="text-lg font-semibold mb-2">{% trans "No modules installed" %}</h3>
-                <p class="text-medium mb-4">{% trans "Explore the Module Store to extend your Hub" %}</p>
-                <ion-button
-                    hx-get="{% url 'system:marketplace' %}"
-                    hx-target="#dashboard-content"
-                    hx-push-url="true">
-                    <ion-icon slot="start" name="storefront-outline"></ion-icon>
-                    {% trans "Browse Module Store" %}
-                </ion-button>
-            </ion-card-content>
-        </ion-card>
-        {% endfor %}
+    <!-- Modules List Container with internal scroll -->
+    <div id="modules-scroll-container" style="height: calc(100vh - 220px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
+        <div id="modules-list">
+            {% include "system/modules/partials/modules_list.html" %}
+        </div>
     </div>
 </div>
-
-<script>
-function modulesPage() {
-    return {
-        async deactivateModule(moduleId) {
-            const alert = document.createElement('ion-alert');
-            alert.header = '{% trans "Deactivate Module" %}';
-            alert.message = '{% trans "Are you sure you want to deactivate this module?" %}';
-            alert.buttons = [
-                { text: '{% trans "Cancel" %}', role: 'cancel' },
-                {
-                    text: '{% trans "Deactivate" %}',
-                    handler: () => {
-                        htmx.ajax('POST', `/modules/api/deactivate/${moduleId}/`, {
-                            target: '#dashboard-content',
-                            swap: 'innerHTML'
-                        });
-                    }
-                }
-            ];
-            document.body.appendChild(alert);
-            await alert.present();
-        },
-
-        async deleteModule(moduleId) {
-            const alert = document.createElement('ion-alert');
-            alert.header = '{% trans "Delete Module" %}';
-            alert.message = '{% trans "This will permanently delete the module and all its data. Are you sure?" %}';
-            alert.buttons = [
-                { text: '{% trans "Cancel" %}', role: 'cancel' },
-                {
-                    text: '{% trans "Delete" %}',
-                    role: 'destructive',
-                    handler: () => {
-                        htmx.ajax('POST', `/modules/api/delete/${moduleId}/`, {
-                            target: '#dashboard-content',
-                            swap: 'innerHTML'
-                        });
-                    }
-                }
-            ];
-            document.body.appendChild(alert);
-            await alert.present();
-        },
-
-        async restartServer() {
-            const alert = document.createElement('ion-alert');
-            alert.header = '{% trans "Restart Server" %}';
-            alert.message = '{% trans "This will restart the server and apply module changes. Continue?" %}';
-            alert.buttons = [
-                { text: '{% trans "Cancel" %}', role: 'cancel' },
-                {
-                    text: '{% trans "Restart" %}',
-                    handler: async () => {
-                        try {
-                            const response = await fetch('/modules/api/restart/', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' }
-                            });
-                            const data = await response.json();
-                            if (data.success) {
-                                await this.showToast('{% trans "Server restarting..." %}', 'success');
-                                setTimeout(() => window.location.reload(), 2000);
-                            } else {
-                                await this.showToast(data.error, 'danger');
-                            }
-                        } catch (error) {
-                            await this.showToast('{% trans "Error restarting server" %}', 'danger');
-                        }
-                    }
-                }
-            ];
-            document.body.appendChild(alert);
-            await alert.present();
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 2000;
-            toast.color = color;
-            document.body.appendChild(toast);
-            await toast.present();
-        }
-    }
-}
-
-// Initialize Alpine for HTMX-loaded content
-setTimeout(() => {
-    const container = document.querySelector('[x-data="modulesPage()"]');
-    if (container && typeof Alpine !== 'undefined' && !container._x_dataStack) {
-        Alpine.initTree(container);
-    }
-}, 0);
-</script>

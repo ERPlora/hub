@@ -14,7 +14,7 @@ class TestWizardFlow:
 
     def test_wizard_redirects_when_not_configured(self, authenticated_client, unconfigured_store):
         """Test that unconfigured store redirects to wizard."""
-        response = authenticated_client.get('/dashboard/')
+        response = authenticated_client.get('/home/')
 
         # Should redirect to wizard
         assert response.status_code == 302
@@ -43,7 +43,7 @@ class TestWizardFlow:
 
         # Success returns 200 with HX-Redirect header
         assert response.status_code == 200
-        assert response.get('HX-Redirect') == '/dashboard/'
+        assert response.get('HX-Redirect') == '/home/'
 
         # Verify config was saved
         config = StoreConfig.get_solo()
@@ -149,9 +149,9 @@ class TestWizardFlow:
 
         response = client.get('/setup/')
 
-        # Should redirect to dashboard
+        # Should redirect to home
         assert response.status_code == 302
-        assert 'dashboard' in response.url
+        assert 'home' in response.url
 
 
 class TestMiddleware:

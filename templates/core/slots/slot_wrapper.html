@@ -1,0 +1,5 @@
+{% if has_content %}
+<{{ wrapper_tag }}{% if wrapper_class %} class="{{ wrapper_class }}"{% endif %} data-slot="{{ slot_name }}">
+{{ content }}
+</{{ wrapper_tag }}>
+{% endif %}

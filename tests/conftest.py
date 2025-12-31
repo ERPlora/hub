@@ -1,6 +1,24 @@
 """
 Pytest fixtures shared across all Hub tests.
 """
+import os
+import sys
+
+# CRITICAL: Set this at module load time, BEFORE pytest-django loads Django
+# This allows Django ORM operations from Playwright's async context
+os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = 'true'
+
+
+def pytest_configure(config):
+    """
+    Called after command line options have been parsed and before
+    test collection and execution begins.
+
+    This ensures DJANGO_ALLOW_ASYNC_UNSAFE is set before Django is loaded.
+    """
+    os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = 'true'
+
+
 import pytest
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
