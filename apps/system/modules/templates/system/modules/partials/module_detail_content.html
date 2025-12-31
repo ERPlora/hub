@@ -1,232 +1,235 @@
-{% load i18n %}
-{% load ui %}
-
-{% if request.htmx %}
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-{% include "system/modules/partials/tabbar_system.html" oob=True %}
-{% endif %}
+{% load i18n ui component_tags %}
 
 {% if error %}
     <!-- Error State -->
-    {% ui_card css_class="card-error" %}
-        <div class="d-flex align-center gap-md">
-            <ion-icon name="alert-circle-outline" class="fs-2xl text-danger"></ion-icon>
-            <div>
-                <h3 class="fw-semibold mb-xs m-0">{% trans "Error" %}</h3>
-                <p class="m-0 text-medium">{{ error }}</p>
-            </div>
-        </div>
-    {% endui_card %}
-    {% url 'marketplace:index' as marketplace_url %}
-    {% ui_button label=_("Back to Marketplace") icon="arrow-back-outline" css_class="mt-md" hx_get=marketplace_url hx_target="#main-content-area" hx_swap="innerHTML" hx_push_url="true" %}
+    {% component "page" title=_("Error") %}
+        {% fill "content" %}
+            {% ui_card css_class="card-error" %}
+                <div class="d-flex align-center gap-md">
+                    <ion-icon name="alert-circle-outline" class="fs-2xl text-danger"></ion-icon>
+                    <div>
+                        <h3 class="fw-semibold mb-xs m-0">{% trans "Error" %}</h3>
+                        <p class="m-0 text-medium">{{ error }}</p>
+                    </div>
+                </div>
+            {% endui_card %}
+            {% url 'marketplace:index' as marketplace_url %}
+            {% ui_button label=_("Back to Marketplace") icon="arrow-back-outline" css_class="mt-md" hx_get=marketplace_url hx_target="#main-content-area" hx_swap="innerHTML" hx_push_url="true" %}
+        {% endfill %}
+    {% endcomponent %}
 
 {% elif no_connection %}
     <!-- No Connection State -->
-    {% ui_card css_class="card-warning" %}
-        <div class="d-flex align-center gap-md">
-            <ion-icon name="cloud-offline-outline" class="fs-2xl text-warning"></ion-icon>
-            <div>
-                <h3 class="fw-semibold mb-xs m-0">{% trans "No Connection" %}</h3>
-                <p class="m-0 text-medium">{% trans "Unable to connect to ERPlora Cloud. Please check your internet connection and try again." %}</p>
-            </div>
-        </div>
-    {% endui_card %}
-    {% url 'mymodules:installed' as installed_url %}
-    {% ui_button label=_("Back to Modules") icon="arrow-back-outline" css_class="mt-md" hx_get=installed_url hx_target="#main-content-area" hx_swap="innerHTML" hx_push_url="true" %}
+    {% component "page" title=_("No Connection") %}
+        {% fill "content" %}
+            {% ui_card css_class="card-warning" %}
+                <div class="d-flex align-center gap-md">
+                    <ion-icon name="cloud-offline-outline" class="fs-2xl text-warning"></ion-icon>
+                    <div>
+                        <h3 class="fw-semibold mb-xs m-0">{% trans "No Connection" %}</h3>
+                        <p class="m-0 text-medium">{% trans "Unable to connect to ERPlora Cloud. Please check your internet connection and try again." %}</p>
+                    </div>
+                </div>
+            {% endui_card %}
+            {% url 'mymodules:installed' as installed_url %}
+            {% ui_button label=_("Back to Modules") icon="arrow-back-outline" css_class="mt-md" hx_get=installed_url hx_target="#main-content-area" hx_swap="innerHTML" hx_push_url="true" %}
+        {% endfill %}
+    {% endcomponent %}
 
 {% elif module %}
-    <!-- Back Button -->
     {% url 'marketplace:index' as marketplace_url %}
-    {% ui_page_header title="" back_url=marketplace_url back_hx_get=marketplace_url back_hx_target="#main-content-area" %}
-
-    <!-- Hero Card -->
-    {% ui_card css_class="mb-lg" %}
-        <div class="module-detail-header">
-            <!-- Icon -->
-            <div class="module-detail-icon">
-                <div class="module-icon-box module-icon-box--large module-icon-box--{{ module.category|default:'default' }}">
-                    <ion-icon name="{{ module.icon|default:'cube-outline' }}"></ion-icon>
-                </div>
-            </div>
-
-            <!-- Info -->
-            <div class="module-detail-info">
-                <h1 class="fs-2xl fw-bold mb-sm m-0">{{ module.name }}</h1>
-                <p class="text-medium mb-sm m-0">
-                    {% trans "by" %} <strong>{{ module.author|default:"ERPlora" }}</strong>
-                </p>
-                <p class="text-medium mb-md m-0">{{ module.description }}</p>
-
-                <!-- Stats -->
-                <div class="d-flex flex-wrap gap-md align-center mb-md">
-                    {% if module.downloads %}
-                    <span class="d-inline-flex align-center gap-xs text-medium fs-sm">
-                        <ion-icon name="download-outline"></ion-icon>
-                        {{ module.downloads }} {% trans "downloads" %}
-                    </span>
-                    {% endif %}
-                    {% if module.category_name %}
-                    <span class="d-inline-flex align-center gap-xs text-medium fs-sm">
-                        <ion-icon name="pricetag-outline"></ion-icon>
-                        {{ module.category_name }}
-                    </span>
-                    {% endif %}
-                </div>
-
-                <!-- Status Badges -->
-                <div class="d-flex flex-wrap gap-sm align-center">
-                    {% if module.is_featured %}
-                    {% ui_badge label=_("Featured") color="warning" icon="star" %}
-                    {% endif %}
-                    {% if is_installed %}
-                    {% ui_chip label=_("Installed") color="success" icon="checkmark-circle-outline" %}
-                    {% elif is_owned %}
-                    {% ui_chip label=_("Owned") color="tertiary" icon="bag-check-outline" %}
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Price & Actions -->
-            <div class="module-detail-actions">
-                {% if not is_installed and not is_owned %}
-                <div class="mb-md">
-                    {% if module.module_type == 'free' or is_free %}
-                    <div class="fs-2xl fw-bold text-success">{% trans "Free" %}</div>
-                    {% elif module.module_type == 'one_time' %}
-                    <div class="fs-2xl fw-bold text-primary">€{{ module.price }}</div>
-                    <div class="fs-sm text-medium">{% trans "one-time payment" %}</div>
-                    {% elif module.module_type == 'subscription' %}
-                    <div class="fs-2xl fw-bold text-primary">€{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}</div>
-                    <div class="fs-sm text-medium">{% trans "monthly subscription" %}</div>
-                    {% endif %}
-                </div>
-                {% endif %}
-
-                <!-- Action Buttons -->
-                <div class="d-flex flex-column gap-sm">
-                    {% if is_installed %}
-                    {% ui_button label=_("Installed") expand="block" color="medium" disabled=True icon="checkmark-circle-outline" %}
-                    {% elif is_owned %}
-                    {% ui_button label=_("Download & Install") expand="block" color="success" icon="download-outline" data_action="download" data_module_slug=module.slug data_download_url=module.download_url %}
-                    {% elif module.module_type == 'free' or is_free %}
-                    {% ui_button label=_("Get Free Module") expand="block" color="primary" icon="download-outline" data_action="install-free" data_module_id=module.id data_module_slug=module.slug data_download_url=module.download_url|default:"" %}
-                    {% else %}
-                    {% ui_button label=_("Purchase") expand="block" color="primary" icon="cart-outline" data_action="purchase" data_module_id=module.id %}
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    {% endui_card %}
-
-    <!-- Tabs -->
-    <div x-data="{ activeTab: 'overview' }">
-        <ion-segment :value="activeTab" @ionChange="activeTab = $event.detail.value">
-            <ion-segment-button value="overview">
-                <ion-label>{% trans "Overview" %}</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="reviews">
-                <ion-label>{% trans "Reviews" %} ({{ module.review_count|default:0 }})</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="changelog">
-                <ion-label>{% trans "Changelog" %}</ion-label>
-            </ion-segment-button>
-        </ion-segment>
-
-        <!-- Overview Tab -->
-        <div x-show="activeTab === 'overview'" class="mt-lg">
-            {% ui_card title=_("About this module") css_class="mb-lg" %}
-                <div class="markdown-content">
-                    {% if module.long_description %}
-                    {{ module.long_description|markdown }}
-                    {% else %}
-                    {{ module.description|linebreaks }}
-                    {% endif %}
-                </div>
-            {% endui_card %}
-
-            {% ui_card title=_("Module Information") %}
-                {% ui_list lines="full" %}
-                    <ion-item>
-                        <ion-label>{% trans "Version" %}</ion-label>
-                        <ion-text slot="end">{{ module.version }}</ion-text>
-                    </ion-item>
-                    <ion-item>
-                        <ion-label>{% trans "Author" %}</ion-label>
-                        <ion-text slot="end">{{ module.author|default:"ERPlora" }}</ion-text>
-                    </ion-item>
-                    <ion-item>
-                        <ion-label>{% trans "Category" %}</ion-label>
-                        <ion-text slot="end">{{ module.category_name|default:module.category }}</ion-text>
-                    </ion-item>
-                    <ion-item>
-                        <ion-label>{% trans "License" %}</ion-label>
-                        <ion-text slot="end">{{ module.license|default:"Proprietary" }}</ion-text>
-                    </ion-item>
-                {% endui_list %}
-            {% endui_card %}
-        </div>
-
-        <!-- Reviews Tab -->
-        <div x-show="activeTab === 'reviews'" class="mt-lg">
-            {% if module.recent_reviews %}
-            {% for review in module.recent_reviews %}
-            {% ui_card css_class="mb-md" %}
-                <div class="d-flex justify-between align-start mb-sm">
-                    <div>
-                        <p class="fw-semibold m-0">{{ review.user_name|default:"Anonymous" }}</p>
-                        <div class="d-flex gap-xxs mt-xs text-warning">
-                            {% for i in "12345" %}
-                                {% if forloop.counter <= review.rating %}
-                                <ion-icon name="star"></ion-icon>
-                                {% else %}
-                                <ion-icon name="star-outline" class="text-medium"></ion-icon>
-                                {% endif %}
-                            {% endfor %}
+    {% component "page" title=module.name back_hx_get=marketplace_url back_hx_target="#main-content-area" back_hx_push_url="true" %}
+        {% fill "content" %}
+            <!-- Hero Card -->
+            {% ui_card css_class="mb-lg" %}
+                <div class="module-detail-header">
+                    <!-- Icon -->
+                    <div class="module-detail-icon">
+                        <div class="module-icon-box module-icon-box--large module-icon-box--{{ module.category|default:'default' }}">
+                            <ion-icon name="{{ module.icon|default:'cube-outline' }}"></ion-icon>
                         </div>
                     </div>
-                    <span class="fs-xs text-medium">{{ review.created_at }}</span>
+
+                    <!-- Info -->
+                    <div class="module-detail-info">
+                        <h1 class="fs-2xl fw-bold mb-sm m-0">{{ module.name }}</h1>
+                        <p class="text-medium mb-sm m-0">
+                            {% trans "by" %} <strong>{{ module.author|default:"ERPlora" }}</strong>
+                        </p>
+                        <p class="text-medium mb-md m-0">{{ module.description }}</p>
+
+                        <!-- Stats -->
+                        <div class="d-flex flex-wrap gap-md align-center mb-md">
+                            {% if module.downloads %}
+                            <span class="d-inline-flex align-center gap-xs text-medium fs-sm">
+                                <ion-icon name="download-outline"></ion-icon>
+                                {{ module.downloads }} {% trans "downloads" %}
+                            </span>
+                            {% endif %}
+                            {% if module.category_name %}
+                            <span class="d-inline-flex align-center gap-xs text-medium fs-sm">
+                                <ion-icon name="pricetag-outline"></ion-icon>
+                                {{ module.category_name }}
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Status Badges -->
+                        <div class="d-flex flex-wrap gap-sm align-center">
+                            {% if module.is_featured %}
+                            {% ui_badge label=_("Featured") color="warning" icon="star" %}
+                            {% endif %}
+                            {% if is_installed %}
+                            {% ui_chip label=_("Installed") color="success" icon="checkmark-circle-outline" %}
+                            {% elif is_owned %}
+                            {% ui_chip label=_("Owned") color="tertiary" icon="bag-check-outline" %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Price & Actions -->
+                    <div class="module-detail-actions">
+                        {% if not is_installed and not is_owned %}
+                        <div class="mb-md">
+                            {% if module.module_type == 'free' or is_free %}
+                            <div class="fs-2xl fw-bold text-success">{% trans "Free" %}</div>
+                            {% elif module.module_type == 'one_time' %}
+                            <div class="fs-2xl fw-bold text-primary">{{ module.price }}</div>
+                            <div class="fs-sm text-medium">{% trans "one-time payment" %}</div>
+                            {% elif module.module_type == 'subscription' %}
+                            <div class="fs-2xl fw-bold text-primary">{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}</div>
+                            <div class="fs-sm text-medium">{% trans "monthly subscription" %}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex flex-column gap-sm">
+                            {% if is_installed %}
+                            {% ui_button label=_("Installed") expand="block" color="medium" disabled=True icon="checkmark-circle-outline" %}
+                            {% elif is_owned %}
+                            {% ui_button label=_("Download & Install") expand="block" color="success" icon="download-outline" data_action="download" data_module_slug=module.slug data_download_url=module.download_url %}
+                            {% elif module.module_type == 'free' or is_free %}
+                            {% ui_button label=_("Get Free Module") expand="block" color="primary" icon="download-outline" data_action="install-free" data_module_id=module.id data_module_slug=module.slug data_download_url=module.download_url|default:"" %}
+                            {% else %}
+                            {% ui_button label=_("Purchase") expand="block" color="primary" icon="cart-outline" data_action="purchase" data_module_id=module.id %}
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-                {% if review.title %}
-                <h4 class="fw-semibold mb-xs m-0">{{ review.title }}</h4>
-                {% endif %}
-                <p class="text-medium m-0">{{ review.comment }}</p>
             {% endui_card %}
-            {% endfor %}
-            {% else %}
-            {% ui_empty_state title=_("No reviews yet") description=_("Be the first to review this module") icon="chatbubbles-outline" %}
+
+            <!-- Tabs -->
+            <div x-data="{ activeTab: 'overview' }">
+                <ion-segment :value="activeTab" @ionChange="activeTab = $event.detail.value">
+                    <ion-segment-button value="overview">
+                        <ion-label>{% trans "Overview" %}</ion-label>
+                    </ion-segment-button>
+                    <ion-segment-button value="reviews">
+                        <ion-label>{% trans "Reviews" %} ({{ module.review_count|default:0 }})</ion-label>
+                    </ion-segment-button>
+                    <ion-segment-button value="changelog">
+                        <ion-label>{% trans "Changelog" %}</ion-label>
+                    </ion-segment-button>
+                </ion-segment>
+
+                <!-- Overview Tab -->
+                <div x-show="activeTab === 'overview'" class="mt-lg">
+                    {% ui_card title=_("About this module") css_class="mb-lg" %}
+                        <div class="markdown-content">
+                            {% if module.long_description %}
+                            {{ module.long_description|markdown }}
+                            {% else %}
+                            {{ module.description|linebreaks }}
+                            {% endif %}
+                        </div>
+                    {% endui_card %}
+
+                    {% ui_card title=_("Module Information") %}
+                        {% ui_list lines="full" %}
+                            <ion-item>
+                                <ion-label>{% trans "Version" %}</ion-label>
+                                <ion-text slot="end">{{ module.version }}</ion-text>
+                            </ion-item>
+                            <ion-item>
+                                <ion-label>{% trans "Author" %}</ion-label>
+                                <ion-text slot="end">{{ module.author|default:"ERPlora" }}</ion-text>
+                            </ion-item>
+                            <ion-item>
+                                <ion-label>{% trans "Category" %}</ion-label>
+                                <ion-text slot="end">{{ module.category_name|default:module.category }}</ion-text>
+                            </ion-item>
+                            <ion-item>
+                                <ion-label>{% trans "License" %}</ion-label>
+                                <ion-text slot="end">{{ module.license|default:"Proprietary" }}</ion-text>
+                            </ion-item>
+                        {% endui_list %}
+                    {% endui_card %}
+                </div>
+
+                <!-- Reviews Tab -->
+                <div x-show="activeTab === 'reviews'" class="mt-lg">
+                    {% if module.recent_reviews %}
+                    {% for review in module.recent_reviews %}
+                    {% ui_card css_class="mb-md" %}
+                        <div class="d-flex justify-between align-start mb-sm">
+                            <div>
+                                <p class="fw-semibold m-0">{{ review.user_name|default:"Anonymous" }}</p>
+                                <div class="d-flex gap-xxs mt-xs text-warning">
+                                    {% for i in "12345" %}
+                                        {% if forloop.counter <= review.rating %}
+                                        <ion-icon name="star"></ion-icon>
+                                        {% else %}
+                                        <ion-icon name="star-outline" class="text-medium"></ion-icon>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <span class="fs-xs text-medium">{{ review.created_at }}</span>
+                        </div>
+                        {% if review.title %}
+                        <h4 class="fw-semibold mb-xs m-0">{{ review.title }}</h4>
+                        {% endif %}
+                        <p class="text-medium m-0">{{ review.comment }}</p>
+                    {% endui_card %}
+                    {% endfor %}
+                    {% else %}
+                    {% ui_empty_state title=_("No reviews yet") description=_("Be the first to review this module") icon="chatbubbles-outline" %}
+                    {% endif %}
+                </div>
+
+                <!-- Changelog Tab -->
+                <div x-show="activeTab === 'changelog'" class="mt-lg">
+                    {% ui_card title=_("Changelog") %}
+                        {% if module.changelog %}
+                        <div class="markdown-content">
+                            {{ module.changelog|markdown }}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-xl">
+                            <ion-icon name="document-text-outline" class="fs-4xl text-medium"></ion-icon>
+                            <p class="text-medium mt-md m-0">{% trans "No changelog available" %}</p>
+                        </div>
+                        {% endif %}
+                    {% endui_card %}
+                </div>
+            </div>
+
+            <!-- Related Modules -->
+            {% if related_modules %}
+            <div class="mt-xl">
+                <h2 class="fs-xl fw-semibold mb-md">{% trans "Related Modules" %}</h2>
+                {% ui_grid_start padding=False %}
+                    {% ui_row_start %}
+                    {% for related in related_modules %}
+                        {% include "system/modules/partials/module_card.html" with module=related mode="marketplace" %}
+                    {% endfor %}
+                    {% ui_row_end %}
+                {% ui_grid_end %}
+            </div>
             {% endif %}
-        </div>
-
-        <!-- Changelog Tab -->
-        <div x-show="activeTab === 'changelog'" class="mt-lg">
-            {% ui_card title=_("Changelog") %}
-                {% if module.changelog %}
-                <div class="markdown-content">
-                    {{ module.changelog|markdown }}
-                </div>
-                {% else %}
-                <div class="text-center py-xl">
-                    <ion-icon name="document-text-outline" class="fs-4xl text-medium"></ion-icon>
-                    <p class="text-medium mt-md m-0">{% trans "No changelog available" %}</p>
-                </div>
-                {% endif %}
-            {% endui_card %}
-        </div>
-    </div>
-
-    <!-- Related Modules -->
-    {% if related_modules %}
-    <div class="mt-xl">
-        <h2 class="fs-xl fw-semibold mb-md">{% trans "Related Modules" %}</h2>
-        {% ui_grid_start padding=False %}
-            {% ui_row_start %}
-            {% for related in related_modules %}
-                {% include "system/modules/partials/module_card.html" with module=related mode="marketplace" %}
-            {% endfor %}
-            {% ui_row_end %}
-        {% ui_grid_end %}
-    </div>
-    {% endif %}
+        {% endfill %}
+    {% endcomponent %}
 
 {% endif %}
 

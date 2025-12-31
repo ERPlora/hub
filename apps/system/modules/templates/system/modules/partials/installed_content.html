@@ -1,43 +1,36 @@
-{% load i18n %}
-{% load ui %}
+{% load i18n ui component_tags %}
 
-{% if request.htmx %}
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-{% include "system/modules/partials/tabbar_system.html" with current_tab='installed' oob=True %}
-{% endif %}
+{% component "page" title=_("My Modules") subtitle=_("Installed modules in your Hub") %}
+    {% fill "content" %}
+        <!-- Search Bar -->
+        <form id="modules-search-form"
+            hx-get="{% url 'mymodules:index' %}"
+            hx-target="#modules-list"
+            hx-swap="innerHTML"
+            hx-trigger="submit, ionInput from:#modules-search delay:300ms"
+            hx-indicator="#modules-loading">
 
-<!-- Header -->
-{% ui_page_header title=_("My Modules") subtitle=_("Installed modules in your Hub") %}
+            <ion-searchbar
+                id="modules-search"
+                name="q"
+                placeholder="{% trans 'Search modules...' %}"
+                debounce="300"
+                show-cancel-button="never"
+                class="m-0 mb-md"
+                value="{{ request.GET.q|default:'' }}">
+            </ion-searchbar>
+        </form>
 
-<div class="ion-padding">
-    <!-- Search Bar -->
-    <form id="modules-search-form"
-        hx-get="{% url 'mymodules:index' %}"
-        hx-target="#modules-list"
-        hx-swap="innerHTML"
-        hx-trigger="submit, ionInput from:#modules-search delay:300ms"
-        hx-indicator="#modules-loading">
-
-        <ion-searchbar
-            id="modules-search"
-            name="q"
-            placeholder="{% trans 'Search modules...' %}"
-            debounce="300"
-            show-cancel-button="never"
-            class="m-0 mb-md"
-            value="{{ request.GET.q|default:'' }}">
-        </ion-searchbar>
-    </form>
-
-    <!-- Loading Spinner -->
-    <div id="modules-loading" class="htmx-indicator justify-center py-lg">
-        <ion-spinner name="crescent"></ion-spinner>
-    </div>
-
-    <!-- Modules List Container with internal scroll -->
-    <div id="modules-scroll-container" style="height: calc(100vh - 220px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
-        <div id="modules-list">
-            {% include "system/modules/partials/modules_list.html" %}
+        <!-- Loading Spinner -->
+        <div id="modules-loading" class="htmx-indicator justify-center py-lg">
+            <ion-spinner name="crescent"></ion-spinner>
         </div>
-    </div>
-</div>
+
+        <!-- Modules List Container with internal scroll -->
+        <div id="modules-scroll-container" style="height: calc(100vh - 220px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
+            <div id="modules-list">
+                {% include "system/modules/partials/modules_list.html" %}
+            </div>
+        </div>
+    {% endfill %}
+{% endcomponent %}
