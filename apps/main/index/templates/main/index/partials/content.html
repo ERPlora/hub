@@ -1,64 +1,29 @@
-{% load i18n %}
-{% load ui %}
-{% load component_tags %}
-
-{% if request.htmx %}
-<!-- Clear tab bar for home - home doesn't have module tabs -->
-<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
-{% endif %}
+{% load i18n ui component_tags %}
 
 {# Store modules data in a hidden element for JavaScript access #}
 <script id="modules-data" type="application/json">{{ modules_json|safe }}</script>
 
-<div class="ion-padding" x-data="moduleGrid">
-    {% ui_page_header title=_("Home") subtitle=_("Welcome to ERPlora Hub") %}
-
-    <!-- Search Bar -->
-    <div class="module-searchbar">
-        <ion-searchbar
-            placeholder="{% trans 'Search modules...' %}"
-            @ionInput="filterModules($event)"
-            debounce="300">
-        </ion-searchbar>
-    </div>
-
-    <!-- Favorites Section (only if there are favorites) -->
-    <template x-if="favoritesData.length > 0">
-        <div class="module-section">
-            <div class="module-section__header">
-                <ion-icon name="star" class="module-section__icon"></ion-icon>
-                <h3 class="module-section__title">{% trans "Favorites" %}</h3>
+{% component "page" title=_("Home") subtitle=_("Welcome to ERPlora Hub") %}
+    {% fill "content" %}
+        <div x-data="moduleGrid">
+            <!-- Search Bar -->
+            <div class="module-searchbar">
+                <ion-searchbar
+                    placeholder="{% trans 'Search modules...' %}"
+                    @ionInput="filterModules($event)"
+                    debounce="300">
+                </ion-searchbar>
             </div>
-            <div class="module-grid">
-                <template x-for="mod in favoritesData" :key="'fav-' + mod.id">
-                    <div class="module-app-icon"
-                         :hx-get="mod.url"
-                         hx-target="#main-content-area"
-                         hx-push-url="true"
-                         @click="trackRecent(mod.id)">
-                        <div class="module-app-icon__image"
-                             :class="'module-app-icon__image--' + mod.color">
-                            <ion-icon :name="mod.icon"></ion-icon>
-                        </div>
-                        <span class="module-app-icon__label" x-text="mod.label"></span>
-                        <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
+
+            <!-- Favorites Section (only if there are favorites) -->
+            <template x-if="favoritesData.length > 0">
+                <div class="module-section">
+                    <div class="module-section__header">
+                        <ion-icon name="star" class="module-section__icon"></ion-icon>
+                        <h3 class="module-section__title">{% trans "Favorites" %}</h3>
                     </div>
-                </template>
-            </div>
-        </div>
-    </template>
-
-    <!-- Recent Section (only if there are recent modules) - Swiper Carousel -->
-    <template x-if="recentData.length > 0">
-        <div class="module-section module-section--recent">
-            <div class="module-section__header">
-                <ion-icon name="time-outline" class="module-section__icon"></ion-icon>
-                <h3 class="module-section__title">{% trans "Recent" %}</h3>
-            </div>
-            {% component "horizontal_scroll" responsive=True bp_sm=2 bp_md=3 bp_lg=3 bp_xl=4 %}
-                {% fill "slides" %}
-                    <template x-for="mod in recentData" :key="'recent-' + mod.id">
-                        <swiper-slide>
+                    <div class="module-grid">
+                        <template x-for="mod in favoritesData" :key="'fav-' + mod.id">
                             <div class="module-app-icon"
                                  :hx-get="mod.url"
                                  hx-target="#main-content-area"
@@ -69,69 +34,99 @@
                                     <ion-icon :name="mod.icon"></ion-icon>
                                 </div>
                                 <span class="module-app-icon__label" x-text="mod.label"></span>
+                                <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
                             </div>
-                        </swiper-slide>
-                    </template>
-                {% endfill %}
-            {% endcomponent %}
-        </div>
-    </template>
-
-    <!-- All Modules Section -->
-    <div class="module-section">
-        <div class="module-section__header">
-            <ion-icon name="apps-outline" class="module-section__icon"></ion-icon>
-            <h3 class="module-section__title">{% trans "All Modules" %}</h3>
-        </div>
-        <div class="module-grid">
-            <!-- Dynamic modules from Alpine.js -->
-            <template x-for="mod in filteredModules" :key="mod.id">
-                <div class="module-app-icon"
-                     :hx-get="mod.url"
-                     hx-target="#main-content-area"
-                     hx-push-url="true"
-                     :data-module-id="mod.id"
-                     @click="trackRecent(mod.id)"
-                     @contextmenu.prevent="toggleFavorite(mod.id)">
-                    <div class="module-app-icon__image"
-                         :class="'module-app-icon__image--' + mod.color">
-                        <ion-icon :name="mod.icon"></ion-icon>
+                        </template>
                     </div>
-                    <span class="module-app-icon__label" x-text="mod.label"></span>
-                    <template x-if="isFavorite(mod.id)">
-                        <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
-                    </template>
                 </div>
             </template>
 
-            <!-- Add More Modules button -->
-            <div class="module-app-icon module-app-icon--add"
-                 hx-get="/marketplace/"
-                 hx-target="#main-content-area"
-                 hx-push-url="true">
-                <div class="module-app-icon__image">
-                    <ion-icon name="add"></ion-icon>
+            <!-- Recent Section (only if there are recent modules) - Swiper Carousel -->
+            <template x-if="recentData.length > 0">
+                <div class="module-section module-section--recent">
+                    <div class="module-section__header">
+                        <ion-icon name="time-outline" class="module-section__icon"></ion-icon>
+                        <h3 class="module-section__title">{% trans "Recent" %}</h3>
+                    </div>
+                    {% component "horizontal_scroll" responsive=True bp_sm=2 bp_md=3 bp_lg=3 bp_xl=4 %}
+                        {% fill "slides" %}
+                            <template x-for="mod in recentData" :key="'recent-' + mod.id">
+                                <swiper-slide>
+                                    <div class="module-app-icon"
+                                         :hx-get="mod.url"
+                                         hx-target="#main-content-area"
+                                         hx-push-url="true"
+                                         @click="trackRecent(mod.id)">
+                                        <div class="module-app-icon__image"
+                                             :class="'module-app-icon__image--' + mod.color">
+                                            <ion-icon :name="mod.icon"></ion-icon>
+                                        </div>
+                                        <span class="module-app-icon__label" x-text="mod.label"></span>
+                                    </div>
+                                </swiper-slide>
+                            </template>
+                        {% endfill %}
+                    {% endcomponent %}
                 </div>
-                <span class="module-app-icon__label">{% trans "Get More" %}</span>
-            </div>
-        </div>
-    </div>
+            </template>
 
-    <!-- Empty state when no modules and no search -->
-    <template x-if="modules.length === 0">
-        <div class="ui-empty-state">
-            <ion-icon name="extension-puzzle-outline" class="ui-empty-state-icon"></ion-icon>
-            <h3 class="ui-empty-state-title">{% trans "No modules installed" %}</h3>
-            <p class="ui-empty-state-description">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
-            <ion-button
-                hx-get="/marketplace/"
-                hx-target="#main-content-area"
-                hx-push-url="true">
-                <ion-icon slot="start" name="storefront-outline"></ion-icon>
-                {% trans "Browse Marketplace" %}
-            </ion-button>
+            <!-- All Modules Section -->
+            <div class="module-section">
+                <div class="module-section__header">
+                    <ion-icon name="apps-outline" class="module-section__icon"></ion-icon>
+                    <h3 class="module-section__title">{% trans "All Modules" %}</h3>
+                </div>
+                <div class="module-grid">
+                    <!-- Dynamic modules from Alpine.js -->
+                    <template x-for="mod in filteredModules" :key="mod.id">
+                        <div class="module-app-icon"
+                             :hx-get="mod.url"
+                             hx-target="#main-content-area"
+                             hx-push-url="true"
+                             :data-module-id="mod.id"
+                             @click="trackRecent(mod.id)"
+                             @contextmenu.prevent="toggleFavorite(mod.id)">
+                            <div class="module-app-icon__image"
+                                 :class="'module-app-icon__image--' + mod.color">
+                                <ion-icon :name="mod.icon"></ion-icon>
+                            </div>
+                            <span class="module-app-icon__label" x-text="mod.label"></span>
+                            <template x-if="isFavorite(mod.id)">
+                                <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Add More Modules button -->
+                    <div class="module-app-icon module-app-icon--add"
+                         hx-get="/marketplace/"
+                         hx-target="#main-content-area"
+                         hx-push-url="true">
+                        <div class="module-app-icon__image">
+                            <ion-icon name="add"></ion-icon>
+                        </div>
+                        <span class="module-app-icon__label">{% trans "Get More" %}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty state when no modules and no search -->
+            <template x-if="modules.length === 0">
+                <div class="ui-empty-state">
+                    <ion-icon name="extension-puzzle-outline" class="ui-empty-state-icon"></ion-icon>
+                    <h3 class="ui-empty-state-title">{% trans "No modules installed" %}</h3>
+                    <p class="ui-empty-state-description">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
+                    <ion-button
+                        hx-get="/marketplace/"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                        <ion-icon slot="start" name="storefront-outline"></ion-icon>
+                        {% trans "Browse Marketplace" %}
+                    </ion-button>
+                </div>
+            </template>
         </div>
-    </template>
-</div>
+    {% endfill %}
+{% endcomponent %}
 
 {# moduleGrid() is defined globally in ui-helpers.js #}

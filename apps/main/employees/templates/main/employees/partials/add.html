@@ -1,27 +1,24 @@
-{% load i18n ui %}
+{% load i18n ui component_tags %}
 
-{% if request.htmx %}
-<!-- Clear tab bar - Add Employee doesn't need tabs -->
-<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
-{% endif %}
+{% component "page" title=_("Add Employee") back_hx_get="/employees/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
+    {% fill "content" %}
+        <form hx-post="{% url 'main:employee_add' %}"
+              hx-target="#main-content-area"
+              hx-push-url="{% url 'main:employees' %}">
+            {% csrf_token %}
 
-{% ui_page_header title=_("Add Employee") back_hx_get="/employees/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
+            {% ui_card %}
+                {% ui_list_start %}
+                    {% ui_input name="name" label=_("Name") required=True %}
+                    {% ui_input name="email" label=_("Email") type="email" required=True %}
+                    {% ui_select name="role" label=_("Role") value="employee" options=role_options interface="popover" %}
+                    {% ui_input name="pin" label=_("PIN (4 digits)") type="password" maxlength="4" pattern="[0-9]{4}" required=True %}
+                {% ui_list_end %}
+            {% endui_card %}
 
-<form hx-post="{% url 'main:employee_add' %}"
-      hx-target="#main-content-area"
-      hx-push-url="{% url 'main:employees' %}">
-    {% csrf_token %}
-
-    {% ui_card %}
-        {% ui_list_start %}
-            {% ui_input name="name" label=_("Name") required=True %}
-            {% ui_input name="email" label=_("Email") type="email" required=True %}
-            {% ui_select name="role" label=_("Role") value="employee" options=role_options interface="popover" %}
-            {% ui_input name="pin" label=_("PIN (4 digits)") type="password" maxlength="4" pattern="[0-9]{4}" required=True %}
-        {% ui_list_end %}
-    {% endui_card %}
-
-    <div class="ion-padding-top">
-        {% ui_button type="submit" expand="block" label=_("Add Employee") icon="checkmark-outline" %}
-    </div>
-</form>
+            <div class="ion-padding-top">
+                {% ui_button type="submit" expand="block" label=_("Add Employee") icon="checkmark-outline" %}
+            </div>
+        </form>
+    {% endfill %}
+{% endcomponent %}

@@ -1,41 +1,36 @@
-{% load i18n ui %}
+{% load i18n ui component_tags %}
 
-{% if request.htmx %}
-<!-- Clear tab bar - Employees doesn't need tabs -->
-<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
-{% endif %}
+{% component "page" title=_("Employees") action_icon="add-outline" action_label=_("Add") action_hx_get="/employees/add/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
+    {% fill "content" %}
+        <!-- Search Bar -->
+        <form id="employees-search-form"
+            hx-get="{% url 'main:employees' %}"
+            hx-target="#employees-list"
+            hx-swap="innerHTML"
+            hx-trigger="submit, ionInput from:#employees-search delay:300ms"
+            hx-indicator="#employees-loading">
 
-{% ui_page_header title=_("Employees") action_icon="add-outline" action_label=_("Add") action_hx_get="/employees/add/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
+            <ion-searchbar
+                id="employees-search"
+                name="q"
+                placeholder="{% trans 'Search employees...' %}"
+                debounce="300"
+                show-cancel-button="never"
+                class="m-0 mb-md"
+                value="{{ request.GET.q|default:'' }}">
+            </ion-searchbar>
+        </form>
 
-<div class="ion-padding">
-    <!-- Search Bar -->
-    <form id="employees-search-form"
-        hx-get="{% url 'main:employees' %}"
-        hx-target="#employees-list"
-        hx-swap="innerHTML"
-        hx-trigger="submit, ionInput from:#employees-search delay:300ms"
-        hx-indicator="#employees-loading">
-
-        <ion-searchbar
-            id="employees-search"
-            name="q"
-            placeholder="{% trans 'Search employees...' %}"
-            debounce="300"
-            show-cancel-button="never"
-            class="m-0 mb-md"
-            value="{{ request.GET.q|default:'' }}">
-        </ion-searchbar>
-    </form>
-
-    <!-- Loading Spinner -->
-    <div id="employees-loading" class="htmx-indicator justify-center py-lg">
-        <ion-spinner name="crescent"></ion-spinner>
-    </div>
-
-    <!-- Employees List Container with internal scroll -->
-    <div id="employees-scroll-container" style="height: calc(100vh - 220px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
-        <div id="employees-list">
-            {% include "main/employees/partials/employees_list.html" %}
+        <!-- Loading Spinner -->
+        <div id="employees-loading" class="htmx-indicator justify-center py-lg">
+            <ion-spinner name="crescent"></ion-spinner>
         </div>
-    </div>
-</div>
+
+        <!-- Employees List Container with internal scroll -->
+        <div id="employees-scroll-container" style="height: calc(100vh - 220px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
+            <div id="employees-list">
+                {% include "main/employees/partials/employees_list.html" %}
+            </div>
+        </div>
+    {% endfill %}
+{% endcomponent %}

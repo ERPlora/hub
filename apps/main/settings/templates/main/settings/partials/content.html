@@ -1,20 +1,7 @@
 {% load i18n ui component_tags %}
 
-{% if request.htmx %}
-<!-- Clear tab bar - Settings doesn't need tabs -->
-<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
-{% endif %}
-
-{% csrf_token %}
-
-{# Page Header - matches the standard page pattern #}
-<ion-header>
-    <ion-toolbar>
-        <ion-title>{% trans "Settings" %}</ion-title>
-    </ion-toolbar>
-</ion-header>
-
-<div class="ion-padding">
+{% component "page" title=_("Settings") %}
+    {% fill "content" %}
     {# Store Information #}
     <ion-card class="m-0 mb-lg">
         <ion-card-content>
@@ -574,7 +561,8 @@
             </p>
         </div>
     </div>
-</div>
+    {% endfill %}
+{% endcomponent %}
 
 <style>
 .setting-form-grid {

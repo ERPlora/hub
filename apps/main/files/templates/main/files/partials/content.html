@@ -1,72 +1,67 @@
-{% load i18n %}
-{% load ui %}
+{% load i18n ui component_tags %}
 
-{% if request.htmx %}
-{# Clear tab bar - Files doesn't need tabs #}
-<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
-{% endif %}
+{% component "page" title=_("Files") %}
+    {% fill "content" %}
+        <div class="ui-grid--sidebar">
+            {# Left Column: Database + Storage (stacked) #}
+            <div class="ui-grid__aside">
+                {# Database Download Card #}
+                {% ui_card %}
+                    <div class="d-flex align-center gap-sm mb-sm">
+                        <ion-icon name="server-outline" class="fs-xl text-primary"></ion-icon>
+                        <div>
+                            <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Download backup" %}</p>
+                            <h2 class="fs-base fw-bold m-0">{% trans "Database" %}</h2>
+                        </div>
+                    </div>
+                    <p class="fs-sm text-secondary mb-md">
+                        {% trans "Download a backup of your SQLite database containing all your data." %}
+                    </p>
+                    {% ui_button label=_("Download Database") icon="cloud-download-outline" expand="block" href=download_url %}
+                {% endui_card %}
 
-{# Page Header #}
-{% ui_page_header title=_("Files") %}
+                {# Storage Info Card #}
+                {% ui_card %}
+                    <div class="d-flex align-center gap-sm mb-sm">
+                        <ion-icon name="pie-chart-outline" class="fs-xl text-primary"></ion-icon>
+                        <div>
+                            <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Disk usage" %}</p>
+                            <h2 class="fs-base fw-bold m-0">{% trans "Storage" %}</h2>
+                        </div>
+                    </div>
+                    <div id="storage-info"
+                         hx-get="{% url 'configuration:storage_info' %}"
+                         hx-trigger="load"
+                         hx-swap="innerHTML">
+                        {# Loading state #}
+                        <div class="d-flex justify-center p-md">
+                            <ion-spinner name="crescent"></ion-spinner>
+                        </div>
+                    </div>
+                {% endui_card %}
+            </div>
 
-<div class="ui-grid--sidebar">
-    {# Left Column: Database + Storage (stacked) #}
-    <div class="ui-grid__aside">
-        {# Database Download Card #}
-        {% ui_card %}
-            <div class="d-flex align-center gap-sm mb-sm">
-                <ion-icon name="server-outline" class="fs-xl text-primary"></ion-icon>
-                <div>
-                    <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Download backup" %}</p>
-                    <h2 class="fs-base fw-bold m-0">{% trans "Database" %}</h2>
-                </div>
+            {# Right Column: File Browser #}
+            <div class="ui-grid__main">
+                {% ui_card %}
+                    <div class="d-flex align-center gap-sm mb-md">
+                        <ion-icon name="folder-open-outline" class="fs-xl text-primary"></ion-icon>
+                        <div>
+                            <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Browse and download" %}</p>
+                            <h2 class="fs-base fw-bold m-0">{% trans "File Browser" %}</h2>
+                        </div>
+                    </div>
+                    <div id="file-browser-content"
+                         hx-get="{% url 'configuration:file_browser' %}?dir=media"
+                         hx-trigger="load"
+                         hx-swap="innerHTML">
+                        {# Loading state #}
+                        <div class="d-flex justify-center p-lg">
+                            <ion-spinner name="crescent"></ion-spinner>
+                        </div>
+                    </div>
+                {% endui_card %}
             </div>
-            <p class="fs-sm text-secondary mb-md">
-                {% trans "Download a backup of your SQLite database containing all your data." %}
-            </p>
-            {% ui_button label=_("Download Database") icon="cloud-download-outline" expand="block" href=download_url %}
-        {% endui_card %}
-
-        {# Storage Info Card #}
-        {% ui_card %}
-            <div class="d-flex align-center gap-sm mb-sm">
-                <ion-icon name="pie-chart-outline" class="fs-xl text-primary"></ion-icon>
-                <div>
-                    <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Disk usage" %}</p>
-                    <h2 class="fs-base fw-bold m-0">{% trans "Storage" %}</h2>
-                </div>
-            </div>
-            <div id="storage-info"
-                 hx-get="{% url 'configuration:storage_info' %}"
-                 hx-trigger="load"
-                 hx-swap="innerHTML">
-                {# Loading state #}
-                <div class="d-flex justify-center p-md">
-                    <ion-spinner name="crescent"></ion-spinner>
-                </div>
-            </div>
-        {% endui_card %}
-    </div>
-
-    {# Right Column: File Browser #}
-    <div class="ui-grid__main">
-        {% ui_card %}
-            <div class="d-flex align-center gap-sm mb-md">
-                <ion-icon name="folder-open-outline" class="fs-xl text-primary"></ion-icon>
-                <div>
-                    <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Browse and download" %}</p>
-                    <h2 class="fs-base fw-bold m-0">{% trans "File Browser" %}</h2>
-                </div>
-            </div>
-            <div id="file-browser-content"
-                 hx-get="{% url 'configuration:file_browser' %}?dir=media"
-                 hx-trigger="load"
-                 hx-swap="innerHTML">
-                {# Loading state #}
-                <div class="d-flex justify-center p-lg">
-                    <ion-spinner name="crescent"></ion-spinner>
-                </div>
-            </div>
-        {% endui_card %}
-    </div>
-</div>
+        </div>
+    {% endfill %}
+{% endcomponent %}

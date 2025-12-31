@@ -1,68 +1,65 @@
-{% load i18n ui %}
+{% load i18n ui component_tags %}
 
-{% if request.htmx %}
-<!-- Clear tab bar - Edit Employee doesn't need tabs -->
-<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML" style="display: none;"></ion-footer>
-{% endif %}
-
-{% ui_page_header title=_("Edit Employee") back_hx_get="/employees/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-
-<div x-data="{ confirmDelete: false }">
-    <form hx-post="{% url 'main:employee_edit' employee.id %}"
-          hx-target="#main-content-area"
-          hx-push-url="{% url 'main:employees' %}">
-        {% csrf_token %}
-
-        {% ui_card %}
-            {% ui_list_start %}
-                {% ui_input name="name" label=_("Name") value=employee.name required=True %}
-                {% ui_input name="email" label=_("Email") type="email" value=employee.email required=True %}
-                {% ui_select name="role" label=_("Role") value=employee.role options=role_options interface="popover" %}
-            {% ui_list_end %}
-        {% endui_card %}
-
-        <div class="ion-padding-top">
-            {% ui_button type="submit" expand="block" label=_("Save Changes") icon="checkmark-outline" %}
-        </div>
-    </form>
-
-    <!-- Reset PIN Section -->
-    {% ui_form_card title=_("Security") css_class="ion-margin-top" %}
-        <div id="pin-form-container">
-            <form hx-post="{% url 'main:employee_reset_pin' employee.id %}"
-                  hx-target="#pin-form-container"
-                  hx-swap="innerHTML">
+{% component "page" title=_("Edit Employee") back_hx_get="/employees/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
+    {% fill "content" %}
+        <div x-data="{ confirmDelete: false }">
+            <form hx-post="{% url 'main:employee_edit' employee.id %}"
+                  hx-target="#main-content-area"
+                  hx-push-url="{% url 'main:employees' %}">
                 {% csrf_token %}
-                {% ui_list_start %}
-                    {% ui_input name="pin" label=_("New PIN (4 digits)") type="password" maxlength="4" pattern="[0-9]{4}" required=True %}
-                {% ui_list_end %}
+
+                {% ui_card %}
+                    {% ui_list_start %}
+                        {% ui_input name="name" label=_("Name") value=employee.name required=True %}
+                        {% ui_input name="email" label=_("Email") type="email" value=employee.email required=True %}
+                        {% ui_select name="role" label=_("Role") value=employee.role options=role_options interface="popover" %}
+                    {% ui_list_end %}
+                {% endui_card %}
+
                 <div class="ion-padding-top">
-                    {% ui_button type="submit" expand="block" fill="outline" color="warning" label=_("Reset PIN") icon="key-outline" %}
+                    {% ui_button type="submit" expand="block" label=_("Save Changes") icon="checkmark-outline" %}
                 </div>
             </form>
-        </div>
-    {% endui_form_card %}
 
-    <!-- Delete Section -->
-    {% if employee.role != 'admin' %}
-    {% ui_form_card title=_("Danger Zone") title_color="danger" css_class="ion-margin-top" %}
-        <p class="text-medium ion-margin-bottom">{% trans "Deleting an employee will deactivate their account. This action can be undone by an admin." %}</p>
-
-        <template x-if="!confirmDelete">
-            <div>
-                {% ui_button expand="block" fill="outline" color="danger" label=_("Delete Employee") icon="trash-outline" x_click="confirmDelete = true" %}
-            </div>
-        </template>
-
-        <template x-if="confirmDelete">
-            <div>
-                <p class="text-danger fw-semibold ion-margin-bottom">{% trans "Are you sure you want to delete this employee?" %}</p>
-                <div class="d-flex gap-sm">
-                    {% ui_button fill="outline" color="medium" label=_("Cancel") x_click="confirmDelete = false" %}
-                    {% ui_button color="danger" label=_("Yes, Delete") icon="trash-outline" hx_post=employee_delete_url hx_target="#main-content-area" hx_push_url=employees_url %}
+            <!-- Reset PIN Section -->
+            {% ui_form_card title=_("Security") css_class="ion-margin-top" %}
+                <div id="pin-form-container">
+                    <form hx-post="{% url 'main:employee_reset_pin' employee.id %}"
+                          hx-target="#pin-form-container"
+                          hx-swap="innerHTML">
+                        {% csrf_token %}
+                        {% ui_list_start %}
+                            {% ui_input name="pin" label=_("New PIN (4 digits)") type="password" maxlength="4" pattern="[0-9]{4}" required=True %}
+                        {% ui_list_end %}
+                        <div class="ion-padding-top">
+                            {% ui_button type="submit" expand="block" fill="outline" color="warning" label=_("Reset PIN") icon="key-outline" %}
+                        </div>
+                    </form>
                 </div>
-            </div>
-        </template>
-    {% endui_form_card %}
-    {% endif %}
-</div>
+            {% endui_form_card %}
+
+            <!-- Delete Section -->
+            {% if employee.role != 'admin' %}
+            {% ui_form_card title=_("Danger Zone") title_color="danger" css_class="ion-margin-top" %}
+                <p class="text-medium ion-margin-bottom">{% trans "Deleting an employee will deactivate their account. This action can be undone by an admin." %}</p>
+
+                <template x-if="!confirmDelete">
+                    <div>
+                        {% ui_button expand="block" fill="outline" color="danger" label=_("Delete Employee") icon="trash-outline" x_click="confirmDelete = true" %}
+                    </div>
+                </template>
+
+                <template x-if="confirmDelete">
+                    <div>
+                        <p class="text-danger fw-semibold ion-margin-bottom">{% trans "Are you sure you want to delete this employee?" %}</p>
+                        <div class="d-flex gap-sm">
+                            {% ui_button fill="outline" color="medium" label=_("Cancel") x_click="confirmDelete = false" %}
+                            {% ui_button color="danger" label=_("Yes, Delete") icon="trash-outline" hx_post=employee_delete_url hx_target="#main-content-area" hx_push_url=employees_url %}
+                        </div>
+                    </div>
+                </template>
+            {% endui_form_card %}
+            {% endif %}
+        </div>
+    {% endfill %}
+{% endcomponent %}
