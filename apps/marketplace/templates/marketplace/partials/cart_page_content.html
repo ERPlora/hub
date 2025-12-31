@@ -1,135 +1,155 @@
 {% load i18n ui component_tags %}
 
-{% if request.htmx %}
-<!-- Tab bar update via OOB swap -->
-{% include "marketplace/partials/tabbar.html" with store_type=store_type current_view="cart" cart_count=cart.count oob=True %}
-<!-- Clear page header container -->
-<div id="page-header-container" hx-swap-oob="innerHTML"></div>
-{% endif %}
-
-{% ui_page_header title=_("Cart") back_hx_get="/marketplace/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-
-<div class="ion-padding">
-    {% if cart.items %}
-    <ion-card class="m-0 mb-lg">
-        <ion-card-content>
-            <ion-list lines="full" id="cart-items">
-                {% for item in cart.items %}
-                <ion-item-sliding>
-                    <ion-item>
-                        <ion-icon name="{{ item.icon|default:'cube-outline' }}" slot="start" color="primary" style="font-size: 28px;"></ion-icon>
-                        <ion-label>
-                            <h2 class="fw-semibold">{{ item.name }}</h2>
-                            <p class="text-medium">{{ item.description|truncatechars:60 }}</p>
-                        </ion-label>
-                        <div slot="end" class="d-flex align-center gap-sm">
-                            {% if item.price == 0 %}
-                            <ion-chip color="success">{% trans "Free" %}</ion-chip>
-                            {% else %}
-                            <span class="fw-semibold">{{ item.price|floatformat:2 }} EUR</span>
-                            {% if item.quantity > 1 %}
-                            <span class="text-medium">x {{ item.quantity }}</span>
-                            {% endif %}
-                            {% endif %}
-                            <ion-button
-                                fill="clear"
+{% component "page" title=_("Cart") back_hx_get="/marketplace/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
+    {# Marketplace tabbar - manual since it's not a module #}
+    <script>
+    (function() {
+        if (typeof window.updateGlobalTabBar === 'function') {
+            window.updateGlobalTabBar([
+                {
+                    url: '{% url "marketplace:index" %}',
+                    icon: 'cube-outline',
+                    label: '{% trans "Modules" %}',
+                    active: false
+                },
+                {
+                    url: '{% url "marketplace:store_hubs" %}',
+                    icon: 'server-outline',
+                    label: '{% trans "Hubs" %}',
+                    active: false
+                },
+                {
+                    url: '{% url "marketplace:cart_page" %}',
+                    icon: 'cart-outline',
+                    label: '{% trans "Cart" %}',
+                    active: true
+                }
+            ]);
+        }
+    })();
+    </script>
+    {% fill "content" %}
+        {% if cart.items %}
+        <ion-card class="m-0 mb-lg">
+            <ion-card-content>
+                <ion-list lines="full" id="cart-items">
+                    {% for item in cart.items %}
+                    <ion-item-sliding>
+                        <ion-item>
+                            <ion-icon name="{{ item.icon|default:'cube-outline' }}" slot="start" color="primary" style="font-size: 28px;"></ion-icon>
+                            <ion-label>
+                                <h2 class="fw-semibold">{{ item.name }}</h2>
+                                <p class="text-medium">{{ item.description|truncatechars:60 }}</p>
+                            </ion-label>
+                            <div slot="end" class="d-flex align-center gap-sm">
+                                {% if item.price == 0 %}
+                                <ion-chip color="success">{% trans "Free" %}</ion-chip>
+                                {% else %}
+                                <span class="fw-semibold">{{ item.price|floatformat:2 }} EUR</span>
+                                {% if item.quantity > 1 %}
+                                <span class="text-medium">x {{ item.quantity }}</span>
+                                {% endif %}
+                                {% endif %}
+                                <ion-button
+                                    fill="clear"
+                                    color="danger"
+                                    hx-delete="{% url 'marketplace:cart_remove' item.id %}"
+                                    hx-target="#main-content-area"
+                                    hx-push-url="false">
+                                    <ion-icon name="trash-outline" slot="icon-only"></ion-icon>
+                                </ion-button>
+                            </div>
+                        </ion-item>
+                        <ion-item-options side="end">
+                            <ion-item-option
                                 color="danger"
                                 hx-delete="{% url 'marketplace:cart_remove' item.id %}"
                                 hx-target="#main-content-area"
                                 hx-push-url="false">
-                                <ion-icon name="trash-outline" slot="icon-only"></ion-icon>
-                            </ion-button>
-                        </div>
-                    </ion-item>
-                    <ion-item-options side="end">
-                        <ion-item-option
-                            color="danger"
-                            hx-delete="{% url 'marketplace:cart_remove' item.id %}"
-                            hx-target="#main-content-area"
-                            hx-push-url="false">
-                            <ion-icon name="trash" slot="icon-only"></ion-icon>
-                        </ion-item-option>
-                    </ion-item-options>
-                </ion-item-sliding>
-                {% endfor %}
-            </ion-list>
-        </ion-card-content>
-    </ion-card>
+                                <ion-icon name="trash" slot="icon-only"></ion-icon>
+                            </ion-item-option>
+                        </ion-item-options>
+                    </ion-item-sliding>
+                    {% endfor %}
+                </ion-list>
+            </ion-card-content>
+        </ion-card>
 
-    <!-- Cart Summary -->
-    <ion-card class="m-0 mb-lg">
-        <ion-card-content>
-            <div class="d-flex justify-between align-center mb-md">
-                <span class="fs-lg">{% trans "Subtotal" %}</span>
-                <span class="fs-lg fw-semibold">
-                    {% if cart.subtotal == 0 %}
-                    {% trans "Free" %}
-                    {% else %}
-                    {{ cart.subtotal|floatformat:2 }} EUR
-                    {% endif %}
-                </span>
-            </div>
+        <!-- Cart Summary -->
+        <ion-card class="m-0 mb-lg">
+            <ion-card-content>
+                <div class="d-flex justify-between align-center mb-md">
+                    <span class="fs-lg">{% trans "Subtotal" %}</span>
+                    <span class="fs-lg fw-semibold">
+                        {% if cart.subtotal == 0 %}
+                        {% trans "Free" %}
+                        {% else %}
+                        {{ cart.subtotal|floatformat:2 }} EUR
+                        {% endif %}
+                    </span>
+                </div>
 
-            {% if cart.tax > 0 %}
-            <div class="d-flex justify-between align-center mb-md text-medium">
-                <span>{% trans "Tax" %} ({{ cart.tax_rate }}%)</span>
-                <span>{{ cart.tax|floatformat:2 }} EUR</span>
-            </div>
-            {% endif %}
+                {% if cart.tax > 0 %}
+                <div class="d-flex justify-between align-center mb-md text-medium">
+                    <span>{% trans "Tax" %} ({{ cart.tax_rate }}%)</span>
+                    <span>{{ cart.tax|floatformat:2 }} EUR</span>
+                </div>
+                {% endif %}
 
-            <div class="d-flex justify-between align-center pt-md" style="border-top: 2px solid var(--color-primary);">
-                <span class="fs-xl fw-bold">{% trans "Total" %}</span>
-                <span class="fs-xl fw-bold text-primary">
-                    {% if cart.total == 0 %}
-                    {% trans "Free" %}
-                    {% else %}
-                    {{ cart.total|floatformat:2 }} EUR
-                    {% endif %}
-                </span>
-            </div>
-        </ion-card-content>
-    </ion-card>
+                <div class="d-flex justify-between align-center pt-md" style="border-top: 2px solid var(--color-primary);">
+                    <span class="fs-xl fw-bold">{% trans "Total" %}</span>
+                    <span class="fs-xl fw-bold text-primary">
+                        {% if cart.total == 0 %}
+                        {% trans "Free" %}
+                        {% else %}
+                        {{ cart.total|floatformat:2 }} EUR
+                        {% endif %}
+                    </span>
+                </div>
+            </ion-card-content>
+        </ion-card>
 
-    <!-- Actions -->
-    <ion-button expand="block" size="large" class="mb-md">
-        <ion-icon slot="start" name="card-outline"></ion-icon>
-        {% trans "Proceed to Checkout" %}
-    </ion-button>
-
-    <ion-button
-        expand="block"
-        fill="outline"
-        color="danger"
-        hx-delete="{% url 'marketplace:cart_clear' %}"
-        hx-target="#main-content-area"
-        hx-push-url="false">
-        <ion-icon slot="start" name="trash-outline"></ion-icon>
-        {% trans "Clear Cart" %}
-    </ion-button>
-
-    {% else %}
-    <!-- Empty Cart State -->
-    <div class="ui-empty-state">
-        <ion-icon name="cart-outline" class="ui-empty-state-icon"></ion-icon>
-        <h3 class="ui-empty-state-title">{% trans "Your cart is empty" %}</h3>
-        <p class="ui-empty-state-description">{% trans "Browse the marketplace to find modules and services for your Hub." %}</p>
-        <ion-button
-            hx-get="{% url 'marketplace:index' %}"
-            hx-target="#main-content-area"
-            hx-push-url="true">
-            <ion-icon slot="start" name="storefront-outline"></ion-icon>
-            {% trans "Browse Marketplace" %}
+        <!-- Actions -->
+        <ion-button expand="block" size="large" class="mb-md">
+            <ion-icon slot="start" name="card-outline"></ion-icon>
+            {% trans "Proceed to Checkout" %}
         </ion-button>
-    </div>
-    {% endif %}
 
-    <!-- Info Footer -->
-    <div class="mt-lg p-md rounded-lg" style="background: var(--bg-color-secondary);">
-        <div class="d-flex align-start gap-sm">
-            <ion-icon name="information-circle-outline" style="font-size: 20px; color: var(--color-primary); flex-shrink: 0; margin-top: 2px;"></ion-icon>
-            <p class="fs-sm text-secondary m-0">
-                {% trans "All modules include a 15-day free trial. You won't be charged until the trial period ends." %}
-            </p>
+        <ion-button
+            expand="block"
+            fill="outline"
+            color="danger"
+            hx-delete="{% url 'marketplace:cart_clear' %}"
+            hx-target="#main-content-area"
+            hx-push-url="false">
+            <ion-icon slot="start" name="trash-outline"></ion-icon>
+            {% trans "Clear Cart" %}
+        </ion-button>
+
+        {% else %}
+        <!-- Empty Cart State -->
+        <div class="ui-empty-state">
+            <ion-icon name="cart-outline" class="ui-empty-state-icon"></ion-icon>
+            <h3 class="ui-empty-state-title">{% trans "Your cart is empty" %}</h3>
+            <p class="ui-empty-state-description">{% trans "Browse the marketplace to find modules and services for your Hub." %}</p>
+            <ion-button
+                hx-get="{% url 'marketplace:index' %}"
+                hx-target="#main-content-area"
+                hx-push-url="true">
+                <ion-icon slot="start" name="storefront-outline"></ion-icon>
+                {% trans "Browse Marketplace" %}
+            </ion-button>
         </div>
-    </div>
-</div>
+        {% endif %}
+
+        <!-- Info Footer -->
+        <div class="mt-lg p-md rounded-lg" style="background: var(--bg-color-secondary);">
+            <div class="d-flex align-start gap-sm">
+                <ion-icon name="information-circle-outline" style="font-size: 20px; color: var(--color-primary); flex-shrink: 0; margin-top: 2px;"></ion-icon>
+                <p class="fs-sm text-secondary m-0">
+                    {% trans "All modules include a 15-day free trial. You won't be charged until the trial period ends." %}
+                </p>
+            </div>
+        </div>
+    {% endfill %}
+{% endcomponent %}

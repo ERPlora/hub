@@ -62,7 +62,7 @@ def get_store_config(store_type):
 
 
 @login_required
-@htmx_view('marketplace/pages/store.html', 'marketplace/partials/store_content.html')
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/marketplace_content.html')
 def store_index(request, store_type='modules'):
     """
     Main marketplace view with ion-menus for filters and cart.
@@ -293,7 +293,7 @@ def cart_view(request, store_type):
 
 
 @login_required
-@htmx_view('marketplace/pages/store.html', 'marketplace/partials/cart_page_content.html')
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/cart_page_content.html')
 def cart_page(request, store_type='modules'):
     """
     Full cart page view.
@@ -514,7 +514,7 @@ def _fetch_hubs_list(request, search_query, cursor, page_size):
 # Module Detail View
 
 @login_required
-@htmx_view('marketplace/pages/store.html', 'marketplace/partials/module_detail_content.html')
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/module_detail_content.html')
 def module_detail(request, slug):
     """
     Module detail page view.

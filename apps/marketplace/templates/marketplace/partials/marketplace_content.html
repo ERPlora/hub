@@ -1,66 +1,86 @@
 {% load i18n static ui component_tags %}
 
-{% if request.htmx %}
-<!-- Tab bar update via OOB swap -->
-{% include "marketplace/partials/tabbar.html" with store_type=store_type cart_count=cart_count oob=True %}
-<!-- Clear page header container -->
-<div id="page-header-container" hx-swap-oob="innerHTML"></div>
-{% endif %}
-
-{% ui_page_header title=page_title action_icon="cart-outline" action_badge=cart_count action_hx_get="/marketplace/cart/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
-
-<div class="ion-padding">
-    <form id="marketplace-filters-form"
-        hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
-        hx-target="#products-grid" hx-swap="innerHTML"
-        hx-trigger="submit, change from:input[type=hidden], ionInput from:#search-input delay:300ms"
-        hx-indicator="#loading-spinner">
-
-        <div class="d-flex gap-sm mb-md align-center">
-            <ion-searchbar id="search-input" name="q" placeholder="{% trans 'Search...' %}" debounce="300"
-                show-cancel-button="never" class="flex-1 m-0" value="{{ request.GET.q|default:'' }}">
-            </ion-searchbar>
-            <ion-button id="filter-toggle-btn" fill="outline" type="button" onclick="openFiltersModal()">
-                <ion-icon name="options-outline" slot="icon-only"></ion-icon>
-                {% if active_filters_count %}
-                <ion-badge color="danger"
-                    style="position: absolute; top: -4px; right: -4px; font-size: 10px; min-width: 18px; height: 18px; border-radius: 50%;">
-                    {{ active_filters_count }}
-                </ion-badge>
-                {% endif %}
-            </ion-button>
-        </div>
-
-        <!-- Hidden inputs for filters -->
-        <input type="hidden" name="category" id="filter-category" value="{{ request.GET.category|default:'' }}">
-        <input type="hidden" name="industry" id="filter-industry" value="{{ request.GET.industry|default:'' }}">
-        <input type="hidden" name="type" id="filter-type" value="{{ request.GET.type|default:'' }}">
-        <input type="hidden" name="region" id="filter-region" value="{{ request.GET.region|default:'' }}">
-        <input type="hidden" name="plan" id="filter-plan" value="{{ request.GET.plan|default:'' }}">
-
-        <!-- Active Filters Display -->
-        <div id="active-filters" class="d-flex flex-wrap gap-sm mb-md align-center" style="display: none;">
-            <span class="fs-sm text-medium">{% trans "Active:" %}</span>
-            <div id="active-filters-chips"></div>
-        </div>
-    </form>
-
-    <!-- Loading Spinner -->
-    <div id="loading-spinner" class="htmx-indicator justify-center py-xl">
-        <ion-spinner name="crescent"></ion-spinner>
-    </div>
-
-    <!-- Products Grid Container with scroll -->
-    <div id="products-scroll-container" style="height: 65vh; overflow-y: auto; -webkit-overflow-scrolling: touch;">
-        <div id="products-grid"
+{% component "page" title=page_title action_icon="cart-outline" action_badge=cart_count action_hx_get="/marketplace/cart/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
+    {# Marketplace tabbar - manual since it's not a module #}
+    <script>
+    (function() {
+        if (typeof window.updateGlobalTabBar === 'function') {
+            window.updateGlobalTabBar([
+                {
+                    url: '{% url "marketplace:index" %}',
+                    icon: 'cube-outline',
+                    label: '{% trans "Modules" %}',
+                    active: {% if store_type == 'modules' %}true{% else %}false{% endif %}
+                },
+                {
+                    url: '{% url "marketplace:store_hubs" %}',
+                    icon: 'server-outline',
+                    label: '{% trans "Hubs" %}',
+                    active: {% if store_type == 'hubs' %}true{% else %}false{% endif %}
+                },
+                {
+                    url: '{% url "marketplace:cart_page" %}',
+                    icon: 'cart-outline',
+                    label: '{% trans "Cart" %}',
+                    active: {% if current_view == 'cart' %}true{% else %}false{% endif %}
+                }
+            ]);
+        }
+    })();
+    </script>
+    {% fill "content" %}
+        <form id="marketplace-filters-form"
             hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
-            hx-trigger="load" hx-swap="innerHTML" hx-indicator="#loading-spinner">
-            <div class="d-flex justify-center py-xl">
-                <ion-spinner name="crescent"></ion-spinner>
+            hx-target="#products-grid" hx-swap="innerHTML"
+            hx-trigger="submit, change from:input[type=hidden], ionInput from:#search-input delay:300ms"
+            hx-indicator="#loading-spinner">
+
+            <div class="d-flex gap-sm mb-md align-center">
+                <ion-searchbar id="search-input" name="q" placeholder="{% trans 'Search...' %}" debounce="300"
+                    show-cancel-button="never" class="flex-1 m-0" value="{{ request.GET.q|default:'' }}">
+                </ion-searchbar>
+                <ion-button id="filter-toggle-btn" fill="outline" type="button" onclick="openFiltersModal()">
+                    <ion-icon name="options-outline" slot="icon-only"></ion-icon>
+                    {% if active_filters_count %}
+                    <ion-badge color="danger"
+                        style="position: absolute; top: -4px; right: -4px; font-size: 10px; min-width: 18px; height: 18px; border-radius: 50%;">
+                        {{ active_filters_count }}
+                    </ion-badge>
+                    {% endif %}
+                </ion-button>
+            </div>
+
+            <!-- Hidden inputs for filters -->
+            <input type="hidden" name="category" id="filter-category" value="{{ request.GET.category|default:'' }}">
+            <input type="hidden" name="industry" id="filter-industry" value="{{ request.GET.industry|default:'' }}">
+            <input type="hidden" name="type" id="filter-type" value="{{ request.GET.type|default:'' }}">
+            <input type="hidden" name="region" id="filter-region" value="{{ request.GET.region|default:'' }}">
+            <input type="hidden" name="plan" id="filter-plan" value="{{ request.GET.plan|default:'' }}">
+
+            <!-- Active Filters Display -->
+            <div id="active-filters" class="d-flex flex-wrap gap-sm mb-md align-center" style="display: none;">
+                <span class="fs-sm text-medium">{% trans "Active:" %}</span>
+                <div id="active-filters-chips"></div>
+            </div>
+        </form>
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="htmx-indicator justify-center py-xl">
+            <ion-spinner name="crescent"></ion-spinner>
+        </div>
+
+        <!-- Products Grid Container with scroll -->
+        <div id="products-scroll-container" style="height: 65vh; overflow-y: auto; -webkit-overflow-scrolling: touch;">
+            <div id="products-grid"
+                hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
+                hx-trigger="load" hx-swap="innerHTML" hx-indicator="#loading-spinner">
+                <div class="d-flex justify-center py-xl">
+                    <ion-spinner name="crescent"></ion-spinner>
+                </div>
             </div>
         </div>
-    </div>
-</div>
+    {% endfill %}
+{% endcomponent %}
 
 <!-- Filters Modal -->
 <ion-modal id="filters-modal">

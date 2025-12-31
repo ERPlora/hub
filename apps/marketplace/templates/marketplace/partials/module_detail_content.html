@@ -1,17 +1,34 @@
 {% load i18n ui component_tags %}
 
-{% if request.htmx %}
-<!-- Tab bar update via OOB swap -->
-{% include "marketplace/partials/tabbar.html" with store_type="modules" cart_count=cart_count oob=True %}
-<!-- Page header update via OOB swap -->
-<div id="page-header-container" hx-swap-oob="innerHTML">
-{% if module %}
-{% component "page_header" title=module.name back_url="marketplace:index" %}{% endcomponent %}
-{% else %}
-{% component "page_header" title=_("Module Details") back_url="marketplace:index" %}{% endcomponent %}
-{% endif %}
-</div>
-{% endif %}
+{% component "page" title=module.name|default:_("Module Details") back_hx_get="/marketplace/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
+    {# Marketplace tabbar - manual since it's not a module #}
+    <script>
+    (function() {
+        if (typeof window.updateGlobalTabBar === 'function') {
+            window.updateGlobalTabBar([
+                {
+                    url: '{% url "marketplace:index" %}',
+                    icon: 'cube-outline',
+                    label: '{% trans "Modules" %}',
+                    active: true
+                },
+                {
+                    url: '{% url "marketplace:store_hubs" %}',
+                    icon: 'server-outline',
+                    label: '{% trans "Hubs" %}',
+                    active: false
+                },
+                {
+                    url: '{% url "marketplace:cart_page" %}',
+                    icon: 'cart-outline',
+                    label: '{% trans "Cart" %}',
+                    active: false
+                }
+            ]);
+        }
+    })();
+    </script>
+    {% fill "content" %}
 
 {% if error %}
     <!-- Error State -->
@@ -300,6 +317,9 @@
     </div>
 
 {% endif %}
+
+    {% endfill %}
+{% endcomponent %}
 
 <!-- Module action handlers -->
 <script>
