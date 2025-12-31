@@ -1,29 +1,52 @@
 {% load i18n ui component_tags %}
+{#
+    List Page Component - Para páginas de listado de módulos
 
-{# Tab bar update via OOB swap (only on HTMX navigation) #}
-{% if request.htmx %}
-    {% if page_module_id %}
-        {# New system: use tabbar component with module_id #}
-        {% component "tabbar" module_id=page_module_id current_view=tabbar_view oob=True %}{% endcomponent %}
-    {% elif tabbar_template %}
-        {# Legacy: include template directly #}
-        {% include tabbar_template with current_view=tabbar_view oob=True %}
-    {% endif %}
-{% endif %}
+    Genera estructura: content-header + page-content
+    Se swappea en #main-content-area (div en app_base.html).
+    El tabbar se actualiza via JavaScript.
+
+    NOTE: NO genera ion-page porque va dentro de #main-content-area.
+
+    Params:
+        title: Título de la página
+        subtitle: Subtítulo opcional
+        module_id: ID del módulo (para tabbar)
+        tabbar_view: Vista actual del tabbar
+        action_icon: Icono de acción en header
+        action_label: Label de acción en header
+        action_url: URL de acción en header
+        action_hx_target: Target HTMX de acción
+#}
+
+{# Page Header (secondary - inside main-content-area) #}
+{% ui_page_header title=title subtitle=subtitle action_icon=action_icon action_label=action_label action_hx_get=action_url action_hx_target=action_hx_target action_hx_push_url="true" %}
 
 {# CSRF token for JavaScript #}
 {% csrf_token %}
 
-{# Page Header with back button #}
-{% ui_page_header title=title action_icon=action_icon action_label=action_label action_hx_get=action_url action_hx_target=action_hx_target action_hx_push_url="true" %}
-
-<div class="ion-padding">
+{# Main Content #}
+<div class="page-content ion-padding">
     {# Optional Stats Section #}
     {% slot "stats" %}{% endslot %}
 
-    {# Filters Card #}
+    {# Filters Section #}
     {% slot "filters" %}{% endslot %}
 
     {# Main Content (Table/List) #}
     {% slot "content" %}{% endslot %}
 </div>
+
+{# Tab bar - updated via JavaScript #}
+{% if page_module_id %}
+    {% component "tabbar" module_id=page_module_id current_view=tabbar_view %}{% endcomponent %}
+{% else %}
+    {# No module = clear tabbar #}
+    <script>
+    (function() {
+        if (typeof window.updateGlobalTabBar === 'function') {
+            window.updateGlobalTabBar([]);
+        }
+    })();
+    </script>
+{% endif %}

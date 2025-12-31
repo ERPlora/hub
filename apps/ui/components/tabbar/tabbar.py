@@ -1,23 +1,17 @@
 """
 tabbar component - Ion Tab Bar for module navigation.
 
-Two modes of usage:
-
-1. Automatic mode (loads tabs from module.json):
-    {% component "tabbar" module_id="inventory" current_view="products" %}{% endcomponent %}
-
-2. Manual mode with slots (legacy, for custom tabs):
-    {% component "tabbar" current_view=current_view %}
-        {% fill "tabs" %}
-            {% component "tab" url="inventory:dashboard" icon="grid-outline" label=_("Overview") view="dashboard" %}{% endcomponent %}
-        {% endfill %}
-    {% endcomponent %}
-
-For HTMX OOB swap (in content partials):
-    {% if request.htmx %}
+Usage:
     {% component "tabbar" module_id="inventory" current_view="products" oob=True %}{% endcomponent %}
-    {% endif %}
 
+Parameters:
+    module_id: Module identifier to load tabs from module.json
+    current_view: Current view identifier to highlight active tab
+    oob: If True, renders with hx-swap-oob for #global-tabbar (default: True)
+    color: Tab bar color (default: light)
+    max_visible: Maximum visible tabs before showing "More" (default: 5)
+
+The tabbar is sent via OOB swap to #global-tabbar in app_base.html.
 If module.json has no "tabs" section, nothing is rendered.
 If there are more than 5 tabs, shows 4 + "More" button with action sheet.
 """
@@ -36,34 +30,24 @@ class TabBar(Component):
         self,
         module_id: str = "",
         current_view: str = "",
-        oob: bool = False,
-        wrapper: bool = True,
+        oob: bool = True,
         color: str = "light",
         max_visible: int = 5,
         **kwargs
     ):
-        """
-        Args:
-            module_id: Module identifier to load tabs from module.json
-            current_view: Current view identifier to highlight active tab
-            oob: If True, adds hx-swap-oob for HTMX
-            wrapper: If True, wraps in ion-footer (default). If False, outputs only ion-tab-bar
-            color: Tab bar color (default: light)
-            max_visible: Maximum visible tabs before showing "More" (default: 5)
-        """
         # If module_id provided, load tabs from module.json
         tabs = []
         if module_id:
             tabs = self._load_tabs_from_module(module_id)
 
-        # If no tabs from module.json, render nothing (or use slots)
+        # If no tabs from module.json, render empty tabbar (to clear previous)
         if not tabs and module_id:
             return {
-                "render": False,
+                "render": True,  # Still render to clear the tabbar
+                "visible_tabs": [],
                 "use_slots": False,
                 "active_view": current_view,
                 "oob": oob,
-                "wrapper": wrapper,
                 "color": color,
             }
 
@@ -74,7 +58,6 @@ class TabBar(Component):
                 "use_slots": True,
                 "active_view": current_view,
                 "oob": oob,
-                "wrapper": wrapper,
                 "color": color,
                 **kwargs,
             }
@@ -101,7 +84,6 @@ class TabBar(Component):
             "overflow_tabs": overflow_tabs,
             "active_view_in_overflow": active_view_in_overflow,
             "oob": oob,
-            "wrapper": wrapper,
             "color": color,
             **kwargs,
         }

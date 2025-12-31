@@ -1,23 +1,28 @@
 {% load i18n ui component_tags %}
+{#
+    Settings Page Component - Para páginas de configuración de módulos
 
-{# Tabbar OOB swap for HTMX navigation #}
-{% if request.htmx %}
-    {% if page_module_id %}
-        {# New system: use tabbar component with module_id #}
-        {% component "tabbar" module_id=page_module_id current_view=tabbar_view oob=True %}{% endcomponent %}
-    {% elif tabbar_template %}
-        {# Legacy: include template directly #}
-        {% include tabbar_template with current_view=tabbar_view oob=True %}
-    {% endif %}
-{% endif %}
+    Genera estructura: content-header + page-content
+    Se swappea en #main-content-area (div en app_base.html).
+    El tabbar se actualiza via JavaScript.
+
+    NOTE: NO genera ion-page porque va dentro de #main-content-area.
+
+    Params:
+        title: Título de la página
+        module_id: ID del módulo (para tabbar)
+        tabbar_view: Vista actual del tabbar
+        alpine_app: Nombre de la app Alpine.js (opcional)
+#}
+
+{# Page Header (secondary - inside main-content-area) #}
+{% ui_page_header title=title %}
 
 {# CSRF token for JavaScript/HTMX #}
 {% csrf_token %}
 
-{# Page Header with back button #}
-{% ui_page_header title=title %}
-
-<div {% if alpine_app %}x-data="{{ alpine_app }}()" x-init="init()"{% endif %} class="ion-padding">
+{# Main Content #}
+<div class="page-content ion-padding"{% if alpine_app %} x-data="{{ alpine_app }}()" x-init="init()"{% endif %}>
     {# Info slot - for read-only global config sections #}
     {% slot "info" %}{% endslot %}
 
@@ -34,3 +39,17 @@
     {# Footer info slot - for help text #}
     {% slot "footer" %}{% endslot %}
 </div>
+
+{# Tab bar - updated via JavaScript #}
+{% if page_module_id %}
+    {% component "tabbar" module_id=page_module_id current_view=tabbar_view %}{% endcomponent %}
+{% else %}
+    {# No module = clear tabbar #}
+    <script>
+    (function() {
+        if (typeof window.updateGlobalTabBar === 'function') {
+            window.updateGlobalTabBar([]);
+        }
+    })();
+    </script>
+{% endif %}
