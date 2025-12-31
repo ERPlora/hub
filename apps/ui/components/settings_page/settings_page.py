@@ -35,10 +35,11 @@ class SettingsPage(Component):
             save_url: URL for saving settings (used by Alpine.js)
             alpine_app: Name of Alpine.js app function (e.g., "settingsApp")
         """
+        # Rename to avoid conflict with context processor's module_id
         return {
             "title": title,
             "subtitle": subtitle,
-            "module_id": module_id,
+            "page_module_id": module_id,
             "tabbar_template": tabbar_template,
             "tabbar_view": tabbar_view,
             "save_url": save_url,

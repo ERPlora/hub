@@ -52,6 +52,7 @@ class ListPage(Component):
         tabbar_view: str = "",
         **kwargs
     ):
+        # Rename to avoid conflict with context processor's module_id
         return {
             "title": title,
             "subtitle": subtitle,
@@ -59,7 +60,7 @@ class ListPage(Component):
             "action_url": action_url,
             "action_icon": action_icon,
             "action_hx_target": action_hx_target,
-            "module_id": module_id,
+            "page_module_id": module_id,
             "tabbar_template": tabbar_template,
             "tabbar_view": tabbar_view,
             **kwargs,

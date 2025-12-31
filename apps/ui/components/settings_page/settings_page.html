@@ -2,9 +2,9 @@
 
 {# Tabbar OOB swap for HTMX navigation #}
 {% if request.htmx %}
-    {% if module_id %}
+    {% if page_module_id %}
         {# New system: use tabbar component with module_id #}
-        {% component "tabbar" module_id=module_id current_view=tabbar_view oob=True %}{% endcomponent %}
+        {% component "tabbar" module_id=page_module_id current_view=tabbar_view oob=True %}{% endcomponent %}
     {% elif tabbar_template %}
         {# Legacy: include template directly #}
         {% include tabbar_template with current_view=tabbar_view oob=True %}
