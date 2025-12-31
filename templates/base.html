@@ -353,9 +353,16 @@
         htmx.config.allowScriptTags = true;
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Include CSRF token in all HTMX requests
+            // Include CSRF token and module ID in all HTMX requests
             document.body.addEventListener('htmx:configRequest', function(event) {
                 event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+
+                // Include current module ID for navigation context detection
+                // This allows the server to know if we're navigating within the same module
+                var currentModule = document.body.getAttribute('data-module-id');
+                if (currentModule) {
+                    event.detail.headers['X-Module-Id'] = currentModule;
+                }
             });
 
             // Re-initialize Alpine components after HTMX settles

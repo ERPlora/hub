@@ -231,3 +231,61 @@ class ModuleLoader:
 
 # Global module loader instance
 module_loader = ModuleLoader()
+
+
+def get_module_py(module_id: str):
+    """
+    Import and return the module.py configuration file for a module.
+
+    Args:
+        module_id: The module identifier (e.g., 'inventory', 'sections')
+
+    Returns:
+        The imported module.py module object, or None if not found
+
+    Usage:
+        module_py = get_module_py('inventory')
+        navigation = module_py.NAVIGATION  # List of nav items
+        module_name = module_py.MODULE_NAME  # Translated name
+    """
+    try:
+        # Try to import {module_id}.module (e.g., inventory.module)
+        module_config = importlib.import_module(f"{module_id}.module")
+        return module_config
+    except ImportError:
+        # Fallback: return empty module-like object
+        print(f"[WARNING] No module.py found for {module_id}")
+        return type('EmptyModule', (), {
+            'MODULE_ID': module_id,
+            'MODULE_NAME': module_id.title(),
+            'NAVIGATION': [],
+            'MENU': {},
+        })()
+
+
+def get_module_navigation(module_id: str) -> list:
+    """
+    Get navigation items for a module with URLs resolved.
+
+    Args:
+        module_id: The module identifier
+
+    Returns:
+        List of navigation items with 'url' field populated
+    """
+    module_py = get_module_py(module_id)
+    navigation = getattr(module_py, 'NAVIGATION', [])
+
+    # Build navigation with resolved URLs
+    nav_items = []
+    for nav in navigation:
+        item = dict(nav)  # Copy to avoid modifying original
+        # Generate URL from view name
+        view_name = item.get('view', item.get('id', ''))
+        item['url'] = f"/m/{module_id}/{view_name}/" if view_name else f"/m/{module_id}/"
+        # Convert lazy strings to str for JSON serialization
+        if hasattr(item.get('label'), '__str__'):
+            item['label'] = str(item['label'])
+        nav_items.append(item)
+
+    return nav_items
