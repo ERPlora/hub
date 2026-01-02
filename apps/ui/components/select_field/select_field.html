@@ -1,0 +1,22 @@
+{% load i18n %}
+{# Select Field Component - Pure HTMX, no JavaScript #}
+<ion-select
+    {% if name %}name="{{ name }}"{% endif %}
+    {% if value %}value="{{ value }}"{% endif %}
+    {% if label %}label="{{ label }}"{% endif %}
+    {% if label_placement %}label-placement="{{ label_placement }}"{% endif %}
+    {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+    interface="{{ interface|default:'popover' }}"
+    {% if disabled %}disabled{% endif %}
+    {% if hx_post %}
+    hx-post="{{ hx_post }}"
+    hx-trigger="ionChange"
+    hx-vals='js:{"name": "{{ name }}", "value": event.detail.value}'
+    hx-include="[name='csrfmiddlewaretoken']"
+    hx-swap="{{ hx_swap }}"
+    {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
+    {% endif %}>
+    {% for option in options %}
+    <ion-select-option value="{{ option.value }}">{{ option.label }}</ion-select-option>
+    {% endfor %}
+</ion-select>
