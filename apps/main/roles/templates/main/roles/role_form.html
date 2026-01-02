@@ -1,0 +1,66 @@
+{% extends "layouts/module_page.html" %}
+{% load i18n %}
+
+{% block page_content %}
+<ion-content>
+    <div class="ion-padding">
+        <div class="card-form" style="max-width: 600px; margin: 0 auto;">
+            <h2 class="text-lg font-semibold mb-lg">
+                {% if role %}{% trans "Edit Role" %}{% else %}{% trans "Create Role" %}{% endif %}
+            </h2>
+
+            <form method="post">
+                {% csrf_token %}
+
+                {% if not role %}
+                <div class="form-item mb-md">
+                    <ion-item>
+                        <ion-input
+                            name="name"
+                            label="{% trans 'Role Name' %}"
+                            label-placement="stacked"
+                            placeholder="{% trans 'e.g., cashier, supervisor' %}"
+                            required
+                            pattern="[a-z_]+"
+                            helper-text="{% trans 'Lowercase letters and underscores only. Cannot be changed later.' %}"></ion-input>
+                    </ion-item>
+                </div>
+                {% endif %}
+
+                <div class="form-item mb-md">
+                    <ion-item>
+                        <ion-input
+                            name="display_name"
+                            label="{% trans 'Display Name' %}"
+                            label-placement="stacked"
+                            placeholder="{% trans 'e.g., Cashier, Supervisor' %}"
+                            value="{{ role.display_name|default:'' }}"
+                            required></ion-input>
+                    </ion-item>
+                </div>
+
+                <div class="form-item mb-lg">
+                    <ion-item>
+                        <ion-textarea
+                            name="description"
+                            label="{% trans 'Description' %}"
+                            label-placement="stacked"
+                            placeholder="{% trans 'Describe what this role can do...' %}"
+                            rows="3">{{ role.description|default:'' }}</ion-textarea>
+                    </ion-item>
+                </div>
+
+                <div class="form-actions">
+                    <ion-button type="button" fill="outline" href="{{ back_url }}">
+                        {% trans "Cancel" %}
+                    </ion-button>
+                    <ion-button type="submit" color="primary">
+                        <ion-icon slot="start" name="checkmark-outline"></ion-icon>
+                        {% if role %}{% trans "Save Changes" %}{% else %}{% trans "Create Role" %}{% endif %}
+                    </ion-button>
+                </div>
+            </form>
+        </div>
+    </div>
+</ion-content>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "layouts/module_page.html" %}
+{% load i18n %}
+
+{% block page_content %}
+<ion-content>
+    <div class="ion-padding">
+        <!-- Header actions -->
+        <div class="flex justify-between items-center mb-lg">
+            <h1 class="text-xl font-semibold">{% trans "Roles" %}</h1>
+            <div class="flex gap-sm">
+                <ion-button href="{% url 'main:roles:sync_permissions' %}" fill="outline" size="small">
+                    <ion-icon slot="start" name="sync-outline"></ion-icon>
+                    {% trans "Sync Permissions" %}
+                </ion-button>
+                <ion-button href="{% url 'main:roles:create_defaults' %}" fill="outline" size="small">
+                    <ion-icon slot="start" name="shield-outline"></ion-icon>
+                    {% trans "Create Defaults" %}
+                </ion-button>
+                <ion-button href="{% url 'main:roles:create' %}" color="primary">
+                    <ion-icon slot="start" name="add-outline"></ion-icon>
+                    {% trans "New Role" %}
+                </ion-button>
+            </div>
+        </div>
+
+        <!-- Roles list -->
+        {% if roles %}
+        <ion-list class="list-clean">
+            {% for role in roles %}
+            <ion-item href="{% url 'main:roles:detail' role_id=role.id %}" detail="true" class="list-item-clickable">
+                <ion-icon slot="start" name="{% if role.name == 'admin' %}shield-checkmark{% elif role.name == 'manager' %}briefcase{% else %}person{% endif %}-outline" color="{% if role.name == 'admin' %}primary{% elif role.name == 'manager' %}tertiary{% else %}success{% endif %}"></ion-icon>
+                <ion-label>
+                    <h2>{{ role.display_name }}</h2>
+                    <p>{{ role.description|default:"-"|truncatewords:15 }}</p>
+                </ion-label>
+                <ion-note slot="end">
+                    {{ role.user_count }} {% trans "users" %}
+                </ion-note>
+                {% if role.is_system %}
+                <ion-badge slot="end" color="medium">{% trans "System" %}</ion-badge>
+                {% endif %}
+                {% if not role.is_active %}
+                <ion-badge slot="end" color="warning">{% trans "Inactive" %}</ion-badge>
+                {% endif %}
+            </ion-item>
+            {% endfor %}
+        </ion-list>
+        {% else %}
+        <div class="empty-state">
+            <ion-icon name="shield-outline" class="empty-state-icon"></ion-icon>
+            <h3>{% trans "No roles yet" %}</h3>
+            <p>{% trans "Create default roles or add a custom role to get started." %}</p>
+            <ion-button href="{% url 'main:roles:create_defaults' %}">
+                <ion-icon slot="start" name="shield-outline"></ion-icon>
+                {% trans "Create Default Roles" %}
+            </ion-button>
+        </div>
+        {% endif %}
+    </div>
+</ion-content>
+{% endblock %}

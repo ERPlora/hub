@@ -6,6 +6,7 @@ Flat URL structure for clear navigation states:
 /files/         File browser
 /settings/      Settings
 /employees/     Employee management
+/roles/         Roles and permissions management
 """
 from django.urls import path, include
 
@@ -27,4 +28,7 @@ urlpatterns = [
 
     # Employees (includes index + API endpoints)
     path('employees/', include('apps.main.employees.urls')),
+
+    # Roles and permissions
+    path('roles/', include('apps.main.roles.urls')),
 ]
