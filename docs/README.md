@@ -141,6 +141,47 @@ Ver documentación completa: [CLOUD.md](CLOUD.md)
 
 Los modules son Django apps que se cargan dinámicamente. El Hub incluye **25 librerías Python pre-empaquetadas**.
 
+### Configuración de Módulos
+
+Cada módulo define su configuración en `module.py`:
+
+```python
+from django.utils.translation import gettext_lazy as _
+
+MODULE_ID = "inventory"
+MODULE_NAME = _("Inventory")
+MODULE_ICON = "icon.svg"  # SVG/PNG in static/icons/ (fallback: Ionicon name)
+MODULE_VERSION = "1.0.0"
+MODULE_CATEGORY = "inventory"
+
+MENU = {
+    "label": _("Inventory"),
+    "icon": "icon.svg",  # Same as MODULE_ICON
+    "order": 10,
+    "show": True,
+}
+
+NAVIGATION = [
+    {"id": "dashboard", "label": _("Overview"), "icon": "grid-outline", "view": ""},
+    {"id": "products", "label": _("Products"), "icon": "cube-outline", "view": "products"},
+]
+
+DEPENDENCIES = []
+SETTINGS = {}
+PERMISSIONS = ["inventory.view_product", "inventory.add_product"]
+```
+
+Ver documentación completa: [modules/README.md](../../modules/README.md)
+
+### Iconos de Módulos
+
+Los módulos pueden usar iconos SVG personalizados. Fuente recomendada: [React Icons](https://react-icons.github.io/react-icons/)
+
+- **Prioridad**: SVG local > PNG local > Ionicon (MODULE_ICON) > Fallback
+- **Ubicación**: `{module}/static/icons/icon.svg`
+
+Ver documentación: [MODULE_ICONS.md](MODULE_ICONS.md)
+
 ### Activación por Filesystem
 
 | Prefijo | Estado | Descripción |
@@ -276,7 +317,9 @@ Ver documentación completa: [PRINTING_SYSTEM.md](PRINTING_SYSTEM.md)
 |-----------|-------------|
 | [CLOUD.md](CLOUD.md) | Comunicación Hub ↔ Cloud |
 | [GLOBAL_CONFIGURATION.md](GLOBAL_CONFIGURATION.md) | Sistema de configuración |
+| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) | Sistema de roles y permisos |
 | [MODULE_DEPENDENCIES.md](MODULE_DEPENDENCIES.md) | Arquitectura de modules |
+| [MODULE_ICONS.md](MODULE_ICONS.md) | Sistema de iconos SVG |
 | [MODULE_LIBRARIES_COMPLETE.md](MODULE_LIBRARIES_COMPLETE.md) | 25 librerías permitidas |
 | [MODULE_ACTIVATION_FLOW.md](MODULE_ACTIVATION_FLOW.md) | Flujo de activación |
 | [MODULE_RUNTIME_ANALYSIS.md](MODULE_RUNTIME_ANALYSIS.md) | Análisis del runtime |
@@ -304,10 +347,10 @@ ERPlora Hub está licenciado bajo **Business Source License 1.1 (BUSL-1.1)**.
 - Revender o sublicenciar
 
 ### 🔄 Conversión a Open Source
-Después del **2030-01-07**, se convierte en **Apache License 2.0**.
+Después del **2036-01-02**, se convierte en **Apache License 2.0**.
 
 ---
 
-**Última actualización**: 2025-11-30
+**Última actualización**: 2026-01-02
 **Django**: 5.1
 **Python**: 3.11+

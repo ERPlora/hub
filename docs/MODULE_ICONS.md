@@ -1,27 +1,86 @@
 # Module Icons System
 
-ERPlora supports custom SVG and PNG icons for modules, with Ionic icons as fallback.
+ERPlora uses custom SVG and PNG icons for modules. Each module stores its icon in the `static/icons/` directory.
 
-## Icon Priority
+## Icon Location
 
-When rendering a module icon, the system checks in this order:
-
-1. **Local SVG** - `{module}/static/icons/icon.svg` (inline, preferred)
-2. **Local PNG** - `{module}/static/icons/icon.png` (base64 embedded)
-3. **Ionic icon** - From `module.json` → `icon` field
-4. **Fallback** - `cube-outline`
-
-## Directory Structure
+Icons are stored within each module's static folder:
 
 ```
 modules/
 └── my_module/
-    ├── module.json
+    ├── module.py
     ├── static/
     │   └── icons/
-    │       ├── icon.svg      # Preferred (inline, scalable)
-    │       └── icon.png      # Fallback (base64 embedded)
+    │       ├── icon.svg      # SVG icon (preferred)
+    │       └── icon.png      # PNG icon (alternative)
     └── ...
+```
+
+## module.py Configuration
+
+The `MODULE_ICON` field in `module.py` specifies the icon filename (relative to `static/icons/`):
+
+```python
+# modules/sales/module.py
+from django.utils.translation import gettext_lazy as _
+
+MODULE_ID = "sales"
+MODULE_NAME = _("Sales")
+MODULE_ICON = "icon.svg"  # Located at static/icons/icon.svg
+MODULE_VERSION = "1.0.0"
+MODULE_CATEGORY = "pos"
+
+MENU = {
+    "label": _("Sales"),
+    "icon": "icon.svg",  # Same icon for menu
+    "order": 20,
+    "show": True,
+}
+```
+
+### Icon Resolution
+
+The system loads the icon from: `{module}/static/icons/{MODULE_ICON}`
+
+- If `MODULE_ICON = "icon.svg"` → loads `sales/static/icons/icon.svg`
+- If `MODULE_ICON = "icon.png"` → loads `sales/static/icons/icon.png`
+- If not found → falls back to `cube-outline` (default Ionicon)
+
+## Recommended Icon Source: React Icons
+
+**Primary source for module icons**: [https://react-icons.github.io/react-icons/](https://react-icons.github.io/react-icons/)
+
+React Icons provides access to multiple icon libraries in one place:
+- **Ionicons 5** (io5) - Already used in ERPlora, consistent style
+- **Heroicons** (hi, hi2) - Clean, modern design
+- **Feather Icons** (fi) - Minimal, stroke-based
+- **Phosphor Icons** (pi) - Flexible weights
+- **Tabler Icons** (tb) - 4000+ icons, MIT license
+
+### How to Download Icons from React Icons
+
+1. Go to [react-icons.github.io/react-icons](https://react-icons.github.io/react-icons/)
+2. Search for your icon (e.g., "cart", "inventory", "users")
+3. Click on the icon to see its SVG code
+4. Copy the SVG path data
+5. Create your `icon.svg` file with the template below
+
+### SVG Template for React Icons
+
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <!-- Paste path data from React Icons here -->
+  <path d="..."/>
+</svg>
+```
+
+For stroke-based icons (like Ionicons, Feather):
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Paste path data here -->
+  <path d="..."/>
+</svg>
 ```
 
 ## Supported Formats
@@ -88,17 +147,11 @@ Or for stroked icons:
 ### Render module icon
 
 ```django
-{# Auto-detects SVG/PNG or falls back to Ionic #}
+{# Auto-loads SVG/PNG from module's static/icons/ #}
 {% module_icon module_id="sales" css_class="text-primary" size="text-2xl" %}
 
 {# From module metadata dict #}
 {% module_icon_component module=module_data css_class="text-xl" %}
-```
-
-### Render explicit Ionic icon (no file lookup)
-
-```django
-{% module_icon icon="cart-outline" css_class="text-primary" %}
 ```
 
 ### Render SVG from path
@@ -113,32 +166,14 @@ You can use icons from any source, as long as you have the license:
 
 ### Free Icon Libraries (SVG)
 
+- **[React Icons](https://react-icons.github.io/react-icons/)** - Multiple libraries in one place
 - **[Heroicons](https://heroicons.com/)** - MIT license, clean design
 - **[Lucide](https://lucide.dev/)** - ISC license, fork of Feather
 - **[Tabler Icons](https://tabler-icons.io/)** - MIT license, 4000+ icons
 - **[Material Symbols](https://fonts.google.com/icons)** - Apache 2.0
 - **[Phosphor Icons](https://phosphoricons.com/)** - MIT license
 - **[Remix Icon](https://remixicon.com/)** - Apache 2.0
-
-### Ionic Icons (Fallback)
-
-If no local icon is provided, the system uses Ionic icons. Browse available icons:
-- https://ionic.io/ionicons
-
-## module.json Icon Field
-
-The `icon` field in module.json is used as fallback when no local icon exists:
-
-```json
-{
-  "module_id": "sales",
-  "name": "Sales & POS",
-  "icon": "cart-outline",
-  "menu": {
-    "icon": "cart-outline"
-  }
-}
-```
+- **[Ionicons](https://ionic.io/ionicons)** - MIT license
 
 ## Best Practices
 
