@@ -20,11 +20,9 @@ def role_list(request):
     roles = Role.objects.filter(
         hub_id=hub_id,
         is_deleted=False
-    ).order_by('name')
+    ).prefetch_related('permissions', 'users').order_by('-is_system', 'name')
 
-    # Get user count for each role
-    for role in roles:
-        role.user_count = role.users.filter(is_deleted=False).count()
+    # user_count is calculated in template via role.users.count
 
     return render(request, 'main/roles/role_list.html', {
         'roles': roles,

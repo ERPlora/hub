@@ -108,6 +108,7 @@ INSTALLED_APPS = [
     'apps.main.settings.apps.MainSettingsConfig',
     'apps.main.employees.apps.MainEmployeesConfig',
     'apps.main.setup.apps.SetupConfig',
+    'apps.main.roles.apps.RolesConfig',
     # Hub apps - System
     'apps.system.modules.apps.SystemModulesConfig',
     # Hub apps - Marketplace
