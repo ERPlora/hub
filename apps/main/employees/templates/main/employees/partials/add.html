@@ -11,7 +11,7 @@
                 {% ui_list_start %}
                     {% ui_input name="name" label=_("Name") required=True %}
                     {% ui_input name="email" label=_("Email") type="email" required=True %}
-                    {% ui_select name="role" label=_("Role") value="employee" options=role_options interface="popover" %}
+                    {% ui_select name="role_id" label=_("Role") options=role_options interface="popover" %}
                     {% ui_input name="pin" label=_("PIN (4 digits)") type="password" maxlength="4" pattern="[0-9]{4}" required=True %}
                 {% ui_list_end %}
             {% endui_card %}

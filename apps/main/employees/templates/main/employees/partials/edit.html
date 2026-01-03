@@ -12,7 +12,7 @@
                     {% ui_list_start %}
                         {% ui_input name="name" label=_("Name") value=employee.name required=True %}
                         {% ui_input name="email" label=_("Email") type="email" value=employee.email required=True %}
-                        {% ui_select name="role" label=_("Role") value=employee.role options=role_options interface="popover" %}
+                        {% ui_select name="role_id" label=_("Role") value=employee.role_obj.id|default:"" options=role_options interface="popover" %}
                     {% ui_list_end %}
                 {% endui_card %}
 
@@ -39,7 +39,7 @@
             {% endui_form_card %}
 
             <!-- Delete Section -->
-            {% if employee.role != 'admin' %}
+            {% if employee.get_role_name != 'admin' %}
             {% ui_form_card title=_("Danger Zone") title_color="danger" css_class="ion-margin-top" %}
                 <p class="text-medium ion-margin-bottom">{% trans "Deleting an employee will deactivate their account. This action can be undone by an admin." %}</p>
 

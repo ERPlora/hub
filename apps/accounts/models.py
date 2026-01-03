@@ -362,7 +362,14 @@ class LocalUser(HubBaseModel):
             'manager': 'tertiary',
             'employee': 'success',
         }
-        return role_colors.get(self.role, 'medium')
+        return role_colors.get(self.get_role_name(), 'medium')
+
+    def get_role_display(self):
+        """Return human-readable role name for display."""
+        if self.role_obj:
+            return self.role_obj.display_name
+        # Fallback to legacy role with capitalization
+        return self.role.capitalize() if self.role else 'Employee'
 
     @property
     def is_cloud_user(self):

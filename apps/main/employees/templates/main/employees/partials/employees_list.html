@@ -17,7 +17,7 @@
                     <div class="flex-1 min-w-0">
                         <h3 class="fw-semibold text-truncate m-0">{{ user.name }}</h3>
                         <p class="fs-sm text-medium text-truncate m-0">{{ user.email }}</p>
-                        {% ui_chip label=user.role color=user.get_role_color css_class="ion-margin-top" %}
+                        {% ui_chip label=user.get_role_display color=user.get_role_color css_class="ion-margin-top" %}
                     </div>
                     <ion-icon name="chevron-forward-outline" class="text-medium"></ion-icon>
                 </div>

@@ -12,15 +12,13 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
-from apps.accounts.models import LocalUser
+from apps.accounts.models import LocalUser, Role
 
 
-# Role options for select component
-ROLE_OPTIONS = [
-    {'value': 'admin', 'label': _('Admin')},
-    {'value': 'manager', 'label': _('Manager')},
-    {'value': 'employee', 'label': _('Employee')},
-]
+def get_role_options():
+    """Get role options from database for select component."""
+    roles = Role.objects.filter(is_active=True).order_by('name')
+    return [{'value': str(role.id), 'label': role.display_name} for role in roles]
 
 
 @login_required
@@ -36,7 +34,8 @@ def index(request):
         local_users = local_users.filter(
             Q(name__icontains=search_query) |
             Q(email__icontains=search_query) |
-            Q(role__icontains=search_query)
+            Q(role_obj__name__icontains=search_query) |
+            Q(role_obj__display_name__icontains=search_query)
         )
 
     local_users = local_users.order_by('name')
@@ -60,10 +59,12 @@ def index(request):
 @htmx_view('main/employees/pages/index.html', 'main/employees/partials/add.html')
 def add(request):
     """Add employee page (GET) or create employee (POST)"""
+    role_options = get_role_options()
+
     if request.method == 'POST':
         name = request.POST.get('name')
         email = request.POST.get('email')
-        role = request.POST.get('role', 'employee')
+        role_id = request.POST.get('role_id')
         pin = request.POST.get('pin')
 
         if not name or not email or not pin:
@@ -71,7 +72,7 @@ def add(request):
             return {
                 'current_section': 'employees',
                 'page_title': 'Add Employee',
-                'role_options': ROLE_OPTIONS,
+                'role_options': role_options,
             }
 
         if len(pin) != 4 or not pin.isdigit():
@@ -79,7 +80,7 @@ def add(request):
             return {
                 'current_section': 'employees',
                 'page_title': 'Add Employee',
-                'role_options': ROLE_OPTIONS,
+                'role_options': role_options,
             }
 
         if LocalUser.objects.filter(email=email).exists():
@@ -87,15 +88,23 @@ def add(request):
             return {
                 'current_section': 'employees',
                 'page_title': 'Add Employee',
-                'role_options': ROLE_OPTIONS,
+                'role_options': role_options,
             }
+
+        # Get role object (default to employee if not found)
+        role_obj = None
+        if role_id:
+            role_obj = Role.objects.filter(id=role_id, is_active=True).first()
+        if not role_obj:
+            role_obj = Role.objects.filter(name='employee', is_active=True).first()
 
         # Create local-only employee
         user = LocalUser.objects.create(
             cloud_user_id=None,
             email=email,
             name=name,
-            role=role
+            role_obj=role_obj,
+            role=role_obj.name if role_obj else 'employee',  # Keep legacy field in sync
         )
         user.set_pin(pin)
         user.save()
@@ -113,7 +122,7 @@ def add(request):
     return {
         'current_section': 'employees',
         'page_title': 'Add Employee',
-        'role_options': ROLE_OPTIONS,
+        'role_options': role_options,
     }
 
 
@@ -122,19 +131,20 @@ def add(request):
 def edit(request, employee_id):
     """Edit employee page (GET) or update employee (POST)"""
     employee = get_object_or_404(LocalUser, id=employee_id, is_active=True)
+    role_options = get_role_options()
 
     if request.method == 'POST':
         name = request.POST.get('name')
         email = request.POST.get('email')
-        role = request.POST.get('role')
+        role_id = request.POST.get('role_id')
 
-        if not name or not email or not role:
+        if not name or not email:
             messages.error(request, 'Please fill all required fields')
             return {
                 'current_section': 'employees',
                 'page_title': 'Edit Employee',
                 'employee': employee,
-                'role_options': ROLE_OPTIONS,
+                'role_options': role_options,
                 'employee_delete_url': reverse('main:employee_delete', args=[employee.id]),
                 'employees_url': reverse('main:employees'),
             }
@@ -146,14 +156,21 @@ def edit(request, employee_id):
                 'current_section': 'employees',
                 'page_title': 'Edit Employee',
                 'employee': employee,
-                'role_options': ROLE_OPTIONS,
+                'role_options': role_options,
                 'employee_delete_url': reverse('main:employee_delete', args=[employee.id]),
                 'employees_url': reverse('main:employees'),
             }
 
+        # Get role object
+        role_obj = None
+        if role_id:
+            role_obj = Role.objects.filter(id=role_id, is_active=True).first()
+
         employee.name = name
         employee.email = email
-        employee.role = role
+        if role_obj:
+            employee.role_obj = role_obj
+            employee.role = role_obj.name  # Keep legacy field in sync
         employee.save()
 
         messages.success(request, 'Employee updated successfully')
@@ -170,7 +187,7 @@ def edit(request, employee_id):
         'current_section': 'employees',
         'page_title': 'Edit Employee',
         'employee': employee,
-        'role_options': ROLE_OPTIONS,
+        'role_options': role_options,
         'employee_delete_url': reverse('main:employee_delete', args=[employee.id]),
         'employees_url': reverse('main:employees'),
     }
@@ -204,7 +221,7 @@ def delete(request, employee_id):
     employee = get_object_or_404(LocalUser, id=employee_id, is_active=True)
 
     # Prevent deleting admin users
-    if employee.role == 'admin':
+    if employee.get_role_name() == 'admin':
         messages.error(request, 'Cannot delete admin users')
         return {
             'current_section': 'employees',
