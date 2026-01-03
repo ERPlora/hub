@@ -172,6 +172,7 @@ def cloud_login(request):
 
                 # Save hub_jwt if Cloud returned it (Hub registration)
                 hub_jwt = auth_data.get('hub_jwt')
+                hub_refresh_token = auth_data.get('hub_refresh_token')
                 hub_id = auth_data.get('hub_id')
                 public_key = auth_data.get('public_key')
 
@@ -179,6 +180,8 @@ def cloud_login(request):
                     hub_config = HubConfig.get_config()
                     hub_config.hub_id = hub_id
                     hub_config.hub_jwt = hub_jwt
+                    if hub_refresh_token:
+                        hub_config.hub_refresh_token = hub_refresh_token
                     if public_key:
                         hub_config.cloud_public_key = public_key
                     hub_config.is_configured = True

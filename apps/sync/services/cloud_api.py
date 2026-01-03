@@ -36,6 +36,7 @@ class CloudAPIService:
     - Command polling
     - Module marketplace access
     - Configuration sync
+    - Automatic token refresh on 401
 
     All requests use JWT authentication.
     """
@@ -43,15 +44,70 @@ class CloudAPIService:
     DEFAULT_TIMEOUT = 10  # seconds
 
     def __init__(self):
+        self._reload_config()
+
+    def _reload_config(self):
+        """Reload configuration from database."""
         self.config = HubConfig.get_solo()
         self.base_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
         self.hub_jwt = self.config.hub_jwt
+        self.hub_refresh_token = getattr(self.config, 'hub_refresh_token', '')
         self.hub_id = str(self.config.hub_id) if self.config.hub_id else None
 
     @property
     def is_configured(self) -> bool:
         """Check if Hub is configured with Cloud credentials."""
         return bool(self.hub_jwt and self.hub_id)
+
+    def refresh_token(self) -> bool:
+        """
+        Refresh the Hub JWT token using the refresh token.
+
+        Returns:
+            True if token was refreshed successfully, False otherwise
+        """
+        if not self.hub_refresh_token:
+            logger.warning("[CLOUD API] No refresh token available")
+            return False
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/hubs/token/refresh/",
+                json={'refresh_token': self.hub_refresh_token},
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                new_access_token = data.get('access_token')
+                new_refresh_token = data.get('refresh_token')
+
+                if new_access_token:
+                    # Update stored tokens
+                    config = HubConfig.get_solo()
+                    config.hub_jwt = new_access_token
+                    if new_refresh_token:
+                        config.hub_refresh_token = new_refresh_token
+                    config.save()
+
+                    # Update instance variables
+                    self.hub_jwt = new_access_token
+                    if new_refresh_token:
+                        self.hub_refresh_token = new_refresh_token
+
+                    logger.info("[CLOUD API] Token refreshed successfully")
+                    return True
+
+            elif response.status_code == 401:
+                logger.warning("[CLOUD API] Refresh token expired - re-authentication required")
+
+            else:
+                logger.warning(f"[CLOUD API] Token refresh failed: {response.status_code}")
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"[CLOUD API] Token refresh error: {str(e)}")
+
+        return False
 
     def _get_headers(self) -> Dict[str, str]:
         """Build request headers with JWT authentication."""
@@ -71,10 +127,13 @@ class CloudAPIService:
         endpoint: str,
         data: Dict = None,
         params: Dict = None,
-        timeout: int = None
+        timeout: int = None,
+        _retry_on_401: bool = True
     ) -> Dict[str, Any]:
         """
         Make authenticated request to Cloud API.
+
+        Automatically refreshes token on 401 and retries once.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
@@ -82,6 +141,7 @@ class CloudAPIService:
             data: Request body (for POST/PUT)
             params: Query parameters
             timeout: Request timeout in seconds
+            _retry_on_401: Internal flag to prevent infinite retry loops
 
         Returns:
             Response JSON data
@@ -110,9 +170,22 @@ class CloudAPIService:
                 f"[CLOUD API] {method.upper()} {endpoint} -> {response.status_code}"
             )
 
-            # Handle response
+            # Handle 401 - try to refresh token and retry
+            if response.status_code == 401 and _retry_on_401:
+                logger.warning("[CLOUD API] Unauthorized - attempting token refresh")
+                if self.refresh_token():
+                    # Retry the request with new token
+                    return self._request(
+                        method, endpoint, data, params, timeout,
+                        _retry_on_401=False  # Don't retry again
+                    )
+                else:
+                    raise CloudAPIError(
+                        "Unauthorized - JWT expired and refresh failed",
+                        status_code=401
+                    )
+
             if response.status_code == 401:
-                logger.warning("[CLOUD API] Unauthorized - JWT may be expired")
                 raise CloudAPIError(
                     "Unauthorized - JWT expired or invalid",
                     status_code=401

@@ -191,6 +191,10 @@ class HubConfig(SingletonConfigMixin, models.Model):
         blank=True,
         help_text='JWT token for Hub-to-Cloud authentication (RS256, 1 year)'
     )
+    hub_refresh_token = models.TextField(
+        blank=True,
+        help_text='Refresh token for Hub JWT (RS256, 2 years)'
+    )
     cloud_public_key = models.TextField(
         blank=True,
         help_text='Cloud RSA public key for validating command JWTs'

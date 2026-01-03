@@ -981,7 +981,20 @@ def install_from_marketplace(request):
                 'error': 'Module already installed'
             }, status=400)
 
-        response = requests.get(download_url, timeout=60, stream=True)
+        # Get Hub JWT token for authentication with Cloud
+        from apps.configuration.models import HubConfig
+        config = HubConfig.get_solo()
+        if not config.hub_jwt:
+            return JsonResponse({
+                'success': False,
+                'error': 'Hub not authenticated with Cloud. Please login again.'
+            }, status=401)
+
+        # Download with X-Hub-Token header
+        headers = {
+            'X-Hub-Token': config.hub_jwt
+        }
+        response = requests.get(download_url, headers=headers, timeout=60, stream=True)
         response.raise_for_status()
 
         with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
