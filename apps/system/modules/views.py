@@ -558,8 +558,8 @@ def _trigger_server_reload():
             wsgi_file.touch()
 
 
-def _render_reload_response(message="Applying changes..."):
-    """Return HTML that shows a loading state and reloads the page after server restarts"""
+def _render_reload_response(message="Applying changes...", success_message="Module activated successfully"):
+    """Return HTML that shows a toast and reloads the page after server restarts"""
     html = f'''
     <div class="ion-padding" style="text-align: center; padding-top: 100px;">
         <ion-spinner name="crescent" style="width: 48px; height: 48px;"></ion-spinner>
@@ -568,24 +568,53 @@ def _render_reload_response(message="Applying changes..."):
     </div>
     <script>
         (function() {{
+            // Show loading toast
+            const loadingToast = document.createElement('ion-toast');
+            loadingToast.message = '{message}';
+            loadingToast.duration = 0;
+            loadingToast.position = 'bottom';
+            loadingToast.icon = 'sync-outline';
+            loadingToast.color = 'primary';
+            document.body.appendChild(loadingToast);
+            loadingToast.present();
+
             let attempts = 0;
-            const maxAttempts = 30;
+            const maxAttempts = 60;
             const checkServer = async () => {{
                 attempts++;
                 try {{
-                    const response = await fetch('/ht/', {{ method: 'HEAD' }});
+                    const response = await fetch('/ht/', {{ method: 'HEAD', cache: 'no-store' }});
                     if (response.ok) {{
-                        window.location.href = '/modules/';
+                        loadingToast.dismiss();
+                        // Show success toast
+                        const successToast = document.createElement('ion-toast');
+                        successToast.message = '{success_message}';
+                        successToast.duration = 2000;
+                        successToast.position = 'bottom';
+                        successToast.icon = 'checkmark-circle-outline';
+                        successToast.color = 'success';
+                        document.body.appendChild(successToast);
+                        successToast.present();
+                        // Reload page after toast
+                        setTimeout(() => {{
+                            window.location.href = '/modules/';
+                        }}, 500);
                     }} else if (attempts < maxAttempts) {{
                         setTimeout(checkServer, 500);
+                    }} else {{
+                        loadingToast.dismiss();
+                        window.location.href = '/modules/';
                     }}
                 }} catch (e) {{
                     if (attempts < maxAttempts) {{
                         setTimeout(checkServer, 500);
+                    }} else {{
+                        loadingToast.dismiss();
+                        window.location.href = '/modules/';
                     }}
                 }}
             }};
-            setTimeout(checkServer, 1000);
+            setTimeout(checkServer, 1500);
         }})();
     </script>
     '''
@@ -595,7 +624,10 @@ def _render_reload_response(message="Applying changes..."):
 @require_http_methods(["POST"])
 @login_required
 def module_activate(request, module_id):
-    """Activate a module by renaming folder"""
+    """Activate a module by renaming folder and running migrations"""
+    from django.core.management import call_command
+    import io
+
     modules_dir = Path(django_settings.MODULES_DIR)
     disabled_folder = modules_dir / f"_{module_id}"
     active_folder = modules_dir / module_id
@@ -611,13 +643,28 @@ def module_activate(request, module_id):
         return JsonResponse({'success': False, 'error': 'Module already active'}, status=400)
 
     try:
+        # Rename folder to activate
         disabled_folder.rename(active_folder)
+
+        # Run migrations for the module
+        try:
+            output = io.StringIO()
+            call_command('migrate', module_id, '--run-syncdb', stdout=output, stderr=output)
+            migration_output = output.getvalue()
+            if migration_output:
+                print(f"[MODULES] Migrations for {module_id}: {migration_output}")
+        except Exception as migrate_error:
+            print(f"[MODULES] Migration error for {module_id}: {migrate_error}")
+            # Continue anyway - migrations might not exist or already applied
 
         # Trigger server reload to register new URLs
         _trigger_server_reload()
 
         if request.htmx:
-            return _render_reload_response(f"Activating {module_id}...")
+            return _render_reload_response(
+                message=f"Activating {module_id}...",
+                success_message=f"Module {module_id} activated successfully"
+            )
 
         return JsonResponse({
             'success': True,
@@ -655,7 +702,10 @@ def module_deactivate(request, module_id):
         _trigger_server_reload()
 
         if request.htmx:
-            return _render_reload_response(f"Deactivating {module_id}...")
+            return _render_reload_response(
+                message=f"Deactivating {module_id}...",
+                success_message=f"Module {module_id} deactivated"
+            )
 
         return JsonResponse({'success': True, 'message': 'Module deactivated. Server restarting.'})
     except Exception as e:
@@ -956,6 +1006,19 @@ def install_from_marketplace(request):
 
             from apps.modules_runtime.loader import module_loader
             module_loader.load_module(module_slug)
+
+            # Run migrations for the new module
+            try:
+                from django.core.management import call_command
+                import io
+                output = io.StringIO()
+                call_command('migrate', module_slug, '--run-syncdb', stdout=output, stderr=output)
+                migration_output = output.getvalue()
+                if migration_output:
+                    print(f"[MODULES] Migrations for {module_slug}: {migration_output}")
+            except Exception as migrate_error:
+                print(f"[MODULES] Migration error for {module_slug}: {migrate_error}")
+                # Continue anyway - migrations might not exist
 
             if 'modules_pending_restart' not in request.session:
                 request.session['modules_pending_restart'] = []

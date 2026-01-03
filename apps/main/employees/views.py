@@ -15,9 +15,9 @@ from apps.accounts.decorators import login_required
 from apps.accounts.models import LocalUser, Role
 
 
-def get_role_options():
+def get_role_options(hub_id):
     """Get role options from database for select component."""
-    roles = Role.objects.filter(is_active=True).order_by('name')
+    roles = Role.objects.filter(hub_id=hub_id, is_active=True, is_deleted=False).order_by('name')
     return [{'value': str(role.id), 'label': role.display_name} for role in roles]
 
 
@@ -27,8 +27,9 @@ def index(request):
     """Employees management page"""
     from django.db.models import Q
 
+    hub_id = request.session.get('hub_id')
     search_query = request.GET.get('q', '').strip()
-    local_users = LocalUser.objects.filter(is_active=True)
+    local_users = LocalUser.objects.filter(hub_id=hub_id, is_active=True)
 
     if search_query:
         local_users = local_users.filter(
@@ -59,7 +60,8 @@ def index(request):
 @htmx_view('main/employees/pages/index.html', 'main/employees/partials/add.html')
 def add(request):
     """Add employee page (GET) or create employee (POST)"""
-    role_options = get_role_options()
+    hub_id = request.session.get('hub_id')
+    role_options = get_role_options(hub_id)
 
     if request.method == 'POST':
         name = request.POST.get('name')
@@ -68,38 +70,39 @@ def add(request):
         pin = request.POST.get('pin')
 
         if not name or not email or not pin:
-            messages.error(request, 'Please fill all required fields')
+            messages.error(request, _('Please fill all required fields'))
             return {
                 'current_section': 'employees',
-                'page_title': 'Add Employee',
+                'page_title': _('Add Employee'),
                 'role_options': role_options,
             }
 
         if len(pin) != 4 or not pin.isdigit():
-            messages.error(request, 'PIN must be 4 digits')
+            messages.error(request, _('PIN must be 4 digits'))
             return {
                 'current_section': 'employees',
-                'page_title': 'Add Employee',
+                'page_title': _('Add Employee'),
                 'role_options': role_options,
             }
 
-        if LocalUser.objects.filter(email=email).exists():
-            messages.error(request, 'Email already exists')
+        if LocalUser.objects.filter(hub_id=hub_id, email=email).exists():
+            messages.error(request, _('Email already exists'))
             return {
                 'current_section': 'employees',
-                'page_title': 'Add Employee',
+                'page_title': _('Add Employee'),
                 'role_options': role_options,
             }
 
         # Get role object (default to employee if not found)
         role_obj = None
         if role_id:
-            role_obj = Role.objects.filter(id=role_id, is_active=True).first()
+            role_obj = Role.objects.filter(id=role_id, hub_id=hub_id, is_active=True).first()
         if not role_obj:
-            role_obj = Role.objects.filter(name='employee', is_active=True).first()
+            role_obj = Role.objects.filter(hub_id=hub_id, name='employee', is_active=True).first()
 
         # Create local-only employee
         user = LocalUser.objects.create(
+            hub_id=hub_id,
             cloud_user_id=None,
             email=email,
             name=name,
@@ -109,19 +112,19 @@ def add(request):
         user.set_pin(pin)
         user.save()
 
-        messages.success(request, 'Employee added successfully')
+        messages.success(request, _('Employee added successfully'))
         # Return the list content
-        local_users = LocalUser.objects.filter(is_active=True).order_by('name')
+        local_users = LocalUser.objects.filter(hub_id=hub_id, is_active=True).order_by('name')
         return {
             'current_section': 'employees',
-            'page_title': 'Employees',
+            'page_title': _('Employees'),
             'local_users': local_users,
             'template': 'main/employees/partials/content.html',
         }
 
     return {
         'current_section': 'employees',
-        'page_title': 'Add Employee',
+        'page_title': _('Add Employee'),
         'role_options': role_options,
     }
 
@@ -130,8 +133,9 @@ def add(request):
 @htmx_view('main/employees/pages/index.html', 'main/employees/partials/edit.html')
 def edit(request, employee_id):
     """Edit employee page (GET) or update employee (POST)"""
-    employee = get_object_or_404(LocalUser, id=employee_id, is_active=True)
-    role_options = get_role_options()
+    hub_id = request.session.get('hub_id')
+    employee = get_object_or_404(LocalUser, id=employee_id, hub_id=hub_id, is_active=True)
+    role_options = get_role_options(hub_id)
 
     if request.method == 'POST':
         name = request.POST.get('name')
@@ -139,10 +143,10 @@ def edit(request, employee_id):
         role_id = request.POST.get('role_id')
 
         if not name or not email:
-            messages.error(request, 'Please fill all required fields')
+            messages.error(request, _('Please fill all required fields'))
             return {
                 'current_section': 'employees',
-                'page_title': 'Edit Employee',
+                'page_title': _('Edit Employee'),
                 'employee': employee,
                 'role_options': role_options,
                 'employee_delete_url': reverse('main:employee_delete', args=[employee.id]),
@@ -150,11 +154,11 @@ def edit(request, employee_id):
             }
 
         # Check if email changed and is already in use
-        if employee.email != email and LocalUser.objects.filter(email=email).exists():
-            messages.error(request, 'Email already exists')
+        if employee.email != email and LocalUser.objects.filter(hub_id=hub_id, email=email).exists():
+            messages.error(request, _('Email already exists'))
             return {
                 'current_section': 'employees',
-                'page_title': 'Edit Employee',
+                'page_title': _('Edit Employee'),
                 'employee': employee,
                 'role_options': role_options,
                 'employee_delete_url': reverse('main:employee_delete', args=[employee.id]),
@@ -164,7 +168,7 @@ def edit(request, employee_id):
         # Get role object
         role_obj = None
         if role_id:
-            role_obj = Role.objects.filter(id=role_id, is_active=True).first()
+            role_obj = Role.objects.filter(id=role_id, hub_id=hub_id, is_active=True).first()
 
         employee.name = name
         employee.email = email
@@ -173,19 +177,19 @@ def edit(request, employee_id):
             employee.role = role_obj.name  # Keep legacy field in sync
         employee.save()
 
-        messages.success(request, 'Employee updated successfully')
+        messages.success(request, _('Employee updated successfully'))
         # Return the list content
-        local_users = LocalUser.objects.filter(is_active=True).order_by('name')
+        local_users = LocalUser.objects.filter(hub_id=hub_id, is_active=True).order_by('name')
         return {
             'current_section': 'employees',
-            'page_title': 'Employees',
+            'page_title': _('Employees'),
             'local_users': local_users,
             'template': 'main/employees/partials/content.html',
         }
 
     return {
         'current_section': 'employees',
-        'page_title': 'Edit Employee',
+        'page_title': _('Edit Employee'),
         'employee': employee,
         'role_options': role_options,
         'employee_delete_url': reverse('main:employee_delete', args=[employee.id]),
@@ -197,7 +201,8 @@ def edit(request, employee_id):
 @require_POST
 def reset_pin(request, employee_id):
     """Reset employee PIN"""
-    employee = get_object_or_404(LocalUser, id=employee_id, is_active=True)
+    hub_id = request.session.get('hub_id')
+    employee = get_object_or_404(LocalUser, id=employee_id, hub_id=hub_id, is_active=True)
     pin = request.POST.get('pin')
 
     if not pin or len(pin) != 4 or not pin.isdigit():
@@ -218,24 +223,25 @@ def reset_pin(request, employee_id):
 @htmx_view('main/employees/pages/index.html', 'main/employees/partials/content.html')
 def delete(request, employee_id):
     """Delete (deactivate) employee"""
-    employee = get_object_or_404(LocalUser, id=employee_id, is_active=True)
+    hub_id = request.session.get('hub_id')
+    employee = get_object_or_404(LocalUser, id=employee_id, hub_id=hub_id, is_active=True)
 
     # Prevent deleting admin users
     if employee.get_role_name() == 'admin':
-        messages.error(request, 'Cannot delete admin users')
+        messages.error(request, _('Cannot delete admin users'))
         return {
             'current_section': 'employees',
-            'page_title': 'Employees',
-            'local_users': LocalUser.objects.filter(is_active=True).order_by('name'),
+            'page_title': _('Employees'),
+            'local_users': LocalUser.objects.filter(hub_id=hub_id, is_active=True).order_by('name'),
         }
 
     # Soft delete
     employee.is_active = False
     employee.save()
 
-    messages.success(request, 'Employee deleted successfully')
+    messages.success(request, _('Employee deleted successfully'))
     return {
         'current_section': 'employees',
-        'page_title': 'Employees',
-        'local_users': LocalUser.objects.filter(is_active=True).order_by('name'),
+        'page_title': _('Employees'),
+        'local_users': LocalUser.objects.filter(hub_id=hub_id, is_active=True).order_by('name'),
     }

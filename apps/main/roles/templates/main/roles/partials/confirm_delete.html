@@ -1,0 +1,33 @@
+{% load i18n ui component_tags %}
+
+{% component "page" title=_("Delete Role") back_hx_get="/roles/"|add:role.id|add:"/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
+    {% fill "content" %}
+        {% ui_card %}
+            <div class="text-center py-lg">
+                <ion-icon name="warning-outline" class="fs-xxxl text-danger"></ion-icon>
+                <h2 class="mt-md mb-sm">{% trans "Delete Role" %}</h2>
+                <p class="text-medium">
+                    {% blocktrans with name=role.display_name %}
+                    Are you sure you want to delete the role <strong>{{ name }}</strong>?
+                    {% endblocktrans %}
+                </p>
+                <p class="text-medium fs-sm">{% trans "This action cannot be undone." %}</p>
+            </div>
+
+            <form method="post"
+                  hx-post
+                  hx-target="#main-content-area">
+                {% csrf_token %}
+                <div class="d-flex gap-md justify-center mt-lg">
+                    <a href="{% url 'main:roles:detail' role_id=role.id %}"
+                       hx-get="{% url 'main:roles:detail' role_id=role.id %}"
+                       hx-target="#main-content-area"
+                       hx-push-url="true">
+                        {% ui_button label=_("Cancel") fill="outline" %}
+                    </a>
+                    {% ui_button type="submit" label=_("Delete Role") color="danger" icon="trash-outline" %}
+                </div>
+            </form>
+        {% endui_card %}
+    {% endfill %}
+{% endcomponent %}

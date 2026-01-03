@@ -166,3 +166,138 @@ def remove_wildcard(request, role_id, wildcard):
         return JsonResponse({'success': True})
 
     return JsonResponse({'error': 'Wildcard not found'}, status=404)
+
+
+@admin_required
+@require_POST
+def toggle_module(request, role_id, module_id):
+    """
+    Toggle all permissions for a module via wildcard.
+
+    HTMX endpoint that enables/disables module.* wildcard.
+    Returns the updated module card HTML for swap.
+    """
+    from django.shortcuts import render
+    from apps.core.services.permission_service import PermissionService
+
+    hub_id = request.session.get('hub_id')
+
+    role = get_object_or_404(
+        Role,
+        id=role_id,
+        hub_id=hub_id,
+        is_deleted=False
+    )
+
+    # Prevent modifying admin role
+    if role.name == 'admin':
+        return HttpResponse(status=403)
+
+    wildcard = f"{module_id}.*"
+
+    # Check if wildcard exists
+    existing = RolePermission.objects.filter(
+        hub_id=hub_id,
+        role=role,
+        wildcard=wildcard,
+        is_deleted=False
+    ).first()
+
+    if existing:
+        # Remove wildcard (disable module)
+        existing.is_deleted = True
+        existing.save()
+        has_wildcard = False
+    else:
+        # Add wildcard (enable module)
+        RolePermission.objects.create(
+            hub_id=hub_id,
+            role=role,
+            permission=None,
+            wildcard=wildcard,
+        )
+        has_wildcard = True
+
+    # Get updated module data for rendering
+    modules = PermissionService.get_modules_with_permissions(hub_id)
+    expanded_permissions = role.get_all_permissions()
+
+    # Find the specific module
+    module = next((m for m in modules if m['id'] == module_id), None)
+    if not module:
+        return HttpResponse(status=404)
+
+    # Calculate module state
+    active_count = sum(
+        1 for p in module['permissions']
+        if p['codename'] in expanded_permissions
+    )
+    total_count = len(module['permissions'])
+
+    module['has_wildcard'] = has_wildcard
+    module['active_count'] = active_count
+    module['total_count'] = total_count
+    module['is_full'] = active_count == total_count and total_count > 0
+    module['is_partial'] = 0 < active_count < total_count
+
+    return render(request, 'main/roles/partials/module_card.html', {
+        'role': role,
+        'module': module,
+        'expanded_permissions': expanded_permissions,
+    })
+
+
+@admin_required
+@require_POST
+def toggle_permission(request, role_id, codename):
+    """
+    Toggle a single permission for a role.
+
+    HTMX endpoint that adds/removes an individual permission.
+    Returns 200 OK on success.
+    """
+    hub_id = request.session.get('hub_id')
+
+    role = get_object_or_404(
+        Role,
+        id=role_id,
+        hub_id=hub_id,
+        is_deleted=False
+    )
+
+    # Prevent modifying admin role
+    if role.name == 'admin':
+        return HttpResponse(status=403)
+
+    # Get the permission
+    try:
+        perm = Permission.objects.get(
+            hub_id=hub_id,
+            codename=codename,
+            is_deleted=False
+        )
+    except Permission.DoesNotExist:
+        return HttpResponse(status=404)
+
+    # Check if permission exists for this role
+    existing = RolePermission.objects.filter(
+        hub_id=hub_id,
+        role=role,
+        permission=perm,
+        is_deleted=False
+    ).first()
+
+    if existing:
+        # Remove permission
+        existing.is_deleted = True
+        existing.save()
+    else:
+        # Add permission
+        RolePermission.objects.create(
+            hub_id=hub_id,
+            role=role,
+            permission=perm,
+            wildcard='',
+        )
+
+    return HttpResponse(status=200)

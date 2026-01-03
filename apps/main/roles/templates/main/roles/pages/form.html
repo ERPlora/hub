@@ -1,0 +1,8 @@
+{% extends "ui/app_base.html" %}
+{% load i18n %}
+
+{% block page_title %}{% if role %}{% trans "Edit Role" %}{% else %}{% trans "Create Role" %}{% endif %}{% endblock %}
+
+{% block page_content %}
+{% include "main/roles/partials/form.html" %}
+{% endblock %}

@@ -10,9 +10,11 @@ from django.utils.translation import gettext as _
 from apps.accounts.decorators import admin_required
 from apps.accounts.models import Role, Permission, RolePermission
 from apps.core.services.permission_service import PermissionService
+from apps.core.htmx import htmx_view
 
 
 @admin_required
+@htmx_view('main/roles/pages/index.html', 'main/roles/partials/list_content.html')
 def role_list(request):
     """List all roles."""
     hub_id = request.session.get('hub_id')
@@ -22,16 +24,15 @@ def role_list(request):
         is_deleted=False
     ).prefetch_related('permissions', 'users').order_by('-is_system', 'name')
 
-    # user_count is calculated in template via role.users.count
-
-    return render(request, 'main/roles/role_list.html', {
+    return {
         'roles': roles,
         'page_title': _('Roles'),
-        'page_type': 'list',
-    })
+        'current_section': 'roles',
+    }
 
 
 @admin_required
+@htmx_view('main/roles/pages/detail.html', 'main/roles/partials/detail.html')
 def role_detail(request, role_id):
     """View role details and edit permissions."""
     hub_id = request.session.get('hub_id')
@@ -43,14 +44,14 @@ def role_detail(request, role_id):
         is_deleted=False
     )
 
-    # Get permissions grouped by module
-    permissions_by_module = PermissionService.get_permissions_by_module(hub_id)
+    # Get modules with their permissions for the UI
+    modules = PermissionService.get_modules_with_permissions(hub_id)
 
-    # Get current role permissions (expanded)
-    role_permissions = role.get_all_permissions()
+    # Get current role permissions (expanded from wildcards)
+    expanded_permissions = role.get_all_permissions()
 
-    # Get role wildcards
-    wildcards = list(
+    # Get role wildcards as a set for easy lookup
+    wildcards = set(
         RolePermission.objects.filter(
             role=role,
             is_deleted=False,
@@ -58,18 +59,46 @@ def role_detail(request, role_id):
         ).values_list('wildcard', flat=True)
     )
 
-    return render(request, 'main/roles/role_detail.html', {
+    # Get individual permissions (not from wildcards)
+    individual_permissions = set(
+        RolePermission.objects.filter(
+            role=role,
+            is_deleted=False,
+            permission__isnull=False
+        ).values_list('permission__codename', flat=True)
+    )
+
+    # Calculate module states for the UI
+    for module in modules:
+        module_wildcard = module['wildcard']
+        has_wildcard = module_wildcard in wildcards
+
+        # Count active permissions in this module
+        active_count = sum(
+            1 for p in module['permissions']
+            if p['codename'] in expanded_permissions
+        )
+        total_count = len(module['permissions'])
+
+        module['has_wildcard'] = has_wildcard
+        module['active_count'] = active_count
+        module['total_count'] = total_count
+        module['is_full'] = active_count == total_count and total_count > 0
+        module['is_partial'] = 0 < active_count < total_count
+
+    return {
         'role': role,
-        'permissions_by_module': permissions_by_module,
-        'role_permissions': role_permissions,
+        'modules': modules,
+        'expanded_permissions': expanded_permissions,
+        'individual_permissions': individual_permissions,
         'wildcards': wildcards,
         'page_title': role.display_name,
-        'page_type': 'detail',
-        'back_url': '/main/roles/',
-    })
+        'current_section': 'roles',
+    }
 
 
 @admin_required
+@htmx_view('main/roles/pages/form.html', 'main/roles/partials/form.html')
 def role_create(request):
     """Create a new role."""
     hub_id = request.session.get('hub_id')
@@ -99,14 +128,14 @@ def role_create(request):
         messages.success(request, _('Role created successfully.'))
         return redirect('main:roles:detail', role_id=role.id)
 
-    return render(request, 'main/roles/role_form.html', {
+    return {
         'page_title': _('Create Role'),
-        'page_type': 'form',
-        'back_url': '/main/roles/',
-    })
+        'current_section': 'roles',
+    }
 
 
 @admin_required
+@htmx_view('main/roles/pages/form.html', 'main/roles/partials/form.html')
 def role_edit(request, role_id):
     """Edit a role."""
     hub_id = request.session.get('hub_id')
@@ -130,15 +159,15 @@ def role_edit(request, role_id):
         messages.success(request, _('Role updated successfully.'))
         return redirect('main:roles:detail', role_id=role.id)
 
-    return render(request, 'main/roles/role_form.html', {
+    return {
         'role': role,
         'page_title': _('Edit Role'),
-        'page_type': 'form',
-        'back_url': f'/main/roles/{role.id}/',
-    })
+        'current_section': 'roles',
+    }
 
 
 @admin_required
+@htmx_view('main/roles/pages/confirm_delete.html', 'main/roles/partials/confirm_delete.html')
 def role_delete(request, role_id):
     """Delete a role (soft delete)."""
     hub_id = request.session.get('hub_id')
@@ -164,16 +193,15 @@ def role_delete(request, role_id):
         return redirect('main:roles:detail', role_id=role.id)
 
     if request.method == 'POST':
-        role.soft_delete()
+        role.delete()  # Soft delete by default in HubBaseModel
         messages.success(request, _('Role deleted successfully.'))
         return redirect('main:roles:list')
 
-    return render(request, 'main/roles/role_confirm_delete.html', {
+    return {
         'role': role,
         'page_title': _('Delete Role'),
-        'page_type': 'form',
-        'back_url': f'/main/roles/{role.id}/',
-    })
+        'current_section': 'roles',
+    }
 
 
 @admin_required

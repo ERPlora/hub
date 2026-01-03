@@ -93,11 +93,11 @@
             {% if mode == "installed" %}
                 {# Installed module actions: Activate/Deactivate + Delete #}
                 {% if module.is_active %}
-                {% ui_button label=_("Deactivate") fill="clear" size="small" color="warning" icon="pause-outline" css_class="flex-1" hx_post=module.deactivate_url hx_target="#main-content-area" hx_swap="innerHTML" hx_confirm=_("Are you sure you want to deactivate this module?") %}
+                {% ui_button label=_("Deactivate") fill="clear" size="small" color="warning" icon="pause-outline" css_class="flex-1" data_action="module-deactivate" data_url=module.deactivate_url data_module_name=module.name %}
                 {% else %}
                 {% ui_button label=_("Activate") fill="clear" size="small" color="success" icon="play-outline" css_class="flex-1" hx_post=module.activate_url hx_target="#main-content-area" hx_swap="innerHTML" %}
                 {% endif %}
-                {% ui_button label=_("Delete") fill="clear" size="small" color="danger" icon="trash-outline" css_class="flex-1" hx_post=module.delete_url hx_target="#main-content-area" hx_swap="innerHTML" hx_confirm=_("This will permanently delete the module and all its data. Are you sure?") %}
+                {% ui_button label=_("Delete") fill="clear" size="small" color="danger" icon="trash-outline" css_class="flex-1" data_action="module-delete" data_url=module.delete_url data_module_name=module.name %}
             {% else %}
                 {# Marketplace module actions: Install/Purchase #}
                 {% if module.is_installed %}

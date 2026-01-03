@@ -120,6 +120,7 @@ def verify_pin(request):
             user.save()
 
             request.session['local_user_id'] = str(user.id)
+            request.session['hub_id'] = str(user.hub_id)
             request.session['user_name'] = user.name
             request.session['user_email'] = user.email
             request.session['user_role'] = user.role
@@ -255,6 +256,7 @@ def cloud_login(request):
                     request.session['jwt_token'] = access_token
                     request.session['jwt_refresh'] = refresh_token
                     request.session['local_user_id'] = str(local_user.id)
+                    request.session['hub_id'] = str(local_user.hub_id)
                     request.session['user_name'] = local_user.name
                     request.session['user_email'] = local_user.email
                     request.session['user_role'] = local_user.role
@@ -339,6 +341,7 @@ def setup_pin(request):
             del request.session['pending_user_email']
 
         request.session['local_user_id'] = str(user.id)
+        request.session['hub_id'] = str(user.hub_id)
         request.session['user_name'] = user.name
         request.session['user_email'] = user.email
         request.session['user_role'] = user.role

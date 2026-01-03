@@ -1,0 +1,39 @@
+{% load i18n ui component_tags %}
+
+{% with page_title=role.display_name|default:_("Create Role") %}
+{% component "page" title=page_title back_hx_get="/roles/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
+    {% fill "content" %}
+        <form method="post"
+              hx-post
+              hx-target="#main-content-area"
+              hx-push-url="true">
+            {% csrf_token %}
+
+            {% ui_card %}
+                {% ui_list_start %}
+                    {% if not role %}
+                    {% ui_input name="name" label=_("Role Name") value="" required=True helper_text=_("Lowercase letters and underscores only. Cannot be changed later.") %}
+                    {% endif %}
+                    {% ui_input name="display_name" label=_("Display Name") value=role.display_name|default:"" required=True %}
+                    <ion-item>
+                        <ion-textarea
+                            name="description"
+                            label="{% trans 'Description' %}"
+                            label-placement="floating"
+                            rows="3"
+                            placeholder="{% trans 'Optional description for this role' %}">{{ role.description|default:"" }}</ion-textarea>
+                    </ion-item>
+                {% ui_list_end %}
+            {% endui_card %}
+
+            <div class="ion-padding-top">
+                {% if role %}
+                {% ui_button type="submit" expand="block" label=_("Save Changes") icon="checkmark-outline" %}
+                {% else %}
+                {% ui_button type="submit" expand="block" label=_("Create Role") icon="add-outline" %}
+                {% endif %}
+            </div>
+        </form>
+    {% endfill %}
+{% endcomponent %}
+{% endwith %}

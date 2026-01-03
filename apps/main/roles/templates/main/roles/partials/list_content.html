@@ -1,0 +1,44 @@
+{% load i18n ui component_tags %}
+
+{% component "page" title=_("Roles") action_icon="add-outline" action_label=_("Add") action_hx_get="/roles/create/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
+    {% fill "content" %}
+        <!-- Roles Grid -->
+        <div id="roles-scroll-container" style="height: calc(100vh - 180px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
+            {% ui_grid_start padding=False %}
+                {% ui_row_start %}
+                    {% for role in roles %}
+                    {% ui_col_start size="12" size_md="6" size_lg="4" %}
+                        {% url 'main:roles:detail' role_id=role.id as detail_url %}
+                        {% ui_card css_class="cursor-pointer" hx_get=detail_url hx_target="#main-content-area" hx_push_url="true" %}
+                            <div class="d-flex align-center gap-md">
+                                <ion-icon name="{% if role.name == 'admin' %}shield-checkmark{% elif role.name == 'manager' %}briefcase{% else %}person{% endif %}-outline"
+                                          class="fs-xxl text-{% if role.name == 'admin' %}primary{% elif role.name == 'manager' %}tertiary{% else %}success{% endif %}"></ion-icon>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="fw-semibold text-truncate m-0">{{ role.display_name }}</h3>
+                                    <p class="fs-sm text-medium text-truncate m-0">{{ role.description|default:"-"|truncatewords:10 }}</p>
+                                    <div class="d-flex gap-xs mt-xs">
+                                        {% if role.is_system %}
+                                        {% ui_chip label=_("System") color="medium" %}
+                                        {% endif %}
+                                        {% if not role.is_active %}
+                                        {% ui_chip label=_("Inactive") color="warning" %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="fs-sm text-medium">{{ role.users.count }} {% trans "users" %}</span>
+                                </div>
+                                <ion-icon name="chevron-forward-outline" class="text-medium"></ion-icon>
+                            </div>
+                        {% endui_card %}
+                    {% ui_col_end %}
+                    {% empty %}
+                    {% ui_col_start size="12" %}
+                        {% ui_empty_state title=_("No roles yet") description=_("Create your first custom role to get started.") icon="shield-outline" action_label=_("Create Role") action_hx_get="/roles/create/" action_hx_target="#main-content-area" %}
+                    {% ui_col_end %}
+                    {% endfor %}
+                {% ui_row_end %}
+            {% ui_grid_end %}
+        </div>
+    {% endfill %}
+{% endcomponent %}

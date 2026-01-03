@@ -26,4 +26,8 @@ urlpatterns = [
     path('api/<uuid:role_id>/permissions/', api.update_role_permissions, name='api_permissions'),
     path('api/<uuid:role_id>/wildcard/', api.add_wildcard, name='api_add_wildcard'),
     path('api/<uuid:role_id>/wildcard/<str:wildcard>/', api.remove_wildcard, name='api_remove_wildcard'),
+
+    # HTMX endpoints for UI
+    path('api/<uuid:role_id>/module/<str:module_id>/toggle/', api.toggle_module, name='api_toggle_module'),
+    path('api/<uuid:role_id>/permission/<path:codename>/toggle/', api.toggle_permission, name='api_toggle_permission'),
 ]

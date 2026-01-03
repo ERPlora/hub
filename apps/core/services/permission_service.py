@@ -33,31 +33,34 @@ class PermissionService:
         'inventory.view_product', 'inventory.add_product', etc.
     """
 
-    # Default roles configuration
+    # Default roles configuration for ERP
+    # These are standard roles that cover most business scenarios
     DEFAULT_ROLES = [
         {
             'name': 'admin',
             'display_name': 'Administrator',
             'description': 'Full system access. Can manage all settings, users, and data.',
             'is_system': True,
-            'wildcards': ['*'],  # All permissions
+            'wildcards': ['*'],  # All permissions in all modules
         },
         {
             'name': 'manager',
             'display_name': 'Manager',
-            'description': 'Management access. Can view reports, manage inventory, and process sales.',
+            'description': 'Management access. CRUD on main modules, reports, and team oversight.',
             'is_system': True,
             'wildcards': [
                 'inventory.*',
                 'sales.*',
                 'customers.*',
                 'cash_register.*',
+                'invoicing.*',
+                'reports.*',
             ],
         },
         {
             'name': 'employee',
             'display_name': 'Employee',
-            'description': 'Basic access. Can process sales and view products.',
+            'description': 'Basic access. Day-to-day operations like sales and viewing products.',
             'is_system': True,
             'wildcards': [
                 'inventory.view_*',
@@ -65,6 +68,42 @@ class PermissionService:
                 'sales.add_sale',
                 'sales.process_payment',
                 'customers.view_*',
+            ],
+        },
+        {
+            'name': 'accountant',
+            'display_name': 'Accountant',
+            'description': 'Finance access. Invoicing, reports, and financial data.',
+            'is_system': True,
+            'wildcards': [
+                'invoicing.*',
+                'reports.*',
+                'sales.view_*',
+                'customers.view_*',
+                'cash_register.view_*',
+            ],
+        },
+        {
+            'name': 'warehouse',
+            'display_name': 'Warehouse',
+            'description': 'Inventory management. Full inventory access, view sales.',
+            'is_system': True,
+            'wildcards': [
+                'inventory.*',
+                'sales.view_*',
+            ],
+        },
+        {
+            'name': 'cashier',
+            'display_name': 'Cashier',
+            'description': 'Point of sale access. Sales, cash register, and product viewing.',
+            'is_system': True,
+            'wildcards': [
+                'sales.*',
+                'cash_register.*',
+                'inventory.view_*',
+                'customers.view_*',
+                'customers.add_*',
             ],
         },
     ]
@@ -101,7 +140,7 @@ class PermissionService:
                 hub_id=hub_id,
                 codename=codename,
                 defaults={
-                    'name': name,
+                    'name': str(name),  # Convert lazy string
                     'description': description,
                     'module_id': module_id,
                 }
@@ -118,7 +157,8 @@ class PermissionService:
         """
         Sync permissions from all active modules.
 
-        Scans INSTALLED_APPS for modules with PERMISSIONS defined.
+        Uses the dynamic ModuleLoader to find loaded modules.
+        Also applies ROLE_PERMISSIONS defaults for each module.
 
         Args:
             hub_id: Hub UUID
@@ -126,22 +166,16 @@ class PermissionService:
         Returns:
             Total number of permissions synced
         """
-        from django.conf import settings
+        from apps.modules_runtime.loader import module_loader
         from importlib import import_module
 
         total = 0
 
-        for app in settings.INSTALLED_APPS:
-            # Only process module apps
-            if not app.startswith('modules.'):
-                continue
-
-            module_id = app.split('.')[-1]
-
+        # Get all loaded modules from the dynamic loader
+        for module_id, module_info in module_loader.loaded_modules.items():
             try:
-                # Try to import module.py from the module
-                module_path = f"{app}.module"
-                mod = import_module(module_path)
+                # Import module.py from the module
+                mod = import_module(f"{module_id}.module")
 
                 if hasattr(mod, 'PERMISSIONS'):
                     count = cls.sync_module_permissions(
@@ -152,6 +186,14 @@ class PermissionService:
                     total += count
                     logger.info(f"Synced {count} permissions from {module_id}")
 
+                    # Apply ROLE_PERMISSIONS defaults if defined
+                    if hasattr(mod, 'ROLE_PERMISSIONS'):
+                        cls.apply_module_role_defaults(
+                            hub_id=hub_id,
+                            module_id=module_id,
+                            role_permissions=mod.ROLE_PERMISSIONS
+                        )
+
             except ImportError:
                 # Module doesn't have module.py or PERMISSIONS
                 pass
@@ -159,6 +201,79 @@ class PermissionService:
                 logger.warning(f"Error syncing permissions from {module_id}: {e}")
 
         return total
+
+    @classmethod
+    @transaction.atomic
+    def apply_module_role_defaults(cls, hub_id: str, module_id: str, role_permissions: dict) -> int:
+        """
+        Apply ROLE_PERMISSIONS defaults from a module's module.py.
+
+        This creates RolePermission entries for each role/permission pair defined.
+        Only applies if the role exists and permission entry doesn't already exist.
+
+        Args:
+            hub_id: Hub UUID
+            module_id: Module identifier (e.g., 'inventory')
+            role_permissions: Dict mapping role names to permission suffix lists
+                Example: {"admin": ["*"], "manager": ["view_product", "add_product"]}
+
+        Returns:
+            Number of role permissions created
+        """
+        from apps.accounts.models import Role, Permission, RolePermission
+
+        count = 0
+
+        for role_name, perm_suffixes in role_permissions.items():
+            # Get the role (skip if doesn't exist)
+            try:
+                role = Role.objects.get(
+                    hub_id=hub_id,
+                    name=role_name,
+                    is_deleted=False
+                )
+            except Role.DoesNotExist:
+                logger.debug(f"Role {role_name} not found, skipping module defaults")
+                continue
+
+            for suffix in perm_suffixes:
+                if suffix == "*":
+                    # Wildcard for all module permissions
+                    wildcard = f"{module_id}.*"
+                    rp, created = RolePermission.objects.get_or_create(
+                        hub_id=hub_id,
+                        role=role,
+                        wildcard=wildcard,
+                        defaults={'permission': None}
+                    )
+                    if created:
+                        count += 1
+                        logger.debug(f"Added wildcard {wildcard} to role {role_name}")
+                else:
+                    # Specific permission
+                    codename = f"{module_id}.{suffix}"
+                    try:
+                        perm = Permission.objects.get(
+                            hub_id=hub_id,
+                            codename=codename,
+                            is_deleted=False
+                        )
+                        rp, created = RolePermission.objects.get_or_create(
+                            hub_id=hub_id,
+                            role=role,
+                            permission=perm,
+                            defaults={'wildcard': ''}
+                        )
+                        if created:
+                            count += 1
+                            logger.debug(f"Added permission {codename} to role {role_name}")
+                    except Permission.DoesNotExist:
+                        logger.warning(f"Permission {codename} not found")
+
+        if count > 0:
+            logger.info(f"Applied {count} role permission defaults for {module_id}")
+
+        return count
 
     @classmethod
     @transaction.atomic
@@ -364,3 +479,205 @@ class PermissionService:
 
         user.extra_permissions.remove(permission)
         return True
+
+    @classmethod
+    def get_role_permissions_for_module(cls, hub_id: str, role_id: str, module_id: str) -> dict:
+        """
+        Get the permissions a role has for a specific module.
+
+        Args:
+            hub_id: Hub UUID
+            role_id: Role UUID
+            module_id: Module identifier (e.g., 'inventory')
+
+        Returns:
+            Dict with:
+            - permissions: List of permission dicts for the module
+            - active_codenames: Set of codenames the role has
+            - has_wildcard: True if role has module.* wildcard
+        """
+        from apps.accounts.models import Role, Permission, RolePermission
+
+        role = Role.objects.get(id=role_id, hub_id=hub_id, is_deleted=False)
+
+        # Get all permissions for the module
+        permissions = list(
+            Permission.objects.filter(
+                hub_id=hub_id,
+                module_id=module_id,
+                is_deleted=False
+            ).order_by('codename').values('id', 'codename', 'name', 'description')
+        )
+
+        # Check for module wildcard
+        wildcard = f"{module_id}.*"
+        has_wildcard = RolePermission.objects.filter(
+            hub_id=hub_id,
+            role=role,
+            wildcard=wildcard,
+            is_deleted=False
+        ).exists()
+
+        # Get expanded permissions for this role
+        all_role_perms = role.get_all_permissions()
+
+        # Filter to only this module's permissions
+        active_codenames = {
+            p['codename'] for p in permissions
+            if p['codename'] in all_role_perms
+        }
+
+        return {
+            'permissions': permissions,
+            'active_codenames': active_codenames,
+            'has_wildcard': has_wildcard,
+            'active_count': len(active_codenames),
+            'total_count': len(permissions),
+        }
+
+    @classmethod
+    @transaction.atomic
+    def toggle_role_permission(cls, hub_id: str, role_id: str, codename: str) -> bool:
+        """
+        Toggle a permission for a role.
+
+        If the role has the permission, remove it. Otherwise, add it.
+
+        Args:
+            hub_id: Hub UUID
+            role_id: Role UUID
+            codename: Full permission codename (e.g., 'inventory.view_product')
+
+        Returns:
+            True if permission was added, False if removed
+        """
+        from apps.accounts.models import Role, Permission, RolePermission
+
+        role = Role.objects.get(id=role_id, hub_id=hub_id, is_deleted=False)
+        perm = Permission.objects.get(hub_id=hub_id, codename=codename, is_deleted=False)
+
+        # Check if permission exists
+        existing = RolePermission.objects.filter(
+            hub_id=hub_id,
+            role=role,
+            permission=perm,
+            is_deleted=False
+        ).first()
+
+        if existing:
+            # Remove permission
+            existing.is_deleted = True
+            existing.save()
+            logger.debug(f"Removed permission {codename} from role {role.name}")
+            return False
+        else:
+            # Add permission
+            RolePermission.objects.create(
+                hub_id=hub_id,
+                role=role,
+                permission=perm,
+                wildcard='',
+            )
+            logger.debug(f"Added permission {codename} to role {role.name}")
+            return True
+
+    @classmethod
+    @transaction.atomic
+    def toggle_role_module_wildcard(cls, hub_id: str, role_id: str, module_id: str) -> bool:
+        """
+        Toggle the module.* wildcard for a role.
+
+        Args:
+            hub_id: Hub UUID
+            role_id: Role UUID
+            module_id: Module identifier
+
+        Returns:
+            True if wildcard was added, False if removed
+        """
+        from apps.accounts.models import Role, RolePermission
+
+        role = Role.objects.get(id=role_id, hub_id=hub_id, is_deleted=False)
+        wildcard = f"{module_id}.*"
+
+        # Check if wildcard exists
+        existing = RolePermission.objects.filter(
+            hub_id=hub_id,
+            role=role,
+            wildcard=wildcard,
+            is_deleted=False
+        ).first()
+
+        if existing:
+            # Remove wildcard
+            existing.is_deleted = True
+            existing.save()
+            logger.debug(f"Removed wildcard {wildcard} from role {role.name}")
+            return False
+        else:
+            # Add wildcard
+            RolePermission.objects.create(
+                hub_id=hub_id,
+                role=role,
+                permission=None,
+                wildcard=wildcard,
+            )
+            logger.debug(f"Added wildcard {wildcard} to role {role.name}")
+            return True
+
+    @classmethod
+    def get_modules_with_permissions(cls, hub_id: str) -> List[dict]:
+        """
+        Get all modules with their permissions for the role editor UI.
+
+        Returns a list of modules with their permissions, sorted alphabetically.
+
+        Args:
+            hub_id: Hub UUID
+
+        Returns:
+            List of dicts with module info and permissions
+        """
+        from apps.accounts.models import Permission
+        from apps.modules_runtime.loader import module_loader
+        from importlib import import_module
+        from collections import defaultdict
+
+        # Get module metadata from dynamically loaded modules
+        module_metadata = {}
+        for module_id in module_loader.loaded_modules.keys():
+            try:
+                mod = import_module(f"{module_id}.module")
+                module_metadata[module_id] = {
+                    'name': str(getattr(mod, 'MODULE_NAME', module_id.title())),
+                    'icon': getattr(mod, 'MODULE_ICON', 'cube-outline'),
+                }
+            except ImportError:
+                module_metadata[module_id] = {
+                    'name': module_id.title(),
+                    'icon': 'cube-outline',
+                }
+
+        # Get permissions grouped by module
+        permissions_by_module = defaultdict(list)
+        for perm in Permission.objects.filter(hub_id=hub_id, is_deleted=False).order_by('codename'):
+            permissions_by_module[perm.module_id].append({
+                'id': str(perm.id),
+                'codename': perm.codename,
+                'name': str(perm.name),
+                'description': perm.description or '',
+            })
+
+        # Build result list
+        modules = []
+        for module_id, perms in sorted(permissions_by_module.items()):
+            meta = module_metadata.get(module_id, {'name': module_id.title(), 'icon': 'cube-outline'})
+            modules.append({
+                'id': module_id,
+                'name': meta['name'],
+                'icon': meta['icon'],
+                'wildcard': f"{module_id}.*",
+                'permissions': perms,
+            })
+
+        return modules

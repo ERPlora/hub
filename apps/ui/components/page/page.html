@@ -23,7 +23,7 @@
 #}
 
 {# Page Header (secondary - inside ion-content) #}
-{% ui_page_header title=title subtitle=subtitle action_icon=action_icon action_label=action_label action_hx_get=action_url action_hx_target=action_hx_target action_hx_push_url="true" action_x_click=action_x_click show_back=show_back %}
+{% ui_page_header title=title subtitle=subtitle back_hx_get=back_hx_get back_hx_target=back_hx_target back_hx_push_url=back_hx_push_url action_icon=action_icon action_label=action_label action_hx_get=action_hx_get action_hx_target=action_hx_target action_hx_push_url=action_hx_push_url action_x_click=action_x_click show_back=show_back %}
 
 {# CSRF token for JavaScript #}
 {% csrf_token %}

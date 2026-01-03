@@ -34,3 +34,74 @@
         </div>
     {% endfill %}
 {% endcomponent %}
+
+<script>
+(function() {
+    // Handle module deactivate with Ionic alert
+    document.body.addEventListener('click', async function(e) {
+        const btn = e.target.closest('[data-action="module-deactivate"]');
+        if (!btn) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const url = btn.dataset.url;
+        const moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
+
+        const alert = document.createElement('ion-alert');
+        alert.header = '{% trans "Deactivate Module" %}';
+        alert.message = '{% trans "Are you sure you want to deactivate" %} <strong>' + moduleName + '</strong>?';
+        alert.buttons = [
+            {
+                text: '{% trans "Cancel" %}',
+                role: 'cancel'
+            },
+            {
+                text: '{% trans "Deactivate" %}',
+                role: 'confirm',
+                handler: () => {
+                    htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
+                }
+            }
+        ];
+
+        document.body.appendChild(alert);
+        await alert.present();
+    });
+
+    // Handle module delete with Ionic alert
+    document.body.addEventListener('click', async function(e) {
+        const btn = e.target.closest('[data-action="module-delete"]');
+        if (!btn) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const url = btn.dataset.url;
+        const moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
+
+        const alert = document.createElement('ion-alert');
+        alert.header = '{% trans "Delete Module" %}';
+        alert.subHeader = '{% trans "This action cannot be undone" %}';
+        alert.message = '{% trans "This will permanently delete" %} <strong>' + moduleName + '</strong> {% trans "and all its data." %}';
+        alert.cssClass = 'alert-danger';
+        alert.buttons = [
+            {
+                text: '{% trans "Cancel" %}',
+                role: 'cancel'
+            },
+            {
+                text: '{% trans "Delete" %}',
+                role: 'destructive',
+                cssClass: 'alert-button-danger',
+                handler: () => {
+                    htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
+                }
+            }
+        ];
+
+        document.body.appendChild(alert);
+        await alert.present();
+    });
+})();
+</script>

@@ -1,0 +1,77 @@
+{% load i18n %}
+{# Module permission card with toggle and expandable permissions #}
+{# Used both in detail.html and as HTMX swap target #}
+
+<ion-accordion-group>
+    <ion-accordion value="{{ module.id }}">
+        <ion-item slot="header" color="light">
+            <!-- Module toggle checkbox -->
+            {% if role.name != 'admin' %}
+            <ion-checkbox
+                slot="start"
+                {% if module.has_wildcard or module.is_full %}checked{% endif %}
+                {% if module.is_partial %}indeterminate{% endif %}
+                hx-post="{% url 'main:roles:api_toggle_module' role_id=role.id module_id=module.id %}"
+                hx-target="#module-{{ module.id }}"
+                hx-swap="innerHTML"
+                onclick="event.stopPropagation();">
+            </ion-checkbox>
+            {% else %}
+            <ion-checkbox
+                slot="start"
+                checked
+                disabled>
+            </ion-checkbox>
+            {% endif %}
+
+            <!-- Module info -->
+            <ion-icon name="{{ module.icon }}" class="mr-sm"></ion-icon>
+            <ion-label>
+                <h2 class="fw-semibold">{{ module.name }}</h2>
+                <p class="fs-sm text-medium">
+                    {% if module.has_wildcard %}
+                    <ion-chip color="primary" style="height: 20px; font-size: 11px;">
+                        <ion-label>{{ module.wildcard }}</ion-label>
+                    </ion-chip>
+                    {% else %}
+                    {{ module.active_count }}/{{ module.total_count }} {% trans "permissions" %}
+                    {% endif %}
+                </p>
+            </ion-label>
+        </ion-item>
+
+        <div slot="content" class="ion-padding">
+            {% if module.permissions %}
+            <ion-list>
+                {% for perm in module.permissions %}
+                <ion-item lines="none">
+                    {% if role.name != 'admin' %}
+                    <ion-checkbox
+                        slot="start"
+                        {% if perm.codename in expanded_permissions %}checked{% endif %}
+                        hx-post="{% url 'main:roles:api_toggle_permission' role_id=role.id codename=perm.codename %}"
+                        hx-swap="none">
+                    </ion-checkbox>
+                    {% else %}
+                    <ion-checkbox
+                        slot="start"
+                        checked
+                        disabled>
+                    </ion-checkbox>
+                    {% endif %}
+                    <ion-label>
+                        <h3>{{ perm.name }}</h3>
+                        <p class="fs-xs text-medium">{{ perm.codename }}</p>
+                        {% if perm.description %}
+                        <p class="fs-xs text-medium">{{ perm.description }}</p>
+                        {% endif %}
+                    </ion-label>
+                </ion-item>
+                {% endfor %}
+            </ion-list>
+            {% else %}
+            <p class="text-medium fs-sm p-md">{% trans "No permissions defined for this module." %}</p>
+            {% endif %}
+        </div>
+    </ion-accordion>
+</ion-accordion-group>

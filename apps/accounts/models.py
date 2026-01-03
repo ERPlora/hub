@@ -62,7 +62,7 @@ class Permission(HubBaseModel):
         verbose_name = 'Permission'
         verbose_name_plural = 'Permissions'
         ordering = ['module_id', 'codename']
-        db_table = 'accounts_permission'
+        db_table = 'accounts_permissions'
         constraints = [
             models.UniqueConstraint(
                 fields=['hub_id', 'codename'],
@@ -130,7 +130,7 @@ class Role(HubBaseModel):
         verbose_name = 'Role'
         verbose_name_plural = 'Roles'
         ordering = ['name']
-        db_table = 'accounts_role'
+        db_table = 'accounts_roles'
         constraints = [
             models.UniqueConstraint(
                 fields=['hub_id', 'name'],
@@ -202,7 +202,7 @@ class RolePermission(HubBaseModel):
     class Meta:
         verbose_name = 'Role Permission'
         verbose_name_plural = 'Role Permissions'
-        db_table = 'accounts_rolepermission'
+        db_table = 'accounts_role_permissions'
         constraints = [
             models.UniqueConstraint(
                 fields=['hub_id', 'role', 'permission'],
@@ -317,7 +317,7 @@ class LocalUser(HubBaseModel):
         verbose_name = 'Local User'
         verbose_name_plural = 'Local Users'
         ordering = ['name']
-        db_table = 'accounts_localuser'
+        db_table = 'accounts_local_users'
         # Unique constraints per Hub (same email can exist in different Hubs)
         constraints = [
             models.UniqueConstraint(

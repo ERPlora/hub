@@ -104,8 +104,28 @@ class CardNode(BlockTagNode):
         subtitle = kwargs.get('subtitle', '')
         css_class = kwargs.get('css_class', '')
 
+        # HTMX attributes (hx_get -> hx-get, hx_target -> hx-target, etc.)
+        hx_get = kwargs.get('hx_get', '')
+        hx_post = kwargs.get('hx_post', '')
+        hx_target = kwargs.get('hx_target', '')
+        hx_push_url = kwargs.get('hx_push_url', '')
+        hx_swap = kwargs.get('hx_swap', '')
+
+        # Build attributes string
+        attrs = [f'class="ui-card{" " + css_class if css_class else ""}"']
+        if hx_get:
+            attrs.append(f'hx-get="{hx_get}"')
+        if hx_post:
+            attrs.append(f'hx-post="{hx_post}"')
+        if hx_target:
+            attrs.append(f'hx-target="{hx_target}"')
+        if hx_push_url:
+            attrs.append(f'hx-push-url="{hx_push_url}"')
+        if hx_swap:
+            attrs.append(f'hx-swap="{hx_swap}"')
+
         # Build card HTML
-        html = f'<ion-card class="ui-card{" " + css_class if css_class else ""}">'
+        html = f'<ion-card {" ".join(attrs)}>'
 
         if title:
             html += '<ion-card-header>'

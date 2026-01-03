@@ -46,15 +46,23 @@ class Page(Component):
         tabbar_view: str = "",
         navigation: list = None,
         show_back: bool = True,
+        back_hx_get: str = "",
+        back_hx_target: str = "",
+        back_hx_push_url: str = "",
         action_icon: str = "",
         action_label: str = "",
         action_url: str = "",
+        action_hx_get: str = "",
         action_hx_target: str = "#main-content-area",
+        action_hx_push_url: str = "true",
         action_x_click: str = "",
         padding: bool = True,
         render_tabbar: bool = False,
         **kwargs
     ):
+        # Support both action_url and action_hx_get
+        final_action_hx_get = action_hx_get or action_url
+
         return {
             "title": title,
             "subtitle": subtitle,
@@ -62,10 +70,15 @@ class Page(Component):
             "tabbar_view": tabbar_view,
             "navigation": navigation or [],
             "show_back": show_back,
+            "back_hx_get": back_hx_get,
+            "back_hx_target": back_hx_target,
+            "back_hx_push_url": back_hx_push_url,
             "action_icon": action_icon,
             "action_label": action_label,
-            "action_url": action_url,
+            "action_url": final_action_hx_get,
+            "action_hx_get": final_action_hx_get,
             "action_hx_target": action_hx_target,
+            "action_hx_push_url": action_hx_push_url,
             "action_x_click": action_x_click,
             "padding": padding,
             "render_tabbar": render_tabbar,
