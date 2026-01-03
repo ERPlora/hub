@@ -33,48 +33,6 @@
 {% endblock %}
 
 {% block content %}
-<!-- Global tabbar update function - must be defined before page_content executes -->
-<script>
-    /**
-     * Global function to update the tabbar via JavaScript
-     * Called by the tabbar component in page_content
-     * @param {Array} tabs - Array of tab objects with url, icon, label, active
-     */
-    function updateGlobalTabBar(tabs) {
-        const tabBar = document.getElementById('global-tabbar');
-        if (!tabBar) return;
-
-        const footer = tabBar.closest('ion-footer');
-
-        if (!tabs || tabs.length === 0) {
-            tabBar.innerHTML = '';
-            if (footer) footer.style.display = 'none';
-            return;
-        }
-
-        const html = tabs.map(tab => `
-            <ion-tab-button
-                hx-get="${tab.url}"
-                hx-target="#main-content-area"
-                hx-push-url="true"
-                class="${tab.active ? 'tab-selected' : ''}">
-                <ion-icon name="${tab.icon}"></ion-icon>
-                <ion-label>${tab.label}</ion-label>
-            </ion-tab-button>
-        `).join('');
-
-        tabBar.innerHTML = html;
-
-        if (footer) footer.style.display = '';
-        tabBar.removeAttribute('hidden');
-
-        if (typeof htmx !== 'undefined') {
-            htmx.process(tabBar);
-        }
-    }
-    window.updateGlobalTabBar = updateGlobalTabBar;
-</script>
-
 <!-- HTMX Loading Indicator -->
 <div id="htmx-indicator"></div>
 
@@ -108,12 +66,29 @@
         <div id="main-content-area" class="ion-padding">
             {% block page_content %}{% endblock %}
         </div>
-        <!-- Global Tabbar (updated via JavaScript) -->
-        <ion-footer style="display: none;">
+        <!-- Global Tabbar -->
+        {# Full page load: rendered from navigation context injected by @module_view #}
+        {# HTMX navigation: updated via OOB swap from partials #}
+        {% if navigation %}
+        <ion-footer id="global-tabbar-footer">
             <ion-tab-bar id="global-tabbar">
-                {# Initially hidden, shown via updateGlobalTabBar() when module has tabs #}
+                {% for nav in navigation %}
+                <ion-tab-button
+                    hx-get="{{ nav.url }}"
+                    hx-target="#main-content-area"
+                    hx-push-url="true"
+                    class="{% if nav.id == current_view %}tab-selected{% endif %}">
+                    <ion-icon name="{{ nav.icon }}"></ion-icon>
+                    <ion-label>{{ nav.label }}</ion-label>
+                </ion-tab-button>
+                {% endfor %}
             </ion-tab-bar>
         </ion-footer>
+        {% else %}
+        <ion-footer id="global-tabbar-footer" style="display: none;">
+            <ion-tab-bar id="global-tabbar"></ion-tab-bar>
+        </ion-footer>
+        {% endif %}
     </div>
 
     <!-- Action Sheet (reusable) -->

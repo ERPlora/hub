@@ -151,11 +151,11 @@ def module_context(request):
     and attempts to extract current_view from the URL name.
 
     Template variables:
-    - {{ module_id }} - Module ID (e.g., 'inventory', 'sales')
+    - {{ current_module_id }} - Current module ID (e.g., 'inventory', 'sales')
     - {{ current_view }} - Current view within module (e.g., 'dashboard', 'products')
 
     The tabbar component uses these to:
-    1. Load tabs from module.json using module_id
+    1. Load tabs from module.json using current_module_id
     2. Highlight the active tab using current_view
     """
     import re
@@ -166,7 +166,7 @@ def module_context(request):
     module_match = re.match(r'^/m/([^/]+)(/.*)?$', path)
     if not module_match:
         return {
-            'module_id': '',
+            'current_module_id': '',
             'current_view': '',
         }
 
@@ -191,6 +191,6 @@ def module_context(request):
         pass
 
     return {
-        'module_id': module_id,
+        'current_module_id': module_id,
         'current_view': current_view,
     }

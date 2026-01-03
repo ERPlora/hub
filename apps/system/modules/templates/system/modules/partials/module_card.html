@@ -1,5 +1,6 @@
 {% load i18n %}
 {% load ui %}
+{% load component_tags %}
 
 {# Unified module card for both installed and marketplace views #}
 {# Variables: module, mode (installed|marketplace) #}
@@ -7,10 +8,12 @@
 {% ui_col_start size="12" size_md="6" size_lg="4" %}
     {% ui_card css_class="module-card" %}
         <div class="d-flex align-center gap-md">
-            {# Module Icon - same style for both modes #}
-            <div class="module-icon-box module-icon-box--{{ module.category|default:'default' }}">
-                <ion-icon name="{{ module.icon|default:'cube-outline' }}"></ion-icon>
-            </div>
+            {# Module Icon - using module_icon component #}
+            {% if mode == "installed" %}
+            {% component "module_icon" module_id=module.module_id icon=module.icon|default:"cube-outline" svg_path=module.svg_path|default:"" size="m" color=module.color|default:"primary" show_label=False clickable=False %}{% endcomponent %}
+            {% else %}
+            {% component "module_icon" module_id=module.slug icon=module.icon|default:"cube-outline" svg_path=module.svg_path|default:"" size="m" color=module.color|default:"primary" show_label=False clickable=False %}{% endcomponent %}
+            {% endif %}
 
             <div class="flex-1 min-w-0">
                 <div class="d-flex align-center gap-sm flex-wrap">

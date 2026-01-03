@@ -4,7 +4,7 @@
 
     Genera estructura: content-header + page-content
     Se swappea en #main-content-area (div en app_base.html).
-    El tabbar se actualiza via JavaScript.
+    El tabbar se actualiza via OOB swap cuando navegas entre módulos.
 
     NOTE: NO genera ion-page porque va dentro de #main-content-area.
 
@@ -40,16 +40,29 @@
     {% slot "footer" %}{% endslot %}
 </div>
 
-{# Tab bar - updated via JavaScript #}
-{% if page_module_id %}
-    {% component "tabbar" module_id=page_module_id current_view=tabbar_view %}{% endcomponent %}
-{% else %}
-    {# No module = clear tabbar #}
-    <script>
-    (function() {
-        if (typeof window.updateGlobalTabBar === 'function') {
-            window.updateGlobalTabBar([]);
-        }
-    })();
-    </script>
+{# Tab bar via OOB swap - only when navigating between modules via HTMX #}
+{# For full page loads, tabbar is rendered in app_base.html directly #}
+{# For HTMX within same module, tabbar already correct #}
+{% if render_tabbar and navigation %}
+<ion-footer id="global-tabbar-footer" hx-swap-oob="outerHTML:#global-tabbar-footer">
+    <ion-tab-bar id="global-tabbar">
+        {% for nav in navigation %}
+        <ion-tab-button
+            hx-get="{{ nav.url }}"
+            hx-target="#main-content-area"
+            hx-push-url="true"
+            class="{% if nav.id == tabbar_view %}tab-selected{% endif %}">
+            <ion-icon name="{{ nav.icon }}"></ion-icon>
+            <ion-label>{{ nav.label }}</ion-label>
+        </ion-tab-button>
+        {% endfor %}
+    </ion-tab-bar>
+</ion-footer>
+<script>document.body.setAttribute('data-module-id', '{{ module_id }}');</script>
+{% elif render_tabbar and not module_id %}
+{# HTMX to non-module page = clear tabbar #}
+<ion-footer id="global-tabbar-footer" hx-swap-oob="outerHTML:#global-tabbar-footer" style="display: none;">
+    <ion-tab-bar id="global-tabbar"></ion-tab-bar>
+</ion-footer>
+<script>document.body.removeAttribute('data-module-id');</script>
 {% endif %}

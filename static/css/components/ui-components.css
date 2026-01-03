@@ -8,7 +8,6 @@
 
 .ui-stat-card {
   margin: 0;
-  --background: var(--bg-color);
 }
 
 .ui-stat-card ion-card-content {

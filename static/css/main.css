@@ -183,6 +183,7 @@ ion-tab-bar {
   top: 0;
   z-index: 10;
   background: var(--ion-background-color, #fff);
+  margin: 16px;
 }
 
 .content-header ion-toolbar {

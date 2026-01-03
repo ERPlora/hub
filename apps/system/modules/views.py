@@ -26,6 +26,7 @@ def modules_index(request):
     """Module management page - shows all installed modules"""
     from django.shortcuts import render as django_render
     from apps.modules_runtime.loader import module_loader
+    import importlib
 
     search_query = request.GET.get('q', '').strip()
     modules_dir = Path(django_settings.MODULES_DIR)
@@ -49,23 +50,43 @@ def modules_index(request):
                 'author': '',
                 'icon': 'cube-outline',
                 'category': 'default',
+                'color': 'primary',
+                'svg_path': '',
                 'is_active': is_active,
             }
 
-            module_json_path = module_dir / 'module.json'
-            if module_json_path.exists():
-                try:
-                    with open(module_json_path, 'r', encoding='utf-8') as f:
-                        json_data = json.load(f)
-                        module_data['name'] = json_data.get('name', module_data['name'])
-                        module_data['description'] = json_data.get('description', '')
-                        module_data['version'] = json_data.get('version', '1.0.0')
-                        module_data['author'] = json_data.get('author', '')
-                        module_data['category'] = json_data.get('category', 'default')
-                        menu_config = json_data.get('menu', {})
-                        module_data['icon'] = menu_config.get('icon', 'cube-outline')
-                except Exception as e:
-                    print(f"[WARNING] Error reading module.json for {module_id}: {e}")
+            # Check for SVG icon
+            svg_icon_path = module_dir / 'static' / display_id / 'icons' / 'icon.svg'
+            if svg_icon_path.exists():
+                module_data['svg_path'] = f'/static/{display_id}/icons/icon.svg'
+
+            # Try module.py first (preferred - supports translations)
+            try:
+                module_py = importlib.import_module(f"{display_id}.module")
+                module_data['name'] = str(getattr(module_py, 'MODULE_NAME', module_data['name']))
+                module_data['description'] = str(getattr(module_py, 'MODULE_DESCRIPTION', ''))
+                module_data['version'] = getattr(module_py, 'MODULE_VERSION', '1.0.0')
+                module_data['author'] = getattr(module_py, 'MODULE_AUTHOR', '')
+                module_data['icon'] = getattr(module_py, 'MODULE_ICON', 'cube-outline')
+                module_data['color'] = getattr(module_py, 'MODULE_COLOR', 'primary')
+                module_data['category'] = getattr(module_py, 'MODULE_CATEGORY', 'default')
+            except ImportError:
+                # Fallback to module.json
+                module_json_path = module_dir / 'module.json'
+                if module_json_path.exists():
+                    try:
+                        with open(module_json_path, 'r', encoding='utf-8') as f:
+                            json_data = json.load(f)
+                            module_data['name'] = json_data.get('name', module_data['name'])
+                            module_data['description'] = json_data.get('description', '')
+                            module_data['version'] = json_data.get('version', '1.0.0')
+                            module_data['author'] = json_data.get('author', '')
+                            module_data['category'] = json_data.get('category', 'default')
+                            menu_config = json_data.get('menu', {})
+                            module_data['icon'] = menu_config.get('icon', 'cube-outline')
+                            module_data['color'] = menu_config.get('color', 'primary')
+                    except Exception as e:
+                        print(f"[WARNING] Error reading module.json for {module_id}: {e}")
 
             all_modules.append(module_data)
 
@@ -426,6 +447,7 @@ def module_detail(request, slug):
 def _render_modules_page(request, error=None):
     """Render modules page as HTMX partial response"""
     from django.shortcuts import render
+    import importlib
 
     modules_dir = Path(django_settings.MODULES_DIR)
     all_modules = []
@@ -448,23 +470,43 @@ def _render_modules_page(request, error=None):
                 'author': '',
                 'icon': 'cube-outline',
                 'category': 'default',
+                'color': 'primary',
+                'svg_path': '',
                 'is_active': is_active,
             }
 
-            module_json_path = module_dir / 'module.json'
-            if module_json_path.exists():
-                try:
-                    with open(module_json_path, 'r', encoding='utf-8') as f:
-                        json_data = json.load(f)
-                        module_data['name'] = json_data.get('name', module_data['name'])
-                        module_data['description'] = json_data.get('description', '')
-                        module_data['version'] = json_data.get('version', '1.0.0')
-                        module_data['author'] = json_data.get('author', '')
-                        module_data['category'] = json_data.get('category', 'default')
-                        menu_config = json_data.get('menu', {})
-                        module_data['icon'] = menu_config.get('icon', 'cube-outline')
-                except Exception:
-                    pass
+            # Check for SVG icon
+            svg_icon_path = module_dir / 'static' / display_id / 'icons' / 'icon.svg'
+            if svg_icon_path.exists():
+                module_data['svg_path'] = f'/static/{display_id}/icons/icon.svg'
+
+            # Try module.py first (preferred - supports translations)
+            try:
+                module_py = importlib.import_module(f"{display_id}.module")
+                module_data['name'] = str(getattr(module_py, 'MODULE_NAME', module_data['name']))
+                module_data['description'] = str(getattr(module_py, 'MODULE_DESCRIPTION', ''))
+                module_data['version'] = getattr(module_py, 'MODULE_VERSION', '1.0.0')
+                module_data['author'] = getattr(module_py, 'MODULE_AUTHOR', '')
+                module_data['icon'] = getattr(module_py, 'MODULE_ICON', 'cube-outline')
+                module_data['color'] = getattr(module_py, 'MODULE_COLOR', 'primary')
+                module_data['category'] = getattr(module_py, 'MODULE_CATEGORY', 'default')
+            except ImportError:
+                # Fallback to module.json
+                module_json_path = module_dir / 'module.json'
+                if module_json_path.exists():
+                    try:
+                        with open(module_json_path, 'r', encoding='utf-8') as f:
+                            json_data = json.load(f)
+                            module_data['name'] = json_data.get('name', module_data['name'])
+                            module_data['description'] = json_data.get('description', '')
+                            module_data['version'] = json_data.get('version', '1.0.0')
+                            module_data['author'] = json_data.get('author', '')
+                            module_data['category'] = json_data.get('category', 'default')
+                            menu_config = json_data.get('menu', {})
+                            module_data['icon'] = menu_config.get('icon', 'cube-outline')
+                            module_data['color'] = menu_config.get('color', 'primary')
+                    except Exception:
+                        pass
 
             all_modules.append(module_data)
 

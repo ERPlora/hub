@@ -154,8 +154,10 @@ class ModuleLoader:
 
     def get_menu_items(self) -> List[Dict]:
         """
-        Get all active module menu items directly from filesystem.
-        Scans modules directory and reads module.json for each active module.
+        Get all active module menu items from module.py configuration.
+        Scans modules directory and imports module.py for each active module.
+
+        Uses module.py instead of module.json to support Django translations.
 
         Returns list of menu items sorted by order
         """
@@ -174,54 +176,66 @@ class ModuleLoader:
                 continue
 
             module_id = module_dir.name
-            module_json_path = module_dir / 'module.json'
 
-            # Read module.json if exists
-            menu_config = {}
-            if module_json_path.exists():
-                try:
-                    with open(module_json_path, 'r', encoding='utf-8') as f:
-                        module_data = json.load(f)
-                        menu_config = module_data.get('menu', {})
-                except Exception as e:
-                    print(f"[WARNING] Error reading module.json for {module_id}: {e}")
+            # Import module.py to get configuration with translations
+            try:
+                module_py = importlib.import_module(f"{module_id}.module")
 
-            # Build menu item
-            menu_item = {
-                'module_id': module_id,
-                'label': menu_config.get('label', module_id.title()),
-                'icon': menu_config.get('icon', 'cube-outline'),
-                'order': menu_config.get('order', 100),
-            }
+                # Get MENU configuration from module.py
+                menu_config = getattr(module_py, 'MENU', {})
 
-            # Check if module has submenu items
-            menu_items_config = menu_config.get('items', [])
-            if menu_items_config:
-                # Override URLs in submenu items to use /m/ prefix
-                fixed_items = []
-                for subitem in menu_items_config:
-                    fixed_item = subitem.copy()
-                    # Always use /m/ prefix, ignore module.json URL
-                    if 'url' in fixed_item:
-                        # Extract path after /modules/ or use as-is
-                        url = fixed_item['url']
-                        if url.startswith(f'/modules/{module_id}'):
-                            url = url.replace(f'/modules/{module_id}', f'/m/{module_id}')
-                        elif not url.startswith(f'/m/{module_id}'):
-                            # Relative or other URL, prefix with /m/{module_id}
-                            url = f'/m/{module_id}/' if url == '/' else f'/m/{module_id}{url}'
-                        fixed_item['url'] = url
-                    fixed_items.append(fixed_item)
-                menu_item['items'] = fixed_items
-                menu_item['has_submenu'] = True
-            else:
-                # Single menu item, always use /m/ prefix
-                menu_item['url'] = f'/m/{module_id}/'
-                menu_item['has_submenu'] = False
+                # Get module name (translated via gettext_lazy)
+                module_name = getattr(module_py, 'MODULE_NAME', module_id.title())
+                module_icon = getattr(module_py, 'MODULE_ICON', 'cube-outline')
 
-            # Only add if show_in_menu is not explicitly False
-            if menu_config.get('show', True):
-                menu_items.append(menu_item)
+                # Check if module has custom SVG icon
+                # Django static structure: static/{module_id}/icons/icon.svg
+                svg_icon_path = module_dir / 'static' / module_id / 'icons' / 'icon.svg'
+                has_svg = svg_icon_path.exists()
+
+                # Build menu item - use str() to evaluate lazy translations
+                menu_item = {
+                    'module_id': module_id,
+                    'label': str(menu_config.get('label', module_name)),
+                    'icon': menu_config.get('icon', module_icon),
+                    'order': menu_config.get('order', 100),
+                    'url': f'/m/{module_id}/',
+                    'has_submenu': False,
+                    'has_svg': has_svg,
+                    'svg_path': f'/static/{module_id}/icons/icon.svg' if has_svg else '',
+                }
+
+                # Only add if show is not explicitly False
+                if menu_config.get('show', True):
+                    menu_items.append(menu_item)
+
+            except ImportError as e:
+                # Fallback to module.json if module.py doesn't exist
+                module_json_path = module_dir / 'module.json'
+                if module_json_path.exists():
+                    try:
+                        with open(module_json_path, 'r', encoding='utf-8') as f:
+                            module_data = json.load(f)
+                            menu_config = module_data.get('menu', {})
+
+                        menu_item = {
+                            'module_id': module_id,
+                            'label': menu_config.get('label', module_id.title()),
+                            'icon': menu_config.get('icon', 'cube-outline'),
+                            'order': menu_config.get('order', 100),
+                            'url': f'/m/{module_id}/',
+                            'has_submenu': False,
+                        }
+
+                        if menu_config.get('show', True):
+                            menu_items.append(menu_item)
+                    except Exception as json_error:
+                        print(f"[WARNING] Error reading module.json for {module_id}: {json_error}")
+                else:
+                    print(f"[WARNING] No module.py or module.json found for {module_id}: {e}")
+
+            except Exception as e:
+                print(f"[WARNING] Error loading menu config for {module_id}: {e}")
 
         # Sort by order, then by label
         menu_items.sort(key=lambda x: (x['order'], x['label']))

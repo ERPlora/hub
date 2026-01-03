@@ -27,7 +27,7 @@ MODULE_COLORS = {
 def get_modules_for_grid(menu_items):
     """
     Convert MODULE_MENU_ITEMS to a list suitable for the grid.
-    Each module gets: id, label, icon, url, color
+    Each module gets: id, label, icon, url, color, has_svg, svg_path
     """
     modules = []
     for item in menu_items:
@@ -38,6 +38,8 @@ def get_modules_for_grid(menu_items):
             'icon': item.get('icon', 'cube-outline'),
             'url': item.get('url', '#'),
             'color': item.get('color', MODULE_COLORS.get(module_id, 'primary')),
+            'has_svg': item.get('has_svg', False),
+            'svg_path': item.get('svg_path', ''),
         })
     return modules
 

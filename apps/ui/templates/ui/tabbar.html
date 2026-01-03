@@ -16,7 +16,7 @@
     {% for tab in tabs %}
     <ion-tab-button
         {% if not tab.disabled %}
-        hx-get="{% url tab.url %}"
+        hx-get="{{ tab.url }}"
         hx-target="#main-content-area"
         hx-push-url="true"
         {% endif %}

@@ -13,7 +13,7 @@
     Params:
         title: Page title
         subtitle: Optional subtitle
-        page_module_id: Module ID for tabbar (sent via OOB)
+        module_id: Module ID for tabbar
         tabbar_view: Current view for active tab
         show_back: Show back button (default True)
         action_icon: Icon for header action
@@ -33,16 +33,5 @@
     {% slot "content" %}{% endslot %}
 </div>
 
-{# Tab bar - updated via JavaScript (no more OOB swap) #}
-{% if page_module_id %}
-    {% component "tabbar" module_id=page_module_id current_view=tabbar_view %}{% endcomponent %}
-{% else %}
-    {# No module = clear tabbar via JavaScript #}
-    <script>
-    (function() {
-        if (typeof window.updateGlobalTabBar === 'function') {
-            window.updateGlobalTabBar([]);
-        }
-    })();
-    </script>
-{% endif %}
+{# Tab bar OOB swap has been moved to ui/includes/tabbar_oob.html #}
+{# Include it AFTER {% endcomponent %} in your partial template #}

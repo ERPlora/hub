@@ -379,13 +379,36 @@
                 if (typeof Alpine !== 'undefined' && Alpine.store('nav')) {
                     Alpine.store('nav').setPath(event.detail.path);
                 }
+                // Update tabbar selected state
+                updateTabbarSelection(event.detail.path);
             });
+
+            // Function to update tabbar selection based on current path
+            function updateTabbarSelection(currentPath) {
+                var footer = document.getElementById('global-tabbar-footer');
+                if (!footer) return;
+
+                footer.querySelectorAll('ion-tab-button').forEach(function(btn) {
+                    var btnPath = btn.getAttribute('hx-get');
+                    btn.classList.remove('tab-selected');
+                    if (btnPath) {
+                        // Normalize paths for comparison
+                        var normalizedCurrent = currentPath.replace(/\/$/, '');
+                        var normalizedBtn = btnPath.replace(/\/$/, '');
+                        if (normalizedCurrent === normalizedBtn) {
+                            btn.classList.add('tab-selected');
+                        }
+                    }
+                });
+            }
 
             // Also handle back/forward navigation
             window.addEventListener('popstate', function() {
                 if (typeof Alpine !== 'undefined' && Alpine.store('nav')) {
                     Alpine.store('nav').setPath(window.location.pathname);
                 }
+                // Update tabbar selection on back/forward
+                updateTabbarSelection(window.location.pathname);
             });
 
             // Initialize nav store on page load

@@ -1444,3 +1444,267 @@ swiper-container[slides-per-view="auto"] swiper-slide {
     --box-shadow: none;
     --background: var(--ion-color-light);
 }
+
+/* =============================================================================
+   Module Icon Component
+   iOS-style app icons with customizable sizes and colors
+   ============================================================================= */
+
+/* Base styles */
+.module-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--ui-space-sm, 12px);
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Clickable variant */
+.module-icon--clickable {
+    cursor: pointer;
+    border-radius: var(--ui-radius-md, 12px);
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.module-icon--clickable:hover {
+    background: var(--ion-color-light, #f4f5f8);
+}
+
+.module-icon--clickable:active {
+    transform: scale(0.92);
+}
+
+/* Icon container - the colored box */
+.module-icon__container {
+    width: var(--icon-container-size, 56px);
+    height: var(--icon-container-size, 56px);
+    border-radius: var(--icon-radius, 14px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    /* Default solid border */
+    border: 2px solid transparent;
+}
+
+.module-icon--clickable:hover .module-icon__container {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Color Variants with Gradient Background */
+.module-icon__container--primary {
+    background: linear-gradient(145deg, var(--ion-color-primary), var(--ion-color-primary-shade));
+    border-color: var(--ion-color-primary-shade);
+}
+
+.module-icon__container--success {
+    background: linear-gradient(145deg, var(--ion-color-success), var(--ion-color-success-shade));
+    border-color: var(--ion-color-success-shade);
+}
+
+.module-icon__container--warning {
+    background: linear-gradient(145deg, var(--ion-color-warning), var(--ion-color-warning-shade));
+    border-color: var(--ion-color-warning-shade);
+}
+
+.module-icon__container--danger {
+    background: linear-gradient(145deg, var(--ion-color-danger), var(--ion-color-danger-shade));
+    border-color: var(--ion-color-danger-shade);
+}
+
+.module-icon__container--secondary {
+    background: linear-gradient(145deg, var(--ion-color-secondary), var(--ion-color-secondary-shade));
+    border-color: var(--ion-color-secondary-shade);
+}
+
+.module-icon__container--tertiary {
+    background: linear-gradient(145deg, var(--ion-color-tertiary), var(--ion-color-tertiary-shade));
+    border-color: var(--ion-color-tertiary-shade);
+}
+
+.module-icon__container--medium {
+    background: linear-gradient(145deg, var(--ion-color-medium), var(--ion-color-medium-shade));
+    border-color: var(--ion-color-medium-shade);
+}
+
+.module-icon__container--dark {
+    background: linear-gradient(145deg, var(--ion-color-dark), var(--ion-color-dark-shade));
+    border-color: var(--ion-color-dark-shade);
+}
+
+.module-icon__container--light {
+    background: var(--ion-color-light);
+    border-color: var(--ion-color-medium);
+}
+
+/* Icon Styles (SVG and Ionicons) */
+.module-icon__svg {
+    width: var(--icon-size, 28px);
+    height: var(--icon-size, 28px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* SVG/PNG icon using mask-image for theme color support */
+.module-icon__img {
+    width: 100%;
+    height: 100%;
+    background-color: #fff;
+    -webkit-mask-image: var(--icon-src);
+    mask-image: var(--icon-src);
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+}
+
+/* Fallback for browsers without mask support - use filter */
+@supports not (mask-image: url('')) {
+    .module-icon__img {
+        background-color: transparent;
+        -webkit-mask-image: none;
+        mask-image: none;
+        background-image: var(--icon-src);
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        filter: brightness(0) invert(1);
+    }
+}
+
+/* Ionicon styling */
+.module-icon__ionicon {
+    font-size: var(--icon-size, 28px);
+    color: #fff;
+}
+
+/* Size Variants */
+
+/* Small - 40px */
+.module-icon--s {
+    --icon-container-size: 40px;
+    --icon-size: 20px;
+    --icon-radius: 10px;
+}
+
+.module-icon--s .module-icon__label {
+    font-size: 0.65rem;
+    max-width: 50px;
+}
+
+/* Medium - 56px (default) */
+.module-icon--m {
+    --icon-container-size: 56px;
+    --icon-size: 28px;
+    --icon-radius: 14px;
+}
+
+.module-icon--m .module-icon__label {
+    font-size: 0.75rem;
+    max-width: 70px;
+}
+
+/* Large - 64px */
+.module-icon--l {
+    --icon-container-size: 64px;
+    --icon-size: 32px;
+    --icon-radius: 16px;
+}
+
+.module-icon--l .module-icon__label {
+    font-size: 0.8rem;
+    max-width: 80px;
+}
+
+/* Extra Large - 80px */
+.module-icon--xl {
+    --icon-container-size: 80px;
+    --icon-size: 40px;
+    --icon-radius: 20px;
+}
+
+.module-icon--xl .module-icon__label {
+    font-size: 0.85rem;
+    max-width: 100px;
+}
+
+/* Extra Extra Large - 96px */
+.module-icon--xxl {
+    --icon-container-size: 96px;
+    --icon-size: 48px;
+    --icon-radius: 24px;
+}
+
+.module-icon--xxl .module-icon__label {
+    font-size: 0.9rem;
+    max-width: 120px;
+}
+
+/* Label */
+.module-icon__label {
+    margin-top: var(--ui-space-sm, 8px);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-align: center;
+    color: var(--ion-text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+/* Add Style (Dashed Border for "Add More" Button) */
+.module-icon--add .module-icon__container {
+    background: var(--ion-color-light, #f4f5f8);
+    border: 2px dashed var(--ion-color-medium);
+    box-shadow: none;
+}
+
+.module-icon--add .module-icon__ionicon {
+    color: var(--ion-color-medium);
+}
+
+.module-icon--add .module-icon__img {
+    filter: none;
+    opacity: 0.5;
+}
+
+.module-icon--add:hover .module-icon__container {
+    border-color: var(--ion-color-primary);
+    background: var(--ion-color-primary-tint);
+}
+
+.module-icon--add:hover .module-icon__ionicon {
+    color: var(--ion-color-primary);
+}
+
+.module-icon--add:hover .module-icon__img {
+    opacity: 1;
+    filter: brightness(0) saturate(100%) invert(38%) sepia(84%) saturate(1747%) hue-rotate(196deg) brightness(95%) contrast(101%);
+}
+
+/* Dark Mode Support for Module Icon */
+body.dark .module-icon--clickable:hover {
+    background: var(--ion-color-step-100, #1e1e1e);
+}
+
+body.dark .module-icon__label {
+    color: var(--ion-color-step-850, #d7d8da);
+}
+
+body.dark .module-icon--add .module-icon__container {
+    background: var(--ion-color-step-100, #1e1e1e);
+    border-color: var(--ion-color-step-500);
+}
+
+body.dark .module-icon--add .module-icon__ionicon {
+    color: var(--ion-color-step-500);
+}

@@ -24,16 +24,23 @@
                     </div>
                     <div class="module-grid">
                         <template x-for="mod in favoritesData" :key="'fav-' + mod.id">
-                            <div class="module-app-icon"
+                            <div class="module-icon module-icon--l module-icon--clickable"
                                  :hx-get="mod.url"
                                  hx-target="#main-content-area"
                                  hx-push-url="true"
                                  @click="trackRecent(mod.id)">
-                                <div class="module-app-icon__image"
-                                     :class="'module-app-icon__image--' + mod.color">
-                                    <ion-icon :name="mod.icon"></ion-icon>
+                                <div class="module-icon__container"
+                                     :class="'module-icon__container--' + mod.color">
+                                    <template x-if="mod.has_svg && mod.svg_path">
+                                        <div class="module-icon__svg">
+                                            <div class="module-icon__img" :style="'--icon-src: url(' + mod.svg_path + ')'"></div>
+                                        </div>
+                                    </template>
+                                    <template x-if="!mod.has_svg || !mod.svg_path">
+                                        <ion-icon :name="mod.icon" class="module-icon__ionicon"></ion-icon>
+                                    </template>
                                 </div>
-                                <span class="module-app-icon__label" x-text="mod.label"></span>
+                                <span class="module-icon__label" x-text="mod.label"></span>
                                 <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
                             </div>
                         </template>
@@ -52,16 +59,23 @@
                         {% fill "slides" %}
                             <template x-for="mod in recentData" :key="'recent-' + mod.id">
                                 <swiper-slide>
-                                    <div class="module-app-icon"
+                                    <div class="module-icon module-icon--l module-icon--clickable"
                                          :hx-get="mod.url"
                                          hx-target="#main-content-area"
                                          hx-push-url="true"
                                          @click="trackRecent(mod.id)">
-                                        <div class="module-app-icon__image"
-                                             :class="'module-app-icon__image--' + mod.color">
-                                            <ion-icon :name="mod.icon"></ion-icon>
+                                        <div class="module-icon__container"
+                                             :class="'module-icon__container--' + mod.color">
+                                            <template x-if="mod.has_svg && mod.svg_path">
+                                                <div class="module-icon__svg">
+                                                    <div class="module-icon__img" :style="'--icon-src: url(' + mod.svg_path + ')'"></div>
+                                                </div>
+                                            </template>
+                                            <template x-if="!mod.has_svg || !mod.svg_path">
+                                                <ion-icon :name="mod.icon" class="module-icon__ionicon"></ion-icon>
+                                            </template>
                                         </div>
-                                        <span class="module-app-icon__label" x-text="mod.label"></span>
+                                        <span class="module-icon__label" x-text="mod.label"></span>
                                     </div>
                                 </swiper-slide>
                             </template>
@@ -79,18 +93,25 @@
                 <div class="module-grid">
                     <!-- Dynamic modules from Alpine.js -->
                     <template x-for="mod in filteredModules" :key="mod.id">
-                        <div class="module-app-icon"
+                        <div class="module-icon module-icon--l module-icon--clickable"
                              :hx-get="mod.url"
                              hx-target="#main-content-area"
                              hx-push-url="true"
                              :data-module-id="mod.id"
                              @click="trackRecent(mod.id)"
                              @contextmenu.prevent="toggleFavorite(mod.id)">
-                            <div class="module-app-icon__image"
-                                 :class="'module-app-icon__image--' + mod.color">
-                                <ion-icon :name="mod.icon"></ion-icon>
+                            <div class="module-icon__container"
+                                 :class="'module-icon__container--' + mod.color">
+                                <template x-if="mod.has_svg && mod.svg_path">
+                                    <div class="module-icon__svg">
+                                        <div class="module-icon__img" :style="'--icon-src: url(' + mod.svg_path + ')'"></div>
+                                    </div>
+                                </template>
+                                <template x-if="!mod.has_svg || !mod.svg_path">
+                                    <ion-icon :name="mod.icon" class="module-icon__ionicon"></ion-icon>
+                                </template>
                             </div>
-                            <span class="module-app-icon__label" x-text="mod.label"></span>
+                            <span class="module-icon__label" x-text="mod.label"></span>
                             <template x-if="isFavorite(mod.id)">
                                 <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
                             </template>
@@ -98,14 +119,14 @@
                     </template>
 
                     <!-- Add More Modules button -->
-                    <div class="module-app-icon module-app-icon--add"
+                    <div class="module-icon module-icon--l module-icon--clickable module-icon--add"
                          hx-get="/marketplace/"
                          hx-target="#main-content-area"
                          hx-push-url="true">
-                        <div class="module-app-icon__image">
-                            <ion-icon name="add"></ion-icon>
+                        <div class="module-icon__container">
+                            <ion-icon name="add" class="module-icon__ionicon"></ion-icon>
                         </div>
-                        <span class="module-app-icon__label">{% trans "Get More" %}</span>
+                        <span class="module-icon__label">{% trans "Get More" %}</span>
                     </div>
                 </div>
             </div>
@@ -128,5 +149,10 @@
         </div>
     {% endfill %}
 {% endcomponent %}
+
+{# Hide tabbar when returning to home via HTMX #}
+{% if request.htmx %}
+{% include "ui/includes/tabbar_hide.html" %}
+{% endif %}
 
 {# moduleGrid() is defined globally in ui-helpers.js #}

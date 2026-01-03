@@ -50,9 +50,10 @@ class ListPage(Component):
         module_id: str = "",
         tabbar_template: str = "",  # Legacy - kept for backwards compatibility
         tabbar_view: str = "",
+        navigation: list = None,
+        render_tabbar: bool = False,
         **kwargs
     ):
-        # Rename to avoid conflict with context processor's module_id
         return {
             "title": title,
             "subtitle": subtitle,
@@ -60,8 +61,10 @@ class ListPage(Component):
             "action_url": action_url,
             "action_icon": action_icon,
             "action_hx_target": action_hx_target,
-            "page_module_id": module_id,
+            "module_id": module_id,
             "tabbar_template": tabbar_template,
             "tabbar_view": tabbar_view,
+            "navigation": navigation or [],
+            "render_tabbar": render_tabbar,
             **kwargs,
         }

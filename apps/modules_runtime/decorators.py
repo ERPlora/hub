@@ -150,13 +150,18 @@ def module_view(module_id: str, view_id: str, template_name: str = None):
     1. Executes the view function to get context data
     2. Loads navigation from module.py
     3. Marks the active tab
-    4. Detects if request is from same module (HTMX with X-Module-Id header)
-    5. Renders with or without tabbar update accordingly
+    4. Detects if request is HTMX or full page load
+    5. Renders appropriate template (partial for HTMX, full page for refresh)
 
     Args:
         module_id: The module identifier (e.g., 'inventory', 'sections')
         view_id: The current view/tab identifier (e.g., 'products', 'categories')
         template_name: Optional custom template path. Defaults to '{module_id}/{view_id}.html'
+
+    Template resolution:
+        - HTMX request: Uses '{module_id}/{view_id}.html' (partial content)
+        - Full page load: Uses '{module_id}/pages/{view_id}.html' (extends app_base.html)
+        - If pages/ template doesn't exist, falls back to partial template
 
     Usage:
         @module_view("inventory", "products")
@@ -165,7 +170,8 @@ def module_view(module_id: str, view_id: str, template_name: str = None):
 
         # The decorator will:
         # - Add navigation, page_title, module_id to context
-        # - Render inventory/products.html
+        # - Render inventory/products.html for HTMX
+        # - Render inventory/pages/products.html for full page load
         # - Include tabbar update script if coming from different module
     """
     def decorator(view_func):
@@ -214,13 +220,48 @@ def module_view(module_id: str, view_id: str, template_name: str = None):
             client_module = request.headers.get('X-Module-Id', '')
             same_module = client_module == module_id
 
-            # Should we render the tabbar update script?
-            # - Yes if: full page load OR coming from different module
-            # - No if: HTMX request from same module (tab navigation)
-            context['render_tabbar'] = not (is_htmx and same_module)
+            # Should we emit tabbar update script in the partial?
+            # - Full page load: NO (tabbar is rendered in app_base.html from navigation context)
+            # - HTMX from different module: YES (need to update existing tabbar via JS)
+            # - HTMX from same module: NO (tabbar already correct)
+            context['render_tabbar'] = is_htmx and not same_module
+            context['is_htmx'] = is_htmx
 
-            # 6. Determine template
-            tpl = template_name or f"{module_id}/{view_id}.html"
+            # 6. Determine template based on request type
+            # Template resolution order:
+            # - HTMX: partials/{view_id}_content.html -> {view_id}.html
+            # - Full page: pages/{view_id}.html -> {view_id}.html
+            from django.template.loader import get_template
+            from django.template import TemplateDoesNotExist
+
+            if template_name:
+                # Custom template specified - use as-is
+                tpl = template_name
+            elif is_htmx:
+                # HTMX request - try partials first, then root template
+                partial_tpl = f"{module_id}/partials/{view_id}_content.html"
+                root_tpl = f"{module_id}/{view_id}.html"
+
+                try:
+                    get_template(partial_tpl)
+                    tpl = partial_tpl
+                except TemplateDoesNotExist:
+                    tpl = root_tpl
+            else:
+                # Full page load (F5 refresh, direct URL) - try pages/ first
+                full_page_tpl = f"{module_id}/pages/{view_id}.html"
+                root_tpl = f"{module_id}/{view_id}.html"
+
+                try:
+                    get_template(full_page_tpl)
+                    tpl = full_page_tpl
+                except TemplateDoesNotExist:
+                    # Fall back to root template
+                    tpl = root_tpl
+                    logger.debug(
+                        f"[MODULE_VIEW] Full page template {full_page_tpl} not found, "
+                        f"using {root_tpl}"
+                    )
 
             return render(request, tpl, context)
 

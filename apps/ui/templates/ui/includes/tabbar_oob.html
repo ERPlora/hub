@@ -1,0 +1,49 @@
+{# Tabbar OOB Swap - Include this AFTER the main component in partials #}
+{# Usage: {% include "ui/includes/tabbar_oob.html" %} #}
+{% if render_tabbar and navigation %}
+<ion-footer id="global-tabbar-footer" hx-swap-oob="outerHTML:#global-tabbar-footer" style="visibility: visible !important;">
+    <ion-tab-bar id="global-tabbar" style="visibility: visible !important;">
+        {% for nav in navigation %}
+        <ion-tab-button
+            hx-get="{{ nav.url }}"
+            hx-target="#main-content-area"
+            hx-push-url="true"
+            style="visibility: visible !important;"
+            class="{% if nav.id == current_view %}tab-selected{% endif %}">
+            <ion-icon name="{{ nav.icon }}" style="visibility: visible !important;"></ion-icon>
+            <ion-label style="visibility: visible !important;">{{ nav.label }}</ion-label>
+        </ion-tab-button>
+        {% endfor %}
+    </ion-tab-bar>
+</ion-footer>
+<script>
+document.body.setAttribute('data-module-id', '{{ module_id }}');
+// Force visibility after OOB swap (Ionic CSS hides non-hydrated elements)
+(function() {
+    var footer = document.getElementById('global-tabbar-footer');
+    if (footer) {
+        footer.style.visibility = 'visible';
+        // Also force visibility on all child Ionic elements
+        footer.querySelectorAll('ion-tab-bar, ion-tab-button, ion-icon, ion-label').forEach(function(el) {
+            el.style.visibility = 'visible';
+        });
+        // Update selected tab based on current URL
+        var currentPath = window.location.pathname;
+        footer.querySelectorAll('ion-tab-button').forEach(function(btn) {
+            var btnPath = btn.getAttribute('hx-get');
+            btn.classList.remove('tab-selected');
+            // Exact match or match with trailing variations
+            if (btnPath && (currentPath === btnPath || currentPath === btnPath.replace(/\/$/, '') || currentPath.replace(/\/$/, '') === btnPath.replace(/\/$/, ''))) {
+                btn.classList.add('tab-selected');
+            }
+        });
+    }
+})();
+</script>
+{% elif render_tabbar and not navigation %}
+{# HTMX to non-module page = hide tabbar #}
+<ion-footer id="global-tabbar-footer" hx-swap-oob="outerHTML:#global-tabbar-footer" style="display: none;">
+    <ion-tab-bar id="global-tabbar"></ion-tab-bar>
+</ion-footer>
+<script>document.body.removeAttribute('data-module-id');</script>
+{% endif %}
