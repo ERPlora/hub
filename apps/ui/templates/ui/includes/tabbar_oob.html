@@ -1,5 +1,6 @@
 {# Tabbar OOB Swap - Include this AFTER the main component in partials #}
 {# Usage: {% include "ui/includes/tabbar_oob.html" %} #}
+{% load djicons %}
 {% if render_tabbar and navigation %}
 <ion-footer id="global-tabbar-footer" hx-swap-oob="outerHTML:#global-tabbar-footer" style="visibility: visible !important;">
     <ion-tab-bar id="global-tabbar" style="visibility: visible !important;">
@@ -10,7 +11,7 @@
             hx-push-url="true"
             style="visibility: visible !important;"
             class="{% if nav.id == current_view %}tab-selected{% endif %}">
-            <ion-icon name="{{ nav.icon }}" style="visibility: visible !important;"></ion-icon>
+            {% icon nav.icon style="visibility: visible !important;" %}
             <ion-label style="visibility: visible !important;">{{ nav.label }}</ion-label>
         </ion-tab-button>
         {% endfor %}

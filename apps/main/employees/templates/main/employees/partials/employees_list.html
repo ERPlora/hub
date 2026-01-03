@@ -1,4 +1,4 @@
-{% load i18n ui %}
+{% load i18n ui djicons %}
 
 {% ui_grid_start padding=False %}
     {% ui_row_start %}
@@ -19,7 +19,7 @@
                         <p class="fs-sm text-medium text-truncate m-0">{{ user.email }}</p>
                         {% ui_chip label=user.get_role_display color=user.get_role_color css_class="ion-margin-top" %}
                     </div>
-                    <ion-icon name="chevron-forward-outline" class="text-medium"></ion-icon>
+                    {% icon "chevron-forward-outline" css_class="text-medium" %}
                 </div>
             {% endui_card %}
         {% ui_col_end %}

@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n djicons %}
 
 <div class="cart-container">
     {% if cart.items %}
@@ -6,7 +6,7 @@
         {% for item in cart.items %}
         <ion-item-sliding>
             <ion-item>
-                <ion-icon name="{{ item.icon }}" slot="start" color="primary"></ion-icon>
+                {% icon item.icon slot="start" color="primary" %}
                 <ion-label>
                     <h3>{{ item.name }}</h3>
                     <p>
@@ -24,7 +24,7 @@
                     hx-delete="{% url 'marketplace:cart_remove' store_type item.id %}"
                     hx-target="#cart-content"
                     hx-swap="innerHTML">
-                    <ion-icon name="trash-outline" slot="icon-only"></ion-icon>
+                    {% icon "trash-outline" slot="icon-only" %}
                 </ion-button>
             </ion-item>
             <ion-item-options side="end">
@@ -33,7 +33,7 @@
                     hx-delete="{% url 'marketplace:cart_remove' store_type item.id %}"
                     hx-target="#cart-content"
                     hx-swap="innerHTML">
-                    <ion-icon name="trash" slot="icon-only"></ion-icon>
+                    {% icon "trash" slot="icon-only" %}
                 </ion-item-option>
             </ion-item-options>
         </ion-item-sliding>
@@ -65,7 +65,7 @@
     <!-- Cart Actions -->
     <div class="ion-padding">
         <ion-button expand="block" color="primary" onclick="checkoutCart()">
-            <ion-icon name="card-outline" slot="start"></ion-icon>
+            {% icon "card-outline" slot="start" %}
             {% trans "Checkout" %}
         </ion-button>
 
@@ -77,7 +77,7 @@
             hx-delete="{% url 'marketplace:cart_clear' store_type %}"
             hx-target="#cart-content"
             hx-swap="innerHTML">
-            <ion-icon name="trash-outline" slot="start"></ion-icon>
+            {% icon "trash-outline" slot="start" %}
             {% trans "Clear Cart" %}
         </ion-button>
     </div>
@@ -85,11 +85,11 @@
     {% else %}
     <!-- Empty Cart -->
     <div class="ion-padding ion-text-center empty-cart">
-        <ion-icon name="cart-outline" style="font-size: 64px; color: var(--ion-color-medium);"></ion-icon>
+        {% icon "cart-outline" style="font-size: 64px; color: var(--ion-color-medium);" %}
         <h3>{% trans "Your cart is empty" %}</h3>
         <p class="text-medium">{% trans "Add items from the marketplace to get started" %}</p>
         <ion-button fill="clear" onclick="menuController.close('cart-menu')">
-            <ion-icon name="storefront-outline" slot="start"></ion-icon>
+            {% icon "storefront-outline" slot="start" %}
             {% trans "Browse Marketplace" %}
         </ion-button>
     </div>

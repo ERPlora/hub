@@ -1,4 +1,4 @@
-{% load static %}
+{% load static djicons %}
 
 <div class="module-icon module-icon--{{ size }}{% if add_style %} module-icon--add{% endif %}{% if clickable %} module-icon--clickable{% endif %}"
      {% if clickable and url %}
@@ -16,8 +16,8 @@
                 <div class="module-icon__img" style="--icon-src: url('{{ svg_path }}')"></div>
             </div>
         {% else %}
-            {# Ionicon fallback #}
-            <ion-icon name="{{ icon }}" class="module-icon__ionicon"></ion-icon>
+            {# Ionicon fallback - using djicons #}
+            {% icon icon css_class="module-icon__ionicon" %}
         {% endif %}
     </div>
 

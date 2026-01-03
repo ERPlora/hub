@@ -1,4 +1,4 @@
-<ion-card
+{% load djicons %}<ion-card
     {% if href or hx_get %}button="true"{% endif %}
     {% if href %}href="{{ href }}"{% endif %}
     {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
@@ -15,7 +15,7 @@
             </ion-avatar>
             {% elif icon %}
             <div class="ui-entity-card-icon">
-                <ion-icon name="{{ icon }}"></ion-icon>
+                {% icon icon %}
             </div>
             {% endif %}
             <div class="ui-entity-card-info">

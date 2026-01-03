@@ -1,8 +1,8 @@
-{% load i18n %}
+{% load i18n djicons %}
 
 <ion-card class="border-l-4 border-danger">
     <ion-card-content class="text-center py-8">
-        <ion-icon name="cloud-offline-outline" class="text-6xl text-danger mb-4"></ion-icon>
+        {% icon "cloud-offline-outline" css_class="text-6xl text-danger mb-4" %}
         <h3 class="text-lg font-semibold text-danger mb-2">{% trans "Connection Error" %}</h3>
         <p class="mb-4 text-medium">{{ error }}</p>
         <ion-button
@@ -11,7 +11,7 @@
             hx-target="#marketplace-modules-grid"
             hx-swap="innerHTML"
             hx-indicator="#loading-spinner">
-            <ion-icon slot="start" name="refresh-outline"></ion-icon>
+            {% icon "refresh-outline" slot="start" %}
             {% trans "Try Again" %}
         </ion-button>
     </ion-card-content>

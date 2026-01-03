@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n djicons %}
 {# Module permission card with toggle and expandable permissions #}
 {# Used both in detail.html and as HTMX swap target #}
 
@@ -25,7 +25,7 @@
             {% endif %}
 
             <!-- Module info -->
-            <ion-icon name="{{ module.icon }}" class="mr-sm"></ion-icon>
+            {% icon module.icon css_class="mr-sm" %}
             <ion-label>
                 <h2 class="fw-semibold">{{ module.name }}</h2>
                 <p class="fs-sm text-medium">

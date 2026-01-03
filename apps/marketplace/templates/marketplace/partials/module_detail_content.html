@@ -1,4 +1,4 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 
 {% component "page" title=module.name|default:_("Module Details") back_hx_get="/marketplace/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
     {# Marketplace tabbar - manual since it's not a module #}
@@ -36,7 +36,7 @@
         <ion-card class="m-0">
             <ion-card-content>
                 <div class="d-flex align-center gap-md">
-                    <ion-icon name="alert-circle-outline" class="fs-2xl text-danger"></ion-icon>
+                    {% icon "alert-circle-outline" css_class="fs-2xl text-danger" %}
                     <div>
                         <h3 class="fw-semibold mb-xs m-0">{% trans "Error" %}</h3>
                         <p class="m-0 text-medium">{{ error }}</p>
@@ -55,7 +55,7 @@
                     <!-- Icon -->
                     <div class="module-detail-icon">
                         <div class="module-icon-box module-icon-box--large module-icon-box--{{ module.category|default:'default' }}">
-                            <ion-icon name="{{ module.icon|default:'cube-outline' }}"></ion-icon>
+                            {% icon module.icon|default:"cube-outline" %}
                         </div>
                     </div>
 
@@ -71,19 +71,19 @@
                         <div class="d-flex flex-wrap gap-md align-center mb-md">
                             {% if module.downloads %}
                             <span class="d-inline-flex align-center gap-xs text-medium fs-sm">
-                                <ion-icon name="download-outline"></ion-icon>
+                                {% icon "download-outline" %}
                                 {{ module.downloads }} {% trans "downloads" %}
                             </span>
                             {% endif %}
                             {% if module.rating %}
                             <span class="d-inline-flex align-center gap-xs text-medium fs-sm">
-                                <ion-icon name="star" class="text-warning"></ion-icon>
+                                {% icon "star" css_class="text-warning" %}
                                 {{ module.rating|floatformat:1 }}
                             </span>
                             {% endif %}
                             {% if module.category_name %}
                             <span class="d-inline-flex align-center gap-xs text-medium fs-sm">
-                                <ion-icon name="pricetag-outline"></ion-icon>
+                                {% icon "pricetag-outline" %}
                                 {{ module.category_name }}
                             </span>
                             {% endif %}
@@ -93,18 +93,18 @@
                         <div class="d-flex flex-wrap gap-sm align-center">
                             {% if module.is_featured %}
                             <ion-badge color="warning">
-                                <ion-icon name="star"></ion-icon>
+                                {% icon "star" %}
                                 {% trans "Featured" %}
                             </ion-badge>
                             {% endif %}
                             {% if is_installed %}
                             <ion-chip color="success">
-                                <ion-icon name="checkmark-circle-outline"></ion-icon>
+                                {% icon "checkmark-circle-outline" %}
                                 <ion-label>{% trans "Installed" %}</ion-label>
                             </ion-chip>
                             {% elif is_owned %}
                             <ion-chip color="tertiary">
-                                <ion-icon name="bag-check-outline"></ion-icon>
+                                {% icon "bag-check-outline" %}
                                 <ion-label>{% trans "Owned" %}</ion-label>
                             </ion-chip>
                             {% endif %}
@@ -131,7 +131,7 @@
                         <div class="d-flex flex-column gap-sm">
                             {% if is_installed %}
                             <ion-button expand="block" color="medium" disabled>
-                                <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                                {% icon "checkmark-circle-outline" slot="start" %}
                                 {% trans "Installed" %}
                             </ion-button>
                             {% elif is_owned %}
@@ -139,7 +139,7 @@
                                 data-action="download"
                                 data-module-slug="{{ module.slug }}"
                                 data-download-url="{{ module.download_url }}">
-                                <ion-icon name="download-outline" slot="start"></ion-icon>
+                                {% icon "download-outline" slot="start" %}
                                 {% trans "Download & Install" %}
                             </ion-button>
                             {% elif module.module_type == 'free' or is_free %}
@@ -148,14 +148,14 @@
                                 data-module-id="{{ module.id }}"
                                 data-module-slug="{{ module.slug }}"
                                 data-download-url="{{ module.download_url|default:'' }}">
-                                <ion-icon name="download-outline" slot="start"></ion-icon>
+                                {% icon "download-outline" slot="start" %}
                                 {% trans "Get Free Module" %}
                             </ion-button>
                             {% else %}
                             <ion-button expand="block" color="primary"
                                 data-action="purchase"
                                 data-module-id="{{ module.id }}">
-                                <ion-icon name="cart-outline" slot="start"></ion-icon>
+                                {% icon "cart-outline" slot="start" %}
                                 {% trans "Purchase" %}
                             </ion-button>
                             {% endif %}
@@ -235,9 +235,9 @@
                                 <div class="d-flex gap-xxs mt-xs text-warning">
                                     {% for i in "12345" %}
                                         {% if forloop.counter <= review.rating %}
-                                        <ion-icon name="star"></ion-icon>
+                                        {% icon "star" %}
                                         {% else %}
-                                        <ion-icon name="star-outline" class="text-medium"></ion-icon>
+                                        {% icon "star-outline" css_class="text-medium" %}
                                         {% endif %}
                                     {% endfor %}
                                 </div>
@@ -253,7 +253,7 @@
                 {% endfor %}
                 {% else %}
                 <div class="ui-empty-state">
-                    <ion-icon name="chatbubbles-outline" class="ui-empty-state-icon"></ion-icon>
+                    {% icon "chatbubbles-outline" css_class="ui-empty-state-icon" %}
                     <h3 class="ui-empty-state-title">{% trans "No reviews yet" %}</h3>
                     <p class="ui-empty-state-description">{% trans "Be the first to review this module" %}</p>
                 </div>
@@ -273,7 +273,7 @@
                         </div>
                         {% else %}
                         <div class="text-center py-xl">
-                            <ion-icon name="document-text-outline" class="fs-4xl text-medium"></ion-icon>
+                            {% icon "document-text-outline" css_class="fs-4xl text-medium" %}
                             <p class="text-medium mt-md m-0">{% trans "No changelog available" %}</p>
                         </div>
                         {% endif %}
@@ -294,7 +294,7 @@
                             <ion-card-content>
                                 <div class="d-flex align-center gap-md">
                                     <div class="module-icon-box module-icon-box--{{ related.category|default:'default' }}">
-                                        <ion-icon name="{{ related.icon|default:'cube-outline' }}"></ion-icon>
+                                        {% icon related.icon|default:"cube-outline" %}
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <a href="{% url 'marketplace:module_detail' related.slug %}"

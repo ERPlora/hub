@@ -1322,7 +1322,10 @@ def ui_header_action_button(icon, alpine_click=None, onclick=None, color="", css
         attrs.append(f'class="{css_class}"')
 
     attrs_str = ' '.join(attrs)
-    return mark_safe(f'<ion-button {attrs_str}><ion-icon slot="icon-only" name="{icon}"></ion-icon></ion-button>')
+    # Import djicons to render the icon
+    from djicons import icon as render_icon
+    icon_html = render_icon(icon, slot="icon-only")
+    return mark_safe(f'<ion-button {attrs_str}>{icon_html}</ion-button>')
 
 
 # =============================================================================
@@ -1468,7 +1471,8 @@ class AccordionNode(BlockTagNode):
         html = '<ion-accordion>'
         html += f'<ion-item slot="header" class="nav-item{" " + css_class if css_class else ""}">'
         if header_icon:
-            html += f'<ion-icon name="{header_icon}" slot="start"></ion-icon>'
+            from djicons import icon as render_icon
+            html += render_icon(header_icon, slot="start")
         html += f'<ion-label>{header_label}</ion-label>'
         html += '</ion-item>'
         html += f'<div slot="content" class="submenu-content">{content}</div>'
@@ -1664,7 +1668,8 @@ class ModuleSectionNode(BlockTagNode):
         html += '<div class="module-section__header">'
 
         if icon:
-            html += f'<ion-icon name="{icon}" class="module-section__icon"></ion-icon>'
+            from djicons import icon as render_icon
+            html += render_icon(icon, css_class="module-section__icon")
 
         html += f'<h3 class="module-section__title">{title}</h3>'
 

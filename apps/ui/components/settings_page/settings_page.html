@@ -1,4 +1,4 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 {#
     Settings Page Component - Para páginas de configuración de módulos
 
@@ -52,7 +52,7 @@
             hx-target="#main-content-area"
             hx-push-url="true"
             class="{% if nav.id == tabbar_view %}tab-selected{% endif %}">
-            <ion-icon name="{{ nav.icon }}"></ion-icon>
+            {% icon nav.icon %}
             <ion-label>{{ nav.label }}</ion-label>
         </ion-tab-button>
         {% endfor %}

@@ -1,4 +1,4 @@
-<ion-card
+{% load djicons %}<ion-card
     {% if href or hx_get %}button="true"{% endif %}
     {% if href %}href="{{ href }}"{% endif %}
     {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
@@ -13,7 +13,7 @@
         <div class="ui-module-card-header">
             {% if icon and not image %}
             <div class="ui-module-card-icon">
-                <ion-icon name="{{ icon }}"></ion-icon>
+                {% icon icon %}
             </div>
             {% endif %}
             <div class="ui-module-card-header-info">

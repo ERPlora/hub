@@ -1,4 +1,4 @@
-<ion-button
+{% load djicons %}<ion-button
     x-show="canInstall"
     @click="installApp()"
     x-cloak
@@ -6,6 +6,6 @@
     color="primary"
     class="ui-pwa-install-btn{% if css_class %} {{ css_class }}{% endif %}"
 >
-    <ion-icon slot="start" name="download-outline"></ion-icon>
+    {% icon "download-outline" slot="start" %}
     {% if label %}<span class="hidden-mobile">{{ label }}</span>{% endif %}
 </ion-button>

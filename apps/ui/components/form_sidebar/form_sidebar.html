@@ -1,3 +1,4 @@
+{% load djicons %}
 <!-- Form Sidebar Backdrop -->
 <div class="form-sidebar-backdrop"
      x-show="$store.sidebar.isOpen"
@@ -27,7 +28,7 @@
     <header class="form-sidebar-header">
         <h2 x-text="$store.sidebar.title"></h2>
         <ion-button fill="clear" color="medium" @click="$store.sidebar.close()">
-            <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            {% icon "close-outline" slot="icon-only" %}
         </ion-button>
     </header>
 

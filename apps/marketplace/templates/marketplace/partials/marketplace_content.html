@@ -1,4 +1,4 @@
-{% load i18n static ui component_tags %}
+{% load i18n static ui component_tags djicons %}
 
 {% component "page" title=page_title action_icon="cart-outline" action_badge=cart_count action_hx_get="/marketplace/cart/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
     {% fill "content" %}
@@ -40,7 +40,7 @@
                     show-cancel-button="never" class="flex-1 m-0" value="{{ request.GET.q|default:'' }}">
                 </ion-searchbar>
                 <ion-button id="filter-toggle-btn" fill="outline" type="button" onclick="openFiltersModal()">
-                    <ion-icon name="options-outline" slot="icon-only"></ion-icon>
+                    {% icon "options-outline" slot="icon-only" %}
                     {% if active_filters_count %}
                     <ion-badge color="danger"
                         style="position: absolute; top: -4px; right: -4px; font-size: 10px; min-width: 18px; height: 18px; border-radius: 50%;">
@@ -89,7 +89,7 @@
             <ion-title>{% trans "Filters" %}</ion-title>
             <ion-buttons slot="end">
                 <ion-button onclick="closeFiltersModal()">
-                    <ion-icon name="close" slot="icon-only"></ion-icon>
+                    {% icon "close" slot="icon-only" %}
                 </ion-button>
             </ion-buttons>
         </ion-toolbar>
@@ -161,7 +161,7 @@
                         <ion-chip class="cursor-pointer filter-chip" data-filter="type" data-value="{{ type.id }}"
                             color="{% if request.GET.type == type.id %}primary{% else %}medium{% endif %}"
                             onclick="setFilter('type', '{{ type.id }}')">
-                            {% if type.icon %}<ion-icon name="{{ type.icon }}"></ion-icon>{% endif %}
+                            {% if type.icon %}{% icon type.icon %}{% endif %}
                             <ion-label>{{ type.name }}</ion-label>
                         </ion-chip>
                         {% endfor %}
@@ -222,7 +222,7 @@
         <ion-toolbar>
             <ion-buttons slot="start">
                 <ion-button fill="clear" color="danger" onclick="clearAllFilters()">
-                    <ion-icon name="trash-outline" slot="start"></ion-icon>
+                    {% icon "trash-outline" slot="start" %}
                     {% trans "Clear" %}
                 </ion-button>
             </ion-buttons>

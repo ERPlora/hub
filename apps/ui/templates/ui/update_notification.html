@@ -1,12 +1,11 @@
-{% load i18n %}
-{% load ui %}
+{% load i18n ui djicons %}
 <!-- Update notification banner -->
 <div id="update-notification" class="ui-alert-banner ui-alert-banner--warning">
     <ion-card>
         <ion-card-content>
             <div class="ui-alert-content">
                 <div class="ui-alert-icon">
-                    <ion-icon name="cloud-download-outline"></ion-icon>
+                    {% icon "cloud-download-outline" %}
                 </div>
                 <div class="ui-alert-body">
                     <strong>{% trans "New version available" %}</strong>
@@ -21,7 +20,7 @@
                                 hx-get="/htmx/update-notification/dismiss/"
                                 hx-target="#update-notification"
                                 hx-swap="outerHTML">
-                        <ion-icon name="close-outline" slot="icon-only"></ion-icon>
+                        {% icon "close-outline" slot="icon-only" %}
                     </ion-button>
                 </div>
             </div>

@@ -1,4 +1,4 @@
-{% load i18n component_tags %}
+{% load i18n component_tags djicons %}
 
 <ion-card class="m-0">
     <ion-card-content class="p-0">
@@ -39,7 +39,7 @@
                 {% if total_count == 0 and show_empty %}
                 <div class="p-xl text-center">
                     {% slot "empty" %}
-                    <ion-icon name="file-tray-outline" style="font-size: 64px; color: var(--text-color-secondary);"></ion-icon>
+                    {% icon "file-tray-outline" style="font-size: 64px; color: var(--text-color-secondary);" %}
                     <p class="mt-md" style="color: var(--text-color-secondary);">
                         {% blocktrans %}No {{ entity_name_plural }} found{% endblocktrans %}
                     </p>

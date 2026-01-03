@@ -1,4 +1,4 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 
 {% component "page" title=_("Files") %}
     {% fill "content" %}
@@ -8,7 +8,7 @@
                 {# Database Download Card #}
                 {% ui_card %}
                     <div class="d-flex align-center gap-sm mb-sm">
-                        <ion-icon name="server-outline" class="fs-xl text-primary"></ion-icon>
+                        {% icon "server-outline" css_class="fs-xl text-primary" %}
                         <div>
                             <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Download backup" %}</p>
                             <h2 class="fs-base fw-bold m-0">{% trans "Database" %}</h2>
@@ -23,7 +23,7 @@
                 {# Storage Info Card #}
                 {% ui_card %}
                     <div class="d-flex align-center gap-sm mb-sm">
-                        <ion-icon name="pie-chart-outline" class="fs-xl text-primary"></ion-icon>
+                        {% icon "pie-chart-outline" css_class="fs-xl text-primary" %}
                         <div>
                             <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Disk usage" %}</p>
                             <h2 class="fs-base fw-bold m-0">{% trans "Storage" %}</h2>
@@ -45,7 +45,7 @@
             <div class="ui-grid__main">
                 {% ui_card %}
                     <div class="d-flex align-center gap-sm mb-md">
-                        <ion-icon name="folder-open-outline" class="fs-xl text-primary"></ion-icon>
+                        {% icon "folder-open-outline" css_class="fs-xl text-primary" %}
                         <div>
                             <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Browse and download" %}</p>
                             <h2 class="fs-base fw-bold m-0">{% trans "File Browser" %}</h2>

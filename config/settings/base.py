@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     'djmoney',
     'django_htmx',
     'django_components',
+    'djicons',  # SVG icons for Django templates
     # Health Check
     'health_check',
     'health_check.db',
@@ -455,6 +456,17 @@ COMPONENTS = {
     "context_behavior": "django",  # or "isolated"
 }
 
+# =============================================================================
+# DJICONS - SVG Icons for Django Templates
+# =============================================================================
+
+DJICONS = {
+    "DEFAULT_NAMESPACE": "ion",  # Ionicons as default (compatible with existing <ion-icon>)
+    "PACKS": ["ionicons", "heroicons", "material", "tabler", "lucide", "fontawesome"],
+    "MISSING_ICON_SILENT": False,  # Show error in development
+    "CACHE_ENABLED": True,
+    "CACHE_TIMEOUT": 86400,  # 24 hours
+}
 
 # =============================================================================
 # AUTO-LOAD MODULES (common logic)

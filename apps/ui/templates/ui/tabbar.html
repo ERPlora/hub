@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n djicons %}
 {#
     Tab Bar Component
 
@@ -22,7 +22,7 @@
         {% endif %}
         {% if tab.disabled %}disabled{% endif %}
         {% if current_view == tab.view %}class="tab-selected"{% endif %}>
-        <ion-icon name="{{ tab.icon }}"></ion-icon>
+        {% icon tab.icon %}
         <ion-label>{% if tab.label_trans %}{% trans tab.label_trans %}{% else %}{{ tab.label }}{% endif %}</ion-label>
         {% if tab.badge %}
         <ion-badge color="{{ tab.badge_color|default:'danger' }}">{{ tab.badge }}</ion-badge>

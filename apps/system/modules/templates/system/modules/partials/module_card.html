@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n djicons %}
 {% load ui %}
 {% load component_tags %}
 
@@ -56,19 +56,19 @@
         <div class="d-flex align-center gap-md fs-sm text-medium mb-md">
             {% if module.rating %}
             <span class="d-inline-flex align-center gap-xs">
-                <ion-icon name="star" class="text-warning"></ion-icon>
+                {% icon "star" css_class="text-warning" %}
                 {{ module.rating|floatformat:1 }}
             </span>
             {% endif %}
             {% if module.downloads %}
             <span class="d-inline-flex align-center gap-xs">
-                <ion-icon name="download-outline"></ion-icon>
+                {% icon "download-outline" %}
                 {{ module.downloads }}
             </span>
             {% endif %}
             {% if module.category_name %}
             <span class="d-inline-flex align-center gap-xs">
-                <ion-icon name="pricetag-outline"></ion-icon>
+                {% icon "pricetag-outline" %}
                 {{ module.category_name }}
             </span>
             {% endif %}

@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n djicons %}
 {# oob can be passed to enable HTMX OOB swap #}
 
 <ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
@@ -9,7 +9,7 @@
             hx-target="#main-content-area"
             hx-push-url="true"
             {% if current_tab == 'installed' %}class="tab-selected"{% endif %}>
-            <ion-icon name="apps-outline"></ion-icon>
+            {% icon "apps-outline" %}
             <ion-label>{% trans "My Modules" %}</ion-label>
         </ion-tab-button>
 
@@ -19,20 +19,20 @@
             hx-target="#main-content-area"
             hx-push-url="true"
             {% if current_tab == 'marketplace' %}class="tab-selected"{% endif %}>
-            <ion-icon name="cube-outline"></ion-icon>
+            {% icon "cube-outline" %}
             <ion-label>{% trans "Modules" %}</ion-label>
         </ion-tab-button>
 
         <!-- Components (Coming Soon) -->
         <ion-tab-button disabled>
-            <ion-icon name="hardware-chip-outline"></ion-icon>
+            {% icon "hardware-chip-outline" %}
             <ion-label>{% trans "Components" %}</ion-label>
             <ion-badge color="medium" style="font-size: 0.5rem;">{% trans "Soon" %}</ion-badge>
         </ion-tab-button>
 
         <!-- Product Catalog (Coming Soon) -->
         <ion-tab-button disabled>
-            <ion-icon name="pricetag-outline"></ion-icon>
+            {% icon "pricetag-outline" %}
             <ion-label>{% trans "Products" %}</ion-label>
             <ion-badge color="medium" style="font-size: 0.5rem;">{% trans "Soon" %}</ion-badge>
         </ion-tab-button>

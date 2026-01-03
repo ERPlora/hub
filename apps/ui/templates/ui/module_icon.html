@@ -1,5 +1,6 @@
 {# Module Icon Component #}
-{# Renders inline SVG, PNG img, or Ionic icon (in priority order) #}
+{# Renders inline SVG, PNG img, or djicons icon (in priority order) #}
+{% load djicons %}
 {% if has_svg %}
 {{ svg_content }}
 {% elif has_png %}
@@ -9,5 +10,5 @@
      class="{{ all_classes }}"
      alt="Module icon" />
 {% else %}
-<ion-icon name="{{ icon_name }}" class="{{ all_classes }}"></ion-icon>
+{% icon icon_name css_class=all_classes %}
 {% endif %}

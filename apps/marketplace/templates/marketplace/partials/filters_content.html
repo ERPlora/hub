@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n djicons %}
 
 <div x-data="filtersMenu()" x-init="init()">
     <ion-list lines="none">
@@ -64,7 +64,7 @@
                 {% for type in filters.types %}
                 <ion-item>
                     <ion-radio value="{{ type.id }}" slot="start"></ion-radio>
-                    <ion-icon name="{{ type.icon }}" slot="start" class="ion-margin-end"></ion-icon>
+                    {% icon type.icon slot="start" css_class="ion-margin-end" %}
                     <ion-label>{{ type.name }}</ion-label>
                 </ion-item>
                 {% endfor %}
@@ -122,7 +122,7 @@
     <!-- Apply Button (mobile friendly) -->
     <div class="ion-padding">
         <ion-button expand="block" @click="applyAndClose()">
-            <ion-icon name="checkmark-outline" slot="start"></ion-icon>
+            {% icon "checkmark-outline" slot="start" %}
             {% trans "Apply Filters" %}
         </ion-button>
     </div>

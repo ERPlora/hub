@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static i18n ui %}
+{% load static i18n ui djicons %}
 
 {% block title %}ERPlora Hub - {% trans "Login" %}{% endblock %}
 
@@ -151,7 +151,7 @@
         <ion-content class="ion-padding">
             <div class="pin-setup-content">
                 <div class="pin-setup-header">
-                    <ion-icon name="key-outline"></ion-icon>
+                    {% icon "key-outline" %}
                     <h2>{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
                     <p>{% trans "Setup a 4-digit PIN for quick access" %}</p>
                 </div>

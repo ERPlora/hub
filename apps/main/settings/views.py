@@ -45,10 +45,12 @@ def get_sorted_timezones():
 
 def render_message(message, color='success'):
     """Render a simple message HTML snippet"""
-    icon = 'checkmark-circle-outline' if color == 'success' else 'alert-circle-outline'
+    from djicons import icon as render_icon
+    icon_name = 'checkmark-circle-outline' if color == 'success' else 'alert-circle-outline'
+    icon_html = render_icon(icon_name)
     return f'''
     <div class="flex items-center gap-2 p-3 rounded-lg" style="background: var(--ion-color-{color}-tint); color: var(--ion-color-{color}-shade);">
-        <ion-icon name="{icon}"></ion-icon>
+        {icon_html}
         <span>{message}</span>
     </div>
     '''

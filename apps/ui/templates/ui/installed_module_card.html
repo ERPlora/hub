@@ -1,11 +1,11 @@
-{% load i18n %}
+{% load i18n djicons %}
 <ion-card class="ui-installed-module-card{% if css_class %} {{ css_class }}{% endif %}">
     <ion-card-header>
         <div class="d-flex align-center gap-md">
             {% if icon %}
-            <ion-icon name="{{ icon }}" class="text-primary fs-xl"></ion-icon>
+            {% icon icon css_class="text-primary fs-xl" %}
             {% else %}
-            <ion-icon name="extension-puzzle-outline" class="text-primary fs-xl"></ion-icon>
+            {% icon "extension-puzzle-outline" css_class="text-primary fs-xl" %}
             {% endif %}
             <div class="flex-1" style="min-width: 0;">
                 <ion-card-title class="text-truncate">{{ name }}</ion-card-title>
@@ -36,7 +36,7 @@
             {% if deactivate_alpine %}@click="{{ deactivate_alpine }}"{% endif %}
             {% if deactivate_hx_post %}hx-post="{{ deactivate_hx_post }}" hx-target="{{ deactivate_hx_target|default:'#main-content-area' }}" hx-swap="innerHTML"{% endif %}
         >
-            <ion-icon slot="start" name="pause-outline"></ion-icon>
+            {% icon "pause-outline" slot="start" %}
             {% trans "Deactivate" %}
         </ion-button>
         {% else %}
@@ -47,7 +47,7 @@
             class="flex-1"
             {% if activate_hx_post %}hx-post="{{ activate_hx_post }}" hx-target="{{ activate_hx_target|default:'#main-content-area' }}" hx-swap="innerHTML"{% endif %}
         >
-            <ion-icon slot="start" name="play-outline"></ion-icon>
+            {% icon "play-outline" slot="start" %}
             {% trans "Activate" %}
         </ion-button>
         {% endif %}
@@ -58,7 +58,7 @@
             class="flex-1"
             {% if delete_alpine %}@click="{{ delete_alpine }}"{% endif %}
         >
-            <ion-icon slot="start" name="trash-outline"></ion-icon>
+            {% icon "trash-outline" slot="start" %}
             {% trans "Delete" %}
         </ion-button>
     </div>

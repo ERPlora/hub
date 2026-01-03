@@ -1,4 +1,4 @@
-<ion-button
+{% load djicons %}<ion-button
     color="{{ color }}"
     fill="{{ fill }}"
     {% if size != "default" %}size="{{ size }}"{% endif %}
@@ -18,13 +18,13 @@
     {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
 >
     {% if icon and icon_slot == "start" %}
-    <ion-icon slot="start" name="{{ icon }}"></ion-icon>
+    {% icon icon slot="start" %}
     {% endif %}
     {% if icon_slot != "icon-only" %}{{ label }}{% endif %}
     {% if icon and icon_slot == "end" %}
-    <ion-icon slot="end" name="{{ icon }}"></ion-icon>
+    {% icon icon slot="end" %}
     {% endif %}
     {% if icon and icon_slot == "icon-only" %}
-    <ion-icon slot="icon-only" name="{{ icon }}"></ion-icon>
+    {% icon icon slot="icon-only" %}
     {% endif %}
 </ion-button>

@@ -1,4 +1,4 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 
 {# Store modules data in a hidden element for JavaScript access #}
 <script id="modules-data" type="application/json">{{ modules_json|safe }}</script>
@@ -134,14 +134,14 @@
             <!-- Empty state when no modules and no search -->
             <template x-if="modules.length === 0">
                 <div class="ui-empty-state">
-                    <ion-icon name="extension-puzzle-outline" class="ui-empty-state-icon"></ion-icon>
+                    {% icon "extension-puzzle-outline" css_class="ui-empty-state-icon" %}
                     <h3 class="ui-empty-state-title">{% trans "No modules installed" %}</h3>
                     <p class="ui-empty-state-description">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
                     <ion-button
                         hx-get="/marketplace/"
                         hx-target="#main-content-area"
                         hx-push-url="true">
-                        <ion-icon slot="start" name="storefront-outline"></ion-icon>
+                        {% icon "storefront-outline" slot="start" %}
                         {% trans "Browse Marketplace" %}
                     </ion-button>
                 </div>

@@ -1,4 +1,4 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 
 {% component "page" title=role.display_name back_hx_get="/roles/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
     {% fill "content" %}
@@ -59,7 +59,7 @@
         {% if role.name == 'admin' %}
         <div class="p-md bg-light border-radius-md mb-md">
             <div class="d-flex align-center gap-sm">
-                <ion-icon name="shield-checkmark" class="fs-xl text-primary"></ion-icon>
+                {% icon "shield-checkmark" css_class="fs-xl text-primary" %}
                 <div>
                     <p class="fw-semibold m-0">{% trans "Administrator Role" %}</p>
                     <p class="fs-sm text-medium m-0">{% trans "This role has full access to all permissions. Permissions cannot be modified." %}</p>
@@ -87,12 +87,11 @@
                 <ion-chip color="tertiary">
                     <ion-label>{{ wildcard }}</ion-label>
                     {% if wildcard != '*' %}
-                    <ion-icon name="close-circle"
-                        hx-post="{% url 'main:roles:api_remove_wildcard' role_id=role.id wildcard=wildcard %}"
+                    <span hx-post="{% url 'main:roles:api_remove_wildcard' role_id=role.id wildcard=wildcard %}"
                         hx-target="#main-content-area"
                         hx-swap="innerHTML"
                         onclick="event.stopPropagation();"
-                        style="cursor: pointer;"></ion-icon>
+                        style="cursor: pointer;">{% icon "close-circle" %}</span>
                     {% endif %}
                 </ion-chip>
                 {% endif %}
@@ -119,7 +118,7 @@
                             }).then(() => htmx.ajax('GET', window.location.href, {target: '#main-content-area'}));
                         }
                     ">
-                    <ion-icon slot="start" name="add-outline"></ion-icon>
+                    {% icon "add-outline" slot="start" %}
                     {% trans "Add" %}
                 </ion-button>
             </div>

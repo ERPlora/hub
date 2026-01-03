@@ -1,4 +1,4 @@
-{% load i18n component_tags %}
+{% load i18n component_tags djicons %}
 
 <div class="table-actions d-flex gap-xs justify-center"
      x-data="{ deleting: false }"
@@ -10,7 +10,7 @@
                 hx-target="{{ hx_target }}"
                 hx-push-url="true"
                 title="{% trans 'View' %}">
-        <ion-icon slot="icon-only" name="eye-outline"></ion-icon>
+        {% icon "eye-outline" slot="icon-only" %}
     </ion-button>
     {% endif %}
 
@@ -21,7 +21,7 @@
                 hx-target="{{ hx_target }}"
                 hx-push-url="true"
                 title="{% trans 'Edit' %}">
-        <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+        {% icon "create-outline" slot="icon-only" %}
     </ion-button>
     {% endif %}
 
@@ -32,7 +32,7 @@
                 @click="$store.ui.confirmDelete($el._deleteConfig.url, $el._deleteConfig.name, $el._deleteConfig.method, $el)"
                 title="{% trans 'Delete' %}">
         <ion-spinner x-show="deleting" name="crescent" style="width: 16px; height: 16px;"></ion-spinner>
-        <ion-icon x-show="!deleting" slot="icon-only" name="trash-outline"></ion-icon>
+        <span x-show="!deleting">{% icon "trash-outline" slot="icon-only" %}</span>
     </ion-button>
     {% endif %}
 </div>

@@ -1,4 +1,4 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 
 {% component "page" title=_("Marketplace") subtitle=_("Discover and install modules") %}
     {% fill "content" %}
@@ -64,21 +64,21 @@
                     :color="typeFilter === 'free' ? 'success' : 'medium'"
                     @click="setTypeFilter('free')"
                     class="cursor-pointer">
-                    <ion-icon name="gift-outline" slot="start"></ion-icon>
+                    {% icon "gift-outline" slot="start" %}
                     <ion-label>{% trans "Free" %}</ion-label>
                 </ion-chip>
                 <ion-chip
                     :color="typeFilter === 'one_time' ? 'primary' : 'medium'"
                     @click="setTypeFilter('one_time')"
                     class="cursor-pointer">
-                    <ion-icon name="card-outline" slot="start"></ion-icon>
+                    {% icon "card-outline" slot="start" %}
                     <ion-label>{% trans "One-time" %}</ion-label>
                 </ion-chip>
                 <ion-chip
                     :color="typeFilter === 'subscription' ? 'tertiary' : 'medium'"
                     @click="setTypeFilter('subscription')"
                     class="cursor-pointer">
-                    <ion-icon name="sync-outline" slot="start"></ion-icon>
+                    {% icon "sync-outline" slot="start" %}
                     <ion-label>{% trans "Subscription" %}</ion-label>
                 </ion-chip>
             </div>
@@ -88,31 +88,31 @@
                 <span class="fs-sm text-medium">{% trans "Active:" %}</span>
                 <template x-if="searchQuery">
                     <ion-chip color="warning" class="cursor-pointer" @click="clearSearch()">
-                        <ion-icon name="search" slot="start"></ion-icon>
+                        {% icon "search" slot="start" %}
                         <ion-label x-text="searchQuery"></ion-label>
-                        <ion-icon name="close-circle" slot="end"></ion-icon>
+                        {% icon "close-circle" slot="end" %}
                     </ion-chip>
                 </template>
                 <template x-if="categoryFilter">
                     <ion-chip color="warning" class="cursor-pointer" @click="setCategory('')">
                         <ion-label x-text="getCategoryName(categoryFilter)"></ion-label>
-                        <ion-icon name="close-circle" slot="end"></ion-icon>
+                        {% icon "close-circle" slot="end" %}
                     </ion-chip>
                 </template>
                 <template x-if="industryFilter">
                     <ion-chip color="warning" class="cursor-pointer" @click="setIndustry('')">
                         <ion-label x-text="getIndustryName(industryFilter)"></ion-label>
-                        <ion-icon name="close-circle" slot="end"></ion-icon>
+                        {% icon "close-circle" slot="end" %}
                     </ion-chip>
                 </template>
                 <template x-if="typeFilter">
                     <ion-chip color="warning" class="cursor-pointer" @click="setTypeFilter('')">
                         <ion-label x-text="getTypeLabel(typeFilter)"></ion-label>
-                        <ion-icon name="close-circle" slot="end"></ion-icon>
+                        {% icon "close-circle" slot="end" %}
                     </ion-chip>
                 </template>
                 <ion-button size="small" fill="clear" color="danger" @click="clearAllFilters()">
-                    <ion-icon name="trash-outline" slot="start"></ion-icon>
+                    {% icon "trash-outline" slot="start" %}
                     {% trans "Clear all" %}
                 </ion-button>
             </div>

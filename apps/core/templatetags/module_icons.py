@@ -215,10 +215,10 @@ def module_icon(module_id: str = None, icon: str = None, css_class: str = '', si
                     f'{class_attr} alt="Module icon" />'
                 )
 
-    # Fallback to Ionic icon
+    # Fallback to djicons (which uses Ionicons by default)
+    from djicons import icon as render_icon
     icon_name = icon or 'cube-outline'
-    class_attr = f'class="{escape(all_classes)}"' if all_classes else ''
-    return mark_safe(f'<ion-icon name="{escape(icon_name)}" {class_attr}></ion-icon>')
+    return mark_safe(render_icon(icon_name, css_class=all_classes))
 
 
 @register.simple_tag

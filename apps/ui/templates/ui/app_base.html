@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static i18n ui %}
+{% load static i18n ui djicons %}
 {#
     UI Base Template - Base para todas las páginas del dashboard
 
@@ -53,10 +53,11 @@
                 <ion-title>ERPlora</ion-title>
                 <ion-buttons slot="end">
                     <ion-button @click="toggleTheme()">
-                        <ion-icon :name="isDark ? 'sunny-outline' : 'moon-outline'" slot="icon-only"></ion-icon>
+                        <span x-show="isDark" slot="icon-only">{% icon "sunny-outline" %}</span>
+                        <span x-show="!isDark" x-cloak slot="icon-only">{% icon "moon-outline" %}</span>
                     </ion-button>
                     <ion-button @click="handleUserMenu()">
-                        <ion-icon name="person-circle-outline" slot="icon-only"></ion-icon>
+                        {% icon "person-circle-outline" slot="icon-only" %}
                     </ion-button>
                 </ion-buttons>
             </ion-toolbar>
@@ -78,7 +79,7 @@
                     hx-target="#main-content-area"
                     hx-push-url="true"
                     class="{% if nav.id == current_view %}tab-selected{% endif %}">
-                    <ion-icon name="{{ nav.icon }}"></ion-icon>
+                    {% icon nav.icon %}
                     <ion-label>{{ nav.label }}</ion-label>
                 </ion-tab-button>
                 {% endfor %}

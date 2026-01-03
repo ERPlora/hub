@@ -1,17 +1,17 @@
-{% load i18n %}
+{% load i18n djicons %}
 
 <div class="ion-padding ion-text-center coming-soon-state">
-    <ion-icon name="{{ store_config.icon }}" style="font-size: 80px; color: var(--ion-color-medium);"></ion-icon>
+    {% icon store_config.icon style="font-size: 80px; color: var(--ion-color-medium);" %}
     <h2>{{ store_config.name }}</h2>
     <ion-chip color="warning">
-        <ion-icon name="time-outline"></ion-icon>
+        {% icon "time-outline" %}
         <ion-label>{% trans "Coming Soon" %}</ion-label>
     </ion-chip>
     <p class="text-medium ion-margin-top">
         {% trans "This store is under development. Stay tuned for updates!" %}
     </p>
     <ion-button fill="outline" hx-get="{% url 'marketplace:index' %}" hx-target="#main-content-area" hx-push-url="true">
-        <ion-icon name="cube-outline" slot="start"></ion-icon>
+        {% icon "cube-outline" slot="start" %}
         {% trans "Browse Modules" %}
     </ion-button>
 </div>

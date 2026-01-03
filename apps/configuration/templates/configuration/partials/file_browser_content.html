@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n djicons %}
 
 {# Breadcrumbs #}
 <div class="d-flex align-center gap-xs mb-md fs-sm flex-wrap">
@@ -10,7 +10,7 @@
        class="text-primary">
         {{ crumb.name }}
     </a>
-    <ion-icon name="chevron-forward-outline" class="text-secondary"></ion-icon>
+    {% icon "chevron-forward-outline" css_class="text-secondary" %}
     {% else %}
     <span class="fw-semibold">{{ crumb.name }}</span>
     {% endif %}
@@ -25,7 +25,7 @@
         class="cursor-pointer"
         hx-get="{% url 'configuration:file_browser' %}?dir={{ key }}"
         hx-target="#file-browser-content">
-        <ion-icon name="{{ dir_info.icon }}-outline"></ion-icon>
+        {% icon dir_info.icon|add:"-outline" %}
         <ion-label>{{ dir_info.name }}</ion-label>
     </ion-chip>
     {% endfor %}
@@ -37,7 +37,7 @@
     hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ parent_path }}"
     hx-target="#file-browser-content"
     class="mb-xs">
-    <ion-icon name="arrow-back-outline" slot="start"></ion-icon>
+    {% icon "arrow-back-outline" slot="start" %}
     <ion-label>{% trans "Back" %}</ion-label>
 </ion-item>
 {% endif %}
@@ -45,7 +45,7 @@
 {# Files List #}
 {% if is_empty %}
 <div class="table-empty">
-    <ion-icon name="folder-open-outline" class="table-empty-icon"></ion-icon>
+    {% icon "folder-open-outline" css_class="table-empty-icon" %}
     <p class="text-secondary">{% trans "No files in this directory" %}</p>
 </div>
 {% else %}
@@ -56,7 +56,7 @@
     <ion-item button
         hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ item.path }}"
         hx-target="#file-browser-content">
-        <ion-icon name="folder" slot="start" color="warning"></ion-icon>
+        {% icon "folder" slot="start" color="warning" %}
         <ion-label>
             <h3>{{ item.name }}</h3>
             <p class="fs-xs text-secondary">{{ item.modified }}</p>
@@ -65,7 +65,7 @@
     {% else %}
     {# File #}
     <ion-item>
-        <ion-icon name="{{ item.icon }}-outline" slot="start" color="medium"></ion-icon>
+        {% icon item.icon|add:"-outline" slot="start" color="medium" %}
         <ion-label>
             <h3>{{ item.name }}</h3>
             <p class="fs-xs text-secondary">{{ item.size }} &bull; {{ item.modified }}</p>
@@ -75,7 +75,7 @@
             slot="end"
             href="{% url 'configuration:download_file' %}?dir={{ dir_key }}&path={{ item.path }}"
             download>
-            <ion-icon name="download-outline" slot="icon-only"></ion-icon>
+            {% icon "download-outline" slot="icon-only" %}
         </ion-button>
     </ion-item>
     {% endif %}

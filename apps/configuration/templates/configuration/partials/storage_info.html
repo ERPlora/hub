@@ -1,9 +1,9 @@
-{% load i18n %}
+{% load i18n djicons %}
 
 {# Total Storage #}
 <div class="d-flex justify-between align-center p-sm rounded-lg mb-sm" style="background: rgba(var(--color-primary-rgb), 0.1);">
     <div class="d-flex align-center gap-sm">
-        <ion-icon name="folder-open" class="fs-xl text-primary"></ion-icon>
+        {% icon "folder-open" css_class="fs-xl text-primary" %}
         <span class="fw-semibold">{% trans "Total Storage" %}</span>
     </div>
     <div class="text-right">
@@ -16,7 +16,7 @@
 {% for key, info in storage_info.items %}
 <div class="d-flex justify-between align-center p-xs rounded mb-xs">
     <div class="d-flex align-center gap-sm">
-        <ion-icon name="{{ info.icon }}-outline" class="fs-lg text-secondary"></ion-icon>
+        {% icon info.icon|add:"-outline" css_class="fs-lg text-secondary" %}
         <span>{{ info.name }}</span>
     </div>
     <div class="text-right">
@@ -29,7 +29,7 @@
 {# Data Location #}
 <div class="mt-md p-sm rounded-lg" style="background: var(--bg-color-secondary);">
     <p class="fs-xs text-secondary m-0">
-        <ion-icon name="folder-outline" style="vertical-align: middle;"></ion-icon>
+        {% icon "folder-outline" style="vertical-align: middle;" %}
         {% trans "Data location" %}:
     </p>
     <p class="fs-xs mono mt-xs m-0" style="word-break: break-all;">{{ base_path }}</p>

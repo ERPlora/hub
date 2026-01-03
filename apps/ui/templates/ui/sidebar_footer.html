@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n djicons %}
 <ion-footer class="sidebar-footer{% if css_class %} {{ css_class }}{% endif %}">
     <ion-list lines="none">
         <!-- PWA Install Button -->
@@ -21,7 +21,7 @@
             lines="none"
             @click="installPWA()"
             class="nav-item">
-            <ion-icon slot="start" name="download-outline"></ion-icon>
+            {% icon "download-outline" slot="start" %}
             <ion-label>{% trans "Install App" %}</ion-label>
         </ion-item>
 
@@ -33,7 +33,7 @@
             lines="none"
             href="{{ signout_url }}"
             class="nav-item">
-            <ion-icon slot="start" name="log-out-outline"></ion-icon>
+            {% icon "log-out-outline" slot="start" %}
             <ion-label>{{ signout_label }}</ion-label>
         </ion-item>
         {% endif %}

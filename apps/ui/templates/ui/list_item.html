@@ -1,4 +1,4 @@
-<ion-item
+{% load djicons %}<ion-item
     {% if button or href or hx_get %}button="true" detail="false"{% endif %}
     {% if lines %}lines="{{ lines }}"{% endif %}
     {% if href %}href="{{ href }}"{% endif %}
@@ -13,13 +13,13 @@
         <img src="{{ avatar }}" alt="">
     </ion-avatar>
     {% elif icon %}
-    <ion-icon slot="start" name="{{ icon }}"></ion-icon>
+    {% icon icon slot="start" %}
     {% endif %}
     <ion-label>
         <h2>{{ label }}</h2>
         {% if detail %}<p>{{ detail }}</p>{% endif %}
     </ion-label>
     {% if button or href or hx_get %}
-    <ion-icon slot="end" name="chevron-forward-outline"></ion-icon>
+    {% icon "chevron-forward-outline" slot="end" %}
     {% endif %}
 </ion-item>

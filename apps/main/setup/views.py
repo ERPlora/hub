@@ -83,9 +83,11 @@ def wizard(request):
 
         if errors:
             # Return error response for HTMX
+            from djicons import icon as render_icon
+            alert_icon = render_icon("alert-circle-outline")
             error_html = '<div class="text-danger ion-padding">'
             for error in errors:
-                error_html += f'<p><ion-icon name="alert-circle-outline"></ion-icon> {error}</p>'
+                error_html += f'<p>{alert_icon} {error}</p>'
             error_html += '</div>'
             return HttpResponse(error_html, status=400)
 

@@ -1,14 +1,11 @@
-{% load i18n component_tags %}
+{% load i18n component_tags djicons %}
 
 <ion-card class="m-0 mb-md">
     <ion-card-content class="p-md">
         <div class="d-flex gap-sm flex-wrap align-center">
             {# Search Input #}
             <div class="flex-1" style="position: relative; min-width: 200px;">
-                <ion-icon
-                    name="search-outline"
-                    style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-color-secondary); pointer-events: none; z-index: 10;">
-                </ion-icon>
+                <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-color-secondary); pointer-events: none; z-index: 10;">{% icon "search-outline" %}</span>
                 <input
                     type="text"
                     name="{{ search_name }}"

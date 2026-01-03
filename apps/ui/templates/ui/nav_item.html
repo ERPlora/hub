@@ -1,4 +1,4 @@
-<ion-item
+{% load djicons %}<ion-item
     button="true"
     detail="false"
     lines="{{ lines }}"
@@ -10,13 +10,13 @@
     {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
 >
     {% if icon %}
-    <ion-icon slot="start" name="{{ icon }}"></ion-icon>
+    {% icon icon slot="start" %}
     {% endif %}
     <ion-label>{{ label }}</ion-label>
     {% if badge %}
     <ion-badge slot="end" color="danger">{{ badge }}</ion-badge>
     {% endif %}
     {% if detail %}
-    <ion-icon slot="end" name="chevron-forward-outline"></ion-icon>
+    {% icon "chevron-forward-outline" slot="end" %}
     {% endif %}
 </ion-item>

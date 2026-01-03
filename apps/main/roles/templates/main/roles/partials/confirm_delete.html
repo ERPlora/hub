@@ -1,10 +1,10 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 
 {% component "page" title=_("Delete Role") back_hx_get="/roles/"|add:role.id|add:"/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
     {% fill "content" %}
         {% ui_card %}
             <div class="text-center py-lg">
-                <ion-icon name="warning-outline" class="fs-xxxl text-danger"></ion-icon>
+                {% icon "warning-outline" css_class="fs-xxxl text-danger" %}
                 <h2 class="mt-md mb-sm">{% trans "Delete Role" %}</h2>
                 <p class="text-medium">
                     {% blocktrans with name=role.display_name %}

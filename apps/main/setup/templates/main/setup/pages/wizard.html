@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static i18n ui %}
+{% load static i18n ui djicons %}
 
 {% block title %}ERPlora Hub - {% trans "Setup" %}{% endblock %}
 
@@ -30,7 +30,7 @@
 
                 <!-- Regional Settings Section -->
                 <h3 class="section-title">
-                    <ion-icon name="globe-outline"></ion-icon>
+                    {% icon "globe-outline" %}
                     {% trans "Regional Settings" %}
                 </h3>
 
@@ -66,7 +66,7 @@
 
                 <!-- Business Information Section -->
                 <h3 class="section-title">
-                    <ion-icon name="business-outline"></ion-icon>
+                    {% icon "business-outline" %}
                     {% trans "Business Information" %}
                 </h3>
 
@@ -132,7 +132,7 @@
 
                 <!-- Tax Configuration Section -->
                 <h3 class="section-title">
-                    <ion-icon name="calculator-outline"></ion-icon>
+                    {% icon "calculator-outline" %}
                     {% trans "Tax Configuration" %}
                 </h3>
 
@@ -166,7 +166,7 @@
                 <!-- Submit Button -->
                 <div class="setup-submit">
                     <ion-button type="submit" expand="block" size="large">
-                        <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
+                        {% icon "checkmark-circle-outline" slot="start" %}
                         {% trans "Complete Setup" %}
                         <ion-spinner id="submit-spinner" name="crescent" class="htmx-indicator" style="margin-left: 8px;"></ion-spinner>
                     </ion-button>

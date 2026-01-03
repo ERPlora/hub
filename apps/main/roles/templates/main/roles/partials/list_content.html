@@ -1,4 +1,4 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 
 {% component "page" title=_("Roles") action_icon="add-outline" action_label=_("Add") action_hx_get="/roles/create/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
     {% fill "content" %}
@@ -11,8 +11,7 @@
                         {% url 'main:roles:detail' role_id=role.id as detail_url %}
                         {% ui_card css_class="cursor-pointer" hx_get=detail_url hx_target="#main-content-area" hx_push_url="true" %}
                             <div class="d-flex align-center gap-md">
-                                <ion-icon name="{% if role.name == 'admin' %}shield-checkmark{% elif role.name == 'manager' %}briefcase{% else %}person{% endif %}-outline"
-                                          class="fs-xxl text-{% if role.name == 'admin' %}primary{% elif role.name == 'manager' %}tertiary{% else %}success{% endif %}"></ion-icon>
+                                {% if role.name == 'admin' %}{% icon "shield-checkmark-outline" css_class="fs-xxl text-primary" %}{% elif role.name == 'manager' %}{% icon "briefcase-outline" css_class="fs-xxl text-tertiary" %}{% else %}{% icon "person-outline" css_class="fs-xxl text-success" %}{% endif %}
                                 <div class="flex-1 min-w-0">
                                     <h3 class="fw-semibold text-truncate m-0">{{ role.display_name }}</h3>
                                     <p class="fs-sm text-medium text-truncate m-0">{{ role.description|default:"-"|truncatewords:10 }}</p>
@@ -28,7 +27,7 @@
                                 <div class="text-end">
                                     <span class="fs-sm text-medium">{{ role.users.count }} {% trans "users" %}</span>
                                 </div>
-                                <ion-icon name="chevron-forward-outline" class="text-medium"></ion-icon>
+                                {% icon "chevron-forward-outline" css_class="text-medium" %}
                             </div>
                         {% endui_card %}
                     {% ui_col_end %}

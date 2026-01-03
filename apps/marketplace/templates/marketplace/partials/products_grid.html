@@ -1,4 +1,4 @@
-{% load i18n ui %}
+{% load i18n ui djicons %}
 
 {% if products %}
 <ion-grid class="p-0">
@@ -10,7 +10,7 @@
                     <div class="d-flex align-center gap-md">
                         {# Module Icon #}
                         <div class="module-icon-box module-icon-box--{{ product.category|default:'default' }}">
-                            <ion-icon name="{{ product.icon|default:'cube-outline' }}"></ion-icon>
+                            {% icon product.icon|default:"cube-outline" %}
                         </div>
 
                         <div class="flex-1 min-w-0">
@@ -33,12 +33,12 @@
                         <div class="flex-shrink-0">
                             {% if product.is_installed %}
                             <ion-chip color="success">
-                                <ion-icon name="checkmark-circle-outline"></ion-icon>
+                                {% icon "checkmark-circle-outline" %}
                                 <ion-label>{% trans "Installed" %}</ion-label>
                             </ion-chip>
                             {% elif product.is_owned %}
                             <ion-chip color="tertiary">
-                                <ion-icon name="bag-check-outline"></ion-icon>
+                                {% icon "bag-check-outline" %}
                                 <ion-label>{% trans "Owned" %}</ion-label>
                             </ion-chip>
                             {% endif %}
@@ -51,19 +51,19 @@
                     <div class="d-flex align-center gap-md fs-sm text-medium mb-md">
                         {% if product.rating %}
                         <span class="d-inline-flex align-center gap-xs">
-                            <ion-icon name="star" class="text-warning"></ion-icon>
+                            {% icon "star" css_class="text-warning" %}
                             {{ product.rating|floatformat:1 }}
                         </span>
                         {% endif %}
                         {% if product.downloads %}
                         <span class="d-inline-flex align-center gap-xs">
-                            <ion-icon name="download-outline"></ion-icon>
+                            {% icon "download-outline" %}
                             {{ product.downloads }}
                         </span>
                         {% endif %}
                         {% if product.category_name %}
                         <span class="d-inline-flex align-center gap-xs">
-                            <ion-icon name="pricetag-outline"></ion-icon>
+                            {% icon "pricetag-outline" %}
                             {{ product.category_name }}
                         </span>
                         {% endif %}
@@ -86,7 +86,7 @@
                     <div class="module-card-actions">
                         {% if product.is_installed %}
                         <ion-button fill="clear" size="small" color="medium" disabled expand="block">
-                            <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                            {% icon "checkmark-circle-outline" slot="start" %}
                             {% trans "Installed" %}
                         </ion-button>
                         {% elif product.is_owned %}
@@ -94,7 +94,7 @@
                             data-action="download"
                             data-module-slug="{{ product.slug }}"
                             data-download-url="{{ product.download_url }}">
-                            <ion-icon name="download-outline" slot="start"></ion-icon>
+                            {% icon "download-outline" slot="start" %}
                             {% trans "Install" %}
                         </ion-button>
                         {% elif product.is_free or product.module_type == 'free' or product.price == 0 %}
@@ -103,14 +103,14 @@
                             data-module-id="{{ product.id }}"
                             data-module-slug="{{ product.slug }}"
                             data-download-url="{{ product.download_url|default:'' }}">
-                            <ion-icon name="download-outline" slot="start"></ion-icon>
+                            {% icon "download-outline" slot="start" %}
                             {% trans "Install" %}
                         </ion-button>
                         {% else %}
                         <ion-button fill="clear" size="small" color="primary" expand="block"
                             data-action="purchase"
                             data-module-id="{{ product.id }}">
-                            <ion-icon name="cart-outline" slot="start"></ion-icon>
+                            {% icon "cart-outline" slot="start" %}
                             {% trans "Purchase" %}
                         </ion-button>
                         {% endif %}
@@ -137,7 +137,7 @@
 {% else %}
 <!-- No Results -->
 <div class="ion-padding ion-text-center no-results">
-    <ion-icon name="search-outline" style="font-size: 64px; color: var(--ion-color-medium);"></ion-icon>
+    {% icon "search-outline" style="font-size: 64px; color: var(--ion-color-medium);" %}
     <h3>{% trans "No products found" %}</h3>
     <p class="text-medium">{% trans "Try adjusting your search or filters" %}</p>
 </div>

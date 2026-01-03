@@ -1,4 +1,4 @@
-<ion-button
+{% load djicons %}<ion-button
     color="{{ color }}"
     fill="{{ fill }}"
     {% if size != "default" %}size="{{ size }}"{% endif %}
@@ -13,5 +13,5 @@
     {% if css_class %}class="{{ css_class }}"{% endif %}
     {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
 >
-    <ion-icon slot="icon-only" name="{{ icon }}"></ion-icon>
+    {% icon icon slot="icon-only" %}
 </ion-button>

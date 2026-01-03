@@ -1,5 +1,6 @@
 {# Content Header - styled as secondary header inside ion-content #}
 {# Note: Uses div instead of ion-header because it's placed inside ion-content #}
+{% load djicons %}
 <div class="content-header">
     <ion-toolbar>
         {% if back_url or back_hx_get %}
@@ -29,10 +30,10 @@
                 {% if action_badge %}style="position: relative;"{% endif %}
             >
                 {% if action_icon and action_label %}
-                <ion-icon slot="start" name="{{ action_icon }}"></ion-icon>
+                {% icon action_icon slot="start" %}
                 {{ action_label }}
                 {% elif action_icon %}
-                <ion-icon slot="icon-only" name="{{ action_icon }}"></ion-icon>
+                {% icon action_icon slot="icon-only" %}
                 {% else %}
                 {{ action_label }}
                 {% endif %}

@@ -1,6 +1,6 @@
-<div class="ui-empty-state {{ css_class }}">
+{% load djicons %}<div class="ui-empty-state {{ css_class }}">
     {% if icon %}
-    <ion-icon name="{{ icon }}" class="ui-empty-state-icon"></ion-icon>
+    {% icon icon css_class="ui-empty-state-icon" %}
     {% endif %}
     <h3 class="ui-empty-state-title">{{ title }}</h3>
     {% if description %}

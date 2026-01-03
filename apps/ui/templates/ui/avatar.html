@@ -1,9 +1,9 @@
-<ion-avatar class="ui-avatar ui-avatar--{{ size }} {{ css_class }}">
+{% load djicons %}<ion-avatar class="ui-avatar ui-avatar--{{ size }} {{ css_class }}">
     {% if src %}
     <img src="{{ src }}" alt="{{ alt }}">
     {% elif initials %}
     <div class="ui-avatar-initials ui-avatar-initials--{{ color }}">{{ initials }}</div>
     {% else %}
-    <ion-icon name="person-outline"></ion-icon>
+    {% icon "person-outline" %}
     {% endif %}
 </ion-avatar>

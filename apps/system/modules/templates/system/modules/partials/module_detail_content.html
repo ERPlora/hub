@@ -1,4 +1,4 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 
 {% if error %}
     <!-- Error State -->
@@ -6,7 +6,7 @@
         {% fill "content" %}
             {% ui_card css_class="card-error" %}
                 <div class="d-flex align-center gap-md">
-                    <ion-icon name="alert-circle-outline" class="fs-2xl text-danger"></ion-icon>
+                    {% icon "alert-circle-outline" css_class="fs-2xl text-danger" %}
                     <div>
                         <h3 class="fw-semibold mb-xs m-0">{% trans "Error" %}</h3>
                         <p class="m-0 text-medium">{{ error }}</p>
@@ -24,7 +24,7 @@
         {% fill "content" %}
             {% ui_card css_class="card-warning" %}
                 <div class="d-flex align-center gap-md">
-                    <ion-icon name="cloud-offline-outline" class="fs-2xl text-warning"></ion-icon>
+                    {% icon "cloud-offline-outline" css_class="fs-2xl text-warning" %}
                     <div>
                         <h3 class="fw-semibold mb-xs m-0">{% trans "No Connection" %}</h3>
                         <p class="m-0 text-medium">{% trans "Unable to connect to ERPlora Cloud. Please check your internet connection and try again." %}</p>
@@ -46,7 +46,7 @@
                     <!-- Icon -->
                     <div class="module-detail-icon">
                         <div class="module-icon-box module-icon-box--large module-icon-box--{{ module.category|default:'default' }}">
-                            <ion-icon name="{{ module.icon|default:'cube-outline' }}"></ion-icon>
+                            {% icon module.icon|default:"cube-outline" %}
                         </div>
                     </div>
 
@@ -62,13 +62,13 @@
                         <div class="d-flex flex-wrap gap-md align-center mb-md">
                             {% if module.downloads %}
                             <span class="d-inline-flex align-center gap-xs text-medium fs-sm">
-                                <ion-icon name="download-outline"></ion-icon>
+                                {% icon "download-outline" %}
                                 {{ module.downloads }} {% trans "downloads" %}
                             </span>
                             {% endif %}
                             {% if module.category_name %}
                             <span class="d-inline-flex align-center gap-xs text-medium fs-sm">
-                                <ion-icon name="pricetag-outline"></ion-icon>
+                                {% icon "pricetag-outline" %}
                                 {{ module.category_name }}
                             </span>
                             {% endif %}
@@ -178,9 +178,9 @@
                                 <div class="d-flex gap-xxs mt-xs text-warning">
                                     {% for i in "12345" %}
                                         {% if forloop.counter <= review.rating %}
-                                        <ion-icon name="star"></ion-icon>
+                                        {% icon "star" %}
                                         {% else %}
-                                        <ion-icon name="star-outline" class="text-medium"></ion-icon>
+                                        {% icon "star-outline" css_class="text-medium" %}
                                         {% endif %}
                                     {% endfor %}
                                 </div>
@@ -207,7 +207,7 @@
                         </div>
                         {% else %}
                         <div class="text-center py-xl">
-                            <ion-icon name="document-text-outline" class="fs-4xl text-medium"></ion-icon>
+                            {% icon "document-text-outline" css_class="fs-4xl text-medium" %}
                             <p class="text-medium mt-md m-0">{% trans "No changelog available" %}</p>
                         </div>
                         {% endif %}

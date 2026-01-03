@@ -1,4 +1,4 @@
-{% load i18n ui component_tags %}
+{% load i18n ui component_tags djicons %}
 
 {% component "page" title=_("Settings") %}
     {% fill "content" %}
@@ -17,7 +17,7 @@
 
                     {% if not store_config.is_configured %}
                     <div class="d-flex align-center gap-sm mb-md p-sm rounded-md" style="background: var(--ion-color-warning-tint);">
-                        <ion-icon name="alert-circle-outline" color="warning"></ion-icon>
+                        {% icon "alert-circle-outline" color="warning" %}
                         <span class="fs-sm">{% trans "Store configuration required" %}</span>
                     </div>
                     {% endif %}
@@ -120,7 +120,7 @@
                                 {% if store_config.logo %}
                                 <img src="{{ store_config.logo.url }}" alt="Logo">
                                 {% else %}
-                                <ion-icon name="image-outline"></ion-icon>
+                                {% icon "image-outline" %}
                                 {% endif %}
                             </div>
                             {% ui_file_input name="logo" label=_("Choose image") accept="image/*" icon="image-outline" %}
@@ -344,7 +344,7 @@
                         <div class="mt-md">
                             <ion-button type="submit">
                                 <ion-spinner id="tax-spinner" name="crescent" class="htmx-indicator me-sm"></ion-spinner>
-                                <ion-icon slot="start" name="add-outline"></ion-icon>
+                                {% icon "add-outline" slot="start" %}
                                 {% trans "Add Tax Class" %}
                             </ion-button>
                         </div>
@@ -474,7 +474,7 @@
                             hx-swap="innerHTML"
                             hx-indicator="#backup-now-spinner">
                             <ion-spinner id="backup-now-spinner" name="crescent" class="htmx-indicator me-sm"></ion-spinner>
-                            <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
+                            {% icon "cloud-upload-outline" slot="start" %}
                             {% trans "Backup Now" %}
                         </ion-button>
                     </div>
@@ -521,7 +521,7 @@
 
                 <div class="mt-lg pt-md" style="border-top: 1px solid var(--border-color);">
                     <ion-button expand="block" fill="outline" href="{{ CLOUD_URL }}" target="_blank">
-                        <ion-icon slot="start" name="open-outline"></ion-icon>
+                        {% icon "open-outline" slot="start" %}
                         {% trans "Open Cloud Portal" %}
                     </ion-button>
                 </div>
@@ -542,7 +542,7 @@
                     hx-get="{% url 'configuration:scan_orphaned_data' %}"
                     hx-target="#scan-results"
                     hx-indicator="#scan-spinner">
-                    <ion-icon slot="start" name="search-outline"></ion-icon>
+                    {% icon "search-outline" slot="start" %}
                     {% trans "Scan for Orphaned Data" %}
                     <ion-spinner id="scan-spinner" name="crescent" class="htmx-indicator ms-sm"></ion-spinner>
                 </ion-button>
@@ -555,7 +555,7 @@
     {# Footer info #}
     <div class="mt-lg p-md rounded-lg" style="background: var(--bg-color-secondary);">
         <div class="d-flex align-start gap-sm">
-            <ion-icon name="information-circle-outline" style="font-size: 20px; color: var(--color-primary); flex-shrink: 0; margin-top: 2px;"></ion-icon>
+            {% icon "information-circle-outline" style="font-size: 20px; color: var(--color-primary); flex-shrink: 0; margin-top: 2px;" %}
             <p class="fs-sm text-secondary m-0">
                 {% trans "These settings are saved locally in the Hub. Changes are applied after saving each section." %}
             </p>

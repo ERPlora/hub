@@ -1,4 +1,4 @@
-<ion-modal id="{{ modal_id }}" {% if css_class %}class="{{ css_class }}"{% endif %}>
+{% load djicons %}<ion-modal id="{{ modal_id }}" {% if css_class %}class="{{ css_class }}"{% endif %}>
     <ion-header>
         <ion-toolbar>
             {% if title %}
@@ -6,7 +6,7 @@
             {% endif %}
             <ion-buttons slot="end">
                 <ion-button onclick="document.getElementById('{{ modal_id }}').dismiss()">
-                    <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+                    {% icon "close-outline" slot="icon-only" %}
                 </ion-button>
             </ion-buttons>
         </ion-toolbar>

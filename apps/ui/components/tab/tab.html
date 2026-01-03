@@ -1,4 +1,4 @@
-{% load static %}
+{% load static djicons %}
 {# Single Tab Button #}
 <ion-tab-button
     {% if not disabled %}
@@ -11,7 +11,7 @@
     {% if icon_svg %}
     <img src="{% static icon_svg %}" alt="" class="tab-icon-svg" />
     {% elif icon %}
-    <ion-icon name="{{ icon }}"></ion-icon>
+    {% icon icon %}
     {% endif %}
     <ion-label>{{ label }}</ion-label>
     {% if badge %}
