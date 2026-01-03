@@ -1,34 +1,34 @@
 {% load i18n static ui component_tags %}
 
 {% component "page" title=page_title action_icon="cart-outline" action_badge=cart_count action_hx_get="/marketplace/cart/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
-    {# Marketplace tabbar - manual since it's not a module #}
-    <script>
-    (function() {
-        if (typeof window.updateGlobalTabBar === 'function') {
-            window.updateGlobalTabBar([
-                {
-                    url: '{% url "marketplace:index" %}',
-                    icon: 'cube-outline',
-                    label: '{% trans "Modules" %}',
-                    active: {% if store_type == 'modules' %}true{% else %}false{% endif %}
-                },
-                {
-                    url: '{% url "marketplace:store_hubs" %}',
-                    icon: 'server-outline',
-                    label: '{% trans "Hubs" %}',
-                    active: {% if store_type == 'hubs' %}true{% else %}false{% endif %}
-                },
-                {
-                    url: '{% url "marketplace:cart_page" %}',
-                    icon: 'cart-outline',
-                    label: '{% trans "Cart" %}',
-                    active: {% if current_view == 'cart' %}true{% else %}false{% endif %}
-                }
-            ]);
-        }
-    })();
-    </script>
     {% fill "content" %}
+        {# Marketplace tabbar - manual since it's not a module #}
+        <script>
+        (function() {
+            if (typeof window.updateGlobalTabBar === 'function') {
+                window.updateGlobalTabBar([
+                    {
+                        url: '{% url "marketplace:index" %}',
+                        icon: 'cube-outline',
+                        label: '{% trans "Modules" %}',
+                        active: {% if store_type == 'modules' %}true{% else %}false{% endif %}
+                    },
+                    {
+                        url: '{% url "marketplace:store_hubs" %}',
+                        icon: 'server-outline',
+                        label: '{% trans "Hubs" %}',
+                        active: {% if store_type == 'hubs' %}true{% else %}false{% endif %}
+                    },
+                    {
+                        url: '{% url "marketplace:cart_page" %}',
+                        icon: 'cart-outline',
+                        label: '{% trans "Cart" %}',
+                        active: {% if current_view == 'cart' %}true{% else %}false{% endif %}
+                    }
+                ]);
+            }
+        })();
+        </script>
         <form id="marketplace-filters-form"
             hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
             hx-target="#products-grid" hx-swap="innerHTML"
