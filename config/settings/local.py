@@ -134,11 +134,18 @@ def reload_local_modules():
     global INSTALLED_APPS
 
     # Remove any modules that were loaded from wrong directory
+    # Keep all third-party packages and hub apps, only filter out modules
+    third_party_apps = [
+        'djmoney', 'django_htmx', 'djicons', 'django_components',
+        'rest_framework', 'drf_spectacular', 'drf_spectacular_sidecar',
+        'health_check',
+    ]
     INSTALLED_APPS = [app for app in INSTALLED_APPS if not (
         isinstance(app, str) and
         not app.startswith('django') and
         not app.startswith('apps.') and
-        app not in ['djmoney', 'django_htmx']
+        not app.startswith('health_check') and
+        app not in third_party_apps
     )]
 
     if not MODULES_DIR.exists():

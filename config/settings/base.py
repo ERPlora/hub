@@ -466,10 +466,14 @@ COMPONENTS = {
 
 DJICONS = {
     "DEFAULT_NAMESPACE": "ion",  # Ionicons as default (compatible with existing <ion-icon>)
-    "PACKS": ["ionicons", "heroicons", "material", "tabler", "lucide", "fontawesome"],
+    "ICON_DIRS": {
+        "ion": BASE_DIR / "static" / "ionicons" / "dist" / "svg",
+    },
+    "PACKS": [],  # Disable bundled packs, use ICON_DIRS instead
     "MISSING_ICON_SILENT": False,  # Show error in development
-    "CACHE_ENABLED": True,
     "CACHE_TIMEOUT": 86400,  # 24 hours
+    "DEFAULT_SIZE": 20,  # Default icon size in pixels (matches ion-icon default)
+    "DEFAULT_CLASS": "icon",  # Base CSS class for all icons
 }
 
 # =============================================================================
