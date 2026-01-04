@@ -86,8 +86,8 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',
     'djmoney',
     'django_htmx',
+    'djicons',  # SVG icons for Django templates (must be before django_components)
     'django_components',
-    'djicons',  # SVG icons for Django templates
     # Health Check
     'health_check',
     'health_check.db',
@@ -169,7 +169,11 @@ TEMPLATES = [
             ],
             'builtins': [
                 'django_components.templatetags.component_tags',
+                'djicons.templatetags.djicons',  # SVG icons
             ],
+            'libraries': {
+                'djicons': 'djicons.templatetags.djicons',
+            },
         },
     },
 ]
