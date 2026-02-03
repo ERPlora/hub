@@ -1,10 +1,7 @@
-{% load djicons %}<ion-button
-    fill="clear"
+{% load djicons %}<button
+    class="ux-button ux-button--clear ui-theme-toggle{% if css_class %} {{ css_class }}{% endif %}"
     @click="toggleTheme()"
-    class="ui-theme-toggle{% if css_class %} {{ css_class }}{% endif %}"
 >
-    <span slot="icon-only">
-        <span x-show="isDark">{% icon "sunny-outline" %}</span>
-        <span x-show="!isDark" x-cloak>{% icon "moon-outline" %}</span>
-    </span>
-</ion-button>
+    <span x-show="isDark">{% icon "sunny-outline" %}</span>
+    <span x-show="!isDark" x-cloak>{% icon "moon-outline" %}</span>
+</button>

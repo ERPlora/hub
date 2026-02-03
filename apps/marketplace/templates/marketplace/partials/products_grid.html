@@ -1,126 +1,112 @@
 {% load i18n ui djicons %}
 
 {% if products %}
-<ion-grid class="p-0">
-    <ion-row>
-        {% for product in products %}
-        <ion-col size="12" size-md="6" size-lg="4">
-            <ion-card class="module-card m-0">
-                <ion-card-content>
-                    <div class="d-flex align-center gap-md">
-                        {# Module Icon #}
-                        <div class="module-icon-box module-icon-box--{{ product.category|default:'default' }}">
-                            {% icon product.icon|default:"cube-outline" %}
-                        </div>
+<div class="ux-product-grid">
+    {% for product in products %}
+    <article class="ux-product-card"
+             hx-get="{% url 'marketplace:module_detail' product.slug %}"
+             hx-target="#main-content-area"
+             hx-push-url="true">
+        {# Image/Icon Area #}
+        <div class="ux-product-card__image-wrapper">
+            {# Badges #}
+            <div class="ux-product-card__badges">
+                {% if product.is_featured %}
+                <span class="ux-product-card__badge ux-product-card__badge--new">
+                    {% trans "Featured" %}
+                </span>
+                {% endif %}
+                {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
+                <span class="ux-product-card__badge" style="background-color: var(--ux-success);">
+                    {% trans "Free" %}
+                </span>
+                {% endif %}
+            </div>
 
-                        <div class="flex-1 min-w-0">
-                            <div class="d-flex align-center gap-sm flex-wrap">
-                                <a href="{% url 'marketplace:module_detail' product.slug %}"
-                                   hx-get="{% url 'marketplace:module_detail' product.slug %}"
-                                   hx-target="#main-content-area"
-                                   hx-push-url="true"
-                                   class="fw-semibold text-truncate m-0 fs-base module-card-title">{{ product.name }}</a>
-                                {% if product.is_featured %}
-                                <ion-badge color="warning" class="fs-xxs">{% trans "Featured" %}</ion-badge>
-                                {% endif %}
-                            </div>
-                            <p class="fs-sm text-medium m-0 mt-xxs">
-                                {% if product.author %}{% trans "by" %} {{ product.author }} • {% endif %}v{{ product.version|default:"1.0" }}
-                            </p>
-                        </div>
+            {# Module Icon as placeholder #}
+            <div class="ux-product-card__placeholder">
+                {% icon product.icon|default:"cube-outline" %}
+            </div>
 
-                        {# Status Badge #}
-                        <div class="flex-shrink-0">
-                            {% if product.is_installed %}
-                            <ion-chip color="success">
-                                {% icon "checkmark-circle-outline" %}
-                                <ion-label>{% trans "Installed" %}</ion-label>
-                            </ion-chip>
-                            {% elif product.is_owned %}
-                            <ion-chip color="tertiary">
-                                {% icon "bag-check-outline" %}
-                                <ion-label>{% trans "Owned" %}</ion-label>
-                            </ion-chip>
-                            {% endif %}
-                        </div>
-                    </div>
+            {# Quick action button #}
+            {% if not product.is_installed %}
+            <button type="button"
+                    class="ux-product-card__quick-add"
+                    onclick="event.stopPropagation(); handleQuickAction(this, '{{ product.id }}', '{{ product.slug }}', '{{ product.download_url|default:'' }}', '{{ product.module_type }}', {{ product.is_owned|yesno:'true,false' }}, {{ product.is_free|yesno:'true,false' }})"
+                    title="{% if product.is_owned %}{% trans 'Install' %}{% elif product.is_free or product.module_type == 'free' or product.price == 0 %}{% trans 'Get Free' %}{% else %}{% trans 'Purchase' %}{% endif %}">
+                {% if product.is_owned %}
+                    {% icon "download-outline" %}
+                {% elif product.is_free or product.module_type == 'free' or product.price == 0 %}
+                    {% icon "add" %}
+                {% else %}
+                    {% icon "cart-outline" %}
+                {% endif %}
+            </button>
+            {% endif %}
+        </div>
 
-                    <p class="fs-sm text-medium mb-md mt-md module-description">{{ product.description|default:"-"|truncatewords:20 }}</p>
+        {# Content #}
+        <div class="ux-product-card__content">
+            {# Category #}
+            {% if product.category_name %}
+            <span class="ux-product-card__category">{{ product.category_name }}</span>
+            {% endif %}
 
-                    {# Stats Row #}
-                    <div class="d-flex align-center gap-md fs-sm text-medium mb-md">
-                        {% if product.rating %}
-                        <span class="d-inline-flex align-center gap-xs">
-                            {% icon "star" css_class="text-warning" %}
-                            {{ product.rating|floatformat:1 }}
-                        </span>
-                        {% endif %}
-                        {% if product.downloads %}
-                        <span class="d-inline-flex align-center gap-xs">
-                            {% icon "download-outline" %}
-                            {{ product.downloads }}
-                        </span>
-                        {% endif %}
-                        {% if product.category_name %}
-                        <span class="d-inline-flex align-center gap-xs">
-                            {% icon "pricetag-outline" %}
-                            {{ product.category_name }}
-                        </span>
-                        {% endif %}
-                    </div>
+            {# Name #}
+            <h3 class="ux-product-card__name">{{ product.name }}</h3>
 
-                    {# Price Display #}
-                    <div class="d-flex justify-between align-center mb-md">
-                        <span class="fw-semibold fs-base">
-                            {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
-                            <span class="text-success">{% trans "Free" %}</span>
-                            {% elif product.module_type == 'subscription' %}
-                            <span class="text-primary">€{{ product.price }}/{% trans "mo" %}</span>
-                            {% else %}
-                            <span class="text-primary">€{{ product.price }}</span>
-                            {% endif %}
-                        </span>
-                    </div>
+            {# Author & Version #}
+            <p class="fs-xs text-tertiary m-0">
+                {% if product.author %}{{ product.author }} &bull; {% endif %}v{{ product.version|default:"1.0" }}
+            </p>
 
-                    {# Action Button #}
-                    <div class="module-card-actions">
-                        {% if product.is_installed %}
-                        <ion-button fill="clear" size="small" color="medium" disabled expand="block">
-                            {% icon "checkmark-circle-outline" slot="start" %}
-                            {% trans "Installed" %}
-                        </ion-button>
-                        {% elif product.is_owned %}
-                        <ion-button fill="clear" size="small" color="success" expand="block"
-                            data-action="download"
-                            data-module-slug="{{ product.slug }}"
-                            data-download-url="{{ product.download_url }}">
-                            {% icon "download-outline" slot="start" %}
-                            {% trans "Install" %}
-                        </ion-button>
-                        {% elif product.is_free or product.module_type == 'free' or product.price == 0 %}
-                        <ion-button fill="clear" size="small" color="primary" expand="block"
-                            data-action="install-free"
-                            data-module-id="{{ product.id }}"
-                            data-module-slug="{{ product.slug }}"
-                            data-download-url="{{ product.download_url|default:'' }}">
-                            {% icon "download-outline" slot="start" %}
-                            {% trans "Install" %}
-                        </ion-button>
-                        {% else %}
-                        <ion-button fill="clear" size="small" color="primary" expand="block"
-                            data-action="purchase"
-                            data-module-id="{{ product.id }}">
-                            {% icon "cart-outline" slot="start" %}
-                            {% trans "Purchase" %}
-                        </ion-button>
-                        {% endif %}
-                    </div>
-                </ion-card-content>
-            </ion-card>
-        </ion-col>
-        {% endfor %}
-    </ion-row>
-</ion-grid>
+            {# Stats Row #}
+            <div class="d-flex align-center gap-sm fs-xs text-secondary mt-auto pt-xs">
+                {% if product.rating %}
+                <span class="d-inline-flex align-center gap-xxs">
+                    {% icon "star" css_class="text-warning" size="14" %}
+                    {{ product.rating|floatformat:1 }}
+                </span>
+                {% endif %}
+                {% if product.downloads %}
+                <span class="d-inline-flex align-center gap-xxs">
+                    {% icon "download-outline" size="14" %}
+                    {{ product.downloads }}
+                </span>
+                {% endif %}
+            </div>
+
+            {# Price #}
+            <div class="ux-product-card__price-wrapper mt-xs">
+                {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
+                <span class="ux-product-card__price" style="color: var(--ux-success);">{% trans "Free" %}</span>
+                {% elif product.module_type == 'subscription' %}
+                <span class="ux-product-card__price">&euro;{{ product.price }}/{% trans "mo" %}</span>
+                {% else %}
+                <span class="ux-product-card__price">&euro;{{ product.price }}</span>
+                {% endif %}
+            </div>
+
+            {# Status Chips #}
+            {% if product.is_installed or product.is_owned %}
+            <div class="mt-xs">
+                {% if product.is_installed %}
+                <span class="ux-chip ux-chip--sm ux-color-success--soft">
+                    <span class="ux-chip__icon">{% icon "checkmark-circle-outline" %}</span>
+                    {% trans "Installed" %}
+                </span>
+                {% elif product.is_owned %}
+                <span class="ux-chip ux-chip--sm ux-color-tertiary--soft">
+                    <span class="ux-chip__icon">{% icon "bag-check-outline" %}</span>
+                    {% trans "Owned" %}
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</div>
 
 {% if has_more %}
 <!-- Infinite Scroll Trigger -->
@@ -130,37 +116,33 @@
      hx-swap="outerHTML"
      hx-indicator="#load-more-spinner"
      class="d-flex justify-center py-lg">
-    <ion-spinner id="load-more-spinner" name="crescent" class="htmx-indicator"></ion-spinner>
+    <div id="load-more-spinner" class="ux-spinner htmx-indicator"></div>
 </div>
 {% endif %}
 
 {% else %}
 <!-- No Results -->
-<div class="ion-padding ion-text-center no-results">
-    {% icon "search-outline" style="font-size: 64px; color: var(--ion-color-medium);" %}
-    <h3>{% trans "No products found" %}</h3>
-    <p class="text-medium">{% trans "Try adjusting your search or filters" %}</p>
+<div class="ux-empty-state py-2xl">
+    <div class="ux-empty-state__icon">
+        {% icon "search-outline" %}
+    </div>
+    <h3 class="ux-empty-state__title">{% trans "No products found" %}</h3>
+    <p class="ux-empty-state__description">{% trans "Try adjusting your search or filters" %}</p>
 </div>
 {% endif %}
 
 <!-- Module action handlers -->
 <script>
-document.addEventListener('click', function(e) {
-    const button = e.target.closest('ion-button[data-action]');
-    if (!button) return;
-
-    const action = button.dataset.action;
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (action === 'download') {
-        downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button);
-    } else if (action === 'install-free') {
-        installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button);
-    } else if (action === 'purchase') {
-        purchaseModule(button.dataset.moduleId, button);
+// Handle quick action button click
+function handleQuickAction(button, moduleId, moduleSlug, downloadUrl, moduleType, isOwned, isFree) {
+    if (isOwned) {
+        downloadAndInstall(moduleSlug, downloadUrl, button);
+    } else if (isFree || moduleType === 'free') {
+        installFreeModule(moduleId, moduleSlug, downloadUrl, button);
+    } else {
+        purchaseModule(moduleId, button);
     }
-});
+}
 
 // Install free module
 async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
@@ -261,7 +243,7 @@ function setButtonLoading(button, loading) {
     if (!button) return;
     button.disabled = loading;
     if (loading) {
-        button.innerHTML = '<ion-spinner name="crescent"></ion-spinner>';
+        button.innerHTML = '<div class="ux-spinner ux-spinner--sm"></div>';
     }
 }
 </script>

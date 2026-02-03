@@ -24,18 +24,29 @@ MODULE_COLORS = {
 }
 
 
+def _render_icon_svg(icon_name):
+    """Render an icon to SVG string using djicons for client-side use."""
+    try:
+        from djicons import icon as render_icon
+        return str(render_icon(icon_name, size=28))
+    except Exception:
+        return ''
+
+
 def get_modules_for_grid(menu_items):
     """
     Convert MODULE_MENU_ITEMS to a list suitable for the grid.
-    Each module gets: id, label, icon, url, color, has_svg, svg_path
+    Each module gets: id, label, icon, url, color, has_svg, svg_path, icon_svg
     """
     modules = []
     for item in menu_items:
         module_id = item.get('module_id', item.get('label', '').lower())
+        icon_name = item.get('icon', 'cube-outline')
         modules.append({
             'id': module_id,
             'label': item.get('label', 'Module'),
-            'icon': item.get('icon', 'cube-outline'),
+            'icon': icon_name,
+            'icon_svg': _render_icon_svg(icon_name),
             'url': item.get('url', '#'),
             'color': item.get('color', MODULE_COLORS.get(module_id, 'primary')),
             'has_svg': item.get('has_svg', False),

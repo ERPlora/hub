@@ -1,8 +1,9 @@
 {% load i18n djicons %}
-<ion-footer class="sidebar-footer{% if css_class %} {{ css_class }}{% endif %}">
-    <ion-list lines="none">
+<footer class="sidebar-footer{% if css_class %} {{ css_class }}{% endif %}">
+    <div class="ux-list">
         <!-- PWA Install Button -->
-        <ion-item
+        <div
+            class="ux-list__item nav-item"
             x-data="{
                 canInstall: typeof canInstallPWA === 'function' && canInstallPWA(),
                 init() {
@@ -16,26 +17,21 @@
             }"
             x-show="canInstall"
             x-cloak
-            button="true"
-            detail="false"
-            lines="none"
             @click="installPWA()"
-            class="nav-item">
-            {% icon "download-outline" slot="start" %}
-            <ion-label>{% trans "Install App" %}</ion-label>
-        </ion-item>
+            role="button">
+            <span class="ux-list__item-start">{% icon "download-outline" %}</span>
+            <span>{% trans "Install App" %}</span>
+        </div>
 
         {% if signout_url %}
-        <ion-item
+        <a
             id="btn-signout"
-            button="true"
-            detail="false"
-            lines="none"
             href="{{ signout_url }}"
-            class="nav-item">
-            {% icon "log-out-outline" slot="start" %}
-            <ion-label>{{ signout_label }}</ion-label>
-        </ion-item>
+            class="ux-list__item nav-item"
+            role="button">
+            <span class="ux-list__item-start">{% icon "log-out-outline" %}</span>
+            <span>{{ signout_label }}</span>
+        </a>
         {% endif %}
-    </ion-list>
-</ion-footer>
+    </div>
+</footer>

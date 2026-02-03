@@ -1,7 +1,7 @@
 {% load i18n component_tags djicons %}
 
-<ion-card class="m-0 mb-md">
-    <ion-card-content class="p-md">
+<div class="ux-card m-0 mb-md">
+    <div class="ux-card__body p-md">
         <div class="d-flex gap-sm flex-wrap align-center">
             {# Search Input #}
             <div class="flex-1" style="position: relative; min-width: 200px;">
@@ -11,8 +11,8 @@
                     name="{{ search_name }}"
                     value="{{ search_value }}"
                     placeholder="{{ search_placeholder }}"
-                    class="w-full rounded-lg"
-                    style="height: var(--touch-target-min); padding-left: 40px; padding-right: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);"
+                    class="ux-input w-full rounded-lg"
+                    style="height: var(--touch-target-min); padding-left: 40px; padding-right: 12px;"
                     {% if search_url %}
                     hx-get="{{ search_url }}"
                     hx-trigger="keyup changed delay:{{ debounce_ms }}ms"
@@ -30,5 +30,5 @@
                 {% slot "actions" %}{% endslot %}
             </div>
         </div>
-    </ion-card-content>
-</ion-card>
+    </div>
+</div>

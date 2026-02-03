@@ -197,19 +197,17 @@ urlpatterns = [
 {{%load static%}}
 
 {{%block content%}}
-<ion-content>
-    <div class="ion-padding">
-        <ion-card>
-            <ion-card-header>
-                <ion-card-title>{module_name}</ion-card-title>
-            </ion-card-header>
-            <ion-card-content>
-                <p>¡Module creado exitosamente!</p>
-                <p>Comienza a desarrollar tu module aquí.</p>
-            </ion-card-content>
-        </ion-card>
+<div class="ux-content">
+    <div class="ux-card">
+        <div class="ux-card__header">
+            <h3 class="ux-card__title">{module_name}</h3>
+        </div>
+        <div class="ux-card__body">
+            <p>¡Module creado exitosamente!</p>
+            <p>Comienza a desarrollar tu module aquí.</p>
+        </div>
     </div>
-</ion-content>
+</div>
 {{%endblock%}}
 ''')
 

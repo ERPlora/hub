@@ -1,6 +1,6 @@
 {% load i18n djicons %}
-<ion-card class="ui-installed-module-card{% if css_class %} {{ css_class }}{% endif %}">
-    <ion-card-header>
+<div class="ux-card ui-installed-module-card{% if css_class %} {{ css_class }}{% endif %}">
+    <div class="ux-card__header">
         <div class="d-flex align-center gap-md">
             {% if icon %}
             {% icon icon css_class="text-primary fs-xl" %}
@@ -8,58 +8,49 @@
             {% icon "extension-puzzle-outline" css_class="text-primary fs-xl" %}
             {% endif %}
             <div class="flex-1" style="min-width: 0;">
-                <ion-card-title class="text-truncate">{{ name }}</ion-card-title>
+                <h3 class="ux-card__title text-truncate">{{ name }}</h3>
                 {% if version %}
-                <ion-card-subtitle>v{{ version }}</ion-card-subtitle>
+                <p class="ux-card__subtitle">v{{ version }}</p>
                 {% endif %}
             </div>
-            <ion-chip color="{% if is_active %}success{% else %}medium{% endif %}">
+            <span class="ux-chip ux-color-{% if is_active %}success{% else %}medium{% endif %}">
                 {% if is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}
-            </ion-chip>
+            </span>
         </div>
-    </ion-card-header>
-    <ion-card-content>
+    </div>
+    <div class="ux-card__body">
         {% if description %}
         <p class="fs-sm text-medium mb-md">{{ description }}</p>
         {% endif %}
         {% if author %}
         <p class="fs-sm text-medium m-0">{% trans "By" %} {{ author }}</p>
         {% endif %}
-    </ion-card-content>
+    </div>
     <div class="module-card-actions">
         {% if is_active %}
-        <ion-button
-            fill="clear"
-            size="small"
-            color="warning"
-            class="flex-1"
+        <button
+            class="ux-button ux-button--clear ux-button--small ux-color-warning flex-1"
             {% if deactivate_alpine %}@click="{{ deactivate_alpine }}"{% endif %}
             {% if deactivate_hx_post %}hx-post="{{ deactivate_hx_post }}" hx-target="{{ deactivate_hx_target|default:'#main-content-area' }}" hx-swap="innerHTML"{% endif %}
         >
-            {% icon "pause-outline" slot="start" %}
+            {% icon "pause-outline" %}
             {% trans "Deactivate" %}
-        </ion-button>
+        </button>
         {% else %}
-        <ion-button
-            fill="clear"
-            size="small"
-            color="success"
-            class="flex-1"
+        <button
+            class="ux-button ux-button--clear ux-button--small ux-color-success flex-1"
             {% if activate_hx_post %}hx-post="{{ activate_hx_post }}" hx-target="{{ activate_hx_target|default:'#main-content-area' }}" hx-swap="innerHTML"{% endif %}
         >
-            {% icon "play-outline" slot="start" %}
+            {% icon "play-outline" %}
             {% trans "Activate" %}
-        </ion-button>
+        </button>
         {% endif %}
-        <ion-button
-            fill="clear"
-            size="small"
-            color="danger"
-            class="flex-1"
+        <button
+            class="ux-button ux-button--clear ux-button--small ux-color-danger flex-1"
             {% if delete_alpine %}@click="{{ delete_alpine }}"{% endif %}
         >
-            {% icon "trash-outline" slot="start" %}
+            {% icon "trash-outline" %}
             {% trans "Delete" %}
-        </ion-button>
+        </button>
     </div>
-</ion-card>
+</div>

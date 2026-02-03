@@ -1,25 +1,24 @@
-{% load djicons %}<ion-item
-    {% if button or href or hx_get %}button="true" detail="false"{% endif %}
-    {% if lines %}lines="{{ lines }}"{% endif %}
-    {% if href %}href="{{ href }}"{% endif %}
+{% load djicons %}<div
+    class="ux-list__item{% if css_class %} {{ css_class }}{% endif %}"
+    {% if href %}data-href="{{ href }}"{% endif %}
     {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
     {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
     {% if hx_push_url %}hx-push-url="{{ hx_push_url }}"{% endif %}
-    {% if css_class %}class="{{ css_class }}"{% endif %}
     {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
+    {% if button or href or hx_get %}role="button"{% endif %}
 >
     {% if avatar %}
-    <ion-avatar slot="start">
+    <div class="ux-avatar ux-list__item-start">
         <img src="{{ avatar }}" alt="">
-    </ion-avatar>
+    </div>
     {% elif icon %}
-    {% icon icon slot="start" %}
+    <span class="ux-list__item-start">{% icon icon %}</span>
     {% endif %}
-    <ion-label>
+    <div class="ux-list__item-content">
         <h2>{{ label }}</h2>
         {% if detail %}<p>{{ detail }}</p>{% endif %}
-    </ion-label>
+    </div>
     {% if button or href or hx_get %}
-    {% icon "chevron-forward-outline" slot="end" %}
+    <span class="ux-list__item-end">{% icon "chevron-forward-outline" %}</span>
     {% endif %}
-</ion-item>
+</div>

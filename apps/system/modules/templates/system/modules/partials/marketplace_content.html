@@ -4,122 +4,118 @@
     {% fill "content" %}
         <div x-data="marketplaceFilters()" x-init="init()">
             <!-- Search & Filters -->
-            <ion-grid class="ion-no-padding ion-margin-bottom">
+            <div class="container-fluid ux-mb-lg" style="padding: 0;">
                 <!-- Search Row -->
-                <ion-row>
-                    <ion-col size="12">
-                        <ion-searchbar
+                <div class="row">
+                    <div class="col-12">
+                        <input type="search"
+                            class="ux-input"
                             id="search-input"
                             placeholder="{% trans 'Search modules...' %}"
-                            debounce="300"
-                            show-cancel-button="never"
-                            @ionInput="onSearchInput($event)">
-                        </ion-searchbar>
-                    </ion-col>
-                </ion-row>
+                            @input="onSearchInput($event)">
+                    </div>
+                </div>
 
                 <!-- Filters Row: stacked on small, side by side on large -->
-                <ion-row class="ion-align-items-center">
+                <div class="row align-items-center mt-md">
                     <!-- Category Filter -->
-                    <ion-col size="12" size-lg="6">
-                        <ion-select
+                    <div class="col-12 col-lg-6">
+                        <select class="ux-select"
                             id="category-select"
                             aria-label="{% trans 'Categories' %}"
-                            placeholder="{% trans 'Filter by category' %}"
                             :value="categoryFilter"
-                            @ionChange="onCategoryChange($event)">
-                            <ion-select-option value="">{% trans "All Categories" %}</ion-select-option>
+                            @change="onCategoryChange($event)">
+                            <option value="">{% trans "All Categories" %}</option>
                             {% for category in categories %}
-                            <ion-select-option value="{{ category.id }}">{{ category.name }}</ion-select-option>
+                            <option value="{{ category.id }}">{{ category.name }}</option>
                             {% endfor %}
-                        </ion-select>
-                    </ion-col>
+                        </select>
+                    </div>
 
                     <!-- Industry Filter -->
-                    <ion-col size="12" size-lg="6">
-                        <ion-select
+                    <div class="col-12 col-lg-6">
+                        <select class="ux-select"
                             id="industry-select"
                             aria-label="{% trans 'Industries' %}"
-                            placeholder="{% trans 'Filter by industry' %}"
                             :value="industryFilter"
-                            @ionChange="onIndustryChange($event)">
-                            <ion-select-option value="">{% trans "All Industries" %}</ion-select-option>
+                            @change="onIndustryChange($event)">
+                            <option value="">{% trans "All Industries" %}</option>
                             {% for industry in industries %}
-                            <ion-select-option value="{{ industry.id }}">{{ industry.name }}</ion-select-option>
+                            <option value="{{ industry.id }}">{{ industry.name }}</option>
                             {% endfor %}
-                        </ion-select>
-                    </ion-col>
-                </ion-row>
-            </ion-grid>
+                        </select>
+                    </div>
+                </div>
+            </div>
 
             <!-- Type Filter Chips -->
             <div class="d-flex flex-wrap gap-sm mb-md align-center">
-                <ion-chip
-                    :color="typeFilter === '' ? 'primary' : 'medium'"
+                <span class="ux-chip"
+                    :class="typeFilter === '' ? 'ux-badge--primary' : ''"
                     @click="setTypeFilter('')"
-                    class="cursor-pointer">
-                    <ion-label>{% trans "All" %}</ion-label>
-                </ion-chip>
-                <ion-chip
-                    :color="typeFilter === 'free' ? 'success' : 'medium'"
+                    style="cursor: pointer;">
+                    <span>{% trans "All" %}</span>
+                </span>
+                <span class="ux-chip"
+                    :class="typeFilter === 'free' ? 'ux-badge--success' : ''"
                     @click="setTypeFilter('free')"
-                    class="cursor-pointer">
-                    {% icon "gift-outline" slot="start" %}
-                    <ion-label>{% trans "Free" %}</ion-label>
-                </ion-chip>
-                <ion-chip
-                    :color="typeFilter === 'one_time' ? 'primary' : 'medium'"
+                    style="cursor: pointer;">
+                    {% icon "gift-outline" %}
+                    <span>{% trans "Free" %}</span>
+                </span>
+                <span class="ux-chip"
+                    :class="typeFilter === 'one_time' ? 'ux-badge--primary' : ''"
                     @click="setTypeFilter('one_time')"
-                    class="cursor-pointer">
-                    {% icon "card-outline" slot="start" %}
-                    <ion-label>{% trans "One-time" %}</ion-label>
-                </ion-chip>
-                <ion-chip
-                    :color="typeFilter === 'subscription' ? 'tertiary' : 'medium'"
+                    style="cursor: pointer;">
+                    {% icon "card-outline" %}
+                    <span>{% trans "One-time" %}</span>
+                </span>
+                <span class="ux-chip"
+                    :class="typeFilter === 'subscription' ? 'ux-badge--tertiary' : ''"
                     @click="setTypeFilter('subscription')"
-                    class="cursor-pointer">
-                    {% icon "sync-outline" slot="start" %}
-                    <ion-label>{% trans "Subscription" %}</ion-label>
-                </ion-chip>
+                    style="cursor: pointer;">
+                    {% icon "sync-outline" %}
+                    <span>{% trans "Subscription" %}</span>
+                </span>
             </div>
 
             <!-- Active Filters Summary -->
             <div class="d-flex flex-wrap gap-sm mb-md align-center" x-show="hasActiveFilters()" x-cloak>
                 <span class="fs-sm text-medium">{% trans "Active:" %}</span>
                 <template x-if="searchQuery">
-                    <ion-chip color="warning" class="cursor-pointer" @click="clearSearch()">
-                        {% icon "search" slot="start" %}
-                        <ion-label x-text="searchQuery"></ion-label>
-                        {% icon "close-circle" slot="end" %}
-                    </ion-chip>
+                    <span class="ux-chip ux-badge--warning" style="cursor: pointer;" @click="clearSearch()">
+                        {% icon "search" %}
+                        <span x-text="searchQuery"></span>
+                        {% icon "close-circle" %}
+                    </span>
                 </template>
                 <template x-if="categoryFilter">
-                    <ion-chip color="warning" class="cursor-pointer" @click="setCategory('')">
-                        <ion-label x-text="getCategoryName(categoryFilter)"></ion-label>
-                        {% icon "close-circle" slot="end" %}
-                    </ion-chip>
+                    <span class="ux-chip ux-badge--warning" style="cursor: pointer;" @click="setCategory('')">
+                        <span x-text="getCategoryName(categoryFilter)"></span>
+                        {% icon "close-circle" %}
+                    </span>
                 </template>
                 <template x-if="industryFilter">
-                    <ion-chip color="warning" class="cursor-pointer" @click="setIndustry('')">
-                        <ion-label x-text="getIndustryName(industryFilter)"></ion-label>
-                        {% icon "close-circle" slot="end" %}
-                    </ion-chip>
+                    <span class="ux-chip ux-badge--warning" style="cursor: pointer;" @click="setIndustry('')">
+                        <span x-text="getIndustryName(industryFilter)"></span>
+                        {% icon "close-circle" %}
+                    </span>
                 </template>
                 <template x-if="typeFilter">
-                    <ion-chip color="warning" class="cursor-pointer" @click="setTypeFilter('')">
-                        <ion-label x-text="getTypeLabel(typeFilter)"></ion-label>
-                        {% icon "close-circle" slot="end" %}
-                    </ion-chip>
+                    <span class="ux-chip ux-badge--warning" style="cursor: pointer;" @click="setTypeFilter('')">
+                        <span x-text="getTypeLabel(typeFilter)"></span>
+                        {% icon "close-circle" %}
+                    </span>
                 </template>
-                <ion-button size="small" fill="clear" color="danger" @click="clearAllFilters()">
-                    {% icon "trash-outline" slot="start" %}
+                <button class="ux-button ux-button--sm ux-button--clear ux-color-danger" @click="clearAllFilters()">
+                    {% icon "trash-outline" %}
                     {% trans "Clear all" %}
-                </ion-button>
+                </button>
             </div>
 
             <!-- Loading Spinner -->
             <div id="loading-spinner" class="htmx-indicator d-flex justify-center py-xl">
-                <ion-spinner name="crescent"></ion-spinner>
+                <div class="ux-spinner"></div>
             </div>
 
             <!-- Modules Grid (loaded via HTMX) -->
@@ -130,7 +126,7 @@
                  hx-indicator="#loading-spinner">
                 <!-- Initial loading state -->
                 <div class="d-flex justify-center py-xl">
-                    <ion-spinner name="crescent"></ion-spinner>
+                    <div class="ux-spinner"></div>
                 </div>
             </div>
         </div>
@@ -177,12 +173,12 @@
         },
 
         onCategoryChange(event) {
-            this.categoryFilter = event.detail.value || '';
+            this.categoryFilter = event.target.value || '';
             this.fetchModules();
         },
 
         onIndustryChange(event) {
-            this.industryFilter = event.detail.value || '';
+            this.industryFilter = event.target.value || '';
             this.fetchModules();
         },
 

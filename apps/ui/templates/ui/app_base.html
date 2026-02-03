@@ -1,25 +1,21 @@
-{% extends "base.html" %}
+{% extends "app.html" %}
 {% load static i18n ui djicons %}
 {#
     UI Base Template - Base para todas las páginas del dashboard
 
     Este template provee:
-    - Estructura ion-app con ion-menu
-    - Sidebar con navegación
-    - Global header (siempre visible)
-    - Área de contenido principal (#main-content-area) dentro de ion-content
-    - Alpine.js dashboard app
+    - Estructura ux-shell con sidebar
+    - Sidebar con navegación (incluye backdrop para mobile)
+    - Área de contenido principal con scroll
+    - Alpine.js store para estado del sidebar
 
     Estructura:
-    ion-app
-    ├── ion-menu (sidebar)
-    └── div.ion-page#main-content
-        ├── ion-header (GLOBAL - "ERPlora", hamburger, theme, user)
-        └── ion-content#main-content-area (HTMX target)
-            └── [partial content: page-header + page-content + tabbar]
-
-    Los partials NO generan ion-page porque están dentro de ion-content.
-    El tabbar se renderiza inline dentro del partial.
+    ux-shell ux-shell--sidebar
+    ├── ux-shell__sidebar (menu lateral)
+    │   └── include sidebar.html
+    └── ux-shell__main
+        └── ux-content (área principal con scroll)
+            └── block main_content
 
     Templates que extienden este:
     - ui/base_module.html - Para módulos (con tabbar)
@@ -32,87 +28,71 @@
 {% block section_css %}{% endblock %}
 {% endblock %}
 
-{% block content %}
+{% block app_content %}
+<!-- Alpine.js Store for Sidebar -->
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('sidebar', {
+            open: false,
+            toggle() { this.open = !this.open; },
+            close() { this.open = false; }
+        });
+    });
+</script>
+
 <!-- HTMX Loading Indicator -->
 <div id="htmx-indicator"></div>
 
-<ion-app id="dashboard-app" x-data="dashboardApp()" x-init="init()" :class="isDark ? 'dark' : ''">
-    <!-- Sidebar Menu -->
-    <ion-menu content-id="main-content" menu-id="main-menu" type="reveal">
+<div class="ux-shell ux-shell--sidebar" x-data>
+    <!-- Sidebar Backdrop (mobile) -->
+    <div
+        class="ux-shell__backdrop"
+        x-show="$store.sidebar.open"
+        x-transition:enter="ux-transition-fade"
+        x-transition:leave="ux-transition-fade"
+        @click="$store.sidebar.close()"
+        x-cloak
+    ></div>
+
+    <!-- Sidebar -->
+    <aside
+        class="ux-shell__sidebar"
+        :data-state="$store.sidebar.open ? 'open' : 'closed'"
+    >
+        {% block sidebar %}
         {% include "ui/partials/sidebar.html" %}
-    </ion-menu>
+        {% endblock %}
+    </aside>
 
-    <!-- Main Content -->
-    <div class="ion-page" id="main-content">
-        <!-- Global Header -->
-        <ion-header>
-            <ion-toolbar>
-                <ion-buttons slot="start">
-                    <ion-menu-button></ion-menu-button>
-                </ion-buttons>
-                <ion-title>ERPlora</ion-title>
-                <ion-buttons slot="end">
-                    <ion-button @click="toggleTheme()">
-                        <span x-show="isDark" slot="icon-only">{% icon "sunny-outline" %}</span>
-                        <span x-show="!isDark" x-cloak slot="icon-only">{% icon "moon-outline" %}</span>
-                    </ion-button>
-                    <ion-button @click="handleUserMenu()">
-                        {% icon "person-circle-outline" slot="icon-only" %}
-                    </ion-button>
-                </ion-buttons>
-            </ion-toolbar>
-        </ion-header>
-        <!-- Page Content (HTMX target) -->
-        <!-- Cada partial genera: content-header + page-content (sin tabbar) -->
-        <div id="main-content-area" class="ion-padding">
+    <!-- Main Content Area -->
+    <main class="ux-shell__main">
+        {% block main_header %}{% endblock %}
+
+        <div class="ux-content" id="main-content-area">
+            {% block main_content %}
             {% block page_content %}{% endblock %}
+            {% endblock %}
         </div>
-        <!-- Global Tabbar -->
-        {# Full page load: rendered from navigation context injected by @module_view #}
-        {# HTMX navigation: updated via OOB swap from partials #}
-        {% if navigation %}
-        <ion-footer id="global-tabbar-footer">
-            <ion-tab-bar id="global-tabbar">
-                {% for nav in navigation %}
-                <ion-tab-button
-                    hx-get="{{ nav.url }}"
-                    hx-target="#main-content-area"
-                    hx-push-url="true"
-                    class="{% if nav.id == current_view %}tab-selected{% endif %}">
-                    {% icon nav.icon %}
-                    <ion-label>{{ nav.label }}</ion-label>
-                </ion-tab-button>
-                {% endfor %}
-            </ion-tab-bar>
-        </ion-footer>
-        {% else %}
-        <ion-footer id="global-tabbar-footer" style="display: none;">
-            <ion-tab-bar id="global-tabbar"></ion-tab-bar>
-        </ion-footer>
-        {% endif %}
-    </div>
 
-    <!-- Action Sheet (reusable) -->
-    <ion-action-sheet class="custom-action-sheet"></ion-action-sheet>
-</ion-app>
+        {% block main_footer %}{% endblock %}
+    </main>
+</div>
 {% endblock %}
 
-{% block scripts %}
+{% block app_scripts %}
 <script>
-    function dashboardApp() {
-        return {
+    // Dashboard functionality
+    (function() {
+        const dashboard = {
             isDark: window.ERPlora?.isDark || false,
             darkModeAuto: window.ERPlora?.darkModeAuto ?? true,
-            isFullscreen: false,
             currentSection: '{{ current_section|default:"dashboard" }}',
             userName: '{{ request.session.user_name|default:"" }}',
             userEmail: '{{ request.session.user_email|default:"" }}',
             userRole: '{{ request.session.user_role|default:"" }}',
-            canInstall: false,
 
             init() {
-                localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
-
+                // HTMX navigation tracking
                 document.body.addEventListener('htmx:pushedIntoHistory', (e) => {
                     this.updateCurrentSection(e.detail.path);
                 });
@@ -121,19 +101,11 @@
                     this.updateCurrentSection(window.location.pathname);
                 });
 
-                document.addEventListener('fullscreenchange', () => {
-                    this.isFullscreen = !!document.fullscreenElement;
-                });
-
-                this.canInstall = typeof canInstallPWA === 'function' && canInstallPWA();
-
-                document.addEventListener('pwa-installable', () => {
-                    this.canInstall = true;
-                });
-
-                document.addEventListener('pwa-installed', () => {
-                    this.canInstall = false;
-                    this.showToast('{% trans "App installed successfully!" %}', 'success');
+                // Close sidebar on HTMX navigation (mobile)
+                document.body.addEventListener('htmx:afterSwap', () => {
+                    if (window.Alpine && Alpine.store('sidebar')) {
+                        Alpine.store('sidebar').close();
+                    }
                 });
             },
 
@@ -142,31 +114,11 @@
                 else if (path.includes('/modules') || path.includes('/marketplace')) this.currentSection = 'modules';
                 else if (path.includes('/employees')) this.currentSection = 'employees';
                 else this.currentSection = 'dashboard';
-
-                this.updateTabBar();
-            },
-
-            updateTabBar() {
-                document.querySelectorAll('ion-tab-button').forEach(btn => {
-                    const href = btn.getAttribute('hx-get') || btn.getAttribute('href');
-                    if (href && window.location.pathname.startsWith(href)) {
-                        btn.classList.add('tab-selected');
-                    } else {
-                        btn.classList.remove('tab-selected');
-                    }
-                });
-            },
-
-            async toggleSidebar() {
-                const menu = document.querySelector('ion-menu');
-                if (menu) {
-                    await menu.toggle();
-                }
             },
 
             async toggleTheme() {
                 this.isDark = !this.isDark;
-                document.body.classList.toggle('dark');
+                document.documentElement.classList.toggle('ux-dark', this.isDark);
 
                 document.dispatchEvent(new CustomEvent('theme-changed', {
                     detail: { isDark: this.isDark }
@@ -187,84 +139,6 @@
                 }
             },
 
-            toggleFullscreen() {
-                if (window.pywebview && window.pywebview.api) {
-                    window.pywebview.api.toggle_fullscreen().then(response => {
-                        this.isFullscreen = response.fullscreen;
-                    });
-                } else {
-                    if (!document.fullscreenElement) {
-                        document.documentElement.requestFullscreen();
-                        this.isFullscreen = true;
-                    } else {
-                        document.exitFullscreen();
-                        this.isFullscreen = false;
-                    }
-                }
-            },
-
-            async installApp() {
-                if (typeof installPWA === 'function') {
-                    const installed = await installPWA();
-                    if (installed) {
-                        this.canInstall = false;
-                    }
-                }
-            },
-
-            async showToast(message, color = 'primary') {
-                const toast = document.createElement('ion-toast');
-                toast.message = message;
-                toast.duration = 2000;
-                toast.position = 'bottom';
-                toast.color = color;
-                document.body.appendChild(toast);
-                await toast.present();
-            },
-
-            async handleUserMenu() {
-                const actionSheet = document.querySelector('ion-action-sheet');
-                actionSheet.header = this.userName;
-                actionSheet.subHeader = this.userEmail;
-                actionSheet.buttons = [
-                    {
-                        text: '{% trans "Settings" %}',
-                        handler: () => {
-                            htmx.ajax('GET', '{% url "main:settings" %}', {
-                                target: '#main-content-area',
-                                swap: 'innerHTML'
-                            });
-                            history.pushState({}, '', '{% url "main:settings" %}');
-                            this.currentSection = 'settings';
-                        }
-                    },
-                    {
-                        text: '{% trans "Employees" %}',
-                        handler: () => {
-                            htmx.ajax('GET', '{% url "main:employees" %}', {
-                                target: '#main-content-area',
-                                swap: 'innerHTML'
-                            });
-                            history.pushState({}, '', '{% url "main:employees" %}');
-                            this.currentSection = 'employees';
-                        }
-                    },
-                    {
-                        text: '{% trans "Sign Out" %}',
-                        role: 'destructive',
-                        handler: () => {
-                            window.location.href = '{% url "auth:logout" %}';
-                        }
-                    },
-                    {
-                        text: '{% trans "Cancel" %}',
-                        role: 'cancel'
-                    }
-                ];
-
-                await actionSheet.present();
-            },
-
             navigateTo(url) {
                 htmx.ajax('GET', url, {
                     target: '#main-content-area',
@@ -273,9 +147,18 @@
                 history.pushState({}, '', url);
                 this.updateCurrentSection(url);
             }
-        }
-    }
+        };
 
+        // Initialize on DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => dashboard.init());
+        } else {
+            dashboard.init();
+        }
+
+        // Expose for global access if needed
+        window.ERPloraDashboard = dashboard;
+    })();
 </script>
 
 {% block section_scripts %}{% endblock %}

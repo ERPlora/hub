@@ -8,11 +8,11 @@
         {% endif %}
         <h3 class="module-section__title">{{ title }}</h3>
         {% if action_label %}
-        <ion-button fill="clear" size="small"
-            {% if action_url %}href="{{ action_url }}"{% endif %}
+        <button class="ux-button ux-button--clear ux-button--small"
+            {% if action_url %}onclick="window.location='{{ action_url }}'"{% endif %}
             {% if action_hx_get %}hx-get="{{ action_hx_get }}" hx-target="#main-content-area" hx-push-url="true"{% endif %}>
             {{ action_label }}
-        </ion-button>
+        </button>
         {% endif %}
     </div>
     <div class="module-grid">

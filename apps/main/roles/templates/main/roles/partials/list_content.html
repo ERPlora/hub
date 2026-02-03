@@ -1,43 +1,99 @@
-{% load i18n ui component_tags djicons %}
+{% load i18n djicons %}
 
-{% component "page" title=_("Roles") action_icon="add-outline" action_label=_("Add") action_hx_get="/roles/create/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
-    {% fill "content" %}
-        <!-- Roles Grid -->
-        <div id="roles-scroll-container" style="height: calc(100vh - 180px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
-            {% ui_grid_start padding=False %}
-                {% ui_row_start %}
-                    {% for role in roles %}
-                    {% ui_col_start size="12" size_md="6" size_lg="4" %}
-                        {% url 'main:roles:detail' role_id=role.id as detail_url %}
-                        {% ui_card css_class="cursor-pointer" hx_get=detail_url hx_target="#main-content-area" hx_push_url="true" %}
-                            <div class="d-flex align-center gap-md">
-                                {% if role.name == 'admin' %}{% icon "shield-checkmark-outline" css_class="fs-xxl text-primary" %}{% elif role.name == 'manager' %}{% icon "briefcase-outline" css_class="fs-xxl text-tertiary" %}{% else %}{% icon "person-outline" css_class="fs-xxl text-success" %}{% endif %}
-                                <div class="flex-1 min-w-0">
-                                    <h3 class="fw-semibold text-truncate m-0">{{ role.display_name }}</h3>
-                                    <p class="fs-sm text-medium text-truncate m-0">{{ role.description|default:"-"|truncatewords:10 }}</p>
-                                    <div class="d-flex gap-xs mt-xs">
-                                        {% if role.is_system %}
-                                        {% ui_chip label=_("System") color="medium" %}
-                                        {% endif %}
-                                        {% if not role.is_active %}
-                                        {% ui_chip label=_("Inactive") color="warning" %}
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div class="text-end">
-                                    <span class="fs-sm text-medium">{{ role.users.count }} {% trans "users" %}</span>
-                                </div>
-                                {% icon "chevron-forward-outline" css_class="text-medium" %}
-                            </div>
-                        {% endui_card %}
-                    {% ui_col_end %}
-                    {% empty %}
-                    {% ui_col_start size="12" %}
-                        {% ui_empty_state title=_("No roles yet") description=_("Create your first custom role to get started.") icon="shield-outline" action_label=_("Create Role") action_hx_get="/roles/create/" action_hx_target="#main-content-area" %}
-                    {% ui_col_end %}
-                    {% endfor %}
-                {% ui_row_end %}
-            {% ui_grid_end %}
+<div class="ux-page">
+    <!-- Header Toolbar -->
+    <header class="ux-header">
+        <div class="ux-toolbar ux-toolbar--glass ux-margin-horizontal" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
+            <div class="ux-toolbar__start">
+                <button class="ux-back-button"
+                        hx-get="{% url 'main:index' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                    {% icon "arrow-back-outline" %}
+                </button>
+            </div>
+            <div class="ux-toolbar__center">
+                <h1 class="ux-toolbar__title">{% trans "Roles" %}</h1>
+            </div>
+            <div class="ux-toolbar__end">
+                <button class="ux-button ux-button--sm ux-color-primary"
+                        hx-get="{% url 'main:roles:create' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                    {% icon "add-outline" %}
+                    <span class="ux-hide-mobile">{% trans "Add" %}</span>
+                </button>
+            </div>
         </div>
-    {% endfill %}
-{% endcomponent %}
+    </header>
+
+    <!-- Content -->
+    <div class="ux-page__content" style="flex: 1; overflow: auto;">
+        <div class="ux-padding">
+            {% if roles %}
+            <!-- Roles List -->
+            <div class="ux-list ux-list--inset">
+                {% for role in roles %}
+                <a href="{% url 'main:roles:detail' role_id=role.id %}"
+                   class="ux-item ux-item--button"
+                   hx-get="{% url 'main:roles:detail' role_id=role.id %}"
+                   hx-target="#main-content-area"
+                   hx-push-url="true">
+
+                    <!-- Role Icon -->
+                    <span class="ux-item__icon">
+                        {% if role.name == 'admin' %}
+                            {% icon "shield-checkmark-outline" %}
+                        {% elif role.name == 'manager' %}
+                            {% icon "briefcase-outline" %}
+                        {% else %}
+                            {% icon "person-outline" %}
+                        {% endif %}
+                    </span>
+
+                    <!-- Role Info -->
+                    <div class="ux-item__content">
+                        <span class="ux-item__label">{{ role.display_name }}</span>
+                        <span class="ux-item__note">{{ role.description|default:"-"|truncatewords:10 }}</span>
+                    </div>
+
+                    <!-- Badges -->
+                    <div class="ux-flex ux-gap-xs ux-mr-sm">
+                        {% if role.is_system %}
+                        <span class="ux-badge ux-badge--sm ux-badge--medium">{% trans "System" %}</span>
+                        {% endif %}
+                        {% if not role.is_active %}
+                        <span class="ux-badge ux-badge--sm ux-badge--warning">{% trans "Inactive" %}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- User Count -->
+                    <span class="ux-item__detail">{{ role.users.count }}</span>
+
+                    <!-- Chevron -->
+                    <svg class="ux-item__chevron" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <!-- Empty State -->
+            <div class="ux-empty-state ux-text-center ux-py-2xl">
+                <div class="ux-empty-state__icon ux-mb-lg">
+                    {% icon "shield-outline" %}
+                </div>
+                <h3 class="ux-empty-state__title ux-mb-sm">{% trans "No roles yet" %}</h3>
+                <p class="ux-empty-state__text ux-mb-lg">{% trans "Create your first custom role to get started." %}</p>
+                <button class="ux-button ux-color-primary"
+                        hx-get="{% url 'main:roles:create' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                    {% icon "add-outline" %}
+                    {% trans "Create Role" %}
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

@@ -27,9 +27,9 @@
     <!-- Sidebar Header -->
     <header class="form-sidebar-header">
         <h2 x-text="$store.sidebar.title"></h2>
-        <ion-button fill="clear" color="medium" @click="$store.sidebar.close()">
-            {% icon "close-outline" slot="icon-only" %}
-        </ion-button>
+        <button class="ux-button ux-button--clear ux-color-medium" @click="$store.sidebar.close()">
+            {% icon "close-outline" %}
+        </button>
     </header>
 
     <!-- Sidebar Content (loaded via HTMX) -->

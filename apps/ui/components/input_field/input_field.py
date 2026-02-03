@@ -1,8 +1,8 @@
 """
 Input Field Component with HTMX
 
-A reusable ion-input wrapper that handles HTMX requests automatically.
-Uses hx-vals='js:{}' to capture the input value on ionChange.
+A reusable input wrapper that handles HTMX requests automatically.
+Uses hx-vals='js:{}' to capture the input value on change.
 
 Usage:
     {% component "input_field"
@@ -51,7 +51,7 @@ class InputField(Component):
         hx_post="",
         hx_target="",
         hx_swap="none",
-        hx_trigger="ionChange",
+        hx_trigger="change",
         debounce=None,
         **kwargs
     ):
@@ -73,7 +73,7 @@ class InputField(Component):
             hx_post: HTMX POST URL
             hx_target: HTMX target element
             hx_swap: HTMX swap mode (default: none)
-            hx_trigger: HTMX trigger event (default: ionChange)
+            hx_trigger: HTMX trigger event (default: change)
             debounce: Debounce delay (e.g., "500ms")
         """
         # Build trigger with optional debounce

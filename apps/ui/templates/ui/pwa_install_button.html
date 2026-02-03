@@ -1,11 +1,9 @@
-{% load djicons %}<ion-button
+{% load djicons %}<button
+    class="ux-button ux-button--clear ux-color-primary ui-pwa-install-btn{% if css_class %} {{ css_class }}{% endif %}"
     x-show="canInstall"
     @click="installApp()"
     x-cloak
-    fill="clear"
-    color="primary"
-    class="ui-pwa-install-btn{% if css_class %} {{ css_class }}{% endif %}"
 >
-    {% icon "download-outline" slot="start" %}
+    {% icon "download-outline" %}
     {% if label %}<span class="hidden-mobile">{{ label }}</span>{% endif %}
-</ion-button>
+</button>

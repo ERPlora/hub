@@ -12,21 +12,21 @@
             {"url": "inventory:products", "icon": "cube-outline", "label": "Products", "view": "products"},
         ]
 #}
-<ion-tab-bar slot="bottom" color="light">
+<div class="ux-tab-bar">
     {% for tab in tabs %}
-    <ion-tab-button
+    <button
+        class="ux-tab-button{% if current_view == tab.view %} tab-selected{% endif %}"
         {% if not tab.disabled %}
         hx-get="{{ tab.url }}"
         hx-target="#main-content-area"
         hx-push-url="true"
         {% endif %}
-        {% if tab.disabled %}disabled{% endif %}
-        {% if current_view == tab.view %}class="tab-selected"{% endif %}>
+        {% if tab.disabled %}disabled{% endif %}>
         {% icon tab.icon %}
-        <ion-label>{% if tab.label_trans %}{% trans tab.label_trans %}{% else %}{{ tab.label }}{% endif %}</ion-label>
+        <span>{% if tab.label_trans %}{% trans tab.label_trans %}{% else %}{{ tab.label }}{% endif %}</span>
         {% if tab.badge %}
-        <ion-badge color="{{ tab.badge_color|default:'danger' }}">{{ tab.badge }}</ion-badge>
+        <span class="ux-badge ux-color-{{ tab.badge_color|default:'danger' }}">{{ tab.badge }}</span>
         {% endif %}
-    </ion-tab-button>
+    </button>
     {% endfor %}
-</ion-tab-bar>
+</div>

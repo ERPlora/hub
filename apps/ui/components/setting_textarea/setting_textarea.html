@@ -7,24 +7,25 @@
         <p class="setting-textarea__description">{{ description }}</p>
         {% endif %}
     </div>
-    <ion-textarea
+    <textarea
+        class="ux-textarea setting-textarea__field"
         {% if name %}x-ref="textarea_{{ name }}"{% endif %}
         rows="{{ rows|default:3 }}"
         {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
         {% if disabled %}disabled{% endif %}
-        class="setting-textarea__field">{{ value }}</ion-textarea>
+    >{{ value }}</textarea>
 </div>
 
 <style>
 .setting-textarea {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
-    padding: var(--space-md) 0;
+    gap: var(--ux-space-sm);
+    padding: var(--ux-space-md) 0;
 }
 
 .setting-textarea:not(:last-child) {
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--ux-border-color);
 }
 
 .setting-textarea__header {
@@ -33,24 +34,23 @@
 }
 
 .setting-textarea__title {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
-    margin: 0 0 var(--space-xxs) 0;
+    font-size: var(--ux-font-size-md);
+    font-weight: 600;
+    color: var(--ux-text-primary);
+    margin: 0 0 var(--ux-space-xs) 0;
 }
 
 .setting-textarea__description {
-    font-size: var(--font-size-sm);
-    color: var(--text-color-secondary);
+    font-size: var(--ux-font-size-sm);
+    color: var(--ux-text-secondary);
     margin: 0;
     line-height: 1.4;
 }
 
 .setting-textarea__field {
     width: 100%;
-    --padding-start: var(--space-sm);
-    --padding-end: var(--space-sm);
-    --background: var(--bg-color-secondary);
-    border-radius: var(--border-radius-md);
+    padding: var(--ux-space-sm);
+    background: var(--ux-surface);
+    border-radius: var(--ux-border-radius);
 }
 </style>

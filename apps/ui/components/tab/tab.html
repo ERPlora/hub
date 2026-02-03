@@ -1,20 +1,19 @@
 {% load static djicons %}
 {# Single Tab Button #}
-<ion-tab-button
+<button class="ux-tab-button{% if is_active %} tab-selected{% endif %}"
     {% if not disabled %}
     hx-get="{% url url %}"
     hx-target="#main-content-area"
     hx-push-url="true"
     {% endif %}
-    {% if disabled %}disabled{% endif %}
-    {% if is_active %}class="tab-selected"{% endif %}>
+    {% if disabled %}disabled{% endif %}>
     {% if icon_svg %}
     <img src="{% static icon_svg %}" alt="" class="tab-icon-svg" />
     {% elif icon %}
     {% icon icon %}
     {% endif %}
-    <ion-label>{{ label }}</ion-label>
+    <span>{{ label }}</span>
     {% if badge %}
-    <ion-badge color="{{ badge_color }}">{{ badge }}</ion-badge>
+    <span class="ux-badge ux-color-{{ badge_color }}">{{ badge }}</span>
     {% endif %}
-</ion-tab-button>
+</button>

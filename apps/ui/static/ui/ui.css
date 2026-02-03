@@ -1,6 +1,6 @@
 /* ==========================================================================
    UI COMPONENTS - Minimal CSS for Django UI Components
-   These styles complement Ionic components, not replace them.
+   These styles complement the UX library components.
    ========================================================================== */
 
 /* ==========================================================================
@@ -1002,7 +1002,7 @@ ion-modal.modal-xl::part(content) {
 
 /* ==========================================================================
    ION-GRID ENHANCEMENTS
-   Using Ionic's native grid system instead of Bootstrap
+   Grid system utilities
    ========================================================================== */
 
 /* Consistent column padding */
@@ -1377,7 +1377,7 @@ ion-row.row-gap-lg {
    Swiper Element Customization
    ============================================================================= */
 
-/* Navigation buttons - use Ionic theme colors */
+/* Navigation buttons - use theme colors */
 swiper-container::part(button-prev),
 swiper-container::part(button-next) {
     color: var(--ion-color-primary);
@@ -1399,7 +1399,7 @@ swiper-container::part(button-next)::after {
     font-weight: bold;
 }
 
-/* Pagination - use Ionic theme colors */
+/* Pagination - use theme colors */
 swiper-container::part(bullet) {
     background: var(--ion-color-medium);
     opacity: 0.5;
@@ -1542,7 +1542,7 @@ swiper-container[slides-per-view="auto"] swiper-slide {
     border-color: var(--ion-color-medium);
 }
 
-/* Icon Styles (SVG and Ionicons) */
+/* Icon Styles (SVG and Icons) */
 .module-icon__svg {
     width: var(--icon-size, 28px);
     height: var(--icon-size, 28px);
@@ -1580,8 +1580,8 @@ swiper-container[slides-per-view="auto"] swiper-slide {
     }
 }
 
-/* Ionicon styling */
-.module-icon__ionicon {
+/* Icon styling */
+.module-icon__icon {
     font-size: var(--icon-size, 28px);
     color: #fff;
 }
@@ -1668,7 +1668,7 @@ swiper-container[slides-per-view="auto"] swiper-slide {
     box-shadow: none;
 }
 
-.module-icon--add .module-icon__ionicon {
+.module-icon--add .module-icon__icon {
     color: var(--ion-color-medium);
 }
 
@@ -1682,7 +1682,7 @@ swiper-container[slides-per-view="auto"] swiper-slide {
     background: var(--ion-color-primary-tint);
 }
 
-.module-icon--add:hover .module-icon__ionicon {
+.module-icon--add:hover .module-icon__icon {
     color: var(--ion-color-primary);
 }
 
@@ -1705,6 +1705,6 @@ body.dark .module-icon--add .module-icon__container {
     border-color: var(--ion-color-step-500);
 }
 
-body.dark .module-icon--add .module-icon__ionicon {
+body.dark .module-icon--add .module-icon__icon {
     color: var(--ion-color-step-500);
 }

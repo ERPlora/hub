@@ -1,8 +1,8 @@
 """
 Toggle Component with HTMX
 
-A reusable ion-toggle wrapper that handles HTMX requests automatically.
-Uses hx-vals='js:{}' to capture the toggle state on ionChange.
+A reusable toggle (checkbox) wrapper that handles HTMX requests automatically.
+Uses hx-vals='js:{}' to capture the toggle state on change.
 
 Usage (standalone):
     {% component "toggle"
@@ -20,15 +20,15 @@ Usage (with label):
         hx_post="/m/returns/settings/toggle/" %}
     {% endcomponent %}
 
-Usage (inside ion-item):
-    <ion-item>
+Usage (inside a list item):
+    <div class="ux-list__item">
         {% component "toggle"
             name="show_timer"
             checked=config.show_timer
             title=_("Show Timer")
             hx_post="/m/sections/settings/toggle/" %}
         {% endcomponent %}
-    </ion-item>
+    </div>
 """
 
 from django_components import Component, register
@@ -57,8 +57,8 @@ class Toggle(Component):
             checked: Initial checked state
             disabled: Whether toggle is disabled
             color: Toggle color (primary, success, warning, danger)
-            title: Optional label title (renders ion-label h3)
-            description: Optional description (renders ion-label p)
+            title: Optional label title
+            description: Optional description text
             hx_post: HTMX POST URL
             hx_target: HTMX target element
             hx_swap: HTMX swap mode (default: none)

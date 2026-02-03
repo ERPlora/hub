@@ -1,22 +1,20 @@
-{% load djicons %}<ion-item
-    button="true"
-    detail="false"
-    lines="{{ lines }}"
-    {% if url %}href="{{ url }}"{% endif %}
+{% load djicons %}<div
+    class="ux-list__item ui-nav-item nav-item{% if active %} active{% endif %}{% if css_class %} {{ css_class }}{% endif %}"
+    {% if url %}data-href="{{ url }}"{% endif %}
     {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
     {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
     {% if hx_push_url %}hx-push-url="true"{% endif %}
-    class="ui-nav-item nav-item{% if active %} active{% endif %}{% if css_class %} {{ css_class }}{% endif %}"
     {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
+    role="button"
 >
     {% if icon %}
-    {% icon icon slot="start" %}
+    <span class="ux-list__item-start">{% icon icon %}</span>
     {% endif %}
-    <ion-label>{{ label }}</ion-label>
+    <span>{{ label }}</span>
     {% if badge %}
-    <ion-badge slot="end" color="danger">{{ badge }}</ion-badge>
+    <span class="ux-badge ux-color-danger ux-list__item-end">{{ badge }}</span>
     {% endif %}
     {% if detail %}
-    {% icon "chevron-forward-outline" slot="end" %}
+    <span class="ux-list__item-end">{% icon "chevron-forward-outline" %}</span>
     {% endif %}
-</ion-item>
+</div>

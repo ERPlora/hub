@@ -1,39 +1,91 @@
-{% load i18n ui component_tags %}
+{% load i18n djicons %}
 
-{% with page_title=role.display_name|default:_("Create Role") %}
-{% component "page" title=page_title back_hx_get="/roles/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {% fill "content" %}
-        <form method="post"
-              hx-post
-              hx-target="#main-content-area"
-              hx-push-url="true">
-            {% csrf_token %}
-
-            {% ui_card %}
-                {% ui_list_start %}
-                    {% if not role %}
-                    {% ui_input name="name" label=_("Role Name") value="" required=True helper_text=_("Lowercase letters and underscores only. Cannot be changed later.") %}
-                    {% endif %}
-                    {% ui_input name="display_name" label=_("Display Name") value=role.display_name|default:"" required=True %}
-                    <ion-item>
-                        <ion-textarea
-                            name="description"
-                            label="{% trans 'Description' %}"
-                            label-placement="floating"
-                            rows="3"
-                            placeholder="{% trans 'Optional description for this role' %}">{{ role.description|default:"" }}</ion-textarea>
-                    </ion-item>
-                {% ui_list_end %}
-            {% endui_card %}
-
-            <div class="ion-padding-top">
-                {% if role %}
-                {% ui_button type="submit" expand="block" label=_("Save Changes") icon="checkmark-outline" %}
-                {% else %}
-                {% ui_button type="submit" expand="block" label=_("Create Role") icon="add-outline" %}
-                {% endif %}
+<div class="ux-page">
+    <!-- Header Toolbar -->
+    <header class="ux-header">
+        <div class="ux-toolbar ux-toolbar--glass ux-margin-horizontal" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
+            <div class="ux-toolbar__start">
+                <button class="ux-back-button"
+                        hx-get="{% url 'main:roles:index' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                    {% icon "arrow-back-outline" %}
+                </button>
             </div>
-        </form>
-    {% endfill %}
-{% endcomponent %}
-{% endwith %}
+            <div class="ux-toolbar__center">
+                <h1 class="ux-toolbar__title">
+                    {% if role %}{% trans "Edit Role" %}{% else %}{% trans "Create Role" %}{% endif %}
+                </h1>
+            </div>
+            <div class="ux-toolbar__end"></div>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="ux-page__content" style="flex: 1; overflow: auto;">
+        <div class="ux-padding">
+            <form method="post"
+                  hx-post
+                  hx-target="#main-content-area"
+                  hx-push-url="true">
+                {% csrf_token %}
+
+                <!-- Role Info Card -->
+                <div class="ux-card ux-card--glass ux-mb-lg">
+                    <div class="ux-card__content">
+                        <div class="ux-flex ux-flex-col ux-gap-lg">
+                            {% if not role %}
+                            <!-- Role Name (only for new roles) -->
+                            <div class="ux-input-group">
+                                <label class="ux-input__label" for="role-name">{% trans "Role Name" %} *</label>
+                                <input type="text"
+                                       id="role-name"
+                                       name="name"
+                                       class="ux-input"
+                                       value=""
+                                       required
+                                       pattern="[a-z_]+"
+                                       placeholder="{% trans 'e.g., warehouse_staff' %}">
+                                <span class="ux-input__helper">{% trans "Lowercase letters and underscores only. Cannot be changed later." %}</span>
+                            </div>
+                            {% endif %}
+
+                            <!-- Display Name -->
+                            <div class="ux-input-group">
+                                <label class="ux-input__label" for="display-name">{% trans "Display Name" %} *</label>
+                                <input type="text"
+                                       id="display-name"
+                                       name="display_name"
+                                       class="ux-input"
+                                       value="{{ role.display_name|default:'' }}"
+                                       required
+                                       placeholder="{% trans 'e.g., Warehouse Staff' %}">
+                            </div>
+
+                            <!-- Description -->
+                            <div class="ux-input-group">
+                                <label class="ux-input__label" for="description">{% trans "Description" %}</label>
+                                <textarea id="description"
+                                          name="description"
+                                          class="ux-textarea"
+                                          rows="3"
+                                          placeholder="{% trans 'Optional description for this role' %}">{{ role.description|default:'' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="ux-button ux-button--block ux-color-primary">
+                    {% if role %}
+                        {% icon "checkmark-outline" %}
+                        {% trans "Save Changes" %}
+                    {% else %}
+                        {% icon "add-outline" %}
+                        {% trans "Create Role" %}
+                    {% endif %}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>

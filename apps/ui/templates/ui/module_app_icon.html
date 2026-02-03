@@ -18,7 +18,7 @@
     </div>
     <span class="module-app-icon__label">{{ label }}</span>
     {% if badge %}
-    <ion-badge class="module-app-icon__badge" color="{{ badge_color|default:'danger' }}">{{ badge }}</ion-badge>
+    <span class="ux-badge module-app-icon__badge ux-color-{{ badge_color|default:'danger' }}">{{ badge }}</span>
     {% endif %}
     {% if is_favorite %}
     {% icon "star" css_class="module-app-icon__favorite" %}

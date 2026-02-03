@@ -131,7 +131,7 @@ class InfiniteScrollPaginator:
              hx-target="this"
              hx-swap="outerHTML"
              hx-include="[name='search'],[name='order_by']">
-            <ion-spinner name="crescent"></ion-spinner>
+            <div class="ux-spinner"></div>
         </div>
         {% else %}
         <div class="infinite-scroll-end">

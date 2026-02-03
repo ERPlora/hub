@@ -4,7 +4,7 @@
 
 :root {
   /* ==========================================================================
-     COLORES - Paleta Ionic
+     COLORES - Paleta de colores
      ========================================================================== */
   --color-primary: #3880ff;
   --color-primary-rgb: 56, 128, 255;
@@ -183,8 +183,8 @@ body.dark {
 }
 
 /* ==========================================================================
-   IONIC VARIABLE OVERRIDES
-   Map our variables to Ionic's expected variable names
+   LEGACY VARIABLE MAPPINGS
+   Map our variables to --ion-* variable names (still referenced in components)
    ========================================================================== */
 :root {
   --ion-color-primary: var(--color-primary);

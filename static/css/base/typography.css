@@ -1,10 +1,9 @@
 /* ==========================================================================
-   TYPOGRAPHY - Only utilities that Ionic doesn't provide
-   Ionic handles: ion-text, ion-label, color classes
+   TYPOGRAPHY - Text utility classes
    ========================================================================== */
 
 /* ==========================================================================
-   SPECIAL TEXT STYLES (Not in Ionic)
+   SPECIAL TEXT STYLES
    ========================================================================== */
 
 /* Monospace for code/numbers */
@@ -25,7 +24,7 @@
 }
 
 /* ==========================================================================
-   TEXT TRUNCATION (Not in Ionic)
+   TEXT TRUNCATION
    ========================================================================== */
 
 .text-truncate {

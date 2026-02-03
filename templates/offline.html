@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERPlora Hub - {% trans "Offline" %}</title>
-    <link rel="stylesheet" href="{% static 'css/ionic.bundle.css' %}">
+    <link rel="stylesheet" href="https://erplora.github.io/ux/dist/ux.min.css">
     <link rel="stylesheet" href="{% static 'css/layout/offline.css' %}">
 </head>
 <body class="offline-page">
@@ -13,10 +13,9 @@
         {% icon "cloud-offline-outline" css_class="offline-icon" %}
         <h1>{% trans "You're Offline" %}</h1>
         <p>{% trans "Please check your internet connection and try again." %}</p>
-        <ion-button onclick="window.location.reload()">
+        <button class="ux-button" onclick="window.location.reload()">
             {% trans "Try Again" %}
-        </ion-button>
+        </button>
     </div>
-    <script type="module" src="{% static 'js/ionic/ionic.esm.js' %}"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 /**
- * UI Helpers - Componentes reutilizables con Ionic
+ * UI Helpers - Componentes reutilizables con UX library
  *
  * Incluido globalmente en base.html
  *
@@ -24,7 +24,7 @@
 // ============================================================================
 
 /**
- * Muestra un toast notification de Ionic
+ * Muestra un toast notification
  *
  * @param {string} message - Mensaje a mostrar
  * @param {string} color - Color del toast (success, danger, warning, primary, etc.)
@@ -136,7 +136,7 @@ const Notify = {
 // ============================================================================
 
 /**
- * Muestra un alert dialog de Ionic
+ * Muestra un alert dialog
  *
  * @param {string} header - Título del alert
  * @param {string} message - Mensaje del alert
@@ -158,7 +158,7 @@ async function showAlert(header, message, buttonText = 'OK') {
 }
 
 /**
- * Muestra un confirm dialog de Ionic
+ * Muestra un confirm dialog
  *
  * @param {string} header - Título del confirm
  * @param {string} message - Mensaje del confirm

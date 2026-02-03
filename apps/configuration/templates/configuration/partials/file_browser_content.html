@@ -20,26 +20,24 @@
 {# Directory Tabs #}
 <div class="d-flex gap-xs mb-md overflow-x-auto pb-xs">
     {% for key, dir_info in directories.items %}
-    <ion-chip
-        {% if key == dir_key %}color="primary"{% else %}color="medium"{% endif %}
-        class="cursor-pointer"
+    <span class="ux-chip {% if key == dir_key %}ux-badge--primary{% endif %}"
+        style="cursor: pointer;"
         hx-get="{% url 'configuration:file_browser' %}?dir={{ key }}"
         hx-target="#file-browser-content">
         {% icon dir_info.icon|add:"-outline" %}
-        <ion-label>{{ dir_info.name }}</ion-label>
-    </ion-chip>
+        <span>{{ dir_info.name }}</span>
+    </span>
     {% endfor %}
 </div>
 
 {# Back Button #}
 {% if has_parent %}
-<ion-item button
+<div class="ux-list__item mb-xs" style="cursor: pointer;"
     hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ parent_path }}"
-    hx-target="#file-browser-content"
-    class="mb-xs">
-    {% icon "arrow-back-outline" slot="start" %}
-    <ion-label>{% trans "Back" %}</ion-label>
-</ion-item>
+    hx-target="#file-browser-content">
+    {% icon "arrow-back-outline" %}
+    <span>{% trans "Back" %}</span>
+</div>
 {% endif %}
 
 {# Files List #}
@@ -49,36 +47,34 @@
     <p class="text-secondary">{% trans "No files in this directory" %}</p>
 </div>
 {% else %}
-<ion-list>
+<div class="ux-list">
     {% for item in items %}
     {% if item.is_dir %}
     {# Directory #}
-    <ion-item button
+    <div class="ux-list__item" style="cursor: pointer;"
         hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ item.path }}"
         hx-target="#file-browser-content">
-        {% icon "folder" slot="start" color="warning" %}
-        <ion-label>
+        <span style="color: var(--ux-warning);">{% icon "folder" %}</span>
+        <div class="flex-1">
             <h3>{{ item.name }}</h3>
             <p class="fs-xs text-secondary">{{ item.modified }}</p>
-        </ion-label>
-    </ion-item>
+        </div>
+    </div>
     {% else %}
     {# File #}
-    <ion-item>
-        {% icon item.icon|add:"-outline" slot="start" color="medium" %}
-        <ion-label>
+    <div class="ux-list__item d-flex align-center gap-sm">
+        <span style="color: var(--ux-text-secondary);">{% icon item.icon|add:"-outline" %}</span>
+        <div class="flex-1">
             <h3>{{ item.name }}</h3>
             <p class="fs-xs text-secondary">{{ item.size }} &bull; {{ item.modified }}</p>
-        </ion-label>
-        <ion-button
-            fill="clear"
-            slot="end"
+        </div>
+        <a class="ux-button ux-button--clear"
             href="{% url 'configuration:download_file' %}?dir={{ dir_key }}&path={{ item.path }}"
             download>
-            {% icon "download-outline" slot="icon-only" %}
-        </ion-button>
-    </ion-item>
+            {% icon "download-outline" %}
+        </a>
+    </div>
     {% endif %}
     {% endfor %}
-</ion-list>
+</div>
 {% endif %}

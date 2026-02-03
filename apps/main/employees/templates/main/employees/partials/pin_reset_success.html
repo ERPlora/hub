@@ -8,19 +8,18 @@
       hx-swap="innerHTML">
     {% csrf_token %}
     {% ui_list_start %}
-        <ion-item>
-            <ion-input
+        <div class="ux-list__item">
+            <label for="pin" class="ux-label">{% trans "New PIN (4 digits)" %}</label>
+            <input class="ux-input"
                 name="pin"
-                label="{% trans 'New PIN (4 digits)' %}"
-                label-placement="floating"
+                id="pin"
                 type="password"
                 maxlength="4"
                 pattern="[0-9]{4}"
-                required
-            ></ion-input>
-        </ion-item>
+                required>
+        </div>
     {% ui_list_end %}
-    <div class="ion-padding-top">
+    <div style="padding-top: var(--ux-space-md);">
         {% ui_button type="submit" expand="block" fill="outline" color="warning" label=_("Reset PIN") icon="key-outline" %}
     </div>
 </form>

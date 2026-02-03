@@ -1,5 +1,5 @@
 """
-page component - Base page structure with ion-page, header, content, and optional tabbar.
+page component - Base page structure with header, content, and optional tabbar.
 
 This is the generic base component for all module pages. Use specialized components
 (list_page, settings_page) when they fit your use case better.
@@ -28,7 +28,7 @@ Params:
     action_icon: Icon for header action button
     action_label: Label for header action button
     action_url: URL for header action button (HTMX)
-    padding: Add ion-padding to content (default True)
+    padding: Add padding to content (default True)
 """
 
 from django_components import Component, register

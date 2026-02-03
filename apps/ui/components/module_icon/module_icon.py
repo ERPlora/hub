@@ -1,7 +1,7 @@
 """
 module_icon component - Displays module icons with customizable sizes and styles.
 
-Supports both SVG files (from module's static/icons/) and Ionicons.
+Supports both SVG files (from module's static/icons/) and djicons.
 Automatically applies theme colors (primary fill, transparent stroke).
 
 Usage:
@@ -20,7 +20,7 @@ Usage:
         label="Products" %}
     {% endcomponent %}
 
-    <!-- With Ionicon -->
+    <!-- With djicons icon -->
     {% component "module_icon"
         icon="cube-outline"
         size="xl"
@@ -36,7 +36,7 @@ Sizes:
 
 Params:
     module_id: Module ID to auto-load SVG from static/icons/icon.svg
-    icon: Ionicon name (fallback if no SVG)
+    icon: djicons icon name (fallback if no SVG)
     svg_path: Direct path to SVG file
     size: Size variant (s, m, l, xl, xxl)
     label: Text label below icon

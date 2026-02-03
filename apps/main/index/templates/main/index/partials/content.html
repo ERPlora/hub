@@ -7,144 +7,169 @@
     {% fill "content" %}
         <div x-data="moduleGrid">
             <!-- Search Bar -->
-            <div class="module-searchbar">
-                <ion-searchbar
-                    placeholder="{% trans 'Search modules...' %}"
-                    @ionInput="filterModules($event)"
-                    debounce="300">
-                </ion-searchbar>
+            <div class="ux-searchbar ux-searchbar--rounded" x-data="{ search: '', focused: false }" :class="{ 'ux-searchbar--focused': focused, 'ux-searchbar--has-value': search.length > 0 }">
+                <div class="ux-searchbar__container">
+                    <span class="ux-searchbar__icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32" d="M338.29 338.29L448 448"/></svg>
+                    </span>
+                    <input
+                        type="search"
+                        class="ux-searchbar__input"
+                        placeholder="{% trans 'Search modules...' %}"
+                        x-model="search"
+                        @input="filterModules({ detail: { value: search } })"
+                        @focus="focused = true"
+                        @blur="focused = false">
+                    <button type="button" class="ux-searchbar__clear" @click="search = ''; filterModules({ detail: { value: '' } })">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="currentColor" d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Favorites Section (only if there are favorites) -->
             <template x-if="favoritesData.length > 0">
-                <div class="module-section">
-                    <div class="module-section__header">
-                        <ion-icon name="star" class="module-section__icon"></ion-icon>
-                        <h3 class="module-section__title">{% trans "Favorites" %}</h3>
-                    </div>
-                    <div class="module-grid">
-                        <template x-for="mod in favoritesData" :key="'fav-' + mod.id">
-                            <div class="module-icon module-icon--l module-icon--clickable"
-                                 :hx-get="mod.url"
-                                 hx-target="#main-content-area"
-                                 hx-push-url="true"
-                                 @click="trackRecent(mod.id)">
-                                <div class="module-icon__container"
-                                     :class="'module-icon__container--' + mod.color">
-                                    <template x-if="mod.has_svg && mod.svg_path">
-                                        <div class="module-icon__svg">
-                                            <div class="module-icon__img" :style="'--icon-src: url(' + mod.svg_path + ')'"></div>
-                                        </div>
-                                    </template>
-                                    <template x-if="!mod.has_svg || !mod.svg_path">
-                                        <ion-icon :name="mod.icon" class="module-icon__ionicon"></ion-icon>
-                                    </template>
+                <section class="ux-section">
+                    <header class="ux-section__header">
+                        <div class="ux-section__header-content">
+                            <h3 class="ux-section__title">
+                                {% icon "star" style="vertical-align: middle; margin-right: 4px; color: var(--ux-warning);" %}
+                                {% trans "Favorites" %}
+                            </h3>
+                        </div>
+                    </header>
+                    <div class="ux-section__content">
+                        <div class="ux-app-grid">
+                            <template x-for="mod in favoritesData" :key="'fav-' + mod.id">
+                                <div class="ux-app-item"
+                                     :hx-get="mod.url"
+                                     hx-target="#main-content-area"
+                                     hx-push-url="true"
+                                     @click="trackRecent(mod.id)">
+                                    <div class="ux-app-icon ux-app-icon--lg"
+                                         :class="'ux-app-icon--' + mod.color">
+                                        <template x-if="mod.has_svg && mod.svg_path">
+                                            <img :src="mod.svg_path" :alt="mod.label" style="width: 32px; height: 32px;">
+                                        </template>
+                                        <template x-if="!mod.has_svg || !mod.svg_path">
+                                            <span x-html="mod.icon_svg"></span>
+                                        </template>
+                                    </div>
+                                    <span class="ux-app-item__label" x-text="mod.label"></span>
+                                    {% icon "star" css_class="ux-app-item__badge" style="color: var(--ux-warning);" %}
                                 </div>
-                                <span class="module-icon__label" x-text="mod.label"></span>
-                                <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
-                            </div>
-                        </template>
+                            </template>
+                        </div>
                     </div>
-                </div>
+                </section>
             </template>
 
             <!-- Recent Section (only if there are recent modules) - Swiper Carousel -->
             <template x-if="recentData.length > 0">
-                <div class="module-section module-section--recent">
-                    <div class="module-section__header">
-                        <ion-icon name="time-outline" class="module-section__icon"></ion-icon>
-                        <h3 class="module-section__title">{% trans "Recent" %}</h3>
-                    </div>
-                    {% component "horizontal_scroll" responsive=True bp_sm=2 bp_md=3 bp_lg=3 bp_xl=4 %}
-                        {% fill "slides" %}
-                            <template x-for="mod in recentData" :key="'recent-' + mod.id">
-                                <swiper-slide>
-                                    <div class="module-icon module-icon--l module-icon--clickable"
-                                         :hx-get="mod.url"
-                                         hx-target="#main-content-area"
-                                         hx-push-url="true"
-                                         @click="trackRecent(mod.id)">
-                                        <div class="module-icon__container"
-                                             :class="'module-icon__container--' + mod.color">
-                                            <template x-if="mod.has_svg && mod.svg_path">
-                                                <div class="module-icon__svg">
-                                                    <div class="module-icon__img" :style="'--icon-src: url(' + mod.svg_path + ')'"></div>
-                                                </div>
-                                            </template>
-                                            <template x-if="!mod.has_svg || !mod.svg_path">
-                                                <ion-icon :name="mod.icon" class="module-icon__ionicon"></ion-icon>
-                                            </template>
+                <section class="ux-section">
+                    <header class="ux-section__header">
+                        <div class="ux-section__header-content">
+                            <h3 class="ux-section__title">
+                                {% icon "time-outline" style="vertical-align: middle; margin-right: 4px; color: var(--ux-text-secondary);" %}
+                                {% trans "Recent" %}
+                            </h3>
+                        </div>
+                    </header>
+                    <div class="ux-section__content">
+                        {% component "horizontal_scroll" responsive=True bp_sm=2 bp_md=3 bp_lg=3 bp_xl=4 %}
+                            {% fill "slides" %}
+                                <template x-for="mod in recentData" :key="'recent-' + mod.id">
+                                    <swiper-slide>
+                                        <div class="ux-app-item"
+                                             :hx-get="mod.url"
+                                             hx-target="#main-content-area"
+                                             hx-push-url="true"
+                                             @click="trackRecent(mod.id)">
+                                            <div class="ux-app-icon ux-app-icon--lg"
+                                                 :class="'ux-app-icon--' + mod.color">
+                                                <template x-if="mod.has_svg && mod.svg_path">
+                                                    <img :src="mod.svg_path" :alt="mod.label" style="width: 32px; height: 32px;">
+                                                </template>
+                                                <template x-if="!mod.has_svg || !mod.svg_path">
+                                                    <span x-html="mod.icon_svg"></span>
+                                                </template>
+                                            </div>
+                                            <span class="ux-app-item__label" x-text="mod.label"></span>
                                         </div>
-                                        <span class="module-icon__label" x-text="mod.label"></span>
-                                    </div>
-                                </swiper-slide>
-                            </template>
-                        {% endfill %}
-                    {% endcomponent %}
-                </div>
+                                    </swiper-slide>
+                                </template>
+                            {% endfill %}
+                        {% endcomponent %}
+                    </div>
+                </section>
             </template>
 
             <!-- All Modules Section -->
-            <div class="module-section">
-                <div class="module-section__header">
-                    <ion-icon name="apps-outline" class="module-section__icon"></ion-icon>
-                    <h3 class="module-section__title">{% trans "All Modules" %}</h3>
-                </div>
-                <div class="module-grid">
-                    <!-- Dynamic modules from Alpine.js -->
-                    <template x-for="mod in filteredModules" :key="mod.id">
-                        <div class="module-icon module-icon--l module-icon--clickable"
-                             :hx-get="mod.url"
-                             hx-target="#main-content-area"
-                             hx-push-url="true"
-                             :data-module-id="mod.id"
-                             @click="trackRecent(mod.id)"
-                             @contextmenu.prevent="toggleFavorite(mod.id)">
-                            <div class="module-icon__container"
-                                 :class="'module-icon__container--' + mod.color">
-                                <template x-if="mod.has_svg && mod.svg_path">
-                                    <div class="module-icon__svg">
-                                        <div class="module-icon__img" :style="'--icon-src: url(' + mod.svg_path + ')'"></div>
-                                    </div>
-                                </template>
-                                <template x-if="!mod.has_svg || !mod.svg_path">
-                                    <ion-icon :name="mod.icon" class="module-icon__ionicon"></ion-icon>
+            <section class="ux-section">
+                <header class="ux-section__header">
+                    <div class="ux-section__header-content">
+                        <h3 class="ux-section__title">
+                            {% icon "apps-outline" style="vertical-align: middle; margin-right: 4px; color: var(--ux-text-secondary);" %}
+                            {% trans "All Modules" %}
+                        </h3>
+                    </div>
+                </header>
+                <div class="ux-section__content">
+                    <div class="ux-app-grid">
+                        <!-- Dynamic modules from Alpine.js -->
+                        <template x-for="mod in filteredModules" :key="mod.id">
+                            <div class="ux-app-item"
+                                 :hx-get="mod.url"
+                                 hx-target="#main-content-area"
+                                 hx-push-url="true"
+                                 :data-module-id="mod.id"
+                                 @click="trackRecent(mod.id)"
+                                 @contextmenu.prevent="toggleFavorite(mod.id)">
+                                <div class="ux-app-icon ux-app-icon--lg"
+                                     :class="'ux-app-icon--' + mod.color">
+                                    <template x-if="mod.has_svg && mod.svg_path">
+                                        <img :src="mod.svg_path" :alt="mod.label" style="width: 32px; height: 32px;">
+                                    </template>
+                                    <template x-if="!mod.has_svg || !mod.svg_path">
+                                        <span x-html="mod.icon_svg"></span>
+                                    </template>
+                                </div>
+                                <span class="ux-app-item__label" x-text="mod.label"></span>
+                                <template x-if="isFavorite(mod.id)">
+                                    {% icon "star" css_class="ux-app-item__badge" style="color: var(--ux-warning);" %}
                                 </template>
                             </div>
-                            <span class="module-icon__label" x-text="mod.label"></span>
-                            <template x-if="isFavorite(mod.id)">
-                                <ion-icon name="star" class="module-app-icon__favorite"></ion-icon>
-                            </template>
-                        </div>
-                    </template>
+                        </template>
 
-                    <!-- Add More Modules button -->
-                    <div class="module-icon module-icon--l module-icon--clickable module-icon--add"
-                         hx-get="/marketplace/"
-                         hx-target="#main-content-area"
-                         hx-push-url="true">
-                        <div class="module-icon__container">
-                            <ion-icon name="add" class="module-icon__ionicon"></ion-icon>
+                        <!-- Add More Modules button -->
+                        <div class="ux-app-item"
+                             hx-get="/marketplace/"
+                             hx-target="#main-content-area"
+                             hx-push-url="true">
+                            <div class="ux-app-icon ux-app-icon--lg ux-app-icon--dashed">
+                                {% icon "add" size=28 %}
+                            </div>
+                            <span class="ux-app-item__label">{% trans "Get More" %}</span>
                         </div>
-                        <span class="module-icon__label">{% trans "Get More" %}</span>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <!-- Empty state when no modules and no search -->
             <template x-if="modules.length === 0">
-                <div class="ui-empty-state">
-                    {% icon "extension-puzzle-outline" css_class="ui-empty-state-icon" %}
-                    <h3 class="ui-empty-state-title">{% trans "No modules installed" %}</h3>
-                    <p class="ui-empty-state-description">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
-                    <ion-button
-                        hx-get="/marketplace/"
-                        hx-target="#main-content-area"
-                        hx-push-url="true">
-                        {% icon "storefront-outline" slot="start" %}
-                        {% trans "Browse Marketplace" %}
-                    </ion-button>
-                </div>
+                <section class="ux-section">
+                    <div class="ux-section__content" style="text-align: center; padding: var(--ux-space-2xl);">
+                        {% icon "extension-puzzle-outline" style="font-size: 64px; color: var(--ux-text-tertiary); margin-bottom: var(--ux-space-lg);" %}
+                        <h3 style="margin: 0 0 var(--ux-space-sm); font-size: var(--ux-font-size-xl); color: var(--ux-text);">{% trans "No modules installed" %}</h3>
+                        <p style="margin: 0 0 var(--ux-space-lg); color: var(--ux-text-secondary);">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
+                        <button class="ux-button ux-button--primary"
+                                hx-get="/marketplace/"
+                                hx-target="#main-content-area"
+                                hx-push-url="true">
+                            {% icon "storefront-outline" style="margin-right: var(--ux-space-sm);" %}
+                            {% trans "Browse Marketplace" %}
+                        </button>
+                    </div>
+                </section>
             </template>
         </div>
     {% endfill %}
@@ -156,3 +181,67 @@
 {% endif %}
 
 {# moduleGrid() is defined globally in ui-helpers.js #}
+
+<style>
+/* App Item Component (wrapper for ux-app-icon with label) */
+.ux-app-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--ux-space-sm);
+    cursor: pointer;
+    position: relative;
+    padding: var(--ux-space-sm);
+    border-radius: var(--ux-border-radius);
+    transition: background-color var(--ux-transition-fast) var(--ux-ease);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ux-app-item:hover {
+    background-color: var(--ux-surface-secondary);
+}
+
+.ux-app-item:active {
+    background-color: var(--ux-light);
+}
+
+.ux-app-item__label {
+    font-size: var(--ux-font-size-sm);
+    color: var(--ux-text);
+    text-align: center;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ux-app-item__badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 14px;
+}
+
+/* Button styles if ux-button is not available */
+.ux-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--ux-space-sm) var(--ux-space-lg);
+    font-size: var(--ux-font-size-md);
+    font-weight: var(--ux-font-weight-medium);
+    border: none;
+    border-radius: var(--ux-border-radius);
+    cursor: pointer;
+    transition: all var(--ux-transition-fast) var(--ux-ease);
+}
+
+.ux-button--primary {
+    background-color: var(--ux-primary);
+    color: var(--ux-primary-contrast);
+}
+
+.ux-button--primary:hover {
+    background-color: var(--ux-primary-shade);
+}
+</style>

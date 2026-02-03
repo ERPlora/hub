@@ -1,18 +1,14 @@
-{% load djicons %}<ion-modal id="{{ modal_id }}" {% if css_class %}class="{{ css_class }}"{% endif %}>
-    <ion-header>
-        <ion-toolbar>
-            {% if title %}
-            <ion-title>{{ title }}</ion-title>
-            {% endif %}
-            <ion-buttons slot="end">
-                <ion-button onclick="document.getElementById('{{ modal_id }}').dismiss()">
-                    {% icon "close-outline" slot="icon-only" %}
-                </ion-button>
-            </ion-buttons>
-        </ion-toolbar>
-    </ion-header>
-    <ion-content class="ion-padding">
-        <!-- Modal content is loaded dynamically or via slots -->
-        <div id="{{ modal_id }}-content"></div>
-    </ion-content>
-</ion-modal>
+{% load djicons %}
+<div class="ux-modal-backdrop" id="{{ modal_id }}-backdrop" data-state="closed"{% if css_class %} class="{{ css_class }}"{% endif %}>
+    <div class="ux-modal" id="{{ modal_id }}">
+        <div class="ux-modal__header">
+            {% if title %}<h2 class="ux-modal__title">{{ title }}</h2>{% endif %}
+            <button class="ux-modal__close" onclick="document.getElementById('{{ modal_id }}-backdrop').setAttribute('data-state', 'closed')">
+                {% icon "close-outline" %}
+            </button>
+        </div>
+        <div class="ux-modal__body">
+            <div id="{{ modal_id }}-content"></div>
+        </div>
+    </div>
+</div>

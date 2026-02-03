@@ -17,9 +17,9 @@ Usage:
         {% endfill %}
 
         {% fill "actions" %}
-            <ion-button fill="outline" onclick="importFile()">
-                <ion-icon slot="icon-only" name="cloud-upload-outline"></ion-icon>
-            </ion-button>
+            <button class="ux-button ux-button--outline" onclick="importFile()">
+                {% icon "cloud-upload-outline" %}
+            </button>
         {% endfill %}
     {% endcomponent %}
 """

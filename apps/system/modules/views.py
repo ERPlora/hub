@@ -561,22 +561,17 @@ def _trigger_server_reload():
 def _render_reload_response(message="Applying changes...", success_message="Module activated successfully"):
     """Return HTML that shows a toast and reloads the page after server restarts"""
     html = f'''
-    <div class="ion-padding" style="text-align: center; padding-top: 100px;">
-        <ion-spinner name="crescent" style="width: 48px; height: 48px;"></ion-spinner>
+    <div class="ux-padding" style="text-align: center; padding-top: 100px;">
+        <div class="ux-spinner" style="width: 48px; height: 48px; margin: 0 auto;"></div>
         <h2 style="margin-top: 24px;">{message}</h2>
         <p class="text-medium">The page will reload automatically.</p>
     </div>
     <script>
         (function() {{
             // Show loading toast
-            const loadingToast = document.createElement('ion-toast');
-            loadingToast.message = '{message}';
-            loadingToast.duration = 0;
-            loadingToast.position = 'bottom';
-            loadingToast.icon = 'sync-outline';
-            loadingToast.color = 'primary';
-            document.body.appendChild(loadingToast);
-            loadingToast.present();
+            if (typeof Toast !== 'undefined') {{
+                Toast.info('{message}');
+            }}
 
             let attempts = 0;
             const maxAttempts = 60;
@@ -585,16 +580,10 @@ def _render_reload_response(message="Applying changes...", success_message="Modu
                 try {{
                     const response = await fetch('/ht/', {{ method: 'HEAD', cache: 'no-store' }});
                     if (response.ok) {{
-                        loadingToast.dismiss();
                         // Show success toast
-                        const successToast = document.createElement('ion-toast');
-                        successToast.message = '{success_message}';
-                        successToast.duration = 2000;
-                        successToast.position = 'bottom';
-                        successToast.icon = 'checkmark-circle-outline';
-                        successToast.color = 'success';
-                        document.body.appendChild(successToast);
-                        successToast.present();
+                        if (typeof Toast !== 'undefined') {{
+                            Toast.success('{success_message}');
+                        }}
                         // Reload page after toast
                         setTimeout(() => {{
                             window.location.href = '/modules/';
@@ -602,14 +591,12 @@ def _render_reload_response(message="Applying changes...", success_message="Modu
                     }} else if (attempts < maxAttempts) {{
                         setTimeout(checkServer, 500);
                     }} else {{
-                        loadingToast.dismiss();
                         window.location.href = '/modules/';
                     }}
                 }} catch (e) {{
                     if (attempts < maxAttempts) {{
                         setTimeout(checkServer, 500);
                     }} else {{
-                        loadingToast.dismiss();
                         window.location.href = '/modules/';
                     }}
                 }}

@@ -1,24 +1,29 @@
-{% load djicons %}<ion-header {% if css_class %}class="{{ css_class }}"{% endif %}>
-    <ion-toolbar {% if color %}color="{{ color }}"{% endif %}>
-        <ion-buttons slot="start">
+{% load djicons %}<header class="ux-header{% if css_class %} {{ css_class }}{% endif %}">
+    <div class="ux-toolbar{% if color %} ux-toolbar--{{ color }}{% endif %}">
+        <div class="ux-toolbar__start">
             {% if show_back_button %}
-            <ion-button
-                {% if back_url %}href="{{ back_url }}"{% endif %}
+            <button
+                class="ux-back-button"
+                {% if back_url %}onclick="window.location='{{ back_url }}'"{% endif %}
                 {% if back_hx_get %}hx-get="{{ back_hx_get }}"{% endif %}
                 {% if back_hx_target %}hx-target="{{ back_hx_target }}"{% endif %}
                 {% if back_hx_get %}hx-push-url="true"{% endif %}
             >
-                {% icon "arrow-back-outline" slot="icon-only" %}
-            </ion-button>
+                {% icon "arrow-back-outline" %}
+            </button>
             {% elif show_menu_button %}
-            <ion-menu-button></ion-menu-button>
+            <button class="ux-icon-button" @click="$store.sidebar.toggle()">
+                {% icon "menu" %}
+            </button>
             {% endif %}
-        </ion-buttons>
+        </div>
         {% if title %}
-        <ion-title>{{ title }}</ion-title>
+        <div class="ux-toolbar__center">
+            <h1 class="ux-toolbar__title">{{ title }}</h1>
+        </div>
         {% endif %}
-        <ion-buttons slot="end">
+        <div class="ux-toolbar__end">
             {{ slot }}
-        </ion-buttons>
-    </ion-toolbar>
-</ion-header>
+        </div>
+    </div>
+</header>

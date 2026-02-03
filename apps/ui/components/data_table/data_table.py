@@ -14,7 +14,7 @@ Usage:
         {% fill "columns" %}
             <th class="sortable" hx-get="..." hx-vals='{"order_by": "name"}'>
                 Name
-                <ion-icon name="chevron-up-outline" class="sort-icon"></ion-icon>
+                {% icon "chevron-up-outline" css_class="sort-icon" %}
             </th>
             <th class="cell-right">Price</th>
             <th class="cell-actions">Actions</th>

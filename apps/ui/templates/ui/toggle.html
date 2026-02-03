@@ -1,14 +1,15 @@
-<ion-item {% if css_class %}class="{{ css_class }}"{% endif %}>
+<div class="ux-list__item{% if css_class %} {{ css_class }}{% endif %}">
     {% if label %}
-    <ion-label>{{ label }}</ion-label>
+    <label class="ux-label" for="id_{{ name }}">{{ label }}</label>
     {% endif %}
-    <ion-toggle
+    <input
+        type="checkbox"
+        class="ux-toggle"
+        id="id_{{ name }}"
         name="{{ name }}"
         value="{{ value }}"
-        color="{{ color }}"
-        {% if checked %}checked="true"{% endif %}
-        {% if disabled %}disabled="true"{% endif %}
-        slot="end"
+        {% if checked %}checked{% endif %}
+        {% if disabled %}disabled{% endif %}
         {% for key, val in extra_attrs.items %}{{ key }}="{{ val }}"{% endfor %}
-    ></ion-toggle>
-</ion-item>
+    >
+</div>

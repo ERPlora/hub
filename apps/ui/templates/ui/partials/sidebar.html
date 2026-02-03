@@ -1,12 +1,94 @@
+{% load static %}
 {% load i18n %}
-{% load ui %}
+{% load djicons %}
 
-{% ui_sidebar_content %}
-    {% ui_sidebar_header logo_static="img/logo.png" logo_alt="ERPlora" logo_text="ERPlora Hub" %}
+<div class="ux-shell__sidebar-header">
+    <img class="ux-shell__sidebar-logo" src="{% static 'img/logo.png' %}" alt="ERPlora">
+    <span class="ux-shell__sidebar-title">ERPlora Hub</span>
+</div>
 
-    {% ui_sidebar_nav %}
-        {% include "ui/partials/sidebar_nav.html" %}
-    {% endui_sidebar_nav %}
+<nav class="ux-shell__sidebar-nav">
+    <!-- Main Group - Hub functions -->
+    <a href="/"
+       hx-get="/"
+       hx-target="#main-content-area"
+       hx-push-url="true"
+       class="ux-shell__sidebar-item {% if current_section == 'home' or not current_section %}ux-shell__sidebar-item--active{% endif %}">
+        <span class="ux-shell__sidebar-item-icon">{% icon "home-outline" %}</span>
+        <span class="ux-shell__sidebar-item-text">{% trans "Main" %}</span>
+    </a>
 
-    {% ui_sidebar_footer %}
-{% endui_sidebar_content %}
+    <a href="/files/"
+       hx-get="/files/"
+       hx-target="#main-content-area"
+       hx-push-url="true"
+       class="ux-shell__sidebar-item {% if current_section == 'files' %}ux-shell__sidebar-item--active{% endif %}">
+        <span class="ux-shell__sidebar-item-icon">{% icon "folder-outline" %}</span>
+        <span class="ux-shell__sidebar-item-text">{% trans "Files" %}</span>
+    </a>
+
+    <a href="/employees/"
+       hx-get="/employees/"
+       hx-target="#main-content-area"
+       hx-push-url="true"
+       class="ux-shell__sidebar-item {% if current_section == 'employees' %}ux-shell__sidebar-item--active{% endif %}">
+        <span class="ux-shell__sidebar-item-icon">{% icon "people-outline" %}</span>
+        <span class="ux-shell__sidebar-item-text">{% trans "Employees" %}</span>
+    </a>
+
+    <a href="/roles/"
+       hx-get="/roles/"
+       hx-target="#main-content-area"
+       hx-push-url="true"
+       class="ux-shell__sidebar-item {% if current_section == 'roles' %}ux-shell__sidebar-item--active{% endif %}">
+        <span class="ux-shell__sidebar-item-icon">{% icon "shield-outline" %}</span>
+        <span class="ux-shell__sidebar-item-text">{% trans "Roles" %}</span>
+    </a>
+
+    <a href="/modules/"
+       hx-get="/modules/"
+       hx-target="#main-content-area"
+       hx-push-url="true"
+       class="ux-shell__sidebar-item {% if current_section == 'modules' %}ux-shell__sidebar-item--active{% endif %}">
+        <span class="ux-shell__sidebar-item-icon">{% icon "apps-outline" %}</span>
+        <span class="ux-shell__sidebar-item-text">{% trans "My Modules" %}</span>
+    </a>
+
+    <a href="/settings/"
+       hx-get="/settings/"
+       hx-target="#main-content-area"
+       hx-push-url="true"
+       class="ux-shell__sidebar-item {% if current_section == 'settings' %}ux-shell__sidebar-item--active{% endif %}">
+        <span class="ux-shell__sidebar-item-icon">{% icon "settings-outline" %}</span>
+        <span class="ux-shell__sidebar-item-text">{% trans "Settings" %}</span>
+    </a>
+
+    <hr class="ux-shell__sidebar-divider">
+
+    <a href="/marketplace/"
+       hx-get="/marketplace/"
+       hx-target="#main-content-area"
+       hx-push-url="true"
+       class="ux-shell__sidebar-item {% if current_section == 'marketplace' %}ux-shell__sidebar-item--active{% endif %}">
+        <span class="ux-shell__sidebar-item-icon">{% icon "storefront-outline" %}</span>
+        <span class="ux-shell__sidebar-item-text">{% trans "Marketplace" %}</span>
+    </a>
+</nav>
+
+<div class="ux-shell__sidebar-footer">
+    {% if user.is_authenticated %}
+    <div class="ux-shell__sidebar-user">
+        <span class="ux-shell__sidebar-user-avatar">
+            {% if user.avatar %}
+            <img src="{{ user.avatar.url }}" alt="{{ user.get_full_name|default:user.username }}">
+            {% else %}
+            {% icon "person-circle-outline" %}
+            {% endif %}
+        </span>
+        <span class="ux-shell__sidebar-user-info">
+            <span class="ux-shell__sidebar-user-name">{{ user.get_full_name|default:user.username }}</span>
+            <span class="ux-shell__sidebar-user-role">{{ user.role|default:_("User") }}</span>
+        </span>
+    </div>
+    {% endif %}
+</div>

@@ -121,17 +121,17 @@
 
             <!-- Tabs -->
             <div x-data="{ activeTab: 'overview' }">
-                <ion-segment :value="activeTab" @ionChange="activeTab = $event.detail.value">
-                    <ion-segment-button value="overview">
-                        <ion-label>{% trans "Overview" %}</ion-label>
-                    </ion-segment-button>
-                    <ion-segment-button value="reviews">
-                        <ion-label>{% trans "Reviews" %} ({{ module.review_count|default:0 }})</ion-label>
-                    </ion-segment-button>
-                    <ion-segment-button value="changelog">
-                        <ion-label>{% trans "Changelog" %}</ion-label>
-                    </ion-segment-button>
-                </ion-segment>
+                <div class="ux-tab-bar">
+                    <button class="ux-tab-button" :class="{ 'ux-tab-button--active': activeTab === 'overview' }" @click="activeTab = 'overview'">
+                        <span>{% trans "Overview" %}</span>
+                    </button>
+                    <button class="ux-tab-button" :class="{ 'ux-tab-button--active': activeTab === 'reviews' }" @click="activeTab = 'reviews'">
+                        <span>{% trans "Reviews" %} ({{ module.review_count|default:0 }})</span>
+                    </button>
+                    <button class="ux-tab-button" :class="{ 'ux-tab-button--active': activeTab === 'changelog' }" @click="activeTab = 'changelog'">
+                        <span>{% trans "Changelog" %}</span>
+                    </button>
+                </div>
 
                 <!-- Overview Tab -->
                 <div x-show="activeTab === 'overview'" class="mt-lg">
@@ -147,22 +147,22 @@
 
                     {% ui_card title=_("Module Information") %}
                         {% ui_list lines="full" %}
-                            <ion-item>
-                                <ion-label>{% trans "Version" %}</ion-label>
-                                <ion-text slot="end">{{ module.version }}</ion-text>
-                            </ion-item>
-                            <ion-item>
-                                <ion-label>{% trans "Author" %}</ion-label>
-                                <ion-text slot="end">{{ module.author|default:"ERPlora" }}</ion-text>
-                            </ion-item>
-                            <ion-item>
-                                <ion-label>{% trans "Category" %}</ion-label>
-                                <ion-text slot="end">{{ module.category_name|default:module.category }}</ion-text>
-                            </ion-item>
-                            <ion-item>
-                                <ion-label>{% trans "License" %}</ion-label>
-                                <ion-text slot="end">{{ module.license|default:"Proprietary" }}</ion-text>
-                            </ion-item>
+                            <div class="ux-list__item d-flex justify-between">
+                                <span>{% trans "Version" %}</span>
+                                <span>{{ module.version }}</span>
+                            </div>
+                            <div class="ux-list__item d-flex justify-between">
+                                <span>{% trans "Author" %}</span>
+                                <span>{{ module.author|default:"ERPlora" }}</span>
+                            </div>
+                            <div class="ux-list__item d-flex justify-between">
+                                <span>{% trans "Category" %}</span>
+                                <span>{{ module.category_name|default:module.category }}</span>
+                            </div>
+                            <div class="ux-list__item d-flex justify-between">
+                                <span>{% trans "License" %}</span>
+                                <span>{{ module.license|default:"Proprietary" }}</span>
+                            </div>
                         {% endui_list %}
                     {% endui_card %}
                 </div>
@@ -236,7 +236,7 @@
 <!-- Module action handlers -->
 <script>
 document.addEventListener('click', function(e) {
-    const button = e.target.closest('ion-button[data-action]');
+    const button = e.target.closest('button[data-action], .ux-button[data-action]');
     if (!button) return;
 
     const action = button.dataset.action;
@@ -351,7 +351,7 @@ function setButtonLoading(button, loading) {
     if (!button) return;
     button.disabled = loading;
     if (loading) {
-        button.innerHTML = '<ion-spinner name="crescent"></ion-spinner>';
+        button.innerHTML = '<div class="ux-spinner"></div>';
     }
 }
 </script>
@@ -390,7 +390,7 @@ function setButtonLoading(button, loading) {
 }
 
 .markdown-content code {
-    background: var(--ion-color-light);
+    background: var(--ux-surface);
     padding: 0.2rem 0.4rem;
     border-radius: 4px;
     font-size: 0.875rem;
@@ -398,7 +398,7 @@ function setButtonLoading(button, loading) {
 }
 
 .markdown-content pre {
-    background: var(--ion-color-light);
+    background: var(--ux-surface);
     padding: 1rem;
     border-radius: 8px;
     overflow-x: auto;
@@ -411,10 +411,10 @@ function setButtonLoading(button, loading) {
 }
 
 .markdown-content blockquote {
-    border-left: 4px solid var(--ion-color-primary);
+    border-left: 4px solid var(--ux-primary);
     padding-left: 1rem;
     margin: 1rem 0;
-    color: var(--ion-color-medium);
+    color: var(--ux-text-secondary);
 }
 
 .markdown-content table {
@@ -425,18 +425,18 @@ function setButtonLoading(button, loading) {
 
 .markdown-content table th,
 .markdown-content table td {
-    border: 1px solid var(--ion-color-light);
+    border: 1px solid var(--ux-surface);
     padding: 0.5rem;
     text-align: left;
 }
 
 .markdown-content table th {
-    background: var(--ion-color-light);
+    background: var(--ux-surface);
     font-weight: 600;
 }
 
 .markdown-content a {
-    color: var(--ion-color-primary);
+    color: var(--ux-primary);
     text-decoration: none;
 }
 

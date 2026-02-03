@@ -1,5 +1,5 @@
-{% load djicons %}<ion-card class="ui-stat-card {{ css_class }}">
-    <ion-card-content>
+{% load djicons %}<div class="ux-card ui-stat-card {{ css_class }}">
+    <div class="ux-card__body">
         <div class="ui-stat-content">
             {% if icon %}
             <div class="ui-stat-icon ui-stat-icon--{{ color }}">
@@ -17,5 +17,5 @@
                 {% endif %}
             </div>
         </div>
-    </ion-card-content>
-</ion-card>
+    </div>
+</div>

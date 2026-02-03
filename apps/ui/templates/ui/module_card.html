@@ -1,15 +1,15 @@
-{% load djicons %}<ion-card
-    {% if href or hx_get %}button="true"{% endif %}
-    {% if href %}href="{{ href }}"{% endif %}
+{% load djicons %}<div
+    class="ux-card ui-module-card{% if css_class %} {{ css_class }}{% endif %}"
+    {% if href %}data-href="{{ href }}"{% endif %}
     {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
     {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
-    class="ui-module-card{% if css_class %} {{ css_class }}{% endif %}"
     {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
+    {% if href or hx_get %}role="button"{% endif %}
 >
     {% if image %}
     <img src="{{ image }}" alt="{{ name }}" class="ui-module-card-image">
     {% endif %}
-    <ion-card-header>
+    <div class="ux-card__header">
         <div class="ui-module-card-header">
             {% if icon and not image %}
             <div class="ui-module-card-icon">
@@ -17,32 +17,32 @@
             </div>
             {% endif %}
             <div class="ui-module-card-header-info">
-                <ion-card-title>{{ name }}</ion-card-title>
+                <h3 class="ux-card__title">{{ name }}</h3>
                 {% if author %}
-                <ion-card-subtitle>{{ author }}</ion-card-subtitle>
+                <p class="ux-card__subtitle">{{ author }}</p>
                 {% endif %}
             </div>
         </div>
-    </ion-card-header>
-    <ion-card-content>
+    </div>
+    <div class="ux-card__body">
         {% if description %}
         <p class="ui-module-card-description">{{ description }}</p>
         {% endif %}
         <div class="ui-module-card-footer">
             {% if version %}
-            <ion-chip outline="true" class="ui-module-card-version">
-                <ion-label>v{{ version }}</ion-label>
-            </ion-chip>
+            <span class="ux-chip ux-chip--outline ui-module-card-version">
+                <span>v{{ version }}</span>
+            </span>
             {% endif %}
             {% if is_installed %}
-            <ion-badge color="{% if is_active %}success{% else %}medium{% endif %}">
+            <span class="ux-badge ux-color-{% if is_active %}success{% else %}medium{% endif %}">
                 {% if is_active %}Active{% else %}Installed{% endif %}
-            </ion-badge>
+            </span>
             {% elif price %}
             <span class="ui-module-card-price">{{ price }}</span>
             {% else %}
-            <ion-badge color="success">Free</ion-badge>
+            <span class="ux-badge ux-color-success">Free</span>
             {% endif %}
         </div>
-    </ion-card-content>
-</ion-card>
+    </div>
+</div>

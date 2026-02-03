@@ -1,7 +1,7 @@
 """
 Setting Select Component
 
-A single select setting with title, description, and ion-select.
+A single select setting with title, description, and native select element.
 Designed for touch-friendly settings pages.
 """
 from django_components import Component, register
@@ -19,7 +19,6 @@ class SettingSelect(Component):
         value="",
         options=None,
         placeholder="",
-        interface="popover",
         disabled=False,
         **kwargs
     ):
@@ -31,7 +30,6 @@ class SettingSelect(Component):
             value: Currently selected value
             options: List of dicts with 'value' and 'label' keys
             placeholder: Placeholder text
-            interface: Ionic select interface (popover, action-sheet, alert)
             disabled: Whether select is disabled
         """
         return {
@@ -41,7 +39,6 @@ class SettingSelect(Component):
             "value": value,
             "options": options or [],
             "placeholder": placeholder,
-            "interface": interface,
             "disabled": disabled,
             **kwargs
         }

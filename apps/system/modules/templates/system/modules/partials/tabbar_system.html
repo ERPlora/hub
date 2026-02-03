@@ -1,40 +1,38 @@
 {% load i18n djicons %}
 {# oob can be passed to enable HTMX OOB swap #}
 
-<ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-    <ion-tab-bar slot="bottom" color="light">
+<footer id="dashboard-tabbar" class="ux-footer"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+    <div class="ux-tab-bar">
         <!-- My Modules (Installed) -->
-        <ion-tab-button
+        <button class="ux-tab-button{% if current_tab == 'installed' %} ux-tab-button--active{% endif %}"
             hx-get="{% url 'mymodules:index' %}"
             hx-target="#main-content-area"
-            hx-push-url="true"
-            {% if current_tab == 'installed' %}class="tab-selected"{% endif %}>
+            hx-push-url="true">
             {% icon "apps-outline" %}
-            <ion-label>{% trans "My Modules" %}</ion-label>
-        </ion-tab-button>
+            <span>{% trans "My Modules" %}</span>
+        </button>
 
         <!-- Marketplace -->
-        <ion-tab-button
+        <button class="ux-tab-button{% if current_tab == 'marketplace' %} ux-tab-button--active{% endif %}"
             hx-get="{% url 'mymodules:marketplace' %}"
             hx-target="#main-content-area"
-            hx-push-url="true"
-            {% if current_tab == 'marketplace' %}class="tab-selected"{% endif %}>
+            hx-push-url="true">
             {% icon "cube-outline" %}
-            <ion-label>{% trans "Modules" %}</ion-label>
-        </ion-tab-button>
+            <span>{% trans "Modules" %}</span>
+        </button>
 
         <!-- Components (Coming Soon) -->
-        <ion-tab-button disabled>
+        <button class="ux-tab-button" disabled>
             {% icon "hardware-chip-outline" %}
-            <ion-label>{% trans "Components" %}</ion-label>
-            <ion-badge color="medium" style="font-size: 0.5rem;">{% trans "Soon" %}</ion-badge>
-        </ion-tab-button>
+            <span>{% trans "Components" %}</span>
+            <span class="ux-badge ux-badge--medium" style="font-size: 0.5rem;">{% trans "Soon" %}</span>
+        </button>
 
         <!-- Product Catalog (Coming Soon) -->
-        <ion-tab-button disabled>
+        <button class="ux-tab-button" disabled>
             {% icon "pricetag-outline" %}
-            <ion-label>{% trans "Products" %}</ion-label>
-            <ion-badge color="medium" style="font-size: 0.5rem;">{% trans "Soon" %}</ion-badge>
-        </ion-tab-button>
-    </ion-tab-bar>
-</ion-footer>
+            <span>{% trans "Products" %}</span>
+            <span class="ux-badge ux-badge--medium" style="font-size: 0.5rem;">{% trans "Soon" %}</span>
+        </button>
+    </div>
+</footer>

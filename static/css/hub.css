@@ -1,0 +1,154 @@
+/* ERPlora Hub Custom Styles */
+/* Complementa @erplora/ux */
+
+/* ============================================
+   Alpine.js Cloak
+   Oculta elementos hasta que Alpine.js inicialice
+   ============================================ */
+[x-cloak] {
+    display: none !important;
+}
+
+/* ============================================
+   HTMX Loading Indicator
+   Barra de progreso en la parte superior
+   ============================================ */
+#htmx-indicator {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--ux-primary, #3b82f6);
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+}
+
+.htmx-request #htmx-indicator,
+.htmx-request.htmx-indicator {
+    opacity: 1;
+}
+
+/* Animacion de progreso indeterminado */
+#htmx-indicator::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.4),
+        transparent
+    );
+    animation: htmx-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes htmx-loading {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* ============================================
+   Custom Variables
+   Variables especificas del Hub
+   ============================================ */
+:root {
+    /* Layout */
+    --hub-sidebar-width: 260px;
+    --hub-sidebar-collapsed-width: 64px;
+    --hub-header-height: 56px;
+    --hub-tab-bar-height: 56px;
+
+    /* Transitions */
+    --hub-transition-fast: 150ms ease-out;
+    --hub-transition-normal: 200ms ease-out;
+    --hub-transition-slow: 300ms ease-out;
+
+    /* Z-index scale */
+    --hub-z-dropdown: 100;
+    --hub-z-sticky: 200;
+    --hub-z-modal-backdrop: 300;
+    --hub-z-modal: 400;
+    --hub-z-toast: 500;
+    --hub-z-loading: 9999;
+}
+
+/* ============================================
+   Smooth Transitions for Alpine.js
+   Transiciones para componentes dinamicos
+   ============================================ */
+
+/* Fade transition */
+.hub-fade-enter {
+    opacity: 0;
+}
+.hub-fade-enter-active {
+    transition: opacity var(--hub-transition-normal);
+}
+.hub-fade-leave-active {
+    transition: opacity var(--hub-transition-fast);
+    opacity: 0;
+}
+
+/* Slide transition */
+.hub-slide-enter {
+    transform: translateY(-10px);
+    opacity: 0;
+}
+.hub-slide-enter-active {
+    transition: transform var(--hub-transition-normal), opacity var(--hub-transition-normal);
+}
+.hub-slide-leave-active {
+    transition: transform var(--hub-transition-fast), opacity var(--hub-transition-fast);
+    transform: translateY(-10px);
+    opacity: 0;
+}
+
+/* ============================================
+   HTMX Transition Classes
+   Para transiciones suaves entre vistas
+   ============================================ */
+.htmx-swapping {
+    opacity: 0;
+    transition: opacity var(--hub-transition-fast);
+}
+
+.htmx-settling {
+    opacity: 1;
+    transition: opacity var(--hub-transition-normal);
+}
+
+/* ============================================
+   Utility Classes
+   Clases de utilidad especificas del Hub
+   ============================================ */
+
+/* Deshabilitar interacciones durante carga */
+.hub-loading {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Scroll suave para navegacion */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Focus visible para accesibilidad */
+:focus-visible {
+    outline: 2px solid var(--ux-primary, #3b82f6);
+    outline-offset: 2px;
+}
+
+/* Evitar scroll cuando modal esta abierto */
+body.hub-modal-open {
+    overflow: hidden;
+}

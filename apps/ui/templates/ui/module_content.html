@@ -20,39 +20,39 @@
         {% extends "ui/module_content.html" %}
 
         {% block header_actions %}
-        <ion-button>
-            {% icon "add-outline" slot="icon-only" %}
-        </ion-button>
+        <button class="ux-button">
+            {% icon "add-outline" %}
+        </button>
         {% endblock %}
 
         {% block content %}
-        <ion-list>
+        <div class="ux-list">
             {% for item in items %}
-            <ion-item>{{ item.name }}</ion-item>
+            <div class="ux-list__item">{{ item.name }}</div>
             {% endfor %}
-        </ion-list>
+        </div>
         {% endblock %}
 #}
 {% load i18n %}
 
 {# Page Header (secondary, inside main-content-area) #}
 <div class="content-header">
-    <ion-toolbar>
-        <ion-buttons slot="start">
-            <ion-back-button
-                default-href="/"
-                text=""
+    <div class="ux-toolbar">
+        <div class="ux-toolbar__start">
+            <button
+                class="ux-button ux-button--clear"
                 hx-get="/"
                 hx-target="#main-content-area"
                 hx-push-url="true"
-                @click.prevent
-            ></ion-back-button>
-        </ion-buttons>
-        <ion-title>{{ page_title }}</ion-title>
-        <ion-buttons slot="end">
+                aria-label="Back">
+                {% load djicons %}{% icon "chevron-back-outline" %}
+            </button>
+        </div>
+        <h1 class="ux-toolbar__title">{{ page_title }}</h1>
+        <div class="ux-toolbar__end">
             {% block header_actions %}{% endblock %}
-        </ion-buttons>
-    </ion-toolbar>
+        </div>
+    </div>
 </div>
 
 {# Page Content #}

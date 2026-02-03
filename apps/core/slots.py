@@ -10,11 +10,11 @@ content to be rendered.
 Example - Module defining slots in template:
     {% load slots %}
 
-    <ion-header>
+    <header class="ux-header">
         {% render_slot 'sales.pos_header_start' %}
-        <ion-searchbar>...</ion-searchbar>
+        <input type="search" class="ux-input">
         {% render_slot 'sales.pos_header_end' %}
-    </ion-header>
+    </header>
 
 Example - Module registering content for a slot:
     from apps.core.slots import slots

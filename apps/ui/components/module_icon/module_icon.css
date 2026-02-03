@@ -22,7 +22,7 @@
 }
 
 .module-icon--clickable:hover {
-    background: var(--ion-color-light, #f4f5f8);
+    background: var(--ux-color-light, #f4f5f8);
 }
 
 .module-icon--clickable:active {
@@ -54,52 +54,52 @@
    ============================================================================= */
 
 .module-icon__container--primary {
-    background: linear-gradient(145deg, var(--ion-color-primary), var(--ion-color-primary-shade));
-    border-color: var(--ion-color-primary-shade);
+    background: linear-gradient(145deg, var(--ux-color-primary), var(--ux-color-primary-shade));
+    border-color: var(--ux-color-primary-shade);
 }
 
 .module-icon__container--success {
-    background: linear-gradient(145deg, var(--ion-color-success), var(--ion-color-success-shade));
-    border-color: var(--ion-color-success-shade);
+    background: linear-gradient(145deg, var(--ux-color-success), var(--ux-color-success-shade));
+    border-color: var(--ux-color-success-shade);
 }
 
 .module-icon__container--warning {
-    background: linear-gradient(145deg, var(--ion-color-warning), var(--ion-color-warning-shade));
-    border-color: var(--ion-color-warning-shade);
+    background: linear-gradient(145deg, var(--ux-color-warning), var(--ux-color-warning-shade));
+    border-color: var(--ux-color-warning-shade);
 }
 
 .module-icon__container--danger {
-    background: linear-gradient(145deg, var(--ion-color-danger), var(--ion-color-danger-shade));
-    border-color: var(--ion-color-danger-shade);
+    background: linear-gradient(145deg, var(--ux-color-danger), var(--ux-color-danger-shade));
+    border-color: var(--ux-color-danger-shade);
 }
 
 .module-icon__container--secondary {
-    background: linear-gradient(145deg, var(--ion-color-secondary), var(--ion-color-secondary-shade));
-    border-color: var(--ion-color-secondary-shade);
+    background: linear-gradient(145deg, var(--ux-color-secondary), var(--ux-color-secondary-shade));
+    border-color: var(--ux-color-secondary-shade);
 }
 
 .module-icon__container--tertiary {
-    background: linear-gradient(145deg, var(--ion-color-tertiary), var(--ion-color-tertiary-shade));
-    border-color: var(--ion-color-tertiary-shade);
+    background: linear-gradient(145deg, var(--ux-color-tertiary), var(--ux-color-tertiary-shade));
+    border-color: var(--ux-color-tertiary-shade);
 }
 
 .module-icon__container--medium {
-    background: linear-gradient(145deg, var(--ion-color-medium), var(--ion-color-medium-shade));
-    border-color: var(--ion-color-medium-shade);
+    background: linear-gradient(145deg, var(--ux-color-medium), var(--ux-color-medium-shade));
+    border-color: var(--ux-color-medium-shade);
 }
 
 .module-icon__container--dark {
-    background: linear-gradient(145deg, var(--ion-color-dark), var(--ion-color-dark-shade));
-    border-color: var(--ion-color-dark-shade);
+    background: linear-gradient(145deg, var(--ux-color-dark), var(--ux-color-dark-shade));
+    border-color: var(--ux-color-dark-shade);
 }
 
 .module-icon__container--light {
-    background: var(--ion-color-light);
-    border-color: var(--ion-color-medium);
+    background: var(--ux-color-light);
+    border-color: var(--ux-color-medium);
 }
 
 /* =============================================================================
-   Icon Styles (SVG and Ionicons)
+   Icon Styles (SVG and djicons)
    ============================================================================= */
 
 /* SVG container */
@@ -120,8 +120,8 @@
     filter: brightness(0) invert(1);
 }
 
-/* Ionicon styling */
-.module-icon__ionicon {
+/* djicons icon styling */
+.module-icon__icon {
     font-size: var(--icon-size, 28px);
     color: #fff;
 }
@@ -199,7 +199,7 @@
     font-size: 0.75rem;
     font-weight: 500;
     text-align: center;
-    color: var(--ion-text-color);
+    color: var(--text-color);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -211,13 +211,13 @@
    ============================================================================= */
 
 .module-icon--add .module-icon__container {
-    background: var(--ion-color-light, #f4f5f8);
-    border: 2px dashed var(--ion-color-medium);
+    background: var(--ux-color-light, #f4f5f8);
+    border: 2px dashed var(--ux-color-medium);
     box-shadow: none;
 }
 
-.module-icon--add .module-icon__ionicon {
-    color: var(--ion-color-medium);
+.module-icon--add .module-icon__icon {
+    color: var(--ux-color-medium);
 }
 
 .module-icon--add .module-icon__img {
@@ -226,12 +226,12 @@
 }
 
 .module-icon--add:hover .module-icon__container {
-    border-color: var(--ion-color-primary);
-    background: var(--ion-color-primary-tint);
+    border-color: var(--ux-color-primary);
+    background: var(--ux-color-primary-tint);
 }
 
-.module-icon--add:hover .module-icon__ionicon {
-    color: var(--ion-color-primary);
+.module-icon--add:hover .module-icon__icon {
+    color: var(--ux-color-primary);
 }
 
 .module-icon--add:hover .module-icon__img {
@@ -244,18 +244,18 @@
    ============================================================================= */
 
 body.dark .module-icon--clickable:hover {
-    background: var(--ion-color-step-100, #1e1e1e);
+    background: var(--ux-color-step-100, #1e1e1e);
 }
 
 body.dark .module-icon__label {
-    color: var(--ion-color-step-850, #d7d8da);
+    color: var(--ux-color-step-850, #d7d8da);
 }
 
 body.dark .module-icon--add .module-icon__container {
-    background: var(--ion-color-step-100, #1e1e1e);
-    border-color: var(--ion-color-step-500);
+    background: var(--ux-color-step-100, #1e1e1e);
+    border-color: var(--ux-color-step-500);
 }
 
-body.dark .module-icon--add .module-icon__ionicon {
-    color: var(--ion-color-step-500);
+body.dark .module-icon--add .module-icon__icon {
+    color: var(--ux-color-step-500);
 }

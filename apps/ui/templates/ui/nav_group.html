@@ -1,5 +1,5 @@
-<ion-item-group {% if css_class %}class="{{ css_class }}"{% endif %}>
-    <ion-item-divider>
-        <ion-label>{% if label %}{{ label }}{% else %}&nbsp;{% endif %}</ion-label>
-    </ion-item-divider>
-</ion-item-group>
+<div class="ux-list-group{% if css_class %} {{ css_class }}{% endif %}">
+    <div class="ux-list-group__header">
+        <span>{% if label %}{{ label }}{% else %}&nbsp;{% endif %}</span>
+    </div>
+</div>

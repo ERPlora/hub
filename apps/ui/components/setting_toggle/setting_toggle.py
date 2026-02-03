@@ -1,7 +1,7 @@
 """
 Setting Toggle Component
 
-A single toggle setting with title, description, and ion-toggle.
+A single toggle setting with title, description, and toggle checkbox.
 Designed for touch-friendly settings pages.
 """
 from django_components import Component, register

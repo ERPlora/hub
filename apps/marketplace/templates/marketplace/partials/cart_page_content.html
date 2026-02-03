@@ -30,54 +30,44 @@
     </script>
     {% fill "content" %}
         {% if cart.items %}
-        <ion-card class="m-0 mb-lg">
-            <ion-card-content>
-                <ion-list lines="full" id="cart-items">
+        <div class="ux-card m-0 mb-lg">
+            <div class="ux-card__body">
+                <div class="ux-list" id="cart-items">
                     {% for item in cart.items %}
-                    <ion-item-sliding>
-                        <ion-item>
-                            {% icon item.icon|default:"cube-outline" slot="start" color="primary" style="font-size: 28px;" %}
-                            <ion-label>
-                                <h2 class="fw-semibold">{{ item.name }}</h2>
-                                <p class="text-medium">{{ item.description|truncatechars:60 }}</p>
-                            </ion-label>
-                            <div slot="end" class="d-flex align-center gap-sm">
-                                {% if item.price == 0 %}
-                                <ion-chip color="success">{% trans "Free" %}</ion-chip>
-                                {% else %}
-                                <span class="fw-semibold">{{ item.price|floatformat:2 }} EUR</span>
-                                {% if item.quantity > 1 %}
-                                <span class="text-medium">x {{ item.quantity }}</span>
-                                {% endif %}
-                                {% endif %}
-                                <ion-button
-                                    fill="clear"
-                                    color="danger"
-                                    hx-delete="{% url 'marketplace:cart_remove' item.id %}"
-                                    hx-target="#main-content-area"
-                                    hx-push-url="false">
-                                    {% icon "trash-outline" slot="icon-only" %}
-                                </ion-button>
-                            </div>
-                        </ion-item>
-                        <ion-item-options side="end">
-                            <ion-item-option
-                                color="danger"
+                    <div class="ux-list__item d-flex align-center gap-md">
+                        <span style="font-size: 28px; color: var(--ux-primary);">
+                            {% icon item.icon|default:"cube-outline" %}
+                        </span>
+                        <div class="flex-1">
+                            <h2 class="fw-semibold">{{ item.name }}</h2>
+                            <p class="text-medium">{{ item.description|truncatechars:60 }}</p>
+                        </div>
+                        <div class="d-flex align-center gap-sm">
+                            {% if item.price == 0 %}
+                            <span class="ux-chip ux-badge--success">{% trans "Free" %}</span>
+                            {% else %}
+                            <span class="fw-semibold">{{ item.price|floatformat:2 }} EUR</span>
+                            {% if item.quantity > 1 %}
+                            <span class="text-medium">x {{ item.quantity }}</span>
+                            {% endif %}
+                            {% endif %}
+                            <button
+                                class="ux-button ux-button--clear ux-color-danger"
                                 hx-delete="{% url 'marketplace:cart_remove' item.id %}"
                                 hx-target="#main-content-area"
                                 hx-push-url="false">
-                                {% icon "trash" slot="icon-only" %}
-                            </ion-item-option>
-                        </ion-item-options>
-                    </ion-item-sliding>
+                                {% icon "trash-outline" %}
+                            </button>
+                        </div>
+                    </div>
                     {% endfor %}
-                </ion-list>
-            </ion-card-content>
-        </ion-card>
+                </div>
+            </div>
+        </div>
 
         <!-- Cart Summary -->
-        <ion-card class="m-0 mb-lg">
-            <ion-card-content>
+        <div class="ux-card m-0 mb-lg">
+            <div class="ux-card__body">
                 <div class="d-flex justify-between align-center mb-md">
                     <span class="fs-lg">{% trans "Subtotal" %}</span>
                     <span class="fs-lg fw-semibold">
@@ -106,25 +96,23 @@
                         {% endif %}
                     </span>
                 </div>
-            </ion-card-content>
-        </ion-card>
+            </div>
+        </div>
 
         <!-- Actions -->
-        <ion-button expand="block" size="large" class="mb-md">
-            {% icon "card-outline" slot="start" %}
+        <button class="ux-button ux-button--block ux-button--lg mb-md">
+            {% icon "card-outline" %}
             {% trans "Proceed to Checkout" %}
-        </ion-button>
+        </button>
 
-        <ion-button
-            expand="block"
-            fill="outline"
-            color="danger"
+        <button
+            class="ux-button ux-button--block ux-button--outline ux-color-danger"
             hx-delete="{% url 'marketplace:cart_clear' %}"
             hx-target="#main-content-area"
             hx-push-url="false">
-            {% icon "trash-outline" slot="start" %}
+            {% icon "trash-outline" %}
             {% trans "Clear Cart" %}
-        </ion-button>
+        </button>
 
         {% else %}
         <!-- Empty Cart State -->
@@ -132,13 +120,13 @@
             {% icon "cart-outline" css_class="ui-empty-state-icon" %}
             <h3 class="ui-empty-state-title">{% trans "Your cart is empty" %}</h3>
             <p class="ui-empty-state-description">{% trans "Browse the marketplace to find modules and services for your Hub." %}</p>
-            <ion-button
+            <button class="ux-button"
                 hx-get="{% url 'marketplace:index' %}"
                 hx-target="#main-content-area"
                 hx-push-url="true">
-                {% icon "storefront-outline" slot="start" %}
+                {% icon "storefront-outline" %}
                 {% trans "Browse Marketplace" %}
-            </ion-button>
+            </button>
         </div>
         {% endif %}
 

@@ -1,9 +1,8 @@
-{% load djicons %}{% if back_url %}<ion-button
-    fill="clear"
-    {% if css_class %}class="{{ css_class }}"{% endif %}
+{% load djicons %}{% if back_url %}<button
+    class="ux-button ux-button--clear{% if css_class %} {{ css_class }}{% endif %}"
     hx-get="{{ back_url }}"
     hx-target="#main-content-area"
     hx-push-url="true"
     aria-label="Back">
-    {% icon "chevron-back-outline" slot="icon-only" %}
-</ion-button>{% endif %}
+    {% icon "chevron-back-outline" %}
+</button>{% endif %}

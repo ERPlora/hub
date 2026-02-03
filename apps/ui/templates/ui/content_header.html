@@ -1,27 +1,29 @@
-{# Content Header - styled as secondary header inside ion-content #}
-{# Note: Uses div instead of ion-header because it's placed inside ion-content #}
+{# Content Header - styled as secondary header inside ux-content #}
 {% load djicons %}
 <div class="content-header">
-    <ion-toolbar>
-        {% if back_url or back_hx_get %}
-        <ion-buttons slot="start">
-            <ion-back-button
-                default-href="/"
-                text=""
-                {% if back_url %}href="{{ back_url }}"{% endif %}
+    <div class="ux-toolbar">
+        <div class="ux-toolbar__start">
+            {% if back_url or back_hx_get %}
+            <button
+                class="ux-back-button"
+                {% if back_url %}onclick="window.location='{{ back_url }}'"{% endif %}
                 {% if back_hx_get %}hx-get="{{ back_hx_get }}"{% endif %}
                 {% if back_hx_target %}hx-target="{{ back_hx_target }}"{% endif %}
                 {% if back_hx_push_url %}hx-push-url="{{ back_hx_push_url }}"{% endif %}
-                @click.prevent
-            ></ion-back-button>
-        </ion-buttons>
-        {% endif %}
-        <ion-title>{{ title }}</ion-title>
-        {% if action_icon or action_label %}
-        <ion-buttons slot="end">
-            <ion-button
-                {% if action_color %}color="{{ action_color }}"{% endif %}
-                {% if action_href %}href="{{ action_href }}"{% endif %}
+            >
+                {% icon "arrow-back-outline" %}
+            </button>
+            {% endif %}
+        </div>
+        <div class="ux-toolbar__center">
+            <h1 class="ux-toolbar__title">{{ title }}</h1>
+        </div>
+        <div class="ux-toolbar__end">
+            {% if action_icon or action_label %}
+            <button
+                class="ux-button ux-button--sm"
+                {% if action_color %}data-color="{{ action_color }}"{% endif %}
+                {% if action_href %}onclick="window.location='{{ action_href }}'"{% endif %}
                 {% if action_hx_get %}hx-get="{{ action_hx_get }}"{% endif %}
                 {% if action_hx_post %}hx-post="{{ action_hx_post }}"{% endif %}
                 {% if action_hx_target %}hx-target="{{ action_hx_target }}"{% endif %}
@@ -29,19 +31,13 @@
                 {% if action_x_click %}@click="{{ action_x_click }}"{% endif %}
                 {% if action_badge %}style="position: relative;"{% endif %}
             >
-                {% if action_icon and action_label %}
-                {% icon action_icon slot="start" %}
-                {{ action_label }}
-                {% elif action_icon %}
-                {% icon action_icon slot="icon-only" %}
-                {% else %}
-                {{ action_label }}
-                {% endif %}
+                {% if action_icon %}{% icon action_icon %}{% endif %}
+                {% if action_label %}<span>{{ action_label }}</span>{% endif %}
                 {% if action_badge %}
-                <ion-badge color="{{ action_badge_color }}" style="position: absolute; top: -4px; right: -4px; font-size: 10px; min-width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">{{ action_badge }}</ion-badge>
+                <span class="ux-badge ux-badge--{{ action_badge_color|default:'danger' }}" style="position: absolute; top: -4px; right: -4px; font-size: 10px; min-width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">{{ action_badge }}</span>
                 {% endif %}
-            </ion-button>
-        </ion-buttons>
-        {% endif %}
-    </ion-toolbar>
+            </button>
+            {% endif %}
+        </div>
+    </div>
 </div>

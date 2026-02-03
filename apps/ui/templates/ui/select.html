@@ -1,26 +1,31 @@
-<ion-item {% if css_class %}class="{{ css_class }}"{% endif %}{% if error_text %} class="ion-invalid"{% endif %}>
-    <ion-select
+<div class="ux-form-group{% if css_class %} {{ css_class }}{% endif %}{% if error_text %} ux-form-group--error{% endif %}">
+    {% if label %}
+    <label class="ux-label" {% if name %}for="id_{{ name }}"{% endif %}>{{ label }}{% if required %}<span class="ux-required">*</span>{% endif %}</label>
+    {% endif %}
+    <select
+        class="ux-select"
+        id="id_{{ name }}"
         name="{{ name }}"
-        {% if label %}label="{{ label }}{% if required %}*{% endif %}"{% endif %}
-        {% if label_placement %}label-placement="{{ label_placement }}"{% endif %}
         {% if value %}value="{{ value }}"{% endif %}
-        {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+        {% if placeholder %}data-placeholder="{{ placeholder }}"{% endif %}
         {% if required %}required{% endif %}
         {% if disabled %}disabled{% endif %}
         {% if multiple %}multiple{% endif %}
-        interface="{{ interface|default:'popover' }}"
         {% for key, val in extra_attrs.items %}{{ key }}="{{ val }}"{% endfor %}
     >
+        {% if placeholder %}
+        <option value="" disabled {% if not value %}selected{% endif %}>{{ placeholder }}</option>
+        {% endif %}
         {% for option in options %}
-        <ion-select-option value="{{ option.value }}"{% if option.value == value %} selected{% endif %}>
+        <option value="{{ option.value }}"{% if option.value == value %} selected{% endif %}>
             {{ option.label }}
-        </ion-select-option>
+        </option>
         {% endfor %}
-    </ion-select>
-</ion-item>
+    </select>
+</div>
 {% if helper_text and not error_text %}
-<ion-note class="ui-helper-text">{{ helper_text }}</ion-note>
+<p class="ux-text-secondary ux-text-xs">{{ helper_text }}</p>
 {% endif %}
 {% if error_text %}
-<ion-note class="ui-error-text" color="danger">{{ error_text }}</ion-note>
+<p class="ux-text-xs" style="color: var(--ux-danger);">{{ error_text }}</p>
 {% endif %}

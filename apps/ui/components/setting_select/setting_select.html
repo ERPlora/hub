@@ -7,17 +7,14 @@
         <p class="setting-select__description">{{ description }}</p>
         {% endif %}
     </div>
-    <ion-select
+    <select
         {% if name %}x-ref="select_{{ name }}"{% endif %}
-        value="{{ value }}"
-        interface="{{ interface|default:'popover' }}"
-        {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
         {% if disabled %}disabled{% endif %}
-        class="setting-select__field">
+        class="ux-select setting-select__field">
         {% for option in options %}
-        <ion-select-option value="{{ option.value }}">{{ option.label }}</ion-select-option>
+        <option value="{{ option.value }}"{% if option.value == value %} selected{% endif %}>{{ option.label }}</option>
         {% endfor %}
-    </ion-select>
+    </select>
 </div>
 
 <style>
@@ -54,7 +51,6 @@
 
 .setting-select__field {
     max-width: 180px;
-    --padding-start: var(--space-sm);
-    --padding-end: var(--space-sm);
+    padding: var(--space-sm);
 }
 </style>

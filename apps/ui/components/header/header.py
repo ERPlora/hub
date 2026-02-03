@@ -12,19 +12,19 @@ With back button (automatic from context processor):
 With action buttons:
     {% component "header" title=_("Products") %}
         {% fill "actions" %}
-        <ion-button size="small" fill="clear">
-            <ion-icon name="add-outline" slot="icon-only"></ion-icon>
-        </ion-button>
+        <button class="ux-button ux-button--sm ux-button--clear">
+            {% icon "add-outline" %}
+        </button>
         {% endfill %}
     {% endcomponent %}
 
 Full example:
     {% component "header" title=_("Edit Product") back_url="inventory:products_list" %}
         {% fill "actions" %}
-        <ion-button size="small" color="danger">
-            <ion-icon name="trash-outline" slot="start"></ion-icon>
+        <button class="ux-button ux-button--sm ux-color-danger">
+            {% icon "trash-outline" %}
             Delete
-        </ion-button>
+        </button>
         {% endfill %}
     {% endcomponent %}
 """

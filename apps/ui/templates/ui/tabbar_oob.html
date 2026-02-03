@@ -8,23 +8,23 @@
         - tabs: List of tab dicts with url, icon, label, view, disabled, badge, badge_color
         - current_view: Current view identifier to highlight active tab
 #}
-<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML">
-    <ion-tab-bar slot="bottom" color="light">
+<footer id="dashboard-tabbar" class="ux-footer" hx-swap-oob="outerHTML">
+    <div class="ux-tab-bar ux-tab-bar--bottom">
         {% for tab in tabs %}
-        <ion-tab-button
+        <button
+            class="ux-tab-button{% if current_view == tab.view %} ux-tab-button--selected{% endif %}"
             {% if not tab.disabled %}
             hx-get="{{ tab.url }}"
             hx-target="#main-content-area"
             hx-push-url="true"
             {% endif %}
-            {% if tab.disabled %}disabled{% endif %}
-            {% if current_view == tab.view %}class="tab-selected"{% endif %}>
+            {% if tab.disabled %}disabled{% endif %}>
             {% icon tab.icon %}
-            <ion-label>{% if tab.label_trans %}{% trans tab.label_trans %}{% else %}{{ tab.label }}{% endif %}</ion-label>
+            <span class="ux-tab-button__label">{% if tab.label_trans %}{% trans tab.label_trans %}{% else %}{{ tab.label }}{% endif %}</span>
             {% if tab.badge %}
-            <ion-badge color="{{ tab.badge_color|default:'danger' }}">{{ tab.badge }}</ion-badge>
+            <span class="ux-badge ux-badge--{{ tab.badge_color|default:'danger' }}">{{ tab.badge }}</span>
             {% endif %}
-        </ion-tab-button>
+        </button>
         {% endfor %}
-    </ion-tab-bar>
-</ion-footer>
+    </div>
+</footer>

@@ -1,36 +1,72 @@
-{% load i18n ui component_tags %}
+{% load i18n djicons %}
 
-{% component "page" title=_("Employees") action_icon="add-outline" action_label=_("Add") action_hx_get="/employees/add/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
-    {% fill "content" %}
-        <!-- Search Bar -->
-        <form id="employees-search-form"
-            hx-get="{% url 'main:employees' %}"
-            hx-target="#employees-list"
-            hx-swap="innerHTML"
-            hx-trigger="submit, ionInput from:#employees-search delay:300ms"
-            hx-indicator="#employees-loading">
-
-            <ion-searchbar
-                id="employees-search"
-                name="q"
-                placeholder="{% trans 'Search employees...' %}"
-                debounce="300"
-                show-cancel-button="never"
-                class="m-0 mb-md"
-                value="{{ request.GET.q|default:'' }}">
-            </ion-searchbar>
-        </form>
-
-        <!-- Loading Spinner -->
-        <div id="employees-loading" class="htmx-indicator justify-center py-lg">
-            <ion-spinner name="crescent"></ion-spinner>
+<div class="ux-page">
+    <!-- Header Toolbar -->
+    <header class="ux-header">
+        <div class="ux-toolbar ux-toolbar--glass ux-margin-horizontal" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
+            <div class="ux-toolbar__start">
+                <button class="ux-back-button"
+                        hx-get="{% url 'main:index' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                    {% icon "arrow-back-outline" %}
+                </button>
+            </div>
+            <div class="ux-toolbar__center">
+                <h1 class="ux-toolbar__title">{% trans "Employees" %}</h1>
+            </div>
+            <div class="ux-toolbar__end">
+                <button class="ux-button ux-button--sm ux-color-primary"
+                        hx-get="{% url 'main:employee_add' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                    {% icon "add-outline" %}
+                    <span class="ux-hide-mobile">{% trans "Add" %}</span>
+                </button>
+            </div>
         </div>
+    </header>
 
-        <!-- Employees List Container with internal scroll -->
-        <div id="employees-scroll-container" style="height: calc(100vh - 220px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
+    <!-- Content -->
+    <div class="ux-page__content" style="flex: 1; overflow: auto;">
+        <div class="ux-padding">
+            <!-- Search Bar -->
+            <form id="employees-search-form"
+                  hx-get="{% url 'main:employees' %}"
+                  hx-target="#employees-list"
+                  hx-swap="innerHTML"
+                  hx-trigger="submit, input from:#employees-search delay:300ms"
+                  hx-indicator="#employees-loading"
+                  class="ux-mb-md">
+
+                <div class="ux-searchbar ux-searchbar--glass">
+                    <span class="ux-searchbar__icon">
+                        {% icon "search-outline" %}
+                    </span>
+                    <input type="text"
+                           id="employees-search"
+                           name="q"
+                           class="ux-searchbar__input"
+                           placeholder="{% trans 'Search employees...' %}"
+                           value="{{ request.GET.q|default:'' }}"
+                           autocomplete="off">
+                    {% if request.GET.q %}
+                    <button type="button" class="ux-searchbar__clear" onclick="document.getElementById('employees-search').value=''; htmx.trigger('#employees-search-form', 'submit');">
+                        {% icon "close-circle" %}
+                    </button>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- Loading Spinner -->
+            <div id="employees-loading" class="htmx-indicator ux-text-center ux-py-xl">
+                <div class="ux-spinner ux-spinner--lg"></div>
+            </div>
+
+            <!-- Employees List Container -->
             <div id="employees-list">
                 {% include "main/employees/partials/employees_list.html" %}
             </div>
         </div>
-    {% endfill %}
-{% endcomponent %}
+    </div>
+</div>

@@ -1,7 +1,7 @@
 {% load i18n component_tags djicons %}
 
-<ion-card class="m-0">
-    <ion-card-content class="p-0">
+<div class="ux-card m-0">
+    <div class="ux-card__body p-0">
         <div id="{{ table_id }}">
             <div class="data-table-container">
                 <table class="data-table">
@@ -23,7 +23,7 @@
                      hx-target="#{{ tbody_id }}"
                      hx-swap="beforeend"
                      hx-select="#{{ tbody_id }} > tr, .infinite-scroll-loader, .infinite-scroll-end">
-                    <ion-spinner name="crescent"></ion-spinner>
+                    <div class="ux-spinner"></div>
                 </div>
                 {% elif total_count > 0 %}
                 <div class="infinite-scroll-end">
@@ -48,5 +48,5 @@
                 {% endif %}
             </div>
         </div>
-    </ion-card-content>
-</ion-card>
+    </div>
+</div>

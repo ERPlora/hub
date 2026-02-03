@@ -9,11 +9,12 @@ Usage:
     {% component "form_sidebar" %}{% endcomponent %}
 
     Then trigger it with buttons:
-    <ion-button hx-get="/products/new/"
-                hx-target="#sidebar-content"
-                @click="$store.sidebar.open('New Product')">
+    <button class="ux-button"
+            hx-get="/products/new/"
+            hx-target="#sidebar-content"
+            @click="$store.sidebar.open('New Product')">
         New
-    </ion-button>
+    </button>
 
     The form partial loaded via HTMX should contain the form fields.
 """

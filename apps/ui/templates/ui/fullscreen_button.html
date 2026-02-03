@@ -1,10 +1,7 @@
-{% load djicons %}<ion-button
-    fill="clear"
+{% load djicons %}<button
+    class="ux-button ux-button--clear ui-fullscreen-btn{% if css_class %} {{ css_class }}{% endif %}"
     @click="toggleFullscreen()"
-    class="ui-fullscreen-btn{% if css_class %} {{ css_class }}{% endif %}"
 >
-    <span slot="icon-only">
-        <span x-show="isFullscreen">{% icon "contract-outline" %}</span>
-        <span x-show="!isFullscreen" x-cloak>{% icon "expand-outline" %}</span>
-    </span>
-</ion-button>
+    <span x-show="isFullscreen">{% icon "contract-outline" %}</span>
+    <span x-show="!isFullscreen" x-cloak>{% icon "expand-outline" %}</span>
+</button>

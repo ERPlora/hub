@@ -1,7 +1,7 @@
 """
 Setting Input Component
 
-A single input setting with title, description, and ion-input.
+A single input setting with title, description, and native input element.
 Designed for touch-friendly settings pages.
 """
 from django_components import Component, register

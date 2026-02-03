@@ -1,14 +1,13 @@
-<ion-button
-    fill="clear"
+<button
+    class="ux-button ux-button--clear ui-user-avatar-btn{% if css_class %} {{ css_class }}{% endif %}"
     @click="handleUserMenu()"
-    class="ui-user-avatar-btn{% if css_class %} {{ css_class }}{% endif %}"
     {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
 >
     {% if src %}
-    <ion-avatar class="user-avatar">
+    <div class="ux-avatar user-avatar">
         <img src="{{ src }}" alt="">
-    </ion-avatar>
+    </div>
     {% else %}
     <div class="user-avatar">{{ initials }}</div>
     {% endif %}
-</ion-button>
+</button>

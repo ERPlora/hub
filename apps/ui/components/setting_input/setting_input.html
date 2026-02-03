@@ -7,7 +7,8 @@
         <p class="setting-input__description">{{ description }}</p>
         {% endif %}
     </div>
-    <ion-input
+    <input
+        class="ux-input setting-input__field"
         {% if name %}x-ref="input_{{ name }}"{% endif %}
         type="{{ type|default:'text' }}"
         value="{{ value }}"
@@ -15,9 +16,7 @@
         {% if min is not None %}min="{{ min }}"{% endif %}
         {% if max is not None %}max="{{ max }}"{% endif %}
         {% if step %}step="{{ step }}"{% endif %}
-        {% if disabled %}disabled{% endif %}
-        class="setting-input__field">
-    </ion-input>
+        {% if disabled %}disabled{% endif %}>
 </div>
 
 <style>
@@ -55,9 +54,8 @@
 .setting-input__field {
     max-width: 120px;
     text-align: right;
-    --padding-start: var(--space-sm);
-    --padding-end: var(--space-sm);
-    --background: var(--bg-color-secondary);
+    padding: var(--space-sm);
+    background: var(--bg-color-secondary);
     border-radius: var(--border-radius-md);
 }
 

@@ -7,23 +7,21 @@
             hx-get="{% url 'mymodules:index' %}"
             hx-target="#modules-list"
             hx-swap="innerHTML"
-            hx-trigger="submit, ionInput from:#modules-search delay:300ms"
+            hx-trigger="submit, input from:#modules-search delay:300ms"
             hx-indicator="#modules-loading">
 
-            <ion-searchbar
+            <input type="search"
+                class="ux-input"
                 id="modules-search"
                 name="q"
                 placeholder="{% trans 'Search modules...' %}"
-                debounce="300"
-                show-cancel-button="never"
-                class="m-0 mb-md"
-                value="{{ request.GET.q|default:'' }}">
-            </ion-searchbar>
+                value="{{ request.GET.q|default:'' }}"
+                style="margin-bottom: var(--ux-space-md);">
         </form>
 
         <!-- Loading Spinner -->
         <div id="modules-loading" class="htmx-indicator justify-center py-lg">
-            <ion-spinner name="crescent"></ion-spinner>
+            <div class="ux-spinner"></div>
         </div>
 
         <!-- Modules List Container with internal scroll -->
@@ -37,8 +35,8 @@
 
 <script>
 (function() {
-    // Handle module deactivate with Ionic alert
-    document.body.addEventListener('click', async function(e) {
+    // Handle module deactivate with UX alert
+    document.body.addEventListener('click', function(e) {
         const btn = e.target.closest('[data-action="module-deactivate"]');
         if (!btn) return;
 
@@ -48,29 +46,41 @@
         const url = btn.dataset.url;
         const moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
 
-        const alert = document.createElement('ion-alert');
-        alert.header = '{% trans "Deactivate Module" %}';
-        alert.message = '{% trans "Are you sure you want to deactivate" %} <strong>' + moduleName + '</strong>?';
-        alert.buttons = [
-            {
-                text: '{% trans "Cancel" %}',
-                role: 'cancel'
-            },
-            {
-                text: '{% trans "Deactivate" %}',
-                role: 'confirm',
-                handler: () => {
-                    htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
-                }
-            }
-        ];
+        // Create UX alert backdrop
+        const backdrop = document.createElement('div');
+        backdrop.className = 'ux-alert-backdrop';
+        backdrop.setAttribute('data-state', 'open');
+        backdrop.innerHTML = `
+            <div class="ux-alert">
+                <div class="ux-alert__header">
+                    <h3>{% trans "Deactivate Module" %}</h3>
+                </div>
+                <div class="ux-alert__body">
+                    <p>{% trans "Are you sure you want to deactivate" %} <strong>${moduleName}</strong>?</p>
+                </div>
+                <div class="ux-alert__footer">
+                    <button class="ux-button ux-button--outline" data-role="cancel">{% trans "Cancel" %}</button>
+                    <button class="ux-button ux-color-warning" data-role="confirm">{% trans "Deactivate" %}</button>
+                </div>
+            </div>
+        `;
 
-        document.body.appendChild(alert);
-        await alert.present();
+        backdrop.querySelector('[data-role="cancel"]').addEventListener('click', function() {
+            backdrop.setAttribute('data-state', 'closed');
+            setTimeout(() => backdrop.remove(), 300);
+        });
+
+        backdrop.querySelector('[data-role="confirm"]').addEventListener('click', function() {
+            backdrop.setAttribute('data-state', 'closed');
+            setTimeout(() => backdrop.remove(), 300);
+            htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
+        });
+
+        document.body.appendChild(backdrop);
     });
 
-    // Handle module delete with Ionic alert
-    document.body.addEventListener('click', async function(e) {
+    // Handle module delete with UX alert
+    document.body.addEventListener('click', function(e) {
         const btn = e.target.closest('[data-action="module-delete"]');
         if (!btn) return;
 
@@ -80,28 +90,38 @@
         const url = btn.dataset.url;
         const moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
 
-        const alert = document.createElement('ion-alert');
-        alert.header = '{% trans "Delete Module" %}';
-        alert.subHeader = '{% trans "This action cannot be undone" %}';
-        alert.message = '{% trans "This will permanently delete" %} <strong>' + moduleName + '</strong> {% trans "and all its data." %}';
-        alert.cssClass = 'alert-danger';
-        alert.buttons = [
-            {
-                text: '{% trans "Cancel" %}',
-                role: 'cancel'
-            },
-            {
-                text: '{% trans "Delete" %}',
-                role: 'destructive',
-                cssClass: 'alert-button-danger',
-                handler: () => {
-                    htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
-                }
-            }
-        ];
+        // Create UX alert backdrop
+        const backdrop = document.createElement('div');
+        backdrop.className = 'ux-alert-backdrop';
+        backdrop.setAttribute('data-state', 'open');
+        backdrop.innerHTML = `
+            <div class="ux-alert">
+                <div class="ux-alert__header">
+                    <h3>{% trans "Delete Module" %}</h3>
+                    <p class="ux-text-secondary">{% trans "This action cannot be undone" %}</p>
+                </div>
+                <div class="ux-alert__body">
+                    <p>{% trans "This will permanently delete" %} <strong>${moduleName}</strong> {% trans "and all its data." %}</p>
+                </div>
+                <div class="ux-alert__footer">
+                    <button class="ux-button ux-button--outline" data-role="cancel">{% trans "Cancel" %}</button>
+                    <button class="ux-button ux-color-danger" data-role="confirm">{% trans "Delete" %}</button>
+                </div>
+            </div>
+        `;
 
-        document.body.appendChild(alert);
-        await alert.present();
+        backdrop.querySelector('[data-role="cancel"]').addEventListener('click', function() {
+            backdrop.setAttribute('data-state', 'closed');
+            setTimeout(() => backdrop.remove(), 300);
+        });
+
+        backdrop.querySelector('[data-role="confirm"]').addEventListener('click', function() {
+            backdrop.setAttribute('data-state', 'closed');
+            setTimeout(() => backdrop.remove(), 300);
+            htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
+        });
+
+        document.body.appendChild(backdrop);
     });
 })();
 </script>

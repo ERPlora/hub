@@ -1,68 +1,64 @@
 {% load i18n ui component_tags djicons %}
 {#
-    Settings Page Component - Para páginas de configuración de módulos
+    Settings Page Component - Para paginas de configuracion de modulos
 
     Genera estructura: content-header + page-content
     Se swappea en #main-content-area (div en app_base.html).
-    El tabbar se actualiza via OOB swap cuando navegas entre módulos.
-
-    NOTE: NO genera ion-page porque va dentro de #main-content-area.
+    El tabbar se actualiza via OOB swap cuando navegas entre modulos.
 
     Params:
-        title: Título de la página
-        module_id: ID del módulo (para tabbar)
+        title: Titulo de la pagina
+        module_id: ID del modulo (para tabbar)
         tabbar_view: Vista actual del tabbar
         alpine_app: Nombre de la app Alpine.js (opcional)
 #}
 
-{# Page Header (secondary - inside main-content-area) #}
+{# Page Header #}
 {% ui_page_header title=title %}
 
 {# CSRF token for JavaScript/HTMX #}
 {% csrf_token %}
 
 {# Main Content #}
-<div class="page-content ion-padding"{% if alpine_app %} x-data="{{ alpine_app }}()" x-init="init()"{% endif %}>
+<div class="page-content ux-padding"{% if alpine_app %} x-data="{{ alpine_app }}()" x-init="init()"{% endif %}>
     {# Info slot - for read-only global config sections #}
     {% slot "info" %}{% endslot %}
 
     {# Main settings content #}
-    <ion-card class="m-0">
-        <ion-card-content>
+    <div class="ux-card" style="margin: 0;">
+        <div class="ux-card__body">
             {% slot "settings" %}{% endslot %}
 
             {# Actions slot - for reset/save buttons #}
             {% slot "actions" %}{% endslot %}
-        </ion-card-content>
-    </ion-card>
+        </div>
+    </div>
 
     {# Footer info slot - for help text #}
     {% slot "footer" %}{% endslot %}
 </div>
 
-{# Tab bar via OOB swap - only when navigating between modules via HTMX #}
-{# For full page loads, tabbar is rendered in app_base.html directly #}
-{# For HTMX within same module, tabbar already correct #}
+{# Tab bar via OOB swap #}
 {% if render_tabbar and navigation %}
-<ion-footer id="global-tabbar-footer" hx-swap-oob="outerHTML:#global-tabbar-footer">
-    <ion-tab-bar id="global-tabbar">
+<footer id="global-tabbar-footer" class="ux-footer" hx-swap-oob="outerHTML:#global-tabbar-footer">
+    <div id="global-tabbar" class="ux-tab-bar ux-tab-bar--bottom">
         {% for nav in navigation %}
-        <ion-tab-button
+        <button
+            class="ux-tab-button{% if nav.id == tabbar_view %} ux-tab-button--selected{% endif %}"
             hx-get="{{ nav.url }}"
             hx-target="#main-content-area"
-            hx-push-url="true"
-            class="{% if nav.id == tabbar_view %}tab-selected{% endif %}">
+            hx-push-url="true">
             {% icon nav.icon %}
-            <ion-label>{{ nav.label }}</ion-label>
-        </ion-tab-button>
+            <span class="ux-tab-button__label">{{ nav.label }}</span>
+        </button>
         {% endfor %}
-    </ion-tab-bar>
-</ion-footer>
+    </div>
+</footer>
 <script>document.body.setAttribute('data-module-id', '{{ module_id }}');</script>
 {% elif render_tabbar and not module_id %}
 {# HTMX to non-module page = clear tabbar #}
-<ion-footer id="global-tabbar-footer" hx-swap-oob="outerHTML:#global-tabbar-footer" style="display: none;">
-    <ion-tab-bar id="global-tabbar"></ion-tab-bar>
-</ion-footer>
+<footer id="global-tabbar-footer" class="ux-footer" hx-swap-oob="outerHTML:#global-tabbar-footer" style="display: none;">
+    <div id="global-tabbar" class="ux-tab-bar ux-tab-bar--bottom"></div>
+</footer>
 <script>document.body.removeAttribute('data-module-id');</script>
 {% endif %}

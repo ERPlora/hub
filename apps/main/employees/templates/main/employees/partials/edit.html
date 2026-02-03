@@ -1,65 +1,179 @@
-{% load i18n ui component_tags %}
+{% load i18n djicons %}
 
-{% component "page" title=_("Edit Employee") back_hx_get="/employees/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {% fill "content" %}
-        <div x-data="{ confirmDelete: false }">
+<div class="ux-page" x-data="{ confirmDelete: false }">
+    <!-- Header Toolbar -->
+    <header class="ux-header">
+        <div class="ux-toolbar ux-toolbar--glass ux-margin-horizontal" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
+            <div class="ux-toolbar__start">
+                <button class="ux-back-button"
+                        hx-get="{% url 'main:employees' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                    {% icon "arrow-back-outline" %}
+                </button>
+            </div>
+            <div class="ux-toolbar__center">
+                <h1 class="ux-toolbar__title">{% trans "Edit Employee" %}</h1>
+            </div>
+            <div class="ux-toolbar__end"></div>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="ux-page__content" style="flex: 1; overflow: auto;">
+        <div class="ux-padding">
+            <!-- Edit Form -->
             <form hx-post="{% url 'main:employee_edit' employee.id %}"
                   hx-target="#main-content-area"
                   hx-push-url="{% url 'main:employees' %}">
                 {% csrf_token %}
 
-                {% ui_card %}
-                    {% ui_list_start %}
-                        {% ui_input name="name" label=_("Name") value=employee.name required=True %}
-                        {% ui_input name="email" label=_("Email") type="email" value=employee.email required=True %}
-                        {% ui_select name="role_id" label=_("Role") value=employee.role_obj.id|default:"" options=role_options interface="popover" %}
-                    {% ui_list_end %}
-                {% endui_card %}
+                <!-- Employee Info Card -->
+                <div class="ux-card ux-card--glass ux-mb-lg">
+                    <div class="ux-card__header">
+                        <h3 class="ux-card__title">{% trans "Employee Information" %}</h3>
+                    </div>
+                    <div class="ux-card__body">
+                        <!-- Avatar Preview -->
+                        <div class="ux-text-center ux-mb-lg">
+                            {% if employee.avatar %}
+                            <div class="ux-avatar ux-avatar--xl" style="background-image: url('{{ employee.avatar.url }}'); margin: 0 auto;"></div>
+                            {% else %}
+                            <div class="ux-avatar ux-avatar--xl ux-avatar--{{ employee.get_role_color|default:'primary' }}" style="margin: 0 auto;">
+                                <span class="ux-avatar__initials">{{ employee.get_initials }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
 
-                <div class="ion-padding-top">
-                    {% ui_button type="submit" expand="block" label=_("Save Changes") icon="checkmark-outline" %}
+                        <!-- Name Input -->
+                        <div class="ux-input-group ux-mb-md">
+                            <label class="ux-label" for="employee-name">{% trans "Name" %}</label>
+                            <input type="text"
+                                   id="employee-name"
+                                   name="name"
+                                   class="ux-input"
+                                   value="{{ employee.name }}"
+                                   placeholder="{% trans 'Full name' %}"
+                                   required>
+                        </div>
+
+                        <!-- Email Input -->
+                        <div class="ux-input-group ux-mb-md">
+                            <label class="ux-label" for="employee-email">{% trans "Email" %}</label>
+                            <input type="email"
+                                   id="employee-email"
+                                   name="email"
+                                   class="ux-input"
+                                   value="{{ employee.email }}"
+                                   placeholder="{% trans 'email@example.com' %}"
+                                   required>
+                        </div>
+
+                        <!-- Role Select -->
+                        <div class="ux-input-group">
+                            <label class="ux-label" for="employee-role">{% trans "Role" %}</label>
+                            <select id="employee-role"
+                                    name="role_id"
+                                    class="ux-select">
+                                <option value="">{% trans "Select a role" %}</option>
+                                {% for option in role_options %}
+                                <option value="{{ option.value }}" {% if employee.role_obj.id == option.value %}selected{% endif %}>{{ option.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="ux-button ux-button--block ux-color-primary ux-mb-lg">
+                    {% icon "checkmark-outline" %}
+                    {% trans "Save Changes" %}
+                </button>
             </form>
 
             <!-- Reset PIN Section -->
-            {% ui_form_card title=_("Security") css_class="ion-margin-top" %}
-                <div id="pin-form-container">
-                    <form hx-post="{% url 'main:employee_reset_pin' employee.id %}"
-                          hx-target="#pin-form-container"
-                          hx-swap="innerHTML">
-                        {% csrf_token %}
-                        {% ui_list_start %}
-                            {% ui_input name="pin" label=_("New PIN (4 digits)") type="password" maxlength="4" pattern="[0-9]{4}" required=True %}
-                        {% ui_list_end %}
-                        <div class="ion-padding-top">
-                            {% ui_button type="submit" expand="block" fill="outline" color="warning" label=_("Reset PIN") icon="key-outline" %}
-                        </div>
-                    </form>
+            <div class="ux-card ux-card--glass ux-mb-lg">
+                <div class="ux-card__header">
+                    <h3 class="ux-card__title">{% trans "Security" %}</h3>
                 </div>
-            {% endui_form_card %}
+                <div class="ux-card__body">
+                    <div id="pin-form-container">
+                        <form hx-post="{% url 'main:employee_reset_pin' employee.id %}"
+                              hx-target="#pin-form-container"
+                              hx-swap="innerHTML">
+                            {% csrf_token %}
 
-            <!-- Delete Section -->
+                            <!-- New PIN Input -->
+                            <div class="ux-input-group ux-mb-md">
+                                <label class="ux-label" for="employee-new-pin">{% trans "New PIN (4 digits)" %}</label>
+                                <input type="password"
+                                       id="employee-new-pin"
+                                       name="pin"
+                                       class="ux-input"
+                                       maxlength="4"
+                                       pattern="[0-9]{4}"
+                                       inputmode="numeric"
+                                       placeholder="****"
+                                       required>
+                                <span class="ux-input-hint">{% trans "4-digit PIN for quick access" %}</span>
+                            </div>
+
+                            <button type="submit" class="ux-button ux-button--block ux-button--outline ux-color-warning">
+                                {% icon "key-outline" %}
+                                {% trans "Reset PIN" %}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delete Section (only for non-admin users) -->
             {% if employee.get_role_name != 'admin' %}
-            {% ui_form_card title=_("Danger Zone") title_color="danger" css_class="ion-margin-top" %}
-                <p class="text-medium ion-margin-bottom">{% trans "Deleting an employee will deactivate their account. This action can be undone by an admin." %}</p>
+            <div class="ux-card ux-card--glass ux-card--danger">
+                <div class="ux-card__header">
+                    <h3 class="ux-card__title ux-color-danger">{% trans "Danger Zone" %}</h3>
+                </div>
+                <div class="ux-card__body">
+                    <p class="ux-text-secondary ux-mb-md">
+                        {% trans "Deleting an employee will deactivate their account. This action can be undone by an admin." %}
+                    </p>
 
-                <template x-if="!confirmDelete">
-                    <div>
-                        {% ui_button expand="block" fill="outline" color="danger" label=_("Delete Employee") icon="trash-outline" x_click="confirmDelete = true" %}
-                    </div>
-                </template>
+                    <!-- Initial Delete Button -->
+                    <template x-if="!confirmDelete">
+                        <button type="button"
+                                class="ux-button ux-button--block ux-button--outline ux-color-danger"
+                                @click="confirmDelete = true">
+                            {% icon "trash-outline" %}
+                            {% trans "Delete Employee" %}
+                        </button>
+                    </template>
 
-                <template x-if="confirmDelete">
-                    <div>
-                        <p class="text-danger fw-semibold ion-margin-bottom">{% trans "Are you sure you want to delete this employee?" %}</p>
-                        <div class="d-flex gap-sm">
-                            {% ui_button fill="outline" color="medium" label=_("Cancel") x_click="confirmDelete = false" %}
-                            {% ui_button color="danger" label=_("Yes, Delete") icon="trash-outline" hx_post=employee_delete_url hx_target="#main-content-area" hx_push_url=employees_url %}
+                    <!-- Confirmation Dialog -->
+                    <template x-if="confirmDelete">
+                        <div>
+                            <p class="ux-text-danger ux-fw-semibold ux-mb-md">
+                                {% trans "Are you sure you want to delete this employee?" %}
+                            </p>
+                            <div class="ux-button-group">
+                                <button type="button"
+                                        class="ux-button ux-button--outline"
+                                        @click="confirmDelete = false">
+                                    {% trans "Cancel" %}
+                                </button>
+                                <button type="button"
+                                        class="ux-button ux-color-danger"
+                                        hx-post="{{ employee_delete_url }}"
+                                        hx-target="#main-content-area"
+                                        hx-push-url="{{ employees_url }}">
+                                    {% icon "trash-outline" %}
+                                    {% trans "Yes, Delete" %}
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                </template>
-            {% endui_form_card %}
+                    </template>
+                </div>
+            </div>
             {% endif %}
         </div>
-    {% endfill %}
-{% endcomponent %}
+    </div>
+</div>

@@ -1,7 +1,7 @@
 """
 UI Components - Django Template Tags
 
-Encapsulates Ionic components so views don't need to know about Ionic internals.
+Encapsulates @erplora/ux components so views don't need to know about CSS internals.
 
 Usage:
     {% load ui %}
@@ -112,7 +112,7 @@ class CardNode(BlockTagNode):
         hx_swap = kwargs.get('hx_swap', '')
 
         # Build attributes string
-        attrs = [f'class="ui-card{" " + css_class if css_class else ""}"']
+        attrs = [f'class="ux-card{" " + css_class if css_class else ""}"']
         if hx_get:
             attrs.append(f'hx-get="{hx_get}"')
         if hx_post:
@@ -125,17 +125,17 @@ class CardNode(BlockTagNode):
             attrs.append(f'hx-swap="{hx_swap}"')
 
         # Build card HTML
-        html = f'<ion-card {" ".join(attrs)}>'
+        html = f'<div {" ".join(attrs)}>'
 
         if title:
-            html += '<ion-card-header>'
-            html += f'<ion-card-title>{title}</ion-card-title>'
+            html += '<div class="ux-card__header">'
+            html += f'<h3 class="ux-card__title">{title}</h3>'
             if subtitle:
-                html += f'<ion-card-subtitle>{subtitle}</ion-card-subtitle>'
-            html += '</ion-card-header>'
+                html += f'<p class="ux-text-secondary">{subtitle}</p>'
+            html += '</div>'
 
-        html += f'<ion-card-content>{content}</ion-card-content>'
-        html += '</ion-card>'
+        html += f'<div class="ux-card__body">{content}</div>'
+        html += '</div>'
 
         return html
 
@@ -143,7 +143,7 @@ class CardNode(BlockTagNode):
 @register.tag('ui_card')
 def do_ui_card(parser, token):
     """
-    Block tag for ion-card with content.
+    Block tag for card with content.
 
     Usage:
         {% ui_card title="My Card" subtitle="Optional" %}
@@ -162,27 +162,19 @@ class ListNode(BlockTagNode):
     def render(self, context):
         args, kwargs = self.resolve_args(context)
         content = self.nodelist.render(context)
-
-        lines = kwargs.get('lines', 'full')
-        inset = kwargs.get('inset', False)
         css_class = kwargs.get('css_class', '')
 
-        attrs = [f'lines="{lines}"']
-        if inset:
-            attrs.append('inset="true"')
-        if css_class:
-            attrs.append(f'class="{css_class}"')
-
-        return f'<ion-list {" ".join(attrs)}>{content}</ion-list>'
+        class_str = f'ux-list{" " + css_class if css_class else ""}'
+        return f'<div class="{class_str}">{content}</div>'
 
 
 @register.tag('ui_list')
 def do_ui_list(parser, token):
     """
-    Block tag for ion-list.
+    Block tag for list.
 
     Usage:
-        {% ui_list lines="none" %}
+        {% ui_list %}
             {% ui_list_item label="Item 1" %}
         {% endui_list %}
     """
@@ -200,25 +192,23 @@ class HeaderNode(BlockTagNode):
         content = self.nodelist.render(context)
 
         title = kwargs.get('title', '')
-        title_class = kwargs.get('title_class', 'header-title')
-        color = kwargs.get('color', '')
+        title_class = kwargs.get('title_class', 'ux-toolbar__title')
         css_class = kwargs.get('css_class', '')
 
         # Build header HTML
-        header_class = f' class="{css_class}"' if css_class else ''
-        toolbar_color = f' color="{color}"' if color else ''
+        header_class = f' {css_class}' if css_class else ''
 
-        html = f'<ion-header{header_class}>'
-        html += f'<ion-toolbar{toolbar_color}>'
+        html = f'<header class="ux-header{header_class}">'
+        html += '<div class="ux-toolbar">'
 
         # Content includes slots (start buttons, title, end buttons)
         html += content
 
         # Add title if provided and not already in content
         if title and '<!-- title -->' not in content:
-            html += f'<ion-title class="{title_class}">{title}</ion-title>'
+            html += f'<div class="ux-toolbar__center"><h1 class="{title_class}">{title}</h1></div>'
 
-        html += '</ion-toolbar></ion-header>'
+        html += '</div></header>'
 
         return html
 
@@ -235,7 +225,6 @@ def do_ui_header(parser, token):
             {% endui_buttons_start %}
             {% ui_buttons_end %}
                 {% ui_theme_toggle %}
-                {% ui_user_avatar_button %}
             {% endui_buttons_end %}
         {% endui_header %}
     """
@@ -254,7 +243,7 @@ class ButtonsSlotNode(BlockTagNode):
 
     def render(self, context):
         content = self.nodelist.render(context)
-        return f'<ion-buttons slot="{self.slot}">{content}</ion-buttons>'
+        return f'<div class="ux-toolbar__{self.slot}">{content}</div>'
 
 
 @register.tag('ui_buttons_start')
@@ -276,10 +265,10 @@ def do_ui_buttons_end(parser, token):
 
 
 @register.simple_tag
-def ui_title(text, css_class="header-title"):
-    """Render ion-title."""
+def ui_title(text, css_class="ux-toolbar__title"):
+    """Render toolbar title."""
     class_attr = f' class="{css_class}"' if css_class else ''
-    return mark_safe(f'<!-- title --><ion-title{class_attr}>{text}</ion-title>')
+    return mark_safe(f'<!-- title --><div class="ux-toolbar__center"><h1{class_attr}>{text}</h1></div>')
 
 
 # Keep ui_toolbar as alias for backwards compatibility
@@ -314,9 +303,9 @@ class TabbarNode(BlockTagNode):
         content = self.nodelist.render(context)
 
         css_class = kwargs.get('css_class', '')
-        class_attr = f' class="{css_class}"' if css_class else ''
+        class_attr = f' {css_class}' if css_class else ''
 
-        return f'<ion-footer><ion-tab-bar{class_attr}>{content}</ion-tab-bar></ion-footer>'
+        return f'<footer class="ux-footer"><div class="ux-tab-bar ux-tab-bar--bottom{class_attr}">{content}</div></footer>'
 
 
 @register.tag('ui_tabbar')
@@ -355,16 +344,16 @@ class FormCardNode(BlockTagNode):
         # Get CSRF token from context
         csrf_token = context.get('csrf_token', '')
 
-        html = f'<ion-card class="ui-form-card{" " + css_class if css_class else ""}">'
+        html = f'<div class="ux-card{" " + css_class if css_class else ""}">'
 
         if title:
-            html += '<ion-card-header>'
-            html += f'<ion-card-title>{title}</ion-card-title>'
+            html += '<div class="ux-card__header">'
+            html += f'<h3 class="ux-card__title">{title}</h3>'
             if subtitle:
-                html += f'<ion-card-subtitle>{subtitle}</ion-card-subtitle>'
-            html += '</ion-card-header>'
+                html += f'<p class="ux-text-secondary">{subtitle}</p>'
+            html += '</div>'
 
-        html += '<ion-card-content>'
+        html += '<div class="ux-card__body">'
 
         # Form tag
         form_attrs = [f'method="{method}"']
@@ -382,7 +371,7 @@ class FormCardNode(BlockTagNode):
             html += f'<input type="hidden" name="csrfmiddlewaretoken" value="{csrf_token}">'
         html += content
         html += '</form>'
-        html += '</ion-card-content></ion-card>'
+        html += '</div></div>'
 
         return html
 
@@ -395,7 +384,6 @@ def do_ui_form_card(parser, token):
     Usage:
         {% ui_form_card title="Settings" hx_post="/save/" %}
             {% ui_input name="name" label="Name" %}
-            {% ui_form_actions submit_label="Save" %}
         {% endui_form_card %}
     """
     tag_name, args, kwargs = parse_token_args(parser, token)
@@ -432,24 +420,24 @@ def ui_button(
     **kwargs
 ):
     """
-    Render an Ionic button.
+    Render a UX button.
 
     Args:
         label: Button text
-        color: primary, secondary, success, warning, danger, light, medium, dark
-        fill: solid, outline, clear
-        size: small, default, large
-        expand: block, full (optional)
+        color: primary, secondary, success, warning, danger
+        fill: solid, outline, ghost
+        size: sm, default, lg
+        expand: block (optional)
         disabled: True/False
-        icon: Ionicon name (e.g., "add-outline")
-        icon_slot: start, end, icon-only
+        icon: Icon name (e.g., "add-outline")
+        icon_slot: start, end
         href: URL for link button
         hx_get/hx_post: HTMX attributes
         hx_target: HTMX target
         hx_swap: HTMX swap method
         hx_push_url: HTMX push URL
-        hx_confirm: HTMX confirmation dialog (preferred over Alpine.js)
-        x_click: Alpine.js @click handler (use only when HTMX can't solve it)
+        hx_confirm: HTMX confirmation dialog
+        x_click: Alpine.js @click handler
         x_show: Alpine.js x-show directive
         type: button, submit, reset
         css_class: Additional CSS classes
@@ -534,7 +522,7 @@ def ui_stat_card(
     Args:
         value: The main value to display
         label: Description label
-        icon: Ionicon name
+        icon: Icon name
         color: primary, success, warning, danger
         trend: up, down (optional)
         trend_value: Trend percentage or value
@@ -575,7 +563,7 @@ def ui_input(
     **kwargs
 ):
     """
-    Render an Ionic input field.
+    Render an input field.
 
     Args:
         name: Input name attribute
@@ -588,7 +576,7 @@ def ui_input(
         readonly: True/False
         helper_text: Help text below input
         error_text: Error message
-        icon: Ionicon name
+        icon: Icon name
         icon_slot: start, end
         label_placement: floating, stacked, fixed, start, end
         maxlength: Maximum input length
@@ -633,13 +621,12 @@ def ui_select(
     **kwargs
 ):
     """
-    Render an Ionic select.
+    Render a select dropdown.
 
     Args:
         options: List of dicts with 'value' and 'label' keys,
                  or list of tuples (value, label)
         label_placement: floating, stacked, fixed, start, end
-        interface: popover, action-sheet, alert
     """
     # Normalize options format
     normalized_options = []
@@ -696,10 +683,10 @@ def ui_file_input(
         multiple: Allow multiple file selection
         required: Mark as required
         disabled: Disable the input
-        icon: Ionicon name for button
-        color: Button color (primary, medium, etc.)
-        fill: Button fill (solid, outline, clear)
-        size: Button size (small, default, large)
+        icon: Icon name for button
+        color: Button color
+        fill: Button fill (solid, outline, ghost)
+        size: Button size (sm, default, lg)
         show_filename: Show selected filename next to button
         input_id: Custom input ID (defaults to name)
     """
@@ -740,12 +727,12 @@ def ui_list_item(
     **kwargs
 ):
     """
-    Render an Ionic list item.
+    Render a list item.
 
     Args:
         label: Main text
         detail: Secondary text
-        icon: Ionicon name (start slot)
+        icon: Icon name (start slot)
         avatar: Avatar image URL
         href: Link URL
         button: Make item clickable
@@ -773,7 +760,7 @@ def ui_list_item(
 
 @register.inclusion_tag("ui/badge.html")
 def ui_badge(label, color="primary", css_class=""):
-    """Render an Ionic badge."""
+    """Render a badge."""
     return {
         "label": label,
         "color": color,
@@ -791,7 +778,7 @@ def ui_chip(
     css_class="",
     **kwargs
 ):
-    """Render an Ionic chip."""
+    """Render a chip."""
     return {
         "label": label,
         "color": color,
@@ -857,7 +844,7 @@ def ui_empty_state(
     Args:
         title: Main message
         description: Secondary message
-        icon: Ionicon name
+        icon: Icon name
         action_label: Button text
         action_url: Button URL
         action_hx_get: HTMX get URL
@@ -959,34 +946,34 @@ def ui_page_header(
 
 @register.simple_tag
 def ui_grid_start(padding=True):
-    """Start an Ionic grid."""
-    padding_attr = "" if padding else ' class="ion-no-padding"'
-    return mark_safe(f"<ion-grid{padding_attr}>")
+    """Start a grid container."""
+    padding_class = "" if padding else ' style="padding:0"'
+    return mark_safe(f'<div class="container-fluid"{padding_class}>')
 
 
 @register.simple_tag
 def ui_grid_end():
-    """End an Ionic grid."""
-    return mark_safe("</ion-grid>")
+    """End a grid container."""
+    return mark_safe("</div>")
 
 
 @register.simple_tag
 def ui_row_start(css_class=""):
-    """Start an Ionic row."""
-    class_attr = f' class="{css_class}"' if css_class else ""
-    return mark_safe(f"<ion-row{class_attr}>")
+    """Start a grid row."""
+    class_attr = f' class="row {css_class}"' if css_class else ' class="row"'
+    return mark_safe(f"<div{class_attr}>")
 
 
 @register.simple_tag
 def ui_row_end():
-    """End an Ionic row."""
-    return mark_safe("</ion-row>")
+    """End a grid row."""
+    return mark_safe("</div>")
 
 
 @register.simple_tag
 def ui_col_start(size="12", size_sm=None, size_md=None, size_lg=None, size_xl=None, css_class=""):
     """
-    Start an Ionic column.
+    Start a grid column using Bootstrap grid classes.
 
     Args:
         size: Default column size (1-12)
@@ -995,24 +982,24 @@ def ui_col_start(size="12", size_sm=None, size_md=None, size_lg=None, size_xl=No
         size_lg: Size at lg breakpoint
         size_xl: Size at xl breakpoint
     """
-    attrs = [f'size="{size}"']
+    classes = [f'col-{size}']
     if size_sm:
-        attrs.append(f'size-sm="{size_sm}"')
+        classes.append(f'col-sm-{size_sm}')
     if size_md:
-        attrs.append(f'size-md="{size_md}"')
+        classes.append(f'col-md-{size_md}')
     if size_lg:
-        attrs.append(f'size-lg="{size_lg}"')
+        classes.append(f'col-lg-{size_lg}')
     if size_xl:
-        attrs.append(f'size-xl="{size_xl}"')
+        classes.append(f'col-xl-{size_xl}')
     if css_class:
-        attrs.append(f'class="{css_class}"')
-    return mark_safe(f"<ion-col {' '.join(attrs)}>")
+        classes.append(css_class)
+    return mark_safe(f'<div class="{" ".join(classes)}">')
 
 
 @register.simple_tag
 def ui_col_end():
-    """End an Ionic column."""
-    return mark_safe("</ion-col>")
+    """End a grid column."""
+    return mark_safe("</div>")
 
 
 # =============================================================================
@@ -1039,7 +1026,7 @@ def ui_nav_item(
 
     Args:
         label: Item text
-        icon: Ionicon name
+        icon: Icon name
         url: Navigation URL
         hx_get: HTMX URL
         hx_target: HTMX target
@@ -1097,7 +1084,7 @@ def ui_tab_button(
 
     Args:
         label: Tab label
-        icon: Ionicon name
+        icon: Icon name
         url: Navigation URL
         hx_get: HTMX URL
         hx_target: HTMX target
@@ -1202,53 +1189,45 @@ def ui_theme_toggle(css_class=""):
 
 @register.simple_tag
 def ui_list_start(lines="full", inset=False, css_class=""):
-    """Start an ion-list."""
-    attrs = []
-    if lines:
-        attrs.append(f'lines="{lines}"')
-    if inset:
-        attrs.append('inset="true"')
-    if css_class:
-        attrs.append(f'class="{css_class}"')
-    return mark_safe(f"<ion-list {' '.join(attrs)}>")
+    """Start a list."""
+    class_str = f'ux-list{" " + css_class if css_class else ""}'
+    return mark_safe(f'<div class="{class_str}">')
 
 
 @register.simple_tag
 def ui_list_end():
-    """End an ion-list."""
-    return mark_safe("</ion-list>")
+    """End a list."""
+    return mark_safe("</div>")
 
 
 @register.simple_tag
 def ui_tabbar_start(css_class=""):
-    """Start an ion-tab-bar."""
-    class_attr = f' class="{css_class}"' if css_class else ""
-    return mark_safe(f"<ion-footer><ion-tab-bar{class_attr}>")
+    """Start a tab bar."""
+    class_attr = f' {css_class}' if css_class else ""
+    return mark_safe(f'<footer class="ux-footer"><div class="ux-tab-bar ux-tab-bar--bottom{class_attr}">')
 
 
 @register.simple_tag
 def ui_tabbar_end():
-    """End an ion-tab-bar."""
-    return mark_safe("</ion-tab-bar></ion-footer>")
+    """End a tab bar."""
+    return mark_safe("</div></footer>")
 
 
 @register.simple_tag
 def ui_content_start(padding=True, fullscreen=False, css_class=""):
-    """Start an ion-content area."""
-    attrs = []
-    if not padding:
-        attrs.append('class="ion-no-padding"')
-    elif css_class:
-        attrs.append(f'class="{css_class}"')
-    if fullscreen:
-        attrs.append('fullscreen="true"')
-    return mark_safe(f"<ion-content {' '.join(attrs)}>")
+    """Start a content area."""
+    classes = ['ux-content']
+    if padding:
+        classes.append('ux-padding')
+    if css_class:
+        classes.append(css_class)
+    return mark_safe(f'<div class="{" ".join(classes)}">')
 
 
 @register.simple_tag
 def ui_content_end():
-    """End an ion-content area."""
-    return mark_safe("</ion-content>")
+    """End a content area."""
+    return mark_safe("</div>")
 
 
 # =============================================================================
@@ -1305,27 +1284,25 @@ def ui_header_action_button(icon, alpine_click=None, onclick=None, color="", css
     Render a simple header action button.
 
     Args:
-        icon: Ionicon name
+        icon: Icon name
         alpine_click: Alpine.js @click handler
         onclick: JavaScript onclick handler
         color: Button color
         css_class: Additional CSS classes
     """
-    attrs = []
+    attrs = ['class="ux-icon-button']
+    if css_class:
+        attrs[0] += f' {css_class}'
+    attrs[0] += '"'
     if alpine_click:
         attrs.append(f'@click="{alpine_click}"')
     if onclick:
         attrs.append(f'onclick="{onclick}"')
-    if color:
-        attrs.append(f'color="{color}"')
-    if css_class:
-        attrs.append(f'class="{css_class}"')
 
     attrs_str = ' '.join(attrs)
-    # Import djicons to render the icon
     from djicons import icon as render_icon
-    icon_html = render_icon(icon, slot="icon-only")
-    return mark_safe(f'<ion-button {attrs_str}>{icon_html}</ion-button>')
+    icon_html = render_icon(icon)
+    return mark_safe(f'<button {attrs_str}>{icon_html}</button>')
 
 
 # =============================================================================
@@ -1378,7 +1355,7 @@ class SidebarNavNode(BlockTagNode):
 
         class_attr = f' class="sidebar-menu {css_class}"' if css_class else ' class="sidebar-menu"'
 
-        return f'<nav id="sidebar-nav"{class_attr}><ion-list id="sidebar-nav-list">{content}</ion-list></nav>'
+        return f'<nav id="sidebar-nav"{class_attr}><div class="ux-list" id="sidebar-nav-list">{content}</div></nav>'
 
 
 @register.tag('ui_sidebar_nav')
@@ -1402,15 +1379,7 @@ class SidebarContentNode(BlockTagNode):
 
     def render(self, context):
         content = self.nodelist.render(context)
-        # Check if content contains ion-footer and extract it
-        # The ion-footer should be rendered outside ion-content for proper positioning
-        import re
-        footer_match = re.search(r'(<ion-footer[^>]*>.*?</ion-footer>)', content, re.DOTALL)
-        footer_html = ''
-        if footer_match:
-            footer_html = footer_match.group(1)
-            content = content.replace(footer_html, '')
-        return f'<ion-content id="sidebar-content"><div id="sidebar-wrapper" class="sidebar-wrapper">{content}</div></ion-content>{footer_html}'
+        return f'<div class="ux-content" id="sidebar-content"><div id="sidebar-wrapper" class="sidebar-wrapper">{content}</div></div>'
 
 
 @register.tag('ui_sidebar_content')
@@ -1436,7 +1405,7 @@ class AccordionGroupNode(BlockTagNode):
 
     def render(self, context):
         content = self.nodelist.render(context)
-        return f'<ion-accordion-group>{content}</ion-accordion-group>'
+        return f'<div class="ux-accordion-group">{content}</div>'
 
 
 @register.tag('ui_accordion_group')
@@ -1468,15 +1437,15 @@ class AccordionNode(BlockTagNode):
         header_icon = kwargs.get('header_icon', '')
         css_class = kwargs.get('css_class', '')
 
-        html = '<ion-accordion>'
-        html += f'<ion-item slot="header" class="nav-item{" " + css_class if css_class else ""}">'
+        html = f'<div class="ux-accordion{" " + css_class if css_class else ""}" x-data="{{ open: false }}">'
+        html += f'<button class="ux-accordion__header nav-item" @click="open = !open">'
         if header_icon:
             from djicons import icon as render_icon
-            html += render_icon(header_icon, slot="start")
-        html += f'<ion-label>{header_label}</ion-label>'
-        html += '</ion-item>'
-        html += f'<div slot="content" class="submenu-content">{content}</div>'
-        html += '</ion-accordion>'
+            html += render_icon(header_icon)
+        html += f'<span>{header_label}</span>'
+        html += '</button>'
+        html += f'<div class="ux-accordion__content submenu-content" x-show="open" x-cloak>{content}</div>'
+        html += '</div>'
 
         return html
 
@@ -1514,7 +1483,7 @@ def ui_submenu_item(
 
     Args:
         label: Item text
-        icon: Ionicon name
+        icon: Icon name
         url: Navigation URL
         hx_get: HTMX URL
         hx_target: HTMX target
@@ -1541,7 +1510,7 @@ def ui_empty_nav_item(label, icon="information-circle-outline", css_class=""):
 
     Args:
         label: Item text
-        icon: Ionicon name
+        icon: Icon name
     """
     return {
         "label": label,
@@ -1627,9 +1596,9 @@ def ui_module_app_icon(
     Args:
         module_id: Unique identifier for the module
         label: Display name
-        icon: Ionicon name (e.g., "cube-outline")
+        icon: Icon name (e.g., "cube-outline")
         url: Navigation URL
-        color: Background color (primary, success, warning, danger, medium, etc.)
+        color: Background color (primary, success, warning, danger, etc.)
         badge: Badge text (e.g., notification count)
         badge_color: Badge color
         is_favorite: Show star indicator
@@ -1675,9 +1644,9 @@ class ModuleSectionNode(BlockTagNode):
 
         if action_label:
             if action_hx_get:
-                html += f'<ion-button fill="clear" size="small" hx-get="{action_hx_get}" hx-target="#main-content-area" hx-push-url="true">{action_label}</ion-button>'
+                html += f'<button class="ux-button ux-button--ghost ux-button--sm" hx-get="{action_hx_get}" hx-target="#main-content-area" hx-push-url="true">{action_label}</button>'
             elif action_url:
-                html += f'<ion-button fill="clear" size="small" href="{action_url}">{action_label}</ion-button>'
+                html += f'<a class="ux-button ux-button--ghost ux-button--sm" href="{action_url}">{action_label}</a>'
 
         html += '</div>'
         html += f'<div class="module-grid">{content}</div>'
@@ -1737,7 +1706,7 @@ def do_ui_module_grid(parser, token):
 @register.inclusion_tag('ui/tabbar.html', takes_context=True)
 def ui_tabbar(context, tabs=None, current_view=None):
     """
-    Renders an ion-tab-bar with the given tabs.
+    Renders a tab bar with the given tabs.
 
     Usage:
         {% ui_tabbar tabs=module_tabs current_view=current_view %}
@@ -1751,7 +1720,7 @@ def ui_tabbar(context, tabs=None, current_view=None):
 
     Each tab dict can have:
         - url: Django URL name (required) - will be resolved with {% url %}
-        - icon: Ionicon name (required)
+        - icon: Icon name (required)
         - label: Tab label text (required)
         - view: View identifier to match current_view for active state (optional)
         - disabled: If True, tab is disabled (optional)
@@ -1768,7 +1737,7 @@ def ui_tabbar(context, tabs=None, current_view=None):
 @register.simple_tag(takes_context=True)
 def ui_tabbar_oob(context, tabs=None, current_view=None):
     """
-    Renders an ion-tab-bar with OOB swap for HTMX navigation.
+    Renders a tab bar with OOB swap for HTMX navigation.
 
     Usage in content partials:
         {% if request.htmx %}
@@ -1791,18 +1760,16 @@ def ui_tabbar_oob(context, tabs=None, current_view=None):
 @register.inclusion_tag('ui/tab.html', takes_context=True)
 def ui_tab(context, url, icon, label, active=False, disabled=False, badge=None, badge_color='danger'):
     """
-    Renders a single ion-tab-button for use in module layouts.
+    Renders a single tab button for use in module layouts.
 
     Usage:
         {% ui_tab url="inventory:dashboard" icon="grid-outline" label=_("Overview") active=True %}
         {% ui_tab url="inventory:products" icon="cube-outline" label=_("Products") %}
-        {% ui_tab url="inventory:settings" icon="settings-outline" label=_("Settings") disabled=True %}
-        {% ui_tab url="marketplace:cart" icon="cart-outline" label=_("Cart") badge=cart_count badge_color="danger" %}
 
     Args:
-        url: Django URL name (required) - will be resolved with {% url %}
-        icon: Ionicon name (required)
-        label: Tab label text (required) - use _("text") for translation
+        url: Django URL name (required)
+        icon: Icon name (required)
+        label: Tab label text (required)
         active: If True, tab is marked as selected (optional)
         disabled: If True, tab is disabled (optional)
         badge: Badge text to show (optional)

@@ -1,16 +1,16 @@
-{# Single tab button for ion-tab-bar #}
+{# Single tab button for ux-tab-bar #}
 {% load djicons %}
-<ion-tab-button
+<button
+    class="ux-tab-button{% if active %} tab-selected{% endif %}"
     {% if not disabled %}
     hx-get="{% url url %}"
     hx-target="#main-content-area"
     hx-push-url="true"
     {% endif %}
-    {% if disabled %}disabled{% endif %}
-    {% if active %}class="tab-selected"{% endif %}>
+    {% if disabled %}disabled{% endif %}>
     {% icon icon %}
-    <ion-label>{{ label }}</ion-label>
+    <span>{{ label }}</span>
     {% if badge %}
-    <ion-badge color="{{ badge_color }}">{{ badge }}</ion-badge>
+    <span class="ux-badge ux-color-{{ badge_color }}">{{ badge }}</span>
     {% endif %}
-</ion-tab-button>
+</button>

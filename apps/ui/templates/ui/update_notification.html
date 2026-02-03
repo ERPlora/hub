@@ -1,8 +1,8 @@
 {% load i18n ui djicons %}
 <!-- Update notification banner -->
 <div id="update-notification" class="ui-alert-banner ui-alert-banner--warning">
-    <ion-card>
-        <ion-card-content>
+    <div class="ux-card">
+        <div class="ux-card__body">
             <div class="ui-alert-content">
                 <div class="ui-alert-icon">
                     {% icon "cloud-download-outline" %}
@@ -16,14 +16,14 @@
                 </div>
                 <div class="ui-alert-actions">
                     {% ui_button label=_("View details") size="small" color="warning" hx_get="/settings/" hx_target="#main-content-area" hx_push_url="true" %}
-                    <ion-button size="small" fill="clear"
+                    <button class="ux-button ux-button--clear ux-button--small"
                                 hx-get="/htmx/update-notification/dismiss/"
                                 hx-target="#update-notification"
                                 hx-swap="outerHTML">
-                        {% icon "close-outline" slot="icon-only" %}
-                    </ion-button>
+                        {% icon "close-outline" %}
+                    </button>
                 </div>
             </div>
-        </ion-card-content>
-    </ion-card>
+        </div>
+    </div>
 </div>

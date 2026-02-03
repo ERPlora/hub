@@ -1,6 +1,5 @@
 /* ==========================================================================
    RESET CSS - Minimal reset for ERPlora
-   Let Ionic handle most styling natively
    ========================================================================== */
 
 /* Box sizing */
@@ -83,11 +82,10 @@ svg {
 }
 
 /* ==========================================================================
-   MINIMAL UTILITIES (only what Ionic doesn't provide)
-   Use ion-padding, ion-margin, ion-text-* when possible
+   MINIMAL UTILITIES (supplementary helpers)
    ========================================================================== */
 
-/* Flex utilities - Ionic uses ion-justify-content-* but no gap */
+/* Flex utilities */
 .d-flex { display: flex; }
 .flex-1 { flex: 1; }
 .align-center { align-items: center; }
@@ -95,7 +93,7 @@ svg {
 .justify-between { justify-content: space-between; }
 .flex-wrap { flex-wrap: wrap; }
 
-/* Gap - Ionic doesn't provide */
+/* Gap utilities */
 .gap-xs { gap: 4px; }
 .gap-sm { gap: 8px; }
 .gap-md { gap: 16px; }
@@ -110,14 +108,14 @@ svg {
 /* Margin reset */
 .m-0 { margin: 0; }
 
-/* Margin utilities - use ion-margin-* when possible */
+/* Margin utilities */
 .mt-sm { margin-top: 12px; }
 .mt-md { margin-top: 16px; }
 .mb-xxs { margin-bottom: 4px; }
 .mb-sm { margin-bottom: 12px; }
 .mb-md { margin-bottom: 16px; }
 
-/* Padding utilities - use ion-padding-* when possible */
+/* Padding utilities */
 .py-lg { padding-top: 24px; padding-bottom: 24px; }
 .py-xl { padding-top: 32px; padding-bottom: 32px; }
 
@@ -134,7 +132,7 @@ svg {
 .fw-semibold { font-weight: 600; }
 .fw-bold { font-weight: 700; }
 
-/* Text color utilities - use ion-text color="" when possible */
+/* Text color utilities */
 .text-primary { color: var(--ion-color-primary); }
 .text-medium { color: var(--ion-color-medium); }
 .text-danger { color: var(--ion-color-danger); }

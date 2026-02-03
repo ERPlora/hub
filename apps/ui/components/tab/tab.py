@@ -1,5 +1,5 @@
 """
-tab component - Single tab button for ion-tab-bar.
+tab component - Single tab button for tab bar navigation.
 
 Usage with SVG icon (recommended):
     {% with cv=current_view %}
@@ -7,7 +7,7 @@ Usage with SVG icon (recommended):
     {% component "tab" url="inventory:products_list" icon_svg="inventory/icons/products.svg" label=_("Products") view="products" current_view=cv %}{% endcomponent %}
     {% endwith %}
 
-Usage with Ionicon (fallback):
+Usage with djicons icon (fallback):
     {% component "tab" url="inventory:dashboard" icon="grid-outline" label=_("Overview") view="dashboard" current_view=cv %}{% endcomponent %}
 
 The 'view' parameter is compared with 'current_view' to determine active state.
@@ -38,7 +38,7 @@ class Tab(Component):
         Args:
             url: Django URL name (required) - will be resolved with {% url %}
             label: Tab label text (required) - use _("text") for translation
-            icon: Ionicon name (optional, fallback if no icon_svg)
+            icon: djicons icon name (optional, fallback if no icon_svg)
             icon_svg: Path to SVG icon in static folder (e.g., "inventory/icons/overview.svg")
             view: View identifier for this tab
             current_view: Current active view - compared with view for active state

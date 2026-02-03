@@ -1,5 +1,5 @@
 """
-Marketplace Views - Multi-store marketplace with ion-menu filters and cart
+Marketplace Views - Multi-store marketplace with sidebar filters and cart
 
 Supports multiple store types:
 - modules: Software modules from Cloud
@@ -65,7 +65,7 @@ def get_store_config(store_type):
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/marketplace_content.html')
 def store_index(request, store_type='modules'):
     """
-    Main marketplace view with ion-menus for filters and cart.
+    Main marketplace view with sidebar filters and cart.
     """
     from apps.configuration.models import HubConfig
 
@@ -223,9 +223,9 @@ def cart_add(request, store_type):
     }, request=request)
 
     badge_html = f'''
-    <ion-badge id="cart-badge" color="danger" hx-swap-oob="true">
+    <span id="cart-badge" class="ux-badge ux-badge--danger" hx-swap-oob="true">
         {len(cart['items'])}
-    </ion-badge>
+    </span>
     '''
 
     return HttpResponse(html + badge_html)
@@ -249,9 +249,9 @@ def cart_remove(request, store_type, item_id):
 
     badge_count = len(cart['items'])
     badge_html = f'''
-    <ion-badge id="cart-badge" color="danger" hx-swap-oob="true" {'style="display:none"' if badge_count == 0 else ''}>
+    <span id="cart-badge" class="ux-badge ux-badge--danger" hx-swap-oob="true" {'style="display:none"' if badge_count == 0 else ''}>
         {badge_count}
-    </ion-badge>
+    </span>
     '''
 
     return HttpResponse(html + badge_html)
@@ -271,9 +271,9 @@ def cart_clear(request, store_type):
     }, request=request)
 
     badge_html = '''
-    <ion-badge id="cart-badge" color="danger" hx-swap-oob="true" style="display:none">
+    <span id="cart-badge" class="ux-badge ux-badge--danger" hx-swap-oob="true" style="display:none">
         0
-    </ion-badge>
+    </span>
     '''
 
     return HttpResponse(html + badge_html)

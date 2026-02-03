@@ -12,15 +12,14 @@
         class="ui-file-input__native"
         onchange="updateFileInputLabel(this)"
     >
-    <ion-button
-        fill="{{ fill|default:'outline' }}"
-        color="{{ color|default:'medium' }}"
-        size="{{ size|default:'default' }}"
+    <button
+        type="button"
+        class="ux-button ux-button--outline"
         {% if disabled %}disabled{% endif %}
         onclick="this.parentElement.querySelector('input[type=file]').click()">
-        {% icon icon|default:"cloud-upload-outline" slot="start" %}
+        {% icon icon|default:"cloud-upload-outline" %}
         <span class="ui-file-input__label">{{ label|default:"Choose file" }}</span>
-    </ion-button>
+    </button>
     {% if show_filename %}
     <span class="ui-file-input__filename" id="{{ input_id|default:name }}-filename"></span>
     {% endif %}
@@ -30,12 +29,11 @@
 .ui-file-input {
     display: flex;
     align-items: center;
-    gap: var(--space-sm, 8px);
+    gap: var(--ux-space-sm, 8px);
     flex-wrap: wrap;
 }
 
 .ui-file-input__native {
-    /* Completely hide the native file input */
     position: absolute;
     width: 1px;
     height: 1px;
@@ -49,7 +47,7 @@
 
 .ui-file-input__filename {
     font-size: 13px;
-    color: var(--ion-color-medium);
+    color: var(--ux-text-secondary);
     max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -30,7 +30,7 @@ def format_file_size(size_bytes: int) -> str:
 
 
 def get_file_icon(filename: str, is_dir: bool = False) -> str:
-    """Get Ionicon name for file type."""
+    """Get icon name for file type."""
     if is_dir:
         return 'folder'
 

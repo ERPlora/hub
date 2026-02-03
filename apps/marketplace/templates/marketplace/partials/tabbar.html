@@ -1,10 +1,52 @@
-{% load i18n component_tags %}
+{% load i18n djicons %}
 
-{% component "tabbar" oob=oob %}
-    {% fill "tabs" %}
-    {% component "tab" url="marketplace:index" icon="cube-outline" label=_("Modules") view="modules" current_view=store_type %}{% endcomponent %}
-    {% component "tab" url="marketplace:store_hubs" icon="server-outline" label=_("Hubs") view="hubs" current_view=store_type %}{% endcomponent %}
-    {% component "tab" url="marketplace:index" icon="hardware-chip-outline" label=_("Components") disabled=True badge=_("Soon") badge_color="medium" %}{% endcomponent %}
-    {% component "tab" url="marketplace:cart_page" icon="cart-outline" label=_("Cart") view="cart" current_view=current_view badge=cart_count badge_color="danger" %}{% endcomponent %}
-    {% endfill %}
-{% endcomponent %}
+{# Marketplace Tab Bar using @erplora/ux #}
+<nav class="ux-tab-bar ux-tab-bar--bottom" {% if oob %}hx-swap-oob="true" id="global-tabbar"{% endif %}>
+    {# Modules Tab #}
+    <a href="{% url 'marketplace:index' %}"
+       class="ux-tab-button ux-tab-button--layout-icon-top {% if store_type == 'modules' %}ux-tab-button--selected{% endif %}"
+       hx-get="{% url 'marketplace:index' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
+        <span class="ux-tab-button__icon">
+            {% icon "cube-outline" %}
+        </span>
+        <span class="ux-tab-button__label">{% trans "Modules" %}</span>
+    </a>
+
+    {# Hubs Tab #}
+    <a href="{% url 'marketplace:store_hubs' %}"
+       class="ux-tab-button ux-tab-button--layout-icon-top {% if store_type == 'hubs' %}ux-tab-button--selected{% endif %}"
+       hx-get="{% url 'marketplace:store_hubs' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
+        <span class="ux-tab-button__icon">
+            {% icon "server-outline" %}
+        </span>
+        <span class="ux-tab-button__label">{% trans "Hubs" %}</span>
+    </a>
+
+    {# Components Tab (Coming Soon) #}
+    <span class="ux-tab-button ux-tab-button--layout-icon-top ux-tab-button--disabled">
+        <span class="ux-tab-button__icon">
+            {% icon "hardware-chip-outline" %}
+        </span>
+        <span class="ux-tab-button__label">{% trans "Components" %}</span>
+        <span class="ux-tab-button__badge">{% trans "Soon" %}</span>
+    </span>
+
+    {# Cart Tab #}
+    <a href="{% url 'marketplace:cart_page' %}"
+       class="ux-tab-button ux-tab-button--layout-icon-top {% if current_view == 'cart' %}ux-tab-button--selected{% endif %}"
+       hx-get="{% url 'marketplace:cart_page' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
+        <span class="ux-tab-button__icon">
+            {% icon "cart-outline" %}
+        </span>
+        <span class="ux-tab-button__label">{% trans "Cart" %}</span>
+        {% if cart_count %}
+        <span class="ux-tab-button__badge">{{ cart_count }}</span>
+        {% endif %}
+    </a>
+</nav>

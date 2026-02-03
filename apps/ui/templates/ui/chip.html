@@ -1,14 +1,12 @@
-{% load djicons %}<ion-chip
-    color="{{ color }}"
-    {% if outline %}outline="true"{% endif %}
-    {% if css_class %}class="{{ css_class }}"{% endif %}
+{% load djicons %}<span
+    class="ux-chip{% if color %} ux-color-{{ color }}{% endif %}{% if outline %} ux-chip--outline{% endif %}{% if css_class %} {{ css_class }}{% endif %}"
     {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
 >
     {% if icon %}
     {% icon icon %}
     {% endif %}
-    <ion-label>{{ label }}</ion-label>
+    <span>{{ label }}</span>
     {% if closable %}
     {% icon "close-circle" %}
     {% endif %}
-</ion-chip>
+</span>

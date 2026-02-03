@@ -1,36 +1,128 @@
-{% load i18n ui djicons %}
+{% load i18n djicons %}
 
-{% ui_grid_start padding=False %}
-    {% ui_row_start %}
+{% if local_users %}
+<!-- Desktop: DataTable View -->
+<div class="ux-hide-mobile">
+    <div class="ux-datatable">
+        <table class="ux-datatable__table">
+            <thead class="ux-datatable__thead">
+                <tr>
+                    <th class="ux-datatable__th">{% trans "Employee" %}</th>
+                    <th class="ux-datatable__th">{% trans "Email" %}</th>
+                    <th class="ux-datatable__th">{% trans "Role" %}</th>
+                    <th class="ux-datatable__th ux-datatable__th--actions">{% trans "Actions" %}</th>
+                </tr>
+            </thead>
+            <tbody class="ux-datatable__tbody">
+                {% for user in local_users %}
+                <tr class="ux-datatable__tr ux-datatable__tr--clickable"
+                    hx-get="{% url 'main:employee_edit' user.id %}"
+                    hx-target="#main-content-area"
+                    hx-push-url="true">
+                    <td class="ux-datatable__td">
+                        <div class="ux-datatable__cell-flex">
+                            {% if user.avatar %}
+                            <div class="ux-avatar ux-avatar--md" style="background-image: url('{{ user.avatar.url }}');"></div>
+                            {% else %}
+                            <div class="ux-avatar ux-avatar--md ux-avatar--{{ user.get_role_color|default:'primary' }}">
+                                <span class="ux-avatar__initials">{{ user.get_initials }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="ux-datatable__cell-info">
+                                <span class="ux-datatable__cell-title">{{ user.name }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="ux-datatable__td">
+                        <span class="ux-text-secondary">{{ user.email }}</span>
+                    </td>
+                    <td class="ux-datatable__td">
+                        <span class="ux-badge ux-badge--{{ user.get_role_color|default:'primary' }}">
+                            {{ user.get_role_display }}
+                        </span>
+                    </td>
+                    <td class="ux-datatable__td ux-datatable__td--actions" onclick="event.stopPropagation();">
+                        <button class="ux-icon-btn ux-icon-btn--sm ux-icon-btn--primary"
+                                hx-get="{% url 'main:employee_edit' user.id %}"
+                                hx-target="#main-content-area"
+                                hx-push-url="true"
+                                title="{% trans 'Edit' %}">
+                            {% icon "create-outline" %}
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Mobile: Card View -->
+<div class="ux-show-mobile">
+    <div class="ux-card-grid">
         {% for user in local_users %}
-        {% ui_col_start size="12" size_md="6" size_lg="4" %}
-            {% ui_card css_class="employee-card cursor-pointer" %}
-                <div class="d-flex align-center gap-md"
-                     hx-get="{% url 'main:employee_edit' user.id %}"
-                     hx-target="#main-content-area"
-                     hx-push-url="true">
+        <div class="ux-card ux-card--glass ux-card--clickable"
+             hx-get="{% url 'main:employee_edit' user.id %}"
+             hx-target="#main-content-area"
+             hx-push-url="true">
+            <div class="ux-card__body">
+                <div class="ux-card__row">
                     {% if user.avatar %}
-                    {% ui_avatar initials=user.get_initials src=user.avatar.url size="lg" %}
+                    <div class="ux-avatar ux-avatar--lg" style="background-image: url('{{ user.avatar.url }}');"></div>
                     {% else %}
-                    {% ui_avatar initials=user.get_initials size="lg" %}
-                    {% endif %}
-                    <div class="flex-1 min-w-0">
-                        <h3 class="fw-semibold text-truncate m-0">{{ user.name }}</h3>
-                        <p class="fs-sm text-medium text-truncate m-0">{{ user.email }}</p>
-                        {% ui_chip label=user.get_role_display color=user.get_role_color css_class="ion-margin-top" %}
+                    <div class="ux-avatar ux-avatar--lg ux-avatar--{{ user.get_role_color|default:'primary' }}">
+                        <span class="ux-avatar__initials">{{ user.get_initials }}</span>
                     </div>
-                    {% icon "chevron-forward-outline" css_class="text-medium" %}
+                    {% endif %}
+                    <div class="ux-card__info">
+                        <h3 class="ux-card__title">{{ user.name }}</h3>
+                        <p class="ux-card__subtitle">{{ user.email }}</p>
+                        <span class="ux-badge ux-badge--sm ux-badge--{{ user.get_role_color|default:'primary' }} ux-mt-xs">
+                            {{ user.get_role_display }}
+                        </span>
+                    </div>
+                    <span class="ux-card__chevron">
+                        {% icon "chevron-forward-outline" %}
+                    </span>
                 </div>
-            {% endui_card %}
-        {% ui_col_end %}
-        {% empty %}
-        {% ui_col_start size="12" %}
-            {% if search_query %}
-            {% ui_empty_state title=_("No employees found") description=_("Try a different search term") icon="search-outline" %}
-            {% else %}
-            {% ui_empty_state title=_("No employees yet") description=_("Add your first employee to get started") icon="people-outline" action_label=_("Add First Employee") action_hx_get="/employees/add/" action_hx_target="#main-content-area" %}
-            {% endif %}
-        {% ui_col_end %}
+            </div>
+        </div>
         {% endfor %}
-    {% ui_row_end %}
-{% ui_grid_end %}
+    </div>
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="ux-empty-state">
+    <div class="ux-empty-state__icon">
+        {% if search_query %}
+        {% icon "search-outline" %}
+        {% else %}
+        {% icon "people-outline" %}
+        {% endif %}
+    </div>
+    <h3 class="ux-empty-state__title">
+        {% if search_query %}
+        {% trans "No employees found" %}
+        {% else %}
+        {% trans "No employees yet" %}
+        {% endif %}
+    </h3>
+    <p class="ux-empty-state__description">
+        {% if search_query %}
+        {% trans "Try a different search term" %}
+        {% else %}
+        {% trans "Add your first employee to get started" %}
+        {% endif %}
+    </p>
+    {% if not search_query %}
+    <button class="ux-button ux-color-primary"
+            hx-get="{% url 'main:employee_add' %}"
+            hx-target="#main-content-area"
+            hx-push-url="true">
+        {% icon "add-outline" %}
+        {% trans "Add First Employee" %}
+    </button>
+    {% endif %}
+</div>
+{% endif %}

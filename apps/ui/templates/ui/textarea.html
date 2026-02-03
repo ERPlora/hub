@@ -1,21 +1,21 @@
-<ion-item {% if css_class %}class="{{ css_class }}"{% endif %} {% if error_text %}class="ion-invalid"{% endif %}>
+<div class="ux-form-group{% if css_class %} {{ css_class }}{% endif %}{% if error_text %} ux-form-group--error{% endif %}">
     {% if label %}
-    <ion-label position="{{ label_position }}">{{ label }}{% if required %}<span class="ui-required">*</span>{% endif %}</ion-label>
+    <label class="ux-label">{{ label }}{% if required %}<span class="ux-required">*</span>{% endif %}</label>
     {% endif %}
-    <ion-textarea
+    <textarea
+        class="ux-textarea"
         name="{{ name }}"
         rows="{{ rows }}"
-        {% if value %}value="{{ value }}"{% endif %}
         {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
-        {% if required %}required="true"{% endif %}
-        {% if disabled %}disabled="true"{% endif %}
-        {% if readonly %}readonly="true"{% endif %}
+        {% if required %}required{% endif %}
+        {% if disabled %}disabled{% endif %}
+        {% if readonly %}readonly{% endif %}
         {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
-    >{{ value }}</ion-textarea>
-</ion-item>
+    >{{ value }}</textarea>
+</div>
 {% if helper_text and not error_text %}
-<ion-note class="ui-helper-text">{{ helper_text }}</ion-note>
+<p class="ux-text-secondary ux-text-xs">{{ helper_text }}</p>
 {% endif %}
 {% if error_text %}
-<ion-note class="ui-error-text" color="danger">{{ error_text }}</ion-note>
+<p class="ux-text-xs" style="color: var(--ux-danger);">{{ error_text }}</p>
 {% endif %}

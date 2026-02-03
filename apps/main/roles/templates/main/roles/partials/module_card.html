@@ -2,76 +2,120 @@
 {# Module permission card with toggle and expandable permissions #}
 {# Used both in detail.html and as HTMX swap target #}
 
-<ion-accordion-group>
-    <ion-accordion value="{{ module.id }}">
-        <ion-item slot="header" color="light">
-            <!-- Module toggle checkbox -->
-            {% if role.name != 'admin' %}
-            <ion-checkbox
-                slot="start"
-                {% if module.has_wildcard or module.is_full %}checked{% endif %}
-                {% if module.is_partial %}indeterminate{% endif %}
-                hx-post="{% url 'main:roles:api_toggle_module' role_id=role.id module_id=module.id %}"
-                hx-target="#module-{{ module.id }}"
-                hx-swap="innerHTML"
-                onclick="event.stopPropagation();">
-            </ion-checkbox>
-            {% else %}
-            <ion-checkbox
-                slot="start"
-                checked
-                disabled>
-            </ion-checkbox>
-            {% endif %}
+<div class="ux-accordion-item ux-accordion-item--with-icon" :class="{ 'ux-accordion-item--open': isOpen({{ forloop.counter0|default:0 }}) }">
+    <button class="ux-accordion-item__header" @click="toggle({{ forloop.counter0|default:0 }})">
+        <!-- Module toggle checkbox -->
+        {% if role.name != 'admin' %}
+        <label class="ux-checkbox ux-mr-sm" @click.stop>
+            <input type="checkbox"
+                   class="ux-checkbox__input"
+                   {% if module.has_wildcard or module.is_full %}checked{% endif %}
+                   {% if module.is_partial %}data-indeterminate="true"{% endif %}
+                   hx-post="{% url 'main:roles:api_toggle_module' role_id=role.id module_id=module.id %}"
+                   hx-target="#module-{{ module.id }}"
+                   hx-swap="innerHTML">
+            <span class="ux-checkbox__box">
+                <span class="ux-checkbox__checkmark">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                    </svg>
+                </span>
+            </span>
+        </label>
+        {% else %}
+        <label class="ux-checkbox ux-mr-sm">
+            <input type="checkbox" class="ux-checkbox__input" checked disabled>
+            <span class="ux-checkbox__box">
+                <span class="ux-checkbox__checkmark">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                    </svg>
+                </span>
+            </span>
+        </label>
+        {% endif %}
 
-            <!-- Module info -->
-            {% icon module.icon css_class="mr-sm" %}
-            <ion-label>
-                <h2 class="fw-semibold">{{ module.name }}</h2>
-                <p class="fs-sm text-medium">
-                    {% if module.has_wildcard %}
-                    <ion-chip color="primary" style="height: 20px; font-size: 11px;">
-                        <ion-label>{{ module.wildcard }}</ion-label>
-                    </ion-chip>
-                    {% else %}
-                    {{ module.active_count }}/{{ module.total_count }} {% trans "permissions" %}
-                    {% endif %}
-                </p>
-            </ion-label>
-        </ion-item>
+        <!-- Module icon -->
+        <span class="ux-accordion-item__icon">
+            {% icon module.icon %}
+        </span>
 
-        <div slot="content" class="ion-padding">
-            {% if module.permissions %}
-            <ion-list>
-                {% for perm in module.permissions %}
-                <ion-item lines="none">
-                    {% if role.name != 'admin' %}
-                    <ion-checkbox
-                        slot="start"
-                        {% if perm.codename in expanded_permissions %}checked{% endif %}
-                        hx-post="{% url 'main:roles:api_toggle_permission' role_id=role.id codename=perm.codename %}"
-                        hx-swap="none">
-                    </ion-checkbox>
-                    {% else %}
-                    <ion-checkbox
-                        slot="start"
-                        checked
-                        disabled>
-                    </ion-checkbox>
-                    {% endif %}
-                    <ion-label>
-                        <h3>{{ perm.name }}</h3>
-                        <p class="fs-xs text-medium">{{ perm.codename }}</p>
-                        {% if perm.description %}
-                        <p class="fs-xs text-medium">{{ perm.description }}</p>
-                        {% endif %}
-                    </ion-label>
-                </ion-item>
-                {% endfor %}
-            </ion-list>
-            {% else %}
-            <p class="text-medium fs-sm p-md">{% trans "No permissions defined for this module." %}</p>
-            {% endif %}
+        <!-- Module info -->
+        <div class="ux-accordion-item__content">
+            <span class="ux-accordion-item__title">{{ module.name }}</span>
+            <span class="ux-accordion-item__subtitle">
+                {% if module.has_wildcard %}
+                <span class="ux-badge ux-badge--primary ux-badge--sm">{{ module.wildcard }}</span>
+                {% else %}
+                {{ module.active_count }}/{{ module.total_count }} {% trans "permissions" %}
+                {% endif %}
+            </span>
         </div>
-    </ion-accordion>
-</ion-accordion-group>
+
+        <!-- Chevron -->
+        <span class="ux-accordion-item__chevron">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </span>
+    </button>
+
+    <!-- Accordion Content: Permissions List -->
+    <div class="ux-accordion-item__body">
+        <div class="ux-accordion-item__body-inner">
+            <div class="ux-accordion-item__body-content">
+                {% if module.permissions %}
+                <div class="ux-list">
+                    {% for perm in module.permissions %}
+                    <div class="ux-item">
+                        {% if role.name != 'admin' %}
+                        <label class="ux-checkbox-item">
+                            <input type="checkbox"
+                                   class="ux-checkbox__input"
+                                   {% if perm.codename in expanded_permissions %}checked{% endif %}
+                                   hx-post="{% url 'main:roles:api_toggle_permission' role_id=role.id codename=perm.codename %}"
+                                   hx-swap="none">
+                            <span class="ux-checkbox__box">
+                                <span class="ux-checkbox__checkmark">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </span>
+                            </span>
+                            <div class="ux-checkbox-item__content">
+                                <span class="ux-checkbox-item__title">{{ perm.name }}</span>
+                                <span class="ux-checkbox-item__subtitle">{{ perm.codename }}</span>
+                                {% if perm.description %}
+                                <span class="ux-checkbox-item__subtitle">{{ perm.description }}</span>
+                                {% endif %}
+                            </div>
+                        </label>
+                        {% else %}
+                        <label class="ux-checkbox-item">
+                            <input type="checkbox" class="ux-checkbox__input" checked disabled>
+                            <span class="ux-checkbox__box">
+                                <span class="ux-checkbox__checkmark">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </span>
+                            </span>
+                            <div class="ux-checkbox-item__content">
+                                <span class="ux-checkbox-item__title">{{ perm.name }}</span>
+                                <span class="ux-checkbox-item__subtitle">{{ perm.codename }}</span>
+                                {% if perm.description %}
+                                <span class="ux-checkbox-item__subtitle">{{ perm.description }}</span>
+                                {% endif %}
+                            </div>
+                        </label>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="ux-text-secondary ux-text-sm ux-p-md">{% trans "No permissions defined for this module." %}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

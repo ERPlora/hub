@@ -207,7 +207,7 @@ class TestThemeTemplateRendering:
         response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         content = response.content.decode()
-        # Theme CSS is now named ionic-theme.css inside theme folder
+        # Theme CSS file inside theme folder
         assert '/themes/default/ionic-theme.css' in content
 
     def test_blue_theme_rendered(self, authenticated_client, hub_config):
@@ -218,7 +218,7 @@ class TestThemeTemplateRendering:
         response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         content = response.content.decode()
-        # Theme CSS is now named ionic-theme.css inside theme folder
+        # Theme CSS file inside theme folder
         assert '/themes/blue/ionic-theme.css' in content
 
     def test_dark_mode_class_applied(self, authenticated_client, hub_config):

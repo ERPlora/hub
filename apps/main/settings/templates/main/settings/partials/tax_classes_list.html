@@ -1,23 +1,62 @@
-{% load i18n ui %}
+{% load i18n ui djicons %}
 
 {% if tax_classes %}
-<ion-list>
+<div class="ux-list ux-list--inset">
     {% for tc in tax_classes %}
-    <ion-item>
-        <ion-label>
-            <h2>{{ tc.name }}</h2>
-            <p>
+    <div class="ux-item">
+        <div class="ux-item__content">
+            <span class="ux-item__label">{{ tc.name }}</span>
+            <span class="ux-item__note">
                 {{ tc.rate }}%
                 {% if tc.description %} - {{ tc.description }}{% endif %}
-            </p>
-        </ion-label>
-        {% if tc.is_default %}
-        {% ui_chip label=_("Default") color="success" slot="end" %}
-        {% endif %}
-        {% ui_icon_button icon="trash-outline" slot="end" fill="clear" color="danger" hx_post="/settings/" hx_vals='{"action": "delete_tax_class", "tax_class_id": "'|add:tc.id|add:'"}' hx_target="#tax-classes-list" hx_swap="innerHTML" hx_confirm=_("Are you sure you want to delete this tax class?") %}
-    </ion-item>
+            </span>
+        </div>
+        <div class="ux-item__end" style="gap: var(--ux-space-sm); display: flex; align-items: center;">
+            {% if tc.is_default %}
+            <span class="ux-chip ux-color-success">{% trans "Default" %}</span>
+            {% endif %}
+            <button type="button"
+                    class="ux-button ux-button--clear ux-button--sm"
+                    style="color: var(--ux-danger); padding: var(--ux-space-xs);"
+                    hx-post="{% url 'main:settings' %}"
+                    hx-vals='{"action": "delete_tax_class", "tax_class_id": "{{ tc.id }}"}'
+                    hx-target="#tax-classes-list"
+                    hx-swap="innerHTML"
+                    hx-confirm="{% trans 'Are you sure you want to delete this tax class?' %}">
+                {% icon "trash-outline" %}
+            </button>
+        </div>
+    </div>
     {% endfor %}
-</ion-list>
+</div>
 {% else %}
-{% ui_empty_state title=_("No tax classes configured") description=_("Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)") icon="alert-circle-outline" %}
+<div class="ux-empty-state" style="padding: var(--ux-space-xl); text-align: center;">
+    <div class="ux-empty-state__icon" style="margin-bottom: var(--ux-space-md);">
+        {% icon "alert-circle-outline" style="width: 48px; height: 48px; color: var(--ux-text-tertiary);" %}
+    </div>
+    <h3 class="ux-empty-state__title" style="font-size: var(--ux-font-size-lg); font-weight: 600; margin: 0 0 var(--ux-space-xs);">
+        {% trans "No tax classes configured" %}
+    </h3>
+    <p class="ux-empty-state__description" style="font-size: var(--ux-font-size-sm); color: var(--ux-text-secondary); margin: 0;">
+        {% trans "Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)" %}
+    </p>
+</div>
 {% endif %}
+
+<style>
+.ux-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--ux-space-xs) var(--ux-space-md);
+    border-radius: 9999px;
+    font-size: var(--ux-font-size-sm);
+    font-weight: 500;
+    background: var(--ux-surface-secondary);
+    color: var(--ux-text);
+}
+
+.ux-chip.ux-color-success {
+    background: rgba(var(--ux-success-rgb), 0.15);
+    color: var(--ux-success);
+}
+</style>

@@ -1,12 +1,12 @@
-{% load djicons %}<ion-item
-    class="submenu-item{% if active %} active{% endif %}{% if css_class %} {{ css_class }}{% endif %}"
+{% load djicons %}<div
+    class="ux-list__item submenu-item{% if active %} active{% endif %}{% if css_class %} {{ css_class }}{% endif %}"
     {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
     {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
     {% if hx_push_url %}hx-push-url="true"{% endif %}
-    {% if url %}href="{{ url }}"{% endif %}
-    detail="false"
+    {% if url %}data-href="{{ url }}"{% endif %}
     {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}
+    role="button"
 >
-    {% if icon %}{% icon icon slot="start" %}{% endif %}
-    <ion-label>{{ label }}</ion-label>
-</ion-item>
+    {% if icon %}<span class="ux-list__item-start">{% icon icon %}</span>{% endif %}
+    <span>{{ label }}</span>
+</div>

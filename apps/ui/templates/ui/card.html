@@ -1,11 +1,11 @@
-<ion-card {% if css_class %}class="{{ css_class }}"{% endif %} {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}>
+<div class="ux-card{% if css_class %} {{ css_class }}{% endif %}" {% for key, value in extra_attrs.items %}{{ key }}="{{ value }}"{% endfor %}>
     {% if title or subtitle %}
-    <ion-card-header>
-        {% if title %}<ion-card-title>{{ title }}</ion-card-title>{% endif %}
-        {% if subtitle %}<ion-card-subtitle>{{ subtitle }}</ion-card-subtitle>{% endif %}
-    </ion-card-header>
+    <div class="ux-card__header">
+        {% if title %}<h3 class="ux-card__title">{{ title }}</h3>{% endif %}
+        {% if subtitle %}<p class="ux-card__subtitle">{{ subtitle }}</p>{% endif %}
+    </div>
     {% endif %}
-    <ion-card-content>
+    <div class="ux-card__body">
         {{ content }}
-    </ion-card-content>
-</ion-card>
+    </div>
+</div>
