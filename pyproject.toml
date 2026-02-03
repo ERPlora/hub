@@ -1,18 +1,19 @@
 [project]
 name = "erplora-hub"
 version = "0.12.1"
-description = "ERPlora Hub - Business Management Desktop Application with Django and PyInstaller"
+description = "ERPlora Hub - Business Management Web Application with Django"
 readme = "docs/README.md"
 requires-python = ">=3.11"
 license = { text = "BUSL-1.1" }
 authors = [
     { name = "ERPlora Team", email = "dev@erplora.com" }
 ]
-keywords = ["erp", "business-management", "pos", "django", "desktop", "pyinstaller"]
+keywords = ["erp", "business-management", "pos", "django", "web"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: Django :: 5.2",
     "Intended Audience :: End Users/Desktop",
+    "Environment :: Web Environment",
     "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -23,9 +24,7 @@ dependencies = [
     # === CORE HUB ===
     "Django>=5.2.7",
     "python-decouple>=3.8",
-    "gunicorn>=21.0.0", # WSGI server para Docker (web deployment)
-    "pywebview>=5.0.0", # Desktop webview (desktop deployment)
-    "pyinstaller>=6.0.0", # Desktop builds (desktop deployment)
+    "gunicorn>=21.0.0", # WSGI server
     # === PAQUETES DJANGO COMUNES ===
     "django-components>=0.123", # Componentes reutilizables
     "django-filter>=24.0", # Filtros avanzados para querysets
@@ -73,7 +72,7 @@ dependencies = [
     "pyusb>=1.2.1", # USB devices (impresoras, scanners)
     "python-escpos>=3.0", # Impresoras térmicas ESC/POS (USB/LAN/Serial)
     "evdev>=1.6.0; sys_platform == 'linux'", # Barcode scanners (Linux)
-    "pywinusb>=0.4.2; sys_platform == 'win32'", # USB HID devices (Windows)
+    # "pywinusb>=0.4.2; sys_platform == 'win32'", # USB HID devices (Windows) - web only
     # Email & Validation
     "email-validator>=2.1.0",
     # Utils
@@ -269,10 +268,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-
-[tool.pyinstaller]
-name = "ERPlora Hub"
-icon = "assets/icon.ico"
 
 [dependency-groups]
 dev = [

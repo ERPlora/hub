@@ -1,18 +1,18 @@
 r"""
 Path Management for ERPlora Hub
 
-Maneja las rutas de datos de usuario según el ENTORNO (Docker vs Desktop) y PLATAFORMA.
+Maneja las rutas de datos de usuario según el ENTORNO (Docker vs Local) y PLATAFORMA.
 Todos los datos persisten fuera de la aplicación para permitir actualizaciones limpias.
 
 DETECCIÓN DE ENTORNO:
     1. Variable DEPLOYMENT_MODE='web' → Docker
     2. Archivo /.dockerenv existe → Docker
     3. /proc/1/cgroup contiene 'docker' → Docker
-    4. De lo contrario → Desktop
+    4. De lo contrario → Local (desarrollo)
 
 PATHS POR ENTORNO:
 
-    DOCKER (Cloud Hub):
+    DOCKER (Web/Cloud):
         Base:     /app/
         DB:       /app/db/db.sqlite3
         Media:    /app/media/
@@ -23,21 +23,12 @@ PATHS POR ENTORNO:
         IMPORTANTE: Estos directorios se montan como volúmenes Docker persistentes
                     para que los datos sobrevivan recreaciones del contenedor.
 
-    DESKTOP (PyInstaller):
-        Windows:
-            Base:     C:\Users\<usuario>\AppData\Local\ERPloraHub\
-            DB:       C:\Users\<usuario>\AppData\Local\ERPloraHub\db\db.sqlite3
-            Media:    C:\Users\<usuario>\AppData\Local\ERPloraHub\media\
-
+    LOCAL (Desarrollo):
         macOS:
             Base:     /Users/<usuario>/Library/Application Support/ERPloraHub/
-            DB:       /Users/<usuario>/Library/Application Support/ERPloraHub/db/db.sqlite3
-            Media:    /Users/<usuario>/Library/Application Support/ERPloraHub/media/
 
         Linux:
             Base:     /home/<usuario>/.erplora-hub/
-            DB:       /home/<usuario>/.erplora-hub/db/db.sqlite3
-            Media:    /home/<usuario>/.erplora-hub/media/
 
 Subdirectorios (comunes a todos los entornos):
     - db/              Base de datos SQLite
@@ -103,10 +94,9 @@ class DataPaths:
 
         Returns:
             Path: Directorio base
-              DOCKER (Cloud Hub):
+              DOCKER (Web/Cloud):
                 - /app (root del contenedor, montado como volumen)
-              DESKTOP (PyInstaller):
-                - Windows: C:\Users\<user>\AppData\Local\ERPloraHub
+              LOCAL (Desarrollo):
                 - macOS: /Users/<user>/Library/Application Support/ERPloraHub
                 - Linux: /home/<user>/.erplora-hub
         """
@@ -116,20 +106,12 @@ class DataPaths:
                 # Docker: Usar /app como base (montado como volumen persistente)
                 self._base_dir = Path("/app")
 
-            elif self.platform == "win32":
-                # Windows Desktop: AppData\Local
-                local_appdata = os.getenv("LOCALAPPDATA")
-                if not local_appdata:
-                    # Fallback si LOCALAPPDATA no existe
-                    local_appdata = Path.home() / "AppData" / "Local"
-                self._base_dir = Path(local_appdata) / self.APP_NAME
-
             elif self.platform == "darwin":
-                # macOS Desktop: Library/Application Support
+                # macOS: Library/Application Support
                 self._base_dir = Path.home() / "Library" / "Application Support" / self.APP_NAME
 
             else:
-                # Linux Desktop: directorio oculto en home
+                # Linux: directorio oculto en home
                 self._base_dir = Path.home() / self.APP_NAME_HIDDEN
 
         return self._base_dir
@@ -345,6 +327,6 @@ if __name__ == "__main__":
         print("    -v hub_media:/app/media")
         print("    -v hub_modules:/app/modules")
     else:
-        print("  Running on DESKTOP - using OS-specific user directory")
+        print("  Running LOCAL - using OS-specific user directory")
         print(f"  Data will persist in: {paths.base_dir}")
     print("=" * 70)

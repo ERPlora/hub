@@ -1,14 +1,12 @@
 # ERPlora Hub
 
-Sistema POS (Point of Sale) modular Django con **dos modos de despliegue**.
+Sistema POS (Point of Sale) modular Django desplegado como **web application**.
 
 ## Modos de Despliegue
 
-### 1. Desktop Hub (On-Premise) - GRATIS
-- Aplicacion empaquetada con **PyInstaller**
-- **100% GRATUITA** - sin costo de licencia
-- SQLite local en la maquina del cliente
-- **Funciona 100% offline** despues de setup inicial
+### 1. Local (Desarrollo)
+- Django runserver con SQLite local
+- Datos persisten en `~/Library/Application Support/ERPloraHub/` (macOS)
 - Extensible con modules (gratuitos o de pago)
 
 ### 2. Cloud Hub (SaaS)
@@ -16,8 +14,6 @@ Sistema POS (Point of Sale) modular Django con **dos modos de despliegue**.
 - SQLite en volumen persistente
 - Acceso via subdominio: `{subdomain}.erplora.com`
 - Planes de suscripcion
-
-**Nota:** Ambos modos usan el mismo codigo Django. La unica diferencia es el metodo de despliegue.
 
 ---
 
@@ -62,7 +58,9 @@ hub/
 │   └── core/                 # Utilidades compartidas
 │
 ├── config/                   # Configuracion Django
-│   ├── settings.py
+│   ├── settings/
+│   │   ├── local.py         # Desarrollo local
+│   │   └── web.py           # Docker/Cloud
 │   ├── urls.py
 │   └── module_allowed_deps.py
 │
@@ -70,36 +68,11 @@ hub/
 │   ├── .template/           # Template base para nuevos modules
 │   └── ...                  # Modules activos
 │
-├── templates/               # Django templates (Ionic + HTMX)
+├── templates/               # Django templates (@erplora/ux + HTMX)
 ├── static/                  # CSS/JS
 ├── Dockerfile               # Build para Cloud Hub
-├── main.py                  # Entry point para Desktop Hub (PyInstaller)
-├── main.spec                # Configuracion PyInstaller
-├── build.py                 # Script de build Desktop
 └── pyproject.toml           # Dependencias (uv)
 ```
-
----
-
-## Desktop Hub (PyInstaller)
-
-### Build
-
-```bash
-cd hub
-python build.py
-```
-
-### Ejecutables Generados
-
-- **Windows:** `dist/ERPlora Hub/ERPlora Hub.exe`
-- **macOS:** `dist/ERPlora Hub.app`
-- **Linux:** `dist/ERPlora Hub/ERPlora Hub`
-
-### GitHub Actions
-
-- Push a `staging` → build automatico de RC
-- Merge a `main` → build de release final
 
 ---
 
@@ -156,11 +129,6 @@ El Hub soporta modules dinamicos con dependencias pre-aprobadas.
 
 Ver lista completa en [config/module_allowed_deps.py](config/module_allowed_deps.py).
 
-**Gestion de modules**:
-- Activar: mover de `_module_name/` a `module_name/`
-- Desactivar: mover de `module_name/` a `_module_name/`
-- Ocultar: prefijar con `.` (`.module_name/`)
-
 ---
 
 ## Testing
@@ -180,11 +148,6 @@ pytest --cov=apps --cov-report=html
 |------------|------------|
 | Backend | Django 5.1 |
 | Database | SQLite |
-| Frontend | Ionic 8 (iOS mode) + Alpine.js + HTMX |
+| Frontend | @erplora/ux + Alpine.js + HTMX |
 | Autenticacion | LocalUser con PIN + JWT (Cloud API) |
-| Deployment Cloud | Docker |
-| Deployment Desktop | PyInstaller |
-
----
-
-**Ultima actualizacion:** 2025-12-26
+| Deployment | Docker |
