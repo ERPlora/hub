@@ -1,28 +1,19 @@
 # ERPlora Hub - Sistema POS
 
-ERPlora Hub es el sistema Point of Sale (POS) de ERPlora, disponible en dos modalidades de despliegue.
+ERPlora Hub es el sistema Point of Sale (POS) de ERPlora, desplegado como aplicación web.
 
 ---
 
 ## 🎯 Descripción
 
-ERPlora Hub es una aplicación Django que funciona como punto de venta (POS). Puede desplegarse de dos formas:
+ERPlora Hub es una aplicación Django que funciona como punto de venta (POS). Se despliega como contenedor Docker via Dokploy.
 
-### Opcion 1: Cloud Hub (PAGO)
 - Contenedor Docker desplegado via Dokploy
-- SQLite en volumen Docker persistente
 - Acceso via navegador web
 - URL unica: `{subdomain}.erplora.com` (ej: `mi-tienda.erplora.com`)
-- Suscripcion mensual
 
-### Opción 2: Desktop Hub (GRATUITO)
-- App descargable empaquetada con PyInstaller
-- SQLite en PC del usuario (permanente)
-- WebView (pywebview) en modo kiosk
-- Funciona 100% offline después de setup inicial
-
-**Características comunes:**
-- 💾 Base de datos local SQLite (funciona offline)
+**Características:**
+- 💾 Base de datos SQLite (funciona offline)
 - 🔌 Sistema de modules extensible
 - 🖨️ Impresión 100% web (window.print)
 - 🔄 Sincronización opcional con Cloud vía HTTP API
@@ -31,8 +22,7 @@ ERPlora Hub es una aplicación Django que funciona como punto de venta (POS). Pu
 **Stack tecnológico:**
 - Django 5.1
 - SQLite
-- Ionic 8 (Web Components) + Alpine.js + HTMX para UI
-- PyInstaller (solo para versión Desktop)
+- Alpine.js + HTMX para UI
 - Python 3.11+
 
 ---
@@ -61,10 +51,7 @@ hub/
 ├── static/                    # Archivos estáticos
 ├── locale/                    # Traducciones i18n
 │
-├── main.py                   # Entry point para PyInstaller (Desktop)
-├── main.spec                 # PyInstaller spec file (Desktop)
 ├── Dockerfile                # Para despliegue Cloud
-│
 ├── manage.py                 # Django management
 ├── pyproject.toml            # Dependencias Python (uv)
 └── pytest.ini                # Configuración pytest
@@ -86,9 +73,7 @@ cd hub
 
 # Crear virtual environment
 uv venv
-source .venv/bin/activate  # Linux/macOS
-# o
-.venv\Scripts\activate     # Windows
+source .venv/bin/activate
 
 # Instalar dependencias
 uv pip install -e ".[dev]"
@@ -171,7 +156,7 @@ SETTINGS = {}
 PERMISSIONS = ["inventory.view_product", "inventory.add_product"]
 ```
 
-Ver documentación completa: [modules/README.md](../../modules/README.md)
+Ver documentación completa: [MODULE_ICONS.md](MODULE_ICONS.md)
 
 ### Iconos de Módulos
 
@@ -207,8 +192,6 @@ Ver documentación: [MODULE_ICONS.md](MODULE_ICONS.md)
 **Data & Analysis:** pandas, numpy
 
 **Utils:** python-dateutil, pytz, phonenumbers, email-validator, python-slugify, pydantic, beautifulsoup4
-
-Ver documentación completa: [MODULE_LIBRARIES_COMPLETE.md](MODULE_LIBRARIES_COMPLETE.md)
 
 ---
 
@@ -270,23 +253,6 @@ docker build -t erplora/hub:latest .
 # Cada Hub es un contenedor independiente con SQLite
 ```
 
-### Desktop (PyInstaller)
-
-```bash
-# Crear base de datos
-python manage.py migrate --noinput
-
-# Generar ejecutable
-pyinstaller main.spec --clean
-
-# Output:
-# - Windows: dist/main/main.exe
-# - macOS: dist/CPOS Hub.app
-# - Linux: dist/main/main
-```
-
-**GitHub Actions:** Los builds de Desktop se generan automáticamente en push a `staging`.
-
 ---
 
 ## 🖨️ Sistema de Impresión
@@ -318,9 +284,7 @@ Ver documentación completa: [PRINTING_SYSTEM.md](PRINTING_SYSTEM.md)
 | [CLOUD.md](CLOUD.md) | Comunicación Hub ↔ Cloud |
 | [GLOBAL_CONFIGURATION.md](GLOBAL_CONFIGURATION.md) | Sistema de configuración |
 | [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) | Sistema de roles y permisos |
-| [MODULE_DEPENDENCIES.md](MODULE_DEPENDENCIES.md) | Arquitectura de modules |
 | [MODULE_ICONS.md](MODULE_ICONS.md) | Sistema de iconos SVG |
-| [MODULE_LIBRARIES_COMPLETE.md](MODULE_LIBRARIES_COMPLETE.md) | 25 librerías permitidas |
 | [MODULE_ACTIVATION_FLOW.md](MODULE_ACTIVATION_FLOW.md) | Flujo de activación |
 | [MODULE_RUNTIME_ANALYSIS.md](MODULE_RUNTIME_ANALYSIS.md) | Análisis del runtime |
 | [MODULE_SUBSCRIPTION_USAGE.md](MODULE_SUBSCRIPTION_USAGE.md) | Sistema de suscripciones |

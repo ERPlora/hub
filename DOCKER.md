@@ -247,7 +247,7 @@ docker exec erplora-hub ls -la /app/modules/
 docker exec erplora-hub chown -R 1000:1000 /app/modules/
 
 # Logs de modules
-docker exec erplora-hub python manage.py shell -c "from apps.core.runtime_manager import ModuleRuntimeManager; print(ModuleRuntimeManager().list_modules())"
+docker exec erplora-hub python manage.py shell -c "from apps.modules_runtime.manager import ModuleRuntimeManager; print(ModuleRuntimeManager().modules_dir)"
 ```
 
 ### Puerto ya en uso

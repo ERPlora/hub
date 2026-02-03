@@ -1,11 +1,11 @@
 """
-Module Loader for CPOS Hub
-Dynamically loads and manages modules from external data directory
+Module Loader for ERPlora Hub
+Dynamically loads and manages modules from external data directory.
 
 Modules are stored in platform-specific locations:
-- Windows: C:\\Users\\<user>\\AppData\\Local\\ERPloraHub\\modules\\
+- Docker: /app/modules/
 - macOS: ~/Library/Application Support/ERPloraHub/modules/
-- Linux: ~/.cpos-hub/modules/
+- Linux: ~/.erplora-hub/modules/
 
 This allows modules to persist across app updates and reinstalls.
 """

@@ -1,7 +1,7 @@
 """
 Core API
 
-System endpoints: health check, updates, language.
+System endpoints: health check, version, language.
 """
 from django.conf import settings as django_settings
 from django.utils.translation import activate
@@ -90,23 +90,14 @@ class UpdateCheckView(APIView):
         responses={200: UpdateInfoSerializer}
     )
     def get(self, request):
-        try:
-            from .views_update import check_updates as check_updates_view
-            # Get update info from existing view logic
-            import config.settings as settings_module
-            current_version = getattr(settings_module, 'HUB_VERSION', '0.1.0')
+        import config.settings as settings_module
+        current_version = getattr(settings_module, 'HUB_VERSION', '0.1.0')
 
-            return Response({
-                'current_version': current_version,
-                'update_available': False,  # TODO: Implement actual check
-                'latest_version': current_version,
-            })
-        except Exception as e:
-            return Response({
-                'current_version': 'unknown',
-                'update_available': False,
-                'error': str(e)
-            })
+        return Response({
+            'current_version': current_version,
+            'update_available': False,
+            'latest_version': current_version,
+        })
 
 
 @extend_schema(tags=['System'])

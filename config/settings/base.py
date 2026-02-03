@@ -267,10 +267,10 @@ HUB_VERSION = "1.0.0"
 # MODULE SYSTEM
 # =============================================================================
 
-# Detect frozen (PyInstaller) vs development
-DEVELOPMENT_MODE = not getattr(sys, 'frozen', False) and config('ERPLORA_DEV_MODE', default='true', cast=bool)
+# Development mode
+DEVELOPMENT_MODE = config('ERPLORA_DEV_MODE', default='true', cast=bool)
 
-# Module paths - auto-detected via DataPaths (Docker vs Desktop)
+# Module paths - auto-detected via DataPaths (Docker vs Local)
 # Can be overridden via MODULES_DIR env var
 from config.paths import get_modules_dir
 _modules_dir_env = config('MODULES_DIR', default='')
@@ -300,7 +300,7 @@ MODULE_ALLOWED_DEPENDENCIES = [
     'python-escpos', 'lxml', 'xmltodict', 'signxml', 'cryptography',
     'zeep', 'requests', 'websockets', 'python-dateutil', 'pytz',
     'phonenumbers', 'stripe', 'pandas', 'numpy', 'pyserial', 'pyusb',
-    'evdev', 'pywinusb', 'email-validator', 'python-slugify', 'pydantic',
+    'evdev', 'email-validator', 'python-slugify', 'pydantic',
     'beautifulsoup4', 'PyPDF2'
 ]
 
@@ -465,14 +465,14 @@ COMPONENTS = {
 # =============================================================================
 
 DJICONS = {
-    "DEFAULT_NAMESPACE": "ion",  # Ionicons as default (compatible with existing <ion-icon>)
+    "DEFAULT_NAMESPACE": "ion",  # Ionicons SVGs as default icon set
     "ICON_DIRS": {
-        "ion": BASE_DIR / "static" / "ionicons" / "dist" / "svg",
+        "ion": BASE_DIR / "static" / "icons" / "ionicons",
     },
     "PACKS": [],  # Disable bundled packs, use ICON_DIRS instead
     "MISSING_ICON_SILENT": False,  # Show error in development
     "CACHE_TIMEOUT": 86400,  # 24 hours
-    "DEFAULT_SIZE": 20,  # Default icon size in pixels (matches ion-icon default)
+    "DEFAULT_SIZE": 20,  # Default icon size in pixels
     "DEFAULT_CLASS": "icon",  # Base CSS class for all icons
 }
 
