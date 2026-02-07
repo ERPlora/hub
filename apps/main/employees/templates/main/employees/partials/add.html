@@ -1,66 +1,66 @@
 {% load i18n djicons %}
 
-<div class="ux-page">
+<div class="page">
     <!-- Header Toolbar -->
-    <header class="ux-header">
-        <div class="ux-toolbar ux-toolbar--glass ux-margin-horizontal" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
-            <div class="ux-toolbar__start">
-                <button class="ux-back-button"
+    <header class="header">
+        <div class="glass mx-4" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
+            <div class="flex items-center">
+                <button class="btn btn-ghost btn-sm"
                         hx-get="{% url 'main:employees' %}"
                         hx-target="#main-content-area"
                         hx-push-url="true">
                     {% icon "arrow-back-outline" %}
                 </button>
             </div>
-            <div class="ux-toolbar__center">
-                <h1 class="ux-toolbar__title">{% trans "Add Employee" %}</h1>
+            <div class="flex-1 flex items-center justify-center">
+                <h1 class="font-semibold">{% trans "Add Employee" %}</h1>
             </div>
-            <div class="ux-toolbar__end"></div>
+            <div class="flex items-center gap-2"></div>
         </div>
     </header>
 
     <!-- Content -->
-    <div class="ux-page__content" style="flex: 1; overflow: auto;">
-        <div class="ux-padding">
+    <div style="flex: 1; overflow: auto;">
+        <div class="p-4">
             <form hx-post="{% url 'main:employee_add' %}"
                   hx-target="#main-content-area"
                   hx-push-url="{% url 'main:employees' %}">
                 {% csrf_token %}
 
                 <!-- Employee Info Card -->
-                <div class="ux-card ux-card--glass ux-mb-lg">
-                    <div class="ux-card__header">
-                        <h3 class="ux-card__title">{% trans "Employee Information" %}</h3>
+                <div class="card glass mb-6">
+                    <div class="card-header">
+                        <h3 class="card-title">{% trans "Employee Information" %}</h3>
                     </div>
-                    <div class="ux-card__body">
+                    <div class="card-body">
                         <!-- Name Input -->
-                        <div class="ux-input-group ux-mb-md">
-                            <label class="ux-label" for="employee-name">{% trans "Name" %}</label>
+                        <div class="form-group mb-4">
+                            <label class="form-group-label" for="employee-name">{% trans "Name" %}</label>
                             <input type="text"
                                    id="employee-name"
                                    name="name"
-                                   class="ux-input"
+                                   class="input"
                                    placeholder="{% trans 'Full name' %}"
                                    required>
                         </div>
 
                         <!-- Email Input -->
-                        <div class="ux-input-group ux-mb-md">
-                            <label class="ux-label" for="employee-email">{% trans "Email" %}</label>
+                        <div class="form-group mb-4">
+                            <label class="form-group-label" for="employee-email">{% trans "Email" %}</label>
                             <input type="email"
                                    id="employee-email"
                                    name="email"
-                                   class="ux-input"
+                                   class="input"
                                    placeholder="{% trans 'email@example.com' %}"
                                    required>
                         </div>
 
                         <!-- Role Select -->
-                        <div class="ux-input-group ux-mb-md">
-                            <label class="ux-label" for="employee-role">{% trans "Role" %}</label>
+                        <div class="form-group mb-4">
+                            <label class="form-group-label" for="employee-role">{% trans "Role" %}</label>
                             <select id="employee-role"
                                     name="role_id"
-                                    class="ux-select">
+                                    class="select">
                                 <option value="">{% trans "Select a role" %}</option>
                                 {% for option in role_options %}
                                 <option value="{{ option.value }}">{{ option.label }}</option>
@@ -71,30 +71,30 @@
                 </div>
 
                 <!-- Security Card -->
-                <div class="ux-card ux-card--glass ux-mb-lg">
-                    <div class="ux-card__header">
-                        <h3 class="ux-card__title">{% trans "Security" %}</h3>
+                <div class="card glass mb-6">
+                    <div class="card-header">
+                        <h3 class="card-title">{% trans "Security" %}</h3>
                     </div>
-                    <div class="ux-card__body">
+                    <div class="card-body">
                         <!-- PIN Input -->
-                        <div class="ux-input-group">
-                            <label class="ux-label" for="employee-pin">{% trans "PIN (4 digits)" %}</label>
+                        <div class="form-group">
+                            <label class="form-group-label" for="employee-pin">{% trans "PIN (4 digits)" %}</label>
                             <input type="password"
                                    id="employee-pin"
                                    name="pin"
-                                   class="ux-input"
+                                   class="input"
                                    maxlength="4"
                                    pattern="[0-9]{4}"
                                    inputmode="numeric"
                                    placeholder="****"
                                    required>
-                            <span class="ux-input-hint">{% trans "4-digit PIN for quick access" %}</span>
+                            <span class="form-group-helper">{% trans "4-digit PIN for quick access" %}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Submit Button -->
-                <button type="submit" class="ux-button ux-button--block ux-color-primary">
+                <button type="submit" class="btn btn-block color-primary">
                     {% icon "checkmark-outline" %}
                     {% trans "Add Employee" %}
                 </button>

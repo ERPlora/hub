@@ -7,14 +7,14 @@
             <div class="ui-grid__aside">
                 {# Database Download Card #}
                 {% ui_card %}
-                    <div class="d-flex align-center gap-sm mb-sm">
+                    <div class="flex items-center gap-sm mb-sm">
                         {% icon "server-outline" css_class="fs-xl text-primary" %}
                         <div>
-                            <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Download backup" %}</p>
+                            <p class="fs-xxs text-secondary text-uppercase font-semibold m-0">{% trans "Download backup" %}</p>
                             <h2 class="fs-base fw-bold m-0">{% trans "Database" %}</h2>
                         </div>
                     </div>
-                    <p class="fs-sm text-secondary mb-md">
+                    <p class="fs-sm text-secondary mb-4">
                         {% trans "Download a backup of your SQLite database containing all your data." %}
                     </p>
                     {% ui_button label=_("Download Database") icon="cloud-download-outline" expand="block" href=download_url %}
@@ -22,10 +22,10 @@
 
                 {# Storage Info Card #}
                 {% ui_card %}
-                    <div class="d-flex align-center gap-sm mb-sm">
+                    <div class="flex items-center gap-sm mb-sm">
                         {% icon "pie-chart-outline" css_class="fs-xl text-primary" %}
                         <div>
-                            <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Disk usage" %}</p>
+                            <p class="fs-xxs text-secondary text-uppercase font-semibold m-0">{% trans "Disk usage" %}</p>
                             <h2 class="fs-base fw-bold m-0">{% trans "Storage" %}</h2>
                         </div>
                     </div>
@@ -34,8 +34,8 @@
                          hx-trigger="load"
                          hx-swap="innerHTML">
                         {# Loading state #}
-                        <div class="d-flex justify-center p-md">
-                            <div class="ux-spinner"></div>
+                        <div class="flex justify-center p-4">
+                            <div class="loading"></div>
                         </div>
                     </div>
                 {% endui_card %}
@@ -44,10 +44,10 @@
             {# Right Column: File Browser #}
             <div class="ui-grid__main">
                 {% ui_card %}
-                    <div class="d-flex align-center gap-sm mb-md">
+                    <div class="flex items-center gap-sm mb-4">
                         {% icon "folder-open-outline" css_class="fs-xl text-primary" %}
                         <div>
-                            <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Browse and download" %}</p>
+                            <p class="fs-xxs text-secondary text-uppercase font-semibold m-0">{% trans "Browse and download" %}</p>
                             <h2 class="fs-base fw-bold m-0">{% trans "File Browser" %}</h2>
                         </div>
                     </div>
@@ -56,8 +56,8 @@
                          hx-trigger="load"
                          hx-swap="innerHTML">
                         {# Loading state #}
-                        <div class="d-flex justify-center p-lg">
-                            <div class="ux-spinner"></div>
+                        <div class="flex justify-center p-6">
+                            <div class="loading"></div>
                         </div>
                     </div>
                 {% endui_card %}

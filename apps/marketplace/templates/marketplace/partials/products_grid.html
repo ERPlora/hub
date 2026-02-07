@@ -1,37 +1,37 @@
 {% load i18n ui djicons %}
 
 {% if products %}
-<div class="ux-product-grid">
+<div class="product-grid">
     {% for product in products %}
-    <article class="ux-product-card"
+    <article class="product-card"
              hx-get="{% url 'marketplace:module_detail' product.slug %}"
              hx-target="#main-content-area"
              hx-push-url="true">
         {# Image/Icon Area #}
-        <div class="ux-product-card__image-wrapper">
+        <div class="product-card-image">
             {# Badges #}
-            <div class="ux-product-card__badges">
+            <div class="absolute top-2 left-2 flex gap-1">
                 {% if product.is_featured %}
-                <span class="ux-product-card__badge ux-product-card__badge--new">
+                <span class="badge color-primary">
                     {% trans "Featured" %}
                 </span>
                 {% endif %}
                 {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
-                <span class="ux-product-card__badge" style="background-color: var(--ux-success);">
+                <span class="badge color-success">
                     {% trans "Free" %}
                 </span>
                 {% endif %}
             </div>
 
             {# Module Icon as placeholder #}
-            <div class="ux-product-card__placeholder">
+            <div class="flex items-center justify-center">
                 {% icon product.icon|default:"cube-outline" %}
             </div>
 
             {# Quick action button #}
             {% if not product.is_installed %}
             <button type="button"
-                    class="ux-product-card__quick-add"
+                    class="btn btn-sm btn-circle"
                     onclick="event.stopPropagation(); handleQuickAction(this, '{{ product.id }}', '{{ product.slug }}', '{{ product.download_url|default:'' }}', '{{ product.module_type }}', {{ product.is_owned|yesno:'true,false' }}, {{ product.is_free|yesno:'true,false' }})"
                     title="{% if product.is_owned %}{% trans 'Install' %}{% elif product.is_free or product.module_type == 'free' or product.price == 0 %}{% trans 'Get Free' %}{% else %}{% trans 'Purchase' %}{% endif %}">
                 {% if product.is_owned %}
@@ -46,14 +46,14 @@
         </div>
 
         {# Content #}
-        <div class="ux-product-card__content">
+        <div class="product-card-content">
             {# Category #}
             {% if product.category_name %}
-            <span class="ux-product-card__category">{{ product.category_name }}</span>
+            <span class="product-card-category">{{ product.category_name }}</span>
             {% endif %}
 
             {# Name #}
-            <h3 class="ux-product-card__name">{{ product.name }}</h3>
+            <h3 class="product-card-name">{{ product.name }}</h3>
 
             {# Author & Version #}
             <p class="fs-xs text-tertiary m-0">
@@ -77,13 +77,13 @@
             </div>
 
             {# Price #}
-            <div class="ux-product-card__price-wrapper mt-xs">
+            <div class="product-card-price mt-xs">
                 {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
-                <span class="ux-product-card__price" style="color: var(--ux-success);">{% trans "Free" %}</span>
+                <span class="product-card-price" style="color: var(--color-success);">{% trans "Free" %}</span>
                 {% elif product.module_type == 'subscription' %}
-                <span class="ux-product-card__price">&euro;{{ product.price }}/{% trans "mo" %}</span>
+                <span class="product-card-price">&euro;{{ product.price }}/{% trans "mo" %}</span>
                 {% else %}
-                <span class="ux-product-card__price">&euro;{{ product.price }}</span>
+                <span class="product-card-price">&euro;{{ product.price }}</span>
                 {% endif %}
             </div>
 
@@ -91,13 +91,13 @@
             {% if product.is_installed or product.is_owned %}
             <div class="mt-xs">
                 {% if product.is_installed %}
-                <span class="ux-chip ux-chip--sm ux-color-success--soft">
-                    <span class="ux-chip__icon">{% icon "checkmark-circle-outline" %}</span>
+                <span class="chip chip-sm color-success">
+                    {% icon "checkmark-circle-outline" %}
                     {% trans "Installed" %}
                 </span>
                 {% elif product.is_owned %}
-                <span class="ux-chip ux-chip--sm ux-color-tertiary--soft">
-                    <span class="ux-chip__icon">{% icon "bag-check-outline" %}</span>
+                <span class="chip chip-sm color-secondary">
+                    {% icon "bag-check-outline" %}
                     {% trans "Owned" %}
                 </span>
                 {% endif %}
@@ -116,18 +116,18 @@
      hx-swap="outerHTML"
      hx-indicator="#load-more-spinner"
      class="d-flex justify-center py-lg">
-    <div id="load-more-spinner" class="ux-spinner htmx-indicator"></div>
+    <div id="load-more-spinner" class="loading htmx-indicator"></div>
 </div>
 {% endif %}
 
 {% else %}
 <!-- No Results -->
-<div class="ux-empty-state py-2xl">
-    <div class="ux-empty-state__icon">
+<div class="flex flex-col items-center text-center py-12">
+    <div class="text-4xl mb-4 opacity-40">
         {% icon "search-outline" %}
     </div>
-    <h3 class="ux-empty-state__title">{% trans "No products found" %}</h3>
-    <p class="ux-empty-state__description">{% trans "Try adjusting your search or filters" %}</p>
+    <h3 class="text-lg font-semibold mb-2">{% trans "No products found" %}</h3>
+    <p class="text-sm opacity-60">{% trans "Try adjusting your search or filters" %}</p>
 </div>
 {% endif %}
 
@@ -243,7 +243,7 @@ function setButtonLoading(button, loading) {
     if (!button) return;
     button.disabled = loading;
     if (loading) {
-        button.innerHTML = '<div class="ux-spinner ux-spinner--sm"></div>';
+        button.innerHTML = '<div class="loading loading-sm"></div>';
     }
 }
 </script>

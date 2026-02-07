@@ -99,8 +99,6 @@ INSTALLED_APPS = [
     'apps.sync.apps.SyncConfig',
     'apps.core.apps.CoreConfig',
     'apps.modules_runtime',
-    # Hub apps - UI Components
-    'apps.ui.apps.UiConfig',
     # Hub apps - Auth
     'apps.auth.login.apps.AuthLoginConfig',
     # Hub apps - Main
@@ -108,7 +106,7 @@ INSTALLED_APPS = [
     'apps.main.files.apps.FilesConfig',
     'apps.main.settings.apps.MainSettingsConfig',
     'apps.main.employees.apps.MainEmployeesConfig',
-    'apps.main.setup.apps.SetupConfig',
+    'apps.setup.apps.SetupConfig',
     'apps.main.roles.apps.RolesConfig',
     # Hub apps - System
     'apps.system.modules.apps.SystemModulesConfig',
@@ -232,6 +230,13 @@ LANGUAGE_COOKIE_SAMESITE = 'Lax'
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# @erplora/ux library — served as static/ux/*
+# In dev: points to local ux repo dist/. In Docker: bundled in static/ux/
+_UX_DIST = Path(config('UX_DIST_PATH', default=str(BASE_DIR.parent.parent / 'ux' / 'dist')))
+if _UX_DIST.is_dir():
+    STATICFILES_DIRS.append(('ux', _UX_DIST))
+
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = 'media/'

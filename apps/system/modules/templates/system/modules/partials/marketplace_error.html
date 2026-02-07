@@ -1,12 +1,12 @@
 {% load i18n djicons %}
 
-<div class="ux-card border-l-4 border-danger">
-    <div class="ux-card__body text-center py-8">
+<div class="card border-l-4 border-danger">
+    <div class="card-body text-center py-8">
         {% icon "cloud-offline-outline" css_class="text-6xl text-danger mb-4" %}
         <h3 class="text-lg font-semibold text-danger mb-2">{% trans "Connection Error" %}</h3>
         <p class="mb-4 text-medium">{{ error }}</p>
         <button
-            class="ux-button ux-color-danger"
+            class="btn color-error"
             hx-get="{% url 'store:modules_list' %}"
             hx-target="#marketplace-modules-grid"
             hx-swap="innerHTML"

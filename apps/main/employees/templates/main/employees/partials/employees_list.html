@@ -2,47 +2,47 @@
 
 {% if local_users %}
 <!-- Desktop: DataTable View -->
-<div class="ux-hide-mobile">
-    <div class="ux-datatable">
-        <table class="ux-datatable__table">
-            <thead class="ux-datatable__thead">
+<div class="hidden sm:block">
+    <div class="table-wrapper">
+        <table class="table">
+            <thead>
                 <tr>
-                    <th class="ux-datatable__th">{% trans "Employee" %}</th>
-                    <th class="ux-datatable__th">{% trans "Email" %}</th>
-                    <th class="ux-datatable__th">{% trans "Role" %}</th>
-                    <th class="ux-datatable__th ux-datatable__th--actions">{% trans "Actions" %}</th>
+                    <th>{% trans "Employee" %}</th>
+                    <th>{% trans "Email" %}</th>
+                    <th>{% trans "Role" %}</th>
+                    <th class="text-right">{% trans "Actions" %}</th>
                 </tr>
             </thead>
-            <tbody class="ux-datatable__tbody">
+            <tbody>
                 {% for user in local_users %}
-                <tr class="ux-datatable__tr ux-datatable__tr--clickable"
+                <tr class="cursor-pointer"
                     hx-get="{% url 'main:employee_edit' user.id %}"
                     hx-target="#main-content-area"
                     hx-push-url="true">
-                    <td class="ux-datatable__td">
-                        <div class="ux-datatable__cell-flex">
+                    <td>
+                        <div class="flex items-center gap-3">
                             {% if user.avatar %}
-                            <div class="ux-avatar ux-avatar--md" style="background-image: url('{{ user.avatar.url }}');"></div>
+                            <div class="avatar" style="background-image: url('{{ user.avatar.url }}');"></div>
                             {% else %}
-                            <div class="ux-avatar ux-avatar--md ux-avatar--{{ user.get_role_color|default:'primary' }}">
-                                <span class="ux-avatar__initials">{{ user.get_initials }}</span>
+                            <div class="avatar avatar--{{ user.get_role_color|default:'primary' }}">
+                                <span>{{ user.get_initials }}</span>
                             </div>
                             {% endif %}
-                            <div class="ux-datatable__cell-info">
-                                <span class="ux-datatable__cell-title">{{ user.name }}</span>
+                            <div class="min-w-0">
+                                <span class="font-medium">{{ user.name }}</span>
                             </div>
                         </div>
                     </td>
-                    <td class="ux-datatable__td">
-                        <span class="ux-text-secondary">{{ user.email }}</span>
+                    <td>
+                        <span class="text-base-content/60">{{ user.email }}</span>
                     </td>
-                    <td class="ux-datatable__td">
-                        <span class="ux-badge ux-badge--{{ user.get_role_color|default:'primary' }}">
+                    <td>
+                        <span class="badge color-{{ user.get_role_color|default:'primary' }}">
                             {{ user.get_role_display }}
                         </span>
                     </td>
-                    <td class="ux-datatable__td ux-datatable__td--actions" onclick="event.stopPropagation();">
-                        <button class="ux-icon-btn ux-icon-btn--sm ux-icon-btn--primary"
+                    <td class="text-right" onclick="event.stopPropagation();">
+                        <button class="btn btn-ghost btn-circle btn-sm color-primary"
                                 hx-get="{% url 'main:employee_edit' user.id %}"
                                 hx-target="#main-content-area"
                                 hx-push-url="true"
@@ -58,30 +58,30 @@
 </div>
 
 <!-- Mobile: Card View -->
-<div class="ux-show-mobile">
-    <div class="ux-card-grid">
+<div class="block sm:hidden">
+    <div class="card-grid">
         {% for user in local_users %}
-        <div class="ux-card ux-card--glass ux-card--clickable"
+        <div class="card glass card-clickable"
              hx-get="{% url 'main:employee_edit' user.id %}"
              hx-target="#main-content-area"
              hx-push-url="true">
-            <div class="ux-card__body">
-                <div class="ux-card__row">
+            <div class="card-body">
+                <div class="flex items-center gap-3">
                     {% if user.avatar %}
-                    <div class="ux-avatar ux-avatar--lg" style="background-image: url('{{ user.avatar.url }}');"></div>
+                    <div class="avatar avatar-lg" style="background-image: url('{{ user.avatar.url }}');"></div>
                     {% else %}
-                    <div class="ux-avatar ux-avatar--lg ux-avatar--{{ user.get_role_color|default:'primary' }}">
-                        <span class="ux-avatar__initials">{{ user.get_initials }}</span>
+                    <div class="avatar avatar-lg avatar--{{ user.get_role_color|default:'primary' }}">
+                        <span>{{ user.get_initials }}</span>
                     </div>
                     {% endif %}
-                    <div class="ux-card__info">
-                        <h3 class="ux-card__title">{{ user.name }}</h3>
-                        <p class="ux-card__subtitle">{{ user.email }}</p>
-                        <span class="ux-badge ux-badge--sm ux-badge--{{ user.get_role_color|default:'primary' }} ux-mt-xs">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="card-title">{{ user.name }}</h3>
+                        <p class="card-subtitle">{{ user.email }}</p>
+                        <span class="badge badge-sm color-{{ user.get_role_color|default:'primary' }} mt-1">
                             {{ user.get_role_display }}
                         </span>
                     </div>
-                    <span class="ux-card__chevron">
+                    <span>
                         {% icon "chevron-forward-outline" %}
                     </span>
                 </div>
@@ -93,22 +93,22 @@
 
 {% else %}
 <!-- Empty State -->
-<div class="ux-empty-state">
-    <div class="ux-empty-state__icon">
+<div class="flex flex-col items-center justify-center py-12">
+    <div class="text-4xl mb-4 opacity-40">
         {% if search_query %}
         {% icon "search-outline" %}
         {% else %}
         {% icon "people-outline" %}
         {% endif %}
     </div>
-    <h3 class="ux-empty-state__title">
+    <h3 class="text-lg font-semibold mb-2">
         {% if search_query %}
         {% trans "No employees found" %}
         {% else %}
         {% trans "No employees yet" %}
         {% endif %}
     </h3>
-    <p class="ux-empty-state__description">
+    <p class="text-sm opacity-60 mb-4">
         {% if search_query %}
         {% trans "Try a different search term" %}
         {% else %}
@@ -116,7 +116,7 @@
         {% endif %}
     </p>
     {% if not search_query %}
-    <button class="ux-button ux-color-primary"
+    <button class="btn color-primary"
             hx-get="{% url 'main:employee_add' %}"
             hx-target="#main-content-area"
             hx-push-url="true">

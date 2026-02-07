@@ -8,9 +8,9 @@
       hx-swap="innerHTML">
     {% csrf_token %}
     {% ui_list_start %}
-        <div class="ux-list__item">
-            <label for="pin" class="ux-label">{% trans "New PIN (4 digits)" %}</label>
-            <input class="ux-input"
+        <div class="list-item">
+            <label for="pin" class="form-group-label">{% trans "New PIN (4 digits)" %}</label>
+            <input class="input"
                 name="pin"
                 id="pin"
                 type="password"
@@ -19,7 +19,7 @@
                 required>
         </div>
     {% ui_list_end %}
-    <div style="padding-top: var(--ux-space-md);">
+    <div style="padding-top: 1rem;">
         {% ui_button type="submit" expand="block" fill="outline" color="warning" label=_("Reset PIN") icon="key-outline" %}
     </div>
 </form>

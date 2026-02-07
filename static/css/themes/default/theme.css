@@ -1,0 +1,33 @@
+/**
+ * ERPlora Hub - Default Theme (Indigo)
+ * Overrides @erplora/ux v3 design tokens
+ */
+
+/* ========================================
+   LIGHT MODE - Override UX primary to Indigo
+   ======================================== */
+
+:root {
+  /* Primary - ERPlora brand indigo */
+  --color-primary: #4F5BD5;
+  --color-primary-content: #ffffff;
+
+  /* Error - Slightly darker red */
+  --color-error: #d4183d;
+  --color-error-content: #ffffff;
+}
+
+/* ========================================
+   DARK MODE
+   ======================================== */
+
+[data-theme="dark"],
+.dark {
+  /* Primary - Lighter indigo for dark mode */
+  --color-primary: #7B8CE8;
+  --color-primary-content: #000000;
+
+  /* Error - Adjusted for dark mode */
+  --color-error: #eb445a;
+  --color-error-content: #ffffff;
+}

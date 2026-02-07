@@ -1,23 +1,23 @@
 {% load i18n djicons %}
 
-<div class="ux-page">
+<div class="page">
     <!-- Header Toolbar -->
-    <header class="ux-header">
-        <div class="ux-toolbar ux-toolbar--glass ux-margin-horizontal" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
-            <div class="ux-toolbar__start">
-                <button class="ux-back-button"
+    <header class="header">
+        <div class="glass mx-4" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
+            <div class="flex items-center">
+                <button class="btn btn-ghost btn-sm"
                         hx-get="{% url 'main:roles:index' %}"
                         hx-target="#main-content-area"
                         hx-push-url="true">
                     {% icon "arrow-back-outline" %}
                 </button>
             </div>
-            <div class="ux-toolbar__center">
-                <h1 class="ux-toolbar__title">{{ role.display_name }}</h1>
+            <div class="flex-1 flex items-center justify-center">
+                <h1 class="font-semibold">{{ role.display_name }}</h1>
             </div>
-            <div class="ux-toolbar__end">
+            <div class="flex items-center gap-2">
                 {% if not role.is_system %}
-                <button class="ux-button ux-button--sm ux-button--outline"
+                <button class="btn btn-sm btn-outline"
                         hx-get="{% url 'main:roles:edit' role_id=role.id %}"
                         hx-target="#main-content-area"
                         hx-push-url="true">
@@ -29,32 +29,32 @@
     </header>
 
     <!-- Content -->
-    <div class="ux-page__content" style="flex: 1; overflow: auto;">
-        <div class="ux-padding">
+    <div style="flex: 1; overflow: auto;">
+        <div class="p-4">
             <!-- Role Info Card -->
-            <div class="ux-card ux-card--glass ux-mb-lg">
-                <div class="ux-card__content">
-                    <p class="ux-text-secondary ux-mb-md">{{ role.description|default:_("No description") }}</p>
+            <div class="card glass mb-6">
+                <div class="card-body">
+                    <p class="text-base-content/60 mb-4">{{ role.description|default:_("No description") }}</p>
 
                     <!-- Badges -->
-                    <div class="ux-flex ux-gap-sm ux-flex-wrap ux-mb-lg">
+                    <div class="flex gap-2 flex-wrap mb-6">
                         {% if role.is_system %}
-                        <span class="ux-badge ux-badge--medium">{% trans "System" %}</span>
+                        <span class="badge color-neutral">{% trans "System" %}</span>
                         {% endif %}
                         {% if role.is_active %}
-                        <span class="ux-badge ux-badge--success">{% trans "Active" %}</span>
+                        <span class="badge color-success">{% trans "Active" %}</span>
                         {% else %}
-                        <span class="ux-badge ux-badge--warning">{% trans "Inactive" %}</span>
+                        <span class="badge color-warning">{% trans "Inactive" %}</span>
                         {% endif %}
                         {% if '*' in wildcards %}
-                        <span class="ux-badge ux-badge--primary">{% trans "Full Access" %}</span>
+                        <span class="badge color-primary">{% trans "Full Access" %}</span>
                         {% endif %}
                     </div>
 
                     <!-- Actions -->
-                    <div class="ux-flex ux-gap-sm ux-flex-wrap">
+                    <div class="flex gap-2 flex-wrap">
                         {% if not role.is_system or role.name != 'admin' %}
-                        <button class="ux-button ux-button--sm ux-button--outline {% if role.is_active %}ux-color-warning{% else %}ux-color-success{% endif %}"
+                        <button class="btn btn-sm btn-outline {% if role.is_active %}color-warning{% else %}color-success{% endif %}"
                                 hx-post="{% url 'main:roles:toggle_active' role_id=role.id %}"
                                 hx-target="#main-content-area">
                             {% if role.is_active %}
@@ -67,7 +67,7 @@
                         </button>
                         {% endif %}
                         {% if not role.is_system %}
-                        <button class="ux-button ux-button--sm ux-button--outline ux-color-danger"
+                        <button class="btn btn-sm btn-outline color-error"
                                 hx-get="{% url 'main:roles:delete' role_id=role.id %}"
                                 hx-target="#main-content-area"
                                 hx-push-url="true">
@@ -80,19 +80,19 @@
             </div>
 
             <!-- Module Permissions Section -->
-            <h3 class="ux-text-lg ux-font-semibold ux-mb-md">{% trans "Module Permissions" %}</h3>
+            <h3 class="text-lg font-semibold mb-4">{% trans "Module Permissions" %}</h3>
 
             {% if role.name == 'admin' %}
             <!-- Admin Notice -->
-            <div class="ux-card ux-card--glass ux-mb-lg">
-                <div class="ux-card__content">
-                    <div class="ux-flex ux-align-center ux-gap-md">
-                        <span class="ux-text-primary" style="font-size: 1.5rem;">
+            <div class="card glass mb-6">
+                <div class="card-body">
+                    <div class="flex items-center gap-4">
+                        <span class="text-primary" style="font-size: 1.5rem;">
                             {% icon "shield-checkmark" %}
                         </span>
                         <div>
-                            <p class="ux-font-semibold ux-mb-0">{% trans "Administrator Role" %}</p>
-                            <p class="ux-text-secondary ux-text-sm ux-mb-0">{% trans "This role has full access to all permissions. Permissions cannot be modified." %}</p>
+                            <p class="font-semibold mb-0">{% trans "Administrator Role" %}</p>
+                            <p class="text-base-content/60 text-sm mb-0">{% trans "This role has full access to all permissions. Permissions cannot be modified." %}</p>
                         </div>
                     </div>
                 </div>
@@ -101,7 +101,7 @@
 
             <!-- Modules Accordion -->
             {% if modules %}
-            <div class="ux-accordion" x-data="uxAccordion({ multiple: true })">
+            <div class="accordion" x-data="uxAccordion({ multiple: true })">
                 {% for module in modules %}
                 <div id="module-{{ module.id }}">
                     {% include "main/roles/partials/module_card.html" with role=role module=module expanded_permissions=expanded_permissions %}
@@ -110,14 +110,14 @@
             </div>
             {% else %}
             <!-- Empty State -->
-            <div class="ux-card ux-card--glass">
-                <div class="ux-card__content ux-text-center ux-py-xl">
-                    <div class="ux-mb-md" style="font-size: 3rem; color: var(--ux-text-tertiary);">
+            <div class="card glass">
+                <div class="card-body text-center py-8">
+                    <div class="mb-4" style="font-size: 3rem; color: var(--color-base-content); opacity: 0.4;">
                         {% icon "cube-outline" %}
                     </div>
-                    <h4 class="ux-mb-sm">{% trans "No modules found" %}</h4>
-                    <p class="ux-text-secondary ux-mb-lg">{% trans "Sync permissions from modules first." %}</p>
-                    <button class="ux-button ux-color-primary"
+                    <h4 class="mb-2">{% trans "No modules found" %}</h4>
+                    <p class="text-base-content/60 mb-6">{% trans "Sync permissions from modules first." %}</p>
+                    <button class="btn color-primary"
                             hx-post="{% url 'main:roles:sync_permissions' %}"
                             hx-target="#main-content-area">
                         {% icon "sync-outline" %}
@@ -129,22 +129,22 @@
 
             <!-- Advanced Wildcards Section (not for admin) -->
             {% if role.name != 'admin' %}
-            <div class="ux-card ux-card--glass ux-mt-xl">
-                <div class="ux-card__header">
-                    <h4 class="ux-card__title">{% trans "Advanced: Custom Wildcards" %}</h4>
+            <div class="card glass mt-8">
+                <div class="card-header">
+                    <h4 class="card-title">{% trans "Advanced: Custom Wildcards" %}</h4>
                 </div>
-                <div class="ux-card__content">
-                    <p class="ux-text-secondary ux-text-sm ux-mb-md">{% trans "Add custom wildcard patterns for advanced permission rules (e.g., inventory.view_*, *.delete_*)." %}</p>
+                <div class="card-body">
+                    <p class="text-base-content/60 text-sm mb-4">{% trans "Add custom wildcard patterns for advanced permission rules (e.g., inventory.view_*, *.delete_*)." %}</p>
 
                     <!-- Current Wildcards -->
-                    <div class="ux-flex ux-flex-wrap ux-gap-sm ux-mb-lg">
+                    <div class="flex flex-wrap gap-2 mb-6">
                         {% for wildcard in wildcards %}
                         {% if '.*' not in wildcard or wildcard == '*' %}
-                        <span class="ux-badge ux-badge--tertiary ux-badge--lg">
+                        <span class="badge badge-lg color-secondary">
                             {{ wildcard }}
                             {% if wildcard != '*' %}
                             <button type="button"
-                                    class="ux-badge__close"
+                                    class="ml-1 cursor-pointer"
                                     hx-post="{% url 'main:roles:api_remove_wildcard' role_id=role.id wildcard=wildcard %}"
                                     hx-target="#main-content-area"
                                     hx-swap="innerHTML"
@@ -155,20 +155,20 @@
                         </span>
                         {% endif %}
                         {% empty %}
-                        <p class="ux-text-secondary ux-text-sm">{% trans "No custom wildcards." %}</p>
+                        <p class="text-base-content/60 text-sm">{% trans "No custom wildcards." %}</p>
                         {% endfor %}
                     </div>
 
                     <!-- Add Wildcard Form -->
-                    <div class="ux-flex ux-gap-sm ux-align-center" x-data="{ wildcard: '' }">
-                        <div class="ux-input-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="flex gap-2 items-center" x-data="{ wildcard: '' }">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <input type="text"
-                                   class="ux-input"
+                                   class="input"
                                    placeholder="{% trans 'e.g., inventory.view_*, *.export_*' %}"
                                    x-model="wildcard">
                         </div>
                         <button type="button"
-                                class="ux-button ux-button--sm ux-color-primary"
+                                class="btn btn-sm color-primary"
                                 @click="
                                     if (wildcard.includes('*')) {
                                         fetch('{% url 'main:roles:api_add_wildcard' role_id=role.id %}', {

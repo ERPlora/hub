@@ -18,7 +18,7 @@
                   hx-post
                   hx-target="#main-content-area">
                 {% csrf_token %}
-                <div class="d-flex gap-md justify-center mt-lg">
+                <div class="flex gap-4 justify-center mt-6">
                     <a href="{% url 'main:roles:detail' role_id=role.id %}"
                        hx-get="{% url 'main:roles:detail' role_id=role.id %}"
                        hx-target="#main-content-area"

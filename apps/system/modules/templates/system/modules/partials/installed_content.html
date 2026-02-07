@@ -11,17 +11,17 @@
             hx-indicator="#modules-loading">
 
             <input type="search"
-                class="ux-input"
+                class="input"
                 id="modules-search"
                 name="q"
                 placeholder="{% trans 'Search modules...' %}"
                 value="{{ request.GET.q|default:'' }}"
-                style="margin-bottom: var(--ux-space-md);">
+                style="margin-bottom: var(--spacing-md);">
         </form>
 
         <!-- Loading Spinner -->
         <div id="modules-loading" class="htmx-indicator justify-center py-lg">
-            <div class="ux-spinner"></div>
+            <div class="loading"></div>
         </div>
 
         <!-- Modules List Container with internal scroll -->
@@ -48,19 +48,19 @@
 
         // Create UX alert backdrop
         const backdrop = document.createElement('div');
-        backdrop.className = 'ux-alert-backdrop';
+        backdrop.className = 'alert-backdrop';
         backdrop.setAttribute('data-state', 'open');
         backdrop.innerHTML = `
-            <div class="ux-alert">
-                <div class="ux-alert__header">
+            <div class="alert">
+                <div class="alert-header">
                     <h3>{% trans "Deactivate Module" %}</h3>
                 </div>
-                <div class="ux-alert__body">
+                <div class="alert-body">
                     <p>{% trans "Are you sure you want to deactivate" %} <strong>${moduleName}</strong>?</p>
                 </div>
-                <div class="ux-alert__footer">
-                    <button class="ux-button ux-button--outline" data-role="cancel">{% trans "Cancel" %}</button>
-                    <button class="ux-button ux-color-warning" data-role="confirm">{% trans "Deactivate" %}</button>
+                <div class="alert-footer">
+                    <button class="btn btn-outline" data-role="cancel">{% trans "Cancel" %}</button>
+                    <button class="btn color-warning" data-role="confirm">{% trans "Deactivate" %}</button>
                 </div>
             </div>
         `;
@@ -92,20 +92,20 @@
 
         // Create UX alert backdrop
         const backdrop = document.createElement('div');
-        backdrop.className = 'ux-alert-backdrop';
+        backdrop.className = 'alert-backdrop';
         backdrop.setAttribute('data-state', 'open');
         backdrop.innerHTML = `
-            <div class="ux-alert">
-                <div class="ux-alert__header">
+            <div class="alert">
+                <div class="alert-header">
                     <h3>{% trans "Delete Module" %}</h3>
-                    <p class="ux-text-secondary">{% trans "This action cannot be undone" %}</p>
+                    <p class="text-base-content/60">{% trans "This action cannot be undone" %}</p>
                 </div>
-                <div class="ux-alert__body">
+                <div class="alert-body">
                     <p>{% trans "This will permanently delete" %} <strong>${moduleName}</strong> {% trans "and all its data." %}</p>
                 </div>
-                <div class="ux-alert__footer">
-                    <button class="ux-button ux-button--outline" data-role="cancel">{% trans "Cancel" %}</button>
-                    <button class="ux-button ux-color-danger" data-role="confirm">{% trans "Delete" %}</button>
+                <div class="alert-footer">
+                    <button class="btn btn-outline" data-role="cancel">{% trans "Cancel" %}</button>
+                    <button class="btn color-error" data-role="confirm">{% trans "Delete" %}</button>
                 </div>
             </div>
         `;

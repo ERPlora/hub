@@ -5,17 +5,17 @@
     <!-- Category Filter -->
     <div class="mb-lg">
         <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Category" %}</h3>
-        <div class="ux-chip-group">
+        <div class="flex flex-wrap gap-2">
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': categoryFilter === '' }"
+                    class="chip"
+                    :class="{ 'chip-active': categoryFilter === '' }"
                     @click="setCategory('')">
                 {% trans "All Categories" %}
             </button>
             {% for category in filters.categories %}
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': categoryFilter === '{{ category.id }}' }"
+                    class="chip"
+                    :class="{ 'chip-active': categoryFilter === '{{ category.id }}' }"
                     @click="setCategory('{{ category.id }}')">
                 {{ category.name }}
             </button>
@@ -26,17 +26,17 @@
     <!-- Industry Filter -->
     <div class="mb-lg">
         <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Industry" %}</h3>
-        <div class="ux-chip-group">
+        <div class="flex flex-wrap gap-2">
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': industryFilter === '' }"
+                    class="chip"
+                    :class="{ 'chip-active': industryFilter === '' }"
                     @click="setIndustry('')">
                 {% trans "All Industries" %}
             </button>
             {% for industry in filters.industries %}
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': industryFilter === '{{ industry.id }}' }"
+                    class="chip"
+                    :class="{ 'chip-active': industryFilter === '{{ industry.id }}' }"
                     @click="setIndustry('{{ industry.id }}')">
                 {{ industry.name }}
             </button>
@@ -47,19 +47,19 @@
     <!-- Type Filter -->
     <div class="mb-lg">
         <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Pricing" %}</h3>
-        <div class="ux-chip-group">
+        <div class="flex flex-wrap gap-2">
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': typeFilter === '' }"
+                    class="chip"
+                    :class="{ 'chip-active': typeFilter === '' }"
                     @click="setType('')">
                 {% trans "All Types" %}
             </button>
             {% for type in filters.types %}
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': typeFilter === '{{ type.id }}' }"
+                    class="chip"
+                    :class="{ 'chip-active': typeFilter === '{{ type.id }}' }"
                     @click="setType('{{ type.id }}')">
-                {% if type.icon %}<span class="ux-chip__icon">{% icon type.icon %}</span>{% endif %}
+                {% if type.icon %}{% icon type.icon %}{% endif %}
                 {{ type.name }}
             </button>
             {% endfor %}
@@ -70,17 +70,17 @@
     <!-- Region Filter -->
     <div class="mb-lg">
         <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Region" %}</h3>
-        <div class="ux-chip-group">
+        <div class="flex flex-wrap gap-2">
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': regionFilter === '' }"
+                    class="chip"
+                    :class="{ 'chip-active': regionFilter === '' }"
                     @click="setRegion('')">
                 {% trans "All Regions" %}
             </button>
             {% for region in filters.regions %}
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': regionFilter === '{{ region.id }}' }"
+                    class="chip"
+                    :class="{ 'chip-active': regionFilter === '{{ region.id }}' }"
                     @click="setRegion('{{ region.id }}')">
                 {{ region.name }}
             </button>
@@ -91,17 +91,17 @@
     <!-- Plan Filter -->
     <div class="mb-lg">
         <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Plan" %}</h3>
-        <div class="ux-chip-group">
+        <div class="flex flex-wrap gap-2">
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': planFilter === '' }"
+                    class="chip"
+                    :class="{ 'chip-active': planFilter === '' }"
                     @click="setPlan('')">
                 {% trans "All Plans" %}
             </button>
             {% for plan in filters.plans %}
             <button type="button"
-                    class="ux-chip ux-chip--interactive"
-                    :class="{ 'ux-chip--selected': planFilter === '{{ plan.id }}' }"
+                    class="chip"
+                    :class="{ 'chip-active': planFilter === '{{ plan.id }}' }"
                     @click="setPlan('{{ plan.id }}')">
                 {{ plan.name }}
             </button>
@@ -113,7 +113,7 @@
     <!-- Apply Button (mobile friendly) -->
     <div class="mt-lg">
         <button type="button"
-                class="ux-button ux-button--lg ux-color-primary"
+                class="btn btn-lg color-primary"
                 style="width: 100%;"
                 @click="applyAndClose()">
             {% icon "checkmark-outline" %}

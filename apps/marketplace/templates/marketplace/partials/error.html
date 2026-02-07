@@ -1,10 +1,10 @@
 {% load i18n djicons %}
 
-<div class="ux-padding error-state" style="text-align: center;">
-    {% icon "cloud-offline-outline" style="font-size: 64px; color: var(--ux-danger);" %}
+<div class="p-4 error-state" style="text-align: center;">
+    {% icon "cloud-offline-outline" style="font-size: 64px; color: var(--color-error);" %}
     <h3>{% trans "Connection Error" %}</h3>
     <p class="text-medium">{{ error }}</p>
-    <button class="ux-button" onclick="location.reload()">
+    <button class="btn" onclick="location.reload()">
         {% icon "refresh-outline" %}
         {% trans "Retry" %}
     </button>

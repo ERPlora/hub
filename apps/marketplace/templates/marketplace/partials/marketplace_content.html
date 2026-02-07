@@ -32,19 +32,19 @@
         <form id="marketplace-filters-form"
             hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
             hx-target="#products-grid" hx-swap="innerHTML"
-            hx-trigger="submit, change from:input[type=hidden], input from:.ux-searchbar__input delay:300ms"
+            hx-trigger="submit, change from:input[type=hidden], input from:.searchbar-input delay:300ms"
             hx-indicator="#loading-spinner">
 
             {# Search Bar with Filter Button #}
-            <div class="d-flex gap-sm mb-md align-center">
-                <div class="ux-searchbar flex-1" x-data="{ focused: false, hasValue: '{{ request.GET.q|default:'' }}' !== '' }"
-                     :class="{ 'ux-searchbar--focused': focused, 'ux-searchbar--has-value': hasValue }">
-                    <div class="ux-searchbar__container">
-                        <span class="ux-searchbar__icon">
+            <div class="d-flex gap-2 mb-4 align-center">
+                <div class="searchbar flex-1" x-data="{ focused: false, hasValue: '{{ request.GET.q|default:'' }}' !== '' }"
+                     :class="{ 'searchbar--focused': focused, 'searchbar--has-value': hasValue }">
+                    <div class="searchbar-container">
+                        <span class="searchbar-icon">
                             {% icon "search-outline" %}
                         </span>
                         <input type="search"
-                               class="ux-searchbar__input"
+                               class="searchbar-input"
                                id="search-input"
                                name="q"
                                placeholder="{% trans 'Search modules...' %}"
@@ -53,7 +53,7 @@
                                @blur="focused = false"
                                @input="hasValue = $el.value.length > 0">
                         <button type="button"
-                                class="ux-searchbar__clear"
+                                class="searchbar-clear"
                                 @click="$refs.searchInput ? $refs.searchInput.value = '' : document.getElementById('search-input').value = ''; hasValue = false; document.getElementById('search-input').dispatchEvent(new Event('input', { bubbles: true }));"
                                 x-show="hasValue">
                             {% icon "close" %}
@@ -62,12 +62,12 @@
                 </div>
                 <button type="button"
                         id="filter-toggle-btn"
-                        class="ux-button ux-button--outline ux-button--icon-only"
+                        class="btn btn-outline btn-icon-only"
                         onclick="openFiltersModal()"
                         style="position: relative;">
                     {% icon "options-outline" %}
                     {% if active_filters_count %}
-                    <span class="ux-badge ux-badge--sm ux-color-danger" style="position: absolute; top: -4px; right: -4px;">
+                    <span class="badge badge-sm color-error" style="position: absolute; top: -4px; right: -4px;">
                         {{ active_filters_count }}
                     </span>
                     {% endif %}
@@ -82,15 +82,15 @@
             <input type="hidden" name="plan" id="filter-plan" value="{{ request.GET.plan|default:'' }}">
 
             <!-- Active Filters Display -->
-            <div id="active-filters" class="ux-chip-group mb-md" style="display: none;">
+            <div id="active-filters" class="flex flex-wrap gap-2 mb-4" style="display: none;">
                 <span class="fs-sm text-medium mr-sm">{% trans "Active:" %}</span>
-                <div id="active-filters-chips" class="ux-chip-group"></div>
+                <div id="active-filters-chips" class="flex flex-wrap gap-2"></div>
             </div>
         </form>
 
         <!-- Loading Spinner -->
-        <div id="loading-spinner" class="htmx-indicator d-flex justify-center py-xl">
-            <div class="ux-spinner"></div>
+        <div id="loading-spinner" class="htmx-indicator d-flex justify-center py-8">
+            <div class="loading"></div>
         </div>
 
         <!-- Products Grid Container with scroll -->
@@ -98,8 +98,8 @@
             <div id="products-grid"
                 hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
                 hx-trigger="load" hx-swap="innerHTML" hx-indicator="#loading-spinner">
-                <div class="d-flex justify-center py-xl">
-                    <div class="ux-spinner"></div>
+                <div class="d-flex justify-center py-8">
+                    <div class="loading"></div>
                 </div>
             </div>
         </div>
@@ -107,25 +107,25 @@
 {% endcomponent %}
 
 <!-- Filters Modal -->
-<div class="ux-modal-backdrop" id="filters-modal-backdrop" data-state="closed"
+<div class="modal-backdrop" id="filters-modal-backdrop" data-state="closed"
      x-data="{ open: false }"
      :data-state="open ? 'open' : 'closed'"
      @click.self="open = false; closeFiltersModal()">
-    <div class="ux-modal ux-modal--lg">
-        <div class="ux-modal__header">
-            <h2 class="ux-modal__title">{% trans "Filters" %}</h2>
-            <button class="ux-modal__close" onclick="closeFiltersModal()">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2 class="modal-title">{% trans "Filters" %}</h2>
+            <button class="modal-close" onclick="closeFiltersModal()">
                 {% icon "close" %}
             </button>
         </div>
-        <div class="ux-modal__body">
+        <div class="modal-body">
             {% if store_type == 'modules' %}
             <!-- Category Filter -->
             <div class="mb-lg">
                 <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Category" %}</h3>
-                <div class="ux-chip-group">
+                <div class="flex flex-wrap gap-2">
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if not request.GET.category %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if not request.GET.category %}chip-active{% endif %}"
                             data-filter="category"
                             data-value=""
                             onclick="setFilter('category', '')">
@@ -133,7 +133,7 @@
                     </button>
                     {% for category in filters.categories %}
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if request.GET.category == category.id %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if request.GET.category == category.id %}chip-active{% endif %}"
                             data-filter="category"
                             data-value="{{ category.id }}"
                             onclick="setFilter('category', '{{ category.id }}')">
@@ -146,9 +146,9 @@
             <!-- Industry Filter -->
             <div class="mb-lg">
                 <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Industry" %}</h3>
-                <div class="ux-chip-group">
+                <div class="flex flex-wrap gap-2">
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if not request.GET.industry %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if not request.GET.industry %}chip-active{% endif %}"
                             data-filter="industry"
                             data-value=""
                             onclick="setFilter('industry', '')">
@@ -156,7 +156,7 @@
                     </button>
                     {% for industry in filters.industries %}
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if request.GET.industry == industry.id %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if request.GET.industry == industry.id %}chip-active{% endif %}"
                             data-filter="industry"
                             data-value="{{ industry.id }}"
                             onclick="setFilter('industry', '{{ industry.id }}')">
@@ -169,9 +169,9 @@
             <!-- Pricing Type Filter -->
             <div class="mb-lg">
                 <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Pricing" %}</h3>
-                <div class="ux-chip-group">
+                <div class="flex flex-wrap gap-2">
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if not request.GET.type %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if not request.GET.type %}chip-active{% endif %}"
                             data-filter="type"
                             data-value=""
                             onclick="setFilter('type', '')">
@@ -179,11 +179,11 @@
                     </button>
                     {% for type in filters.types %}
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if request.GET.type == type.id %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if request.GET.type == type.id %}chip-active{% endif %}"
                             data-filter="type"
                             data-value="{{ type.id }}"
                             onclick="setFilter('type', '{{ type.id }}')">
-                        {% if type.icon %}<span class="ux-chip__icon">{% icon type.icon %}</span>{% endif %}
+                        {% if type.icon %}{% icon type.icon %}{% endif %}
                         {{ type.name }}
                     </button>
                     {% endfor %}
@@ -194,9 +194,9 @@
             <!-- Region Filter -->
             <div class="mb-lg">
                 <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Region" %}</h3>
-                <div class="ux-chip-group">
+                <div class="flex flex-wrap gap-2">
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if not request.GET.region %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if not request.GET.region %}chip-active{% endif %}"
                             data-filter="region"
                             data-value=""
                             onclick="setFilter('region', '')">
@@ -204,7 +204,7 @@
                     </button>
                     {% for region in filters.regions %}
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if request.GET.region == region.id %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if request.GET.region == region.id %}chip-active{% endif %}"
                             data-filter="region"
                             data-value="{{ region.id }}"
                             onclick="setFilter('region', '{{ region.id }}')">
@@ -217,9 +217,9 @@
             <!-- Plan Filter -->
             <div class="mb-lg">
                 <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Plan" %}</h3>
-                <div class="ux-chip-group">
+                <div class="flex flex-wrap gap-2">
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if not request.GET.plan %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if not request.GET.plan %}chip-active{% endif %}"
                             data-filter="plan"
                             data-value=""
                             onclick="setFilter('plan', '')">
@@ -227,7 +227,7 @@
                     </button>
                     {% for plan in filters.plans %}
                     <button type="button"
-                            class="ux-chip ux-chip--interactive filter-chip {% if request.GET.plan == plan.id %}ux-chip--selected{% endif %}"
+                            class="chip filter-chip {% if request.GET.plan == plan.id %}chip-active{% endif %}"
                             data-filter="plan"
                             data-value="{{ plan.id }}"
                             onclick="setFilter('plan', '{{ plan.id }}')">
@@ -238,12 +238,12 @@
             </div>
             {% endif %}
         </div>
-        <div class="ux-modal__footer">
-            <button type="button" class="ux-button ux-button--outline ux-color-danger" onclick="clearAllFilters()">
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline color-error" onclick="clearAllFilters()">
                 {% icon "trash-outline" %}
                 <span>{% trans "Clear" %}</span>
             </button>
-            <button type="button" class="ux-button ux-color-primary" onclick="applyFilters()">
+            <button type="button" class="btn color-primary" onclick="applyFilters()">
                 {% trans "Apply" %}
             </button>
         </div>
@@ -288,9 +288,9 @@
         document.querySelectorAll('.filter-chip[data-filter="' + filterName + '"]').forEach(function (chip) {
             var chipValue = chip.dataset.value;
             if (chipValue === activeValue) {
-                chip.classList.add('ux-chip--selected');
+                chip.classList.add('chip-active');
             } else {
-                chip.classList.remove('ux-chip--selected');
+                chip.classList.remove('chip-active');
             }
         });
     }
@@ -330,8 +330,8 @@
         if (searchValue) {
             var searchChip = document.createElement('button');
             searchChip.type = 'button';
-            searchChip.className = 'ux-chip ux-chip--interactive ux-color-warning';
-            searchChip.innerHTML = '<span class="ux-chip__icon">' + document.querySelector('[data-icon="search-outline"]')?.outerHTML || '<svg></svg>' + '</span>' + searchValue + '<span class="ux-chip__close" onclick="clearSearch(); event.stopPropagation();"><svg viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg></span>';
+            searchChip.className = 'chip color-warning';
+            searchChip.innerHTML = (document.querySelector('[data-icon="search-outline"]')?.outerHTML || '<svg></svg>') + ' ' + searchValue + '<button type="button" onclick="clearSearch(); event.stopPropagation();"><svg viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg></button>';
             searchChip.addEventListener('click', function() { clearSearch(); });
             chipsContainer.appendChild(searchChip);
             count++;
@@ -343,8 +343,8 @@
             if (input && input.value) {
                 var chip = document.createElement('button');
                 chip.type = 'button';
-                chip.className = 'ux-chip ux-chip--interactive ux-color-warning';
-                chip.innerHTML = input.value + '<span class="ux-chip__close"><svg viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg></span>';
+                chip.className = 'chip color-warning';
+                chip.innerHTML = input.value + '<button type="button"><svg viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg></button>';
                 chip.addEventListener('click', function() { removeFilter(filter); });
                 chipsContainer.appendChild(chip);
                 count++;
@@ -360,11 +360,11 @@
 
         // Update badge on filter button
         if (filterToggleBtn) {
-            var badge = filterToggleBtn.querySelector('.ux-badge');
+            var badge = filterToggleBtn.querySelector('.badge');
             if (count > 0) {
                 if (!badge) {
                     badge = document.createElement('span');
-                    badge.className = 'ux-badge ux-badge--sm ux-color-danger';
+                    badge.className = 'badge badge-sm color-error';
                     badge.style.cssText = 'position: absolute; top: -4px; right: -4px;';
                     filterToggleBtn.appendChild(badge);
                 }

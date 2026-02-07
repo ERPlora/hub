@@ -1,0 +1,80 @@
+{% load i18n djicons %}
+
+{% include "setup/partials/stepper.html" %}
+
+{% if errors %}
+<div class="callout callout-warning" style="margin-bottom: var(--space-4);">
+    {% for error in errors %}
+    <p>{% icon "alert-circle-outline" %} {{ error }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="stepper-content">
+    <div class="setup-step">
+        <div class="setup-step__icon">
+            {% icon "globe-outline" %}
+        </div>
+        <h2 class="setup-step__title">{% trans "Regional Settings" %}</h2>
+        <p class="setup-step__description">{% trans "Set your language and timezone" %}</p>
+
+        <form hx-post="{% url 'setup:step' step=1 %}"
+              hx-target="#wizard-step-content"
+              hx-swap="innerHTML">
+            {% csrf_token %}
+
+            <div class="setup-step__fields">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-group-label" for="language">{% trans "System Language" %}</label>
+                        <select class="input glass" name="language" id="language">
+                            {% for code, name in languages %}
+                            <option value="{{ code }}" {% if hub_config.language == code or code == 'en' and not hub_config.language %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-group-label" for="tz-search">{% trans "Timezone" %}</label>
+                        <div class="tz-search-wrapper"
+                             x-data="tzSearch()"
+                             @click.outside="open = false"
+                             @keydown.escape="open = false">
+                            <input type="search"
+                                   class="input glass"
+                                   id="tz-search"
+                                   x-model="query"
+                                   @focus="open = true"
+                                   @input="open = true; highlighted = 0"
+                                   @keydown.arrow-down.prevent="highlighted = Math.min(highlighted + 1, filtered.length - 1)"
+                                   @keydown.arrow-up.prevent="highlighted = Math.max(highlighted - 1, 0)"
+                                   @keydown.enter.prevent="if (filtered.length) { select(filtered[highlighted]); }"
+                                   placeholder="{% trans 'Search timezone...' %}"
+                                   autocomplete="off">
+                            <input type="hidden" name="timezone" :value="selected">
+                            <div class="tz-dropdown"
+                                 x-show="open && filtered.length > 0"
+                                 x-cloak>
+                                <template x-for="(tz, i) in filtered" :key="tz">
+                                    <div class="tz-dropdown-item"
+                                         :class="{ 'tz-highlighted': i === highlighted }"
+                                         @click="select(tz)"
+                                         x-text="tz"></div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stepper-actions">
+                <div class="stepper-actions-start"></div>
+                <div class="stepper-actions-end">
+                    <button type="submit" class="btn color-primary">
+                        {% trans "Continue" %}
+                        {% icon "arrow-forward-outline" %}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

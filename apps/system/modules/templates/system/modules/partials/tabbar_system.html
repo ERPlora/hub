@@ -1,10 +1,10 @@
 {% load i18n djicons %}
 {# oob can be passed to enable HTMX OOB swap #}
 
-<footer id="dashboard-tabbar" class="ux-footer"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-    <div class="ux-tab-bar">
+<footer id="dashboard-tabbar" class="footer"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+    <div class="tab-bar">
         <!-- My Modules (Installed) -->
-        <button class="ux-tab-button{% if current_tab == 'installed' %} ux-tab-button--active{% endif %}"
+        <button class="tab{% if current_tab == 'installed' %} tab-active{% endif %}"
             hx-get="{% url 'mymodules:index' %}"
             hx-target="#main-content-area"
             hx-push-url="true">
@@ -13,7 +13,7 @@
         </button>
 
         <!-- Marketplace -->
-        <button class="ux-tab-button{% if current_tab == 'marketplace' %} ux-tab-button--active{% endif %}"
+        <button class="tab{% if current_tab == 'marketplace' %} tab-active{% endif %}"
             hx-get="{% url 'mymodules:marketplace' %}"
             hx-target="#main-content-area"
             hx-push-url="true">
@@ -22,17 +22,17 @@
         </button>
 
         <!-- Components (Coming Soon) -->
-        <button class="ux-tab-button" disabled>
+        <button class="tab" disabled>
             {% icon "hardware-chip-outline" %}
             <span>{% trans "Components" %}</span>
-            <span class="ux-badge ux-badge--medium" style="font-size: 0.5rem;">{% trans "Soon" %}</span>
+            <span class="badge" style="font-size: 0.5rem;">{% trans "Soon" %}</span>
         </button>
 
         <!-- Product Catalog (Coming Soon) -->
-        <button class="ux-tab-button" disabled>
+        <button class="tab" disabled>
             {% icon "pricetag-outline" %}
             <span>{% trans "Products" %}</span>
-            <span class="ux-badge ux-badge--medium" style="font-size: 0.5rem;">{% trans "Soon" %}</span>
+            <span class="badge" style="font-size: 0.5rem;">{% trans "Soon" %}</span>
         </button>
     </div>
 </footer>

@@ -1,7 +1,0 @@
-{% load djicons %}<button
-    class="ux-button ux-button--clear ui-theme-toggle{% if css_class %} {{ css_class }}{% endif %}"
-    @click="toggleTheme()"
->
-    <span x-show="isDark">{% icon "sunny-outline" %}</span>
-    <span x-show="!isDark" x-cloak>{% icon "moon-outline" %}</span>
-</button>

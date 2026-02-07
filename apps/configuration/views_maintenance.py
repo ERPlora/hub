@@ -22,8 +22,8 @@ def scan_orphaned_data(request):
     if 'local_user_id' not in request.session:
         alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <div class="ux-card border-l-4 border-danger">
-                <div class="ux-card__body flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
                     <span class="text-danger">Not authenticated</span>
                 </div>
@@ -134,8 +134,8 @@ def scan_orphaned_data(request):
         if total_orphans == 0:
             success_icon = render_icon("checkmark-circle-outline", css_class="text-2xl text-success")
             html = f'''
-                <div class="ux-card border-l-4 border-success">
-                    <div class="ux-card__body flex items-center gap-3">
+                <div class="card border-l-4 border-success">
+                    <div class="card-body flex items-center gap-3">
                         {success_icon}
                         <span class="text-success">
                             No orphaned data found
@@ -155,8 +155,8 @@ def scan_orphaned_data(request):
 
             trash_icon = render_icon("trash-outline")
             html = f'''
-                <div class="ux-card border-l-4 border-warning">
-                    <div class="ux-card__body">
+                <div class="card border-l-4 border-warning">
+                    <div class="card-body">
                         <span class="font-semibold text-warning block mb-2">
                             Orphaned Data Found:
                         </span>
@@ -164,7 +164,7 @@ def scan_orphaned_data(request):
                             {''.join(items)}
                         </ul>
                         <button
-                            class="ux-button ux-button--sm ux-color-danger mt-3"
+                            class="btn btn-sm color-error mt-3"
                             hx-post="{clean_url}"
                             hx-target="#scan-results">
                             {trash_icon}
@@ -179,8 +179,8 @@ def scan_orphaned_data(request):
     except Exception as e:
         alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <div class="ux-card border-l-4 border-danger">
-                <div class="ux-card__body flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
                     <span class="text-danger">Error: {str(e)}</span>
                 </div>
@@ -197,8 +197,8 @@ def clean_orphaned_data(request):
     if request.method != 'POST':
         alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <div class="ux-card border-l-4 border-danger">
-                <div class="ux-card__body flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
                     <span class="text-danger">Method not allowed</span>
                 </div>
@@ -210,8 +210,8 @@ def clean_orphaned_data(request):
     if 'local_user_id' not in request.session:
         alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <div class="ux-card border-l-4 border-danger">
-                <div class="ux-card__body flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
                     <span class="text-danger">Not authenticated</span>
                 </div>
@@ -347,8 +347,8 @@ def clean_orphaned_data(request):
         # Return HTML for HTMX
         success_icon = render_icon("checkmark-circle-outline", css_class="text-2xl text-success")
         html = f'''
-            <div class="ux-card border-l-4 border-success">
-                <div class="ux-card__body">
+            <div class="card border-l-4 border-success">
+                <div class="card-body">
                     <div class="flex items-center gap-3 mb-2">
                         {success_icon}
                         <span class="font-semibold text-success">
@@ -369,8 +369,8 @@ def clean_orphaned_data(request):
     except Exception as e:
         alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <div class="ux-card border-l-4 border-danger">
-                <div class="ux-card__body flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
                     <span class="text-danger">Error: {str(e)}</span>
                 </div>

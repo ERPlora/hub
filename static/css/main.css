@@ -1,148 +1,13 @@
 /* ==========================================================================
-   1. BASE - Fundacion del sistema de diseno
-   ========================================================================== */
-
-/* Variables CSS globales - colores, spacing, typography, touch targets */
-@import 'base/variables.css';
-
-/* Reset y normalize - estilos base coherentes */
-@import 'base/reset.css';
-
-/* Sistema tipografico - headings, body text, labels */
-@import 'base/typography.css';
-
-/* Utility classes - flex, spacing, text, etc */
-@import 'base/utilities.css';
-
-/* Animaciones estilo iOS */
-@import 'base/animations.css';
-
-/* ==========================================================================
-   2. LAYOUT - Layout templates
-   ========================================================================== */
-
-/* POS screen layout */
-@import 'layout/pos.css';
-
-/* Offline page layout */
-@import 'layout/offline.css';
-
-/* ==========================================================================
-   3. COMPONENTS - Componentes reutilizables
-   ========================================================================== */
-
-/* Módulos y marketplace */
-@import 'components/modules.css';
-
-/* UI Components (stat cards, empty states, etc) */
-@import 'components/ui-components.css';
-
-/* Data tables */
-@import 'components/tables.css';
-
-/* Toast notifications */
-@import 'components/toast.css';
-
-/* Action sheets */
-@import 'components/action-sheet.css';
-
-/* ==========================================================================
-   4. PAGES - Estilos especificos de paginas
-   ========================================================================== */
-
-/* Login page */
-@import 'pages/login.css';
-
-/* Setup wizard page */
-@import 'pages/setup.css';
-
-/* ==========================================================================
-   DARK MODE SUPPORT
-   Note: Dark mode variables are defined in base/variables.css using body.dark class.
-   The base.html template manages the .dark class based on HubConfig settings
-   (either auto via prefers-color-scheme or manual override).
+   ERPlora Hub - Main Stylesheet
+   Fonts + Hub-specific styles that complement @erplora/ux
    ========================================================================== */
 
 /* ==========================================================================
-   PRINT STYLES
+   FONTS - Plus Jakarta Sans (local)
    ========================================================================== */
 
-@media print {
-
-  .sidebar,
-  ion-header,
-  ion-footer,
-  ion-tab-bar,
-  .no-print {
-    display: none !important;
-  }
-
-  ion-content,
-  .main-content {
-    --padding-start: 0;
-    --padding-end: 0;
-  }
-
-  * {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
-
-/* ==========================================================================
-   SAFE AREA INSETS (iOS)
-   ========================================================================== */
-
-:root {
-  --safe-area-top: env(safe-area-inset-top, 0px);
-  --safe-area-right: env(safe-area-inset-right, 0px);
-  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-area-left: env(safe-area-inset-left, 0px);
-}
-
-ion-tab-bar {
-  padding-bottom: var(--safe-area-bottom);
-}
-
-/* ==========================================================================
-   REDUCED MOTION
-   ========================================================================== */
-
-@media (prefers-reduced-motion: reduce) {
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* ==========================================================================
-   HTMX LOADING INDICATOR
-   ========================================================================== */
-
-.htmx-request .htmx-indicator {
-  display: inline-block;
-}
-
-.htmx-request .htmx-indicator.justify-center {
-  display: flex;
-}
-
-.htmx-indicator {
-  display: none !important;
-}
-
-.htmx-request .htmx-indicator {
-  display: inline-block !important;
-}
-
-.htmx-request .htmx-indicator.justify-center {
-  display: flex !important;
-}
+@import '../fonts/plus-jakarta-sans/plus-jakarta-sans.css';
 
 /* ==========================================================================
    ALPINE.JS CLOAK
@@ -153,77 +18,93 @@ ion-tab-bar {
 }
 
 /* ==========================================================================
-   MODAL OVERRIDES
+   HTMX LOADING INDICATOR
    ========================================================================== */
 
-/* Filters modal - constrain size on large screens */
-@media (min-width: 768px) {
-  ion-modal#filters-modal {
-    --min-width: 80vw;
-    --min-height: auto;
+#htmx-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-primary, #3b82f6);
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+
+.htmx-request #htmx-indicator,
+.htmx-request.htmx-indicator {
+  opacity: 1;
+}
+
+#htmx-indicator::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent);
+  animation: htmx-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes htmx-loading {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
   }
 }
 
 /* ==========================================================================
-   MAIN CONTENT AREA LAYOUT
-   - #main-content-area: HTMX target (div in app_base.html)
-   - Los partials generan: content-header + page-content (sin ion-page)
+   HUB VARIABLES
    ========================================================================== */
 
-#main-content-area {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 56px; /* Espacio para el tabbar */
+:root {
+  --hub-sidebar-width: 260px;
+  --hub-sidebar-collapsed-width: 64px;
+  --hub-header-height: 56px;
+  --hub-tab-bar-height: 56px;
 }
 
-/* Content header - secondary header inside ion-content */
-.content-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--ion-background-color, #fff);
-  margin: 16px;
+/* ==========================================================================
+   HTMX TRANSITIONS
+   ========================================================================== */
+
+.htmx-swapping {
+  opacity: 0;
+  transition: opacity 150ms ease;
 }
 
-.content-header ion-toolbar {
-  --background: var(--ion-toolbar-background, var(--ion-background-color, #fff));
-  --border-width: 0 0 0.55px 0;
-  --border-color: var(--ion-toolbar-border-color, var(--ion-border-color, rgba(0, 0, 0, 0.2)));
+.htmx-settling {
+  opacity: 1;
+  transition: opacity 200ms ease;
 }
 
-body.dark .content-header {
-  background: var(--ion-background-color, #1e1e1e);
+/* ==========================================================================
+   UTILITY
+   ========================================================================== */
+
+.hub-loading {
+  pointer-events: none;
+  opacity: 0.6;
 }
 
-body.dark .content-header ion-toolbar {
-  --border-color: var(--ion-toolbar-border-color, var(--ion-border-color, rgba(255, 255, 255, 0.1)));
+html {
+  scroll-behavior: smooth;
 }
 
-/* Page content container - scrollable area between header and tabbar */
-.page-content {
-  flex: 1;
-  min-height: 0;
+body.hub-modal-open {
+  overflow: hidden;
 }
 
-/* Global tabbar - siempre visible, fijo en la parte de abajo */
-#main-content > ion-footer {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 100 !important;
-  background: var(--ion-tab-bar-background, var(--ion-background-color, #fff));
-}
-
-body.dark #main-content > ion-footer {
-  background: var(--ion-tab-bar-background, var(--ion-background-color-dark, #1e1e1e));
-}
-
-#global-tabbar {
-  --background: transparent;
-}
-
-#global-tabbar:empty {
-  display: none;
+.logo {
+  max-width: 4rem;
+  height: auto;
 }

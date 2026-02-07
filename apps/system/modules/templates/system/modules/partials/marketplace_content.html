@@ -4,12 +4,12 @@
     {% fill "content" %}
         <div x-data="marketplaceFilters()" x-init="init()">
             <!-- Search & Filters -->
-            <div class="container-fluid ux-mb-lg" style="padding: 0;">
+            <div class="container-fluid mb-6" style="padding: 0;">
                 <!-- Search Row -->
                 <div class="row">
                     <div class="col-12">
                         <input type="search"
-                            class="ux-input"
+                            class="input"
                             id="search-input"
                             placeholder="{% trans 'Search modules...' %}"
                             @input="onSearchInput($event)">
@@ -20,7 +20,7 @@
                 <div class="row align-items-center mt-md">
                     <!-- Category Filter -->
                     <div class="col-12 col-lg-6">
-                        <select class="ux-select"
+                        <select class="select"
                             id="category-select"
                             aria-label="{% trans 'Categories' %}"
                             :value="categoryFilter"
@@ -34,7 +34,7 @@
 
                     <!-- Industry Filter -->
                     <div class="col-12 col-lg-6">
-                        <select class="ux-select"
+                        <select class="select"
                             id="industry-select"
                             aria-label="{% trans 'Industries' %}"
                             :value="industryFilter"
@@ -50,28 +50,28 @@
 
             <!-- Type Filter Chips -->
             <div class="d-flex flex-wrap gap-sm mb-md align-center">
-                <span class="ux-chip"
-                    :class="typeFilter === '' ? 'ux-badge--primary' : ''"
+                <span class="chip"
+                    :class="typeFilter === '' ? 'color-primary' : ''"
                     @click="setTypeFilter('')"
                     style="cursor: pointer;">
                     <span>{% trans "All" %}</span>
                 </span>
-                <span class="ux-chip"
-                    :class="typeFilter === 'free' ? 'ux-badge--success' : ''"
+                <span class="chip"
+                    :class="typeFilter === 'free' ? 'color-success' : ''"
                     @click="setTypeFilter('free')"
                     style="cursor: pointer;">
                     {% icon "gift-outline" %}
                     <span>{% trans "Free" %}</span>
                 </span>
-                <span class="ux-chip"
-                    :class="typeFilter === 'one_time' ? 'ux-badge--primary' : ''"
+                <span class="chip"
+                    :class="typeFilter === 'one_time' ? 'color-primary' : ''"
                     @click="setTypeFilter('one_time')"
                     style="cursor: pointer;">
                     {% icon "card-outline" %}
                     <span>{% trans "One-time" %}</span>
                 </span>
-                <span class="ux-chip"
-                    :class="typeFilter === 'subscription' ? 'ux-badge--tertiary' : ''"
+                <span class="chip"
+                    :class="typeFilter === 'subscription' ? 'color-tertiary' : ''"
                     @click="setTypeFilter('subscription')"
                     style="cursor: pointer;">
                     {% icon "sync-outline" %}
@@ -83,31 +83,31 @@
             <div class="d-flex flex-wrap gap-sm mb-md align-center" x-show="hasActiveFilters()" x-cloak>
                 <span class="fs-sm text-medium">{% trans "Active:" %}</span>
                 <template x-if="searchQuery">
-                    <span class="ux-chip ux-badge--warning" style="cursor: pointer;" @click="clearSearch()">
+                    <span class="chip color-warning" style="cursor: pointer;" @click="clearSearch()">
                         {% icon "search" %}
                         <span x-text="searchQuery"></span>
                         {% icon "close-circle" %}
                     </span>
                 </template>
                 <template x-if="categoryFilter">
-                    <span class="ux-chip ux-badge--warning" style="cursor: pointer;" @click="setCategory('')">
+                    <span class="chip color-warning" style="cursor: pointer;" @click="setCategory('')">
                         <span x-text="getCategoryName(categoryFilter)"></span>
                         {% icon "close-circle" %}
                     </span>
                 </template>
                 <template x-if="industryFilter">
-                    <span class="ux-chip ux-badge--warning" style="cursor: pointer;" @click="setIndustry('')">
+                    <span class="chip color-warning" style="cursor: pointer;" @click="setIndustry('')">
                         <span x-text="getIndustryName(industryFilter)"></span>
                         {% icon "close-circle" %}
                     </span>
                 </template>
                 <template x-if="typeFilter">
-                    <span class="ux-chip ux-badge--warning" style="cursor: pointer;" @click="setTypeFilter('')">
+                    <span class="chip color-warning" style="cursor: pointer;" @click="setTypeFilter('')">
                         <span x-text="getTypeLabel(typeFilter)"></span>
                         {% icon "close-circle" %}
                     </span>
                 </template>
-                <button class="ux-button ux-button--sm ux-button--clear ux-color-danger" @click="clearAllFilters()">
+                <button class="btn btn-sm btn-ghost color-error" @click="clearAllFilters()">
                     {% icon "trash-outline" %}
                     {% trans "Clear all" %}
                 </button>
@@ -115,7 +115,7 @@
 
             <!-- Loading Spinner -->
             <div id="loading-spinner" class="htmx-indicator d-flex justify-center py-xl">
-                <div class="ux-spinner"></div>
+                <div class="loading"></div>
             </div>
 
             <!-- Modules Grid (loaded via HTMX) -->
@@ -126,7 +126,7 @@
                  hx-indicator="#loading-spinner">
                 <!-- Initial loading state -->
                 <div class="d-flex justify-center py-xl">
-                    <div class="ux-spinner"></div>
+                    <div class="loading"></div>
                 </div>
             </div>
         </div>

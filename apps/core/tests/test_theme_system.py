@@ -208,7 +208,7 @@ class TestThemeTemplateRendering:
         assert response.status_code == 200
         content = response.content.decode()
         # Theme CSS file inside theme folder
-        assert '/themes/default/ionic-theme.css' in content
+        assert '/themes/default/theme.css' in content
 
     def test_blue_theme_rendered(self, authenticated_client, hub_config):
         """Test that blue theme is loaded when selected."""
@@ -219,7 +219,7 @@ class TestThemeTemplateRendering:
         assert response.status_code == 200
         content = response.content.decode()
         # Theme CSS file inside theme folder
-        assert '/themes/blue/ionic-theme.css' in content
+        assert '/themes/blue/theme.css' in content
 
     def test_dark_mode_class_applied(self, authenticated_client, hub_config):
         """Test that dark class is applied when dark mode is enabled."""

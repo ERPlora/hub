@@ -49,7 +49,7 @@ def render_message(message, color='success'):
     icon_name = 'checkmark-circle-outline' if color == 'success' else 'alert-circle-outline'
     icon_html = render_icon(icon_name)
     return f'''
-    <div class="flex items-center gap-2 p-3 rounded-lg" style="background: var(--ux-{color}-bg, var(--ux-surface)); color: var(--ux-{color});">
+    <div class="alert color-{color}">
         {icon_html}
         <span>{message}</span>
     </div>

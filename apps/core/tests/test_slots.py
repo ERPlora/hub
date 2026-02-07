@@ -439,9 +439,9 @@ class TestRealWorldScenarios:
         """Simulate multiple modules injecting into POS header."""
         def render_template(template, context, request=None):
             if 'table' in template:
-                return f'<button class="ux-button">Table {context.get("table_id", "?")}</button>'
+                return f'<button class="btn">Table {context.get("table_id", "?")}</button>'
             if 'loyalty' in template:
-                return f'<span class="ux-badge">{context.get("points", 0)} pts</span>'
+                return f'<span class="badge">{context.get("points", 0)} pts</span>'
             return f'<div>{template}</div>'
 
         mock_render.side_effect = render_template

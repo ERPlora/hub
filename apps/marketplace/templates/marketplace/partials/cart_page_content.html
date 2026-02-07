@@ -30,12 +30,12 @@
     </script>
     {% fill "content" %}
         {% if cart.items %}
-        <div class="ux-card m-0 mb-lg">
-            <div class="ux-card__body">
-                <div class="ux-list" id="cart-items">
+        <div class="card m-0 mb-lg">
+            <div class="card-body">
+                <div class="list" id="cart-items">
                     {% for item in cart.items %}
-                    <div class="ux-list__item d-flex align-center gap-md">
-                        <span style="font-size: 28px; color: var(--ux-primary);">
+                    <div class="list-item flex items-center gap-4">
+                        <span style="font-size: 28px; color: var(--color-primary);">
                             {% icon item.icon|default:"cube-outline" %}
                         </span>
                         <div class="flex-1">
@@ -44,7 +44,7 @@
                         </div>
                         <div class="d-flex align-center gap-sm">
                             {% if item.price == 0 %}
-                            <span class="ux-chip ux-badge--success">{% trans "Free" %}</span>
+                            <span class="chip color-success">{% trans "Free" %}</span>
                             {% else %}
                             <span class="fw-semibold">{{ item.price|floatformat:2 }} EUR</span>
                             {% if item.quantity > 1 %}
@@ -52,7 +52,7 @@
                             {% endif %}
                             {% endif %}
                             <button
-                                class="ux-button ux-button--clear ux-color-danger"
+                                class="btn btn-ghost color-error"
                                 hx-delete="{% url 'marketplace:cart_remove' item.id %}"
                                 hx-target="#main-content-area"
                                 hx-push-url="false">
@@ -66,8 +66,8 @@
         </div>
 
         <!-- Cart Summary -->
-        <div class="ux-card m-0 mb-lg">
-            <div class="ux-card__body">
+        <div class="card m-0 mb-lg">
+            <div class="card-body">
                 <div class="d-flex justify-between align-center mb-md">
                     <span class="fs-lg">{% trans "Subtotal" %}</span>
                     <span class="fs-lg fw-semibold">
@@ -100,13 +100,13 @@
         </div>
 
         <!-- Actions -->
-        <button class="ux-button ux-button--block ux-button--lg mb-md">
+        <button class="btn btn-block btn-lg mb-4">
             {% icon "card-outline" %}
             {% trans "Proceed to Checkout" %}
         </button>
 
         <button
-            class="ux-button ux-button--block ux-button--outline ux-color-danger"
+            class="btn btn-block btn-outline color-error"
             hx-delete="{% url 'marketplace:cart_clear' %}"
             hx-target="#main-content-area"
             hx-push-url="false">
@@ -120,7 +120,7 @@
             {% icon "cart-outline" css_class="ui-empty-state-icon" %}
             <h3 class="ui-empty-state-title">{% trans "Your cart is empty" %}</h3>
             <p class="ui-empty-state-description">{% trans "Browse the marketplace to find modules and services for your Hub." %}</p>
-            <button class="ux-button"
+            <button class="btn"
                 hx-get="{% url 'marketplace:index' %}"
                 hx-target="#main-content-area"
                 hx-push-url="true">

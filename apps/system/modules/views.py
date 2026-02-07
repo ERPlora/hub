@@ -561,8 +561,8 @@ def _trigger_server_reload():
 def _render_reload_response(message="Applying changes...", success_message="Module activated successfully"):
     """Return HTML that shows a toast and reloads the page after server restarts"""
     html = f'''
-    <div class="ux-padding" style="text-align: center; padding-top: 100px;">
-        <div class="ux-spinner" style="width: 48px; height: 48px; margin: 0 auto;"></div>
+    <div class="p-4" style="text-align: center; padding-top: 100px;">
+        <div class="loading" style="width: 48px; height: 48px; margin: 0 auto;"></div>
         <h2 style="margin-top: 24px;">{message}</h2>
         <p class="text-medium">The page will reload automatically.</p>
     </div>

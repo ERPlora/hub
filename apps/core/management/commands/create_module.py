@@ -197,12 +197,12 @@ urlpatterns = [
 {{%load static%}}
 
 {{%block content%}}
-<div class="ux-content">
-    <div class="ux-card">
-        <div class="ux-card__header">
-            <h3 class="ux-card__title">{module_name}</h3>
+<div class="content">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{module_name}</h3>
         </div>
-        <div class="ux-card__body">
+        <div class="card-body">
             <p>¡Module creado exitosamente!</p>
             <p>Comienza a desarrollar tu module aquí.</p>
         </div>

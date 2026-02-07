@@ -1,6 +1,0 @@
-{# Hide Tabbar via OOB Swap - Use in non-module pages #}
-{# This will hide the tabbar when navigating via HTMX to a non-module page #}
-<footer id="global-tabbar-footer" class="ux-footer" hx-swap-oob="outerHTML:#global-tabbar-footer" style="display: none;">
-    <div id="global-tabbar" class="ux-tab-bar ux-tab-bar--bottom"></div>
-</footer>
-<script>document.body.removeAttribute('data-module-id');</script>

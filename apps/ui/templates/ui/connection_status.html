@@ -1,8 +1,0 @@
-{% load djicons %}<button
-    id="connection-status"
-    class="ux-button ux-button--clear connection-status{% if css_class %} {{ css_class }}{% endif %}"
-    hx-get="{{ url }}"
-    hx-trigger="load, every {{ interval }}"
-    hx-swap="innerHTML">
-    {% icon "cloud-offline-outline" %}
-</button>

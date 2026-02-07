@@ -1,16 +1,16 @@
 {% load i18n djicons %}
 
-<div class="ux-padding coming-soon-state" style="text-align: center;">
-    {% icon store_config.icon style="font-size: 80px; color: var(--ux-text-secondary);" %}
+<div class="p-4 coming-soon-state" style="text-align: center;">
+    {% icon store_config.icon style="font-size: 80px; opacity: 0.6;" %}
     <h2>{{ store_config.name }}</h2>
-    <span class="ux-chip ux-badge--warning">
+    <span class="chip color-warning">
         {% icon "time-outline" %}
         <span>{% trans "Coming Soon" %}</span>
     </span>
-    <p class="text-medium ux-mt-lg">
+    <p class="text-medium mt-6">
         {% trans "This store is under development. Stay tuned for updates!" %}
     </p>
-    <button class="ux-button ux-button--outline" hx-get="{% url 'marketplace:index' %}" hx-target="#main-content-area" hx-push-url="true">
+    <button class="btn btn-outline" hx-get="{% url 'marketplace:index' %}" hx-target="#main-content-area" hx-push-url="true">
         {% icon "cube-outline" %}
         {% trans "Browse Modules" %}
     </button>

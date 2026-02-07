@@ -224,3 +224,11 @@ if DEBUG_TOOLBAR_ENABLED:
     }
 
     print(f"[LOCAL] Debug Toolbar: ENABLED")
+
+# =============================================================================
+# DJANGO BROWSER RELOAD (auto-refresh on file changes)
+# =============================================================================
+
+INSTALLED_APPS += ['django_browser_reload']
+
+MIDDLEWARE += ['django_browser_reload.middleware.BrowserReloadMiddleware']

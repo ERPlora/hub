@@ -32,25 +32,25 @@
 
 {% if error %}
     <!-- Error State -->
-    <div class="ux-callout ux-callout--danger mx-md my-md">
-        <div class="ux-callout__icon">
+    <div class="callout callout-error mx-4 my-4">
+        <span class="callout-icon">
             {% icon "alert-circle-outline" %}
-        </div>
-        <div class="ux-callout__content">
-            <h3 class="ux-callout__title">{% trans "Error" %}</h3>
-            <p class="ux-callout__text">{{ error }}</p>
+        </span>
+        <div class="callout-content">
+            <div class="callout-title">{% trans "Error" %}</div>
+            <div class="callout-text">{{ error }}</div>
         </div>
     </div>
 
 {% elif module %}
     <div class="p-md">
         <!-- Hero Card -->
-        <div class="ux-card mb-lg">
-            <div class="ux-card__body">
+        <div class="card mb-lg">
+            <div class="card-body">
                 <div class="module-detail-header">
                     <!-- Icon -->
                     <div class="module-detail-icon">
-                        <div class="ux-product-card__placeholder" style="width: 80px; height: 80px; border-radius: var(--ux-border-radius-lg);">
+                        <div class="flex items-center justify-center" style="width: 80px; height: 80px; border-radius: var(--radius-lg);">
                             {% icon module.icon|default:"cube-outline" %}
                         </div>
                     </div>
@@ -88,19 +88,19 @@
                         <!-- Status Badges -->
                         <div class="d-flex flex-wrap gap-sm align-center">
                             {% if module.is_featured %}
-                            <span class="ux-badge ux-color-warning">
+                            <span class="badge color-warning">
                                 {% icon "star" %}
                                 {% trans "Featured" %}
                             </span>
                             {% endif %}
                             {% if is_installed %}
-                            <span class="ux-chip ux-color-success--soft">
-                                <span class="ux-chip__icon">{% icon "checkmark-circle-outline" %}</span>
+                            <span class="chip color-success">
+                                {% icon "checkmark-circle-outline" %}
                                 {% trans "Installed" %}
                             </span>
                             {% elif is_owned %}
-                            <span class="ux-chip ux-color-tertiary--soft">
-                                <span class="ux-chip__icon">{% icon "bag-check-outline" %}</span>
+                            <span class="chip color-secondary">
+                                {% icon "bag-check-outline" %}
                                 {% trans "Owned" %}
                             </span>
                             {% endif %}
@@ -112,12 +112,12 @@
                         {% if not is_installed and not is_owned %}
                         <div class="mb-md text-right">
                             {% if module.module_type == 'free' or is_free %}
-                            <div class="fs-2xl fw-bold" style="color: var(--ux-success);">{% trans "Free" %}</div>
+                            <div class="fs-2xl fw-bold" style="color: var(--color-success);">{% trans "Free" %}</div>
                             {% elif module.module_type == 'one_time' %}
-                            <div class="fs-2xl fw-bold" style="color: var(--ux-primary);">&euro;{{ module.price }}</div>
+                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.price }}</div>
                             <div class="fs-sm text-secondary">{% trans "one-time payment" %}</div>
                             {% elif module.module_type == 'subscription' %}
-                            <div class="fs-2xl fw-bold" style="color: var(--ux-primary);">&euro;{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}</div>
+                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}</div>
                             <div class="fs-sm text-secondary">{% trans "monthly subscription" %}</div>
                             {% endif %}
                         </div>
@@ -126,13 +126,13 @@
                         <!-- Action Buttons -->
                         <div class="d-flex flex-column gap-sm">
                             {% if is_installed %}
-                            <button type="button" class="ux-button ux-button--lg" disabled>
+                            <button type="button" class="btn btn-lg" disabled>
                                 {% icon "checkmark-circle-outline" %}
                                 <span>{% trans "Installed" %}</span>
                             </button>
                             {% elif is_owned %}
                             <button type="button"
-                                    class="ux-button ux-button--lg ux-color-success"
+                                    class="btn btn-lg color-success"
                                     data-action="download"
                                     data-module-slug="{{ module.slug }}"
                                     data-download-url="{{ module.download_url }}">
@@ -141,7 +141,7 @@
                             </button>
                             {% elif module.module_type == 'free' or is_free %}
                             <button type="button"
-                                    class="ux-button ux-button--lg ux-color-primary"
+                                    class="btn btn-lg color-primary"
                                     data-action="install-free"
                                     data-module-id="{{ module.id }}"
                                     data-module-slug="{{ module.slug }}"
@@ -151,7 +151,7 @@
                             </button>
                             {% else %}
                             <button type="button"
-                                    class="ux-button ux-button--lg ux-color-primary"
+                                    class="btn btn-lg color-primary"
                                     data-action="purchase"
                                     data-module-id="{{ module.id }}">
                                 {% icon "cart-outline" %}
@@ -165,35 +165,35 @@
         </div>
 
         <!-- Tabs -->
-        <div class="ux-tabs" x-data="{ activeTab: 'overview' }">
-            <div class="ux-tab-bar">
+        <div class="tabs" x-data="{ activeTab: 'overview' }">
+            <div>
                 <button type="button"
-                        class="ux-tab-button"
-                        :class="{ 'ux-tab-button--selected': activeTab === 'overview' }"
+                        class="tab"
+                        :class="{ 'tab-active': activeTab === 'overview' }"
                         @click="activeTab = 'overview'">
                     {% trans "Overview" %}
                 </button>
                 <button type="button"
-                        class="ux-tab-button"
-                        :class="{ 'ux-tab-button--selected': activeTab === 'reviews' }"
+                        class="tab"
+                        :class="{ 'tab-active': activeTab === 'reviews' }"
                         @click="activeTab = 'reviews'">
                     {% trans "Reviews" %} ({{ module.review_count|default:0 }})
                 </button>
                 <button type="button"
-                        class="ux-tab-button"
-                        :class="{ 'ux-tab-button--selected': activeTab === 'changelog' }"
+                        class="tab"
+                        :class="{ 'tab-active': activeTab === 'changelog' }"
                         @click="activeTab = 'changelog'">
                     {% trans "Changelog" %}
                 </button>
             </div>
 
             <!-- Overview Tab -->
-            <div class="ux-tab-panel" :class="{ 'ux-tab-panel--active': activeTab === 'overview' }" x-show="activeTab === 'overview'">
-                <div class="ux-card mt-lg mb-lg">
-                    <div class="ux-card__header">
-                        <h3 class="ux-card__title">{% trans "About this module" %}</h3>
+            <div class="tab-panel" :class="{ 'tab-panel--active': activeTab === 'overview' }" x-show="activeTab === 'overview'">
+                <div class="card mt-lg mb-lg">
+                    <div class="card-header">
+                        <h3 class="card-title">{% trans "About this module" %}</h3>
                     </div>
-                    <div class="ux-card__body">
+                    <div class="card-body">
                         <div class="markdown-content">
                             {% if module.long_description %}
                             {{ module.long_description|linebreaks }}
@@ -204,27 +204,27 @@
                     </div>
                 </div>
 
-                <div class="ux-card">
-                    <div class="ux-card__header">
-                        <h3 class="ux-card__title">{% trans "Module Information" %}</h3>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">{% trans "Module Information" %}</h3>
                     </div>
-                    <div class="ux-card__body p-0">
-                        <div class="ux-list">
-                            <div class="ux-list__item">
-                                <span class="ux-list__item-label">{% trans "Version" %}</span>
-                                <span class="ux-list__item-value">{{ module.version }}</span>
+                    <div class="card-body p-0">
+                        <div class="list">
+                            <div class="list-item">
+                                <span class="list-item-label">{% trans "Version" %}</span>
+                                <span class="list-item-value">{{ module.version }}</span>
                             </div>
-                            <div class="ux-list__item">
-                                <span class="ux-list__item-label">{% trans "Author" %}</span>
-                                <span class="ux-list__item-value">{{ module.author|default:"ERPlora" }}</span>
+                            <div class="list-item">
+                                <span class="list-item-label">{% trans "Author" %}</span>
+                                <span class="list-item-value">{{ module.author|default:"ERPlora" }}</span>
                             </div>
-                            <div class="ux-list__item">
-                                <span class="ux-list__item-label">{% trans "Category" %}</span>
-                                <span class="ux-list__item-value">{{ module.category_name|default:module.category }}</span>
+                            <div class="list-item">
+                                <span class="list-item-label">{% trans "Category" %}</span>
+                                <span class="list-item-value">{{ module.category_name|default:module.category }}</span>
                             </div>
-                            <div class="ux-list__item">
-                                <span class="ux-list__item-label">{% trans "License" %}</span>
-                                <span class="ux-list__item-value">{{ module.license|default:"Proprietary" }}</span>
+                            <div class="list-item">
+                                <span class="list-item-label">{% trans "License" %}</span>
+                                <span class="list-item-value">{{ module.license|default:"Proprietary" }}</span>
                             </div>
                         </div>
                     </div>
@@ -232,11 +232,11 @@
             </div>
 
             <!-- Reviews Tab -->
-            <div class="ux-tab-panel" :class="{ 'ux-tab-panel--active': activeTab === 'reviews' }" x-show="activeTab === 'reviews'">
+            <div class="tab-panel" :class="{ 'tab-panel--active': activeTab === 'reviews' }" x-show="activeTab === 'reviews'">
                 {% if module.recent_reviews %}
                 {% for review in module.recent_reviews %}
-                <div class="ux-card mt-lg mb-md">
-                    <div class="ux-card__body">
+                <div class="card mt-lg mb-md">
+                    <div class="card-body">
                         <div class="d-flex justify-between align-start mb-sm">
                             <div>
                                 <p class="fw-semibold m-0">{{ review.user_name|default:"Anonymous" }}</p>
@@ -260,23 +260,23 @@
                 </div>
                 {% endfor %}
                 {% else %}
-                <div class="ux-empty-state mt-lg">
-                    <div class="ux-empty-state__icon">
+                <div class="flex flex-col items-center text-center py-12 mt-4">
+                    <div class="text-4xl mb-4 opacity-40">
                         {% icon "chatbubbles-outline" %}
                     </div>
-                    <h3 class="ux-empty-state__title">{% trans "No reviews yet" %}</h3>
-                    <p class="ux-empty-state__description">{% trans "Be the first to review this module" %}</p>
+                    <h3 class="text-lg font-semibold mb-2">{% trans "No reviews yet" %}</h3>
+                    <p class="text-sm opacity-60">{% trans "Be the first to review this module" %}</p>
                 </div>
                 {% endif %}
             </div>
 
             <!-- Changelog Tab -->
-            <div class="ux-tab-panel" :class="{ 'ux-tab-panel--active': activeTab === 'changelog' }" x-show="activeTab === 'changelog'">
-                <div class="ux-card mt-lg">
-                    <div class="ux-card__header">
-                        <h3 class="ux-card__title">{% trans "Changelog" %}</h3>
+            <div class="tab-panel" :class="{ 'tab-panel--active': activeTab === 'changelog' }" x-show="activeTab === 'changelog'">
+                <div class="card mt-lg">
+                    <div class="card-header">
+                        <h3 class="card-title">{% trans "Changelog" %}</h3>
                     </div>
-                    <div class="ux-card__body">
+                    <div class="card-body">
                         {% if module.changelog %}
                         <div class="markdown-content">
                             {{ module.changelog|linebreaks }}
@@ -296,19 +296,19 @@
         {% if related_modules %}
         <div class="mt-xl">
             <h2 class="fs-xl fw-semibold mb-md">{% trans "Related Modules" %}</h2>
-            <div class="ux-product-grid ux-product-grid--3">
+            <div class="product-grid product-grid--3">
                 {% for related in related_modules %}
-                <article class="ux-product-card"
+                <article class="product-card"
                          hx-get="{% url 'marketplace:module_detail' related.slug %}"
                          hx-target="#main-content-area"
                          hx-push-url="true">
-                    <div class="ux-product-card__image-wrapper">
-                        <div class="ux-product-card__placeholder">
+                    <div class="product-card-image">
+                        <div class="flex items-center justify-center">
                             {% icon related.icon|default:"cube-outline" %}
                         </div>
                     </div>
-                    <div class="ux-product-card__content">
-                        <h3 class="ux-product-card__name">{{ related.name }}</h3>
+                    <div class="product-card-content">
+                        <h3 class="product-card-name">{{ related.name }}</h3>
                         <p class="fs-xs text-tertiary m-0">v{{ related.version|default:"1.0" }}</p>
                         <p class="fs-sm text-secondary mt-xs mb-0" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ related.description }}</p>
                     </div>
@@ -444,7 +444,7 @@ function setButtonLoading(button, loading) {
     if (loading) {
         const originalContent = button.innerHTML;
         button.dataset.originalContent = originalContent;
-        button.innerHTML = '<div class="ux-spinner ux-spinner--sm"></div>';
+        button.innerHTML = '<div class="loading loading-sm"></div>';
     } else if (button.dataset.originalContent) {
         button.innerHTML = button.dataset.originalContent;
     }
@@ -455,7 +455,7 @@ function setButtonLoading(button, loading) {
 .module-detail-header {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--ux-space-lg, 1.5rem);
+    gap: 1.5rem;
 }
 
 .module-detail-icon {
@@ -500,30 +500,4 @@ function setButtonLoading(button, loading) {
     margin-bottom: 0.5rem;
 }
 
-/* Simple list styles for module info */
-.ux-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.ux-list__item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--ux-space-md, 1rem) var(--ux-space-lg, 1.5rem);
-    border-bottom: 1px solid var(--ux-border-color);
-}
-
-.ux-list__item:last-child {
-    border-bottom: none;
-}
-
-.ux-list__item-label {
-    color: var(--ux-text-secondary);
-}
-
-.ux-list__item-value {
-    color: var(--ux-text);
-    font-weight: 500;
-}
 </style>

@@ -1,47 +1,47 @@
 {% load i18n djicons %}
 
-<div class="ux-page">
+<div class="page">
     <!-- Header Toolbar -->
-    <header class="ux-header">
-        <div class="ux-toolbar ux-toolbar--glass ux-margin-horizontal" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
-            <div class="ux-toolbar__start">
-                <button class="ux-back-button"
+    <header class="header">
+        <div class="glass mx-4" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
+            <div class="flex items-center">
+                <button class="btn btn-ghost btn-sm"
                         hx-get="{% url 'main:index' %}"
                         hx-target="#main-content-area"
                         hx-push-url="true">
                     {% icon "arrow-back-outline" %}
                 </button>
             </div>
-            <div class="ux-toolbar__center">
-                <h1 class="ux-toolbar__title">{% trans "Roles" %}</h1>
+            <div class="flex-1 flex items-center justify-center">
+                <h1 class="font-semibold">{% trans "Roles" %}</h1>
             </div>
-            <div class="ux-toolbar__end">
-                <button class="ux-button ux-button--sm ux-color-primary"
+            <div class="flex items-center gap-2">
+                <button class="btn btn-sm color-primary"
                         hx-get="{% url 'main:roles:create' %}"
                         hx-target="#main-content-area"
                         hx-push-url="true">
                     {% icon "add-outline" %}
-                    <span class="ux-hide-mobile">{% trans "Add" %}</span>
+                    <span class="hidden sm:block">{% trans "Add" %}</span>
                 </button>
             </div>
         </div>
     </header>
 
     <!-- Content -->
-    <div class="ux-page__content" style="flex: 1; overflow: auto;">
-        <div class="ux-padding">
+    <div style="flex: 1; overflow: auto;">
+        <div class="p-4">
             {% if roles %}
             <!-- Roles List -->
-            <div class="ux-list ux-list--inset">
+            <div class="list list--inset">
                 {% for role in roles %}
                 <a href="{% url 'main:roles:detail' role_id=role.id %}"
-                   class="ux-item ux-item--button"
+                   class="list-item list-item-clickable"
                    hx-get="{% url 'main:roles:detail' role_id=role.id %}"
                    hx-target="#main-content-area"
                    hx-push-url="true">
 
                     <!-- Role Icon -->
-                    <span class="ux-item__icon">
+                    <span class="list-item-start">
                         {% if role.name == 'admin' %}
                             {% icon "shield-checkmark-outline" %}
                         {% elif role.name == 'manager' %}
@@ -52,26 +52,26 @@
                     </span>
 
                     <!-- Role Info -->
-                    <div class="ux-item__content">
-                        <span class="ux-item__label">{{ role.display_name }}</span>
-                        <span class="ux-item__note">{{ role.description|default:"-"|truncatewords:10 }}</span>
+                    <div class="list-item-content">
+                        <span class="list-item-label">{{ role.display_name }}</span>
+                        <span class="list-item-note">{{ role.description|default:"-"|truncatewords:10 }}</span>
                     </div>
 
                     <!-- Badges -->
-                    <div class="ux-flex ux-gap-xs ux-mr-sm">
+                    <div class="flex gap-1 mr-2">
                         {% if role.is_system %}
-                        <span class="ux-badge ux-badge--sm ux-badge--medium">{% trans "System" %}</span>
+                        <span class="badge badge-sm color-neutral">{% trans "System" %}</span>
                         {% endif %}
                         {% if not role.is_active %}
-                        <span class="ux-badge ux-badge--sm ux-badge--warning">{% trans "Inactive" %}</span>
+                        <span class="badge badge-sm color-warning">{% trans "Inactive" %}</span>
                         {% endif %}
                     </div>
 
                     <!-- User Count -->
-                    <span class="ux-item__detail">{{ role.users.count }}</span>
+                    <span class="list-item-value">{{ role.users.count }}</span>
 
                     <!-- Chevron -->
-                    <svg class="ux-item__chevron" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="list-item-chevron" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                     </svg>
                 </a>
@@ -79,13 +79,13 @@
             </div>
             {% else %}
             <!-- Empty State -->
-            <div class="ux-empty-state ux-text-center ux-py-2xl">
-                <div class="ux-empty-state__icon ux-mb-lg">
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+                <div class="text-4xl mb-4 opacity-40">
                     {% icon "shield-outline" %}
                 </div>
-                <h3 class="ux-empty-state__title ux-mb-sm">{% trans "No roles yet" %}</h3>
-                <p class="ux-empty-state__text ux-mb-lg">{% trans "Create your first custom role to get started." %}</p>
-                <button class="ux-button ux-color-primary"
+                <h3 class="text-lg font-semibold mb-2">{% trans "No roles yet" %}</h3>
+                <p class="text-sm opacity-60 mb-4">{% trans "Create your first custom role to get started." %}</p>
+                <button class="btn color-primary"
                         hx-get="{% url 'main:roles:create' %}"
                         hx-target="#main-content-area"
                         hx-push-url="true">

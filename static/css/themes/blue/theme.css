@@ -1,0 +1,57 @@
+/**
+ * ERPlora Hub - Blue Theme (Sky)
+ * Overrides @erplora/ux v3 design tokens
+ */
+
+/* ========================================
+   LIGHT MODE - Sky Blue
+   ======================================== */
+
+:root {
+  /* Primary - Sky Blue */
+  --color-primary: #0ea5e9;
+  --color-primary-content: #ffffff;
+
+  /* Secondary - Indigo */
+  --color-secondary: #6366f1;
+  --color-secondary-content: #ffffff;
+
+  /* Success - Emerald */
+  --color-success: #10b981;
+  --color-success-content: #ffffff;
+
+  /* Warning - Amber */
+  --color-warning: #f59e0b;
+  --color-warning-content: #000000;
+
+  /* Error - Red */
+  --color-error: #ef4444;
+  --color-error-content: #ffffff;
+}
+
+/* ========================================
+   DARK MODE
+   ======================================== */
+
+[data-theme="dark"],
+.dark {
+  /* Primary - Brighter sky for dark mode */
+  --color-primary: #38bdf8;
+  --color-primary-content: #000000;
+
+  /* Secondary - Lighter indigo */
+  --color-secondary: #818cf8;
+  --color-secondary-content: #000000;
+
+  /* Success - Brighter green */
+  --color-success: #34d399;
+  --color-success-content: #000000;
+
+  /* Warning - Brighter amber */
+  --color-warning: #fbbf24;
+  --color-warning-content: #000000;
+
+  /* Error - Lighter red */
+  --color-error: #f87171;
+  --color-error-content: #000000;
+}

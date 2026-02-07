@@ -1,16 +1,16 @@
 {% load i18n djicons %}
 
-<div class="ux-cart">
+<div class="cart">
     {% if cart.items %}
     {# Cart Header #}
-    <div class="ux-cart__header">
-        <h2 class="ux-cart__title">
+    <div class="cart-header">
+        <h2>
             {% icon "cart-outline" %}
             {% trans "Shopping Cart" %}
-            <span class="ux-cart__count">{{ cart.items|length }}</span>
+            <span class="badge">{{ cart.items|length }}</span>
         </h2>
         <button type="button"
-                class="ux-cart__clear"
+                class="btn btn-ghost btn-sm"
                 hx-delete="{% url 'marketplace:cart_clear' store_type %}"
                 hx-target="#cart-content"
                 hx-swap="innerHTML"
@@ -21,30 +21,30 @@
     </div>
 
     {# Cart Items #}
-    <div class="ux-cart__items">
-        <ul class="ux-cart__items-list">
+    <div class="cart-items">
+        <ul>
             {% for item in cart.items %}
-            <li class="ux-cart-item">
+            <li class="cart-item">
                 {# Item Icon #}
-                <div class="ux-cart-item__image-placeholder">
+                <div class="flex items-center justify-center">
                     {% icon item.icon|default:"cube-outline" %}
                 </div>
 
                 {# Item Content #}
-                <div class="ux-cart-item__content">
-                    <h3 class="ux-cart-item__name">{{ item.name }}</h3>
+                <div class="cart-item-content">
+                    <h3 class="cart-item-name">{{ item.name }}</h3>
                     {% if item.quantity > 1 %}
-                    <p class="ux-cart-item__meta">{% trans "Qty:" %} {{ item.quantity }}</p>
+                    <p class="cart-item-meta">{% trans "Qty:" %} {{ item.quantity }}</p>
                     {% endif %}
                     {% if item.price > 0 %}
-                    <span class="ux-cart-item__unit-price">&euro;{{ item.price }} {% trans "each" %}</span>
+                    <span class="cart-item-unit">&euro;{{ item.price }} {% trans "each" %}</span>
                     {% endif %}
                 </div>
 
                 {# Item Price #}
-                <div class="ux-cart-item__price">
+                <div class="cart-item-price">
                     {% if item.price == 0 %}
-                    <span style="color: var(--ux-success);">{% trans "Free" %}</span>
+                    <span style="color: var(--color-success);">{% trans "Free" %}</span>
                     {% else %}
                     &euro;{% widthratio item.price 1 item.quantity %}
                     {% endif %}
@@ -52,7 +52,7 @@
 
                 {# Remove Button #}
                 <button type="button"
-                        class="ux-cart-item__remove"
+                        class="btn btn-ghost btn-sm"
                         hx-delete="{% url 'marketplace:cart_remove' store_type item.id %}"
                         hx-target="#cart-content"
                         hx-swap="innerHTML"
@@ -65,10 +65,10 @@
     </div>
 
     {# Cart Summary #}
-    <div class="ux-cart-summary">
-        <div class="ux-cart-summary__row ux-cart-summary__row--total">
-            <span class="ux-cart-summary__label">{% trans "Total" %}</span>
-            <span class="ux-cart-summary__value">
+    <div class="cart-summary">
+        <div class="cart-summary-row">
+            <span>{% trans "Total" %}</span>
+            <span class="cart-summary-value">
                 {% if cart.total == 0 %}
                 {% trans "Free" %}
                 {% else %}
@@ -79,15 +79,15 @@
     </div>
 
     {# Cart Actions #}
-    <div class="ux-cart__actions">
+    <div class="cart-actions">
         <button type="button"
-                class="ux-button ux-button--lg ux-color-primary"
+                class="btn btn-lg color-primary"
                 onclick="checkoutCart()">
             {% icon "card-outline" %}
             <span>{% trans "Checkout" %}</span>
         </button>
         <button type="button"
-                class="ux-button ux-button--outline"
+                class="btn btn-outline"
                 hx-get="{% url 'marketplace:index' %}"
                 hx-target="#main-content-area"
                 hx-push-url="true">
@@ -98,14 +98,14 @@
 
     {% else %}
     {# Empty Cart State #}
-    <div class="ux-cart__empty">
-        <div class="ux-cart__empty-icon">
+    <div class="flex flex-col items-center justify-center py-8">
+        <div>
             {% icon "cart-outline" %}
         </div>
-        <h3 class="ux-cart__empty-title">{% trans "Your cart is empty" %}</h3>
-        <p class="ux-cart__empty-text">{% trans "Add items from the marketplace to get started" %}</p>
+        <h3>{% trans "Your cart is empty" %}</h3>
+        <p class="text-base-content/60">{% trans "Add items from the marketplace to get started" %}</p>
         <button type="button"
-                class="ux-button ux-color-primary mt-lg"
+                class="btn color-primary mt-6"
                 hx-get="{% url 'marketplace:index' %}"
                 hx-target="#main-content-area"
                 hx-push-url="true">

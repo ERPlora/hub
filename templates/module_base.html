@@ -1,0 +1,27 @@
+{% extends "page_base.html" %}
+{% load i18n djicons %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+
+{% block page_content %}
+{% block module_content %}{% endblock %}
+{% endblock %}
+
+{% block page_footer %}
+{% if navigation %}
+<footer id="global-tabbar-footer">
+    <nav class="tabs tabs-border" aria-label="{% trans 'Module navigation' %}">
+        {% for nav in navigation %}
+        <button type="button"
+                class="tab{% if nav.active %} tab-active{% endif %}"
+                hx-get="{{ nav.url }}"
+                hx-target="#main-content-area"
+                hx-push-url="true">
+            {% icon nav.icon %}
+            <span>{{ nav.label }}</span>
+        </button>
+        {% endfor %}
+    </nav>
+</footer>
+{% endif %}
+{% endblock %}

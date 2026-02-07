@@ -1,52 +1,52 @@
 {% load i18n djicons %}
 
-{# Marketplace Tab Bar using @erplora/ux #}
-<nav class="ux-tab-bar ux-tab-bar--bottom" {% if oob %}hx-swap-oob="true" id="global-tabbar"{% endif %}>
+{# Marketplace Tab Bar #}
+<nav class="tabs tabs-bottom" {% if oob %}hx-swap-oob="true" id="global-tabbar"{% endif %}>
     {# Modules Tab #}
     <a href="{% url 'marketplace:index' %}"
-       class="ux-tab-button ux-tab-button--layout-icon-top {% if store_type == 'modules' %}ux-tab-button--selected{% endif %}"
+       class="tab tab-icon-top {% if store_type == 'modules' %}tab-active{% endif %}"
        hx-get="{% url 'marketplace:index' %}"
        hx-target="#main-content-area"
        hx-push-url="true">
-        <span class="ux-tab-button__icon">
+        <span class="tab-icon">
             {% icon "cube-outline" %}
         </span>
-        <span class="ux-tab-button__label">{% trans "Modules" %}</span>
+        <span class="tab-label">{% trans "Modules" %}</span>
     </a>
 
     {# Hubs Tab #}
     <a href="{% url 'marketplace:store_hubs' %}"
-       class="ux-tab-button ux-tab-button--layout-icon-top {% if store_type == 'hubs' %}ux-tab-button--selected{% endif %}"
+       class="tab tab-icon-top {% if store_type == 'hubs' %}tab-active{% endif %}"
        hx-get="{% url 'marketplace:store_hubs' %}"
        hx-target="#main-content-area"
        hx-push-url="true">
-        <span class="ux-tab-button__icon">
+        <span class="tab-icon">
             {% icon "server-outline" %}
         </span>
-        <span class="ux-tab-button__label">{% trans "Hubs" %}</span>
+        <span class="tab-label">{% trans "Hubs" %}</span>
     </a>
 
     {# Components Tab (Coming Soon) #}
-    <span class="ux-tab-button ux-tab-button--layout-icon-top ux-tab-button--disabled">
-        <span class="ux-tab-button__icon">
+    <span class="tab tab-icon-top tab-disabled">
+        <span class="tab-icon">
             {% icon "hardware-chip-outline" %}
         </span>
-        <span class="ux-tab-button__label">{% trans "Components" %}</span>
-        <span class="ux-tab-button__badge">{% trans "Soon" %}</span>
+        <span class="tab-label">{% trans "Components" %}</span>
+        <span class="badge">{% trans "Soon" %}</span>
     </span>
 
     {# Cart Tab #}
     <a href="{% url 'marketplace:cart_page' %}"
-       class="ux-tab-button ux-tab-button--layout-icon-top {% if current_view == 'cart' %}ux-tab-button--selected{% endif %}"
+       class="tab tab-icon-top {% if current_view == 'cart' %}tab-active{% endif %}"
        hx-get="{% url 'marketplace:cart_page' %}"
        hx-target="#main-content-area"
        hx-push-url="true">
-        <span class="ux-tab-button__icon">
+        <span class="tab-icon">
             {% icon "cart-outline" %}
         </span>
-        <span class="ux-tab-button__label">{% trans "Cart" %}</span>
+        <span class="tab-label">{% trans "Cart" %}</span>
         {% if cart_count %}
-        <span class="ux-tab-button__badge">{{ cart_count }}</span>
+        <span class="badge">{{ cart_count }}</span>
         {% endif %}
     </a>
 </nav>

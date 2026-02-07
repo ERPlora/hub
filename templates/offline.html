@@ -6,14 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERPlora Hub - {% trans "Offline" %}</title>
     <link rel="stylesheet" href="https://erplora.github.io/ux/dist/ux.min.css">
-    <link rel="stylesheet" href="{% static 'css/layout/offline.css' %}">
 </head>
 <body class="offline-page">
     <div class="offline-container">
         {% icon "cloud-offline-outline" css_class="offline-icon" %}
         <h1>{% trans "You're Offline" %}</h1>
         <p>{% trans "Please check your internet connection and try again." %}</p>
-        <button class="ux-button" onclick="window.location.reload()">
+        <button class="btn" onclick="window.location.reload()">
             {% trans "Try Again" %}
         </button>
     </div>

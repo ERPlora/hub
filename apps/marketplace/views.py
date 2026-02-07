@@ -223,7 +223,7 @@ def cart_add(request, store_type):
     }, request=request)
 
     badge_html = f'''
-    <span id="cart-badge" class="ux-badge ux-badge--danger" hx-swap-oob="true">
+    <span id="cart-badge" class="badge color-error" hx-swap-oob="true">
         {len(cart['items'])}
     </span>
     '''
@@ -249,7 +249,7 @@ def cart_remove(request, store_type, item_id):
 
     badge_count = len(cart['items'])
     badge_html = f'''
-    <span id="cart-badge" class="ux-badge ux-badge--danger" hx-swap-oob="true" {'style="display:none"' if badge_count == 0 else ''}>
+    <span id="cart-badge" class="badge color-error" hx-swap-oob="true" {'style="display:none"' if badge_count == 0 else ''}>
         {badge_count}
     </span>
     '''
@@ -271,7 +271,7 @@ def cart_clear(request, store_type):
     }, request=request)
 
     badge_html = '''
-    <span id="cart-badge" class="ux-badge ux-badge--danger" hx-swap-oob="true" style="display:none">
+    <span id="cart-badge" class="badge color-error" hx-swap-oob="true" style="display:none">
         0
     </span>
     '''

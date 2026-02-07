@@ -1,23 +1,23 @@
 {% load i18n ui djicons %}
 
 {% if tax_classes %}
-<div class="ux-list ux-list--inset">
+<div class="list list-inset">
     {% for tc in tax_classes %}
-    <div class="ux-item">
-        <div class="ux-item__content">
-            <span class="ux-item__label">{{ tc.name }}</span>
-            <span class="ux-item__note">
+    <div class="list-item">
+        <div class="list-item-content">
+            <span class="list-item-label">{{ tc.name }}</span>
+            <span class="list-item-note">
                 {{ tc.rate }}%
                 {% if tc.description %} - {{ tc.description }}{% endif %}
             </span>
         </div>
-        <div class="ux-item__end" style="gap: var(--ux-space-sm); display: flex; align-items: center;">
+        <div class="list-item-end" style="gap: 0.5rem; display: flex; align-items: center;">
             {% if tc.is_default %}
-            <span class="ux-chip ux-color-success">{% trans "Default" %}</span>
+            <span class="badge color-success">{% trans "Default" %}</span>
             {% endif %}
             <button type="button"
-                    class="ux-button ux-button--clear ux-button--sm"
-                    style="color: var(--ux-danger); padding: var(--ux-space-xs);"
+                    class="btn btn-ghost btn-sm"
+                    style="color: var(--color-error); padding: 0.25rem;"
                     hx-post="{% url 'main:settings' %}"
                     hx-vals='{"action": "delete_tax_class", "tax_class_id": "{{ tc.id }}"}'
                     hx-target="#tax-classes-list"
@@ -30,33 +30,15 @@
     {% endfor %}
 </div>
 {% else %}
-<div class="ux-empty-state" style="padding: var(--ux-space-xl); text-align: center;">
-    <div class="ux-empty-state__icon" style="margin-bottom: var(--ux-space-md);">
-        {% icon "alert-circle-outline" style="width: 48px; height: 48px; color: var(--ux-text-tertiary);" %}
+<div class="flex flex-col items-center justify-center py-12" style="text-align: center;">
+    <div class="text-4xl mb-4 opacity-40">
+        {% icon "alert-circle-outline" style="width: 48px; height: 48px;" %}
     </div>
-    <h3 class="ux-empty-state__title" style="font-size: var(--ux-font-size-lg); font-weight: 600; margin: 0 0 var(--ux-space-xs);">
+    <h3 class="text-lg font-semibold mb-2">
         {% trans "No tax classes configured" %}
     </h3>
-    <p class="ux-empty-state__description" style="font-size: var(--ux-font-size-sm); color: var(--ux-text-secondary); margin: 0;">
+    <p class="text-sm opacity-60">
         {% trans "Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)" %}
     </p>
 </div>
 {% endif %}
-
-<style>
-.ux-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: var(--ux-space-xs) var(--ux-space-md);
-    border-radius: 9999px;
-    font-size: var(--ux-font-size-sm);
-    font-weight: 500;
-    background: var(--ux-surface-secondary);
-    color: var(--ux-text);
-}
-
-.ux-chip.ux-color-success {
-    background: rgba(var(--ux-success-rgb), 0.15);
-    color: var(--ux-success);
-}
-</style>

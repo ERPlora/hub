@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% load static i18n djicons %}
+
+{% block content %}
+<div class="page" x-data="app()" x-init="init()">
+    <div class="sidebar-wrapper" :class="{ 'sidebar-open': sidebarOpen, 'sidebar-collapsed': sidebarCollapsed }">
+        <!-- Backdrop (mobile) -->
+        <div class="drawer-backdrop" @click="sidebarOpen = false"></div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" aria-label="{% trans 'Navigation menu' %}">
+            <!-- User Profile -->
+            <div class="sidebar-header text-center p-4">
+                <div class="avatar avatar-lg mx-auto mb-2">
+                    <span>{{ request.user.first_name|first|default:"U" }}{{ request.user.last_name|first }}</span>
+                </div>
+                <div class="font-semibold">
+                    {{ request.user.get_full_name|default:request.user.username }}
+                </div>
+                <div class="text-sm text-base-content/60">
+                    {{ request.user.role_name|default:"" }}
+                </div>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="sidebar-content overflow-auto" aria-label="{% trans 'Main navigation' %}">
+                <ul class="sidebar-menu">
+                    <!-- Home -->
+                    <li>
+                        <a class="sidebar-menu-button"
+                           :class="{ 'active': $store.nav.currentPath === '/' }"
+                           href="/"
+                           hx-get="/"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            <span class="sidebar-menu-icon">{% icon "home-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Home" %}</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-button"
+                           :class="{ 'active': $store.nav.isActive('/files') }"
+                           href="{% url 'main:files' %}"
+                           hx-get="{% url 'main:files' %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            <span class="sidebar-menu-icon">{% icon "briefcase-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Files" %}</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-button"
+                           :class="{ 'active': $store.nav.isActive('/employees') }"
+                           href="{% url 'main:employees' %}"
+                           hx-get="{% url 'main:employees' %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            <span class="sidebar-menu-icon">{% icon "people-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Employees" %}</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-button"
+                           :class="{ 'active': $store.nav.isActive('/roles') }"
+                           href="{% url 'main:roles:list' %}"
+                           hx-get="{% url 'main:roles:list' %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            <span class="sidebar-menu-icon">{% icon "shield-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Roles" %}</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-button"
+                           :class="{ 'active': $store.nav.isActive('/settings') }"
+                           href="{% url 'main:settings' %}"
+                           hx-get="{% url 'main:settings' %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            <span class="sidebar-menu-icon">{% icon "settings-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Settings" %}</span>
+                        </a>
+                    </li>
+
+                    {% if MODULE_MENU_ITEMS %}
+                    <!-- Separator -->
+                    <li class="sidebar-separator"></li>
+
+                    {% for item in MODULE_MENU_ITEMS %}
+                    <li>
+                        <a class="sidebar-menu-button"
+                           :class="{ 'active': $store.nav.isActive('{{ item.url }}') }"
+                           href="{{ item.url }}"
+                           hx-get="{{ item.url }}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            <span class="sidebar-menu-icon">
+                                {% if item.has_svg %}
+                                <img src="{{ item.svg_path }}" alt="" width="20" height="20">
+                                {% else %}
+                                {% icon item.icon %}
+                                {% endif %}
+                            </span>
+                            <span class="sidebar-label">{{ item.label }}</span>
+                        </a>
+                    </li>
+                    {% endfor %}
+                    {% endif %}
+
+                    <!-- Separator -->
+                    <li class="sidebar-separator"></li>
+
+                    <li>
+                        <a class="sidebar-menu-button"
+                           :class="{ 'active': $store.nav.isActive('/modules') }"
+                           href="{% url 'mymodules:index' %}"
+                           hx-get="{% url 'mymodules:index' %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            <span class="sidebar-menu-icon">{% icon "cube-outline" %}</span>
+                            <span class="sidebar-label">{% trans "My Modules" %}</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-button"
+                           :class="{ 'active': $store.nav.isActive('/marketplace') }"
+                           href="/marketplace/"
+                           hx-get="/marketplace/"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            <span class="sidebar-menu-icon">{% icon "storefront-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Marketplace" %}</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <!-- Logout -->
+            <div class="sidebar-footer">
+                <a href="{% url 'logout' %}" class="sidebar-menu-button">
+                    <span class="sidebar-menu-icon">{% icon "log-out-outline" %}</span>
+                    <span class="sidebar-label">{% trans "Log Out" %}</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="sidebar-gap">
+            {% block main %}{% endblock %}
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function app() {
+        return {
+            sidebarOpen: false,
+            sidebarCollapsed: false,
+            isDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
+
+            init() {
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                    this.isDark = e.matches;
+                    document.documentElement.classList.toggle('dark', this.isDark);
+                });
+
+                document.body.addEventListener('htmx:afterSettle', () => {
+                    if (window.innerWidth < 992) {
+                        this.sidebarOpen = false;
+                    }
+                });
+            },
+
+            toggleSidebar() {
+                this.sidebarCollapsed = !this.sidebarCollapsed;
+            },
+
+            toggleTheme() {
+                this.isDark = !this.isDark;
+                document.documentElement.classList.toggle('dark', this.isDark);
+            }
+        }
+    }
+</script>
+{% block app_scripts %}{% endblock %}
+{% endblock %}

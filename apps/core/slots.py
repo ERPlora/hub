@@ -10,9 +10,9 @@ content to be rendered.
 Example - Module defining slots in template:
     {% load slots %}
 
-    <header class="ux-header">
+    <header class="header">
         {% render_slot 'sales.pos_header_start' %}
-        <input type="search" class="ux-input">
+        <input type="search" class="input">
         {% render_slot 'sales.pos_header_end' %}
     </header>
 
