@@ -1,33 +1,20 @@
 /**
  * ERPlora Hub - Default Theme (Indigo)
- * Overrides @erplora/ux v3 design tokens
+ * Overrides @erplora/ux v3 design tokens using OKLCH
  */
 
-/* ========================================
-   LIGHT MODE - Override UX primary to Indigo
-   ======================================== */
-
+/* Light Mode - ERPlora brand indigo */
 :root {
-  /* Primary - ERPlora brand indigo */
-  --color-primary: #4F5BD5;
-  --color-primary-content: #ffffff;
-
-  /* Error - Slightly darker red */
-  --color-error: #d4183d;
-  --color-error-content: #ffffff;
+  --color-primary: oklch(0.49 0.20 275);
+  --color-primary-content: oklch(0.98 0.005 275);
+  --color-error: oklch(0.52 0.22 18);
+  --color-error-content: oklch(0.98 0.005 18);
 }
 
-/* ========================================
-   DARK MODE
-   ======================================== */
-
-[data-theme="dark"],
-.dark {
-  /* Primary - Lighter indigo for dark mode */
-  --color-primary: #7B8CE8;
-  --color-primary-content: #000000;
-
-  /* Error - Adjusted for dark mode */
-  --color-error: #eb445a;
-  --color-error-content: #ffffff;
+/* Dark Mode */
+[data-theme="dark"] {
+  --color-primary: oklch(0.65 0.18 275);
+  --color-primary-content: oklch(0.15 0.02 275);
+  --color-error: oklch(0.65 0.20 18);
+  --color-error-content: oklch(0.98 0.005 18);
 }

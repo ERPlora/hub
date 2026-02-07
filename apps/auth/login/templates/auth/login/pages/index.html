@@ -5,233 +5,78 @@
 
 {% block extra_css %}
 <style>
-    /* Login Page Styles — uses @erplora/ux theme variables */
     .login-page {
         min-height: 100dvh;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: var(--spacing-lg);
+        padding: 1.5rem;
         position: relative;
         overflow: hidden;
-        background: var(--color-base-950);
+        background: var(--color-base-200);
+        color: var(--color-base-content);
     }
 
-    /* Layered gradient background */
+    /* Decorative gradients */
     .login-page::before {
         content: '';
         position: absolute;
         inset: 0;
         background:
-            radial-gradient(ellipse 80% 60% at 70% 10%, rgba(var(--color-primary-rgb), 0.15) 0%, transparent 60%),
-            radial-gradient(ellipse 70% 50% at 20% 90%, rgba(var(--color-tertiary-rgb), 0.12) 0%, transparent 60%),
-            radial-gradient(ellipse 50% 40% at 50% 50%, rgba(var(--color-primary-rgb), 0.06) 0%, transparent 70%);
+            radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
+            radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 40% at 50% 50%, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, transparent 70%);
         z-index: 0;
     }
 
-    /* Subtle grid pattern overlay */
+    /* Subtle grid pattern */
     .login-page::after {
         content: '';
         position: absolute;
         inset: 0;
         background-image:
-            linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            linear-gradient(color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px),
+            linear-gradient(90deg, color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px);
         background-size: 60px 60px;
         z-index: 0;
     }
 
-    .login-page > * {
-        position: relative;
-        z-index: 1;
-    }
+    .login-page > * { position: relative; z-index: 1; }
 
-    .login-container {
-        width: 100%;
-        max-width: 420px;
-    }
-
-    .login-logo {
-        text-align: center;
-        margin-bottom: var(--spacing-xl);
-    }
-
+    /* Logo */
     .login-logo img {
         width: 72px;
         height: 72px;
-        margin-bottom: var(--spacing-md);
-        filter: drop-shadow(0 4px 24px rgba(var(--color-primary-rgb), 0.3));
+        margin-bottom: 1rem;
+        filter: drop-shadow(0 4px 24px color-mix(in oklch, var(--color-primary) 30%, transparent));
     }
+    .login-logo h1 { font-size: 2rem; font-weight: 700; margin: 0 0 0.25rem; letter-spacing: -0.02em; }
+    .login-logo p { color: color-mix(in oklch, var(--color-base-content) 50%, transparent); font-size: 0.875rem; margin: 0; letter-spacing: 0.04em; text-transform: uppercase; }
 
-    .login-logo h1 {
-        color: #fff;
-        font-size: 2rem;
-        font-weight: 700;
-        margin: 0 0 var(--spacing-xs);
-        letter-spacing: -0.02em;
-    }
-
-    .login-logo p {
-        color: var(--color-base-content-muted);
-        font-size: var(--font-size-sm);
-        margin: 0;
-        font-weight: 400;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-    }
-
-    .theme-toggle {
-        position: fixed;
-        top: var(--spacing-lg);
-        right: var(--spacing-lg);
-        z-index: 100;
-    }
-
-    /* Glass card override for login */
-    .login-page .card.glass {
-        background: var(--glass-bg);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid var(--glass-border);
-        border-radius: 20px;
-        box-shadow:
-            var(--shadow-lg),
-            inset 0 1px 0 var(--glass-highlight);
-    }
-
-    /* Employee Selection */
-    .employee-selection h2 {
-        color: #fff;
-        text-align: center;
-        font-size: var(--font-size-lg);
-        font-weight: 600;
-        margin-bottom: var(--spacing-lg);
-    }
-
+    /* Employee grid */
     .employee-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: var(--spacing-md);
-        margin-bottom: var(--spacing-lg);
+        gap: 1rem;
     }
 
-    /* PIN Section */
-    .pin-section {
-        text-align: center;
-        margin-bottom: var(--spacing-lg);
-    }
-
-    .pin-section .avatar {
-        margin-bottom: var(--spacing-md);
-    }
-
-    .pin-section h2 {
-        color: #fff;
-        font-size: var(--font-size-lg);
-        font-weight: 600;
-        margin: 0 0 var(--spacing-xs);
-    }
-
-    .pin-section p {
-        color: var(--color-base-content-muted);
-        font-size: var(--font-size-sm);
-        margin: 0;
-    }
-
-    /* Segment override for dark bg */
-    .login-page .tabs.glass {
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-    }
-
-    .login-page .tabs.glass .tab {
-        color: var(--color-base-content-tertiary);
-    }
-
-    .login-page .tabs.glass .tab-active {
-        color: #fff;
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    /* Input overrides for dark bg */
-    .login-page .input.glass {
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-        color: #fff;
-    }
-
-    .login-page .input.glass::placeholder {
-        color: var(--color-base-content-muted);
-    }
-
-    .login-page .input.glass:focus {
-        border-color: rgba(var(--color-primary-rgb), 0.5);
-        box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
-    }
-
-    .login-page .form-group-label {
-        color: var(--color-base-content-tertiary);
-    }
-
-    /* PIN Error */
-    .pin-error {
-        margin: var(--spacing-md) 0;
-    }
-
-    /* PIN Setup Modal Content */
-    .pin-setup-content {
-        text-align: center;
-        padding: var(--spacing-lg);
-    }
-
-    .pin-setup-header {
-        margin-bottom: var(--spacing-xl);
-    }
-
-    .pin-setup-header svg {
-        width: 48px;
-        height: 48px;
-        color: var(--color-primary);
-        margin-bottom: var(--spacing-md);
-    }
-
-    .pin-setup-header h2 {
-        font-size: var(--font-size-xl);
-        font-weight: 600;
-        margin: 0 0 var(--spacing-sm);
-    }
-
-    .pin-setup-header p {
-        color: var(--color-base-content-secondary);
-        margin: 0;
-    }
-
-    .pin-confirm-message {
-        margin: var(--spacing-md) 0;
-        color: var(--color-primary);
-        font-weight: 500;
-    }
-
-    /* Hidden elements */
-    [x-cloak] {
-        display: none !important;
-    }
+    .pin-confirm-message { margin: 1rem 0; color: var(--color-primary); font-weight: 500; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div x-data="loginApp()" x-init="init()">
     <!-- Theme Toggle -->
-    <button class="btn btn-glass btn-circle theme-toggle" @click="toggleTheme()">
+    <button class="btn btn-glass btn-circle fixed top-6 right-6 z-50" @click="toggleTheme()">
         <span x-show="isDark">{% icon "sunny-outline" %}</span>
         <span x-show="!isDark">{% icon "moon-outline" %}</span>
     </button>
 
     <!-- Login Page -->
     <div class="login-page">
-        <div class="login-container">
+        <div class="w-full max-w-md">
             <!-- Logo -->
-            <div class="login-logo">
+            <div class="login-logo flex flex-col items-center text-center mb-8">
                 <img src="{% static 'img/logo.png' %}" alt="ERPlora">
                 <h1>ERPlora</h1>
                 <p>{% trans "Business Management System" %}</p>
@@ -240,19 +85,21 @@
             <!-- Login Card -->
             <div class="card glass">
                 <div class="card-body">
-                    <!-- Login Tabs (Segment) -->
-                    <div class="tabs tabs-box glass mb-6" x-data="{ indicator: null }" x-init="$nextTick(() => { indicator = $el.querySelector('.tab-active') })">
+                    <!-- Login Tabs -->
+                    <div class="segment segment-block mb-6">
                         <button type="button"
-                                class="tab"
-                                :class="{ 'tab-active': loginMode === 'local' }"
+                                class="segment-btn"
+                                :class="{ 'segment-btn-selected': loginMode === 'local' }"
                                 @click="loginMode = 'local'">
-                            {% trans "Local Login" %}
+                            {% icon "key-outline" class="segment-btn-icon" %}
+                            <span class="segment-btn-label">{% trans "PIN" %}</span>
                         </button>
                         <button type="button"
-                                class="tab"
-                                :class="{ 'tab-active': loginMode === 'cloud' }"
+                                class="segment-btn"
+                                :class="{ 'segment-btn-selected': loginMode === 'cloud' }"
                                 @click="loginMode = 'cloud'">
-                            {% trans "Cloud Login" %}
+                            {% icon "mail-outline" class="segment-btn-icon" %}
+                            <span class="segment-btn-label">{% trans "Email" %}</span>
                         </button>
                     </div>
 
@@ -260,13 +107,13 @@
                     <div x-show="loginMode === 'local'" x-cloak>
                         <!-- Employee Selection -->
                         <div x-show="!selectedEmployee">
-                            <h2 class="employee-selection">{% trans "Select your profile" %}</h2>
+                            <p class="text-center text-sm text-base-content/60 mb-4">{% trans "Select your profile" %}</p>
 
                             <div class="employee-grid">
                                 <template x-for="employee in employees" :key="employee.id">
-                                    <div class="employee-card glass employee-card--clickable"
+                                    <div class="employee-card glass employee-card-clickable"
                                          @click="selectEmployee(employee)">
-                                        <div class="employee-card-avatar" :class="'employee-card-avatar--' + employee.avatarColor">
+                                        <div class="employee-card-avatar" :class="'employee-card-avatar-' + employee.avatarColor">
                                             <span x-text="employee.initials"></span>
                                         </div>
                                         <div class="employee-card-info">
@@ -280,50 +127,48 @@
 
                         <!-- PIN Entry -->
                         <div x-show="selectedEmployee" x-cloak>
-                            <div class="pin-section">
-                                <div class="avatar avatar-xl avatar-primary">
+                            <div class="pinpad">
+                                <!-- Avatar + Name -->
+                                <div class="pinpad-avatar avatar-primary">
                                     <span x-text="selectedEmployee?.initials"></span>
                                 </div>
-                                <h2 x-text="selectedEmployee?.name"></h2>
-                                <p>{% trans "Enter your PIN" %}</p>
-                            </div>
+                                <h2 class="pinpad-title" x-text="selectedEmployee?.name"></h2>
+                                <p class="pinpad-label">{% trans "Enter your PIN" %}</p>
 
-                            <!-- PIN Pad -->
-                            <div class="numpad glass">
                                 <!-- PIN Dots -->
-                                <div class="numpad-dots">
+                                <div class="pinpad-dots">
                                     <template x-for="i in 4">
-                                        <div class="numpad-dot"
+                                        <div class="pinpad-dot"
                                              :class="{
-                                                 'numpad-dot--filled': pinInput.length >= i,
-                                                 'numpad-dot--error': pinError
+                                                 'pinpad-dot-filled': pinInput.length >= i,
+                                                 'pinpad-dot-error': pinError
                                              }"></div>
                                     </template>
                                 </div>
 
-                                <!-- Error Message -->
-                                <p x-show="pinError" x-cloak class="numpad-error">
+                                <!-- Error -->
+                                <p x-show="pinError" x-cloak class="pinpad-error">
                                     {% trans "Incorrect PIN" %}
                                 </p>
 
-                                <!-- Keypad Grid -->
-                                <div class="numpad-grid">
+                                <!-- Keypad -->
+                                <div class="pinpad-grid">
                                     <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
                                         <button type="button"
-                                                class="numpad-key"
+                                                class="pinpad-key"
                                                 @click="addPinDigit(num)"
                                                 x-text="num"></button>
                                     </template>
                                     <button type="button"
-                                            class="numpad-key"
+                                            class="pinpad-key"
                                             @click="selectedEmployee = null; pinInput = ''; pinError = false;">
                                         {% icon "arrow-back-outline" %}
                                     </button>
                                     <button type="button"
-                                            class="numpad-key"
+                                            class="pinpad-key"
                                             @click="addPinDigit(0)">0</button>
                                     <button type="button"
-                                            class="numpad-key"
+                                            class="pinpad-key"
                                             @click="clearPinDigit()">
                                         {% icon "backspace-outline" %}
                                     </button>
@@ -345,19 +190,18 @@
                                        required>
                             </div>
 
-                            <div class="form-group mb-6">
+                            <div class="form-group mb-6" x-data="{ showPassword: false }">
                                 <label class="form-group-label" for="cloud-password">{% trans "Password" %}</label>
-                                <div class="input-password" x-data="{ showPassword: false }">
+                                <label class="input glass">
                                     <input :type="showPassword ? 'text' : 'password'"
                                            id="cloud-password"
-                                           class="input glass"
+                                           class="grow"
                                            x-model="cloudCredentials.password"
                                            placeholder="********"
                                            required>
                                     <button type="button"
-                                            class="input-password-toggle"
-                                            @click="showPassword = !showPassword"
-                                            style="color: rgba(255,255,255,0.8);">
+                                            class="opacity-60 hover:opacity-100 cursor-pointer bg-transparent border-none p-0"
+                                            @click="showPassword = !showPassword">
                                         <template x-if="!showPassword">
                                             {% icon "eye-outline" %}
                                         </template>
@@ -365,7 +209,7 @@
                                             {% icon "eye-off-outline" %}
                                         </template>
                                     </button>
-                                </div>
+                                </label>
                             </div>
 
                             <button type="submit"
@@ -383,30 +227,29 @@
 
     <!-- PIN Setup Modal -->
     <div class="modal-backdrop"
-         :class="{ 'modal-backdrop--open': showPinSetup }"
+         :data-state="showPinSetup ? 'open' : 'closed'"
          @click.self="showPinSetup = false">
         <div class="modal modal-sm">
             <div class="modal-header">
                 <h3 class="modal-title">{% trans "Setup your PIN" %}</h3>
             </div>
             <div class="modal-body">
-                <div class="pin-setup-content">
-                    <div class="pin-setup-header">
+                <div class="text-center p-6">
+                    <div class="mb-8">
                         {% icon "key-outline" %}
-                        <h2>{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
-                        <p>{% trans "Setup a 4-digit PIN for quick access" %}</p>
+                        <h2 class="text-xl font-semibold mt-4 mb-2">{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
+                        <p class="text-base-content/60">{% trans "Setup a 4-digit PIN for quick access" %}</p>
                     </div>
 
                     <!-- PIN Setup Pad -->
-                    <div class="numpad">
-                        <!-- PIN Dots -->
-                        <div class="numpad-dots">
+                    <div class="pinpad">
+                        <div class="pinpad-dots">
                             <template x-for="i in 4">
-                                <div class="numpad-dot"
+                                <div class="pinpad-dot"
                                      :class="{
-                                         'numpad-dot--filled': setupPinInput.length >= i,
-                                         'numpad-dot--error': setupPinError,
-                                         'numpad-dot--success': setupPinConfirm && setupPinInput.length >= i
+                                         'pinpad-dot-filled': setupPinInput.length >= i,
+                                         'pinpad-dot-error': setupPinError,
+                                         'pinpad-dot-success': setupPinConfirm && setupPinInput.length >= i
                                      }"></div>
                             </template>
                         </div>
@@ -415,25 +258,23 @@
                             <p>{% trans "Confirm your PIN" %}</p>
                         </div>
 
-                        <!-- Error Message -->
-                        <p x-show="setupPinError" x-cloak class="numpad-error">
+                        <p x-show="setupPinError" x-cloak class="pinpad-error">
                             {% trans "PINs don't match" %}
                         </p>
 
-                        <!-- Keypad Grid -->
-                        <div class="numpad-grid">
+                        <div class="pinpad-grid">
                             <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
                                 <button type="button"
-                                        class="numpad-key"
+                                        class="pinpad-key"
                                         @click="addSetupPinDigit(num)"
                                         x-text="num"></button>
                             </template>
-                            <button type="button" class="numpad-key numpad-key--hidden"></button>
+                            <button type="button" class="pinpad-key pinpad-key-hidden"></button>
                             <button type="button"
-                                    class="numpad-key"
+                                    class="pinpad-key"
                                     @click="addSetupPinDigit(0)">0</button>
                             <button type="button"
-                                    class="numpad-key"
+                                    class="pinpad-key"
                                     @click="clearSetupPinDigit()">
                                 {% icon "backspace-outline" %}
                             </button>
@@ -473,8 +314,6 @@
             setupPinError: false,
 
             init() {
-                // Dark mode is already applied by base.html
-                // Sync localStorage for consistency
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
             },
 
@@ -617,11 +456,13 @@
 
             async toggleTheme() {
                 this.isDark = !this.isDark;
-                document.body.classList.toggle('dark', this.isDark);
-                document.documentElement.classList.toggle('dark', this.isDark);
+                if (this.isDark) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
 
-                // Save to database
                 try {
                     await fetch('{% url "main:settings" %}', {
                         method: 'POST',
@@ -637,13 +478,11 @@
             },
 
             async showToast(message, type = 'primary') {
-                // Use Notify from @erplora/ux if available
                 if (typeof Notify !== 'undefined' && Notify[type]) {
                     Notify[type]('', message);
                 } else {
-                    // Fallback: create a simple toast
                     const toast = document.createElement('div');
-                    toast.className = `snackbar snackbar--${type} snackbar--visible`;
+                    toast.className = `snackbar snackbar-${type} snackbar-visible`;
                     toast.innerHTML = `<span class="snackbar-message">${message}</span>`;
                     toast.style.cssText = 'position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 9999;';
                     document.body.appendChild(toast);

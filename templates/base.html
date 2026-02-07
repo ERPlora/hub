@@ -1,7 +1,7 @@
 {% load static %}
 {% load i18n %}
 <!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE }}" class="{% if HUB_CONFIG.dark_mode %}dark{% endif %}">
+<html lang="{{ LANGUAGE_CODE }}" {% if HUB_CONFIG.dark_mode %}data-theme="dark"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -528,25 +528,23 @@
             window.ERPlora.isDark = isDark;
             window.ERPlora.darkModeAuto = darkModeAuto;
 
-            // Apply immediately to prevent flash
+            // Apply data-theme attribute immediately to prevent flash
             if (isDark) {
-                document.documentElement.classList.add('dark');
+                document.documentElement.setAttribute('data-theme', 'dark');
             }
         })();
     </script>
 </head>
 <body class="app">
     <script>
-        // Apply dark class to body (documentElement already has it if needed)
-        if (window.ERPlora && window.ERPlora.isDark) {
-            document.body.classList.add('dark');
-        }
-
         // Listen for system preference changes (only if auto mode)
         if (window.ERPlora && window.ERPlora.darkModeAuto) {
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                document.body.classList.toggle('dark', e.matches);
-                document.documentElement.classList.toggle('dark', e.matches);
+                if (e.matches) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
                 window.ERPlora.isDark = e.matches;
             });
         }

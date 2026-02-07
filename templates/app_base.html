@@ -163,7 +163,11 @@
             init() {
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
                     this.isDark = e.matches;
-                    document.documentElement.classList.toggle('dark', this.isDark);
+                    if (this.isDark) {
+                        document.documentElement.setAttribute('data-theme', 'dark');
+                    } else {
+                        document.documentElement.removeAttribute('data-theme');
+                    }
                 });
 
                 document.body.addEventListener('htmx:afterSettle', () => {
@@ -179,7 +183,11 @@
 
             toggleTheme() {
                 this.isDark = !this.isDark;
-                document.documentElement.classList.toggle('dark', this.isDark);
+                if (this.isDark) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
             }
         }
     }

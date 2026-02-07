@@ -229,8 +229,8 @@ class TestThemeTemplateRendering:
         response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         content = response.content.decode()
-        # Check that dark mode is applied in script
-        assert "document.body.classList.add('dark')" in content
+        # Check that dark mode is applied via data-theme attribute
+        assert 'data-theme="dark"' in content
 
 
 @pytest.mark.django_db
