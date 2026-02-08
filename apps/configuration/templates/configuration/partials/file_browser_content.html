@@ -1,78 +1,84 @@
 {% load i18n djicons %}
 
-{# Breadcrumbs #}
-<div class="d-flex align-center gap-xs mb-md fs-sm flex-wrap">
+<!-- Directory Tabs -->
+<div class="flex gap-1.5 mb-4 overflow-x-auto pb-1 border-b border-base-content/10 -mx-4 px-4">
+    {% for key, dir_info in directories.items %}
+    <button class="chip chip-sm {% if key == dir_key %}color-primary{% else %}chip-ghost{% endif %}"
+            hx-get="{% url 'configuration:file_browser' %}?dir={{ key }}"
+            hx-target="#file-browser-content">
+        {% icon dir_info.icon|add:"-outline" %}
+        <span>{{ dir_info.name }}</span>
+    </button>
+    {% endfor %}
+</div>
+
+<!-- Breadcrumbs -->
+{% if has_parent %}
+<nav class="flex items-center gap-1 mb-3 text-xs flex-wrap">
     {% for crumb in breadcrumbs %}
     {% if not forloop.last %}
     <a href="#"
        hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ crumb.path }}"
        hx-target="#file-browser-content"
-       class="text-primary">
+       class="text-primary hover:underline">
         {{ crumb.name }}
     </a>
-    {% icon "chevron-forward-outline" css_class="text-secondary" %}
+    <span class="text-base-content/30">{% icon "chevron-forward-outline" %}</span>
     {% else %}
-    <span class="fw-semibold">{{ crumb.name }}</span>
+    <span class="font-semibold text-base-content/70">{{ crumb.name }}</span>
     {% endif %}
     {% endfor %}
-</div>
-
-{# Directory Tabs #}
-<div class="d-flex gap-xs mb-md overflow-x-auto pb-xs">
-    {% for key, dir_info in directories.items %}
-    <span class="chip {% if key == dir_key %}color-primary{% endif %}"
-        style="cursor: pointer;"
-        hx-get="{% url 'configuration:file_browser' %}?dir={{ key }}"
-        hx-target="#file-browser-content">
-        {% icon dir_info.icon|add:"-outline" %}
-        <span>{{ dir_info.name }}</span>
-    </span>
-    {% endfor %}
-</div>
-
-{# Back Button #}
-{% if has_parent %}
-<div class="list-item mb-xs" style="cursor: pointer;"
-    hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ parent_path }}"
-    hx-target="#file-browser-content">
-    {% icon "arrow-back-outline" %}
-    <span>{% trans "Back" %}</span>
-</div>
+</nav>
 {% endif %}
 
-{# Files List #}
+<!-- Files List -->
 {% if is_empty %}
-<div class="table-empty">
-    {% icon "folder-open-outline" css_class="table-empty-icon" %}
-    <p class="text-secondary">{% trans "No files in this directory" %}</p>
+<div class="flex flex-col items-center justify-center py-16 text-center">
+    <span class="text-5xl text-base-content/15 mb-3">{% icon "folder-open-outline" %}</span>
+    <p class="text-sm font-medium text-base-content/50 m-0">{% trans "Empty directory" %}</p>
+    <p class="text-xs text-base-content/40 m-0 mt-1">{% trans "No files in this directory" %}</p>
 </div>
 {% else %}
-<div class="list">
+<div class="flex flex-col gap-0.5">
     {% for item in items %}
     {% if item.is_dir %}
-    {# Directory #}
-    <div class="list-item" style="cursor: pointer;"
-        hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ item.path }}"
-        hx-target="#file-browser-content">
-        <span style="color: var(--color-warning);">{% icon "folder" %}</span>
-        <div class="flex-1">
-            <h3>{{ item.name }}</h3>
-            <p class="fs-xs text-secondary">{{ item.modified }}</p>
+    <!-- Directory -->
+    <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-base-200 transition-colors group"
+         hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ item.path }}"
+         hx-target="#file-browser-content">
+        <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+            <span class="text-warning">{% icon "folder" %}</span>
         </div>
+        <div class="flex-1 min-w-0">
+            <p class="font-medium text-sm m-0 truncate">{{ item.name }}</p>
+            <p class="text-xs text-base-content/40 m-0">{{ item.modified }}</p>
+        </div>
+        <span class="text-base-content/20 group-hover:text-base-content/50 transition-colors">
+            {% icon "chevron-forward-outline" %}
+        </span>
     </div>
     {% else %}
-    {# File #}
-    <div class="list-item d-flex align-center gap-sm">
-        <span style="color: var(--color-base-content-secondary);">{% icon item.icon|add:"-outline" %}</span>
-        <div class="flex-1">
-            <h3>{{ item.name }}</h3>
-            <p class="fs-xs text-secondary">{{ item.size }} &bull; {{ item.modified }}</p>
+    <!-- File -->
+    <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-base-200 transition-colors group cursor-pointer"
+         hx-get="{% url 'configuration:file_preview' %}?dir={{ dir_key }}&path={{ item.path }}"
+         hx-target="#file-preview-content"
+         @click="previewOpen = true">
+        <div class="w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center shrink-0 group-hover:bg-base-300 transition-colors">
+            <span class="text-base-content/40">{% icon item.icon|add:"-outline" %}</span>
         </div>
-        <a class="btn btn-ghost"
-            href="{% url 'configuration:download_file' %}?dir={{ dir_key }}&path={{ item.path }}"
-            download>
-            {% icon "download-outline" %}
-        </a>
+        <div class="flex-1 min-w-0">
+            <p class="font-medium text-sm m-0 truncate">{{ item.name }}</p>
+            <p class="text-xs text-base-content/40 m-0">{{ item.size }} &bull; {{ item.modified }}</p>
+        </div>
+        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a class="btn btn-ghost btn-xs btn-circle"
+               href="{% url 'configuration:download_file' %}?dir={{ dir_key }}&path={{ item.path }}"
+               download
+               title="{% trans 'Download' %}"
+               @click.stop>
+                {% icon "download-outline" %}
+            </a>
+        </div>
     </div>
     {% endif %}
     {% endfor %}

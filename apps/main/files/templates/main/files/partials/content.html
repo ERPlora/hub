@@ -1,70 +1,102 @@
 {% load i18n djicons %}
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
-    <!-- Left Column: Database + Storage -->
-    <div class="flex flex-col gap-6">
-        <!-- Database Download Card -->
-        <div class="card">
-            <div class="card-body">
-                <div class="flex items-center gap-3 mb-3">
-                    {% icon "server-outline" css_class="text-xl text-primary" %}
-                    <div>
-                        <p class="text-xs uppercase font-semibold opacity-60 m-0">{% trans "Download backup" %}</p>
-                        <h2 class="text-base font-bold m-0">{% trans "Database" %}</h2>
-                    </div>
+<div x-data="{ previewOpen: false }" class="mt-5">
+
+    <!-- Top Row: Quick Action Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+        <!-- Database Backup -->
+        <a href="{{ download_url }}" class="card glass hover:shadow-lg transition-shadow group">
+            <div class="card-body p-4 flex flex-row items-center gap-4">
+                <div class="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                    <span class="text-xl text-primary">{% icon "server-outline" %}</span>
                 </div>
-                <p class="text-sm opacity-60 mb-4">
-                    {% trans "Download a backup of your SQLite database containing all your data." %}
-                </p>
-                <a href="{{ download_url }}" class="btn btn-block color-primary">
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-sm m-0">{% trans "Database" %}</p>
+                    <p class="text-xs text-base-content/50 m-0">{% trans "Download backup" %}</p>
+                </div>
+                <span class="text-base-content/30 group-hover:text-primary transition-colors">
                     {% icon "cloud-download-outline" %}
-                    {% trans "Download Database" %}
-                </a>
+                </span>
+            </div>
+        </a>
+
+        <!-- Storage Info (loaded via HTMX) -->
+        <div class="card glass">
+            <div class="card-body p-4" id="storage-summary"
+                 hx-get="{% url 'configuration:storage_info' %}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <div class="flex items-center justify-center h-11">
+                    <span class="loading loading-sm"></span>
+                </div>
             </div>
         </div>
 
-        <!-- Storage Info Card -->
-        <div class="card">
-            <div class="card-body">
-                <div class="flex items-center gap-3 mb-3">
-                    {% icon "pie-chart-outline" css_class="text-xl text-primary" %}
-                    <div>
-                        <p class="text-xs uppercase font-semibold opacity-60 m-0">{% trans "Disk usage" %}</p>
-                        <h2 class="text-base font-bold m-0">{% trans "Storage" %}</h2>
-                    </div>
+        <!-- Total Files -->
+        <div class="card glass">
+            <div class="card-body p-4 flex flex-row items-center gap-4">
+                <div class="w-11 h-11 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+                    <span class="text-xl text-success">{% icon "documents-outline" %}</span>
                 </div>
-                <div id="storage-info"
-                     hx-get="{% url 'configuration:storage_info' %}"
-                     hx-trigger="load"
-                     hx-swap="innerHTML">
-                    <div class="flex justify-center p-4">
-                        <div class="loading"></div>
-                    </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-sm m-0">{% trans "Browse" %}</p>
+                    <p class="text-xs text-base-content/50 m-0">{% trans "5 directories" %}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Location -->
+        <div class="card glass">
+            <div class="card-body p-4 flex flex-row items-center gap-4">
+                <div class="w-11 h-11 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+                    <span class="text-xl text-warning">{% icon "folder-outline" %}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-sm m-0 truncate">{% trans "Location" %}</p>
+                    <p class="text-xs text-base-content/50 m-0 truncate font-mono" title="{{ base_path }}">{{ base_path }}</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Right Column: File Browser -->
-    <div class="lg:col-span-2">
-        <div class="card">
-            <div class="card-body">
-                <div class="flex items-center gap-3 mb-4">
-                    {% icon "folder-open-outline" css_class="text-xl text-primary" %}
-                    <div>
-                        <p class="text-xs uppercase font-semibold opacity-60 m-0">{% trans "Browse and download" %}</p>
-                        <h2 class="text-base font-bold m-0">{% trans "File Browser" %}</h2>
+    <!-- File Manager -->
+    <div class="card glass">
+        <div class="card-body p-0">
+            <div class="flex h-full" style="min-height: 500px;">
+
+                <!-- File Browser (left side) -->
+                <div class="flex-1 border-r border-base-content/10" :class="previewOpen ? 'hidden lg:block lg:w-1/2' : 'w-full'">
+                    <div class="p-4" id="file-browser-content"
+                         hx-get="{% url 'configuration:file_browser' %}?dir=media"
+                         hx-trigger="load"
+                         hx-swap="innerHTML">
+                        <div class="flex justify-center p-12">
+                            <span class="loading loading-sm"></span>
+                        </div>
                     </div>
                 </div>
-                <div id="file-browser-content"
-                     hx-get="{% url 'configuration:file_browser' %}?dir=media"
-                     hx-trigger="load"
-                     hx-swap="innerHTML">
-                    <div class="flex justify-center p-6">
-                        <div class="loading"></div>
+
+                <!-- Preview Panel (right side) -->
+                <div class="flex-1 lg:w-1/2" x-show="previewOpen" x-cloak>
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold m-0 text-base-content/70">{% trans "Preview" %}</h3>
+                            <button class="btn btn-ghost btn-sm btn-circle" @click="previewOpen = false" title="{% trans 'Close preview' %}">
+                                {% icon "close-outline" %}
+                            </button>
+                        </div>
+                        <div id="file-preview-content">
+                            <div class="rounded-xl bg-base-200 p-12 text-center">
+                                <span class="text-4xl text-base-content/20 block mb-3">{% icon "eye-outline" %}</span>
+                                <p class="text-sm text-base-content/40 m-0">{% trans "Select a file to preview" %}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
+
 </div>

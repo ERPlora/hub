@@ -1,0 +1,56 @@
+{% load i18n djicons %}
+
+<!-- Preview Header -->
+<div class="flex items-center gap-3 mb-4">
+    <span class="text-2xl text-base-content/50">{% icon file_icon|add:"-outline" %}</span>
+    <div class="flex-1 min-w-0">
+        <h3 class="font-semibold text-sm m-0 truncate">{{ file_name }}</h3>
+        <p class="text-xs text-base-content/50 m-0">{{ file_size }} &bull; {{ file_modified }}</p>
+    </div>
+    <a class="btn btn-sm color-primary"
+       href="{% url 'configuration:download_file' %}?dir={{ dir_key }}&path={{ file_path }}"
+       download>
+        {% icon "download-outline" %}
+        {% trans "Download" %}
+    </a>
+</div>
+
+<!-- Preview Content -->
+{% if preview_type == 'image' %}
+<div class="rounded-xl overflow-hidden bg-base-200 flex items-center justify-center" style="min-height: 200px;">
+    <img src="{% url 'configuration:serve_file' %}?dir={{ dir_key }}&path={{ file_path }}"
+         alt="{{ file_name }}"
+         class="max-w-full max-h-[60vh] object-contain">
+</div>
+
+{% elif preview_type == 'pdf' %}
+<div class="rounded-xl overflow-hidden bg-base-200" style="height: 60vh;">
+    <iframe src="{% url 'configuration:serve_file' %}?dir={{ dir_key }}&path={{ file_path }}"
+            class="w-full h-full border-0"></iframe>
+</div>
+
+{% elif preview_type == 'text' %}
+<div class="rounded-xl overflow-hidden bg-base-200">
+    <pre class="text-xs p-4 m-0 overflow-auto max-h-[60vh] whitespace-pre-wrap break-words font-mono">{{ text_content }}</pre>
+</div>
+{% if truncated %}
+<p class="text-xs text-base-content/50 mt-2 text-center">
+    {% icon "information-circle-outline" %}
+    {% trans "Showing first 500 lines" %}
+</p>
+{% endif %}
+
+{% else %}
+<div class="rounded-xl bg-base-200 p-8 text-center">
+    <span class="text-4xl text-base-content/30 block mb-3">{% icon file_icon|add:"-outline" %}</span>
+    <p class="text-sm text-base-content/60 mb-1">{{ content_type }}</p>
+    <p class="text-xs text-base-content/40">{% trans "Preview not available for this file type" %}</p>
+</div>
+{% endif %}
+
+<!-- File Info -->
+<div class="flex gap-4 mt-4 text-xs text-base-content/50">
+    <span>{% icon "document-outline" %} {{ ext }}</span>
+    <span>{% icon "server-outline" %} {{ file_size }}</span>
+    <span>{% icon "time-outline" %} {{ file_modified }}</span>
+</div>

@@ -25,4 +25,6 @@ urlpatterns = [
     path('files/download/', views_files.download_file, name='download_file'),
     path('files/download-database/', views_files.download_database, name='download_database'),
     path('files/storage-info/', views_files.get_storage_info, name='storage_info'),
+    path('files/preview/', views_files.file_preview, name='file_preview'),
+    path('files/serve/', views_files.serve_file, name='serve_file'),
 ]

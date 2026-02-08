@@ -228,6 +228,137 @@ def download_file(request):
 
 @login_required
 @require_GET
+def file_preview(request):
+    """
+    HTMX endpoint: Preview a file inline.
+
+    Returns HTML partial with preview content based on file type:
+    - Images: <img> tag
+    - PDF: <iframe>
+    - Text/code/logs: content in <pre> (first 500 lines)
+    - Other: file info + download button
+
+    Query params:
+        - dir: Directory key
+        - path: Relative path to file
+    """
+    dir_key = request.GET.get('dir', '')
+    rel_path = request.GET.get('path', '').strip('/')
+
+    if not dir_key or not rel_path:
+        return HttpResponse('<p class="text-error text-sm">Missing parameters</p>', status=400)
+
+    allowed_dirs = get_allowed_directories()
+
+    if dir_key not in allowed_dirs:
+        return HttpResponse('<p class="text-error text-sm">Invalid directory</p>', status=400)
+
+    base_dir = allowed_dirs[dir_key]['path']
+    file_path = base_dir / rel_path
+
+    # Security check
+    try:
+        file_path = file_path.resolve()
+        base_dir = base_dir.resolve()
+        if not str(file_path).startswith(str(base_dir)):
+            return HttpResponse('<p class="text-error text-sm">Access denied</p>', status=403)
+    except Exception:
+        return HttpResponse('<p class="text-error text-sm">Invalid path</p>', status=400)
+
+    if not file_path.exists() or not file_path.is_file():
+        return HttpResponse('<p class="text-error text-sm">File not found</p>', status=404)
+
+    stat = file_path.stat()
+    content_type, _ = mimetypes.guess_type(str(file_path))
+    ext = file_path.suffix.lower()
+
+    context = {
+        'file_name': file_path.name,
+        'file_size': format_file_size(stat.st_size),
+        'file_modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M'),
+        'file_icon': get_file_icon(file_path.name),
+        'dir_key': dir_key,
+        'file_path': rel_path,
+        'content_type': content_type or 'application/octet-stream',
+        'ext': ext,
+    }
+
+    # Determine preview type
+    image_exts = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'}
+    text_exts = {'.txt', '.log', '.csv', '.py', '.js', '.html', '.css', '.json', '.xml', '.md', '.yml', '.yaml', '.ini', '.cfg', '.conf', '.sh', '.sql'}
+    pdf_exts = {'.pdf'}
+
+    if ext in image_exts:
+        context['preview_type'] = 'image'
+    elif ext in pdf_exts:
+        context['preview_type'] = 'pdf'
+    elif ext in text_exts:
+        context['preview_type'] = 'text'
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()[:500]
+                context['text_content'] = ''.join(lines)
+                context['total_lines'] = len(lines)
+                if len(lines) == 500:
+                    context['truncated'] = True
+        except Exception:
+            context['preview_type'] = 'binary'
+    else:
+        context['preview_type'] = 'binary'
+
+    html = render_to_string('configuration/partials/file_preview.html', context)
+    return HttpResponse(html)
+
+
+@login_required
+@require_GET
+def serve_file(request):
+    """
+    Serve a file inline (not as download) for preview purposes.
+
+    Used by image <img> tags and PDF <iframe> elements.
+    """
+    dir_key = request.GET.get('dir', '')
+    rel_path = request.GET.get('path', '').strip('/')
+
+    if not dir_key or not rel_path:
+        return JsonResponse({'error': 'Missing parameters'}, status=400)
+
+    allowed_dirs = get_allowed_directories()
+
+    if dir_key not in allowed_dirs:
+        return JsonResponse({'error': 'Invalid directory'}, status=400)
+
+    base_dir = allowed_dirs[dir_key]['path']
+    file_path = base_dir / rel_path
+
+    # Security check
+    try:
+        file_path = file_path.resolve()
+        base_dir = base_dir.resolve()
+        if not str(file_path).startswith(str(base_dir)):
+            return JsonResponse({'error': 'Access denied'}, status=403)
+    except Exception:
+        return JsonResponse({'error': 'Invalid path'}, status=400)
+
+    if not file_path.exists() or not file_path.is_file():
+        return JsonResponse({'error': 'File not found'}, status=404)
+
+    content_type, _ = mimetypes.guess_type(str(file_path))
+    if content_type is None:
+        content_type = 'application/octet-stream'
+
+    response = FileResponse(
+        open(file_path, 'rb'),
+        content_type=content_type,
+    )
+    # Serve inline, not as download
+    response['Content-Disposition'] = f'inline; filename="{file_path.name}"'
+    return response
+
+
+@login_required
+@require_GET
 def get_storage_info(request):
     """
     HTMX endpoint: Get storage information for all directories.
