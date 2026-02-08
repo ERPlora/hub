@@ -2,33 +2,46 @@
 {% load static i18n djicons %}
 
 {% block content %}
-<div class="page" x-data="app()" x-init="init()">
-    <div class="sidebar-wrapper" :class="{ 'sidebar-open': sidebarOpen, 'sidebar-collapsed': sidebarCollapsed }">
-        <!-- Backdrop (mobile) -->
-        <div class="drawer-backdrop" @click="sidebarOpen = false"></div>
+<div class="app" x-data="app()" x-init="init()">
+    <div class="page">
+        <!-- Drawer Backdrop (mobile) -->
+        <label class="drawer-backdrop"
+               :class="{ 'drawer-backdrop-open': drawerOpen }"
+               @click="drawerOpen = false"></label>
 
-        <!-- Sidebar -->
-        <aside class="sidebar" aria-label="{% trans 'Navigation menu' %}">
-            <!-- User Profile -->
-            <div class="sidebar-header text-center p-4">
-                <div class="avatar avatar-lg mx-auto mb-2">
-                    <span>{{ request.user.first_name|first|default:"U" }}{{ request.user.last_name|first }}</span>
+        <!-- Drawer (left navigation) -->
+        <aside class="drawer drawer-start glass"
+               :class="{ 'drawer-open': drawerOpen, 'drawer-collapsed': drawerCollapsed }">
+            <!-- Drawer Header: User Card -->
+            <div class="header flex justify-center">
+                {% if request.user.pk %}
+                <div class="employee-card border-0">
+                    <div class="employee-card-avatar employee-card-avatar-primary">
+                        {{ request.user.first_name|first|default:"U" }}{{ request.user.last_name|first }}
+                    </div>
+                    <div class="employee-card-info">
+                        <h3 class="employee-card-name">{{ request.user.get_full_name|default:request.user.username }}</h3>
+                        <span class="employee-card-title">{{ request.user.role_name|default:"" }}</span>
+                    </div>
+                    <div class="employee-card-actions">
+                        <a class="employee-card-action"
+                           href="{% url 'main:employee_edit' employee_id=request.user.pk %}"
+                           hx-get="{% url 'main:employee_edit' employee_id=request.user.pk %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            {% icon "create-outline" %}
+                        </a>
+                    </div>
                 </div>
-                <div class="font-semibold">
-                    {{ request.user.get_full_name|default:request.user.username }}
-                </div>
-                <div class="text-sm text-base-content/60">
-                    {{ request.user.role_name|default:"" }}
-                </div>
+                {% endif %}
             </div>
 
-            <!-- Navigation Menu -->
-            <nav class="sidebar-content overflow-auto" aria-label="{% trans 'Main navigation' %}">
-                <ul class="sidebar-menu">
-                    <!-- Home -->
-                    <li>
+            <!-- Drawer Content: Navigation -->
+            <div class="content" style="padding: 0.5rem;">
+                <nav class="sidebar-menu">
+                    <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
-                           :class="{ 'active': $store.nav.currentPath === '/' }"
+                           :class="{ 'is-active': $store.nav.currentPath === '/' }"
                            href="/"
                            hx-get="/"
                            hx-target="#main-content-area"
@@ -36,10 +49,10 @@
                             <span class="sidebar-menu-icon">{% icon "home-outline" %}</span>
                             <span class="sidebar-label">{% trans "Home" %}</span>
                         </a>
-                    </li>
-                    <li>
+                    </div>
+                    <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
-                           :class="{ 'active': $store.nav.isActive('/files') }"
+                           :class="{ 'is-active': $store.nav.isActive('/files') }"
                            href="{% url 'main:files' %}"
                            hx-get="{% url 'main:files' %}"
                            hx-target="#main-content-area"
@@ -47,10 +60,10 @@
                             <span class="sidebar-menu-icon">{% icon "briefcase-outline" %}</span>
                             <span class="sidebar-label">{% trans "Files" %}</span>
                         </a>
-                    </li>
-                    <li>
+                    </div>
+                    <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
-                           :class="{ 'active': $store.nav.isActive('/employees') }"
+                           :class="{ 'is-active': $store.nav.isActive('/employees') }"
                            href="{% url 'main:employees' %}"
                            hx-get="{% url 'main:employees' %}"
                            hx-target="#main-content-area"
@@ -58,10 +71,10 @@
                             <span class="sidebar-menu-icon">{% icon "people-outline" %}</span>
                             <span class="sidebar-label">{% trans "Employees" %}</span>
                         </a>
-                    </li>
-                    <li>
+                    </div>
+                    <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
-                           :class="{ 'active': $store.nav.isActive('/roles') }"
+                           :class="{ 'is-active': $store.nav.isActive('/roles') }"
                            href="{% url 'main:roles:list' %}"
                            hx-get="{% url 'main:roles:list' %}"
                            hx-target="#main-content-area"
@@ -69,10 +82,10 @@
                             <span class="sidebar-menu-icon">{% icon "shield-outline" %}</span>
                             <span class="sidebar-label">{% trans "Roles" %}</span>
                         </a>
-                    </li>
-                    <li>
+                    </div>
+                    <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
-                           :class="{ 'active': $store.nav.isActive('/settings') }"
+                           :class="{ 'is-active': $store.nav.isActive('/settings') }"
                            href="{% url 'main:settings' %}"
                            hx-get="{% url 'main:settings' %}"
                            hx-target="#main-content-area"
@@ -80,16 +93,14 @@
                             <span class="sidebar-menu-icon">{% icon "settings-outline" %}</span>
                             <span class="sidebar-label">{% trans "Settings" %}</span>
                         </a>
-                    </li>
+                    </div>
 
                     {% if MODULE_MENU_ITEMS %}
-                    <!-- Separator -->
-                    <li class="sidebar-separator"></li>
-
+                    <div class="sidebar-separator"></div>
                     {% for item in MODULE_MENU_ITEMS %}
-                    <li>
+                    <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
-                           :class="{ 'active': $store.nav.isActive('{{ item.url }}') }"
+                           :class="{ 'is-active': $store.nav.isActive('{{ item.url }}') }"
                            href="{{ item.url }}"
                            hx-get="{{ item.url }}"
                            hx-target="#main-content-area"
@@ -103,16 +114,14 @@
                             </span>
                             <span class="sidebar-label">{{ item.label }}</span>
                         </a>
-                    </li>
+                    </div>
                     {% endfor %}
                     {% endif %}
 
-                    <!-- Separator -->
-                    <li class="sidebar-separator"></li>
-
-                    <li>
+                    <div class="sidebar-separator"></div>
+                    <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
-                           :class="{ 'active': $store.nav.isActive('/modules') }"
+                           :class="{ 'is-active': $store.nav.isActive('/modules') }"
                            href="{% url 'mymodules:index' %}"
                            hx-get="{% url 'mymodules:index' %}"
                            hx-target="#main-content-area"
@@ -120,10 +129,10 @@
                             <span class="sidebar-menu-icon">{% icon "cube-outline" %}</span>
                             <span class="sidebar-label">{% trans "My Modules" %}</span>
                         </a>
-                    </li>
-                    <li>
+                    </div>
+                    <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
-                           :class="{ 'active': $store.nav.isActive('/marketplace') }"
+                           :class="{ 'is-active': $store.nav.isActive('/marketplace') }"
                            href="/marketplace/"
                            hx-get="/marketplace/"
                            hx-target="#main-content-area"
@@ -131,23 +140,25 @@
                             <span class="sidebar-menu-icon">{% icon "storefront-outline" %}</span>
                             <span class="sidebar-label">{% trans "Marketplace" %}</span>
                         </a>
-                    </li>
-                </ul>
-            </nav>
+                    </div>
+                </nav>
+            </div>
 
-            <!-- Logout -->
-            <div class="sidebar-footer">
-                <a href="{% url 'logout' %}" class="sidebar-menu-button">
-                    <span class="sidebar-menu-icon">{% icon "log-out-outline" %}</span>
-                    <span class="sidebar-label">{% trans "Log Out" %}</span>
-                </a>
+            <!-- Drawer Footer: Logo + Logout -->
+            <div class="footer">
+                <div class="sidebar-menu">
+                    <div class="sidebar-menu-item">
+                        <a href="{% url 'auth:logout' %}" class="sidebar-menu-button">
+                            <span class="sidebar-menu-icon">{% icon "log-out-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Log Out" %}</span>
+                        </a>
+                    </div>
+                </div>
             </div>
         </aside>
 
-        <!-- Main Content Area -->
-        <main class="sidebar-gap">
-            {% block main %}{% endblock %}
-        </main>
+        <!-- Main content area (direct child of .page → grid column 2, row 2) -->
+        {% block main %}{% endblock %}
     </div>
 </div>
 {% endblock %}
@@ -156,8 +167,8 @@
 <script>
     function app() {
         return {
-            sidebarOpen: false,
-            sidebarCollapsed: false,
+            drawerOpen: false,
+            drawerCollapsed: false,
             isDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
 
             init() {
@@ -172,13 +183,17 @@
 
                 document.body.addEventListener('htmx:afterSettle', () => {
                     if (window.innerWidth < 992) {
-                        this.sidebarOpen = false;
+                        this.drawerOpen = false;
                     }
                 });
             },
 
-            toggleSidebar() {
-                this.sidebarCollapsed = !this.sidebarCollapsed;
+            toggleDrawer() {
+                if (window.innerWidth >= 992) {
+                    this.drawerCollapsed = !this.drawerCollapsed;
+                } else {
+                    this.drawerOpen = !this.drawerOpen;
+                }
             },
 
             toggleTheme() {

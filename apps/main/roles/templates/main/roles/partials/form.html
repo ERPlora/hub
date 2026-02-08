@@ -1,91 +1,64 @@
 {% load i18n djicons %}
 
-<div class="page">
-    <!-- Header Toolbar -->
-    <header class="header">
-        <div class="glass mx-4" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
-            <div class="flex items-center">
-                <button class="btn btn-ghost btn-sm"
-                        hx-get="{% url 'main:roles:index' %}"
-                        hx-target="#main-content-area"
-                        hx-push-url="true">
-                    {% icon "arrow-back-outline" %}
-                </button>
-            </div>
-            <div class="flex-1 flex items-center justify-center">
-                <h1 class="font-semibold">
-                    {% if role %}{% trans "Edit Role" %}{% else %}{% trans "Create Role" %}{% endif %}
-                </h1>
-            </div>
-            <div class="flex items-center gap-2"></div>
-        </div>
-    </header>
+<form method="post"
+      hx-post
+      hx-target="#main-content-area"
+      hx-push-url="true">
+    {% csrf_token %}
 
-    <!-- Content -->
-    <div style="flex: 1; overflow: auto;">
-        <div class="p-4">
-            <form method="post"
-                  hx-post
-                  hx-target="#main-content-area"
-                  hx-push-url="true">
-                {% csrf_token %}
+    <!-- Role Info Card -->
+    <div class="card glass mb-6">
+        <div class="card-body">
+            <div class="flex flex-col gap-4">
+                {% if not role %}
+                <!-- Role Name (only for new roles) -->
+                <div class="form-group">
+                    <label class="form-group-label" for="role-name">{% trans "Role Name" %} *</label>
+                    <input type="text"
+                           id="role-name"
+                           name="name"
+                           class="input"
+                           value=""
+                           required
+                           pattern="[a-z_]+"
+                           placeholder="{% trans 'e.g., warehouse_staff' %}">
+                    <span class="form-group-helper">{% trans "Lowercase letters and underscores only. Cannot be changed later." %}</span>
+                </div>
+                {% endif %}
 
-                <!-- Role Info Card -->
-                <div class="card glass mb-6">
-                    <div class="card-body">
-                        <div class="flex flex-col gap-4">
-                            {% if not role %}
-                            <!-- Role Name (only for new roles) -->
-                            <div class="form-group">
-                                <label class="form-group-label" for="role-name">{% trans "Role Name" %} *</label>
-                                <input type="text"
-                                       id="role-name"
-                                       name="name"
-                                       class="input"
-                                       value=""
-                                       required
-                                       pattern="[a-z_]+"
-                                       placeholder="{% trans 'e.g., warehouse_staff' %}">
-                                <span class="form-group-helper">{% trans "Lowercase letters and underscores only. Cannot be changed later." %}</span>
-                            </div>
-                            {% endif %}
-
-                            <!-- Display Name -->
-                            <div class="form-group">
-                                <label class="form-group-label" for="display-name">{% trans "Display Name" %} *</label>
-                                <input type="text"
-                                       id="display-name"
-                                       name="display_name"
-                                       class="input"
-                                       value="{{ role.display_name|default:'' }}"
-                                       required
-                                       placeholder="{% trans 'e.g., Warehouse Staff' %}">
-                            </div>
-
-                            <!-- Description -->
-                            <div class="form-group">
-                                <label class="form-group-label" for="description">{% trans "Description" %}</label>
-                                <textarea id="description"
-                                          name="description"
-                                          class="textarea"
-                                          rows="3"
-                                          placeholder="{% trans 'Optional description for this role' %}">{{ role.description|default:'' }}</textarea>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Display Name -->
+                <div class="form-group">
+                    <label class="form-group-label" for="display-name">{% trans "Display Name" %} *</label>
+                    <input type="text"
+                           id="display-name"
+                           name="display_name"
+                           class="input"
+                           value="{{ role.display_name|default:'' }}"
+                           required
+                           placeholder="{% trans 'e.g., Warehouse Staff' %}">
                 </div>
 
-                <!-- Submit Button -->
-                <button type="submit" class="btn btn-block color-primary">
-                    {% if role %}
-                        {% icon "checkmark-outline" %}
-                        {% trans "Save Changes" %}
-                    {% else %}
-                        {% icon "add-outline" %}
-                        {% trans "Create Role" %}
-                    {% endif %}
-                </button>
-            </form>
+                <!-- Description -->
+                <div class="form-group">
+                    <label class="form-group-label" for="description">{% trans "Description" %}</label>
+                    <textarea id="description"
+                              name="description"
+                              class="textarea"
+                              rows="3"
+                              placeholder="{% trans 'Optional description for this role' %}">{{ role.description|default:'' }}</textarea>
+                </div>
+            </div>
         </div>
     </div>
-</div>
+
+    <!-- Submit Button -->
+    <button type="submit" class="btn btn-block color-primary">
+        {% if role %}
+            {% icon "checkmark-outline" %}
+            {% trans "Save Changes" %}
+        {% else %}
+            {% icon "add-outline" %}
+            {% trans "Create Role" %}
+        {% endif %}
+    </button>
+</form>

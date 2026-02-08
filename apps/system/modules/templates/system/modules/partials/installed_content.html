@@ -1,8 +1,6 @@
-{% load i18n ui component_tags %}
+{% load i18n %}
 
-{% component "page" title=_("My Modules") subtitle=_("Installed modules in your Hub") %}
-    {% fill "content" %}
-        <!-- Search Bar -->
+<!-- Search Bar -->
         <form id="modules-search-form"
             hx-get="{% url 'mymodules:index' %}"
             hx-target="#modules-list"
@@ -30,9 +28,6 @@
                 {% include "system/modules/partials/modules_list.html" %}
             </div>
         </div>
-    {% endfill %}
-{% endcomponent %}
-
 <script>
 (function() {
     // Handle module deactivate with UX alert

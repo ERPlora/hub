@@ -3,6 +3,16 @@
 
 {% block page_title %}{% trans "Roles" %}{% endblock %}
 
+{% block page_actions %}
+<button class="btn btn-sm color-primary"
+        hx-get="{% url 'main:roles:create' %}"
+        hx-target="#main-content-area"
+        hx-push-url="true">
+    {% icon "add-outline" %}
+    <span class="hidden sm:block">{% trans "Add" %}</span>
+</button>
+{% endblock %}
+
 {% block page_content %}
 {% include "main/roles/partials/list_content.html" %}
 {% endblock %}

@@ -13,6 +13,7 @@ from django.utils.translation import gettext_lazy as _
 from zoneinfo import available_timezones
 from apps.accounts.decorators import login_required
 from apps.core.htmx import is_htmx_request
+from apps.core.services.permission_service import PermissionService
 from apps.configuration.models import StoreConfig, HubConfig
 from config.countries import get_all_countries, get_locale_map
 
@@ -298,7 +299,10 @@ def _handle_step_post(request, step, hub_config, store_config):
         context = _get_step_context(next_step, hub_config, store_config)
         return render(request, STEP_TEMPLATES[next_step], context)
     else:
-        # Final step complete → redirect to home
+        # Final step complete → create default roles and redirect to home
+        hub_id = hub_config.hub_id
+        if hub_id:
+            PermissionService.create_default_roles(str(hub_id))
         response = HttpResponse(status=200)
         response['HX-Redirect'] = '/'
         return response

@@ -1,172 +1,70 @@
 {% load i18n djicons %}
 
-{# Store modules data in a hidden element for JavaScript access #}
 <script id="modules-data" type="application/json">{{ modules_json|safe }}</script>
 
-        <div x-data="moduleGrid">
-            <!-- Search Bar -->
-            <div class="search-bar" x-data="{ search: '', focused: false }">
-                <label class="input rounded-full" :class="{ 'input-focused': focused }">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-5 h-5 opacity-50"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32" d="M338.29 338.29L448 448"/></svg>
-                    <input
-                        type="search"
-                        class="grow"
-                        placeholder="{% trans 'Search modules...' %}"
-                        x-model="search"
-                        @input="filterModules({ detail: { value: search } })"
-                        @focus="focused = true"
-                        @blur="focused = false">
-                    <button type="button" class="btn btn-ghost btn-circle btn-sm" @click="search = ''; filterModules({ detail: { value: '' } })" x-show="search.length > 0">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-4 h-4"><path fill="currentColor" d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg>
-                    </button>
-                </label>
+<div x-data="moduleGrid">
+    <!-- Search -->
+    <div class="mb-4">
+        <label class="input rounded-full" x-data="{ focused: false }" :class="{ 'input-focused': focused }">
+            {% icon "search-outline" css_class="opacity-50" %}
+            <input type="search"
+                   class="grow"
+                   placeholder="{% trans 'Search modules...' %}"
+                   x-model="searchQuery"
+                   @focus="focused = true"
+                   @blur="focused = false">
+        </label>
+    </div>
+
+    <!-- Module Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <template x-for="mod in filteredModules" :key="mod.id">
+            <a class="card card-body items-center text-center gap-2 no-underline text-base-content hover:shadow-md transition-shadow cursor-pointer"
+               :href="mod.url"
+               :hx-get="mod.url"
+               hx-target="#main-content-area"
+               hx-push-url="true"
+               @click="trackRecent(mod.id)">
+                <div class="app-icon" :class="'app-icon-' + mod.color">
+                    <template x-if="mod.has_svg && mod.svg_path">
+                        <img :src="mod.svg_path" :alt="mod.label" class="w-7 h-7">
+                    </template>
+                    <template x-if="!mod.has_svg || !mod.svg_path">
+                        <span x-html="mod.icon_svg"></span>
+                    </template>
+                </div>
+                <span class="text-sm font-medium" x-text="mod.label"></span>
+            </a>
+        </template>
+
+        <!-- Get More -->
+        <a class="card card-body items-center text-center gap-2 no-underline text-base-content opacity-50 hover:opacity-80 border-2 border-dashed cursor-pointer"
+           href="/marketplace/"
+           hx-get="/marketplace/"
+           hx-target="#main-content-area"
+           hx-push-url="true"
+           style="background: transparent;">
+            <div class="app-icon" style="background: transparent;">
+                {% icon "add" size=28 %}
             </div>
+            <span class="text-sm font-medium">{% trans "Get More" %}</span>
+        </a>
+    </div>
 
-            <!-- Favorites Section (only if there are favorites) -->
-            <template x-if="favoritesData.length > 0">
-                <section class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">
-                            {% icon "star" style="vertical-align: middle; margin-right: 4px; color: var(--color-warning);" %}
-                            {% trans "Favorites" %}
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-4">
-                            <template x-for="mod in favoritesData" :key="'fav-' + mod.id">
-                                <div class="flex flex-col items-center gap-1 p-2 rounded-lg cursor-pointer hover:bg-base-200"
-                                     :hx-get="mod.url"
-                                     hx-target="#main-content-area"
-                                     hx-push-url="true"
-                                     @click="trackRecent(mod.id)">
-                                    <div class="w-14 h-14 rounded-xl flex items-center justify-center"
-                                         :class="'app-icon--' + mod.color">
-                                        <template x-if="mod.has_svg && mod.svg_path">
-                                            <img :src="mod.svg_path" :alt="mod.label" style="width: 32px; height: 32px;">
-                                        </template>
-                                        <template x-if="!mod.has_svg || !mod.svg_path">
-                                            <span x-html="mod.icon_svg"></span>
-                                        </template>
-                                    </div>
-                                    <span class="text-xs text-center" x-text="mod.label"></span>
-                                    {% icon "star" css_class="app-item__badge" style="color: var(--color-warning);" %}
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </section>
-            </template>
-
-            <!-- Recent Section (only if there are recent modules) - Swiper Carousel -->
-            <template x-if="recentData.length > 0">
-                <section class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">
-                            {% icon "time-outline" style="vertical-align: middle; margin-right: 4px; opacity: 0.6;" %}
-                            {% trans "Recent" %}
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-4">
-                                <template x-for="mod in recentData" :key="'recent-' + mod.id">
-                                        <div class="flex flex-col items-center gap-1 p-2 rounded-lg cursor-pointer hover:bg-base-200"
-                                             :hx-get="mod.url"
-                                             hx-target="#main-content-area"
-                                             hx-push-url="true"
-                                             @click="trackRecent(mod.id)">
-                                            <div class="w-14 h-14 rounded-xl flex items-center justify-center"
-                                                 :class="'app-icon--' + mod.color">
-                                                <template x-if="mod.has_svg && mod.svg_path">
-                                                    <img :src="mod.svg_path" :alt="mod.label" style="width: 32px; height: 32px;">
-                                                </template>
-                                                <template x-if="!mod.has_svg || !mod.svg_path">
-                                                    <span x-html="mod.icon_svg"></span>
-                                                </template>
-                                            </div>
-                                            <span class="text-xs text-center" x-text="mod.label"></span>
-                                        </div>
-                                </template>
-                        </div>
-                    </div>
-                </section>
-            </template>
-
-            <!-- All Modules Section -->
-            <section class="card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        {% icon "apps-outline" style="vertical-align: middle; margin-right: 4px; opacity: 0.6;" %}
-                        {% trans "All Modules" %}
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-4">
-                        <!-- Dynamic modules from Alpine.js -->
-                        <template x-for="mod in filteredModules" :key="mod.id">
-                            <div class="flex flex-col items-center gap-1 p-2 rounded-lg cursor-pointer hover:bg-base-200"
-                                 :hx-get="mod.url"
-                                 hx-target="#main-content-area"
-                                 hx-push-url="true"
-                                 :data-module-id="mod.id"
-                                 @click="trackRecent(mod.id)"
-                                 @contextmenu.prevent="toggleFavorite(mod.id)">
-                                <div class="w-14 h-14 rounded-xl flex items-center justify-center"
-                                     :class="'app-icon--' + mod.color">
-                                    <template x-if="mod.has_svg && mod.svg_path">
-                                        <img :src="mod.svg_path" :alt="mod.label" style="width: 32px; height: 32px;">
-                                    </template>
-                                    <template x-if="!mod.has_svg || !mod.svg_path">
-                                        <span x-html="mod.icon_svg"></span>
-                                    </template>
-                                </div>
-                                <span class="text-xs text-center" x-text="mod.label"></span>
-                                <template x-if="isFavorite(mod.id)">
-                                    {% icon "star" css_class="app-item__badge" style="color: var(--color-warning);" %}
-                                </template>
-                            </div>
-                        </template>
-
-                        <!-- Add More Modules button -->
-                        <div class="flex flex-col items-center gap-1 p-2 rounded-lg cursor-pointer hover:bg-base-200"
-                             hx-get="/marketplace/"
-                             hx-target="#main-content-area"
-                             hx-push-url="true">
-                            <div class="w-14 h-14 rounded-xl flex items-center justify-center border-2 border-dashed border-base-300">
-                                {% icon "add" size=28 %}
-                            </div>
-                            <span class="text-xs text-center">{% trans "Get More" %}</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Empty state when no modules and no search -->
-            <template x-if="modules.length === 0">
-                <section class="card">
-                    <div class="card-body" style="text-align: center; padding: 2rem;">
-                        {% icon "extension-puzzle-outline" style="font-size: 64px; opacity: 0.3; margin-bottom: 1.5rem;" %}
-                        <h3 style="margin: 0 0 0.5rem; font-size: 1.25rem;">{% trans "No modules installed" %}</h3>
-                        <p style="margin: 0 0 1.5rem; opacity: 0.6;">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
-                        <button class="btn color-primary"
-                                hx-get="/marketplace/"
-                                hx-target="#main-content-area"
-                                hx-push-url="true">
-                            {% icon "storefront-outline" style="margin-right: 0.5rem;" %}
-                            {% trans "Browse Marketplace" %}
-                        </button>
-                    </div>
-                </section>
-            </template>
+    <!-- Empty state -->
+    <template x-if="modules.length === 0">
+        <div class="flex flex-col items-center text-center py-12">
+            {% icon "extension-puzzle-outline" css_class="w-16 h-16 opacity-30 mb-4" %}
+            <h3 class="text-lg font-semibold mb-2">{% trans "No modules installed" %}</h3>
+            <p class="opacity-60 mb-6">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
+            <a class="btn color-primary"
+               href="/marketplace/"
+               hx-get="/marketplace/"
+               hx-target="#main-content-area"
+               hx-push-url="true">
+                {% icon "storefront-outline" %}
+                {% trans "Browse Marketplace" %}
+            </a>
         </div>
-
-{# moduleGrid() is defined globally in ui-helpers.js #}
-
-<style>
-/* App Item Component */
-.app-item__badge {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    font-size: 14px;
-}
-</style>
+    </template>
+</div>

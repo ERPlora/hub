@@ -1,8 +1,6 @@
-{% load i18n static ui component_tags djicons %}
+{% load i18n static djicons %}
 
-{% component "page" title=page_title action_icon="cart-outline" action_badge=cart_count action_hx_get="/marketplace/cart/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
-    {% fill "content" %}
-        {# Marketplace tabbar - manual since it's not a module #}
+{# Marketplace tabbar - manual since it's not a module #}
         <script>
         (function() {
             if (typeof window.updateGlobalTabBar === 'function') {
@@ -103,9 +101,6 @@
                 </div>
             </div>
         </div>
-    {% endfill %}
-{% endcomponent %}
-
 <!-- Filters Modal -->
 <div class="modal-backdrop" id="filters-modal-backdrop" data-state="closed"
      x-data="{ open: false }"

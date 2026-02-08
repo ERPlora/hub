@@ -1,33 +1,35 @@
-{% load i18n ui component_tags djicons %}
+{% load i18n djicons %}
 
-{% component "page" title=_("Delete Role") back_hx_get="/roles/"|add:role.id|add:"/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {% fill "content" %}
-        {% ui_card %}
-            <div class="text-center py-lg">
-                {% icon "warning-outline" css_class="fs-xxxl text-danger" %}
-                <h2 class="mt-md mb-sm">{% trans "Delete Role" %}</h2>
-                <p class="text-medium">
-                    {% blocktrans with name=role.display_name %}
-                    Are you sure you want to delete the role <strong>{{ name }}</strong>?
-                    {% endblocktrans %}
-                </p>
-                <p class="text-medium fs-sm">{% trans "This action cannot be undone." %}</p>
+<div class="card glass">
+    <div class="card-body text-center py-8">
+        <div class="text-4xl mb-4" style="color: var(--color-warning);">
+            {% icon "warning-outline" %}
+        </div>
+        <h2 class="text-xl font-semibold mb-2">{% trans "Delete Role" %}</h2>
+        <p class="text-base-content/60 mb-1">
+            {% blocktrans with name=role.display_name %}
+            Are you sure you want to delete the role <strong>{{ name }}</strong>?
+            {% endblocktrans %}
+        </p>
+        <p class="text-base-content/60 text-sm mb-6">{% trans "This action cannot be undone." %}</p>
+
+        <form method="post"
+              hx-post
+              hx-target="#main-content-area">
+            {% csrf_token %}
+            <div class="flex gap-4 justify-center">
+                <a class="btn btn-outline"
+                   href="{% url 'main:roles:detail' role_id=role.id %}"
+                   hx-get="{% url 'main:roles:detail' role_id=role.id %}"
+                   hx-target="#main-content-area"
+                   hx-push-url="true">
+                    {% trans "Cancel" %}
+                </a>
+                <button type="submit" class="btn color-error">
+                    {% icon "trash-outline" %}
+                    {% trans "Delete Role" %}
+                </button>
             </div>
-
-            <form method="post"
-                  hx-post
-                  hx-target="#main-content-area">
-                {% csrf_token %}
-                <div class="flex gap-4 justify-center mt-6">
-                    <a href="{% url 'main:roles:detail' role_id=role.id %}"
-                       hx-get="{% url 'main:roles:detail' role_id=role.id %}"
-                       hx-target="#main-content-area"
-                       hx-push-url="true">
-                        {% ui_button label=_("Cancel") fill="outline" %}
-                    </a>
-                    {% ui_button type="submit" label=_("Delete Role") color="danger" icon="trash-outline" %}
-                </div>
-            </form>
-        {% endui_card %}
-    {% endfill %}
-{% endcomponent %}
+        </form>
+    </div>
+</div>

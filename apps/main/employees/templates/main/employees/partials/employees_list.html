@@ -1,90 +1,38 @@
 {% load i18n djicons %}
 
 {% if local_users %}
-<!-- Desktop: DataTable View -->
-<div class="hidden sm:block">
-    <div class="table-wrapper">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>{% trans "Employee" %}</th>
-                    <th>{% trans "Email" %}</th>
-                    <th>{% trans "Role" %}</th>
-                    <th class="text-right">{% trans "Actions" %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in local_users %}
-                <tr class="cursor-pointer"
-                    hx-get="{% url 'main:employee_edit' user.id %}"
-                    hx-target="#main-content-area"
-                    hx-push-url="true">
-                    <td>
-                        <div class="flex items-center gap-3">
-                            {% if user.avatar %}
-                            <div class="avatar" style="background-image: url('{{ user.avatar.url }}');"></div>
-                            {% else %}
-                            <div class="avatar avatar--{{ user.get_role_color|default:'primary' }}">
-                                <span>{{ user.get_initials }}</span>
-                            </div>
-                            {% endif %}
-                            <div class="min-w-0">
-                                <span class="font-medium">{{ user.name }}</span>
-                            </div>
-                        </div>
-                    </td>
-                    <td>
-                        <span class="text-base-content/60">{{ user.email }}</span>
-                    </td>
-                    <td>
-                        <span class="badge color-{{ user.get_role_color|default:'primary' }}">
-                            {{ user.get_role_display }}
-                        </span>
-                    </td>
-                    <td class="text-right" onclick="event.stopPropagation();">
-                        <button class="btn btn-ghost btn-circle btn-sm color-primary"
-                                hx-get="{% url 'main:employee_edit' user.id %}"
-                                hx-target="#main-content-area"
-                                hx-push-url="true"
-                                title="{% trans 'Edit' %}">
-                            {% icon "create-outline" %}
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
 
-<!-- Mobile: Card View -->
-<div class="block sm:hidden">
-    <div class="card-grid">
+{% if current_view == 'cards' %}
+<!-- Card View -->
+<div class="datatable-body">
+    <div class="employee-grid p-4">
         {% for user in local_users %}
-        <div class="card glass card-clickable"
-             hx-get="{% url 'main:employee_edit' user.id %}"
-             hx-target="#main-content-area"
-             hx-push-url="true">
-            <div class="card-body">
-                <div class="flex items-center gap-3">
-                    {% if user.avatar %}
-                    <div class="avatar avatar-lg" style="background-image: url('{{ user.avatar.url }}');"></div>
-                    {% else %}
-                    <div class="avatar avatar-lg avatar--{{ user.get_role_color|default:'primary' }}">
-                        <span>{{ user.get_initials }}</span>
-                    </div>
-                    {% endif %}
-                    <div class="flex-1 min-w-0">
-                        <h3 class="card-title">{{ user.name }}</h3>
-                        <p class="card-subtitle">{{ user.email }}</p>
-                        <span class="badge badge-sm color-{{ user.get_role_color|default:'primary' }} mt-1">
-                            {{ user.get_role_display }}
-                        </span>
-                    </div>
-                    <span>
-                        {% icon "chevron-forward-outline" %}
-                    </span>
-                </div>
+        <div class="employee-card glass employee-card-clickable"
+             @click="openPanel('{% url 'main:employee_edit' user.id %}')">
+            <div class="employee-card-avatar employee-card-avatar-{{ user.get_role_color|default:'primary' }}">
+                {% if user.avatar %}
+                <img src="{{ user.avatar.url }}" alt="{{ user.name }}">
+                {% else %}
+                {{ user.get_initials }}
+                {% endif %}
+            </div>
+            <div class="employee-card-info">
+                <h3 class="employee-card-name">{{ user.name }}</h3>
+                <span class="employee-card-title">{{ user.email }}</span>
+            </div>
+            <div class="employee-card-actions" @click.stop>
+                <span class="badge badge-sm color-{{ user.get_role_color|default:'primary' }}">
+                    {{ user.get_role_display }}
+                </span>
+                <label class="toggle toggle-sm color-success">
+                    <input type="checkbox"
+                           {% if user.is_active %}checked{% endif %}
+                           {% if active_count <= 1 and user.is_active %}disabled{% endif %}
+                           hx-post="{% url 'main:employee_toggle_status' user.id %}"
+                           hx-target="#datatable-body"
+                           hx-include="#employees-datatable">
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
             </div>
         </div>
         {% endfor %}
@@ -92,34 +40,190 @@
 </div>
 
 {% else %}
+<!-- Table View (default) -->
+<div class="datatable-body">
+    <table class="datatable-table">
+        <thead class="datatable-thead">
+            <tr>
+                <th class="datatable-th datatable-th-checkbox">
+                    <label class="checkbox checkbox-sm">
+                        <input type="checkbox"
+                               :checked="selectAll"
+                               @click="toggleAll([{% for user in local_users %}'{{ user.id }}'{% if not forloop.last %},{% endif %}{% endfor %}])">
+                        <span class="checkbox-mark"></span>
+                    </label>
+                </th>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'name' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'main:employees' %}?sort=name&dir={% if sort_field == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#employees-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Employee" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'email' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    data-col="email"
+                    hx-get="{% url 'main:employees' %}?sort=email&dir={% if sort_field == 'email' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#employees-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Email" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th" data-col="role">{% trans "Role" %}</th>
+                <th class="datatable-th datatable-th-center" data-col="status">{% trans "Status" %}</th>
+                <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody class="datatable-tbody">
+            {% for user in local_users %}
+            <tr class="datatable-tr"
+                data-id="{{ user.id }}"
+                :class="{ 'datatable-tr-selected': selectedIds.includes('{{ user.id }}') }">
+                <td class="datatable-td datatable-td-checkbox" onclick="event.stopPropagation();">
+                    <label class="checkbox checkbox-sm">
+                        <input type="checkbox"
+                               :checked="selectedIds.includes('{{ user.id }}')"
+                               @click="toggleSelect('{{ user.id }}')">
+                        <span class="checkbox-mark"></span>
+                    </label>
+                </td>
+                <td class="datatable-td" data-label="{% trans 'Employee' %}">
+                    <div class="flex items-center gap-3 cursor-pointer"
+                         @click="openPanel('{% url 'main:employee_edit' user.id %}')">
+                        {% if user.avatar %}
+                        <div class="avatar" style="background-image: url('{{ user.avatar.url }}');"></div>
+                        {% else %}
+                        <div class="avatar avatar-{{ user.get_role_color|default:'primary' }}">
+                            <span>{{ user.get_initials }}</span>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <span class="font-medium">{{ user.name }}</span>
+                            <span class="text-xs text-base-content/50 block">{{ user.email }}</span>
+                        </div>
+                    </div>
+                </td>
+                <td class="datatable-td" data-col="email" data-label="{% trans 'Email' %}">
+                    <span class="text-base-content/60">{{ user.email }}</span>
+                </td>
+                <td class="datatable-td" data-col="role" data-label="{% trans 'Role' %}">
+                    <span class="badge badge-ghost badge-sm">
+                        {{ user.get_role_display }}
+                    </span>
+                </td>
+                <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}" onclick="event.stopPropagation();">
+                    <label class="toggle toggle-sm color-success">
+                        <input type="checkbox"
+                               {% if user.is_active %}checked{% endif %}
+                               {% if active_count <= 1 and user.is_active %}disabled{% endif %}
+                               hx-post="{% url 'main:employee_toggle_status' user.id %}"
+                               hx-target="#datatable-body"
+                               hx-include="#employees-datatable">
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    </label>
+                </td>
+                <td class="datatable-td datatable-td-actions" onclick="event.stopPropagation();">
+                    <div class="datatable-row-actions">
+                        <button class="datatable-row-action"
+                                @click="openPanel('{% url 'main:employee_edit' user.id %}')"
+                                title="{% trans 'Edit' %}">
+                            {% icon "create-outline" %}
+                        </button>
+                        {% if user.get_role_name != 'admin' %}
+                        <button class="datatable-row-action datatable-row-action-danger"
+                                @click="deleteTarget = { id: '{{ user.id }}', name: '{{ user.name }}', url: '{% url 'main:employee_delete' user.id %}' }; deleteConfirm = true"
+                                title="{% trans 'Delete' %}">
+                            {% icon "trash-outline" %}
+                        </button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Footer / Pagination -->
+<div class="datatable-footer">
+    <div class="datatable-per-page">
+        {% trans "Show" %}
+        <select name="per_page"
+                hx-get="{% url 'main:employees' %}"
+                hx-target="#datatable-body"
+                hx-include="#employees-datatable"
+                hx-trigger="change">
+            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        </select>
+        {% trans "per page" %}
+    </div>
+    <span class="datatable-info">
+        {% if page_obj.paginator.count > 0 %}
+        {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }} employees{% endblocktrans %}
+        {% endif %}
+    </span>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="pagination pagination-sm">
+        <button class="pagination-btn pagination-prev"
+                {% if page_obj.has_previous %}
+                hx-get="{% url 'main:employees' %}?page={{ page_obj.previous_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#employees-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-back-outline" %}
+        </button>
+        {% for num in page_obj.paginator.page_range %}
+        <button class="pagination-btn{% if num == page_obj.number %} pagination-active{% endif %}"
+                hx-get="{% url 'main:employees' %}?page={{ num }}"
+                hx-target="#datatable-body"
+                hx-include="#employees-datatable">
+            {{ num }}
+        </button>
+        {% endfor %}
+        <button class="pagination-btn pagination-next"
+                {% if page_obj.has_next %}
+                hx-get="{% url 'main:employees' %}?page={{ page_obj.next_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#employees-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-forward-outline" %}
+        </button>
+    </nav>
+    {% endif %}
+</div>
+
+{% else %}
 <!-- Empty State -->
-<div class="flex flex-col items-center justify-center py-12">
-    <div class="text-4xl mb-4 opacity-40">
-        {% if search_query %}
+<div class="datatable-empty">
+    <div class="datatable-empty-icon">
+        {% if search_query or role_filter or status_filter %}
         {% icon "search-outline" %}
         {% else %}
         {% icon "people-outline" %}
         {% endif %}
     </div>
-    <h3 class="text-lg font-semibold mb-2">
-        {% if search_query %}
+    <div class="datatable-empty-title">
+        {% if search_query or role_filter or status_filter %}
         {% trans "No employees found" %}
         {% else %}
         {% trans "No employees yet" %}
         {% endif %}
-    </h3>
-    <p class="text-sm opacity-60 mb-4">
-        {% if search_query %}
-        {% trans "Try a different search term" %}
+    </div>
+    <div class="datatable-empty-text">
+        {% if search_query or role_filter or status_filter %}
+        {% trans "Try a different search term or filter" %}
         {% else %}
         {% trans "Add your first employee to get started" %}
         {% endif %}
-    </p>
-    {% if not search_query %}
-    <button class="btn color-primary"
-            hx-get="{% url 'main:employee_add' %}"
-            hx-target="#main-content-area"
-            hx-push-url="true">
+    </div>
+    {% if not search_query and not role_filter and not status_filter %}
+    <button class="btn color-primary mt-4"
+            @click="openPanel('{% url 'main:employee_add' %}')">
         {% icon "add-outline" %}
         {% trans "Add First Employee" %}
     </button>

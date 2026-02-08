@@ -1,8 +1,6 @@
-{% load i18n ui component_tags djicons %}
+{% load i18n djicons %}
 
-{% component "page" title=_("Marketplace") subtitle=_("Discover and install modules") %}
-    {% fill "content" %}
-        <div x-data="marketplaceFilters()" x-init="init()">
+<div x-data="marketplaceFilters()" x-init="init()">
             <!-- Search & Filters -->
             <div class="container-fluid mb-6" style="padding: 0;">
                 <!-- Search Row -->
@@ -130,9 +128,6 @@
                 </div>
             </div>
         </div>
-    {% endfill %}
-{% endcomponent %}
-
 <!-- Alpine.js Filter Logic - HTMX compatible registration -->
 <script>
 (function() {

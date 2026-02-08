@@ -2,44 +2,49 @@
 
 {% if error %}
     <!-- Error State -->
-    {% component "page" title=_("Error") %}
-        {% fill "content" %}
-            {% ui_card css_class="card-error" %}
-                <div class="d-flex align-center gap-md">
-                    {% icon "alert-circle-outline" css_class="fs-2xl text-danger" %}
-                    <div>
-                        <h3 class="fw-semibold mb-xs m-0">{% trans "Error" %}</h3>
-                        <p class="m-0 text-medium">{{ error }}</p>
-                    </div>
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                {% icon "alert-circle-outline" css_class="text-2xl" %}
+                <div>
+                    <h3 class="font-semibold mb-1">{% trans "Error" %}</h3>
+                    <p class="text-base-content/60 mb-0">{{ error }}</p>
                 </div>
-            {% endui_card %}
-            {% url 'marketplace:index' as marketplace_url %}
-            {% ui_button label=_("Back to Marketplace") icon="arrow-back-outline" css_class="mt-md" hx_get=marketplace_url hx_target="#main-content-area" hx_swap="innerHTML" hx_push_url="true" %}
-        {% endfill %}
-    {% endcomponent %}
+            </div>
+        </div>
+    </div>
+    <a class="btn btn-outline"
+       href="{% url 'marketplace:index' %}"
+       hx-get="{% url 'marketplace:index' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
+        {% icon "arrow-back-outline" %}
+        {% trans "Back to Marketplace" %}
+    </a>
 
 {% elif no_connection %}
     <!-- No Connection State -->
-    {% component "page" title=_("No Connection") %}
-        {% fill "content" %}
-            {% ui_card css_class="card-warning" %}
-                <div class="d-flex align-center gap-md">
-                    {% icon "cloud-offline-outline" css_class="fs-2xl text-warning" %}
-                    <div>
-                        <h3 class="fw-semibold mb-xs m-0">{% trans "No Connection" %}</h3>
-                        <p class="m-0 text-medium">{% trans "Unable to connect to ERPlora Cloud. Please check your internet connection and try again." %}</p>
-                    </div>
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                {% icon "cloud-offline-outline" css_class="text-2xl" %}
+                <div>
+                    <h3 class="font-semibold mb-1">{% trans "No Connection" %}</h3>
+                    <p class="text-base-content/60 mb-0">{% trans "Unable to connect to ERPlora Cloud. Please check your internet connection and try again." %}</p>
                 </div>
-            {% endui_card %}
-            {% url 'mymodules:installed' as installed_url %}
-            {% ui_button label=_("Back to Modules") icon="arrow-back-outline" css_class="mt-md" hx_get=installed_url hx_target="#main-content-area" hx_swap="innerHTML" hx_push_url="true" %}
-        {% endfill %}
-    {% endcomponent %}
+            </div>
+        </div>
+    </div>
+    <a class="btn btn-outline"
+       href="{% url 'mymodules:installed' %}"
+       hx-get="{% url 'mymodules:installed' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
+        {% icon "arrow-back-outline" %}
+        {% trans "Back to Modules" %}
+    </a>
 
 {% elif module %}
-    {% url 'marketplace:index' as marketplace_url %}
-    {% component "page" title=module.name back_hx_get=marketplace_url back_hx_target="#main-content-area" back_hx_push_url="true" %}
-        {% fill "content" %}
             <!-- Hero Card -->
             {% ui_card css_class="mb-lg" %}
                 <div class="module-detail-header">
@@ -228,9 +233,6 @@
                 {% ui_grid_end %}
             </div>
             {% endif %}
-        {% endfill %}
-    {% endcomponent %}
-
 {% endif %}
 
 <!-- Module action handlers -->

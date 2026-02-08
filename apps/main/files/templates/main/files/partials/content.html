@@ -1,67 +1,70 @@
-{% load i18n ui component_tags djicons %}
+{% load i18n djicons %}
 
-{% component "page" title=_("Files") %}
-    {% fill "content" %}
-        <div class="ui-grid--sidebar">
-            {# Left Column: Database + Storage (stacked) #}
-            <div class="ui-grid__aside">
-                {# Database Download Card #}
-                {% ui_card %}
-                    <div class="flex items-center gap-sm mb-sm">
-                        {% icon "server-outline" css_class="fs-xl text-primary" %}
-                        <div>
-                            <p class="fs-xxs text-secondary text-uppercase font-semibold m-0">{% trans "Download backup" %}</p>
-                            <h2 class="fs-base fw-bold m-0">{% trans "Database" %}</h2>
-                        </div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
+    <!-- Left Column: Database + Storage -->
+    <div class="flex flex-col gap-6">
+        <!-- Database Download Card -->
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center gap-3 mb-3">
+                    {% icon "server-outline" css_class="text-xl text-primary" %}
+                    <div>
+                        <p class="text-xs uppercase font-semibold opacity-60 m-0">{% trans "Download backup" %}</p>
+                        <h2 class="text-base font-bold m-0">{% trans "Database" %}</h2>
                     </div>
-                    <p class="fs-sm text-secondary mb-4">
-                        {% trans "Download a backup of your SQLite database containing all your data." %}
-                    </p>
-                    {% ui_button label=_("Download Database") icon="cloud-download-outline" expand="block" href=download_url %}
-                {% endui_card %}
-
-                {# Storage Info Card #}
-                {% ui_card %}
-                    <div class="flex items-center gap-sm mb-sm">
-                        {% icon "pie-chart-outline" css_class="fs-xl text-primary" %}
-                        <div>
-                            <p class="fs-xxs text-secondary text-uppercase font-semibold m-0">{% trans "Disk usage" %}</p>
-                            <h2 class="fs-base fw-bold m-0">{% trans "Storage" %}</h2>
-                        </div>
-                    </div>
-                    <div id="storage-info"
-                         hx-get="{% url 'configuration:storage_info' %}"
-                         hx-trigger="load"
-                         hx-swap="innerHTML">
-                        {# Loading state #}
-                        <div class="flex justify-center p-4">
-                            <div class="loading"></div>
-                        </div>
-                    </div>
-                {% endui_card %}
-            </div>
-
-            {# Right Column: File Browser #}
-            <div class="ui-grid__main">
-                {% ui_card %}
-                    <div class="flex items-center gap-sm mb-4">
-                        {% icon "folder-open-outline" css_class="fs-xl text-primary" %}
-                        <div>
-                            <p class="fs-xxs text-secondary text-uppercase font-semibold m-0">{% trans "Browse and download" %}</p>
-                            <h2 class="fs-base fw-bold m-0">{% trans "File Browser" %}</h2>
-                        </div>
-                    </div>
-                    <div id="file-browser-content"
-                         hx-get="{% url 'configuration:file_browser' %}?dir=media"
-                         hx-trigger="load"
-                         hx-swap="innerHTML">
-                        {# Loading state #}
-                        <div class="flex justify-center p-6">
-                            <div class="loading"></div>
-                        </div>
-                    </div>
-                {% endui_card %}
+                </div>
+                <p class="text-sm opacity-60 mb-4">
+                    {% trans "Download a backup of your SQLite database containing all your data." %}
+                </p>
+                <a href="{{ download_url }}" class="btn btn-block color-primary">
+                    {% icon "cloud-download-outline" %}
+                    {% trans "Download Database" %}
+                </a>
             </div>
         </div>
-    {% endfill %}
-{% endcomponent %}
+
+        <!-- Storage Info Card -->
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center gap-3 mb-3">
+                    {% icon "pie-chart-outline" css_class="text-xl text-primary" %}
+                    <div>
+                        <p class="text-xs uppercase font-semibold opacity-60 m-0">{% trans "Disk usage" %}</p>
+                        <h2 class="text-base font-bold m-0">{% trans "Storage" %}</h2>
+                    </div>
+                </div>
+                <div id="storage-info"
+                     hx-get="{% url 'configuration:storage_info' %}"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <div class="flex justify-center p-4">
+                        <div class="loading"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: File Browser -->
+    <div class="lg:col-span-2">
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center gap-3 mb-4">
+                    {% icon "folder-open-outline" css_class="text-xl text-primary" %}
+                    <div>
+                        <p class="text-xs uppercase font-semibold opacity-60 m-0">{% trans "Browse and download" %}</p>
+                        <h2 class="text-base font-bold m-0">{% trans "File Browser" %}</h2>
+                    </div>
+                </div>
+                <div id="file-browser-content"
+                     hx-get="{% url 'configuration:file_browser' %}?dir=media"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <div class="flex justify-center p-6">
+                        <div class="loading"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

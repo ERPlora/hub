@@ -1,8 +1,5 @@
 {% load i18n ui component_tags djicons %}
 
-{% component "page" title=_("Settings") %}
-    {% fill "content" %}
-
     {# Store Information #}
     <section class="card">
         <div class="card-header">
@@ -641,8 +638,6 @@
             {% trans "These settings are saved locally in the Hub. Changes are applied after saving each section." %}
         </p>
     </div>
-    {% endfill %}
-{% endcomponent %}
 
 <style>
 .logo-preview {

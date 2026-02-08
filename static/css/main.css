@@ -10,6 +10,30 @@
 @import '../fonts/plus-jakarta-sans/plus-jakarta-sans.css';
 
 /* ==========================================================================
+   APP BACKGROUND
+   Decorative gradient so glass components show depth.
+   ========================================================================== */
+
+.app {
+  background: var(--color-base-200);
+  position: relative;
+}
+
+.app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, transparent 70%);
+  z-index: 0;
+}
+
+.app > * { position: relative; z-index: 1; }
+
+/* ==========================================================================
    ALPINE.JS CLOAK
    ========================================================================== */
 
@@ -27,7 +51,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--color-primary, #3b82f6);
+  background: var(--color-primary);
   z-index: 9999;
   opacity: 0;
   transition: opacity 0.2s ease-out;
@@ -53,24 +77,8 @@
 }
 
 @keyframes htmx-loading {
-  0% {
-    transform: translateX(-100%);
-  }
-
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-/* ==========================================================================
-   HUB VARIABLES
-   ========================================================================== */
-
-:root {
-  --hub-sidebar-width: 260px;
-  --hub-sidebar-collapsed-width: 64px;
-  --hub-header-height: 56px;
-  --hub-tab-bar-height: 56px;
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 /* ==========================================================================
@@ -96,15 +104,36 @@
   opacity: 0.6;
 }
 
-html {
-  scroll-behavior: smooth;
+svg {
+  color: inherit;
 }
 
 body.hub-modal-open {
   overflow: hidden;
 }
 
-.logo {
-  max-width: 4rem;
-  height: auto;
+/* ==========================================================================
+   MODULE ICON COLORS
+   Colored backgrounds for module grid icons on the home dashboard.
+   ========================================================================== */
+
+.app-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
 }
+
+.app-icon-primary   { background: var(--color-primary); }
+.app-icon-secondary { background: var(--color-secondary); }
+.app-icon-success   { background: var(--color-success); }
+.app-icon-warning   { background: var(--color-warning); }
+.app-icon-error     { background: var(--color-error); }
+.app-icon-accent    { background: var(--color-accent, var(--color-secondary)); }
+.app-icon-tertiary  { background: color-mix(in oklch, var(--color-primary) 60%, var(--color-secondary)); }
+.app-icon-danger    { background: var(--color-error); }
+.app-icon-medium    { background: var(--color-base-400, #9ca3af); }
+.app-icon-dark      { background: var(--color-base-700, #374151); }

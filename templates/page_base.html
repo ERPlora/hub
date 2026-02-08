@@ -2,33 +2,26 @@
 {% load i18n djicons %}
 
 {% block main %}
-<!-- Page Header (optional) -->
-{% block page_header %}
-<nav class="header sticky top-0 z-50 glass" aria-label="{% trans 'Page header' %}">
-    <div class="flex items-center gap-4 px-4 h-14">
-        <div class="flex items-center">
+<main id="main-content-area" class="content overflow-auto">
+    <div class="page padding">
+        {% block page_header %}
+        <div class="header glass">
             <button class="btn btn-ghost btn-sm"
                     aria-label="{% trans 'Toggle navigation menu' %}"
-                    @click="window.innerWidth >= 992 ? toggleSidebar() : sidebarOpen = true">
+                    @click="toggleDrawer()">
                 {% icon "menu-outline" %}
             </button>
-        </div>
-        <div class="flex-1 flex items-center justify-center gap-2">
             <span class="font-semibold">{% block page_title %}{% endblock %}</span>
             <span class="loading loading-sm htmx-indicator"></span>
-        </div>
-        <div class="flex items-center gap-2">
             {% block page_actions %}{% endblock %}
         </div>
+        {% endblock %}
+
+        <div class="content">
+            {% block page_content %}{% endblock %}
+        </div>
+
+        {% block page_footer %}{% endblock %}
     </div>
-</nav>
-{% endblock %}
-
-<!-- Page Content -->
-<div id="main-content-area" class="content overflow-auto">
-    {% block page_content %}{% endblock %}
-</div>
-
-<!-- Page Footer (optional) -->
-{% block page_footer %}{% endblock %}
+</main>
 {% endblock %}
