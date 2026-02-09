@@ -1,4 +1,5 @@
 {% load i18n ui component_tags djicons %}
+<div data-back-url="{% url 'marketplace:index' %}" hidden></div>
 
 {% if error %}
     <!-- Error State -->
@@ -174,32 +175,99 @@
 
                 <!-- Reviews Tab -->
                 <div x-show="activeTab === 'reviews'" class="mt-lg">
-                    {% if module.recent_reviews %}
-                    {% for review in module.recent_reviews %}
-                    {% ui_card css_class="mb-md" %}
-                        <div class="d-flex justify-between align-start mb-sm">
-                            <div>
-                                <p class="fw-semibold m-0">{{ review.user_name|default:"Anonymous" }}</p>
-                                <div class="d-flex gap-xxs mt-xs text-warning">
+                    {# Review Form #}
+                    <div class="card glass mb-4" x-data="{ rating: 0, hoverRating: 0, comment: '', submitting: false, submitted: false }">
+                        <div class="card-body">
+                            <h3 class="font-semibold text-sm mb-3 m-0">{% trans "Write a Review" %}</h3>
+
+                            {# Star selector #}
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="text-sm opacity-60">{% trans "Your rating:" %}</span>
+                                <div class="flex gap-1">
                                     {% for i in "12345" %}
-                                        {% if forloop.counter <= review.rating %}
-                                        {% icon "star" %}
-                                        {% else %}
-                                        {% icon "star-outline" css_class="text-medium" %}
-                                        {% endif %}
+                                    <button type="button"
+                                            class="p-0 border-none bg-transparent cursor-pointer"
+                                            style="line-height: 0; color: var(--color-warning); opacity: 0.3; transition: opacity 0.15s;"
+                                            :style="(hoverRating >= {{ forloop.counter }} || (!hoverRating && rating >= {{ forloop.counter }})) ? 'opacity: 1' : 'opacity: 0.3'"
+                                            @mouseenter="hoverRating = {{ forloop.counter }}"
+                                            @mouseleave="hoverRating = 0"
+                                            @click="rating = {{ forloop.counter }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24" fill="currentColor">
+                                            <path d="M394 480a16 16 0 01-9.39-3L256 383.76 127.39 477a16 16 0 01-24.55-18.08L153 310.35 23 221.2a16 16 0 019-29.2h160.38l48.4-148.95a16 16 0 0130.44 0l48.4 149H480a16 16 0 019.05 29.2L359 310.35l50.13 148.53A16 16 0 01394 480z"/>
+                                        </svg>
+                                    </button>
                                     {% endfor %}
                                 </div>
                             </div>
-                            <span class="fs-xs text-medium">{{ review.created_at }}</span>
+
+                            {# Comment textarea #}
+                            <textarea class="textarea w-full mb-3"
+                                      rows="3"
+                                      x-model="comment"
+                                      placeholder="{% trans 'Share your experience with this module (optional)...' %}"></textarea>
+
+                            {# Submit button #}
+                            <div class="flex items-center gap-3">
+                                <button class="btn btn-sm color-primary"
+                                        :disabled="!rating || submitting"
+                                        @click="
+                                            submitting = true;
+                                            fetch('{% url 'mymodules:api_rate' %}', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                                                body: JSON.stringify({ module_slug: '{{ module.slug }}', rating: rating, comment: comment })
+                                            })
+                                            .then(r => r.json())
+                                            .then(d => { submitted = true; if (typeof Toast !== 'undefined') Toast.success('{% trans 'Review submitted!' %}'); })
+                                            .catch(() => { if (typeof Toast !== 'undefined') Toast.error('{% trans 'Error submitting review' %}'); })
+                                            .finally(() => { submitting = false; })
+                                        ">
+                                    <template x-if="submitting"><div class="loading loading-sm"></div></template>
+                                    <template x-if="!submitting">
+                                        <span>{% icon "send-outline" %} {% trans "Submit Review" %}</span>
+                                    </template>
+                                </button>
+                                <span class="text-xs text-success" x-show="submitted" x-transition>
+                                    {% icon "checkmark-circle-outline" %} {% trans "Thank you for your review!" %}
+                                </span>
+                            </div>
                         </div>
-                        {% if review.title %}
-                        <h4 class="fw-semibold mb-xs m-0">{{ review.title }}</h4>
-                        {% endif %}
-                        <p class="text-medium m-0">{{ review.comment }}</p>
-                    {% endui_card %}
+                    </div>
+
+                    {# Existing reviews #}
+                    {% if module.recent_reviews %}
+                    {% for review in module.recent_reviews %}
+                    <div class="card glass mb-3">
+                        <div class="card-body">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <p class="font-semibold text-sm m-0">{{ review.user_name|default:"Anonymous" }}</p>
+                                    <div class="flex gap-0.5 mt-1" style="color: var(--color-warning);">
+                                        {% for i in "12345" %}
+                                            {% if forloop.counter <= review.rating %}
+                                            {% icon "star" %}
+                                            {% else %}
+                                            {% icon "star-outline" css_class="opacity-30" %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <span class="text-xs opacity-50">{{ review.created_at }}</span>
+                            </div>
+                            {% if review.title %}
+                            <h4 class="font-semibold text-sm mb-1 m-0">{{ review.title }}</h4>
+                            {% endif %}
+                            {% if review.comment %}
+                            <p class="text-sm opacity-60 m-0">{{ review.comment }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
                     {% endfor %}
                     {% else %}
-                    {% ui_empty_state title=_("No reviews yet") description=_("Be the first to review this module") icon="chatbubbles-outline" %}
+                    <div class="flex flex-col items-center justify-center py-8 text-center">
+                        {% icon "chatbubbles-outline" css_class="text-3xl opacity-40 mb-3" %}
+                        <p class="text-sm opacity-50 m-0">{% trans "No reviews yet — be the first!" %}</p>
+                    </div>
                     {% endif %}
                 </div>
 

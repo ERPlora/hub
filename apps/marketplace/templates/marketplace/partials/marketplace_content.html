@@ -30,37 +30,22 @@
         <form id="marketplace-filters-form"
             hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
             hx-target="#products-grid" hx-swap="innerHTML"
-            hx-trigger="submit, change from:input[type=hidden], input from:.searchbar-input delay:300ms"
-            hx-indicator="#loading-spinner">
+            hx-trigger="submit, change from:input[type=hidden], input from:#search-input delay:300ms">
 
             {# Search Bar with Filter Button #}
-            <div class="d-flex gap-2 mb-4 align-center">
-                <div class="searchbar flex-1" x-data="{ focused: false, hasValue: '{{ request.GET.q|default:'' }}' !== '' }"
-                     :class="{ 'searchbar--focused': focused, 'searchbar--has-value': hasValue }">
-                    <div class="searchbar-container">
-                        <span class="searchbar-icon">
-                            {% icon "search-outline" %}
-                        </span>
-                        <input type="search"
-                               class="searchbar-input"
-                               id="search-input"
-                               name="q"
-                               placeholder="{% trans 'Search modules...' %}"
-                               value="{{ request.GET.q|default:'' }}"
-                               @focus="focused = true"
-                               @blur="focused = false"
-                               @input="hasValue = $el.value.length > 0">
-                        <button type="button"
-                                class="searchbar-clear"
-                                @click="$refs.searchInput ? $refs.searchInput.value = '' : document.getElementById('search-input').value = ''; hasValue = false; document.getElementById('search-input').dispatchEvent(new Event('input', { bubbles: true }));"
-                                x-show="hasValue">
-                            {% icon "close" %}
-                        </button>
-                    </div>
-                </div>
+            <div class="flex gap-2 mb-4 items-center">
+                <label class="input rounded-full flex-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="ionicon icon opacity-50" viewBox="0 0 512 512" width="20" height="20" aria-hidden="true"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"></path><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32" d="M338.29 338.29L448 448"></path></svg>
+                    <input type="search"
+                           class="grow"
+                           id="search-input"
+                           name="q"
+                           placeholder="{% trans 'Search modules...' %}"
+                           value="{{ request.GET.q|default:'' }}">
+                </label>
                 <button type="button"
                         id="filter-toggle-btn"
-                        class="btn btn-outline btn-icon-only"
+                        class="btn btn-outline btn-square"
                         onclick="openFiltersModal()"
                         style="position: relative;">
                     {% icon "options-outline" %}
@@ -81,24 +66,17 @@
 
             <!-- Active Filters Display -->
             <div id="active-filters" class="flex flex-wrap gap-2 mb-4" style="display: none;">
-                <span class="fs-sm text-medium mr-sm">{% trans "Active:" %}</span>
+                <span class="text-sm opacity-60 mr-2">{% trans "Active:" %}</span>
                 <div id="active-filters-chips" class="flex flex-wrap gap-2"></div>
             </div>
         </form>
 
-        <!-- Loading Spinner -->
-        <div id="loading-spinner" class="htmx-indicator d-flex justify-center py-8">
-            <div class="loading"></div>
-        </div>
-
-        <!-- Products Grid Container with scroll -->
-        <div id="products-scroll-container" style="height: 65vh; overflow-y: auto; -webkit-overflow-scrolling: touch;">
-            <div id="products-grid"
-                hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
-                hx-trigger="load" hx-swap="innerHTML" hx-indicator="#loading-spinner">
-                <div class="d-flex justify-center py-8">
-                    <div class="loading"></div>
-                </div>
+        <!-- Products Grid -->
+        <div id="products-grid"
+            hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
+            hx-trigger="load" hx-swap="innerHTML">
+            <div class="flex justify-center py-8">
+                <div class="loading"></div>
             </div>
         </div>
 <!-- Filters Modal -->

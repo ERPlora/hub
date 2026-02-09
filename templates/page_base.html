@@ -2,26 +2,37 @@
 {% load i18n djicons %}
 
 {% block main %}
-<main id="main-content-area" class="content overflow-auto">
-    <div class="page padding">
-        {% block page_header %}
-        <div class="header glass">
+<main class="content padding">
+    {% block page_header %}
+    <div class="header glass sticky top-0 z-200">
+        <div class="header-start">
+            <a id="back-button"
+               class="btn btn-ghost btn-sm hidden"
+               href="#"
+               hx-target="#main-content-area"
+               hx-push-url="true">
+                {% icon "arrow-back-outline" %}
+            </a>
             <button class="btn btn-ghost btn-sm"
                     aria-label="{% trans 'Toggle navigation menu' %}"
                     @click="toggleDrawer()">
                 {% icon "menu-outline" %}
             </button>
-            <span class="font-semibold">{% block page_title %}{% endblock %}</span>
+        </div>
+        <span class="header-title" id="page-title">{% block page_title %}{% endblock %}</span>
+        <div class="header-end">
             <span class="loading loading-sm htmx-indicator"></span>
             {% block page_actions %}{% endblock %}
         </div>
-        {% endblock %}
-
-        <div class="content">
-            {% block page_content %}{% endblock %}
-        </div>
-
-        {% block page_footer %}{% endblock %}
     </div>
+    {% endblock %}
+
+    <div id="main-content-area" class="padding flex-1 overflow-y-auto">
+        {% block page_content %}{% endblock %}
+    </div>
+
+    {% block page_footer %}
+    <footer id="global-tabbar-footer"></footer>
+    {% endblock %}
 </main>
 {% endblock %}

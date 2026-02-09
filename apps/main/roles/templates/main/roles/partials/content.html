@@ -1,0 +1,148 @@
+{% load i18n djicons %}
+
+<div x-data="{
+    selectedIds: [],
+    selectAll: false,
+    toggleSelect(id) {
+        const idx = this.selectedIds.indexOf(id);
+        if (idx > -1) this.selectedIds.splice(idx, 1);
+        else this.selectedIds.push(id);
+        this.selectAll = false;
+    },
+    toggleAll(ids) {
+        if (this.selectAll) this.selectedIds = [];
+        else this.selectedIds = [...ids];
+        this.selectAll = !this.selectAll;
+    },
+    clearSelection() { this.selectedIds = []; this.selectAll = false; }
+}">
+
+    <div class="datatable glass mt-5" id="roles-datatable">
+
+        <!-- Toolbar -->
+        <div class="datatable-toolbar">
+            <div class="datatable-toolbar-start">
+                <label class="input input-sm datatable-search">
+                    {% icon "search-outline" %}
+                    <input type="search"
+                           name="q"
+                           placeholder="{% trans 'Search roles...' %}"
+                           value="{{ search_query|default:'' }}"
+                           autocomplete="off"
+                           hx-get="{% url 'main:roles:list' %}"
+                           hx-target="#datatable-body"
+                           hx-include="#roles-datatable"
+                           hx-trigger="input changed delay:300ms, search">
+                </label>
+                <select name="status"
+                        class="select select-sm"
+                        hx-get="{% url 'main:roles:list' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#roles-datatable"
+                        hx-trigger="change">
+                    <option value="">{% trans "All Status" %}</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>{% trans "Active" %}</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>{% trans "Inactive" %}</option>
+                </select>
+                <select name="type"
+                        class="select select-sm"
+                        hx-get="{% url 'main:roles:list' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#roles-datatable"
+                        hx-trigger="change">
+                    <option value="">{% trans "All Types" %}</option>
+                    <option value="system" {% if type_filter == 'system' %}selected{% endif %}>{% trans "System" %}</option>
+                    <option value="custom" {% if type_filter == 'custom' %}selected{% endif %}>{% trans "Custom" %}</option>
+                </select>
+            </div>
+            <div class="datatable-toolbar-end">
+                <!-- Add Role -->
+                <a class="btn btn-sm btn-circle color-primary"
+                   href="{% url 'main:roles:create' %}"
+                   hx-get="{% url 'main:roles:create' %}"
+                   hx-target="#main-content-area"
+                   hx-push-url="true"
+                   title="{% trans 'Add Role' %}">
+                    {% icon "add-outline" %}
+                </a>
+
+                <!-- Export -->
+                <details class="dropdown" x-data="{ open: false }" :open="open" @click.outside="open = false">
+                    <summary class="datatable-export-btn" @click.prevent="open = !open" title="{% trans 'Export' %}">
+                        {% icon "download-outline" %}
+                    </summary>
+                    <div class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" href="#"
+                           @click.prevent="open = false; window.location.href = '{% url 'main:roles:list' %}?export=csv&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', type: document.querySelector('[name=type]')?.value || ''}).toString()">
+                            {% icon "document-text-outline" %}
+                            {% trans "Export as CSV" %}
+                        </a>
+                        <a class="dropdown-item" href="#"
+                           @click.prevent="open = false; window.location.href = '{% url 'main:roles:list' %}?export=excel&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', type: document.querySelector('[name=type]')?.value || ''}).toString()">
+                            {% icon "document-text-outline" %}
+                            {% trans "Export as Excel" %}
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" onclick="window.print();">
+                            {% icon "print-outline" %}
+                            {% trans "Print" %}
+                        </button>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <!-- Bulk Actions Bar -->
+        <div class="datatable-bulk" x-show="selectedIds.length > 0" x-cloak>
+            <div class="datatable-bulk-info">
+                <span class="datatable-bulk-count" x-text="selectedIds.length"></span>
+                <span>{% trans "selected" %}</span>
+            </div>
+            <div class="datatable-bulk-actions">
+                <button class="datatable-bulk-btn"
+                        hx-post="{% url 'main:roles:bulk_action' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#roles-datatable"
+                        :hx-vals="JSON.stringify({ids: selectedIds.join(','), action: 'activate'})"
+                        @htmx:after-request="clearSelection()">
+                    {% icon "checkmark-circle-outline" %}
+                    {% trans "Activate" %}
+                </button>
+                <button class="datatable-bulk-btn"
+                        hx-post="{% url 'main:roles:bulk_action' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#roles-datatable"
+                        :hx-vals="JSON.stringify({ids: selectedIds.join(','), action: 'deactivate'})"
+                        @htmx:after-request="clearSelection()">
+                    {% icon "close-circle-outline" %}
+                    {% trans "Deactivate" %}
+                </button>
+                <button class="datatable-bulk-btn datatable-bulk-btn-danger"
+                        hx-post="{% url 'main:roles:bulk_action' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#roles-datatable"
+                        :hx-vals="JSON.stringify({ids: selectedIds.join(','), action: 'delete'})"
+                        @htmx:after-request="clearSelection()">
+                    {% icon "trash-outline" %}
+                    {% trans "Delete" %}
+                </button>
+                <button class="datatable-bulk-clear" @click="clearSelection()" title="{% trans 'Clear selection' %}">
+                    {% icon "close-outline" %}
+                </button>
+            </div>
+        </div>
+
+        {% csrf_token %}
+
+        <!-- Hidden state inputs -->
+        <input type="hidden" name="sort" value="{{ sort_field|default:'name' }}">
+        <input type="hidden" name="dir" value="{{ sort_dir|default:'asc' }}">
+        <input type="hidden" name="per_page" value="{{ per_page|default:'10' }}">
+
+        <!-- Datatable Body (HTMX swap target) -->
+        <div id="datatable-body">
+            {% include "main/roles/partials/roles_list.html" %}
+        </div>
+    </div>
+
+</div>

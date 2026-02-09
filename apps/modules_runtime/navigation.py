@@ -9,6 +9,7 @@ from functools import wraps
 from pathlib import Path
 from django.conf import settings
 from django.http import HttpResponse
+from django.template.loader import render_to_string
 
 from .loader import get_module_py
 
@@ -43,7 +44,13 @@ def get_module_navigation_items(module_id: str) -> list:
     for nav in navigation:
         item = dict(nav)
         view_name = item.get('view', item.get('id', ''))
-        item['url'] = f"/m/{module_id}/{view_name}/" if view_name else f"/m/{module_id}/"
+        # dashboard maps to module root (empty path)
+        if view_name == 'dashboard':
+            item['url'] = f"/m/{module_id}/"
+        elif view_name:
+            item['url'] = f"/m/{module_id}/{view_name}/"
+        else:
+            item['url'] = f"/m/{module_id}/"
         # Convert lazy strings
         if hasattr(item.get('label'), '__str__'):
             item['label'] = str(item['label'])
@@ -77,11 +84,13 @@ def build_module_context(module_id: str, view_id: str) -> dict:
 
 def with_module_nav(module_id: str, view_id: str):
     """
-    Decorator that injects module navigation context into view results.
+    Decorator that injects module navigation into view responses.
 
-    Composes with @htmx_view - place BEFORE @htmx_view in decorator stack.
+    Attaches module context to request._module_nav so @htmx_view can pick it up.
+    For HTMX responses, also appends an OOB tabbar swap to update the footer.
 
-    Usage:
+    Place BEFORE @htmx_view in decorator stack:
+
         @login_required
         @with_module_nav('inventory', 'products')
         @htmx_view('inventory/pages/products.html', 'inventory/partials/products_content.html')
@@ -91,14 +100,42 @@ def with_module_nav(module_id: str, view_id: str):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
+            module_ctx = build_module_context(module_id, view_id)
+
+            # Attach to request so @htmx_view can merge it into template context
+            request._module_nav = module_ctx
+
             result = view_func(request, *args, **kwargs)
 
-            # Only inject into dict results (not HttpResponse)
             if isinstance(result, dict):
-                module_ctx = build_module_context(module_id, view_id)
-                # Don't overwrite existing keys from the view
+                # If @htmx_view wasn't used, merge directly
                 for key, value in module_ctx.items():
                     result.setdefault(key, value)
+                return result
+
+            # Post-htmx_view: result is HttpResponse
+            # Append OOB tabbar for HTMX requests so footer updates
+            is_htmx = request.headers.get('HX-Request')
+            if is_htmx and isinstance(result, HttpResponse):
+                content_type = result.get('Content-Type', '')
+                if 'text/html' in content_type:
+                    oob_html = render_to_string(
+                        'partials/tabbar_oob.html',
+                        module_ctx,
+                        request=request,
+                    )
+                    result.content = result.content + oob_html.encode('utf-8')
+
+                # Also merge pageTitle into existing HX-Trigger
+                page_title = module_ctx.get('page_title')
+                if page_title:
+                    existing = result.get('HX-Trigger', '')
+                    try:
+                        triggers = json.loads(existing) if existing else {}
+                    except (json.JSONDecodeError, TypeError):
+                        triggers = {}
+                    triggers['pageTitle'] = str(page_title)
+                    result['HX-Trigger'] = json.dumps(triggers)
 
             return result
 

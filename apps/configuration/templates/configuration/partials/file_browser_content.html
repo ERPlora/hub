@@ -34,7 +34,7 @@
 <!-- Files List -->
 {% if is_empty %}
 <div class="flex flex-col items-center justify-center py-16 text-center">
-    <span class="text-5xl text-base-content/15 mb-3">{% icon "folder-open-outline" %}</span>
+    {% icon "folder-open-outline" css_class="text-base-content/15 mb-3" size=48 %}
     <p class="text-sm font-medium text-base-content/50 m-0">{% trans "Empty directory" %}</p>
     <p class="text-xs text-base-content/40 m-0 mt-1">{% trans "No files in this directory" %}</p>
 </div>
@@ -47,15 +47,13 @@
          hx-get="{% url 'configuration:file_browser' %}?dir={{ dir_key }}&path={{ item.path }}"
          hx-target="#file-browser-content">
         <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-            <span class="text-warning">{% icon "folder" %}</span>
+            {% icon "folder-outline" css_class="text-warning" %}
         </div>
         <div class="flex-1 min-w-0">
             <p class="font-medium text-sm m-0 truncate">{{ item.name }}</p>
             <p class="text-xs text-base-content/40 m-0">{{ item.modified }}</p>
         </div>
-        <span class="text-base-content/20 group-hover:text-base-content/50 transition-colors">
-            {% icon "chevron-forward-outline" %}
-        </span>
+        {% icon "chevron-forward-outline" css_class="text-base-content/20 group-hover:text-base-content/50 transition-colors" %}
     </div>
     {% else %}
     <!-- File -->
@@ -64,7 +62,7 @@
          hx-target="#file-preview-content"
          @click="previewOpen = true">
         <div class="w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center shrink-0 group-hover:bg-base-300 transition-colors">
-            <span class="text-base-content/40">{% icon item.icon|add:"-outline" %}</span>
+            {% icon item.icon|add:"-outline" css_class="text-base-content/40" %}
         </div>
         <div class="flex-1 min-w-0">
             <p class="font-medium text-sm m-0 truncate">{{ item.name }}</p>

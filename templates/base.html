@@ -91,99 +91,13 @@
                 }
             });
 
-            // Module Grid Component - Used on the home page
-            // Displays installed modules with favorites, recent, and search functionality
-            Alpine.data('moduleGrid', () => ({
-                modules: [],
-                favorites: [],
-                recent: [],
-                searchQuery: '',
-
-                init() {
-                    // Load modules data from the JSON script tag
-                    const dataEl = document.getElementById('modules-data');
-                    if (dataEl) {
-                        try {
-                            this.modules = JSON.parse(dataEl.textContent) || [];
-                        } catch (e) {
-                            console.error('Error parsing modules data:', e);
-                            this.modules = [];
-                        }
-                    }
-                    // Load favorites and recent from localStorage
-                    this.favorites = JSON.parse(localStorage.getItem('erplora_favorite_modules') || '[]');
-                    this.recent = JSON.parse(localStorage.getItem('erplora_recent_modules') || '[]');
-                },
-
-                get filteredModules() {
-                    if (!this.searchQuery) {
-                        return this.modules;
-                    }
-                    const query = this.searchQuery.toLowerCase();
-                    return this.modules.filter(mod =>
-                        mod.label.toLowerCase().includes(query)
-                    );
-                },
-
-                get favoritesData() {
-                    return this.modules.filter(mod => this.favorites.includes(mod.id));
-                },
-
-                get recentData() {
-                    // Get last 4 recent modules that exist and are not in favorites
-                    return this.recent
-                        .filter(id => !this.favorites.includes(id))
-                        .map(id => this.modules.find(mod => mod.id === id))
-                        .filter(mod => mod !== undefined)
-                        .slice(0, 4);
-                },
-
-                filterModules(event) {
-                    this.searchQuery = event.target.value || '';
-                },
-
-                isFavorite(moduleId) {
-                    return this.favorites.includes(moduleId);
-                },
-
-                toggleFavorite(moduleId) {
-                    const index = this.favorites.indexOf(moduleId);
-                    if (index === -1) {
-                        this.favorites.push(moduleId);
-                    } else {
-                        this.favorites.splice(index, 1);
-                    }
-                    localStorage.setItem('erplora_favorite_modules', JSON.stringify(this.favorites));
-                },
-
-                trackRecent(moduleId) {
-                    // Remove if already in recent
-                    const index = this.recent.indexOf(moduleId);
-                    if (index !== -1) {
-                        this.recent.splice(index, 1);
-                    }
-                    // Add to beginning
-                    this.recent.unshift(moduleId);
-                    // Keep only last 8
-                    this.recent = this.recent.slice(0, 8);
-                    localStorage.setItem('erplora_recent_modules', JSON.stringify(this.recent));
-                }
-            }));
-
             // UI Store - Toast notifications, delete confirmations, etc.
             Alpine.store('ui', {
-                // Show toast notification
-                toast(message, type = 'primary', duration = 2000) {
-                    const container = document.getElementById('toast-container');
-                    const toast = document.createElement('div');
-                    toast.className = 'toast-item color-' + type;
-                    toast.textContent = message;
-                    toast.setAttribute('data-state', 'open');
-                    container.appendChild(toast);
-                    setTimeout(() => {
-                        toast.setAttribute('data-state', 'closed');
-                        setTimeout(() => toast.remove(), 300);
-                    }, duration);
+                // Show toast notification (delegates to global showToast)
+                toast(message, type = 'default', duration = 4000) {
+                    if (typeof showToast === 'function') {
+                        showToast(message, type, duration);
+                    }
                 },
 
                 // Show success toast
@@ -193,7 +107,7 @@
 
                 // Show error toast
                 error(message) {
-                    this.toast(message, 'error', 3000);
+                    this.toast(message, 'error', 5000);
                 },
 
                 // Get CSRF token
@@ -390,14 +304,6 @@
                 }
             }, 200);
 
-            // Listen for showNotification events from HTMX HX-Trigger headers
-            // Usage in Python: response['HX-Trigger'] = json.dumps({'showNotification': {'title': 'Success', 'message': 'Saved!', 'type': 'success'}})
-            document.body.addEventListener('showNotification', function(event) {
-                const { title, message, type } = event.detail || {};
-                if (typeof Notify !== 'undefined' && type && Notify[type]) {
-                    Notify[type](title || '', message || '');
-                }
-            });
         });
     </script>
 
@@ -546,8 +452,69 @@
 
     {% block content %}{% endblock %}
 
-    <!-- Toast container for HTMX OOB swap -->
-    <div id="toast-container"></div>
+    <!-- Toast container -->
+    <div id="toast-container" class="toast toast-bottom toast-center"></div>
+
+    <!-- Toast function & HTMX event listeners (must be after #toast-container) -->
+    <script>
+        (function() {
+            var icons = {
+                info: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>',
+                success: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>',
+                warning: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>',
+                error: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>'
+            };
+            var closeBtn = '<button class="toast-close" onclick="dismissToast(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg></button>';
+
+            window.dismissToast = function(btnOrItem) {
+                var item = btnOrItem.closest ? (btnOrItem.closest('.toast-item') || btnOrItem) : btnOrItem;
+                item.classList.add('toast-removing');
+                item.addEventListener('animationend', function() { item.remove(); });
+            };
+
+            window.showToast = function(message, type, duration) {
+                type = type || 'default';
+                duration = duration || 4000;
+                var container = document.getElementById('toast-container');
+                if (!container) return;
+                var colorClass = (type === 'default' || type === 'primary') ? '' : ' color-' + type;
+                var icon = icons[type] || '';
+                var el = document.createElement('div');
+                el.className = 'toast-item' + colorClass;
+                el.innerHTML = icon + '<span>' + message + '</span>' + closeBtn;
+                container.appendChild(el);
+                setTimeout(function() { dismissToast(el.querySelector('.toast-close')); }, duration);
+            };
+        })();
+
+        // Debug: log ALL HTMX requests and responses
+        document.body.addEventListener('htmx:beforeRequest', function(e) {
+            console.log('[Toast] HTMX request starting:', e.detail.elt.tagName, e.detail.path);
+        });
+        document.body.addEventListener('htmx:beforeOnLoad', function(e) {
+            var xhr = e.detail.xhr;
+            var trigger = xhr.getResponseHeader('HX-Trigger');
+            console.log('[Toast] HTMX response received, status:', xhr.status, 'HX-Trigger:', trigger);
+        });
+        document.body.addEventListener('htmx:afterRequest', function(e) {
+            console.log('[Toast] HTMX afterRequest, successful:', e.detail.successful);
+        });
+
+        // HX-Trigger: {"showMessage": {"message": "...", "type": "success"}}
+        document.body.addEventListener('showMessage', function(e) {
+            console.log('[Toast] showMessage event fired', e.detail);
+            var d = e.detail || {};
+            var msg = d.message || d.value || '';
+            if (msg) showToast(msg, d.type || 'success', d.type === 'error' ? 5000 : 4000);
+        });
+
+        // HX-Trigger: {"showNotification": {"title": "...", "message": "...", "type": "..."}}
+        document.body.addEventListener('showNotification', function(e) {
+            var d = e.detail || {};
+            var text = d.title ? (d.title + ': ' + (d.message || '')) : (d.message || '');
+            if (text) showToast(text, d.type || 'default');
+        });
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>

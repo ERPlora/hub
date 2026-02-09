@@ -95,29 +95,6 @@
                         </a>
                     </div>
 
-                    {% if MODULE_MENU_ITEMS %}
-                    <div class="sidebar-separator"></div>
-                    {% for item in MODULE_MENU_ITEMS %}
-                    <div class="sidebar-menu-item">
-                        <a class="sidebar-menu-button"
-                           :class="{ 'is-active': $store.nav.isActive('{{ item.url }}') }"
-                           href="{{ item.url }}"
-                           hx-get="{{ item.url }}"
-                           hx-target="#main-content-area"
-                           hx-push-url="true">
-                            <span class="sidebar-menu-icon">
-                                {% if item.has_svg %}
-                                <img src="{{ item.svg_path }}" alt="" width="20" height="20">
-                                {% else %}
-                                {% icon item.icon %}
-                                {% endif %}
-                            </span>
-                            <span class="sidebar-label">{{ item.label }}</span>
-                        </a>
-                    </div>
-                    {% endfor %}
-                    {% endif %}
-
                     <div class="sidebar-separator"></div>
                     <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
@@ -185,7 +162,30 @@
                     if (window.innerWidth < 992) {
                         this.drawerOpen = false;
                     }
+                    this.updateBackButton();
                 });
+
+                document.body.addEventListener('pageTitle', (e) => {
+                    const el = document.getElementById('page-title');
+                    if (el) el.textContent = e.detail.value || e.detail;
+                });
+
+                this.updateBackButton();
+            },
+
+            updateBackButton() {
+                const btn = document.getElementById('back-button');
+                if (!btn) return;
+                const meta = document.querySelector('#main-content-area [data-back-url]');
+                if (meta) {
+                    const url = meta.getAttribute('data-back-url');
+                    btn.setAttribute('href', url);
+                    btn.setAttribute('hx-get', url);
+                    htmx.process(btn);
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.classList.add('hidden');
+                }
             },
 
             toggleDrawer() {

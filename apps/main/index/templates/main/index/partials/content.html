@@ -1,8 +1,7 @@
 {% load i18n djicons %}
 
-<script id="modules-data" type="application/json">{{ modules_json|safe }}</script>
-
-<div x-data="moduleGrid">
+<div x-data="{ searchQuery: '' }">
+    {% if modules %}
     <!-- Search -->
     <div class="mb-4">
         <label class="input rounded-full" x-data="{ focused: false }" :class="{ 'input-focused': focused }">
@@ -18,24 +17,23 @@
 
     <!-- Module Grid -->
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        <template x-for="mod in filteredModules" :key="mod.id">
-            <a class="card card-body items-center text-center gap-2 no-underline text-base-content hover:shadow-md transition-shadow cursor-pointer"
-               :href="mod.url"
-               :hx-get="mod.url"
-               hx-target="#main-content-area"
-               hx-push-url="true"
-               @click="trackRecent(mod.id)">
-                <div class="app-icon" :class="'app-icon-' + mod.color">
-                    <template x-if="mod.has_svg && mod.svg_path">
-                        <img :src="mod.svg_path" :alt="mod.label" class="w-7 h-7">
-                    </template>
-                    <template x-if="!mod.has_svg || !mod.svg_path">
-                        <span x-html="mod.icon_svg"></span>
-                    </template>
-                </div>
-                <span class="text-sm font-medium" x-text="mod.label"></span>
-            </a>
-        </template>
+        {% for mod in modules %}
+        <a class="card card-body items-center text-center gap-2 no-underline text-base-content hover:shadow-md transition-shadow cursor-pointer"
+           href="{{ mod.url }}"
+           hx-get="{{ mod.url }}"
+           hx-target="#main-content-area"
+           hx-push-url="true"
+           x-show="!searchQuery || '{{ mod.label|lower }}'.includes(searchQuery.toLowerCase())">
+            <div class="app-icon app-icon-{{ mod.color }}">
+                {% if mod.has_svg and mod.svg_path %}
+                <img src="{{ mod.svg_path }}" alt="{{ mod.label }}" class="w-7 h-7">
+                {% else %}
+                {% icon mod.icon size=28 %}
+                {% endif %}
+            </div>
+            <span class="text-sm font-medium">{{ mod.label }}</span>
+        </a>
+        {% endfor %}
 
         <!-- Get More -->
         <a class="card card-body items-center text-center gap-2 no-underline text-base-content opacity-50 hover:opacity-80 border-2 border-dashed cursor-pointer"
@@ -43,6 +41,7 @@
            hx-get="/marketplace/"
            hx-target="#main-content-area"
            hx-push-url="true"
+           x-show="!searchQuery"
            style="background: transparent;">
             <div class="app-icon" style="background: transparent;">
                 {% icon "add" size=28 %}
@@ -50,21 +49,20 @@
             <span class="text-sm font-medium">{% trans "Get More" %}</span>
         </a>
     </div>
-
+    {% else %}
     <!-- Empty state -->
-    <template x-if="modules.length === 0">
-        <div class="flex flex-col items-center text-center py-12">
-            {% icon "extension-puzzle-outline" css_class="w-16 h-16 opacity-30 mb-4" %}
-            <h3 class="text-lg font-semibold mb-2">{% trans "No modules installed" %}</h3>
-            <p class="opacity-60 mb-6">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
-            <a class="btn color-primary"
-               href="/marketplace/"
-               hx-get="/marketplace/"
-               hx-target="#main-content-area"
-               hx-push-url="true">
-                {% icon "storefront-outline" %}
-                {% trans "Browse Marketplace" %}
-            </a>
-        </div>
-    </template>
+    <div class="flex flex-col items-center text-center py-12">
+        {% icon "extension-puzzle-outline" css_class="w-16 h-16 opacity-30 mb-4" %}
+        <h3 class="text-lg font-semibold mb-2">{% trans "No modules installed" %}</h3>
+        <p class="opacity-60 mb-6">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
+        <a class="btn color-primary"
+           href="/marketplace/"
+           hx-get="/marketplace/"
+           hx-target="#main-content-area"
+           hx-push-url="true">
+            {% icon "storefront-outline" %}
+            {% trans "Browse Marketplace" %}
+        </a>
+    </div>
+    {% endif %}
 </div>

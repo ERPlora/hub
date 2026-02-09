@@ -1,25 +1,31 @@
-{% load i18n ui %}
-
-{% ui_toast_oob message=_("PIN reset successfully") color="success" %}
+{% load i18n djicons %}
 
 <!-- Reset the form (replaces pin-form-container content) -->
+<div class="callout callout-success mb-4">
+    <span class="callout-icon">{% icon "checkmark-circle-outline" %}</span>
+    <div class="callout-content">
+        <span class="callout-text">{% trans "PIN reset successfully" %}</span>
+    </div>
+</div>
+
 <form hx-post="{% url 'main:employee_reset_pin' employee.id %}"
       hx-target="#pin-form-container"
       hx-swap="innerHTML">
     {% csrf_token %}
-    {% ui_list_start %}
-        <div class="list-item">
-            <label for="pin" class="form-group-label">{% trans "New PIN (4 digits)" %}</label>
-            <input class="input"
-                name="pin"
-                id="pin"
-                type="password"
-                maxlength="4"
-                pattern="[0-9]{4}"
-                required>
-        </div>
-    {% ui_list_end %}
-    <div style="padding-top: 1rem;">
-        {% ui_button type="submit" expand="block" fill="outline" color="warning" label=_("Reset PIN") icon="key-outline" %}
+    <div class="form-group mb-4">
+        <label class="form-group-label" for="pin">{% trans "New PIN (4 digits)" %}</label>
+        <input class="input"
+            name="pin"
+            id="pin"
+            type="password"
+            maxlength="4"
+            pattern="[0-9]{4}"
+            inputmode="numeric"
+            placeholder="****"
+            required>
     </div>
+    <button type="submit" class="btn btn-block btn-outline color-warning">
+        {% icon "key-outline" %}
+        {% trans "Reset PIN" %}
+    </button>
 </form>

@@ -11,7 +11,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.template.loader import render_to_string
 from django.urls import reverse
-from djicons import icon as render_icon
+import djicons
 
 
 def scan_orphaned_data(request):
@@ -20,7 +20,7 @@ def scan_orphaned_data(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
             <div class="card border-l-4 border-danger">
                 <div class="card-body flex items-center gap-3">
@@ -132,7 +132,7 @@ def scan_orphaned_data(request):
         total_orphans = len(orphaned_tables) + len(orphaned_migrations) + len(orphaned_media)
 
         if total_orphans == 0:
-            success_icon = render_icon("checkmark-circle-outline", css_class="text-2xl text-success")
+            success_icon = djicons.get("checkmark-circle-outline", css_class="text-2xl text-success")
             html = f'''
                 <div class="card border-l-4 border-success">
                     <div class="card-body flex items-center gap-3">
@@ -153,7 +153,7 @@ def scan_orphaned_data(request):
             if orphaned_media:
                 items.append(f'<li>{len(orphaned_media)} orphaned media folders</li>')
 
-            trash_icon = render_icon("trash-outline")
+            trash_icon = djicons.get("trash-outline")
             html = f'''
                 <div class="card border-l-4 border-warning">
                     <div class="card-body">
@@ -177,7 +177,7 @@ def scan_orphaned_data(request):
         return HttpResponse(html)
 
     except Exception as e:
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
             <div class="card border-l-4 border-danger">
                 <div class="card-body flex items-center gap-3">
@@ -195,7 +195,7 @@ def clean_orphaned_data(request):
     """
     # Only allow POST
     if request.method != 'POST':
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
             <div class="card border-l-4 border-danger">
                 <div class="card-body flex items-center gap-3">
@@ -208,7 +208,7 @@ def clean_orphaned_data(request):
 
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
             <div class="card border-l-4 border-danger">
                 <div class="card-body flex items-center gap-3">
@@ -345,7 +345,7 @@ def clean_orphaned_data(request):
         total_cleaned = len(orphaned_tables) + len(orphaned_migrations) + len(orphaned_media)
 
         # Return HTML for HTMX
-        success_icon = render_icon("checkmark-circle-outline", css_class="text-2xl text-success")
+        success_icon = djicons.get("checkmark-circle-outline", css_class="text-2xl text-success")
         html = f'''
             <div class="card border-l-4 border-success">
                 <div class="card-body">
@@ -367,7 +367,7 @@ def clean_orphaned_data(request):
         return HttpResponse(html)
 
     except Exception as e:
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
             <div class="card border-l-4 border-danger">
                 <div class="card-body flex items-center gap-3">

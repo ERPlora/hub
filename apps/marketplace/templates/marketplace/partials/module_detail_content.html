@@ -1,4 +1,4 @@
-{% load i18n ui component_tags djicons %}
+{% load i18n component_tags djicons %}
 
 {% component "page" title=module.name|default:_("Module Details") back_hx_get="/marketplace/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
     {# Marketplace tabbar - manual since it's not a module #}
@@ -296,23 +296,9 @@
         {% if related_modules %}
         <div class="mt-xl">
             <h2 class="fs-xl fw-semibold mb-md">{% trans "Related Modules" %}</h2>
-            <div class="product-grid product-grid--3">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for related in related_modules %}
-                <article class="product-card"
-                         hx-get="{% url 'marketplace:module_detail' related.slug %}"
-                         hx-target="#main-content-area"
-                         hx-push-url="true">
-                    <div class="product-card-image">
-                        <div class="flex items-center justify-center">
-                            {% icon related.icon|default:"cube-outline" %}
-                        </div>
-                    </div>
-                    <div class="product-card-content">
-                        <h3 class="product-card-name">{{ related.name }}</h3>
-                        <p class="fs-xs text-tertiary m-0">v{{ related.version|default:"1.0" }}</p>
-                        <p class="fs-sm text-secondary mt-xs mb-0" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ related.description }}</p>
-                    </div>
-                </article>
+                {% include "system/modules/partials/module_card.html" with module=related card_context='marketplace' %}
                 {% endfor %}
             </div>
         </div>

@@ -1,4 +1,4 @@
-{% load i18n ui djicons %}
+{% load i18n djicons %}
 
 {% if tax_classes %}
 <div class="list list-inset">
@@ -11,13 +11,12 @@
                 {% if tc.description %} - {{ tc.description }}{% endif %}
             </span>
         </div>
-        <div class="list-item-end" style="gap: 0.5rem; display: flex; align-items: center;">
+        <div class="list-item-end flex items-center gap-2">
             {% if tc.is_default %}
             <span class="badge color-success">{% trans "Default" %}</span>
             {% endif %}
             <button type="button"
-                    class="btn btn-ghost btn-sm"
-                    style="color: var(--color-error); padding: 0.25rem;"
+                    class="btn btn-ghost btn-sm text-error"
                     hx-post="{% url 'main:settings' %}"
                     hx-vals='{"action": "delete_tax_class", "tax_class_id": "{{ tc.id }}"}'
                     hx-target="#tax-classes-list"
@@ -30,7 +29,7 @@
     {% endfor %}
 </div>
 {% else %}
-<div class="flex flex-col items-center justify-center py-12" style="text-align: center;">
+<div class="flex flex-col items-center justify-center py-12 text-center">
     <div class="text-4xl mb-4 opacity-40">
         {% icon "alert-circle-outline" style="width: 48px; height: 48px;" %}
     </div>

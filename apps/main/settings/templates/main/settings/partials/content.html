@@ -1,32 +1,39 @@
-{% load i18n ui component_tags djicons %}
+{% load i18n component_tags djicons %}
 
-    {# Store Information #}
+<div class="flex flex-col gap-6">
+
+    {# ── Store Information ── #}
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">{% trans "Store Information" %}</h2>
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "storefront-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Store Information" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Business details for receipts and invoices" %}</p>
+                </div>
+            </div>
         </div>
         <div class="card-body">
             <form hx-post="{% url 'main:settings' %}"
-                  hx-target="#store-message"
-                  hx-swap="innerHTML"
+                  hx-swap="none"
                   hx-indicator="#store-spinner"
                   enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_store">
-                <div id="store-message"></div>
 
                 {% if not store_config.is_configured %}
-                <div class="alert color-warning" style="margin-bottom: 1.5rem;">
-                    {% icon "alert-circle-outline" %}
-                    <span>{% trans "Store configuration required" %}</span>
+                <div class="callout callout-warning mb-4">
+                    <span class="callout-icon">{% icon "alert-circle-outline" %}</span>
+                    <div class="callout-content">
+                        <div class="callout-text">{% trans "Store configuration required. Please fill in the required fields below." %}</div>
+                    </div>
                 </div>
                 {% endif %}
 
-                <div class="list list-inset">
-                    {# Business Name #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Business Name" %} *</span>
+                <div class="flex flex-col gap-4">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Business Name" %} <span class="form-group-label-required">*</span></label>
                             <input type="text"
                                    name="business_name"
                                    class="input"
@@ -34,12 +41,8 @@
                                    placeholder="{% trans 'Your business name' %}"
                                    required>
                         </div>
-                    </div>
-
-                    {# VAT/Tax ID #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "VAT/Tax ID" %} *</span>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "VAT/Tax ID" %} <span class="form-group-label-required">*</span></label>
                             <input type="text"
                                    name="vat_number"
                                    class="input"
@@ -49,34 +52,26 @@
                         </div>
                     </div>
 
-                    {# Address #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Address" %} *</span>
-                            <textarea name="business_address"
-                                      class="input"
-                                      rows="2"
-                                      placeholder="{% trans 'Street, City, Postal Code' %}"
-                                      required>{{ store_config.business_address }}</textarea>
-                        </div>
+                    <div class="form-group">
+                        <label class="form-group-label">{% trans "Address" %} <span class="form-group-label-required">*</span></label>
+                        <textarea name="business_address"
+                                  class="textarea"
+                                  rows="2"
+                                  placeholder="{% trans 'Street, City, Postal Code' %}"
+                                  required>{{ store_config.business_address }}</textarea>
                     </div>
 
-                    {# Phone #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Phone" %}</span>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Phone" %}</label>
                             <input type="tel"
                                    name="phone"
                                    class="input"
                                    value="{{ store_config.phone }}"
                                    placeholder="+34 600 000 000">
                         </div>
-                    </div>
-
-                    {# Email #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Email" %}</span>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Email" %}</label>
                             <input type="email"
                                    name="email"
                                    class="input"
@@ -85,22 +80,18 @@
                         </div>
                     </div>
 
-                    {# Website #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Website" %}</span>
-                            <input type="url"
-                                   name="website"
-                                   class="input"
-                                   value="{{ store_config.website }}"
-                                   placeholder="https://www.business.com">
-                        </div>
+                    <div class="form-group">
+                        <label class="form-group-label">{% trans "Website" %}</label>
+                        <input type="url"
+                               name="website"
+                               class="input"
+                               value="{{ store_config.website }}"
+                               placeholder="https://www.business.com">
                     </div>
 
-                    {# Default Tax Rate #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Default Tax Rate (%)" %}</span>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Default Tax Rate (%)" %}</label>
                             <input type="number"
                                    name="tax_rate"
                                    class="input"
@@ -110,16 +101,10 @@
                                    max="100"
                                    placeholder="21.00">
                         </div>
-                    </div>
-
-                    {# Tax included in prices #}
-                    <div class="list-item">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Tax included in prices" %}</span>
-                            <span class="list-item-note">{% trans "Prices already include taxes" %}</span>
-                        </div>
-                        <div class="list-item-end">
-                            <label class="toggle">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Tax included in prices" %}</label>
+                            <span class="form-group-helper">{% trans "Prices already include taxes" %}</span>
+                            <label class="toggle mt-2">
                                 <input type="checkbox"
                                        name="tax_included"
                                        value="true"
@@ -132,12 +117,10 @@
                     </div>
 
                     {# Logo #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Logo" %}</span>
-                            <span class="list-item-note">{% trans "Business logo for receipts and invoices" %}</span>
-                        </div>
-                        <div class="list-item-end" style="gap: 1rem; display: flex; align-items: center;">
+                    <div class="form-group">
+                        <label class="form-group-label">{% trans "Logo" %}</label>
+                        <span class="form-group-helper">{% trans "Business logo for receipts and invoices" %}</span>
+                        <div class="flex items-center gap-4 mt-2">
                             <div class="logo-preview">
                                 {% if store_config.logo %}
                                 <img src="{{ store_config.logo.url }}" alt="Logo">
@@ -145,15 +128,19 @@
                                 {% icon "image-outline" %}
                                 {% endif %}
                             </div>
-                            {% ui_file_input name="logo" label=_("Choose image") accept="image/*" icon="image-outline" %}
+                            <label class="btn btn-sm btn-outline">
+                                {% icon "image-outline" %}
+                                {% trans "Choose image" %}
+                                <input type="file" name="logo" accept="image/*" class="hidden">
+                            </label>
                         </div>
                     </div>
                 </div>
 
-                <div style="margin-top: 1.5rem;">
-                    <button type="submit" class="btn btn-block">
-                        <span class="htmx-indicator" id="store-spinner" style="margin-right: 0.5rem;">
-                            <span class="loading loading-sm"></span>
+                <div class="mt-6">
+                    <button type="submit" class="btn color-primary btn-block">
+                        <span class="htmx-indicator" id="store-spinner">
+                            <span class="loading loading-sm mr-2"></span>
                         </span>
                         {% trans "Save Store Settings" %}
                     </button>
@@ -162,29 +149,114 @@
         </div>
     </section>
 
-    {# Hub Configuration #}
+    {# ── Tax Classes ── #}
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">{% trans "Hub Configuration" %}</h2>
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "pricetag-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Tax Classes" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Configure tax rates according to your country's legislation" %}</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="tax-classes-list" class="mb-4">
+                {% include "main/settings/partials/tax_classes_list.html" %}
+            </div>
+
+            <div class="list-header">{% trans "Add Tax Class" %}</div>
+
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-target="#tax-classes-list"
+                  hx-swap="innerHTML"
+                  hx-indicator="#tax-spinner">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_tax_class">
+
+                <div class="flex flex-col gap-4">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Name" %} <span class="form-group-label-required">*</span></label>
+                            <input type="text"
+                                   name="name"
+                                   class="input"
+                                   placeholder="{% trans 'e.g., Standard 21%' %}"
+                                   required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Rate (%)" %} <span class="form-group-label-required">*</span></label>
+                            <input type="number"
+                                   name="rate"
+                                   class="input"
+                                   step="0.01"
+                                   min="0"
+                                   max="100"
+                                   placeholder="21.00"
+                                   required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Description" %}</label>
+                            <input type="text"
+                                   name="description"
+                                   class="input"
+                                   placeholder="{% trans 'Optional notes' %}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Set as default" %}</label>
+                            <span class="form-group-helper">{% trans "Use this tax class by default for new products" %}</span>
+                            <label class="toggle mt-2">
+                                <input type="checkbox" name="is_default" value="true">
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <button type="submit" class="btn">
+                        <span class="htmx-indicator" id="tax-spinner">
+                            <span class="loading loading-sm mr-2"></span>
+                        </span>
+                        {% icon "add-outline" %}
+                        {% trans "Add Tax Class" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    {# ── Hub Configuration ── #}
+    <section class="card">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "server-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Hub Configuration" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "System language, timezone, and display preferences" %}</p>
+                </div>
+            </div>
         </div>
         <div class="card-body">
             <form hx-post="{% url 'main:settings' %}"
-                  hx-target="#hub-message"
-                  hx-swap="innerHTML"
+                  hx-swap="none"
                   hx-indicator="#hub-spinner">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_hub">
-                <div id="hub-message"></div>
 
                 <div class="list list-inset">
-                    {# System Language #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "System Language" %}</span>
                             <span class="list-item-note">{% trans "Default language for the Hub interface" %}</span>
                         </div>
                         <div class="list-item-end">
-                            <select name="language" class="input" style="width: auto; min-width: 150px;">
+                            <select name="language" class="select w-auto min-w-40">
                                 {% for code, name in system_language_choices %}
                                 <option value="{{ code }}" {% if hub_config.language == code %}selected{% endif %}>{{ name }}</option>
                                 {% endfor %}
@@ -192,14 +264,13 @@
                         </div>
                     </div>
 
-                    {# Timezone #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Timezone" %}</span>
                             <span class="list-item-note">{% trans "Timezone for dates and schedules" %}</span>
                         </div>
                         <div class="list-item-end">
-                            <select name="timezone" class="input" style="width: auto; min-width: 200px;">
+                            <select name="timezone" class="select w-auto min-w-48">
                                 {% for tz in timezone_choices %}
                                 <option value="{{ tz }}" {% if hub_config.timezone == tz %}selected{% endif %}>{{ tz }}</option>
                                 {% endfor %}
@@ -207,14 +278,13 @@
                         </div>
                     </div>
 
-                    {# Currency #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Currency" %}</span>
                             <span class="list-item-note">{% trans "Default currency for prices" %}</span>
                         </div>
                         <div class="list-item-end">
-                            <select name="currency" class="input" style="width: auto; min-width: 180px;">
+                            <select name="currency" class="select w-auto min-w-44">
                                 {% for code, name in currency_choices %}
                                 <option value="{{ code }}" {% if hub_config.currency == code %}selected{% endif %}>{{ code }} - {{ name }}</option>
                                 {% endfor %}
@@ -222,7 +292,6 @@
                         </div>
                     </div>
 
-                    {# Dark Mode #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Dark Mode" %}</span>
@@ -242,10 +311,10 @@
                     </div>
                 </div>
 
-                <div style="margin-top: 1.5rem;">
-                    <button type="submit" class="btn btn-block">
-                        <span class="htmx-indicator" id="hub-spinner" style="margin-right: 0.5rem;">
-                            <span class="loading loading-sm"></span>
+                <div class="mt-6">
+                    <button type="submit" class="btn color-primary btn-block">
+                        <span class="htmx-indicator" id="hub-spinner">
+                            <span class="loading loading-sm mr-2"></span>
                         </span>
                         {% trans "Save Hub Settings" %}
                     </button>
@@ -254,30 +323,33 @@
         </div>
     </section>
 
-    {# User Preferences #}
+    {# ── User Preferences ── #}
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">{% trans "User Preferences" %}</h2>
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "person-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "User Preferences" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Personal language and profile settings" %}</p>
+                </div>
+            </div>
         </div>
         <div class="card-body">
             <form hx-post="{% url 'main:settings' %}"
-                  hx-target="#user-message"
-                  hx-swap="innerHTML"
+                  hx-swap="none"
                   hx-indicator="#user-spinner"
                   enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_user">
-                <div id="user-message"></div>
 
                 <div class="list list-inset">
-                    {# Language #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Language" %}</span>
                             <span class="list-item-note">{% trans "Your preferred language" %}</span>
                         </div>
                         <div class="list-item-end">
-                            <select name="language" class="input" style="width: auto; min-width: 150px;">
+                            <select name="language" class="select w-auto min-w-40">
                                 {% for code, name in language_choices %}
                                 <option value="{{ code }}" {% if user.language == code %}selected{% endif %}>{{ name }}</option>
                                 {% endfor %}
@@ -285,13 +357,12 @@
                         </div>
                     </div>
 
-                    {# Avatar #}
                     <div class="list-item list-item-multiline">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Avatar" %}</span>
                             <span class="list-item-note">{% trans "Your profile picture" %}</span>
                         </div>
-                        <div class="list-item-end" style="gap: 1rem; display: flex; align-items: center;">
+                        <div class="list-item-end flex items-center gap-4">
                             <div class="avatar">
                                 {% if user.avatar %}
                                 <img src="{{ user.avatar.url }}" alt="{{ user.name }}">
@@ -299,15 +370,19 @@
                                 <div class="avatar-initials">{{ user.get_initials }}</div>
                                 {% endif %}
                             </div>
-                            {% ui_file_input name="avatar" label=_("Choose image") accept="image/*" icon="person-outline" %}
+                            <label class="btn btn-sm btn-outline">
+                                {% icon "person-outline" %}
+                                {% trans "Choose image" %}
+                                <input type="file" name="avatar" accept="image/*" class="hidden">
+                            </label>
                         </div>
                     </div>
                 </div>
 
-                <div style="margin-top: 1.5rem;">
-                    <button type="submit" class="btn btn-block">
-                        <span class="htmx-indicator" id="user-spinner" style="margin-right: 0.5rem;">
-                            <span class="loading loading-sm"></span>
+                <div class="mt-6">
+                    <button type="submit" class="btn color-primary btn-block">
+                        <span class="htmx-indicator" id="user-spinner">
+                            <span class="loading loading-sm mr-2"></span>
                         </span>
                         {% trans "Save Preferences" %}
                     </button>
@@ -316,111 +391,25 @@
         </div>
     </section>
 
-    {# Tax Classes #}
+    {# ── Automatic Backups ── #}
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">{% trans "Tax Classes" %}</h2>
-            <p class="text-sm opacity-60">{% trans "Configure tax rates according to your country's legislation" %}</p>
-        </div>
-        <div class="card-body">
-            <div id="tax-classes-list" style="margin-bottom: 1.5rem;">
-                {% include "main/settings/partials/tax_classes_list.html" %}
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "cloud-upload-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Automatic Backups" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Schedule and manage database backups" %}</p>
+                </div>
             </div>
-
-            <div class="list-header">{% trans "Add Tax Class" %}</div>
-
-            <form hx-post="{% url 'main:settings' %}"
-                  hx-target="#tax-classes-list"
-                  hx-swap="innerHTML"
-                  hx-indicator="#tax-spinner">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="create_tax_class">
-
-                <div class="list list-inset">
-                    {# Name #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Name" %} *</span>
-                            <input type="text"
-                                   name="name"
-                                   class="input"
-                                   placeholder="{% trans 'e.g., Standard 21%' %}"
-                                   required>
-                        </div>
-                    </div>
-
-                    {# Rate #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Rate (%)" %} *</span>
-                            <input type="number"
-                                   name="rate"
-                                   class="input"
-                                   step="0.01"
-                                   min="0"
-                                   max="100"
-                                   placeholder="21.00"
-                                   required>
-                        </div>
-                    </div>
-
-                    {# Description #}
-                    <div class="list-item list-item-multiline">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Description" %}</span>
-                            <input type="text"
-                                   name="description"
-                                   class="input"
-                                   placeholder="{% trans 'Optional notes' %}">
-                        </div>
-                    </div>
-
-                    {# Set as default #}
-                    <div class="list-item">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Set as default" %}</span>
-                            <span class="list-item-note">{% trans "Use this tax class by default for new products" %}</span>
-                        </div>
-                        <div class="list-item-end">
-                            <label class="toggle">
-                                <input type="checkbox" name="is_default" value="true">
-                                <span class="toggle-track">
-                                    <span class="toggle-thumb"></span>
-                                </span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 1.5rem;">
-                    <button type="submit" class="btn">
-                        <span class="htmx-indicator" id="tax-spinner" style="margin-right: 0.5rem;">
-                            <span class="loading loading-sm"></span>
-                        </span>
-                        {% icon "add-outline" %}
-                        {% trans "Add Tax Class" %}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </section>
-
-    {# Automatic Backups #}
-    <section class="card">
-        <div class="card-header">
-            <h2 class="card-title">{% trans "Automatic Backups" %}</h2>
         </div>
         <div class="card-body">
             <form hx-post="{% url 'main:settings' %}"
-                  hx-target="#backup-message"
-                  hx-swap="innerHTML"
+                  hx-swap="none"
                   hx-indicator="#backup-spinner">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_backup">
-                <div id="backup-message"></div>
 
                 <div class="list list-inset">
-                    {# Enable automatic backups #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Enable automatic backups" %}</span>
@@ -439,14 +428,13 @@
                         </div>
                     </div>
 
-                    {# Frequency #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Frequency" %}</span>
                             <span class="list-item-note">{% trans "How often to create backups" %}</span>
                         </div>
                         <div class="list-item-end">
-                            <select name="backup_frequency" class="input" style="width: auto; min-width: 150px;">
+                            <select name="backup_frequency" class="select w-auto min-w-40">
                                 {% for value, label in backup_frequency_choices %}
                                 <option value="{{ value }}" {% if backup_config.frequency == value %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
@@ -454,14 +442,13 @@
                         </div>
                     </div>
 
-                    {# Backup Time #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Backup Time" %}</span>
                             <span class="list-item-note">{% trans "Time of day to run backup" %}</span>
                         </div>
                         <div class="list-item-end">
-                            <select name="backup_hour" class="input" style="width: auto; min-width: 100px;">
+                            <select name="backup_hour" class="select w-auto min-w-24">
                                 <option value="0" {% if backup_config.time_hour == 0 %}selected{% endif %}>00:00</option>
                                 <option value="2" {% if backup_config.time_hour == 2 %}selected{% endif %}>02:00</option>
                                 <option value="4" {% if backup_config.time_hour == 4 %}selected{% endif %}>04:00</option>
@@ -473,7 +460,6 @@
                         </div>
                     </div>
 
-                    {# Keep backups for (days) #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Keep backups for (days)" %}</span>
@@ -482,15 +468,13 @@
                         <div class="list-item-end">
                             <input type="number"
                                    name="retention_days"
-                                   class="input"
+                                   class="input w-20 text-center"
                                    value="{{ backup_config.retention_days }}"
                                    min="0"
-                                   max="365"
-                                   style="width: 80px; text-align: center;">
+                                   max="365">
                         </div>
                     </div>
 
-                    {# Maximum backups #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Maximum backups" %}</span>
@@ -499,15 +483,13 @@
                         <div class="list-item-end">
                             <input type="number"
                                    name="max_backups"
-                                   class="input"
+                                   class="input w-20 text-center"
                                    value="{{ backup_config.max_backups }}"
                                    min="0"
-                                   max="100"
-                                   style="width: 80px; text-align: center;">
+                                   max="100">
                         </div>
                     </div>
 
-                    {# Last Backup #}
                     <div class="list-item">
                         <div class="list-item-content">
                             <span class="list-item-label">{% trans "Last Backup" %}</span>
@@ -520,16 +502,16 @@
                                 {% endif %}
                             </span>
                             {% if backup_config.last_error %}
-                            <span class="list-item-note" style="color: var(--color-error);">{{ backup_config.last_error|truncatechars:50 }}</span>
+                            <span class="list-item-note text-error">{{ backup_config.last_error|truncatechars:50 }}</span>
                             {% endif %}
                         </div>
                     </div>
                 </div>
 
-                <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
-                    <button type="submit" class="btn" style="flex: 1;">
-                        <span class="htmx-indicator" id="backup-spinner" style="margin-right: 0.5rem;">
-                            <span class="loading loading-sm"></span>
+                <div class="flex gap-2 mt-6">
+                    <button type="submit" class="btn color-primary flex-1">
+                        <span class="htmx-indicator" id="backup-spinner">
+                            <span class="loading loading-sm mr-2"></span>
                         </span>
                         {% trans "Save Backup Settings" %}
                     </button>
@@ -537,13 +519,12 @@
                             class="btn btn-outline"
                             hx-post="{% url 'main:settings' %}"
                             hx-vals='{"action": "run_backup"}'
-                            hx-target="#backup-message"
-                            hx-swap="innerHTML"
+                            hx-swap="none"
                             hx-indicator="#backup-now-spinner">
-                        <span class="htmx-indicator" id="backup-now-spinner" style="margin-right: 0.5rem;">
-                            <span class="loading loading-sm"></span>
+                        <span class="htmx-indicator" id="backup-now-spinner">
+                            <span class="loading loading-sm mr-2"></span>
                         </span>
-                        {% icon "cloud-upload-outline" %}
+                        {% icon "download-outline" %}
                         {% trans "Backup Now" %}
                     </button>
                 </div>
@@ -551,22 +532,26 @@
         </div>
     </section>
 
-    {# Hub Information #}
+    {# ── Hub Information ── #}
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">{% trans "Hub Information" %}</h2>
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "information-circle-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Hub Information" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "System status and connection details" %}</p>
+                </div>
+            </div>
         </div>
         <div class="card-body">
             <div class="list list-inset">
-                {# Hub ID #}
                 <div class="list-item">
                     <div class="list-item-content">
                         <span class="list-item-label">{% trans "Hub ID" %}</span>
-                        <span class="list-item-note" style="font-family: monospace;">{{ hub_config.hub_id|default:"Not configured" }}</span>
+                        <span class="list-item-note font-mono">{{ hub_config.hub_id|default:"—" }}</span>
                     </div>
                 </div>
 
-                {# Status #}
                 <div class="list-item">
                     <div class="list-item-content">
                         <span class="list-item-label">{% trans "Status" %}</span>
@@ -580,15 +565,13 @@
                     </div>
                 </div>
 
-                {# Cloud URL #}
                 <div class="list-item">
                     <div class="list-item-content">
                         <span class="list-item-label">{% trans "Cloud URL" %}</span>
-                        <span class="list-item-note" style="font-family: monospace;">{{ CLOUD_URL }}</span>
+                        <span class="list-item-note font-mono">{{ CLOUD_URL }}</span>
                     </div>
                 </div>
 
-                {# Version #}
                 <div class="list-item">
                     <div class="list-item-content">
                         <span class="list-item-label">{% trans "Version" %}</span>
@@ -597,7 +580,7 @@
                 </div>
             </div>
 
-            <div style="margin-top: 1.5rem;">
+            <div class="mt-6">
                 <a href="{{ CLOUD_URL }}" target="_blank" class="btn btn-outline btn-block">
                     {% icon "open-outline" %}
                     {% trans "Open Cloud Portal" %}
@@ -606,13 +589,16 @@
         </div>
     </section>
 
-    {# Database Maintenance #}
+    {# ── Database Maintenance ── #}
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">{% trans "Database Maintenance" %}</h2>
-            <p class="text-sm opacity-60">
-                {% trans "Scan for and remove orphaned database tables, migration records, and media files left behind by deleted modules." %}
-            </p>
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "construct-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Database Maintenance" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Scan for and remove orphaned data left behind by deleted modules" %}</p>
+                </div>
+            </div>
         </div>
         <div class="card-body">
             <button type="button"
@@ -622,28 +608,30 @@
                     hx-indicator="#scan-spinner">
                 {% icon "search-outline" %}
                 {% trans "Scan for Orphaned Data" %}
-                <span class="htmx-indicator" id="scan-spinner" style="margin-left: 0.5rem;">
+                <span class="htmx-indicator ml-2" id="scan-spinner">
                     <span class="loading loading-sm"></span>
                 </span>
             </button>
 
-            <div id="scan-results" style="margin-top: 1.5rem;"></div>
+            <div id="scan-results" class="mt-4"></div>
         </div>
     </section>
 
     {# Footer info #}
-    <div class="alert" style="margin: 1.5rem;">
-        {% icon "information-circle-outline" %}
-        <p style="margin: 0;">
-            {% trans "These settings are saved locally in the Hub. Changes are applied after saving each section." %}
-        </p>
+    <div class="callout callout-info">
+        <span class="callout-icon">{% icon "information-circle-outline" %}</span>
+        <div class="callout-content">
+            <div class="callout-text">{% trans "These settings are saved locally in the Hub. Changes are applied after saving each section." %}</div>
+        </div>
     </div>
+
+</div>
 
 <style>
 .logo-preview {
     width: 48px;
     height: 48px;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-box);
     background: var(--color-base-200);
     display: flex;
     align-items: center;
@@ -661,7 +649,8 @@
 .logo-preview svg {
     width: 24px;
     height: 24px;
-    color: var(--color-base-content/60);
+    color: var(--color-base-content);
+    opacity: 0.4;
 }
 
 .avatar-initials {
@@ -674,23 +663,5 @@
     color: var(--color-primary-content);
     font-weight: 600;
     font-size: 0.875rem;
-}
-
-/* Input inside list-item */
-.list-item .input {
-    border: none;
-    background: transparent;
-    padding: 0.5rem 0;
-    margin-top: 0.25rem;
-}
-
-.list-item .input:focus {
-    box-shadow: none;
-    border-bottom: 2px solid var(--color-primary);
-}
-
-.list-item textarea.input {
-    resize: vertical;
-    min-height: 60px;
 }
 </style>

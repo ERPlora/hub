@@ -111,9 +111,10 @@ def modules_index(request):
 
     from django.urls import reverse
 
-    # Add action URLs to each module
+    # Add action URLs and slug to each module
     for module in all_modules:
         mid = module['module_id']
+        module['slug'] = mid  # slug matches module_id for installed modules
         module['activate_url'] = reverse('mymodules:api_activate', kwargs={'module_id': mid})
         module['deactivate_url'] = reverse('mymodules:api_deactivate', kwargs={'module_id': mid})
         module['delete_url'] = reverse('mymodules:api_delete', kwargs={'module_id': mid})
@@ -529,7 +530,6 @@ def _render_modules_page(request, error=None):
         module['activate_url'] = reverse('mymodules:api_activate', kwargs={'module_id': mid})
         module['deactivate_url'] = reverse('mymodules:api_deactivate', kwargs={'module_id': mid})
         module['delete_url'] = reverse('mymodules:api_delete', kwargs={'module_id': mid})
-        module['detail_url'] = reverse('mymodules:detail', kwargs={'slug': mid})
 
     context = {
         'current_section': 'modules',
@@ -559,48 +559,46 @@ def _trigger_server_reload():
 
 
 def _render_reload_response(message="Applying changes...", success_message="Module activated successfully"):
-    """Return HTML that shows a toast and reloads the page after server restarts"""
+    """Return HTML that shows a loading spinner and reloads the page after server restarts"""
     html = f'''
-    <div class="p-4" style="text-align: center; padding-top: 100px;">
-        <div class="loading" style="width: 48px; height: 48px; margin: 0 auto;"></div>
-        <h2 style="margin-top: 24px;">{message}</h2>
-        <p class="text-medium">The page will reload automatically.</p>
+    <div class="flex flex-col items-center justify-center py-24">
+        <div class="loading" style="width: 48px; height: 48px;"></div>
+        <h2 class="mt-6">{message}</h2>
+        <p class="text-sm opacity-60">The page will reload automatically.</p>
     </div>
     <script>
         (function() {{
-            // Show loading toast
-            if (typeof Toast !== 'undefined') {{
-                Toast.info('{message}');
+            if (typeof showToast === 'function') {{
+                showToast('{message}', 'primary');
             }}
 
-            let attempts = 0;
-            const maxAttempts = 60;
-            const checkServer = async () => {{
+            var attempts = 0;
+            var maxAttempts = 60;
+            function checkServer() {{
                 attempts++;
-                try {{
-                    const response = await fetch('/ht/', {{ method: 'HEAD', cache: 'no-store' }});
-                    if (response.ok) {{
-                        // Show success toast
-                        if (typeof Toast !== 'undefined') {{
-                            Toast.success('{success_message}');
-                        }}
-                        // Reload page after toast
-                        setTimeout(() => {{
+                fetch('/ht/', {{ method: 'HEAD', cache: 'no-store' }})
+                    .then(function(response) {{
+                        if (response.ok) {{
+                            if (typeof showToast === 'function') {{
+                                showToast('{success_message}', 'success');
+                            }}
+                            setTimeout(function() {{
+                                window.location.href = '/modules/';
+                            }}, 500);
+                        }} else if (attempts < maxAttempts) {{
+                            setTimeout(checkServer, 500);
+                        }} else {{
                             window.location.href = '/modules/';
-                        }}, 500);
-                    }} else if (attempts < maxAttempts) {{
-                        setTimeout(checkServer, 500);
-                    }} else {{
-                        window.location.href = '/modules/';
-                    }}
-                }} catch (e) {{
-                    if (attempts < maxAttempts) {{
-                        setTimeout(checkServer, 500);
-                    }} else {{
-                        window.location.href = '/modules/';
-                    }}
-                }}
-            }};
+                        }}
+                    }})
+                    .catch(function() {{
+                        if (attempts < maxAttempts) {{
+                            setTimeout(checkServer, 500);
+                        }} else {{
+                            window.location.href = '/modules/';
+                        }}
+                    }});
+            }}
             setTimeout(checkServer, 1500);
         }})();
     </script>
@@ -898,7 +896,43 @@ def purchase_module(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+@require_http_methods(["POST"])
+@login_required
+def rate_module(request):
+    """Submit a module review (rating + optional comment) to Cloud API"""
+    try:
+        data = json.loads(request.body)
+        module_slug = data.get('module_slug')
+        rating = data.get('rating')
+        comment = data.get('comment', '')
+
+        if not module_slug or not rating:
+            return JsonResponse({'success': False, 'error': 'Missing module_slug or rating'}, status=400)
+
+        # Forward to Cloud API
+        from apps.configuration.models import HubConfig
+        hub_config = HubConfig.get_solo()
+        auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+        if auth_token:
+            cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+            try:
+                requests.post(
+                    f"{cloud_api_url}/api/marketplace/modules/{module_slug}/review/",
+                    json={'rating': rating, 'comment': comment},
+                    headers={'X-Hub-Token': auth_token, 'Content-Type': 'application/json'},
+                    timeout=10
+                )
+            except requests.exceptions.RequestException:
+                pass  # Silently fail if cloud is unreachable
+
+        return JsonResponse({'success': True, 'message': 'Review submitted'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
 @require_http_methods(["GET"])
+@login_required
 def check_ownership(request, module_id):
     """Check if Hub owner owns a specific module"""
     if 'local_user_id' not in request.session:

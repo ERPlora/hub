@@ -1,6 +1,7 @@
 """
 Main Settings Views
 """
+import json
 from decimal import Decimal, InvalidOperation
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -43,17 +44,13 @@ def get_sorted_timezones():
     return COMMON_TIMEZONES + other_tz
 
 
-def render_message(message, color='success'):
-    """Render a simple message HTML snippet"""
-    from djicons import icon as render_icon
-    icon_name = 'checkmark-circle-outline' if color == 'success' else 'alert-circle-outline'
-    icon_html = render_icon(icon_name)
-    return f'''
-    <div class="alert color-{color}">
-        {icon_html}
-        <span>{message}</span>
-    </div>
-    '''
+def toast_response(message, msg_type='success', status=200, **extra_triggers):
+    """Return an empty HTTP response with HX-Trigger to show a toast."""
+    triggers = {'showMessage': {'message': message, 'type': msg_type}}
+    triggers.update(extra_triggers)
+    response = HttpResponse(status=status)
+    response['HX-Trigger'] = json.dumps(triggers)
+    return response
 
 
 @login_required
@@ -94,12 +91,13 @@ def index(request):
             store_config.is_configured = store_config.is_complete()
             store_config.save()
 
-            return HttpResponse(render_message('Store settings saved'))
+            return toast_response('Store settings saved')
 
         # Handle user preferences form
         if action == 'update_user':
             language = request.POST.get('language')
             avatar = request.FILES.get('avatar')
+            old_language = request.session.get('user_language')
 
             if language:
                 valid_languages = [code for code, name in django_settings.LANGUAGES]
@@ -115,12 +113,12 @@ def index(request):
             user.save()
 
             # If language changed, trigger page reload
-            if language and language != request.session.get('user_language'):
-                response = HttpResponse(render_message('Preferences saved'))
+            if language and language != old_language:
+                response = toast_response('Preferences saved')
                 response['HX-Refresh'] = 'true'
                 return response
 
-            return HttpResponse(render_message('Preferences saved'))
+            return toast_response('Preferences saved')
 
         # Handle hub settings form
         if action == 'update_hub':
@@ -150,7 +148,7 @@ def index(request):
             hub_config.dark_mode_auto = False
             hub_config.save()
 
-            return HttpResponse(render_message('Hub settings saved'))
+            return toast_response('Hub settings saved')
 
         # Handle theme update form (color_theme, dark_mode, auto_print)
         if action == 'update_theme':
@@ -164,7 +162,7 @@ def index(request):
             hub_config.auto_print = auto_print
             hub_config.save()
 
-            return HttpResponse(render_message('Theme settings saved'))
+            return toast_response('Theme settings saved')
 
         # Handle backup settings form
         if action == 'update_backup':
@@ -183,7 +181,7 @@ def index(request):
             from apps.configuration.services import backup_service
             backup_service.reschedule()
 
-            return HttpResponse(render_message('Backup settings saved'))
+            return toast_response('Backup settings saved')
 
         # Handle manual backup trigger
         if action == 'run_backup':
@@ -191,9 +189,9 @@ def index(request):
             success, path, size = backup_service.run_backup()
             if success:
                 size_kb = round(size / 1024) if size else 0
-                return HttpResponse(render_message(f'Backup completed ({size_kb} KB)'))
+                return toast_response(f'Backup completed ({size_kb} KB)')
             else:
-                return HttpResponse(render_message(f'Backup failed: {path}', 'danger'), status=500)
+                return toast_response(f'Backup failed: {path}', 'error', status=500)
 
         # Handle TaxClass actions
         if action == 'create_tax_class':
@@ -203,7 +201,7 @@ def index(request):
             is_default = 'is_default' in request.POST
 
             if not name:
-                return HttpResponse(render_message('Name is required', 'danger'), status=400)
+                return toast_response('Name is required', 'error', status=400)
 
             try:
                 TaxClass.objects.create(
@@ -214,11 +212,15 @@ def index(request):
                 )
                 # Return updated tax classes list
                 tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
-                return render(request, 'main/settings/partials/tax_classes_list.html', {
+                response = render(request, 'main/settings/partials/tax_classes_list.html', {
                     'tax_classes': tax_classes
                 })
+                response['HX-Trigger'] = json.dumps({
+                    'showMessage': {'message': 'Tax class created', 'type': 'success'}
+                })
+                return response
             except (InvalidOperation, Exception) as e:
-                return HttpResponse(render_message(str(e), 'danger'), status=400)
+                return toast_response(str(e), 'error', status=400)
 
         if action == 'delete_tax_class':
             tax_class_id = request.POST.get('tax_class_id')
@@ -227,13 +229,17 @@ def index(request):
                 tax_class.delete()
                 # Return updated tax classes list
                 tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
-                return render(request, 'main/settings/partials/tax_classes_list.html', {
+                response = render(request, 'main/settings/partials/tax_classes_list.html', {
                     'tax_classes': tax_classes
                 })
+                response['HX-Trigger'] = json.dumps({
+                    'showMessage': {'message': 'Tax class deleted', 'type': 'success'}
+                })
+                return response
             except TaxClass.DoesNotExist:
-                return HttpResponse(render_message('Tax class not found', 'danger'), status=404)
+                return toast_response('Tax class not found', 'error', status=404)
 
-        return HttpResponse(render_message('Settings saved'))
+        return toast_response('Settings saved')
 
     # Get backup config and scheduler status
     backup_config = BackupConfig.get_solo()

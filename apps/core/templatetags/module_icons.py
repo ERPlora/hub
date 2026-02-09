@@ -216,9 +216,9 @@ def module_icon(module_id: str = None, icon: str = None, css_class: str = '', si
                 )
 
     # Fallback to djicons
-    from djicons import icon as render_icon
+    import djicons
     icon_name = icon or 'cube-outline'
-    return mark_safe(render_icon(icon_name, css_class=all_classes))
+    return mark_safe(djicons.get(icon_name, css_class=all_classes))
 
 
 @register.simple_tag

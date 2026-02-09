@@ -9,15 +9,13 @@
         <a href="{{ download_url }}" class="card glass hover:shadow-lg transition-shadow group">
             <div class="card-body p-4 flex flex-row items-center gap-4">
                 <div class="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                    <span class="text-xl text-primary">{% icon "server-outline" %}</span>
+                    {% icon "server-outline" css_class="text-primary" size=28 %}
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="font-semibold text-sm m-0">{% trans "Database" %}</p>
                     <p class="text-xs text-base-content/50 m-0">{% trans "Download backup" %}</p>
                 </div>
-                <span class="text-base-content/30 group-hover:text-primary transition-colors">
-                    {% icon "cloud-download-outline" %}
-                </span>
+                {% icon "cloud-download-outline" css_class="text-base-content/30 group-hover:text-primary transition-colors" %}
             </div>
         </a>
 
@@ -37,7 +35,7 @@
         <div class="card glass">
             <div class="card-body p-4 flex flex-row items-center gap-4">
                 <div class="w-11 h-11 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
-                    <span class="text-xl text-success">{% icon "documents-outline" %}</span>
+                    {% icon "documents-outline" css_class="text-success" size=28 %}
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="font-semibold text-sm m-0">{% trans "Browse" %}</p>
@@ -50,7 +48,7 @@
         <div class="card glass">
             <div class="card-body p-4 flex flex-row items-center gap-4">
                 <div class="w-11 h-11 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
-                    <span class="text-xl text-warning">{% icon "folder-outline" %}</span>
+                    {% icon "folder-outline" css_class="text-warning" size=28 %}
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="font-semibold text-sm m-0 truncate">{% trans "Location" %}</p>
@@ -88,7 +86,7 @@
                         </div>
                         <div id="file-preview-content">
                             <div class="rounded-xl bg-base-200 p-12 text-center">
-                                <span class="text-4xl text-base-content/20 block mb-3">{% icon "eye-outline" %}</span>
+                                {% icon "eye-outline" css_class="text-base-content/20 block mb-3" size=48 %}
                                 <p class="text-sm text-base-content/40 m-0">{% trans "Select a file to preview" %}</p>
                             </div>
                         </div>

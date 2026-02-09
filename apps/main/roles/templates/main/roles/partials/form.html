@@ -1,4 +1,5 @@
 {% load i18n djicons %}
+<div data-back-url="{% if role %}{% url 'main:roles:detail' role_id=role.id %}{% else %}{% url 'main:roles:list' %}{% endif %}" hidden></div>
 
 <form method="post"
       hx-post

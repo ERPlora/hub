@@ -1,110 +1,9 @@
-{% load i18n ui djicons %}
+{% load i18n djicons %}
 
 {% if products %}
-<div class="product-grid">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for product in products %}
-    <article class="product-card"
-             hx-get="{% url 'marketplace:module_detail' product.slug %}"
-             hx-target="#main-content-area"
-             hx-push-url="true">
-        {# Image/Icon Area #}
-        <div class="product-card-image">
-            {# Badges #}
-            <div class="absolute top-2 left-2 flex gap-1">
-                {% if product.is_featured %}
-                <span class="badge color-primary">
-                    {% trans "Featured" %}
-                </span>
-                {% endif %}
-                {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
-                <span class="badge color-success">
-                    {% trans "Free" %}
-                </span>
-                {% endif %}
-            </div>
-
-            {# Module Icon as placeholder #}
-            <div class="flex items-center justify-center">
-                {% icon product.icon|default:"cube-outline" %}
-            </div>
-
-            {# Quick action button #}
-            {% if not product.is_installed %}
-            <button type="button"
-                    class="btn btn-sm btn-circle"
-                    onclick="event.stopPropagation(); handleQuickAction(this, '{{ product.id }}', '{{ product.slug }}', '{{ product.download_url|default:'' }}', '{{ product.module_type }}', {{ product.is_owned|yesno:'true,false' }}, {{ product.is_free|yesno:'true,false' }})"
-                    title="{% if product.is_owned %}{% trans 'Install' %}{% elif product.is_free or product.module_type == 'free' or product.price == 0 %}{% trans 'Get Free' %}{% else %}{% trans 'Purchase' %}{% endif %}">
-                {% if product.is_owned %}
-                    {% icon "download-outline" %}
-                {% elif product.is_free or product.module_type == 'free' or product.price == 0 %}
-                    {% icon "add" %}
-                {% else %}
-                    {% icon "cart-outline" %}
-                {% endif %}
-            </button>
-            {% endif %}
-        </div>
-
-        {# Content #}
-        <div class="product-card-content">
-            {# Category #}
-            {% if product.category_name %}
-            <span class="product-card-category">{{ product.category_name }}</span>
-            {% endif %}
-
-            {# Name #}
-            <h3 class="product-card-name">{{ product.name }}</h3>
-
-            {# Author & Version #}
-            <p class="fs-xs text-tertiary m-0">
-                {% if product.author %}{{ product.author }} &bull; {% endif %}v{{ product.version|default:"1.0" }}
-            </p>
-
-            {# Stats Row #}
-            <div class="d-flex align-center gap-sm fs-xs text-secondary mt-auto pt-xs">
-                {% if product.rating %}
-                <span class="d-inline-flex align-center gap-xxs">
-                    {% icon "star" css_class="text-warning" size="14" %}
-                    {{ product.rating|floatformat:1 }}
-                </span>
-                {% endif %}
-                {% if product.downloads %}
-                <span class="d-inline-flex align-center gap-xxs">
-                    {% icon "download-outline" size="14" %}
-                    {{ product.downloads }}
-                </span>
-                {% endif %}
-            </div>
-
-            {# Price #}
-            <div class="product-card-price mt-xs">
-                {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
-                <span class="product-card-price" style="color: var(--color-success);">{% trans "Free" %}</span>
-                {% elif product.module_type == 'subscription' %}
-                <span class="product-card-price">&euro;{{ product.price }}/{% trans "mo" %}</span>
-                {% else %}
-                <span class="product-card-price">&euro;{{ product.price }}</span>
-                {% endif %}
-            </div>
-
-            {# Status Chips #}
-            {% if product.is_installed or product.is_owned %}
-            <div class="mt-xs">
-                {% if product.is_installed %}
-                <span class="chip chip-sm color-success">
-                    {% icon "checkmark-circle-outline" %}
-                    {% trans "Installed" %}
-                </span>
-                {% elif product.is_owned %}
-                <span class="chip chip-sm color-secondary">
-                    {% icon "bag-check-outline" %}
-                    {% trans "Owned" %}
-                </span>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-    </article>
+    {% include "system/modules/partials/module_card.html" with module=product card_context='marketplace' %}
     {% endfor %}
 </div>
 
@@ -114,9 +13,8 @@
      hx-get="{% url 'marketplace:products_list' store_type %}?cursor={{ next_cursor }}{% if search_query %}&q={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if industry_filter %}&industry={{ industry_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}"
      hx-trigger="intersect once threshold:0.1"
      hx-swap="outerHTML"
-     hx-indicator="#load-more-spinner"
-     class="d-flex justify-center py-lg">
-    <div id="load-more-spinner" class="loading htmx-indicator"></div>
+     class="flex justify-center py-8">
+    <div class="loading"></div>
 </div>
 {% endif %}
 
@@ -133,16 +31,23 @@
 
 <!-- Module action handlers -->
 <script>
-// Handle quick action button click
-function handleQuickAction(button, moduleId, moduleSlug, downloadUrl, moduleType, isOwned, isFree) {
-    if (isOwned) {
-        downloadAndInstall(moduleSlug, downloadUrl, button);
-    } else if (isFree || moduleType === 'free') {
-        installFreeModule(moduleId, moduleSlug, downloadUrl, button);
-    } else {
-        purchaseModule(moduleId, button);
+// Handle action button clicks
+document.addEventListener('click', function(e) {
+    var button = e.target.closest('button[data-action]');
+    if (!button) return;
+
+    var action = button.dataset.action;
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (action === 'download') {
+        downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button);
+    } else if (action === 'install-free') {
+        installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button);
+    } else if (action === 'purchase') {
+        purchaseModule(button.dataset.moduleId, button);
     }
-}
+});
 
 // Install free module
 async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
@@ -243,7 +148,10 @@ function setButtonLoading(button, loading) {
     if (!button) return;
     button.disabled = loading;
     if (loading) {
+        button.dataset.originalContent = button.innerHTML;
         button.innerHTML = '<div class="loading loading-sm"></div>';
+    } else if (button.dataset.originalContent) {
+        button.innerHTML = button.dataset.originalContent;
     }
 }
 </script>

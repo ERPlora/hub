@@ -13,7 +13,7 @@
    APP BACKGROUND
    Decorative gradient so glass components show depth.
    ========================================================================== */
-
+/*
 .app {
   background: var(--color-base-200);
   position: relative;
@@ -31,7 +31,46 @@
   z-index: 0;
 }
 
-.app > * { position: relative; z-index: 1; }
+
+.app>* {
+  position: relative;
+  z-index: 1;
+}
+  */
+
+body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px);
+  background-size: 60px 60px;
+  z-index: 0;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, transparent 70%);
+  z-index: 0;
+}
+
+/* Subtle grid pattern */
+
+
+.app>* {
+  /*
+  position: relative;
+  */
+  z-index: 1;
+}
+
 
 /* ==========================================================================
    ALPINE.JS CLOAK
@@ -77,8 +116,13 @@
 }
 
 @keyframes htmx-loading {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 /* ==========================================================================
@@ -104,9 +148,6 @@
   opacity: 0.6;
 }
 
-svg {
-  color: inherit;
-}
 
 body.hub-modal-open {
   overflow: hidden;
@@ -116,7 +157,7 @@ body.hub-modal-open {
    MODULE ICON COLORS
    Colored backgrounds for module grid icons on the home dashboard.
    ========================================================================== */
-
+/*
 .app-icon {
   width: 3.5rem;
   height: 3.5rem;
@@ -127,13 +168,43 @@ body.hub-modal-open {
   color: #fff;
 }
 
-.app-icon-primary   { background: var(--color-primary); }
-.app-icon-secondary { background: var(--color-secondary); }
-.app-icon-success   { background: var(--color-success); }
-.app-icon-warning   { background: var(--color-warning); }
-.app-icon-error     { background: var(--color-error); }
-.app-icon-accent    { background: var(--color-accent, var(--color-secondary)); }
-.app-icon-tertiary  { background: color-mix(in oklch, var(--color-primary) 60%, var(--color-secondary)); }
-.app-icon-danger    { background: var(--color-error); }
-.app-icon-medium    { background: var(--color-base-400, #9ca3af); }
-.app-icon-dark      { background: var(--color-base-700, #374151); }
+.app-icon-primary {
+  background: var(--color-primary);
+}
+
+.app-icon-secondary {
+  background: var(--color-secondary);
+}
+
+.app-icon-success {
+  background: var(--color-success);
+}
+
+.app-icon-warning {
+  background: var(--color-warning);
+}
+
+.app-icon-error {
+  background: var(--color-error);
+}
+
+.app-icon-accent {
+  background: var(--color-accent, var(--color-secondary));
+}
+
+.app-icon-tertiary {
+  background: color-mix(in oklch, var(--color-primary) 60%, var(--color-secondary));
+}
+
+.app-icon-danger {
+  background: var(--color-error);
+}
+
+.app-icon-medium {
+  background: var(--color-base-400, #9ca3af);
+}
+
+.app-icon-dark {
+  background: var(--color-base-700, #374151);
+}
+*/

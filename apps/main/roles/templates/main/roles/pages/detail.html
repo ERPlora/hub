@@ -5,12 +5,13 @@
 
 {% block page_actions %}
 {% if not role.is_system %}
-<button class="btn btn-sm btn-outline"
-        hx-get="{% url 'main:roles:edit' role_id=role.id %}"
-        hx-target="#main-content-area"
-        hx-push-url="true">
+<a class="btn btn-sm btn-outline"
+   href="{% url 'main:roles:edit' role_id=role.id %}"
+   hx-get="{% url 'main:roles:edit' role_id=role.id %}"
+   hx-target="#main-content-area"
+   hx-push-url="true">
     {% icon "create-outline" %}
-</button>
+</a>
 {% endif %}
 {% endblock %}
 
