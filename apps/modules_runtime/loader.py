@@ -114,24 +114,112 @@ class ModuleLoader:
             traceback.print_exc()
             return False
 
+    def _get_module_dependencies(self, module_id: str) -> list:
+        """
+        Read dependencies from a module's module.py or module.json.
+        Supports: DEPENDENCIES in module.py, 'dependencies'/'requires' in module.json.
+        Version specifiers (e.g. 'sales>=1.0.0') are stripped to plain module IDs.
+        """
+        import re
+        raw_deps = []
+
+        try:
+            module_py = importlib.import_module(f"{module_id}.module")
+            raw_deps = getattr(module_py, 'DEPENDENCIES', [])
+        except ImportError:
+            pass
+        except Exception:
+            pass
+
+        # Fallback to module.json if no deps found from module.py
+        if not raw_deps:
+            module_json = self.modules_dir / module_id / 'module.json'
+            if module_json.exists():
+                try:
+                    with open(module_json, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    deps_value = data.get('dependencies', data.get('requires', []))
+                    # Handle dict format: {"python": [...], "modules": [...]}
+                    if isinstance(deps_value, dict):
+                        raw_deps = deps_value.get('modules', [])
+                    else:
+                        raw_deps = deps_value
+                except Exception:
+                    pass
+
+        # Strip version specifiers: 'sales>=1.0.0' -> 'sales'
+        deps = []
+        for dep in raw_deps:
+            module_name = re.split(r'[><=!]', dep)[0].strip()
+            if module_name:
+                deps.append(module_name)
+        return deps
+
+    def _resolve_load_order(self, enabled_ids: set) -> list:
+        """
+        Resolve module load order respecting dependencies.
+        Modules with unmet dependencies are skipped (with warning).
+        Returns ordered list of module IDs to load.
+        """
+        # Build dependency graph
+        deps = {}
+        for mid in enabled_ids:
+            deps[mid] = self._get_module_dependencies(mid)
+
+        # Iteratively remove modules with unmet dependencies
+        to_load = set(enabled_ids)
+        skipped = {}
+        changed = True
+        while changed:
+            changed = False
+            for mid in list(to_load):
+                missing = [d for d in deps.get(mid, []) if d not in to_load]
+                if missing:
+                    to_load.discard(mid)
+                    skipped[mid] = missing
+                    changed = True  # Removal may cascade
+
+        for mid, missing in skipped.items():
+            print(f"[WARNING] Module '{mid}' skipped: missing dependencies {missing}")
+
+        # Topological sort (simple: load deps first)
+        ordered = []
+        visited = set()
+
+        def visit(mid):
+            if mid in visited or mid not in to_load:
+                return
+            visited.add(mid)
+            for dep in deps.get(mid, []):
+                visit(dep)
+            ordered.append(mid)
+
+        for mid in sorted(to_load):
+            visit(mid)
+
+        return ordered
+
     def load_all_active_modules(self) -> int:
         """
-        Load all active modules from filesystem (folders without _)
-        Returns count of successfully loaded modules
+        Load all active modules from filesystem (folders without _).
+        Checks dependencies and skips modules whose deps aren't available.
+        Returns count of successfully loaded modules.
         """
-        loaded_count = 0
-
-        # Scan filesystem for active modules
+        # 1. Discover all enabled module IDs
+        enabled_ids = set()
         for module_dir in self.modules_dir.iterdir():
             if not module_dir.is_dir():
                 continue
-
-            # Skip disabled modules (start with _ or .)
             if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
                 continue
+            enabled_ids.add(module_dir.name)
 
-            module_id = module_dir.name
+        # 2. Resolve load order (skips modules with missing deps)
+        load_order = self._resolve_load_order(enabled_ids)
 
+        # 3. Load in dependency order
+        loaded_count = 0
+        for module_id in load_order:
             if self.load_module(module_id):
                 loaded_count += 1
 

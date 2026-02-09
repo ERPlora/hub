@@ -11,6 +11,13 @@
 {% if navigation %}
 <footer id="global-tabbar-footer" class="footer tabbar glass">
     {% for nav in navigation %}
+    {% if nav.fullpage %}
+    <a href="{{ nav.url }}"
+       class="tabbar-item{% if nav.active %} tabbar-item-active{% endif %}">
+        {% icon nav.icon css_class="tabbar-icon" %}
+        <span class="tabbar-label">{{ nav.label }}</span>
+    </a>
+    {% else %}
     <button type="button"
             class="tabbar-item{% if nav.active %} tabbar-item-active{% endif %}"
             hx-get="{{ nav.url }}"
@@ -19,6 +26,7 @@
         {% icon nav.icon css_class="tabbar-icon" %}
         <span class="tabbar-label">{{ nav.label }}</span>
     </button>
+    {% endif %}
     {% endfor %}
 </footer>
 {% else %}

@@ -31,7 +31,7 @@
 
 {% elif preview_type == 'text' %}
 <div class="rounded-xl overflow-hidden bg-base-200">
-    <pre class="text-xs p-4 m-0 overflow-auto max-h-[60vh] whitespace-pre-wrap break-words font-mono">{{ text_content }}</pre>
+    <pre class="text-xs p-4 m-0 scroll-area-viewport max-h-[60vh] whitespace-pre-wrap break-words font-mono">{{ text_content }}</pre>
 </div>
 {% if truncated %}
 <p class="text-xs text-base-content/50 mt-2 text-center">
