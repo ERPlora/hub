@@ -1,22 +1,21 @@
 {% load i18n djicons module_icons %}
 
-<div class="card glass">
-    <div class="card-body">
-        {# Header: Icon + Name/Meta #}
-        <div class="flex items-start gap-3">
-            <div class="flex items-center justify-center shrink-0 rounded-lg" style="width: 44px; height: 44px; background: var(--color-base-200);">
+<div class="module-card{% if card_context == 'installed' and module.is_active %} module-card-installed{% endif %}{% if card_context == 'marketplace' and module.is_installed %} module-card-installed{% elif card_context == 'marketplace' and module.is_owned %} module-card-owned{% endif %} glass">
+    <div class="module-card-body">
+        {# Header: Icon + Name/Meta + Badges #}
+        <div class="module-card-header">
+            <div class="module-card-icon module-card-icon-soft">
                 {% module_icon module_id=module.module_id icon=module.icon|default:"cube-outline" size="text-xl" %}
             </div>
 
-            <div class="flex-1 min-w-0">
-                <h3 class="font-semibold text-sm truncate m-0">{{ module.name }}</h3>
-
-                <p class="text-xs opacity-50 mt-0.5 m-0">
+            <div class="module-card-info">
+                <h3 class="module-card-name">{{ module.name }}</h3>
+                <span class="module-card-author">
                     {% if module.author %}{{ module.author }} &middot; {% endif %}v{{ module.version }}
-                </p>
+                </span>
 
-                {# Status chips + price — below title so name reads full #}
-                <div class="flex flex-wrap items-center gap-1 mt-1.5">
+                {# Status chips + price badges #}
+                <div class="module-card-meta">
                     {% if card_context == 'installed' %}
                         {% if module.is_active %}
                         <span class="badge badge-sm color-success">{% trans "Active" %}</span>
@@ -38,19 +37,11 @@
                         </span>
                         {% endif %}
 
-                        {% if module.is_free or module.module_type == 'free' or module.price == 0 %}
-                        <span class="badge badge-sm color-success">{% trans "Free" %}</span>
-                        {% elif module.module_type == 'subscription' %}
-                        <span class="badge badge-sm color-primary">&euro;{{ module.price }}/{% trans "mo" %}</span>
-                        {% elif module.price %}
-                        <span class="badge badge-sm color-primary">&euro;{{ module.price }}</span>
-                        {% endif %}
-
                         {% if module.is_featured %}
                         <span class="badge badge-sm color-warning">{% trans "Featured" %}</span>
                         {% endif %}
                         {% if module.category_name %}
-                        <span class="badge badge-sm">{{ module.category_name }}</span>
+                        <span class="chip chip-sm">{{ module.category_name }}</span>
                         {% endif %}
                     {% endif %}
                 </div>
@@ -59,11 +50,11 @@
 
         {# Description #}
         {% if module.description %}
-        <p class="text-sm opacity-60 mt-3 mb-0 line-clamp-2">{{ module.description }}</p>
+        <p class="module-card-description">{{ module.description }}</p>
         {% endif %}
 
         {# Rating stars — read-only, links to detail/reviews #}
-        <a class="flex items-center gap-1.5 mt-3 no-underline"
+        <a class="module-card-rating no-underline"
            {% if card_context == 'marketplace' %}
            href="{% url 'marketplace:module_detail' module.slug %}"
            hx-get="{% url 'marketplace:module_detail' module.slug %}"
@@ -73,98 +64,113 @@
            {% endif %}
            hx-target="#main-content-area"
            hx-push-url="true">
-            <div class="flex gap-0.5">
+            <div class="module-card-stars">
                 {% for i in "12345" %}
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="14" height="14" fill="currentColor"
-                     style="color: var(--color-warning); {% if module.rating and forloop.counter <= module.rating %}opacity: 1;{% else %}opacity: 0.25;{% endif %}">
-                    <path d="M394 480a16 16 0 01-9.39-3L256 383.76 127.39 477a16 16 0 01-24.55-18.08L153 310.35 23 221.2a16 16 0 019-29.2h160.38l48.4-148.95a16 16 0 0130.44 0l48.4 149H480a16 16 0 019.05 29.2L359 310.35l50.13 148.53A16 16 0 01394 480z"/>
-                </svg>
+                <span class="module-card-star{% if module.rating and forloop.counter <= module.rating %} module-card-star-filled{% endif %}">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor">
+                        <path d="M394 480a16 16 0 01-9.39-3L256 383.76 127.39 477a16 16 0 01-24.55-18.08L153 310.35 23 221.2a16 16 0 019-29.2h160.38l48.4-148.95a16 16 0 0130.44 0l48.4 149H480a16 16 0 019.05 29.2L359 310.35l50.13 148.53A16 16 0 01394 480z"/>
+                    </svg>
+                </span>
                 {% endfor %}
             </div>
             {% if module.rating %}
-            <span class="text-xs opacity-50">{{ module.rating|floatformat:1 }}</span>
+            <span class="module-card-rating-value">{{ module.rating|floatformat:1 }}</span>
             {% endif %}
             {% if module.review_count %}
-            <span class="text-xs opacity-40">({{ module.review_count }})</span>
+            <span class="module-card-rating-count">({{ module.review_count }})</span>
             {% endif %}
         </a>
 
-        {# Actions #}
-        <div class="flex gap-2 mt-3">
-            {% if card_context == 'installed' %}
-                {% if module.is_active %}
-                <button class="btn btn-sm btn-soft color-warning flex-1"
-                        data-action="module-deactivate"
-                        data-url="{{ module.deactivate_url }}"
-                        data-module-name="{{ module.name }}">
-                    {% icon "pause-outline" %}
-                    {% trans "Deactivate" %}
-                </button>
-                {% else %}
-                <button class="btn btn-sm btn-soft color-success flex-1"
-                        hx-post="{{ module.activate_url }}"
-                        hx-target="#main-content-area"
-                        hx-swap="innerHTML">
-                    {% icon "play-outline" %}
-                    {% trans "Activate" %}
-                </button>
+        {# Footer: Price + Actions #}
+        <div class="module-card-footer">
+            {% if card_context == 'marketplace' %}
+            <div>
+                {% if module.is_free or module.module_type == 'free' or module.price == 0 %}
+                <span class="module-card-price module-card-price-free">{% trans "Free" %}</span>
+                {% elif module.module_type == 'subscription' %}
+                <span class="module-card-price">&euro;{{ module.price }}<span class="module-card-price-period">/{% trans "mo" %}</span></span>
+                {% elif module.price %}
+                <span class="module-card-price">&euro;{{ module.price }}</span>
                 {% endif %}
-                <button class="btn btn-sm btn-ghost color-error"
-                        data-action="module-delete"
-                        data-url="{{ module.delete_url }}"
-                        data-module-name="{{ module.name }}">
-                    {% icon "trash-outline" %}
-                </button>
-                <a class="btn btn-sm btn-ghost"
-                   href="{{ module.detail_url }}"
-                   hx-get="{{ module.detail_url }}"
-                   hx-target="#main-content-area"
-                   hx-push-url="true"
-                   onclick="event.stopPropagation()">
-                    {% icon "chevron-forward-outline" %}
-                </a>
-
-            {% elif card_context == 'marketplace' %}
-                {% if module.is_installed %}
-                <button class="btn btn-sm flex-1" disabled>
-                    {% icon "checkmark-circle-outline" %}
-                    {% trans "Installed" %}
-                </button>
-                {% elif module.is_owned %}
-                <button class="btn btn-sm btn-soft color-success flex-1"
-                        data-action="download"
-                        data-module-slug="{{ module.slug }}"
-                        data-download-url="{{ module.download_url }}">
-                    {% icon "download-outline" %}
-                    {% trans "Install" %}
-                </button>
-                {% elif module.is_free or module.module_type == 'free' or module.price == 0 %}
-                <button class="btn btn-sm color-primary flex-1"
-                        data-action="install-free"
-                        data-module-id="{{ module.id }}"
-                        data-module-slug="{{ module.slug }}"
-                        data-download-url="{{ module.download_url|default:'' }}">
-                    {% icon "download-outline" %}
-                    {% trans "Get Free" %}
-                </button>
-                {% else %}
-                <button class="btn btn-sm color-primary flex-1"
-                        data-action="purchase"
-                        data-module-id="{{ module.id }}">
-                    {% icon "cart-outline" %}
-                    {% trans "Purchase" %}
-                </button>
-                {% endif %}
-
-                <a class="btn btn-sm btn-ghost"
-                   href="{% url 'marketplace:module_detail' module.slug %}"
-                   hx-get="{% url 'marketplace:module_detail' module.slug %}"
-                   hx-target="#main-content-area"
-                   hx-push-url="true"
-                   onclick="event.stopPropagation()">
-                    {% icon "chevron-forward-outline" %}
-                </a>
+            </div>
             {% endif %}
+
+            <div class="module-card-actions">
+                {% if card_context == 'installed' %}
+                    {% if module.is_active %}
+                    <button class="btn btn-sm btn-soft color-warning flex-1"
+                            data-action="module-deactivate"
+                            data-url="{{ module.deactivate_url }}"
+                            data-module-name="{{ module.name }}">
+                        {% icon "pause-outline" %}
+                        {% trans "Deactivate" %}
+                    </button>
+                    {% else %}
+                    <button class="btn btn-sm btn-soft color-success flex-1"
+                            hx-post="{{ module.activate_url }}"
+                            hx-target="#main-content-area"
+                            hx-swap="innerHTML">
+                        {% icon "play-outline" %}
+                        {% trans "Activate" %}
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-sm btn-ghost color-error"
+                            data-action="module-delete"
+                            data-url="{{ module.delete_url }}"
+                            data-module-name="{{ module.name }}">
+                        {% icon "trash-outline" %}
+                    </button>
+                    <a class="btn btn-sm btn-ghost"
+                       href="{{ module.detail_url }}"
+                       hx-get="{{ module.detail_url }}"
+                       hx-target="#main-content-area"
+                       hx-push-url="true"
+                       onclick="event.stopPropagation()">
+                        {% icon "chevron-forward-outline" %}
+                    </a>
+
+                {% elif card_context == 'marketplace' %}
+                    {% if module.is_installed %}
+                    <button class="btn btn-sm" disabled>
+                        {% icon "checkmark-circle-outline" %}
+                        {% trans "Installed" %}
+                    </button>
+                    {% elif module.is_owned %}
+                    <button class="btn btn-sm btn-soft color-success"
+                            data-action="download"
+                            data-module-slug="{{ module.slug }}"
+                            data-download-url="{{ module.download_url }}">
+                        {% icon "download-outline" %}
+                        {% trans "Install" %}
+                    </button>
+                    {% elif module.is_free or module.module_type == 'free' or module.price == 0 %}
+                    <button class="btn btn-sm color-primary"
+                            data-action="install-free"
+                            data-module-id="{{ module.id }}"
+                            data-module-slug="{{ module.slug }}"
+                            data-download-url="{{ module.download_url|default:'' }}">
+                        {% icon "download-outline" %}
+                        {% trans "Get Free" %}
+                    </button>
+                    {% else %}
+                    <button class="btn btn-sm color-primary"
+                            data-action="purchase"
+                            data-module-id="{{ module.id }}">
+                        {% icon "cart-outline" %}
+                        {% trans "Purchase" %}
+                    </button>
+                    {% endif %}
+
+                    <a class="btn btn-sm btn-ghost"
+                       href="{% url 'marketplace:module_detail' module.slug %}"
+                       hx-get="{% url 'marketplace:module_detail' module.slug %}"
+                       hx-target="#main-content-area"
+                       hx-push-url="true"
+                       onclick="event.stopPropagation()">
+                        {% icon "chevron-forward-outline" %}
+                    </a>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>

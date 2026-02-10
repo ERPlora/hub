@@ -477,8 +477,8 @@ DJICONS = {
     "PACKS": [],  # Disable bundled packs, use ICON_DIRS instead
     "MISSING_ICON_SILENT": False,  # Show error in development
     "CACHE_TIMEOUT": 86400,  # 24 hours
-    "DEFAULT_SIZE": 20,  # Default icon size in pixels
     "DEFAULT_CLASS": "icon",  # Base CSS class for all icons
+    "DEFAULT_FILL": "currentColor",  # Inherit color from parent CSS
 }
 
 # =============================================================================

@@ -296,7 +296,7 @@
         {% if related_modules %}
         <div class="mt-xl">
             <h2 class="fs-xl fw-semibold mb-md">{% trans "Related Modules" %}</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="module-grid module-grid-3">
                 {% for related in related_modules %}
                 {% include "system/modules/partials/module_card.html" with module=related card_context='marketplace' %}
                 {% endfor %}
