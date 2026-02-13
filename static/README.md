@@ -33,7 +33,7 @@ static/
 <!-- 2. Bootstrap Grid -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap-grid.min.css">
 
-<!-- 3. Color Theme (overrides --ux-* variables) -->
+<!-- 3. Color Theme (overrides CSS custom properties) -->
 <link rel="stylesheet" href="{% static 'css/themes/' %}{{ HUB_CONFIG.color_theme }}/theme.css">
 
 <!-- 4. Hub custom styles (fonts + HTMX/Alpine helpers) -->
@@ -42,9 +42,9 @@ static/
 
 ## Theming
 
-Los temas solo sobreescriben las CSS custom properties de `@erplora/ux` (`--ux-primary`, `--ux-danger`, etc.).
+Los temas solo sobreescriben las CSS custom properties de `@erplora/ux` (`--color-primary`, `--color-error`, etc.).
 
-Dark mode se aplica con la clase `ux-dark` en `<html>` y `dark` en `<body>`.
+Dark mode se aplica con la clase `dark` en `<html>` o `[data-theme="dark"]`.
 
 ## Collectstatic
 

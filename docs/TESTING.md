@@ -1,4 +1,4 @@
-# Testing Guide - CPOS Hub
+# Testing Guide - ERPlora Hub
 
 Guía para ejecutar tests en el Hub usando pytest.
 

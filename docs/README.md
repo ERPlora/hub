@@ -47,7 +47,7 @@ hub/
 │   ├── .template/            # Template para nuevos modules
 │   └── ...                   # Modules activos/inactivos
 │
-├── templates/                 # Templates Ionic + HTMX
+├── templates/                 # Templates UX v3 + HTMX
 ├── static/                    # Archivos estáticos
 ├── locale/                    # Traducciones i18n
 │
@@ -82,10 +82,10 @@ uv pip install -e ".[dev]"
 python manage.py migrate
 
 # Ejecutar servidor de desarrollo
-python manage.py runserver 8001
+python manage.py runserver
 ```
 
-Acceder a: http://127.0.0.1:8001
+Acceder a: http://127.0.0.1:8000
 
 ---
 
@@ -135,7 +135,7 @@ from django.utils.translation import gettext_lazy as _
 
 MODULE_ID = "inventory"
 MODULE_NAME = _("Inventory")
-MODULE_ICON = "icon.svg"  # SVG/PNG in static/icons/ (fallback: Ionicon name)
+MODULE_ICON = "icon.svg"  # SVG/PNG in static/icons/ (fallback: default icon)
 MODULE_VERSION = "1.0.0"
 MODULE_CATEGORY = "inventory"
 
@@ -162,7 +162,7 @@ Ver documentación completa: [MODULE_ICONS.md](MODULE_ICONS.md)
 
 Los módulos pueden usar iconos SVG personalizados. Fuente recomendada: [React Icons](https://react-icons.github.io/react-icons/)
 
-- **Prioridad**: SVG local > PNG local > Ionicon (MODULE_ICON) > Fallback
+- **Prioridad**: SVG local > PNG local > Default icon (MODULE_ICON) > Fallback
 - **Ubicación**: `{module}/static/icons/icon.svg`
 
 Ver documentación: [MODULE_ICONS.md](MODULE_ICONS.md)

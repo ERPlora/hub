@@ -39,10 +39,10 @@ uv pip install -e ".[dev]"
 python manage.py migrate
 
 # Servidor de desarrollo
-python manage.py runserver 8001
+python manage.py runserver
 ```
 
-El Hub corre en puerto **8001** por defecto (Cloud Portal usa 8000).
+El Hub corre en puerto **8000** por defecto (Cloud Portal usa 8001).
 
 ---
 
@@ -98,7 +98,7 @@ ALLOWED_HOSTS=erplora.com
 
 ```bash
 docker build -t erplora/hub:latest .
-docker run -d -p 8001:8000 -e HUB_ID=test-hub-123 erplora/hub:latest
+docker run -d -p 8000:8000 -e HUB_ID=test-hub-123 erplora/hub:latest
 ```
 
 ### Volumenes Persistentes
