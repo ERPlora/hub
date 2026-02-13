@@ -5,43 +5,45 @@
 
 {% block extra_css %}
 <style>
-    .login-page {
-        min-height: 100dvh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1.5rem;
-        position: relative;
-        overflow: hidden;
+    /* Background decorations on the .page (fixed viewport, no scroll) */
+    .login-bg {
         background: var(--color-base-200);
         color: var(--color-base-content);
     }
 
-    /* Decorative gradients */
-    .login-page::before {
+    .login-bg::before {
         content: '';
-        position: absolute;
+        position: fixed;
         inset: 0;
         background:
             radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
             radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%),
             radial-gradient(ellipse 50% 40% at 50% 50%, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, transparent 70%);
+        pointer-events: none;
         z-index: 0;
     }
 
-    /* Subtle grid pattern */
-    .login-page::after {
+    .login-bg::after {
         content: '';
-        position: absolute;
+        position: fixed;
         inset: 0;
         background-image:
             linear-gradient(color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px),
             linear-gradient(90deg, color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px);
         background-size: 60px 60px;
+        pointer-events: none;
         z-index: 0;
     }
 
-    .login-page > * { position: relative; z-index: 1; }
+    /* Scrollable content centers its child */
+    .login-content {
+        display: flex;
+        align-items: safe center;
+        justify-content: center;
+        padding: 1.5rem;
+        position: relative;
+        z-index: 1;
+    }
 
     /* Logo */
     .login-logo img {
@@ -72,8 +74,9 @@
         <span x-show="!isDark">{% icon "moon-outline" %}</span>
     </button>
 
-    <!-- Login Page -->
-    <div class="login-page">
+    <!-- Page (.page = fixed viewport grid, .content = scrollable) -->
+    <div class="page login-bg" style="height: 100dvh;">
+      <div class="content login-content">
         <div class="w-full max-w-md">
             <!-- Logo -->
             <div class="login-logo flex flex-col items-center text-center mb-8">
@@ -223,7 +226,8 @@
                 </div>
             </div>
         </div>
-    </div>
+      </div><!-- /.content -->
+    </div><!-- /.page -->
 
     <!-- PIN Setup Modal -->
     <div class="modal-backdrop"

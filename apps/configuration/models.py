@@ -246,6 +246,20 @@ class HubConfig(SingletonConfigMixin, models.Model):
     )
     auto_print = models.BooleanField(default=False)
 
+    # Hardware Bridge
+    bridge_port = models.IntegerField(
+        default=12321,
+        help_text='WebSocket port for the native hardware bridge'
+    )
+    bridge_auto_print = models.BooleanField(
+        default=True,
+        help_text='Auto-print via bridge (if False, shows print preview in browser)'
+    )
+    allow_satellite_printing = models.BooleanField(
+        default=False,
+        help_text='Allow satellite terminals to print via the main terminal bridge'
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -492,3 +506,88 @@ class BackupConfig(SingletonConfigMixin, models.Model):
             return base
 
         return base  # Default to daily
+
+
+class PrinterConfig(models.Model):
+    """
+    Printer discovered and configured via the ERPlora Bridge.
+
+    Each printer maps to a physical device (USB, network, or Bluetooth)
+    and can be assigned to one or more document types with a priority.
+    """
+
+    PRINTER_TYPE_CHOICES = [
+        ('usb', 'USB'),
+        ('network', 'Network'),
+        ('bluetooth', 'Bluetooth'),
+    ]
+
+    bridge_printer_id = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text='Unique printer ID from the bridge (e.g., usb:0x04b8:0x0202)'
+    )
+    name = models.CharField(
+        max_length=255,
+        help_text='Display name for this printer'
+    )
+    printer_type = models.CharField(
+        max_length=50,
+        choices=PRINTER_TYPE_CHOICES,
+        default='usb',
+    )
+    paper_width = models.IntegerField(
+        default=80,
+        help_text='Paper width in mm (58 or 80)'
+    )
+    document_types = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Document types this printer handles (e.g., ["receipt", "kitchen_order"])'
+    )
+    priority = models.IntegerField(
+        default=1,
+        help_text='Priority for document routing (lower = higher priority)'
+    )
+    is_default = models.BooleanField(
+        default=False,
+        help_text='Use as fallback when no specific printer is configured for a document type'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Inactive printers are ignored for routing'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Printer'
+        verbose_name_plural = 'Printers'
+        db_table = 'core_printerconfig'
+        ordering = ['priority', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.printer_type})"
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            PrinterConfig.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_for_document(cls, document_type: str):
+        """Get the best printer for a document type, or default, or None."""
+        printer = cls.objects.filter(
+            document_types__contains=[document_type],
+            is_active=True,
+        ).order_by('priority').first()
+
+        if not printer:
+            printer = cls.objects.filter(is_default=True, is_active=True).first()
+
+        return printer
+
+    @classmethod
+    def get_active(cls):
+        """Get all active printers."""
+        return cls.objects.filter(is_active=True).order_by('priority', 'name')

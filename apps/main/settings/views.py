@@ -11,7 +11,7 @@ from zoneinfo import available_timezones
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 from apps.accounts.models import LocalUser
-from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass
+from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass, PrinterConfig
 
 
 # Common timezones grouped by region (most used first)
@@ -239,6 +239,61 @@ def index(request):
             except TaxClass.DoesNotExist:
                 return toast_response('Tax class not found', 'error', status=404)
 
+        # Handle bridge/hardware settings
+        if action == 'update_bridge':
+            try:
+                hub_config.bridge_port = int(request.POST.get('bridge_port', 12321))
+            except (ValueError, TypeError):
+                pass
+            hub_config.bridge_auto_print = 'bridge_auto_print' in request.POST
+            hub_config.allow_satellite_printing = 'allow_satellite_printing' in request.POST
+            hub_config.save()
+            return toast_response('Hardware settings saved')
+
+        # Save a printer configuration (from bridge discovery)
+        if action == 'save_printer':
+            bridge_printer_id = request.POST.get('bridge_printer_id', '').strip()
+            if not bridge_printer_id:
+                return toast_response('Printer ID is required', 'error', status=400)
+
+            printer, created = PrinterConfig.objects.update_or_create(
+                bridge_printer_id=bridge_printer_id,
+                defaults={
+                    'name': request.POST.get('printer_name', '').strip() or bridge_printer_id,
+                    'printer_type': request.POST.get('printer_type', 'usb'),
+                    'paper_width': int(request.POST.get('paper_width', 80)),
+                    'document_types': request.POST.getlist('document_types'),
+                    'priority': int(request.POST.get('priority', 1)),
+                    'is_default': 'is_default' in request.POST,
+                    'is_active': 'is_active' not in request.POST or request.POST.get('is_active') == 'true',
+                }
+            )
+
+            printers = PrinterConfig.get_active()
+            response = render(request, 'main/settings/partials/printers_list.html', {
+                'printers': printers,
+            })
+            response['HX-Trigger'] = json.dumps({
+                'showMessage': {'message': 'Printer saved' if not created else 'Printer added', 'type': 'success'}
+            })
+            return response
+
+        if action == 'delete_printer':
+            printer_id = request.POST.get('printer_id')
+            try:
+                printer = PrinterConfig.objects.get(id=printer_id)
+                printer.delete()
+                printers = PrinterConfig.get_active()
+                response = render(request, 'main/settings/partials/printers_list.html', {
+                    'printers': printers,
+                })
+                response['HX-Trigger'] = json.dumps({
+                    'showMessage': {'message': 'Printer removed', 'type': 'success'}
+                })
+                return response
+            except PrinterConfig.DoesNotExist:
+                return toast_response('Printer not found', 'error', status=404)
+
         return toast_response('Settings saved')
 
     # Get backup config and scheduler status
@@ -248,6 +303,9 @@ def index(request):
 
     # Get all tax classes
     tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
+
+    # Get configured printers
+    printers = PrinterConfig.get_active()
 
     return {
         'current_section': 'settings',
@@ -263,4 +321,13 @@ def index(request):
         'timezone_choices': get_sorted_timezones(),
         'currency_choices': django_settings.POPULAR_CURRENCY_CHOICES,
         'backup_frequency_choices': BackupConfig.Frequency.choices,
+        'printers': printers,
+        'document_type_choices': [
+            ('receipt', 'Receipt'),
+            ('kitchen_order', 'Kitchen Order'),
+            ('invoice', 'Invoice'),
+            ('delivery_note', 'Delivery Note'),
+            ('barcode_label', 'Barcode Label'),
+            ('cash_session_report', 'Cash Session Report'),
+        ],
     }

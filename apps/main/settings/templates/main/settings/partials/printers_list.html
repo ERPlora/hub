@@ -1,0 +1,59 @@
+{% load i18n djicons %}
+
+{% if printers %}
+<div class="list list-inset">
+    {% for printer in printers %}
+    <div class="list-item list-item-multiline" x-data="{ editing: false }">
+        <div class="list-item-start">
+            {% if printer.printer_type == 'usb' %}
+                {% icon "print-outline" %}
+            {% elif printer.printer_type == 'network' %}
+                {% icon "wifi-outline" %}
+            {% elif printer.printer_type == 'bluetooth' %}
+                {% icon "bluetooth-outline" %}
+            {% endif %}
+        </div>
+        <div class="list-item-content">
+            <span class="list-item-label">{{ printer.name }}</span>
+            <span class="list-item-note">
+                {{ printer.get_printer_type_display }} &middot; {{ printer.paper_width }}mm
+                {% if printer.is_default %}&middot; <strong>{% trans "Default" %}</strong>{% endif %}
+            </span>
+            {% if printer.document_types %}
+            <div class="flex flex-wrap gap-1 mt-1">
+                {% for dt in printer.document_types %}
+                <span class="badge badge-sm">{{ dt }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="list-item-end flex gap-2">
+            <button type="button"
+                    class="btn btn-sm btn-ghost"
+                    @click="
+                        ERPlora.bridge.testPrint('{{ printer.bridge_printer_id }}')
+                            .then(() => $store.ui.success('Test print OK'))
+                            .catch(e => $store.ui.error('Test failed: ' + e.message))
+                    ">
+                {% icon "print-outline" %}
+            </button>
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-target="#printers-list"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_printer">
+                <input type="hidden" name="printer_id" value="{{ printer.id }}">
+                <button type="submit" class="btn btn-sm btn-ghost color-error">
+                    {% icon "trash-outline" %}
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-6 opacity-50">
+    <p>{% trans "No printers configured" %}</p>
+    <p class="text-sm mt-1">{% trans "Use Discover Printers to find connected hardware" %}</p>
+</div>
+{% endif %}
