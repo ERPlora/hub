@@ -4,12 +4,12 @@ Template tags for module icons.
 Supports:
 - Local SVG icons from module's static/icons/ directory (inline rendering)
 - Local PNG icons from module's static/icons/ directory (base64 img tag)
-- Ionic icons as fallback
+- djicons as fallback
 
 Usage:
     {% load module_icons %}
 
-    {# Render module icon (auto-detects SVG/PNG or falls back to Ionic) #}
+    {# Render module icon (auto-detects SVG/PNG or falls back to djicons) #}
     {% module_icon module_id="sales" css_class="text-2xl" %}
 
     {# Render with explicit icon name #}
@@ -141,7 +141,7 @@ def find_module_icon(module_id: str) -> dict | None:
 
 def size_to_px(size: str) -> int:
     """
-    Convert Tailwind/Ionic size classes to pixels.
+    Convert Tailwind size classes to pixels.
 
     Args:
         size: Size class like 'text-2xl', 'text-3xl', 'w-6', etc.
@@ -183,17 +183,17 @@ def module_icon(module_id: str = None, icon: str = None, css_class: str = '', si
     Priority:
     1. SVG from module's static/icons/icon.svg (inline)
     2. PNG from module's static/icons/icon.png (base64 img)
-    3. Ionic icon from module.json
+    3. djicons icon from module.json
     4. Default cube-outline icon
 
     Args:
         module_id: Module identifier (e.g., 'sales', 'inventory')
-        icon: Explicit Ionic icon name (fallback)
+        icon: Explicit icon name (fallback)
         css_class: CSS classes to apply
         size: Size class (e.g., 'text-2xl', 'w-6 h-6')
 
     Returns:
-        Safe HTML string with inline SVG, img tag, or ion-icon element
+        Safe HTML string with inline SVG, img tag, or djicons element
     """
     all_classes = f'{css_class} {size}'.strip()
     size_px = size_to_px(size)
@@ -215,10 +215,10 @@ def module_icon(module_id: str = None, icon: str = None, css_class: str = '', si
                     f'{class_attr} alt="Module icon" />'
                 )
 
-    # Fallback to djicons (which uses Ionicons by default)
-    from djicons import icon as render_icon
+    # Fallback to djicons
+    import djicons
     icon_name = icon or 'cube-outline'
-    return mark_safe(render_icon(icon_name, css_class=all_classes))
+    return mark_safe(djicons.get(icon_name, css_class=all_classes))
 
 
 @register.simple_tag

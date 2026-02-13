@@ -1,6 +1,0 @@
-{# Hide Tabbar via OOB Swap - Use in non-module pages #}
-{# This will hide the tabbar when navigating via HTMX to a non-module page #}
-<ion-footer id="global-tabbar-footer" hx-swap-oob="outerHTML:#global-tabbar-footer" style="display: none;">
-    <ion-tab-bar id="global-tabbar"></ion-tab-bar>
-</ion-footer>
-<script>document.body.removeAttribute('data-module-id');</script>

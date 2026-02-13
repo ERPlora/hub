@@ -1,8 +1,6 @@
-{% load i18n static ui component_tags djicons %}
+{% load i18n static djicons %}
 
-{% component "page" title=page_title action_icon="cart-outline" action_badge=cart_count action_hx_get="/marketplace/cart/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
-    {% fill "content" %}
-        {# Marketplace tabbar - manual since it's not a module #}
+{# Marketplace tabbar - manual since it's not a module #}
         <script>
         (function() {
             if (typeof window.updateGlobalTabBar === 'function') {
@@ -32,22 +30,31 @@
         <form id="marketplace-filters-form"
             hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
             hx-target="#products-grid" hx-swap="innerHTML"
-            hx-trigger="submit, change from:input[type=hidden], ionInput from:#search-input delay:300ms"
-            hx-indicator="#loading-spinner">
+            hx-trigger="submit, change from:input[type=hidden], input from:#search-input delay:300ms">
 
-            <div class="d-flex gap-sm mb-md align-center">
-                <ion-searchbar id="search-input" name="q" placeholder="{% trans 'Search...' %}" debounce="300"
-                    show-cancel-button="never" class="flex-1 m-0" value="{{ request.GET.q|default:'' }}">
-                </ion-searchbar>
-                <ion-button id="filter-toggle-btn" fill="outline" type="button" onclick="openFiltersModal()">
-                    {% icon "options-outline" slot="icon-only" %}
+            {# Search Bar with Filter Button #}
+            <div class="flex gap-2 mb-4 items-center">
+                <label class="input rounded-full flex-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="ionicon icon opacity-50" viewBox="0 0 512 512" width="20" height="20" aria-hidden="true"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"></path><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32" d="M338.29 338.29L448 448"></path></svg>
+                    <input type="search"
+                           class="grow"
+                           id="search-input"
+                           name="q"
+                           placeholder="{% trans 'Search modules...' %}"
+                           value="{{ request.GET.q|default:'' }}">
+                </label>
+                <button type="button"
+                        id="filter-toggle-btn"
+                        class="btn btn-outline btn-square"
+                        onclick="openFiltersModal()"
+                        style="position: relative;">
+                    {% icon "options-outline" %}
                     {% if active_filters_count %}
-                    <ion-badge color="danger"
-                        style="position: absolute; top: -4px; right: -4px; font-size: 10px; min-width: 18px; height: 18px; border-radius: 50%;">
+                    <span class="badge badge-sm color-error" style="position: absolute; top: -4px; right: -4px;">
                         {{ active_filters_count }}
-                    </ion-badge>
+                    </span>
                     {% endif %}
-                </ion-button>
+                </button>
             </div>
 
             <!-- Hidden inputs for filters -->
@@ -58,194 +65,179 @@
             <input type="hidden" name="plan" id="filter-plan" value="{{ request.GET.plan|default:'' }}">
 
             <!-- Active Filters Display -->
-            <div id="active-filters" class="d-flex flex-wrap gap-sm mb-md align-center" style="display: none;">
-                <span class="fs-sm text-medium">{% trans "Active:" %}</span>
-                <div id="active-filters-chips"></div>
+            <div id="active-filters" class="flex flex-wrap gap-2 mb-4" style="display: none;">
+                <span class="text-sm opacity-60 mr-2">{% trans "Active:" %}</span>
+                <div id="active-filters-chips" class="flex flex-wrap gap-2"></div>
             </div>
         </form>
 
-        <!-- Loading Spinner -->
-        <div id="loading-spinner" class="htmx-indicator justify-center py-xl">
-            <ion-spinner name="crescent"></ion-spinner>
-        </div>
-
-        <!-- Products Grid Container with scroll -->
-        <div id="products-scroll-container" style="height: 65vh; overflow-y: auto; -webkit-overflow-scrolling: touch;">
-            <div id="products-grid"
-                hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
-                hx-trigger="load" hx-swap="innerHTML" hx-indicator="#loading-spinner">
-                <div class="d-flex justify-center py-xl">
-                    <ion-spinner name="crescent"></ion-spinner>
-                </div>
+        <!-- Products Grid -->
+        <div id="products-grid"
+            hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
+            hx-trigger="load" hx-swap="innerHTML">
+            <div class="flex justify-center py-8">
+                <div class="loading"></div>
             </div>
         </div>
-    {% endfill %}
-{% endcomponent %}
-
 <!-- Filters Modal -->
-<ion-modal id="filters-modal">
-    <ion-header>
-        <ion-toolbar>
-            <ion-title>{% trans "Filters" %}</ion-title>
-            <ion-buttons slot="end">
-                <ion-button onclick="closeFiltersModal()">
-                    {% icon "close" slot="icon-only" %}
-                </ion-button>
-            </ion-buttons>
-        </ion-toolbar>
-    </ion-header>
-    <ion-content>
-        <ion-accordion-group>
+<div class="modal-backdrop" id="filters-modal-backdrop" data-state="closed"
+     x-data="{ open: false }"
+     :data-state="open ? 'open' : 'closed'"
+     @click.self="open = false; closeFiltersModal()">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2 class="modal-title">{% trans "Filters" %}</h2>
+            <button class="modal-close" onclick="closeFiltersModal()">
+                {% icon "close" %}
+            </button>
+        </div>
+        <div class="modal-body">
             {% if store_type == 'modules' %}
             <!-- Category Filter -->
-            <ion-accordion value="category">
-                <ion-item slot="header">
-                    <ion-label>{% trans "Category" %}</ion-label>
-                </ion-item>
-                <div class="ion-padding" slot="content">
-                    <div class="d-flex flex-wrap gap-xs">
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="category" data-value=""
-                            color="{% if not request.GET.category %}primary{% else %}medium{% endif %}"
+            <div class="mb-lg">
+                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Category" %}</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            class="chip filter-chip {% if not request.GET.category %}chip-active{% endif %}"
+                            data-filter="category"
+                            data-value=""
                             onclick="setFilter('category', '')">
-                            <ion-label>{% trans "All" %}</ion-label>
-                        </ion-chip>
-                        {% for category in filters.categories %}
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="category"
+                        {% trans "All" %}
+                    </button>
+                    {% for category in filters.categories %}
+                    <button type="button"
+                            class="chip filter-chip {% if request.GET.category == category.id %}chip-active{% endif %}"
+                            data-filter="category"
                             data-value="{{ category.id }}"
-                            color="{% if request.GET.category == category.id %}primary{% else %}medium{% endif %}"
                             onclick="setFilter('category', '{{ category.id }}')">
-                            <ion-label>{{ category.name }}</ion-label>
-                        </ion-chip>
-                        {% endfor %}
-                    </div>
+                        {{ category.name }}
+                    </button>
+                    {% endfor %}
                 </div>
-            </ion-accordion>
+            </div>
 
             <!-- Industry Filter -->
-            <ion-accordion value="industry">
-                <ion-item slot="header">
-                    <ion-label>{% trans "Industry" %}</ion-label>
-                </ion-item>
-                <div class="ion-padding" slot="content">
-                    <div class="d-flex flex-wrap gap-xs">
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="industry" data-value=""
-                            color="{% if not request.GET.industry %}primary{% else %}medium{% endif %}"
+            <div class="mb-lg">
+                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Industry" %}</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            class="chip filter-chip {% if not request.GET.industry %}chip-active{% endif %}"
+                            data-filter="industry"
+                            data-value=""
                             onclick="setFilter('industry', '')">
-                            <ion-label>{% trans "All" %}</ion-label>
-                        </ion-chip>
-                        {% for industry in filters.industries %}
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="industry"
+                        {% trans "All" %}
+                    </button>
+                    {% for industry in filters.industries %}
+                    <button type="button"
+                            class="chip filter-chip {% if request.GET.industry == industry.id %}chip-active{% endif %}"
+                            data-filter="industry"
                             data-value="{{ industry.id }}"
-                            color="{% if request.GET.industry == industry.id %}primary{% else %}medium{% endif %}"
                             onclick="setFilter('industry', '{{ industry.id }}')">
-                            <ion-label>{{ industry.name }}</ion-label>
-                        </ion-chip>
-                        {% endfor %}
-                    </div>
+                        {{ industry.name }}
+                    </button>
+                    {% endfor %}
                 </div>
-            </ion-accordion>
+            </div>
 
             <!-- Pricing Type Filter -->
-            <ion-accordion value="pricing">
-                <ion-item slot="header">
-                    <ion-label>{% trans "Pricing" %}</ion-label>
-                </ion-item>
-                <div class="ion-padding" slot="content">
-                    <div class="d-flex flex-wrap gap-xs">
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="type" data-value=""
-                            color="{% if not request.GET.type %}primary{% else %}medium{% endif %}"
+            <div class="mb-lg">
+                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Pricing" %}</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            class="chip filter-chip {% if not request.GET.type %}chip-active{% endif %}"
+                            data-filter="type"
+                            data-value=""
                             onclick="setFilter('type', '')">
-                            <ion-label>{% trans "All" %}</ion-label>
-                        </ion-chip>
-                        {% for type in filters.types %}
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="type" data-value="{{ type.id }}"
-                            color="{% if request.GET.type == type.id %}primary{% else %}medium{% endif %}"
+                        {% trans "All" %}
+                    </button>
+                    {% for type in filters.types %}
+                    <button type="button"
+                            class="chip filter-chip {% if request.GET.type == type.id %}chip-active{% endif %}"
+                            data-filter="type"
+                            data-value="{{ type.id }}"
                             onclick="setFilter('type', '{{ type.id }}')">
-                            {% if type.icon %}{% icon type.icon %}{% endif %}
-                            <ion-label>{{ type.name }}</ion-label>
-                        </ion-chip>
-                        {% endfor %}
-                    </div>
+                        {% if type.icon %}{% icon type.icon %}{% endif %}
+                        {{ type.name }}
+                    </button>
+                    {% endfor %}
                 </div>
-            </ion-accordion>
+            </div>
 
             {% elif store_type == 'hubs' %}
             <!-- Region Filter -->
-            <ion-accordion value="region">
-                <ion-item slot="header">
-                    <ion-label>{% trans "Region" %}</ion-label>
-                </ion-item>
-                <div class="ion-padding" slot="content">
-                    <div class="d-flex flex-wrap gap-xs">
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="region" data-value=""
-                            color="{% if not request.GET.region %}primary{% else %}medium{% endif %}"
+            <div class="mb-lg">
+                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Region" %}</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            class="chip filter-chip {% if not request.GET.region %}chip-active{% endif %}"
+                            data-filter="region"
+                            data-value=""
                             onclick="setFilter('region', '')">
-                            <ion-label>{% trans "All" %}</ion-label>
-                        </ion-chip>
-                        {% for region in filters.regions %}
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="region" data-value="{{ region.id }}"
-                            color="{% if request.GET.region == region.id %}primary{% else %}medium{% endif %}"
+                        {% trans "All" %}
+                    </button>
+                    {% for region in filters.regions %}
+                    <button type="button"
+                            class="chip filter-chip {% if request.GET.region == region.id %}chip-active{% endif %}"
+                            data-filter="region"
+                            data-value="{{ region.id }}"
                             onclick="setFilter('region', '{{ region.id }}')">
-                            <ion-label>{{ region.name }}</ion-label>
-                        </ion-chip>
-                        {% endfor %}
-                    </div>
+                        {{ region.name }}
+                    </button>
+                    {% endfor %}
                 </div>
-            </ion-accordion>
+            </div>
 
             <!-- Plan Filter -->
-            <ion-accordion value="plan">
-                <ion-item slot="header">
-                    <ion-label>{% trans "Plan" %}</ion-label>
-                </ion-item>
-                <div class="ion-padding" slot="content">
-                    <div class="d-flex flex-wrap gap-xs">
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="plan" data-value=""
-                            color="{% if not request.GET.plan %}primary{% else %}medium{% endif %}"
+            <div class="mb-lg">
+                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Plan" %}</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            class="chip filter-chip {% if not request.GET.plan %}chip-active{% endif %}"
+                            data-filter="plan"
+                            data-value=""
                             onclick="setFilter('plan', '')">
-                            <ion-label>{% trans "All" %}</ion-label>
-                        </ion-chip>
-                        {% for plan in filters.plans %}
-                        <ion-chip class="cursor-pointer filter-chip" data-filter="plan" data-value="{{ plan.id }}"
-                            color="{% if request.GET.plan == plan.id %}primary{% else %}medium{% endif %}"
+                        {% trans "All" %}
+                    </button>
+                    {% for plan in filters.plans %}
+                    <button type="button"
+                            class="chip filter-chip {% if request.GET.plan == plan.id %}chip-active{% endif %}"
+                            data-filter="plan"
+                            data-value="{{ plan.id }}"
                             onclick="setFilter('plan', '{{ plan.id }}')">
-                            <ion-label>{{ plan.name }}</ion-label>
-                        </ion-chip>
-                        {% endfor %}
-                    </div>
+                        {{ plan.name }}
+                    </button>
+                    {% endfor %}
                 </div>
-            </ion-accordion>
+            </div>
             {% endif %}
-        </ion-accordion-group>
-    </ion-content>
-    <ion-footer>
-        <ion-toolbar>
-            <ion-buttons slot="start">
-                <ion-button fill="clear" color="danger" onclick="clearAllFilters()">
-                    {% icon "trash-outline" slot="start" %}
-                    {% trans "Clear" %}
-                </ion-button>
-            </ion-buttons>
-            <ion-buttons slot="end">
-                <ion-button fill="solid" color="primary" onclick="applyFilters()">
-                    {% trans "Apply" %}
-                </ion-button>
-            </ion-buttons>
-        </ion-toolbar>
-    </ion-footer>
-</ion-modal>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline color-error" onclick="clearAllFilters()">
+                {% icon "trash-outline" %}
+                <span>{% trans "Clear" %}</span>
+            </button>
+            <button type="button" class="btn color-primary" onclick="applyFilters()">
+                {% trans "Apply" %}
+            </button>
+        </div>
+    </div>
+</div>
 
 <script>
 (function () {
     // Modal functions
     window.openFiltersModal = function () {
-        const modal = document.getElementById('filters-modal');
-        if (modal) modal.present();
+        const backdrop = document.getElementById('filters-modal-backdrop');
+        if (backdrop) {
+            backdrop.setAttribute('data-state', 'open');
+        }
     };
 
     window.closeFiltersModal = function () {
-        const modal = document.getElementById('filters-modal');
-        if (modal) modal.dismiss();
+        const backdrop = document.getElementById('filters-modal-backdrop');
+        if (backdrop) {
+            backdrop.setAttribute('data-state', 'closed');
+        }
     };
 
     window.applyFilters = function () {
@@ -260,15 +252,19 @@
         const input = document.getElementById('filter-' + filterName);
         if (input) {
             input.value = value;
-            updateChipColors(filterName, value);
+            updateChipSelection(filterName, value);
         }
     };
 
-    // Update chip colors for a filter
-    function updateChipColors(filterName, activeValue) {
+    // Update chip selection for a filter
+    function updateChipSelection(filterName, activeValue) {
         document.querySelectorAll('.filter-chip[data-filter="' + filterName + '"]').forEach(function (chip) {
             var chipValue = chip.dataset.value;
-            chip.color = chipValue === activeValue ? 'primary' : 'medium';
+            if (chipValue === activeValue) {
+                chip.classList.add('chip-active');
+            } else {
+                chip.classList.remove('chip-active');
+            }
         });
     }
 
@@ -278,7 +274,7 @@
             var input = document.getElementById('filter-' + filter);
             if (input) {
                 input.value = '';
-                updateChipColors(filter, '');
+                updateChipSelection(filter, '');
             }
         });
         // Clear search
@@ -305,10 +301,10 @@
         var searchInput = document.getElementById('search-input');
         var searchValue = searchInput ? searchInput.value : '';
         if (searchValue) {
-            var searchChip = document.createElement('ion-chip');
-            searchChip.color = 'warning';
-            searchChip.className = 'cursor-pointer';
-            searchChip.innerHTML = '<ion-icon name="search"></ion-icon><ion-label>' + searchValue + '</ion-label><ion-icon name="close-circle"></ion-icon>';
+            var searchChip = document.createElement('button');
+            searchChip.type = 'button';
+            searchChip.className = 'chip color-warning';
+            searchChip.innerHTML = (document.querySelector('[data-icon="search-outline"]')?.outerHTML || '<svg></svg>') + ' ' + searchValue + '<button type="button" onclick="clearSearch(); event.stopPropagation();"><svg viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg></button>';
             searchChip.addEventListener('click', function() { clearSearch(); });
             chipsContainer.appendChild(searchChip);
             count++;
@@ -318,10 +314,10 @@
         ['category', 'industry', 'type', 'region', 'plan'].forEach(function (filter) {
             var input = document.getElementById('filter-' + filter);
             if (input && input.value) {
-                var chip = document.createElement('ion-chip');
-                chip.color = 'warning';
-                chip.className = 'cursor-pointer';
-                chip.innerHTML = '<ion-label>' + input.value + '</ion-label><ion-icon name="close-circle"></ion-icon>';
+                var chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'chip color-warning';
+                chip.innerHTML = input.value + '<button type="button"><svg viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg></button>';
                 chip.addEventListener('click', function() { removeFilter(filter); });
                 chipsContainer.appendChild(chip);
                 count++;
@@ -337,12 +333,12 @@
 
         // Update badge on filter button
         if (filterToggleBtn) {
-            var badge = filterToggleBtn.querySelector('ion-badge');
+            var badge = filterToggleBtn.querySelector('.badge');
             if (count > 0) {
                 if (!badge) {
-                    badge = document.createElement('ion-badge');
-                    badge.color = 'danger';
-                    badge.style.cssText = 'position: absolute; top: -4px; right: -4px; font-size: 10px; min-width: 18px; height: 18px; border-radius: 50%;';
+                    badge = document.createElement('span');
+                    badge.className = 'badge badge-sm color-error';
+                    badge.style.cssText = 'position: absolute; top: -4px; right: -4px;';
                     filterToggleBtn.appendChild(badge);
                 }
                 badge.textContent = count;
@@ -357,7 +353,7 @@
         var input = document.getElementById('filter-' + filterName);
         if (input) {
             input.value = '';
-            updateChipColors(filterName, '');
+            updateChipSelection(filterName, '');
             input.dispatchEvent(new Event('change', { bubbles: true }));
         }
         updateActiveFilters();

@@ -1,7 +1,19 @@
-{% extends "ui/app_base.html" %}
-{% load i18n %}
+{% extends "page_base.html" %}
+{% load i18n djicons %}
 
 {% block page_title %}{{ role.display_name }}{% endblock %}
+
+{% block page_actions %}
+{% if not role.is_system %}
+<a class="btn btn-sm btn-outline"
+   href="{% url 'main:roles:edit' role_id=role.id %}"
+   hx-get="{% url 'main:roles:edit' role_id=role.id %}"
+   hx-target="#main-content-area"
+   hx-push-url="true">
+    {% icon "create-outline" %}
+</a>
+{% endif %}
+{% endblock %}
 
 {% block page_content %}
 {% include "main/roles/partials/detail.html" %}

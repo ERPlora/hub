@@ -1,36 +1,11 @@
 {% load i18n djicons %}
 
-{# Total Storage #}
-<div class="d-flex justify-between align-center p-sm rounded-lg mb-sm" style="background: rgba(var(--color-primary-rgb), 0.1);">
-    <div class="d-flex align-center gap-sm">
-        {% icon "folder-open" css_class="fs-xl text-primary" %}
-        <span class="fw-semibold">{% trans "Total Storage" %}</span>
+<div class="flex flex-row items-center gap-4">
+    <div class="w-11 h-11 rounded-xl bg-info/10 flex items-center justify-center shrink-0">
+        {% icon "pie-chart-outline" css_class="text-info" size=28 %}
     </div>
-    <div class="text-right">
-        <span class="fw-bold fs-lg">{{ total_size }}</span>
-        <span class="fs-sm text-secondary d-block">{{ total_files }} {% trans "files" %}</span>
+    <div class="flex-1 min-w-0">
+        <p class="font-semibold text-sm m-0">{{ total_size }}</p>
+        <p class="text-xs text-base-content/50 m-0">{{ total_files }} {% trans "files" %} &bull; {% trans "Disk usage" %}</p>
     </div>
-</div>
-
-{# Storage Breakdown #}
-{% for key, info in storage_info.items %}
-<div class="d-flex justify-between align-center p-xs rounded mb-xs">
-    <div class="d-flex align-center gap-sm">
-        {% icon info.icon|add:"-outline" css_class="fs-lg text-secondary" %}
-        <span>{{ info.name }}</span>
-    </div>
-    <div class="text-right">
-        <span class="fw-medium">{{ info.size }}</span>
-        <span class="fs-xs text-secondary d-block">{{ info.files }} {% trans "files" %}</span>
-    </div>
-</div>
-{% endfor %}
-
-{# Data Location #}
-<div class="mt-md p-sm rounded-lg" style="background: var(--bg-color-secondary);">
-    <p class="fs-xs text-secondary m-0">
-        {% icon "folder-outline" style="vertical-align: middle;" %}
-        {% trans "Data location" %}:
-    </p>
-    <p class="fs-xs mono mt-xs m-0" style="word-break: break-all;">{{ base_path }}</p>
 </div>

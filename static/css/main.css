@@ -1,148 +1,76 @@
 /* ==========================================================================
-   1. BASE - Fundacion del sistema de diseno
-   ========================================================================== */
-
-/* Variables CSS globales - colores, spacing, typography, touch targets */
-@import 'base/variables.css';
-
-/* Reset y normalize - estilos base coherentes */
-@import 'base/reset.css';
-
-/* Sistema tipografico - headings, body text, labels */
-@import 'base/typography.css';
-
-/* Utility classes - flex, spacing, text, etc */
-@import 'base/utilities.css';
-
-/* Animaciones estilo iOS */
-@import 'base/animations.css';
-
-/* ==========================================================================
-   2. LAYOUT - Layout templates
-   ========================================================================== */
-
-/* POS screen layout */
-@import 'layout/pos.css';
-
-/* Offline page layout */
-@import 'layout/offline.css';
-
-/* ==========================================================================
-   3. COMPONENTS - Componentes reutilizables
-   ========================================================================== */
-
-/* Módulos y marketplace */
-@import 'components/modules.css';
-
-/* UI Components (stat cards, empty states, etc) */
-@import 'components/ui-components.css';
-
-/* Data tables */
-@import 'components/tables.css';
-
-/* Toast notifications */
-@import 'components/toast.css';
-
-/* Action sheets */
-@import 'components/action-sheet.css';
-
-/* ==========================================================================
-   4. PAGES - Estilos especificos de paginas
-   ========================================================================== */
-
-/* Login page */
-@import 'pages/login.css';
-
-/* Setup wizard page */
-@import 'pages/setup.css';
-
-/* ==========================================================================
-   DARK MODE SUPPORT
-   Note: Dark mode variables are defined in base/variables.css using body.dark class.
-   The base.html template manages the .dark class based on HubConfig settings
-   (either auto via prefers-color-scheme or manual override).
+   ERPlora Hub - Main Stylesheet
+   Fonts + Hub-specific styles that complement @erplora/ux
    ========================================================================== */
 
 /* ==========================================================================
-   PRINT STYLES
+   FONTS - Plus Jakarta Sans (local)
    ========================================================================== */
 
-@media print {
-
-  .sidebar,
-  ion-header,
-  ion-footer,
-  ion-tab-bar,
-  .no-print {
-    display: none !important;
-  }
-
-  ion-content,
-  .main-content {
-    --padding-start: 0;
-    --padding-end: 0;
-  }
-
-  * {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
+@import '../fonts/plus-jakarta-sans/plus-jakarta-sans.css';
 
 /* ==========================================================================
-   SAFE AREA INSETS (iOS)
+   APP BACKGROUND
+   Decorative gradient so glass components show depth.
    ========================================================================== */
-
-:root {
-  --safe-area-top: env(safe-area-inset-top, 0px);
-  --safe-area-right: env(safe-area-inset-right, 0px);
-  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-area-left: env(safe-area-inset-left, 0px);
+/*
+.app {
+  background: var(--color-base-200);
+  position: relative;
 }
 
-ion-tab-bar {
-  padding-bottom: var(--safe-area-bottom);
+.app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, transparent 70%);
+  z-index: 0;
 }
 
-/* ==========================================================================
-   REDUCED MOTION
-   ========================================================================== */
 
-@media (prefers-reduced-motion: reduce) {
+.app>* {
+  position: relative;
+  z-index: 1;
+}
+  */
 
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px);
+  background-size: 60px 60px;
+  z-index: 0;
 }
 
-/* ==========================================================================
-   HTMX LOADING INDICATOR
-   ========================================================================== */
-
-.htmx-request .htmx-indicator {
-  display: inline-block;
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, transparent 70%);
+  z-index: 0;
 }
 
-.htmx-request .htmx-indicator.justify-center {
-  display: flex;
+/* Subtle grid pattern */
+
+
+.app>* {
+  /*
+  position: relative;
+  */
+  z-index: 1;
 }
 
-.htmx-indicator {
-  display: none !important;
-}
-
-.htmx-request .htmx-indicator {
-  display: inline-block !important;
-}
-
-.htmx-request .htmx-indicator.justify-center {
-  display: flex !important;
-}
 
 /* ==========================================================================
    ALPINE.JS CLOAK
@@ -153,77 +81,130 @@ ion-tab-bar {
 }
 
 /* ==========================================================================
-   IONIC MODAL OVERRIDES
+   HTMX LOADING INDICATOR
    ========================================================================== */
 
-/* Filters modal - constrain size on large screens */
-@media (min-width: 768px) {
-  ion-modal#filters-modal {
-    --min-width: 80vw;
-    --min-height: auto;
+#htmx-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-primary);
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+
+.htmx-request #htmx-indicator,
+.htmx-request.htmx-indicator {
+  opacity: 1;
+}
+
+#htmx-indicator::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent);
+  animation: htmx-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes htmx-loading {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
   }
 }
 
 /* ==========================================================================
-   MAIN CONTENT AREA LAYOUT
-   - #main-content-area: HTMX target (div in app_base.html)
-   - Los partials generan: content-header + page-content (sin ion-page)
+   HTMX TRANSITIONS
    ========================================================================== */
 
-#main-content-area {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 56px; /* Espacio para el tabbar */
+.htmx-swapping {
+  opacity: 0;
+  transition: opacity 150ms ease;
 }
 
-/* Content header - secondary header inside ion-content */
-.content-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--ion-background-color, #fff);
-  margin: 16px;
+.htmx-settling {
+  opacity: 1;
+  transition: opacity 200ms ease;
 }
 
-.content-header ion-toolbar {
-  --background: var(--ion-toolbar-background, var(--ion-background-color, #fff));
-  --border-width: 0 0 0.55px 0;
-  --border-color: var(--ion-toolbar-border-color, var(--ion-border-color, rgba(0, 0, 0, 0.2)));
+/* ==========================================================================
+   UTILITY
+   ========================================================================== */
+
+.hub-loading {
+  pointer-events: none;
+  opacity: 0.6;
 }
 
-body.dark .content-header {
-  background: var(--ion-background-color, #1e1e1e);
+
+body.hub-modal-open {
+  overflow: hidden;
 }
 
-body.dark .content-header ion-toolbar {
-  --border-color: var(--ion-toolbar-border-color, var(--ion-border-color, rgba(255, 255, 255, 0.1)));
+/* ==========================================================================
+   MODULE ICON COLORS
+   Colored backgrounds for module grid icons on the home dashboard.
+   ========================================================================== */
+/*
+.app-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
 }
 
-/* Page content container - scrollable area between header and tabbar */
-.page-content {
-  flex: 1;
-  min-height: 0;
+.app-icon-primary {
+  background: var(--color-primary);
 }
 
-/* Global tabbar - siempre visible, fijo en la parte de abajo */
-#main-content > ion-footer {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 100 !important;
-  background: var(--ion-tab-bar-background, var(--ion-background-color, #fff));
+.app-icon-secondary {
+  background: var(--color-secondary);
 }
 
-body.dark #main-content > ion-footer {
-  background: var(--ion-tab-bar-background, var(--ion-background-color-dark, #1e1e1e));
+.app-icon-success {
+  background: var(--color-success);
 }
 
-#global-tabbar {
-  --background: transparent;
+.app-icon-warning {
+  background: var(--color-warning);
 }
 
-#global-tabbar:empty {
-  display: none;
+.app-icon-error {
+  background: var(--color-error);
 }
+
+.app-icon-accent {
+  background: var(--color-accent, var(--color-secondary));
+}
+
+.app-icon-tertiary {
+  background: color-mix(in oklch, var(--color-primary) 60%, var(--color-secondary));
+}
+
+.app-icon-danger {
+  background: var(--color-error);
+}
+
+.app-icon-medium {
+  background: var(--color-base-400, #9ca3af);
+}
+
+.app-icon-dark {
+  background: var(--color-base-700, #374151);
+}
+*/

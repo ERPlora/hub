@@ -1,39 +1,65 @@
-{% load i18n ui component_tags %}
+{% load i18n djicons %}
+<div data-back-url="{% if role %}{% url 'main:roles:detail' role_id=role.id %}{% else %}{% url 'main:roles:list' %}{% endif %}" hidden></div>
 
-{% with page_title=role.display_name|default:_("Create Role") %}
-{% component "page" title=page_title back_hx_get="/roles/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {% fill "content" %}
-        <form method="post"
-              hx-post
-              hx-target="#main-content-area"
-              hx-push-url="true">
-            {% csrf_token %}
+<form method="post"
+      hx-post
+      hx-target="#main-content-area"
+      hx-push-url="true">
+    {% csrf_token %}
 
-            {% ui_card %}
-                {% ui_list_start %}
-                    {% if not role %}
-                    {% ui_input name="name" label=_("Role Name") value="" required=True helper_text=_("Lowercase letters and underscores only. Cannot be changed later.") %}
-                    {% endif %}
-                    {% ui_input name="display_name" label=_("Display Name") value=role.display_name|default:"" required=True %}
-                    <ion-item>
-                        <ion-textarea
-                            name="description"
-                            label="{% trans 'Description' %}"
-                            label-placement="floating"
-                            rows="3"
-                            placeholder="{% trans 'Optional description for this role' %}">{{ role.description|default:"" }}</ion-textarea>
-                    </ion-item>
-                {% ui_list_end %}
-            {% endui_card %}
-
-            <div class="ion-padding-top">
-                {% if role %}
-                {% ui_button type="submit" expand="block" label=_("Save Changes") icon="checkmark-outline" %}
-                {% else %}
-                {% ui_button type="submit" expand="block" label=_("Create Role") icon="add-outline" %}
+    <!-- Role Info Card -->
+    <div class="card glass mb-6">
+        <div class="card-body">
+            <div class="flex flex-col gap-4">
+                {% if not role %}
+                <!-- Role Name (only for new roles) -->
+                <div class="form-group">
+                    <label class="form-group-label" for="role-name">{% trans "Role Name" %} *</label>
+                    <input type="text"
+                           id="role-name"
+                           name="name"
+                           class="input"
+                           value=""
+                           required
+                           pattern="[a-z_]+"
+                           placeholder="{% trans 'e.g., warehouse_staff' %}">
+                    <span class="form-group-helper">{% trans "Lowercase letters and underscores only. Cannot be changed later." %}</span>
+                </div>
                 {% endif %}
+
+                <!-- Display Name -->
+                <div class="form-group">
+                    <label class="form-group-label" for="display-name">{% trans "Display Name" %} *</label>
+                    <input type="text"
+                           id="display-name"
+                           name="display_name"
+                           class="input"
+                           value="{{ role.display_name|default:'' }}"
+                           required
+                           placeholder="{% trans 'e.g., Warehouse Staff' %}">
+                </div>
+
+                <!-- Description -->
+                <div class="form-group">
+                    <label class="form-group-label" for="description">{% trans "Description" %}</label>
+                    <textarea id="description"
+                              name="description"
+                              class="textarea"
+                              rows="3"
+                              placeholder="{% trans 'Optional description for this role' %}">{{ role.description|default:'' }}</textarea>
+                </div>
             </div>
-        </form>
-    {% endfill %}
-{% endcomponent %}
-{% endwith %}
+        </div>
+    </div>
+
+    <!-- Submit Button -->
+    <button type="submit" class="btn btn-block color-primary">
+        {% if role %}
+            {% icon "checkmark-outline" %}
+            {% trans "Save Changes" %}
+        {% else %}
+            {% icon "add-outline" %}
+            {% trans "Create Role" %}
+        {% endif %}
+    </button>
+</form>

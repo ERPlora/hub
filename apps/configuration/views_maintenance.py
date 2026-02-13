@@ -11,7 +11,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.template.loader import render_to_string
 from django.urls import reverse
-from djicons import icon as render_icon
+import djicons
 
 
 def scan_orphaned_data(request):
@@ -20,14 +20,14 @@ def scan_orphaned_data(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <ion-card class="border-l-4 border-danger">
-                <ion-card-content class="flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
-                    <ion-label class="text-danger">Not authenticated</ion-label>
-                </ion-card-content>
-            </ion-card>
+                    <span class="text-danger">Not authenticated</span>
+                </div>
+            </div>
         '''
         return HttpResponse(html, status=401)
 
@@ -132,16 +132,16 @@ def scan_orphaned_data(request):
         total_orphans = len(orphaned_tables) + len(orphaned_migrations) + len(orphaned_media)
 
         if total_orphans == 0:
-            success_icon = render_icon("checkmark-circle-outline", css_class="text-2xl text-success")
+            success_icon = djicons.get("checkmark-circle-outline", css_class="text-2xl text-success")
             html = f'''
-                <ion-card class="border-l-4 border-success">
-                    <ion-card-content class="flex items-center gap-3">
+                <div class="card border-l-4 border-success">
+                    <div class="card-body flex items-center gap-3">
                         {success_icon}
-                        <ion-label class="text-success">
+                        <span class="text-success">
                             No orphaned data found
-                        </ion-label>
-                    </ion-card-content>
-                </ion-card>
+                        </span>
+                    </div>
+                </div>
             '''
         else:
             clean_url = reverse('configuration:clean_orphaned_data')
@@ -153,40 +153,38 @@ def scan_orphaned_data(request):
             if orphaned_media:
                 items.append(f'<li>{len(orphaned_media)} orphaned media folders</li>')
 
-            trash_icon = render_icon("trash-outline", slot="start")
+            trash_icon = djicons.get("trash-outline")
             html = f'''
-                <ion-card class="border-l-4 border-warning">
-                    <ion-card-content>
-                        <ion-label class="font-semibold text-warning block mb-2">
+                <div class="card border-l-4 border-warning">
+                    <div class="card-body">
+                        <span class="font-semibold text-warning block mb-2">
                             Orphaned Data Found:
-                        </ion-label>
+                        </span>
                         <ul class="m-0 pl-5 text-medium text-sm">
                             {''.join(items)}
                         </ul>
-                        <ion-button
-                            color="danger"
-                            size="small"
+                        <button
+                            class="btn btn-sm color-error mt-3"
                             hx-post="{clean_url}"
-                            hx-target="#scan-results"
-                            class="mt-3">
+                            hx-target="#scan-results">
                             {trash_icon}
                             Clean Orphaned Data
-                        </ion-button>
-                    </ion-card-content>
-                </ion-card>
+                        </button>
+                    </div>
+                </div>
             '''
 
         return HttpResponse(html)
 
     except Exception as e:
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <ion-card class="border-l-4 border-danger">
-                <ion-card-content class="flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
-                    <ion-label class="text-danger">Error: {str(e)}</ion-label>
-                </ion-card-content>
-            </ion-card>
+                    <span class="text-danger">Error: {str(e)}</span>
+                </div>
+            </div>
         '''
         return HttpResponse(html, status=500)
 
@@ -197,27 +195,27 @@ def clean_orphaned_data(request):
     """
     # Only allow POST
     if request.method != 'POST':
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <ion-card class="border-l-4 border-danger">
-                <ion-card-content class="flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
-                    <ion-label class="text-danger">Method not allowed</ion-label>
-                </ion-card-content>
-            </ion-card>
+                    <span class="text-danger">Method not allowed</span>
+                </div>
+            </div>
         '''
         return HttpResponse(html, status=405)
 
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <ion-card class="border-l-4 border-danger">
-                <ion-card-content class="flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
-                    <ion-label class="text-danger">Not authenticated</ion-label>
-                </ion-card-content>
-            </ion-card>
+                    <span class="text-danger">Not authenticated</span>
+                </div>
+            </div>
         '''
         return HttpResponse(html, status=401)
 
@@ -347,35 +345,35 @@ def clean_orphaned_data(request):
         total_cleaned = len(orphaned_tables) + len(orphaned_migrations) + len(orphaned_media)
 
         # Return HTML for HTMX
-        success_icon = render_icon("checkmark-circle-outline", css_class="text-2xl text-success")
+        success_icon = djicons.get("checkmark-circle-outline", css_class="text-2xl text-success")
         html = f'''
-            <ion-card class="border-l-4 border-success">
-                <ion-card-content>
+            <div class="card border-l-4 border-success">
+                <div class="card-body">
                     <div class="flex items-center gap-3 mb-2">
                         {success_icon}
-                        <ion-label class="font-semibold text-success">
+                        <span class="font-semibold text-success">
                             Successfully cleaned {total_cleaned} orphaned items
-                        </ion-label>
+                        </span>
                     </div>
                     <ul class="m-0 pl-5 text-medium text-sm">
                         <li>{len(orphaned_tables)} database tables deleted</li>
                         <li>{len(orphaned_migrations)} migration records deleted</li>
                         <li>{len(orphaned_media)} media folders deleted</li>
                     </ul>
-                </ion-card-content>
-            </ion-card>
+                </div>
+            </div>
         '''
 
         return HttpResponse(html)
 
     except Exception as e:
-        alert_icon = render_icon("alert-circle-outline", css_class="text-2xl text-danger")
+        alert_icon = djicons.get("alert-circle-outline", css_class="text-2xl text-danger")
         html = f'''
-            <ion-card class="border-l-4 border-danger">
-                <ion-card-content class="flex items-center gap-3">
+            <div class="card border-l-4 border-danger">
+                <div class="card-body flex items-center gap-3">
                     {alert_icon}
-                    <ion-label class="text-danger">Error: {str(e)}</ion-label>
-                </ion-card-content>
-            </ion-card>
+                    <span class="text-danger">Error: {str(e)}</span>
+                </div>
+            </div>
         '''
         return HttpResponse(html, status=500)

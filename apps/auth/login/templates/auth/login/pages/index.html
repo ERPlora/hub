@@ -1,194 +1,293 @@
 {% extends "base.html" %}
-{% load static i18n ui djicons %}
+{% load static i18n djicons %}
 
 {% block title %}ERPlora Hub - {% trans "Login" %}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/pages/login.css' %}">
+<style>
+    /* Background decorations on the .page (fixed viewport, no scroll) */
+    .login-bg {
+        background: var(--color-base-200);
+        color: var(--color-base-content);
+    }
+
+    .login-bg::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background:
+            radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
+            radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 40% at 50% 50%, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .login-bg::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image:
+            linear-gradient(color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px),
+            linear-gradient(90deg, color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px);
+        background-size: 60px 60px;
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /* Scrollable content centers its child */
+    .login-content {
+        display: flex;
+        align-items: safe center;
+        justify-content: center;
+        padding: 1.5rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Logo */
+    .login-logo img {
+        width: 72px;
+        height: 72px;
+        margin-bottom: 1rem;
+        filter: drop-shadow(0 4px 24px color-mix(in oklch, var(--color-primary) 30%, transparent));
+    }
+    .login-logo h1 { font-size: 2rem; font-weight: 700; margin: 0 0 0.25rem; letter-spacing: -0.02em; }
+    .login-logo p { color: color-mix(in oklch, var(--color-base-content) 50%, transparent); font-size: 0.875rem; margin: 0; letter-spacing: 0.04em; text-transform: uppercase; }
+
+    /* Employee grid */
+    .employee-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 1rem;
+    }
+
+    .pin-confirm-message { margin: 1rem 0; color: var(--color-primary); font-weight: 500; }
+</style>
 {% endblock %}
 
 {% block content %}
 <div x-data="loginApp()" x-init="init()">
     <!-- Theme Toggle -->
-    <ion-button fill="clear" @click="toggleTheme()" class="theme-toggle">
-        <ion-icon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
-    </ion-button>
+    <button class="btn btn-glass btn-circle fixed top-6 right-6 z-50" @click="toggleTheme()">
+        <span x-show="isDark">{% icon "sunny-outline" %}</span>
+        <span x-show="!isDark">{% icon "moon-outline" %}</span>
+    </button>
 
-    <!-- Login Container -->
-    <div class="login-container">
-        <ion-card class="login-card">
+    <!-- Page (.page = fixed viewport grid, .content = scrollable) -->
+    <div class="page login-bg" style="height: 100dvh;">
+      <div class="content login-content">
+        <div class="w-full max-w-md">
             <!-- Logo -->
-            <div class="login-logo">
+            <div class="login-logo flex flex-col items-center text-center mb-8">
                 <img src="{% static 'img/logo.png' %}" alt="ERPlora">
                 <h1>ERPlora</h1>
                 <p>{% trans "Business Management System" %}</p>
             </div>
 
-            <ion-card-content>
-                <!-- Login Tabs -->
-                <ion-segment :value="loginMode" class="login-segment">
-                    <ion-segment-button value="local" @click="loginMode = 'local'">
-                        <ion-label>{% trans "Local Login" %}</ion-label>
-                    </ion-segment-button>
-                    <ion-segment-button value="cloud" @click="loginMode = 'cloud'">
-                        <ion-label>{% trans "Cloud Login" %}</ion-label>
-                    </ion-segment-button>
-                </ion-segment>
-
-                <!-- Local Login (Employee Selection + PIN) -->
-                <div x-show="loginMode === 'local'" x-cloak>
-                    <!-- Employee Selection -->
-                    <div x-show="!selectedEmployee" class="employee-selection">
-                        <h2>{% trans "Select your profile" %}</h2>
-
-                        <div class="employee-grid">
-                            <template x-for="employee in employees" :key="employee.id">
-                                <div class="employee-card" @click="selectEmployee(employee)">
-                                    <ion-card>
-                                        <ion-card-content>
-                                            <ion-avatar>
-                                                <div class="avatar-circle">
-                                                    <span x-text="employee.initials"></span>
-                                                </div>
-                                            </ion-avatar>
-                                            <p class="employee-name" x-text="employee.name"></p>
-                                            <ion-chip :color="employee.roleColor">
-                                                <ion-label x-text="employee.role"></ion-label>
-                                            </ion-chip>
-                                        </ion-card-content>
-                                    </ion-card>
-                                </div>
-                            </template>
-                        </div>
+            <!-- Login Card -->
+            <div class="card glass">
+                <div class="card-body">
+                    <!-- Login Tabs -->
+                    <div class="segment segment-block mb-6">
+                        <button type="button"
+                                class="segment-btn"
+                                :class="{ 'segment-btn-selected': loginMode === 'local' }"
+                                @click="loginMode = 'local'">
+                            {% icon "key-outline" class="segment-btn-icon" %}
+                            <span class="segment-btn-label">{% trans "PIN" %}</span>
+                        </button>
+                        <button type="button"
+                                class="segment-btn"
+                                :class="{ 'segment-btn-selected': loginMode === 'cloud' }"
+                                @click="loginMode = 'cloud'">
+                            {% icon "mail-outline" class="segment-btn-icon" %}
+                            <span class="segment-btn-label">{% trans "Email" %}</span>
+                        </button>
                     </div>
 
-                    <!-- PIN Entry -->
-                    <div x-show="selectedEmployee" x-cloak>
-                        <div class="pin-section">
-                            <ion-avatar>
-                                <div class="avatar-circle">
+                    <!-- Local Login (Employee Selection + PIN) -->
+                    <div x-show="loginMode === 'local'" x-cloak>
+                        <!-- Employee Selection -->
+                        <div x-show="!selectedEmployee">
+                            <p class="text-center text-sm text-base-content/60 mb-4">{% trans "Select your profile" %}</p>
+
+                            <div class="employee-grid">
+                                <template x-for="employee in employees" :key="employee.id">
+                                    <div class="employee-card glass employee-card-clickable"
+                                         @click="selectEmployee(employee)">
+                                        <div class="employee-card-avatar" :class="'employee-card-avatar-' + employee.avatarColor">
+                                            <span x-text="employee.initials"></span>
+                                        </div>
+                                        <div class="employee-card-info">
+                                            <p class="employee-card-name" x-text="employee.name"></p>
+                                        </div>
+                                        <span class="chip chip-sm glass" x-text="employee.role"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- PIN Entry -->
+                        <div x-show="selectedEmployee" x-cloak>
+                            <div class="pinpad">
+                                <!-- Avatar + Name -->
+                                <div class="pinpad-avatar avatar-primary">
                                     <span x-text="selectedEmployee?.initials"></span>
                                 </div>
-                            </ion-avatar>
-                            <h2 x-text="selectedEmployee?.name"></h2>
-                            <p>{% trans "Enter your PIN" %}</p>
-                        </div>
+                                <h2 class="pinpad-title" x-text="selectedEmployee?.name"></h2>
+                                <p class="pinpad-label">{% trans "Enter your PIN" %}</p>
 
-                        <!-- PIN Dots -->
-                        <div class="pin-dots">
+                                <!-- PIN Dots -->
+                                <div class="pinpad-dots">
+                                    <template x-for="i in 4">
+                                        <div class="pinpad-dot"
+                                             :class="{
+                                                 'pinpad-dot-filled': pinInput.length >= i,
+                                                 'pinpad-dot-error': pinError
+                                             }"></div>
+                                    </template>
+                                </div>
+
+                                <!-- Error -->
+                                <p x-show="pinError" x-cloak class="pinpad-error">
+                                    {% trans "Incorrect PIN" %}
+                                </p>
+
+                                <!-- Keypad -->
+                                <div class="pinpad-grid">
+                                    <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
+                                        <button type="button"
+                                                class="pinpad-key"
+                                                @click="addPinDigit(num)"
+                                                x-text="num"></button>
+                                    </template>
+                                    <button type="button"
+                                            class="pinpad-key"
+                                            @click="selectedEmployee = null; pinInput = ''; pinError = false;">
+                                        {% icon "arrow-back-outline" %}
+                                    </button>
+                                    <button type="button"
+                                            class="pinpad-key"
+                                            @click="addPinDigit(0)">0</button>
+                                    <button type="button"
+                                            class="pinpad-key"
+                                            @click="clearPinDigit()">
+                                        {% icon "backspace-outline" %}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cloud Login (Email/Password) -->
+                    <div x-show="loginMode === 'cloud'" x-cloak>
+                        <form @submit.prevent="cloudLogin()">
+                            <div class="form-group mb-4">
+                                <label class="form-group-label" for="cloud-email">{% trans "Email" %}</label>
+                                <input type="email"
+                                       id="cloud-email"
+                                       class="input glass"
+                                       x-model="cloudCredentials.email"
+                                       placeholder="{% trans 'your@email.com' %}"
+                                       required>
+                            </div>
+
+                            <div class="form-group mb-6" x-data="{ showPassword: false }">
+                                <label class="form-group-label" for="cloud-password">{% trans "Password" %}</label>
+                                <label class="input glass">
+                                    <input :type="showPassword ? 'text' : 'password'"
+                                           id="cloud-password"
+                                           class="grow"
+                                           x-model="cloudCredentials.password"
+                                           placeholder="********"
+                                           required>
+                                    <button type="button"
+                                            class="opacity-60 hover:opacity-100 cursor-pointer bg-transparent border-none p-0"
+                                            @click="showPassword = !showPassword">
+                                        <template x-if="!showPassword">
+                                            {% icon "eye-outline" %}
+                                        </template>
+                                        <template x-if="showPassword">
+                                            {% icon "eye-off-outline" %}
+                                        </template>
+                                    </button>
+                                </label>
+                            </div>
+
+                            <button type="submit"
+                                    class="btn btn-block color-primary"
+                                    :class="{ 'btn-loading': cloudLoading }"
+                                    :disabled="cloudLoading">
+                                <span x-text="cloudLoading ? '{% trans "Logging in..." %}' : '{% trans "Login" %}'"></span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div><!-- /.content -->
+    </div><!-- /.page -->
+
+    <!-- PIN Setup Modal -->
+    <div class="modal-backdrop"
+         :data-state="showPinSetup ? 'open' : 'closed'"
+         @click.self="showPinSetup = false">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Setup your PIN" %}</h3>
+            </div>
+            <div class="modal-body">
+                <div class="text-center p-6">
+                    <div class="mb-8">
+                        {% icon "key-outline" %}
+                        <h2 class="text-xl font-semibold mt-4 mb-2">{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
+                        <p class="text-base-content/60">{% trans "Setup a 4-digit PIN for quick access" %}</p>
+                    </div>
+
+                    <!-- PIN Setup Pad -->
+                    <div class="pinpad">
+                        <div class="pinpad-dots">
                             <template x-for="i in 4">
-                                <div class="pin-dot" :class="pinInput.length >= i ? 'filled' : ''"></div>
+                                <div class="pinpad-dot"
+                                     :class="{
+                                         'pinpad-dot-filled': setupPinInput.length >= i,
+                                         'pinpad-dot-error': setupPinError,
+                                         'pinpad-dot-success': setupPinConfirm && setupPinInput.length >= i
+                                     }"></div>
                             </template>
                         </div>
 
-                        <!-- Error Message -->
-                        <div x-show="pinError" x-cloak class="pin-error">
-                            <ion-chip color="danger">
-                                <ion-icon name="alert-circle-outline"></ion-icon>
-                                <ion-label>{% trans "Incorrect PIN" %}</ion-label>
-                            </ion-chip>
+                        <div x-show="setupPinConfirm" x-cloak class="pin-confirm-message">
+                            <p>{% trans "Confirm your PIN" %}</p>
                         </div>
 
-                        <!-- Keypad -->
-                        <div class="keypad">
+                        <p x-show="setupPinError" x-cloak class="pinpad-error">
+                            {% trans "PINs don't match" %}
+                        </p>
+
+                        <div class="pinpad-grid">
                             <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
-                                <ion-button expand="block" fill="outline" @click="addPinDigit(num)" x-text="num"></ion-button>
+                                <button type="button"
+                                        class="pinpad-key"
+                                        @click="addSetupPinDigit(num)"
+                                        x-text="num"></button>
                             </template>
-                            <ion-button expand="block" fill="clear" @click="selectedEmployee = null; pinInput = ''; pinError = false;">
-                                <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
-                            </ion-button>
-                            <ion-button expand="block" fill="outline" @click="addPinDigit(0)">0</ion-button>
-                            <ion-button expand="block" fill="clear" @click="clearPinDigit()">
-                                <ion-icon slot="icon-only" name="backspace-outline"></ion-icon>
-                            </ion-button>
+                            <button type="button" class="pinpad-key pinpad-key-hidden"></button>
+                            <button type="button"
+                                    class="pinpad-key"
+                                    @click="addSetupPinDigit(0)">0</button>
+                            <button type="button"
+                                    class="pinpad-key"
+                                    @click="clearSetupPinDigit()">
+                                {% icon "backspace-outline" %}
+                            </button>
                         </div>
                     </div>
                 </div>
-
-                <!-- Cloud Login (Email/Password) -->
-                <div x-show="loginMode === 'cloud'" x-cloak>
-                    <form @submit.prevent="cloudLogin()" class="cloud-login-form">
-                        <div class="form-field">
-                            <ion-label>{% trans "Email" %}</ion-label>
-                            <ion-input
-                                x-model="cloudCredentials.email"
-                                type="email"
-                                placeholder="{% trans 'your@email.com' %}"
-                                fill="outline"
-                                required>
-                            </ion-input>
-                        </div>
-
-                        <div class="form-field">
-                            <ion-label>{% trans "Password" %}</ion-label>
-                            <ion-input
-                                x-model="cloudCredentials.password"
-                                type="password"
-                                placeholder="********"
-                                fill="outline"
-                                required>
-                                <ion-input-password-toggle slot="end"></ion-input-password-toggle>
-                            </ion-input>
-                        </div>
-
-                        <ion-button type="submit" expand="block" :disabled="cloudLoading">
-                            <ion-spinner x-show="cloudLoading" name="crescent" style="width: 20px; height: 20px; margin-right: 8px;"></ion-spinner>
-                            <span x-text="cloudLoading ? '{% trans "Logging in..." %}' : '{% trans "Login" %}'"></span>
-                        </ion-button>
-                    </form>
-                </div>
-            </ion-card-content>
-        </ion-card>
-    </div>
-
-    <!-- PIN Setup Modal -->
-    <ion-modal :is-open="showPinSetup" @didDismiss="showPinSetup = false">
-        <ion-header>
-            <ion-toolbar>
-                <ion-title>{% trans "Setup your PIN" %}</ion-title>
-            </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-            <div class="pin-setup-content">
-                <div class="pin-setup-header">
-                    {% icon "key-outline" %}
-                    <h2>{% trans "Welcome" %}, <span x-text="newUser?.name"></span></h2>
-                    <p>{% trans "Setup a 4-digit PIN for quick access" %}</p>
-                </div>
-
-                <!-- PIN Setup Dots -->
-                <div class="pin-dots">
-                    <template x-for="i in 4">
-                        <div class="pin-dot" :class="setupPinInput.length >= i ? 'filled' : ''"></div>
-                    </template>
-                </div>
-
-                <div x-show="setupPinConfirm" x-cloak class="pin-confirm-message">
-                    <p>{% trans "Confirm your PIN" %}</p>
-                </div>
-
-                <!-- Error Message -->
-                <div x-show="setupPinError" x-cloak class="pin-error">
-                    <ion-chip color="danger">
-                        <ion-icon name="alert-circle-outline"></ion-icon>
-                        <ion-label>{% trans "PINs don't match" %}</ion-label>
-                    </ion-chip>
-                </div>
-
-                <!-- Keypad -->
-                <div class="keypad">
-                    <template x-for="num in [1, 2, 3, 4, 5, 6, 7, 8, 9]">
-                        <ion-button expand="block" fill="outline" @click="addSetupPinDigit(num)" x-text="num"></ion-button>
-                    </template>
-                    <div></div>
-                    <ion-button expand="block" fill="outline" @click="addSetupPinDigit(0)">0</ion-button>
-                    <ion-button expand="block" fill="clear" @click="clearSetupPinDigit()">
-                        <ion-icon slot="icon-only" name="backspace-outline"></ion-icon>
-                    </ion-button>
-                </div>
             </div>
-        </ion-content>
-    </ion-modal>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -219,8 +318,6 @@
             setupPinError: false,
 
             init() {
-                // Dark mode is already applied by base.html
-                // Sync localStorage for consistency
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
             },
 
@@ -363,10 +460,13 @@
 
             async toggleTheme() {
                 this.isDark = !this.isDark;
-                document.body.classList.toggle('dark');
+                if (this.isDark) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
 
-                // Save to database
                 try {
                     await fetch('{% url "main:settings" %}', {
                         method: 'POST',
@@ -381,13 +481,17 @@
                 }
             },
 
-            async showToast(message, color = 'primary') {
-                const toast = document.createElement('ion-toast');
-                toast.message = message;
-                toast.duration = 2000;
-                toast.color = color;
-                document.body.appendChild(toast);
-                await toast.present();
+            async showToast(message, type = 'primary') {
+                if (typeof Notify !== 'undefined' && Notify[type]) {
+                    Notify[type]('', message);
+                } else {
+                    const toast = document.createElement('div');
+                    toast.className = `snackbar snackbar-${type} snackbar-visible`;
+                    toast.innerHTML = `<span class="snackbar-message">${message}</span>`;
+                    toast.style.cssText = 'position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 9999;';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 2000);
+                }
             }
         }
     }

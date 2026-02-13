@@ -45,14 +45,14 @@ The system loads the icon from: `{module}/static/icons/{MODULE_ICON}`
 
 - If `MODULE_ICON = "icon.svg"` → loads `sales/static/icons/icon.svg`
 - If `MODULE_ICON = "icon.png"` → loads `sales/static/icons/icon.png`
-- If not found → falls back to `cube-outline` (default Ionicon)
+- If not found → falls back to `cube-outline` (default icon)
 
 ## Recommended Icon Source: React Icons
 
 **Primary source for module icons**: [https://react-icons.github.io/react-icons/](https://react-icons.github.io/react-icons/)
 
 React Icons provides access to multiple icon libraries in one place:
-- **Ionicons 5** (io5) - Already used in ERPlora, consistent style
+- **Ionicons 5** (io5) - Consistent style
 - **Heroicons** (hi, hi2) - Clean, modern design
 - **Feather Icons** (fi) - Minimal, stroke-based
 - **Phosphor Icons** (pi) - Flexible weights

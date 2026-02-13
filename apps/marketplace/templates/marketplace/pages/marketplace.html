@@ -1,7 +1,21 @@
-{% extends "ui/app_base.html" %}
-{% load i18n static %}
+{% extends "page_base.html" %}
+{% load i18n static djicons %}
 
 {% block page_title %}{{ page_title }}{% endblock %}
+
+{% block page_actions %}
+{% if cart_count %}
+<a class="btn btn-sm btn-ghost"
+   href="/marketplace/cart/"
+   hx-get="/marketplace/cart/"
+   hx-target="#main-content-area"
+   hx-push-url="true"
+   style="position: relative;">
+    {% icon "cart-outline" %}
+    <span class="badge badge-sm color-error" style="position: absolute; top: -4px; right: -4px;">{{ cart_count }}</span>
+</a>
+{% endif %}
+{% endblock %}
 
 {% block page_content %}
 {% include "marketplace/partials/marketplace_content.html" %}

@@ -1,126 +1,11 @@
-{% load i18n ui djicons %}
+{% load i18n djicons %}
 
 {% if products %}
-<ion-grid class="p-0">
-    <ion-row>
-        {% for product in products %}
-        <ion-col size="12" size-md="6" size-lg="4">
-            <ion-card class="module-card m-0">
-                <ion-card-content>
-                    <div class="d-flex align-center gap-md">
-                        {# Module Icon #}
-                        <div class="module-icon-box module-icon-box--{{ product.category|default:'default' }}">
-                            {% icon product.icon|default:"cube-outline" %}
-                        </div>
-
-                        <div class="flex-1 min-w-0">
-                            <div class="d-flex align-center gap-sm flex-wrap">
-                                <a href="{% url 'marketplace:module_detail' product.slug %}"
-                                   hx-get="{% url 'marketplace:module_detail' product.slug %}"
-                                   hx-target="#main-content-area"
-                                   hx-push-url="true"
-                                   class="fw-semibold text-truncate m-0 fs-base module-card-title">{{ product.name }}</a>
-                                {% if product.is_featured %}
-                                <ion-badge color="warning" class="fs-xxs">{% trans "Featured" %}</ion-badge>
-                                {% endif %}
-                            </div>
-                            <p class="fs-sm text-medium m-0 mt-xxs">
-                                {% if product.author %}{% trans "by" %} {{ product.author }} • {% endif %}v{{ product.version|default:"1.0" }}
-                            </p>
-                        </div>
-
-                        {# Status Badge #}
-                        <div class="flex-shrink-0">
-                            {% if product.is_installed %}
-                            <ion-chip color="success">
-                                {% icon "checkmark-circle-outline" %}
-                                <ion-label>{% trans "Installed" %}</ion-label>
-                            </ion-chip>
-                            {% elif product.is_owned %}
-                            <ion-chip color="tertiary">
-                                {% icon "bag-check-outline" %}
-                                <ion-label>{% trans "Owned" %}</ion-label>
-                            </ion-chip>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <p class="fs-sm text-medium mb-md mt-md module-description">{{ product.description|default:"-"|truncatewords:20 }}</p>
-
-                    {# Stats Row #}
-                    <div class="d-flex align-center gap-md fs-sm text-medium mb-md">
-                        {% if product.rating %}
-                        <span class="d-inline-flex align-center gap-xs">
-                            {% icon "star" css_class="text-warning" %}
-                            {{ product.rating|floatformat:1 }}
-                        </span>
-                        {% endif %}
-                        {% if product.downloads %}
-                        <span class="d-inline-flex align-center gap-xs">
-                            {% icon "download-outline" %}
-                            {{ product.downloads }}
-                        </span>
-                        {% endif %}
-                        {% if product.category_name %}
-                        <span class="d-inline-flex align-center gap-xs">
-                            {% icon "pricetag-outline" %}
-                            {{ product.category_name }}
-                        </span>
-                        {% endif %}
-                    </div>
-
-                    {# Price Display #}
-                    <div class="d-flex justify-between align-center mb-md">
-                        <span class="fw-semibold fs-base">
-                            {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
-                            <span class="text-success">{% trans "Free" %}</span>
-                            {% elif product.module_type == 'subscription' %}
-                            <span class="text-primary">€{{ product.price }}/{% trans "mo" %}</span>
-                            {% else %}
-                            <span class="text-primary">€{{ product.price }}</span>
-                            {% endif %}
-                        </span>
-                    </div>
-
-                    {# Action Button #}
-                    <div class="module-card-actions">
-                        {% if product.is_installed %}
-                        <ion-button fill="clear" size="small" color="medium" disabled expand="block">
-                            {% icon "checkmark-circle-outline" slot="start" %}
-                            {% trans "Installed" %}
-                        </ion-button>
-                        {% elif product.is_owned %}
-                        <ion-button fill="clear" size="small" color="success" expand="block"
-                            data-action="download"
-                            data-module-slug="{{ product.slug }}"
-                            data-download-url="{{ product.download_url }}">
-                            {% icon "download-outline" slot="start" %}
-                            {% trans "Install" %}
-                        </ion-button>
-                        {% elif product.is_free or product.module_type == 'free' or product.price == 0 %}
-                        <ion-button fill="clear" size="small" color="primary" expand="block"
-                            data-action="install-free"
-                            data-module-id="{{ product.id }}"
-                            data-module-slug="{{ product.slug }}"
-                            data-download-url="{{ product.download_url|default:'' }}">
-                            {% icon "download-outline" slot="start" %}
-                            {% trans "Install" %}
-                        </ion-button>
-                        {% else %}
-                        <ion-button fill="clear" size="small" color="primary" expand="block"
-                            data-action="purchase"
-                            data-module-id="{{ product.id }}">
-                            {% icon "cart-outline" slot="start" %}
-                            {% trans "Purchase" %}
-                        </ion-button>
-                        {% endif %}
-                    </div>
-                </ion-card-content>
-            </ion-card>
-        </ion-col>
-        {% endfor %}
-    </ion-row>
-</ion-grid>
+<div class="module-grid module-grid-3">
+    {% for product in products %}
+    {% include "system/modules/partials/module_card.html" with module=product card_context='marketplace' %}
+    {% endfor %}
+</div>
 
 {% if has_more %}
 <!-- Infinite Scroll Trigger -->
@@ -128,28 +13,30 @@
      hx-get="{% url 'marketplace:products_list' store_type %}?cursor={{ next_cursor }}{% if search_query %}&q={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if industry_filter %}&industry={{ industry_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}"
      hx-trigger="intersect once threshold:0.1"
      hx-swap="outerHTML"
-     hx-indicator="#load-more-spinner"
-     class="d-flex justify-center py-lg">
-    <ion-spinner id="load-more-spinner" name="crescent" class="htmx-indicator"></ion-spinner>
+     class="flex justify-center py-8">
+    <div class="loading"></div>
 </div>
 {% endif %}
 
 {% else %}
 <!-- No Results -->
-<div class="ion-padding ion-text-center no-results">
-    {% icon "search-outline" style="font-size: 64px; color: var(--ion-color-medium);" %}
-    <h3>{% trans "No products found" %}</h3>
-    <p class="text-medium">{% trans "Try adjusting your search or filters" %}</p>
+<div class="flex flex-col items-center text-center py-12">
+    <div class="text-4xl mb-4 opacity-40">
+        {% icon "search-outline" %}
+    </div>
+    <h3 class="text-lg font-semibold mb-2">{% trans "No products found" %}</h3>
+    <p class="text-sm opacity-60">{% trans "Try adjusting your search or filters" %}</p>
 </div>
 {% endif %}
 
 <!-- Module action handlers -->
 <script>
+// Handle action button clicks
 document.addEventListener('click', function(e) {
-    const button = e.target.closest('ion-button[data-action]');
+    var button = e.target.closest('button[data-action]');
     if (!button) return;
 
-    const action = button.dataset.action;
+    var action = button.dataset.action;
     e.preventDefault();
     e.stopPropagation();
 
@@ -261,7 +148,10 @@ function setButtonLoading(button, loading) {
     if (!button) return;
     button.disabled = loading;
     if (loading) {
-        button.innerHTML = '<ion-spinner name="crescent"></ion-spinner>';
+        button.dataset.originalContent = button.innerHTML;
+        button.innerHTML = '<div class="loading loading-sm"></div>';
+    } else if (button.dataset.originalContent) {
+        button.innerHTML = button.dataset.originalContent;
     }
 }
 </script>

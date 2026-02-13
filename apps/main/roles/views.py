@@ -2,33 +2,147 @@
 Views for roles management.
 """
 
+from django.core.paginator import Paginator
+from django.db.models import Q, Count
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse
 from django.contrib import messages
+from django.views.decorators.http import require_POST
 from django.utils.translation import gettext as _
 
 from apps.accounts.decorators import admin_required
 from apps.accounts.models import Role, Permission, RolePermission
 from apps.core.services.permission_service import PermissionService
 from apps.core.htmx import htmx_view
+from apps.core.services import export_to_csv, export_to_excel
+
+SORT_FIELDS = {
+    'name': 'display_name',
+    'users': 'user_count',
+    'status': 'is_active',
+}
+
+PER_PAGE_CHOICES = [10, 25, 50, 100]
+
+
+def _build_list_context(hub_id, per_page=10):
+    """Build context dict for the roles list (used after mutations)."""
+    roles = Role.objects.filter(
+        hub_id=hub_id, is_deleted=False
+    ).annotate(user_count=Count('users')).order_by('-is_system', 'display_name')
+
+    paginator = Paginator(roles, per_page)
+    page_obj = paginator.get_page(1)
+
+    return {
+        'roles': page_obj,
+        'page_obj': page_obj,
+        'search_query': '',
+        'sort_field': 'name',
+        'sort_dir': 'asc',
+        'status_filter': '',
+        'type_filter': '',
+        'per_page': per_page,
+    }
+
+
+def _render_list(request, hub_id, per_page=10):
+    """Render the roles list partial after a mutation."""
+    context = _build_list_context(hub_id, per_page)
+    return render(request, 'main/roles/partials/roles_list.html', context)
 
 
 @admin_required
-@htmx_view('main/roles/pages/index.html', 'main/roles/partials/list_content.html')
+@htmx_view('main/roles/pages/index.html', 'main/roles/partials/content.html')
 def role_list(request):
-    """List all roles."""
+    """List all roles with search, sort, filter, pagination."""
     hub_id = request.session.get('hub_id')
+    search_query = request.GET.get('q', '').strip()
+    sort_field = request.GET.get('sort', 'name')
+    sort_dir = request.GET.get('dir', 'asc')
+    status_filter = request.GET.get('status', '')
+    type_filter = request.GET.get('type', '')
+    page_number = request.GET.get('page', 1)
+    per_page = int(request.GET.get('per_page', 10))
+    if per_page not in PER_PAGE_CHOICES:
+        per_page = 10
 
     roles = Role.objects.filter(
-        hub_id=hub_id,
-        is_deleted=False
-    ).prefetch_related('permissions', 'users').order_by('-is_system', 'name')
+        hub_id=hub_id, is_deleted=False
+    ).annotate(user_count=Count('users'))
 
-    return {
-        'roles': roles,
-        'page_title': _('Roles'),
-        'current_section': 'roles',
+    # Status filter
+    if status_filter == 'active':
+        roles = roles.filter(is_active=True)
+    elif status_filter == 'inactive':
+        roles = roles.filter(is_active=False)
+
+    # Type filter
+    if type_filter == 'system':
+        roles = roles.filter(is_system=True)
+    elif type_filter == 'custom':
+        roles = roles.filter(is_system=False)
+
+    # Search
+    if search_query:
+        roles = roles.filter(
+            Q(name__icontains=search_query) |
+            Q(display_name__icontains=search_query) |
+            Q(description__icontains=search_query)
+        )
+
+    # Sort
+    order_by = SORT_FIELDS.get(sort_field, 'display_name')
+    if sort_dir == 'desc':
+        order_by = f'-{order_by}'
+    roles = roles.order_by(order_by)
+
+    # Export
+    export_format = request.GET.get('export')
+    if export_format in ('csv', 'excel'):
+        export_fields = ['display_name', 'name', 'description', 'is_system', 'is_active', 'user_count']
+        export_headers = [
+            str(_('Display Name')), str(_('Name')), str(_('Description')),
+            str(_('System')), str(_('Active')), str(_('Users')),
+        ]
+        export_formatters = {
+            'is_system': lambda v: str(_('Yes')) if v else str(_('No')),
+            'is_active': lambda v: str(_('Active')) if v else str(_('Inactive')),
+        }
+        if export_format == 'csv':
+            return export_to_csv(
+                roles, fields=export_fields, headers=export_headers,
+                field_formatters=export_formatters, filename='roles.csv',
+            )
+        return export_to_excel(
+            roles, fields=export_fields, headers=export_headers,
+            field_formatters=export_formatters, filename='roles.xlsx',
+            sheet_name=str(_('Roles')),
+        )
+
+    paginator = Paginator(roles, per_page)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'roles': page_obj,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'sort_field': sort_field,
+        'sort_dir': sort_dir,
+        'status_filter': status_filter,
+        'type_filter': type_filter,
+        'per_page': per_page,
     }
+
+    # HTMX partial: swap only datatable body
+    if request.headers.get('HX-Request') and request.headers.get('HX-Target') == 'datatable-body':
+        return render(request, 'main/roles/partials/roles_list.html', context)
+
+    context.update({
+        'current_section': 'roles',
+        'page_title': _('Roles'),
+    })
+    return context
 
 
 @admin_required
@@ -229,6 +343,49 @@ def role_toggle_active(request, role_id):
         messages.success(request, _('Role deactivated.'))
 
     return redirect('main:roles:detail', role_id=role.id)
+
+
+@admin_required
+@require_POST
+def bulk_action(request):
+    """Bulk activate/deactivate/delete roles."""
+    hub_id = request.session.get('hub_id')
+    ids_str = request.POST.get('ids', '')
+    action = request.POST.get('action', '')
+
+    if not ids_str or not action:
+        return _render_list(request, hub_id)
+
+    ids = [uid.strip() for uid in ids_str.split(',') if uid.strip()]
+    roles = Role.objects.filter(hub_id=hub_id, id__in=ids, is_deleted=False)
+
+    # Exclude system roles from destructive actions
+    if action in ('deactivate', 'delete'):
+        system_count = roles.filter(is_system=True).count()
+        roles = roles.exclude(is_system=True)
+        if system_count:
+            messages.warning(request, _('System roles were excluded from this action.'))
+
+    count = roles.count()
+
+    if action == 'activate':
+        roles.update(is_active=True)
+        messages.success(request, _('%(count)d roles activated.') % {'count': count})
+    elif action == 'deactivate':
+        roles.update(is_active=False)
+        messages.success(request, _('%(count)d roles deactivated.') % {'count': count})
+    elif action == 'delete':
+        roles_with_users = roles.annotate(uc=Count('users')).filter(uc__gt=0)
+        skipped = roles_with_users.count()
+        deletable = roles.exclude(id__in=roles_with_users.values_list('id', flat=True))
+        deleted = deletable.count()
+        deletable.update(is_deleted=True)
+        if skipped:
+            messages.warning(request, _('%(count)d roles skipped (have assigned users).') % {'count': skipped})
+        if deleted:
+            messages.success(request, _('%(count)d roles deleted.') % {'count': deleted})
+
+    return _render_list(request, hub_id)
 
 
 @admin_required

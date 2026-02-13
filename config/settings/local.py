@@ -128,13 +128,14 @@ MODULE_STRICT_VALIDATION = False
 # RE-LOAD MODULES (override base.py loading)
 # =============================================================================
 
-# Clear modules loaded by base.py and reload from local modules dir
+# Clear any modules that base.py may have loaded, then reload with dependency checks
 def reload_local_modules():
-    """Reload modules from local ./modules/ directory"""
+    """Reload modules with dependency resolution."""
     global INSTALLED_APPS
+    import json
+    import re
 
-    # Remove any modules that were loaded from wrong directory
-    # Keep all third-party packages and hub apps, only filter out modules
+    # Remove any modules previously loaded by base.py
     third_party_apps = [
         'djmoney', 'django_htmx', 'djicons', 'django_components',
         'rest_framework', 'drf_spectacular', 'drf_spectacular_sidecar',
@@ -151,17 +152,79 @@ def reload_local_modules():
     if not MODULES_DIR.exists():
         return
 
+    # 1. Discover enabled modules
+    enabled_ids = set()
     for module_dir in MODULES_DIR.iterdir():
         if not module_dir.is_dir():
             continue
-        # Skip disabled modules (start with _ or .)
         if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
             continue
+        enabled_ids.add(module_dir.name)
 
-        if module_dir.name not in INSTALLED_APPS:
-            INSTALLED_APPS.append(module_dir.name)
-            print(f"[LOCAL] Loaded module: {module_dir.name}")
+    # 2. Read dependencies for each module
+    deps = {}
+    for mid in enabled_ids:
+        raw_deps = []
+        # Try module.py first
+        module_py_path = MODULES_DIR / mid / 'module.py'
+        if module_py_path.exists():
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(f"{mid}.module", module_py_path)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                raw_deps = getattr(mod, 'DEPENDENCIES', [])
+            except Exception:
+                pass
 
+        # Fallback to module.json
+        if not raw_deps:
+            module_json = MODULES_DIR / mid / 'module.json'
+            if module_json.exists():
+                try:
+                    with open(module_json, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    deps_value = data.get('dependencies', data.get('requires', []))
+                    if isinstance(deps_value, dict):
+                        raw_deps = deps_value.get('modules', [])
+                    else:
+                        raw_deps = deps_value
+                except Exception:
+                    pass
+
+        # Strip version specifiers
+        deps[mid] = [re.split(r'[><=!]', d)[0].strip() for d in raw_deps if d]
+
+    # 3. Remove modules with unmet dependencies (cascading)
+    to_load = set(enabled_ids)
+    changed = True
+    while changed:
+        changed = False
+        for mid in list(to_load):
+            missing = [d for d in deps.get(mid, []) if d not in to_load]
+            if missing:
+                to_load.discard(mid)
+                print(f"[LOCAL] Module '{mid}' skipped: missing dependencies {missing}")
+                changed = True
+
+    # 4. Topological sort
+    ordered = []
+    visited = set()
+    def visit(mid):
+        if mid in visited or mid not in to_load:
+            return
+        visited.add(mid)
+        for dep in deps.get(mid, []):
+            visit(dep)
+        ordered.append(mid)
+    for mid in sorted(to_load):
+        visit(mid)
+
+    # 5. Add to INSTALLED_APPS
+    for mid in ordered:
+        if mid not in INSTALLED_APPS:
+            INSTALLED_APPS.append(mid)
+            print(f"[LOCAL] Loaded module: {mid}")
 
 reload_local_modules()
 
@@ -224,3 +287,11 @@ if DEBUG_TOOLBAR_ENABLED:
     }
 
     print(f"[LOCAL] Debug Toolbar: ENABLED")
+
+# =============================================================================
+# DJANGO BROWSER RELOAD (auto-refresh on file changes)
+# =============================================================================
+
+INSTALLED_APPS += ['django_browser_reload']
+
+MIDDLEWARE += ['django_browser_reload.middleware.BrowserReloadMiddleware']

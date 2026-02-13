@@ -1,24 +1,104 @@
-{% load i18n ui component_tags %}
+{% load i18n djicons %}
 
-{% component "page" title=_("Add Employee") back_hx_get="/employees/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {% fill "content" %}
-        <form hx-post="{% url 'main:employee_add' %}"
-              hx-target="#main-content-area"
-              hx-push-url="{% url 'main:employees' %}">
-            {% csrf_token %}
-
-            {% ui_card %}
-                {% ui_list_start %}
-                    {% ui_input name="name" label=_("Name") required=True %}
-                    {% ui_input name="email" label=_("Email") type="email" required=True %}
-                    {% ui_select name="role_id" label=_("Role") options=role_options interface="popover" %}
-                    {% ui_input name="pin" label=_("PIN (4 digits)") type="password" maxlength="4" pattern="[0-9]{4}" required=True %}
-                {% ui_list_end %}
-            {% endui_card %}
-
-            <div class="ion-padding-top">
-                {% ui_button type="submit" expand="block" label=_("Add Employee") icon="checkmark-outline" %}
+<div class="page">
+    <!-- Header Toolbar -->
+    <header class="header">
+        <div class="glass mx-4" style="border-radius: 1rem; overflow: hidden; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 20px; margin-top: 0.8rem; position: relative; z-index: 1001;">
+            <div class="flex items-center">
+                <button class="btn btn-ghost btn-sm"
+                        hx-get="{% url 'main:employees' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                    {% icon "arrow-back-outline" %}
+                </button>
             </div>
-        </form>
-    {% endfill %}
-{% endcomponent %}
+            <div class="flex-1 flex items-center justify-center">
+                <h1 class="font-semibold">{% trans "Add Employee" %}</h1>
+            </div>
+            <div class="flex items-center gap-2"></div>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div style="flex: 1; overflow: auto;">
+        <div class="p-4">
+            <form hx-post="{% url 'main:employee_add' %}"
+                  hx-target="#main-content-area"
+                  hx-push-url="{% url 'main:employees' %}">
+                {% csrf_token %}
+
+                <!-- Employee Info Card -->
+                <div class="card glass mb-6">
+                    <div class="card-header">
+                        <h3 class="card-title">{% trans "Employee Information" %}</h3>
+                    </div>
+                    <div class="card-body">
+                        <!-- Name Input -->
+                        <div class="form-group mb-4">
+                            <label class="form-group-label" for="employee-name">{% trans "Name" %}</label>
+                            <input type="text"
+                                   id="employee-name"
+                                   name="name"
+                                   class="input"
+                                   placeholder="{% trans 'Full name' %}"
+                                   required>
+                        </div>
+
+                        <!-- Email Input -->
+                        <div class="form-group mb-4">
+                            <label class="form-group-label" for="employee-email">{% trans "Email" %}</label>
+                            <input type="email"
+                                   id="employee-email"
+                                   name="email"
+                                   class="input"
+                                   placeholder="{% trans 'email@example.com' %}"
+                                   required>
+                        </div>
+
+                        <!-- Role Select -->
+                        <div class="form-group mb-4">
+                            <label class="form-group-label" for="employee-role">{% trans "Role" %}</label>
+                            <select id="employee-role"
+                                    name="role_id"
+                                    class="select">
+                                <option value="">{% trans "Select a role" %}</option>
+                                {% for option in role_options %}
+                                <option value="{{ option.value }}">{{ option.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Card -->
+                <div class="card glass mb-6">
+                    <div class="card-header">
+                        <h3 class="card-title">{% trans "Security" %}</h3>
+                    </div>
+                    <div class="card-body">
+                        <!-- PIN Input -->
+                        <div class="form-group">
+                            <label class="form-group-label" for="employee-pin">{% trans "PIN (4 digits)" %}</label>
+                            <input type="password"
+                                   id="employee-pin"
+                                   name="pin"
+                                   class="input"
+                                   maxlength="4"
+                                   pattern="[0-9]{4}"
+                                   inputmode="numeric"
+                                   placeholder="****"
+                                   required>
+                            <span class="form-group-helper">{% trans "4-digit PIN for quick access" %}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn btn-block color-primary">
+                    {% icon "checkmark-outline" %}
+                    {% trans "Add Employee" %}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>

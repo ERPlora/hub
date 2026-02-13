@@ -1,6 +1,0 @@
-{% load djicons %}<ion-button fill="clear" @click="toggleSidebar()" {% if css_class %}class="{{ css_class }}"{% endif %}>
-    <span slot="icon-only">
-        <span x-show="!sidebarOpen">{% icon "menu-outline" %}</span>
-        <span x-show="sidebarOpen" x-cloak>{% icon "close-outline" %}</span>
-    </span>
-</ion-button>

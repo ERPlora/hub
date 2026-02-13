@@ -95,7 +95,7 @@ urlpatterns = [
     path('', include('apps.auth.login.urls')),
 
     # Setup wizard (initial configuration)
-    path('setup/', include('apps.main.setup.urls')),
+    path('setup/', include('apps.setup.urls')),
 
     # Main UI routes (flat structure for clear active states)
     path('', include('apps.main.urls')),  # Home at /
@@ -131,3 +131,9 @@ if settings.DEBUG:
         urlpatterns = [
             path('__debug__/', include(debug_toolbar.urls)),
         ] + urlpatterns
+
+    # Django Browser Reload (auto-refresh on file changes)
+    if 'django_browser_reload' in settings.INSTALLED_APPS:
+        urlpatterns += [
+            path('__reload__/', include('django_browser_reload.urls')),
+        ]

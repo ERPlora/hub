@@ -44,7 +44,7 @@ message = _("%(count)d products found") % {'count': total}
 After adding new `{% trans %}` tags or `_()` calls:
 
 ```bash
-cd /Users/ioan/Desktop/code/cpos/hub
+cd /Users/ioan/Desktop/code/ERPlora/hub
 
 # Extract translatable strings to .po files
 .venv/bin/python manage.py makemessages -l es --ignore=.venv

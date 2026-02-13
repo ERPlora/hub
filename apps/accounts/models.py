@@ -356,7 +356,7 @@ class LocalUser(HubBaseModel):
         return self.name[0].upper() if self.name else "?"
 
     def get_role_color(self):
-        """Return Ionic color for user role."""
+        """Return UX color for user role."""
         role_colors = {
             'admin': 'primary',
             'manager': 'tertiary',

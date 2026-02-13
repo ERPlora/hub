@@ -1,10 +1,6 @@
 """
 Main Index Views - Dashboard home with iOS-style module grid
 """
-import json
-from django.shortcuts import redirect
-from django.utils import timezone
-from datetime import timedelta
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 
@@ -48,16 +44,11 @@ def get_modules_for_grid(menu_items):
 @htmx_view('main/index/pages/index.html', 'main/index/partials/content.html')
 def index(request):
     """Dashboard home page with iOS-style module grid"""
-    # Get modules from module loader (same source as context processor)
     from apps.modules_runtime.loader import module_loader
     menu_items = module_loader.get_menu_items()
-
-    # Convert to grid-friendly format
-    modules = get_modules_for_grid(menu_items)
 
     return {
         'current_section': 'home',
         'page_title': 'Home',
-        'modules': modules,
-        'modules_json': json.dumps(modules),
+        'modules': get_modules_for_grid(menu_items),
     }
