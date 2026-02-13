@@ -144,7 +144,7 @@ class ModulesRuntimeConfig(AppConfig):
         print("="*80)
 
         from .loader import module_loader
-        from apps.core.runtime_manager import register_module_urls
+        from apps.modules_runtime.router import register_module_urls
 
         # 1️⃣ Load all active modules from filesystem
         loaded_count = module_loader.load_all_active_modules()
@@ -269,7 +269,7 @@ def load_module(self, module_id: str) -> bool:
 #### 5.3 Register URLs Dynamically
 
 ```python
-# apps/core/runtime_manager.py
+# apps/modules_runtime/router.py
 
 def register_module_urls(module_id: str, app_name: str, prefix: str):
     """

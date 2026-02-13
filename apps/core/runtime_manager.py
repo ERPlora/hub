@@ -1,6 +1,6 @@
 """
-Module Runtime Manager for CPOS Hub
-Handles module installation, dependency management, and lifecycle in PyInstaller environment
+Module Runtime Manager for ERPlora Hub
+Handles module installation, dependency management, and lifecycle.
 """
 import os
 import sys
@@ -18,15 +18,13 @@ from django.core.management import call_command
 class ModuleRuntimeManager:
     """
     Manages module installation and dependencies in the Hub runtime environment.
-    Designed to work in PyInstaller bundled apps across Windows, macOS, and Linux.
     """
 
     def __init__(self):
         self.modules_dir = Path(settings.BASE_DIR) / 'modules'
         self.modules_dir.mkdir(exist_ok=True)
 
-        # Create cross-platform temp directory for module uploads
-        # Uses system temp dir (works on Windows, macOS, Linux)
+        # Create temp directory for module uploads
         self.temp_dir = Path(tempfile.gettempdir()) / 'cpos_hub_modules'
         self.temp_dir.mkdir(exist_ok=True)
 
@@ -194,8 +192,6 @@ class ModuleRuntimeManager:
     def _install_python_dependencies(self, module_path: Path) -> Dict:
         """
         Install Python dependencies from requirements.txt using pip.
-
-        Works in PyInstaller environment by detecting the correct pip location.
         """
         result = {
             'success': False,
@@ -246,31 +242,12 @@ class ModuleRuntimeManager:
 
     def _get_pip_command(self) -> str:
         """
-        Get the correct pip command based on OS and PyInstaller environment.
+        Get the correct pip command for the current Python environment.
 
         Returns:
-            Path to pip executable
+            pip command string
         """
-        # Check if running in PyInstaller bundle
-        if getattr(sys, 'frozen', False):
-            # Running in PyInstaller bundle
-            bundle_dir = Path(sys._MEIPASS)
-
-            if sys.platform == 'win32':
-                # Windows
-                pip_path = bundle_dir / 'Scripts' / 'pip.exe'
-                if pip_path.exists():
-                    return str(pip_path)
-                return 'pip.exe'
-            else:
-                # macOS / Linux
-                pip_path = bundle_dir / 'bin' / 'pip'
-                if pip_path.exists():
-                    return str(pip_path)
-                return 'pip'
-        else:
-            # Running in normal Python environment
-            return f'{sys.executable} -m pip'
+        return f'{sys.executable} -m pip'
 
     def _run_migrations(self, module_id: str) -> Dict:
         """

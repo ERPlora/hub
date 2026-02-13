@@ -1,107 +1,114 @@
-{% load i18n ui component_tags %}
+{% load i18n djicons %}
 
-{% component "page" title=_("My Modules") subtitle=_("Installed modules in your Hub") %}
-    {% fill "content" %}
-        <!-- Search Bar -->
-        <form id="modules-search-form"
-            hx-get="{% url 'mymodules:index' %}"
-            hx-target="#modules-list"
-            hx-swap="innerHTML"
-            hx-trigger="submit, ionInput from:#modules-search delay:300ms"
-            hx-indicator="#modules-loading">
+<!-- Search -->
+<form id="modules-search-form"
+      hx-get="{% url 'mymodules:index' %}"
+      hx-target="#modules-list"
+      hx-swap="innerHTML"
+      hx-trigger="submit, input from:#modules-search delay:300ms">
+    <div class="mb-4">
+        <label class="input rounded-full">
+            <svg xmlns="http://www.w3.org/2000/svg" class="ionicon icon opacity-50" viewBox="0 0 512 512" width="20" height="20" aria-hidden="true"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"></path><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32" d="M338.29 338.29L448 448"></path></svg>
+            <input type="search"
+                   class="grow"
+                   id="modules-search"
+                   name="q"
+                   placeholder="{% trans 'Search modules...' %}"
+                   value="{{ request.GET.q|default:'' }}">
+        </label>
+    </div>
+</form>
 
-            <ion-searchbar
-                id="modules-search"
-                name="q"
-                placeholder="{% trans 'Search modules...' %}"
-                debounce="300"
-                show-cancel-button="never"
-                class="m-0 mb-md"
-                value="{{ request.GET.q|default:'' }}">
-            </ion-searchbar>
-        </form>
-
-        <!-- Loading Spinner -->
-        <div id="modules-loading" class="htmx-indicator justify-center py-lg">
-            <ion-spinner name="crescent"></ion-spinner>
-        </div>
-
-        <!-- Modules List Container with internal scroll -->
-        <div id="modules-scroll-container" style="height: calc(100vh - 220px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
-            <div id="modules-list">
-                {% include "system/modules/partials/modules_list.html" %}
-            </div>
-        </div>
-    {% endfill %}
-{% endcomponent %}
+<!-- Modules List -->
+<div id="modules-list">
+    {% include "system/modules/partials/modules_list.html" %}
+</div>
 
 <script>
 (function() {
-    // Handle module deactivate with Ionic alert
-    document.body.addEventListener('click', async function(e) {
-        const btn = e.target.closest('[data-action="module-deactivate"]');
+    // Handle module deactivate
+    document.body.addEventListener('click', function(e) {
+        var btn = e.target.closest('[data-action="module-deactivate"]');
         if (!btn) return;
 
         e.preventDefault();
         e.stopPropagation();
 
-        const url = btn.dataset.url;
-        const moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
+        var url = btn.dataset.url;
+        var moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
 
-        const alert = document.createElement('ion-alert');
-        alert.header = '{% trans "Deactivate Module" %}';
-        alert.message = '{% trans "Are you sure you want to deactivate" %} <strong>' + moduleName + '</strong>?';
-        alert.buttons = [
-            {
-                text: '{% trans "Cancel" %}',
-                role: 'cancel'
-            },
-            {
-                text: '{% trans "Deactivate" %}',
-                role: 'confirm',
-                handler: () => {
-                    htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
-                }
-            }
-        ];
+        var backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        backdrop.setAttribute('data-state', 'open');
+        backdrop.innerHTML =
+            '<div class="modal modal-sm">' +
+                '<div class="modal-header">' +
+                    '<h3 class="modal-title">{% trans "Deactivate Module" %}</h3>' +
+                '</div>' +
+                '<div class="modal-body">' +
+                    '<p>{% trans "Are you sure you want to deactivate" %} <strong>' + moduleName + '</strong>?</p>' +
+                '</div>' +
+                '<div class="modal-footer">' +
+                    '<button class="btn btn-outline" data-role="cancel">{% trans "Cancel" %}</button>' +
+                    '<button class="btn color-warning" data-role="confirm">{% trans "Deactivate" %}</button>' +
+                '</div>' +
+            '</div>';
 
-        document.body.appendChild(alert);
-        await alert.present();
+        backdrop.querySelector('[data-role="cancel"]').addEventListener('click', function() {
+            backdrop.setAttribute('data-state', 'closed');
+            setTimeout(function() { backdrop.remove(); }, 300);
+        });
+
+        backdrop.querySelector('[data-role="confirm"]').addEventListener('click', function() {
+            backdrop.setAttribute('data-state', 'closed');
+            setTimeout(function() { backdrop.remove(); }, 300);
+            htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
+        });
+
+        document.body.appendChild(backdrop);
     });
 
-    // Handle module delete with Ionic alert
-    document.body.addEventListener('click', async function(e) {
-        const btn = e.target.closest('[data-action="module-delete"]');
+    // Handle module delete
+    document.body.addEventListener('click', function(e) {
+        var btn = e.target.closest('[data-action="module-delete"]');
         if (!btn) return;
 
         e.preventDefault();
         e.stopPropagation();
 
-        const url = btn.dataset.url;
-        const moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
+        var url = btn.dataset.url;
+        var moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
 
-        const alert = document.createElement('ion-alert');
-        alert.header = '{% trans "Delete Module" %}';
-        alert.subHeader = '{% trans "This action cannot be undone" %}';
-        alert.message = '{% trans "This will permanently delete" %} <strong>' + moduleName + '</strong> {% trans "and all its data." %}';
-        alert.cssClass = 'alert-danger';
-        alert.buttons = [
-            {
-                text: '{% trans "Cancel" %}',
-                role: 'cancel'
-            },
-            {
-                text: '{% trans "Delete" %}',
-                role: 'destructive',
-                cssClass: 'alert-button-danger',
-                handler: () => {
-                    htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
-                }
-            }
-        ];
+        var backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        backdrop.setAttribute('data-state', 'open');
+        backdrop.innerHTML =
+            '<div class="modal modal-sm">' +
+                '<div class="modal-header">' +
+                    '<h3 class="modal-title">{% trans "Delete Module" %}</h3>' +
+                '</div>' +
+                '<div class="modal-body">' +
+                    '<p>{% trans "This will permanently delete" %} <strong>' + moduleName + '</strong> {% trans "and all its data." %}</p>' +
+                    '<p class="text-sm opacity-60 mt-2">{% trans "This action cannot be undone." %}</p>' +
+                '</div>' +
+                '<div class="modal-footer">' +
+                    '<button class="btn btn-outline" data-role="cancel">{% trans "Cancel" %}</button>' +
+                    '<button class="btn color-error" data-role="confirm">{% trans "Delete" %}</button>' +
+                '</div>' +
+            '</div>';
 
-        document.body.appendChild(alert);
-        await alert.present();
+        backdrop.querySelector('[data-role="cancel"]').addEventListener('click', function() {
+            backdrop.setAttribute('data-state', 'closed');
+            setTimeout(function() { backdrop.remove(); }, 300);
+        });
+
+        backdrop.querySelector('[data-role="confirm"]').addEventListener('click', function() {
+            backdrop.setAttribute('data-state', 'closed');
+            setTimeout(function() { backdrop.remove(); }, 300);
+            htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
+        });
+
+        document.body.appendChild(backdrop);
     });
 })();
 </script>

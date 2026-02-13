@@ -29,6 +29,10 @@ from .export_service import (
     export_to_excel,
     generate_csv_string,
 )
+from .import_service import (
+    parse_import_file,
+    ImportResult,
+)
 from .print_service import (
     render_print_page,
     render_receipt,
@@ -58,6 +62,9 @@ __all__ = [
     "export_to_csv",
     "export_to_excel",
     "generate_csv_string",
+    # Import
+    "parse_import_file",
+    "ImportResult",
     # Print
     "render_print_page",
     "render_receipt",

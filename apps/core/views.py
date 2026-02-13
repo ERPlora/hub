@@ -131,15 +131,15 @@ def connection_status(request):
     cloud_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
     checker = ConnectivityChecker(cloud_url=cloud_url)
 
-    from djicons import icon as render_icon
+    import djicons
 
     if checker.is_online():
         # Green - Connected
-        icon_html = render_icon("cloudy-outline", slot="icon-only", css_class="text-green-500", title="Connected to Cloud")
+        icon_html = djicons.get("cloudy-outline", slot="icon-only", css_class="text-green-500", title="Connected to Cloud")
         return HttpResponse(icon_html)
     else:
         # Red - No connection
-        icon_html = render_icon("cloud-offline-outline", slot="icon-only", css_class="text-red-500", title="No Cloud connection")
+        icon_html = djicons.get("cloud-offline-outline", slot="icon-only", css_class="text-red-500", title="No Cloud connection")
         return HttpResponse(icon_html)
 
 

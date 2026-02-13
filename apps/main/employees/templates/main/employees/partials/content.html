@@ -1,36 +1,319 @@
-{% load i18n ui component_tags %}
+{% load i18n djicons %}
 
-{% component "page" title=_("Employees") action_icon="add-outline" action_label=_("Add") action_hx_get="/employees/add/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
-    {% fill "content" %}
-        <!-- Search Bar -->
-        <form id="employees-search-form"
-            hx-get="{% url 'main:employees' %}"
-            hx-target="#employees-list"
-            hx-swap="innerHTML"
-            hx-trigger="submit, ionInput from:#employees-search delay:300ms"
-            hx-indicator="#employees-loading">
+<div x-data="{
+    view: '{{ current_view|default:'table' }}',
+    panelOpen: false,
+    selectedIds: [],
+    selectAll: false,
+    editUrl: '',
+    deleteConfirm: false,
+    deleteTarget: null,
+    importModal: false,
+    columnsModal: false,
+    cols: { email: true, role: true, status: true },
+    toggleCol(col) {
+        this.cols[col] = !this.cols[col];
+        document.querySelectorAll('[data-col=' + col + ']').forEach(el => el.classList.toggle('hidden', !this.cols[col]));
+    },
+    toggleSelect(id) {
+        const idx = this.selectedIds.indexOf(id);
+        if (idx > -1) this.selectedIds.splice(idx, 1);
+        else this.selectedIds.push(id);
+        this.selectAll = false;
+    },
+    toggleAll(ids) {
+        if (this.selectAll) this.selectedIds = [];
+        else this.selectedIds = [...ids];
+        this.selectAll = !this.selectAll;
+    },
+    clearSelection() { this.selectedIds = []; this.selectAll = false; },
+    openPanel(url) {
+        this.editUrl = url;
+        htmx.ajax('GET', url, { target: '#employee-panel-content', swap: 'innerHTML' });
+        this.panelOpen = true;
+    },
+    closePanel() {
+        this.panelOpen = false;
+    },
+    confirmDelete() {
+        if (this.deleteTarget) {
+            htmx.ajax('POST', this.deleteTarget.url, {
+                target: '#datatable-body',
+                swap: 'innerHTML',
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}' }
+            });
+        }
+        this.deleteConfirm = false;
+        this.deleteTarget = null;
+    }
+}">
 
-            <ion-searchbar
-                id="employees-search"
-                name="q"
-                placeholder="{% trans 'Search employees...' %}"
-                debounce="300"
-                show-cancel-button="never"
-                class="m-0 mb-md"
-                value="{{ request.GET.q|default:'' }}">
-            </ion-searchbar>
-        </form>
+    <div class="datatable glass mt-5" id="employees-datatable">
 
-        <!-- Loading Spinner -->
-        <div id="employees-loading" class="htmx-indicator justify-center py-lg">
-            <ion-spinner name="crescent"></ion-spinner>
-        </div>
+        <!-- Toolbar -->
+        <div class="datatable-toolbar">
+            <div class="datatable-toolbar-start">
+                <label class="input input-sm datatable-search">
+                    {% icon "search-outline" %}
+                    <input type="search"
+                           name="q"
+                           placeholder="{% trans 'Search employees...' %}"
+                           value="{{ search_query|default:'' }}"
+                           autocomplete="off"
+                           hx-get="{% url 'main:employees' %}"
+                           hx-target="#datatable-body"
+                           hx-include="#employees-datatable"
+                           hx-trigger="input changed delay:300ms, search">
+                </label>
+                <select name="status"
+                        class="select select-sm"
+                        hx-get="{% url 'main:employees' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#employees-datatable"
+                        hx-trigger="change">
+                    <option value="">{% trans "All Status" %}</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>{% trans "Active" %}</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>{% trans "Inactive" %}</option>
+                </select>
+                <select name="role"
+                        class="select select-sm"
+                        hx-get="{% url 'main:employees' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#employees-datatable"
+                        hx-trigger="change">
+                    <option value="">{% trans "All Roles" %}</option>
+                    {% for role in roles_list %}
+                    <option value="{{ role.id }}" {% if role_filter == role.id|slugify %}selected{% endif %}>
+                        {{ role.display_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="datatable-toolbar-end">
+                <!-- Add Employee -->
+                <button class="btn btn-sm btn-circle color-primary"
+                        @click="openPanel('{% url 'main:employee_add' %}')"
+                        title="{% trans 'Add Employee' %}">
+                    {% icon "add-outline" %}
+                </button>
 
-        <!-- Employees List Container with internal scroll -->
-        <div id="employees-scroll-container" style="height: calc(100vh - 220px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
-            <div id="employees-list">
-                {% include "main/employees/partials/employees_list.html" %}
+                <!-- Column Visibility -->
+                <button class="datatable-column-btn" @click="columnsModal = true" title="{% trans 'Columns' %}">
+                    {% icon "options-outline" %}
+                </button>
+
+                <!-- Export -->
+                <details class="dropdown" x-data="{ open: false }" :open="open" @click.outside="open = false">
+                    <summary class="datatable-export-btn" @click.prevent="open = !open" title="{% trans 'Export' %}">
+                        {% icon "download-outline" %}
+                    </summary>
+                    <div class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" href="#"
+                           @click.prevent="open = false; window.location.href = '{% url 'main:employees' %}?export=csv&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', role: document.querySelector('[name=role]')?.value || ''}).toString()">
+                            {% icon "document-text-outline" %}
+                            {% trans "Export as CSV" %}
+                        </a>
+                        <a class="dropdown-item" href="#"
+                           @click.prevent="open = false; window.location.href = '{% url 'main:employees' %}?export=excel&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', role: document.querySelector('[name=role]')?.value || ''}).toString()">
+                            {% icon "document-text-outline" %}
+                            {% trans "Export as Excel" %}
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" onclick="window.print();">
+                            {% icon "print-outline" %}
+                            {% trans "Print" %}
+                        </button>
+                    </div>
+                </details>
+
+                <!-- Import -->
+                <button class="datatable-export-btn" @click="importModal = true" title="{% trans 'Import' %}">
+                    {% icon "cloud-upload-outline" %}
+                </button>
+
+                <!-- View Toggle -->
+                <div class="datatable-view-toggle">
+                    <button type="button"
+                            class="datatable-view-btn"
+                            :class="{ 'datatable-view-btn-active': view === 'table' }"
+                            @click="view = 'table'"
+                            hx-get="{% url 'main:employees' %}"
+                            hx-target="#datatable-body"
+                            hx-include="#employees-datatable"
+                            hx-vals='{"view": "table"}'
+                            title="{% trans 'Table view' %}">
+                        {% icon "list-outline" %}
+                    </button>
+                    <button type="button"
+                            class="datatable-view-btn"
+                            :class="{ 'datatable-view-btn-active': view === 'cards' }"
+                            @click="view = 'cards'"
+                            hx-get="{% url 'main:employees' %}"
+                            hx-target="#datatable-body"
+                            hx-include="#employees-datatable"
+                            hx-vals='{"view": "cards"}'
+                            title="{% trans 'Card view' %}">
+                        {% icon "grid-outline" %}
+                    </button>
+                </div>
             </div>
         </div>
-    {% endfill %}
-{% endcomponent %}
+
+        <!-- Bulk Actions Bar -->
+        <div class="datatable-bulk" x-show="selectedIds.length > 0" x-cloak>
+            <div class="datatable-bulk-info">
+                <span class="datatable-bulk-count" x-text="selectedIds.length"></span>
+                <span>{% trans "selected" %}</span>
+            </div>
+            <div class="datatable-bulk-actions">
+                <button class="datatable-bulk-btn"
+                        hx-post="{% url 'main:employees_bulk_toggle' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#employees-datatable"
+                        :hx-vals="JSON.stringify({ids: selectedIds.join(','), action: 'activate'})"
+                        @htmx:after-request="clearSelection()">
+                    {% icon "checkmark-circle-outline" %}
+                    {% trans "Activate" %}
+                </button>
+                <button class="datatable-bulk-btn"
+                        hx-post="{% url 'main:employees_bulk_toggle' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#employees-datatable"
+                        :hx-vals="JSON.stringify({ids: selectedIds.join(','), action: 'deactivate'})"
+                        @htmx:after-request="clearSelection()">
+                    {% icon "close-circle-outline" %}
+                    {% trans "Deactivate" %}
+                </button>
+                <button class="datatable-bulk-btn datatable-bulk-btn-danger"
+                        hx-post="{% url 'main:employees_bulk_toggle' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#employees-datatable"
+                        :hx-vals="JSON.stringify({ids: selectedIds.join(','), action: 'delete'})"
+                        @htmx:after-request="clearSelection()">
+                    {% icon "trash-outline" %}
+                    {% trans "Delete" %}
+                </button>
+                <button class="datatable-bulk-clear" @click="clearSelection()" title="{% trans 'Clear selection' %}">
+                    {% icon "close-outline" %}
+                </button>
+            </div>
+        </div>
+
+        {% csrf_token %}
+
+        <!-- Hidden state inputs -->
+        <input type="hidden" name="sort" value="{{ sort_field|default:'name' }}">
+        <input type="hidden" name="dir" value="{{ sort_dir|default:'asc' }}">
+        <input type="hidden" name="view" :value="view">
+        <input type="hidden" name="per_page" value="{{ per_page|default:'10' }}">
+
+        <!-- Datatable Body (HTMX swap target) -->
+        <div id="datatable-body">
+            {% include "main/employees/partials/employees_list.html" %}
+        </div>
+    </div>
+
+    <!-- Side Sheet (UX component) -->
+    <div class="sheet-backdrop" :class="{ 'is-open': panelOpen }" @click.self="closePanel()">
+        <div class="side-sheet side-sheet-right" id="employee-panel-content">
+            <!-- Content loaded via HTMX -->
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-backdrop" :data-state="deleteConfirm ? 'open' : 'closed'" @click.self="deleteConfirm = false; deleteTarget = null">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Delete Employee" %}</h3>
+                <button class="modal-close" @click="deleteConfirm = false; deleteTarget = null">
+                    {% icon "close-outline" %}
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm text-base-content/70">
+                    {% trans "Are you sure you want to delete" %} <strong x-text="deleteTarget?.name"></strong>?
+                    {% trans "This action cannot be undone." %}
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost btn-sm" @click="deleteConfirm = false; deleteTarget = null">
+                    {% trans "Cancel" %}
+                </button>
+                <button class="btn btn-sm color-error" @click="confirmDelete()">
+                    {% icon "trash-outline" %}
+                    {% trans "Delete" %}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal-backdrop" :data-state="importModal ? 'open' : 'closed'" @click.self="importModal = false">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Import Employees" %}</h3>
+                <button class="modal-close" @click="importModal = false">
+                    {% icon "close-outline" %}
+                </button>
+            </div>
+            <form hx-post="{% url 'main:employees_import' %}"
+                  hx-target="#datatable-body"
+                  hx-encoding="multipart/form-data"
+                  @htmx:after-request="importModal = false">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p class="text-sm text-base-content/70 mb-4">
+                        {% trans "Upload a CSV or Excel file with columns:" %}
+                        <strong>Name, Email, Role, PIN</strong>
+                    </p>
+                    <input type="file" name="file" accept=".csv,.xlsx,.xls" class="input" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost btn-sm" @click="importModal = false">
+                        {% trans "Cancel" %}
+                    </button>
+                    <button type="submit" class="btn btn-sm color-primary">
+                        {% icon "cloud-upload-outline" %}
+                        {% trans "Import" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Columns Modal -->
+    <div class="modal-backdrop" :data-state="columnsModal ? 'open' : 'closed'" @click.self="columnsModal = false">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Show / Hide Columns" %}</h3>
+                <button class="modal-close" @click="columnsModal = false">
+                    {% icon "close-outline" %}
+                </button>
+            </div>
+            <div class="modal-body">
+                <label class="flex items-center gap-3 py-2 cursor-not-allowed opacity-50">
+                    <input type="checkbox" class="checkbox checkbox-sm" checked disabled>
+                    <span class="text-sm">{% trans "Employee" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('email')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.email" readonly>
+                    <span class="text-sm">{% trans "Email" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('role')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.role" readonly>
+                    <span class="text-sm">{% trans "Role" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('status')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.status" readonly>
+                    <span class="text-sm">{% trans "Status" %}</span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-sm color-primary" @click="columnsModal = false">
+                    {% trans "Done" %}
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>

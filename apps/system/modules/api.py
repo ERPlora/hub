@@ -33,7 +33,7 @@ class ModuleSerializer(serializers.Serializer):
     description = serializers.CharField(allow_blank=True)
     version = serializers.CharField()
     author = serializers.CharField(allow_blank=True)
-    icon = serializers.CharField(help_text="Ionicon name")
+    icon = serializers.CharField(help_text="Icon name (djicons)")
     is_active = serializers.BooleanField()
 
 

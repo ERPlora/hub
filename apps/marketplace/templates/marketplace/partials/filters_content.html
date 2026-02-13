@@ -1,130 +1,124 @@
 {% load i18n djicons %}
 
-<div x-data="filtersMenu()" x-init="init()">
-    <ion-list lines="none">
+<div x-data="filtersMenu()" x-init="init()" class="p-md">
+    {% if store_type == 'modules' %}
+    <!-- Category Filter -->
+    <div class="mb-lg">
+        <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Category" %}</h3>
+        <div class="flex flex-wrap gap-2">
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': categoryFilter === '' }"
+                    @click="setCategory('')">
+                {% trans "All Categories" %}
+            </button>
+            {% for category in filters.categories %}
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': categoryFilter === '{{ category.id }}' }"
+                    @click="setCategory('{{ category.id }}')">
+                {{ category.name }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
 
-        {% if store_type == 'modules' %}
-        <!-- Category Filter -->
-        <ion-item-group>
-            <ion-item-divider>
-                <ion-label>{% trans "Category" %}</ion-label>
-            </ion-item-divider>
+    <!-- Industry Filter -->
+    <div class="mb-lg">
+        <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Industry" %}</h3>
+        <div class="flex flex-wrap gap-2">
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': industryFilter === '' }"
+                    @click="setIndustry('')">
+                {% trans "All Industries" %}
+            </button>
+            {% for industry in filters.industries %}
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': industryFilter === '{{ industry.id }}' }"
+                    @click="setIndustry('{{ industry.id }}')">
+                {{ industry.name }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
 
-            <ion-radio-group
-                :value="categoryFilter"
-                @ionChange="setCategory($event.detail.value)">
-                <ion-item>
-                    <ion-radio value="" slot="start"></ion-radio>
-                    <ion-label>{% trans "All Categories" %}</ion-label>
-                </ion-item>
-                {% for category in filters.categories %}
-                <ion-item>
-                    <ion-radio value="{{ category.id }}" slot="start"></ion-radio>
-                    <ion-label>{{ category.name }}</ion-label>
-                </ion-item>
-                {% endfor %}
-            </ion-radio-group>
-        </ion-item-group>
+    <!-- Type Filter -->
+    <div class="mb-lg">
+        <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Pricing" %}</h3>
+        <div class="flex flex-wrap gap-2">
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': typeFilter === '' }"
+                    @click="setType('')">
+                {% trans "All Types" %}
+            </button>
+            {% for type in filters.types %}
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': typeFilter === '{{ type.id }}' }"
+                    @click="setType('{{ type.id }}')">
+                {% if type.icon %}{% icon type.icon %}{% endif %}
+                {{ type.name }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
 
-        <!-- Industry Filter -->
-        <ion-item-group>
-            <ion-item-divider>
-                <ion-label>{% trans "Industry" %}</ion-label>
-            </ion-item-divider>
+    {% elif store_type == 'hubs' %}
+    <!-- Region Filter -->
+    <div class="mb-lg">
+        <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Region" %}</h3>
+        <div class="flex flex-wrap gap-2">
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': regionFilter === '' }"
+                    @click="setRegion('')">
+                {% trans "All Regions" %}
+            </button>
+            {% for region in filters.regions %}
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': regionFilter === '{{ region.id }}' }"
+                    @click="setRegion('{{ region.id }}')">
+                {{ region.name }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
 
-            <ion-radio-group
-                :value="industryFilter"
-                @ionChange="setIndustry($event.detail.value)">
-                <ion-item>
-                    <ion-radio value="" slot="start"></ion-radio>
-                    <ion-label>{% trans "All Industries" %}</ion-label>
-                </ion-item>
-                {% for industry in filters.industries %}
-                <ion-item>
-                    <ion-radio value="{{ industry.id }}" slot="start"></ion-radio>
-                    <ion-label>{{ industry.name }}</ion-label>
-                </ion-item>
-                {% endfor %}
-            </ion-radio-group>
-        </ion-item-group>
-
-        <!-- Type Filter -->
-        <ion-item-group>
-            <ion-item-divider>
-                <ion-label>{% trans "Pricing" %}</ion-label>
-            </ion-item-divider>
-
-            <ion-radio-group
-                :value="typeFilter"
-                @ionChange="setType($event.detail.value)">
-                <ion-item>
-                    <ion-radio value="" slot="start"></ion-radio>
-                    <ion-label>{% trans "All Types" %}</ion-label>
-                </ion-item>
-                {% for type in filters.types %}
-                <ion-item>
-                    <ion-radio value="{{ type.id }}" slot="start"></ion-radio>
-                    {% icon type.icon slot="start" css_class="ion-margin-end" %}
-                    <ion-label>{{ type.name }}</ion-label>
-                </ion-item>
-                {% endfor %}
-            </ion-radio-group>
-        </ion-item-group>
-
-        {% elif store_type == 'hubs' %}
-        <!-- Region Filter -->
-        <ion-item-group>
-            <ion-item-divider>
-                <ion-label>{% trans "Region" %}</ion-label>
-            </ion-item-divider>
-
-            <ion-radio-group
-                :value="regionFilter"
-                @ionChange="setRegion($event.detail.value)">
-                <ion-item>
-                    <ion-radio value="" slot="start"></ion-radio>
-                    <ion-label>{% trans "All Regions" %}</ion-label>
-                </ion-item>
-                {% for region in filters.regions %}
-                <ion-item>
-                    <ion-radio value="{{ region.id }}" slot="start"></ion-radio>
-                    <ion-label>{{ region.name }}</ion-label>
-                </ion-item>
-                {% endfor %}
-            </ion-radio-group>
-        </ion-item-group>
-
-        <!-- Plan Filter -->
-        <ion-item-group>
-            <ion-item-divider>
-                <ion-label>{% trans "Plan" %}</ion-label>
-            </ion-item-divider>
-
-            <ion-radio-group
-                :value="planFilter"
-                @ionChange="setPlan($event.detail.value)">
-                <ion-item>
-                    <ion-radio value="" slot="start"></ion-radio>
-                    <ion-label>{% trans "All Plans" %}</ion-label>
-                </ion-item>
-                {% for plan in filters.plans %}
-                <ion-item>
-                    <ion-radio value="{{ plan.id }}" slot="start"></ion-radio>
-                    <ion-label>{{ plan.name }}</ion-label>
-                </ion-item>
-                {% endfor %}
-            </ion-radio-group>
-        </ion-item-group>
-        {% endif %}
-
-    </ion-list>
+    <!-- Plan Filter -->
+    <div class="mb-lg">
+        <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Plan" %}</h3>
+        <div class="flex flex-wrap gap-2">
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': planFilter === '' }"
+                    @click="setPlan('')">
+                {% trans "All Plans" %}
+            </button>
+            {% for plan in filters.plans %}
+            <button type="button"
+                    class="chip"
+                    :class="{ 'chip-active': planFilter === '{{ plan.id }}' }"
+                    @click="setPlan('{{ plan.id }}')">
+                {{ plan.name }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Apply Button (mobile friendly) -->
-    <div class="ion-padding">
-        <ion-button expand="block" @click="applyAndClose()">
-            {% icon "checkmark-outline" slot="start" %}
-            {% trans "Apply Filters" %}
-        </ion-button>
+    <div class="mt-lg">
+        <button type="button"
+                class="btn btn-lg color-primary"
+                style="width: 100%;"
+                @click="applyAndClose()">
+            {% icon "checkmark-outline" %}
+            <span>{% trans "Apply Filters" %}</span>
+        </button>
     </div>
 </div>
 
@@ -191,7 +185,9 @@
         },
 
         applyAndClose() {
-            menuController.close('filters-menu');
+            if (typeof menuController !== 'undefined') {
+                menuController.close('filters-menu');
+            }
         }
     });
 

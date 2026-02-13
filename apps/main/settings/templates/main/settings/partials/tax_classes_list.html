@@ -1,23 +1,43 @@
-{% load i18n ui %}
+{% load i18n djicons %}
 
 {% if tax_classes %}
-<ion-list>
+<div class="list list-inset">
     {% for tc in tax_classes %}
-    <ion-item>
-        <ion-label>
-            <h2>{{ tc.name }}</h2>
-            <p>
+    <div class="list-item">
+        <div class="list-item-content">
+            <span class="list-item-label">{{ tc.name }}</span>
+            <span class="list-item-note">
                 {{ tc.rate }}%
                 {% if tc.description %} - {{ tc.description }}{% endif %}
-            </p>
-        </ion-label>
-        {% if tc.is_default %}
-        {% ui_chip label=_("Default") color="success" slot="end" %}
-        {% endif %}
-        {% ui_icon_button icon="trash-outline" slot="end" fill="clear" color="danger" hx_post="/settings/" hx_vals='{"action": "delete_tax_class", "tax_class_id": "'|add:tc.id|add:'"}' hx_target="#tax-classes-list" hx_swap="innerHTML" hx_confirm=_("Are you sure you want to delete this tax class?") %}
-    </ion-item>
+            </span>
+        </div>
+        <div class="list-item-end flex items-center gap-2">
+            {% if tc.is_default %}
+            <span class="badge color-success">{% trans "Default" %}</span>
+            {% endif %}
+            <button type="button"
+                    class="btn btn-ghost btn-sm text-error"
+                    hx-post="{% url 'main:settings' %}"
+                    hx-vals='{"action": "delete_tax_class", "tax_class_id": "{{ tc.id }}"}'
+                    hx-target="#tax-classes-list"
+                    hx-swap="innerHTML"
+                    hx-confirm="{% trans 'Are you sure you want to delete this tax class?' %}">
+                {% icon "trash-outline" %}
+            </button>
+        </div>
+    </div>
     {% endfor %}
-</ion-list>
+</div>
 {% else %}
-{% ui_empty_state title=_("No tax classes configured") description=_("Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)") icon="alert-circle-outline" %}
+<div class="flex flex-col items-center justify-center py-12 text-center">
+    <div class="text-4xl mb-4 opacity-40">
+        {% icon "alert-circle-outline" style="width: 48px; height: 48px;" %}
+    </div>
+    <h3 class="text-lg font-semibold mb-2">
+        {% trans "No tax classes configured" %}
+    </h3>
+    <p class="text-sm opacity-60">
+        {% trans "Create tax types according to your country (e.g., Standard 21%, Reduced 10%, Exempt 0%)" %}
+    </p>
+</div>
 {% endif %}

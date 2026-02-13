@@ -1,6 +1,7 @@
 """
 Main Settings Views
 """
+import json
 from decimal import Decimal, InvalidOperation
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -10,7 +11,7 @@ from zoneinfo import available_timezones
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 from apps.accounts.models import LocalUser
-from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass
+from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass, PrinterConfig
 
 
 # Common timezones grouped by region (most used first)
@@ -43,17 +44,13 @@ def get_sorted_timezones():
     return COMMON_TIMEZONES + other_tz
 
 
-def render_message(message, color='success'):
-    """Render a simple message HTML snippet"""
-    from djicons import icon as render_icon
-    icon_name = 'checkmark-circle-outline' if color == 'success' else 'alert-circle-outline'
-    icon_html = render_icon(icon_name)
-    return f'''
-    <div class="flex items-center gap-2 p-3 rounded-lg" style="background: var(--ion-color-{color}-tint); color: var(--ion-color-{color}-shade);">
-        {icon_html}
-        <span>{message}</span>
-    </div>
-    '''
+def toast_response(message, msg_type='success', status=200, **extra_triggers):
+    """Return an empty HTTP response with HX-Trigger to show a toast."""
+    triggers = {'showMessage': {'message': message, 'type': msg_type}}
+    triggers.update(extra_triggers)
+    response = HttpResponse(status=status)
+    response['HX-Trigger'] = json.dumps(triggers)
+    return response
 
 
 @login_required
@@ -94,12 +91,13 @@ def index(request):
             store_config.is_configured = store_config.is_complete()
             store_config.save()
 
-            return HttpResponse(render_message('Store settings saved'))
+            return toast_response('Store settings saved')
 
         # Handle user preferences form
         if action == 'update_user':
             language = request.POST.get('language')
             avatar = request.FILES.get('avatar')
+            old_language = request.session.get('user_language')
 
             if language:
                 valid_languages = [code for code, name in django_settings.LANGUAGES]
@@ -115,12 +113,12 @@ def index(request):
             user.save()
 
             # If language changed, trigger page reload
-            if language and language != request.session.get('user_language'):
-                response = HttpResponse(render_message('Preferences saved'))
+            if language and language != old_language:
+                response = toast_response('Preferences saved')
                 response['HX-Refresh'] = 'true'
                 return response
 
-            return HttpResponse(render_message('Preferences saved'))
+            return toast_response('Preferences saved')
 
         # Handle hub settings form
         if action == 'update_hub':
@@ -150,7 +148,7 @@ def index(request):
             hub_config.dark_mode_auto = False
             hub_config.save()
 
-            return HttpResponse(render_message('Hub settings saved'))
+            return toast_response('Hub settings saved')
 
         # Handle theme update form (color_theme, dark_mode, auto_print)
         if action == 'update_theme':
@@ -164,7 +162,7 @@ def index(request):
             hub_config.auto_print = auto_print
             hub_config.save()
 
-            return HttpResponse(render_message('Theme settings saved'))
+            return toast_response('Theme settings saved')
 
         # Handle backup settings form
         if action == 'update_backup':
@@ -183,7 +181,7 @@ def index(request):
             from apps.configuration.services import backup_service
             backup_service.reschedule()
 
-            return HttpResponse(render_message('Backup settings saved'))
+            return toast_response('Backup settings saved')
 
         # Handle manual backup trigger
         if action == 'run_backup':
@@ -191,9 +189,9 @@ def index(request):
             success, path, size = backup_service.run_backup()
             if success:
                 size_kb = round(size / 1024) if size else 0
-                return HttpResponse(render_message(f'Backup completed ({size_kb} KB)'))
+                return toast_response(f'Backup completed ({size_kb} KB)')
             else:
-                return HttpResponse(render_message(f'Backup failed: {path}', 'danger'), status=500)
+                return toast_response(f'Backup failed: {path}', 'error', status=500)
 
         # Handle TaxClass actions
         if action == 'create_tax_class':
@@ -203,7 +201,7 @@ def index(request):
             is_default = 'is_default' in request.POST
 
             if not name:
-                return HttpResponse(render_message('Name is required', 'danger'), status=400)
+                return toast_response('Name is required', 'error', status=400)
 
             try:
                 TaxClass.objects.create(
@@ -214,11 +212,15 @@ def index(request):
                 )
                 # Return updated tax classes list
                 tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
-                return render(request, 'main/settings/partials/tax_classes_list.html', {
+                response = render(request, 'main/settings/partials/tax_classes_list.html', {
                     'tax_classes': tax_classes
                 })
+                response['HX-Trigger'] = json.dumps({
+                    'showMessage': {'message': 'Tax class created', 'type': 'success'}
+                })
+                return response
             except (InvalidOperation, Exception) as e:
-                return HttpResponse(render_message(str(e), 'danger'), status=400)
+                return toast_response(str(e), 'error', status=400)
 
         if action == 'delete_tax_class':
             tax_class_id = request.POST.get('tax_class_id')
@@ -227,13 +229,72 @@ def index(request):
                 tax_class.delete()
                 # Return updated tax classes list
                 tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
-                return render(request, 'main/settings/partials/tax_classes_list.html', {
+                response = render(request, 'main/settings/partials/tax_classes_list.html', {
                     'tax_classes': tax_classes
                 })
+                response['HX-Trigger'] = json.dumps({
+                    'showMessage': {'message': 'Tax class deleted', 'type': 'success'}
+                })
+                return response
             except TaxClass.DoesNotExist:
-                return HttpResponse(render_message('Tax class not found', 'danger'), status=404)
+                return toast_response('Tax class not found', 'error', status=404)
 
-        return HttpResponse(render_message('Settings saved'))
+        # Handle bridge/hardware settings
+        if action == 'update_bridge':
+            try:
+                hub_config.bridge_port = int(request.POST.get('bridge_port', 12321))
+            except (ValueError, TypeError):
+                pass
+            hub_config.bridge_auto_print = 'bridge_auto_print' in request.POST
+            hub_config.allow_satellite_printing = 'allow_satellite_printing' in request.POST
+            hub_config.save()
+            return toast_response('Hardware settings saved')
+
+        # Save a printer configuration (from bridge discovery)
+        if action == 'save_printer':
+            bridge_printer_id = request.POST.get('bridge_printer_id', '').strip()
+            if not bridge_printer_id:
+                return toast_response('Printer ID is required', 'error', status=400)
+
+            printer, created = PrinterConfig.objects.update_or_create(
+                bridge_printer_id=bridge_printer_id,
+                defaults={
+                    'name': request.POST.get('printer_name', '').strip() or bridge_printer_id,
+                    'printer_type': request.POST.get('printer_type', 'usb'),
+                    'paper_width': int(request.POST.get('paper_width', 80)),
+                    'document_types': request.POST.getlist('document_types'),
+                    'priority': int(request.POST.get('priority', 1)),
+                    'is_default': 'is_default' in request.POST,
+                    'is_active': 'is_active' not in request.POST or request.POST.get('is_active') == 'true',
+                }
+            )
+
+            printers = PrinterConfig.get_active()
+            response = render(request, 'main/settings/partials/printers_list.html', {
+                'printers': printers,
+            })
+            response['HX-Trigger'] = json.dumps({
+                'showMessage': {'message': 'Printer saved' if not created else 'Printer added', 'type': 'success'}
+            })
+            return response
+
+        if action == 'delete_printer':
+            printer_id = request.POST.get('printer_id')
+            try:
+                printer = PrinterConfig.objects.get(id=printer_id)
+                printer.delete()
+                printers = PrinterConfig.get_active()
+                response = render(request, 'main/settings/partials/printers_list.html', {
+                    'printers': printers,
+                })
+                response['HX-Trigger'] = json.dumps({
+                    'showMessage': {'message': 'Printer removed', 'type': 'success'}
+                })
+                return response
+            except PrinterConfig.DoesNotExist:
+                return toast_response('Printer not found', 'error', status=404)
+
+        return toast_response('Settings saved')
 
     # Get backup config and scheduler status
     backup_config = BackupConfig.get_solo()
@@ -242,6 +303,9 @@ def index(request):
 
     # Get all tax classes
     tax_classes = TaxClass.objects.filter(is_active=True).order_by('order', 'rate')
+
+    # Get configured printers
+    printers = PrinterConfig.get_active()
 
     return {
         'current_section': 'settings',
@@ -257,4 +321,13 @@ def index(request):
         'timezone_choices': get_sorted_timezones(),
         'currency_choices': django_settings.POPULAR_CURRENCY_CHOICES,
         'backup_frequency_choices': BackupConfig.Frequency.choices,
+        'printers': printers,
+        'document_type_choices': [
+            ('receipt', 'Receipt'),
+            ('kitchen_order', 'Kitchen Order'),
+            ('invoice', 'Invoice'),
+            ('delivery_note', 'Delivery Note'),
+            ('barcode_label', 'Barcode Label'),
+            ('cash_session_report', 'Cash Session Report'),
+        ],
     }

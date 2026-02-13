@@ -4,6 +4,7 @@ HTMX utilities for SPA navigation.
 Provides decorator and utilities for handling HTMX requests
 to enable SPA-like navigation without full page reloads.
 """
+import json
 from functools import wraps
 from django.shortcuts import render
 
@@ -55,6 +56,12 @@ def htmx_view(full_template, partial_template):
             # Otherwise, result should be context dict
             context = result if isinstance(result, dict) else {}
 
+            # Merge module navigation context if set by @with_module_nav
+            module_nav = getattr(request, '_module_nav', None)
+            if module_nav:
+                for key, value in module_nav.items():
+                    context.setdefault(key, value)
+
             # Check for template override in context
             template_override = context.pop('template', None)
 
@@ -64,7 +71,24 @@ def htmx_view(full_template, partial_template):
             if is_partial:
                 # Use template override if provided, otherwise default partial
                 template = template_override or partial_template
-                return render(request, template, context)
+                response = render(request, template, context)
+
+                # Send page_title via HX-Trigger so the header can update
+                page_title = context.get('page_title')
+                if page_title:
+                    response['HX-Trigger'] = json.dumps({
+                        'pageTitle': str(page_title)
+                    })
+
+                # Clear module tabbar when navigating to non-module views
+                # (module views append their own OOB tabbar via @with_module_nav)
+                if not context.get('navigation'):
+                    response.content = (
+                        response.content
+                        + b'<footer id="global-tabbar-footer" hx-swap-oob="true"></footer>'
+                    )
+
+                return response
 
             # Full page request
             return render(request, full_template, context)
@@ -131,7 +155,7 @@ class InfiniteScrollPaginator:
              hx-target="this"
              hx-swap="outerHTML"
              hx-include="[name='search'],[name='order_by']">
-            <ion-spinner name="crescent"></ion-spinner>
+            <div class="loading"></div>
         </div>
         {% else %}
         <div class="infinite-scroll-end">
@@ -267,7 +291,16 @@ def infinite_scroll_view(full_template, partial_template, items_template):
                 return render(request, items_template, context)
 
             # First HTMX request - return partial with headers
-            return render(request, partial_template, context)
+            response = render(request, partial_template, context)
+
+            # Send page_title via HX-Trigger so the header can update
+            page_title = context.get('page_title')
+            if page_title:
+                response['HX-Trigger'] = json.dumps({
+                    'pageTitle': str(page_title)
+                })
+
+            return response
 
         return wrapper
     return decorator

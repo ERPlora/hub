@@ -1,18 +1,12 @@
 /**
- * UI Helpers - Componentes reutilizables con Ionic
+ * UI Helpers - Reusable components with UX library
  *
- * Incluido globalmente en base.html
+ * Included globally in base.html
  *
  * Toast (simple):
  *   showToast('Message', 'success');
  *   Toast.success('Saved!');
  *   Toast.error('Failed!');
- *
- * Notification (con título):
- *   Notify.success('Guardado', 'El producto se guardó correctamente');
- *   Notify.error('Error', 'No se pudo conectar al servidor');
- *   Notify.warning('Atención', 'Stock bajo en 5 productos');
- *   Notify.info('Info', 'Procesando...');
  *
  * Alert:
  *   showAlert('Title', 'Message');
@@ -24,181 +18,57 @@
 // ============================================================================
 
 /**
- * Muestra un toast notification de Ionic
+ * Show a toast notification using UX toast-item component.
  *
- * @param {string} message - Mensaje a mostrar
- * @param {string} color - Color del toast (success, danger, warning, primary, etc.)
- * @param {number} duration - Duración en milisegundos (default: 2000)
- * @param {string} position - Posición del toast (top, bottom, middle) (default: 'bottom')
- * @returns {Promise<void>}
+ * @param {string} message - Message to display
+ * @param {string} color - Color: success, error, warning, primary (default: 'primary')
+ * @param {number} duration - Duration in ms (default: 2000)
  */
-async function showToast(message, color = 'primary', duration = 2000, position = 'bottom') {
-    const toast = document.createElement('ion-toast');
-    toast.message = message;
-    toast.duration = duration;
-    toast.color = color;
-    toast.position = position;
+function showToast(message, color = 'primary', duration = 2000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
 
-    document.body.appendChild(toast);
-    await toast.present();
+    const item = document.createElement('div');
+    item.className = 'toast-item color-' + color;
+    item.textContent = message;
 
-    // Cleanup después de que se cierre
-    toast.addEventListener('didDismiss', () => {
-        toast.remove();
-    });
+    container.appendChild(item);
+
+    // Auto-dismiss
+    setTimeout(() => {
+        item.style.opacity = '0';
+        item.style.transform = 'translateY(0.5rem)';
+        item.style.transition = 'opacity 0.3s, transform 0.3s';
+        setTimeout(() => item.remove(), 300);
+    }, duration);
 }
 
 /**
- * Shortcuts para tipos comunes de toast
+ * Shortcuts for common toast types
  */
 const Toast = {
     success: (message, duration) => showToast(message, 'success', duration),
-    error: (message, duration) => showToast(message, 'danger', duration),
+    error: (message, duration) => showToast(message, 'error', duration || 3000),
     warning: (message, duration) => showToast(message, 'warning', duration),
     info: (message, duration) => showToast(message, 'primary', duration),
 };
 
 // ============================================================================
-// NOTIFICATION (TOAST CON TÍTULO)
+// ALERT / CONFIRM DIALOGS (native)
 // ============================================================================
 
-/**
- * Muestra una notificación toast con título y mensaje
- *
- * @param {Object} options - Opciones de la notificación
- * @param {string} options.title - Título de la notificación
- * @param {string} options.message - Mensaje de la notificación
- * @param {string} options.type - Tipo: 'success', 'warning', 'danger', 'info'
- * @param {number} options.duration - Duración en ms (default: 3000, 0 si showClose)
- * @param {string} options.position - Posición: 'top', 'bottom', 'middle'
- * @param {boolean} options.showClose - Mostrar botón de cerrar (default: true)
- * @returns {Promise<HTMLIonToastElement>}
- */
-async function showNotification({
-    title = '',
-    message = '',
-    type = 'info',
-    duration = 3000,
-    position = 'top',
-    showClose = true
-} = {}) {
-    const colorMap = {
-        success: 'success',
-        warning: 'warning',
-        danger: 'danger',
-        error: 'danger',
-        info: 'primary'
-    };
+function showAlert(header, message) {
+    alert(header + '\n\n' + message);
+}
 
-    const iconMap = {
-        success: 'checkmark-circle-outline',
-        warning: 'warning-outline',
-        danger: 'alert-circle-outline',
-        error: 'alert-circle-outline',
-        info: 'information-circle-outline'
-    };
-
-    const toast = document.createElement('ion-toast');
-    toast.header = title;
-    toast.message = message;
-    toast.duration = showClose ? 0 : duration;
-    toast.color = colorMap[type] || 'primary';
-    toast.position = position;
-    toast.icon = iconMap[type];
-
-    if (showClose) {
-        toast.buttons = [{
-            icon: 'close-outline',
-            role: 'cancel'
-        }];
+function showConfirm(header, message, onConfirm) {
+    if (confirm(header + '\n\n' + message)) {
+        if (onConfirm) onConfirm();
+        return true;
     }
-
-    document.body.appendChild(toast);
-    await toast.present();
-
-    toast.addEventListener('didDismiss', () => toast.remove());
-
-    return toast;
+    return false;
 }
 
-/**
- * Shortcuts para notificaciones con título
- */
-const Notify = {
-    success: (title, message, opts = {}) => showNotification({ title, message, type: 'success', ...opts }),
-    error: (title, message, opts = {}) => showNotification({ title, message, type: 'danger', ...opts }),
-    warning: (title, message, opts = {}) => showNotification({ title, message, type: 'warning', ...opts }),
-    info: (title, message, opts = {}) => showNotification({ title, message, type: 'info', ...opts }),
-};
-
-// ============================================================================
-// ALERT DIALOGS
-// ============================================================================
-
-/**
- * Muestra un alert dialog de Ionic
- *
- * @param {string} header - Título del alert
- * @param {string} message - Mensaje del alert
- * @param {string} buttonText - Texto del botón (default: 'OK')
- * @returns {Promise<void>}
- */
-async function showAlert(header, message, buttonText = 'OK') {
-    const alert = document.createElement('ion-alert');
-    alert.header = header;
-    alert.message = message;
-    alert.buttons = [buttonText];
-
-    document.body.appendChild(alert);
-    await alert.present();
-
-    alert.addEventListener('didDismiss', () => {
-        alert.remove();
-    });
-}
-
-/**
- * Muestra un confirm dialog de Ionic
- *
- * @param {string} header - Título del confirm
- * @param {string} message - Mensaje del confirm
- * @param {Function} onConfirm - Callback cuando se confirma
- * @param {string} confirmText - Texto del botón confirmar (default: 'Confirm')
- * @param {string} cancelText - Texto del botón cancelar (default: 'Cancel')
- * @returns {Promise<boolean>} - True si se confirmó, false si se canceló
- */
-async function showConfirm(header, message, onConfirm, confirmText = 'Confirm', cancelText = 'Cancel') {
-    return new Promise((resolve) => {
-        const alert = document.createElement('ion-alert');
-        alert.header = header;
-        alert.message = message;
-        alert.buttons = [
-            {
-                text: cancelText,
-                role: 'cancel',
-                handler: () => resolve(false)
-            },
-            {
-                text: confirmText,
-                handler: () => {
-                    if (onConfirm) onConfirm();
-                    resolve(true);
-                }
-            }
-        ];
-
-        document.body.appendChild(alert);
-        alert.present();
-
-        alert.addEventListener('didDismiss', () => {
-            alert.remove();
-        });
-    });
-}
-
-/**
- * Shortcuts para tipos comunes de dialogs
- */
 const Dialog = {
     alert: showAlert,
     confirm: showConfirm,
@@ -207,60 +77,15 @@ const Dialog = {
 };
 
 // ============================================================================
-// LOADING INDICATOR
-// ============================================================================
-
-let activeLoading = null;
-
-/**
- * Muestra un loading indicator
- *
- * @param {string} message - Mensaje a mostrar (default: 'Loading...')
- * @returns {Promise<HTMLIonLoadingElement>}
- */
-async function showLoading(message = 'Loading...') {
-    // Cerrar loading anterior si existe
-    if (activeLoading) {
-        await activeLoading.dismiss();
-    }
-
-    const loading = document.createElement('ion-loading');
-    loading.message = message;
-    loading.spinner = 'crescent';
-
-    document.body.appendChild(loading);
-    await loading.present();
-
-    activeLoading = loading;
-    return loading;
-}
-
-/**
- * Oculta el loading indicator activo
- */
-async function hideLoading() {
-    if (activeLoading) {
-        await activeLoading.dismiss();
-        activeLoading.remove();
-        activeLoading = null;
-    }
-}
-
-// ============================================================================
 // EXPORTS
 // ============================================================================
 
-// Export para uso en módulos ES6 (opcional)
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { showToast, Toast, showNotification, Notify, showAlert, showConfirm, Dialog, showLoading, hideLoading };
+    module.exports = { showToast, Toast, showAlert, showConfirm, Dialog };
 }
 
-// Make available globally for inline handlers
 window.showToast = showToast;
 window.Toast = Toast;
-window.Notify = Notify;
 window.Dialog = Dialog;
 window.showAlert = showAlert;
 window.showConfirm = showConfirm;
-window.showLoading = showLoading;
-window.hideLoading = hideLoading;

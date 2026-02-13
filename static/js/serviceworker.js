@@ -4,12 +4,8 @@ const CACHE_NAME = 'erplora-hub-v1';
 // Files to cache for offline use
 const STATIC_CACHE_URLS = [
     '/',
-    '/static/css/ionic.bundle.css',
-    '/static/css/tailwind-ionic.css',
     '/static/js/alpine.min.js',
     '/static/js/htmx.min.js',
-    '/static/js/ionic/ionic.esm.js',
-    '/static/ionicons/dist/esm/ionicons.js',
     '/static/fonts/plus-jakarta-sans/plus-jakarta-sans.css',
     '/static/img/logo.png',
 ];

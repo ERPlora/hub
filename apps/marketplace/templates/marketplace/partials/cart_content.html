@@ -1,97 +1,117 @@
 {% load i18n djicons %}
 
-<div class="cart-container">
+<div class="cart">
     {% if cart.items %}
-    <ion-list lines="full">
-        {% for item in cart.items %}
-        <ion-item-sliding>
-            <ion-item>
-                {% icon item.icon slot="start" color="primary" %}
-                <ion-label>
-                    <h3>{{ item.name }}</h3>
-                    <p>
-                        {% if item.price == 0 %}
-                        <ion-text color="success">{% trans "Free" %}</ion-text>
-                        {% else %}
-                        {{ item.price }} EUR {% if item.quantity > 1 %}x {{ item.quantity }}{% endif %}
-                        {% endif %}
-                    </p>
-                </ion-label>
-                <ion-button
-                    fill="clear"
-                    color="danger"
-                    slot="end"
-                    hx-delete="{% url 'marketplace:cart_remove' store_type item.id %}"
-                    hx-target="#cart-content"
-                    hx-swap="innerHTML">
-                    {% icon "trash-outline" slot="icon-only" %}
-                </ion-button>
-            </ion-item>
-            <ion-item-options side="end">
-                <ion-item-option
-                    color="danger"
-                    hx-delete="{% url 'marketplace:cart_remove' store_type item.id %}"
-                    hx-target="#cart-content"
-                    hx-swap="innerHTML">
-                    {% icon "trash" slot="icon-only" %}
-                </ion-item-option>
-            </ion-item-options>
-        </ion-item-sliding>
-        {% endfor %}
-    </ion-list>
-
-    <!-- Cart Summary -->
-    <div class="ion-padding cart-summary">
-        <ion-grid>
-            <ion-row class="ion-align-items-center">
-                <ion-col>
-                    <strong>{% trans "Total" %}</strong>
-                </ion-col>
-                <ion-col size="auto">
-                    <ion-text color="primary">
-                        <strong>
-                            {% if cart.total == 0 %}
-                            {% trans "Free" %}
-                            {% else %}
-                            {{ cart.total|floatformat:2 }} EUR
-                            {% endif %}
-                        </strong>
-                    </ion-text>
-                </ion-col>
-            </ion-row>
-        </ion-grid>
+    {# Cart Header #}
+    <div class="cart-header">
+        <h2>
+            {% icon "cart-outline" %}
+            {% trans "Shopping Cart" %}
+            <span class="badge">{{ cart.items|length }}</span>
+        </h2>
+        <button type="button"
+                class="btn btn-ghost btn-sm"
+                hx-delete="{% url 'marketplace:cart_clear' store_type %}"
+                hx-target="#cart-content"
+                hx-swap="innerHTML"
+                hx-confirm="{% trans 'Are you sure you want to clear your cart?' %}">
+            {% icon "trash-outline" %}
+            <span>{% trans "Clear" %}</span>
+        </button>
     </div>
 
-    <!-- Cart Actions -->
-    <div class="ion-padding">
-        <ion-button expand="block" color="primary" onclick="checkoutCart()">
-            {% icon "card-outline" slot="start" %}
-            {% trans "Checkout" %}
-        </ion-button>
+    {# Cart Items #}
+    <div class="cart-items">
+        <ul>
+            {% for item in cart.items %}
+            <li class="cart-item">
+                {# Item Icon #}
+                <div class="flex items-center justify-center">
+                    {% icon item.icon|default:"cube-outline" %}
+                </div>
 
-        <ion-button
-            expand="block"
-            fill="outline"
-            color="danger"
-            class="ion-margin-top"
-            hx-delete="{% url 'marketplace:cart_clear' store_type %}"
-            hx-target="#cart-content"
-            hx-swap="innerHTML">
-            {% icon "trash-outline" slot="start" %}
-            {% trans "Clear Cart" %}
-        </ion-button>
+                {# Item Content #}
+                <div class="cart-item-content">
+                    <h3 class="cart-item-name">{{ item.name }}</h3>
+                    {% if item.quantity > 1 %}
+                    <p class="cart-item-meta">{% trans "Qty:" %} {{ item.quantity }}</p>
+                    {% endif %}
+                    {% if item.price > 0 %}
+                    <span class="cart-item-unit">&euro;{{ item.price }} {% trans "each" %}</span>
+                    {% endif %}
+                </div>
+
+                {# Item Price #}
+                <div class="cart-item-price">
+                    {% if item.price == 0 %}
+                    <span style="color: var(--color-success);">{% trans "Free" %}</span>
+                    {% else %}
+                    &euro;{% widthratio item.price 1 item.quantity %}
+                    {% endif %}
+                </div>
+
+                {# Remove Button #}
+                <button type="button"
+                        class="btn btn-ghost btn-sm"
+                        hx-delete="{% url 'marketplace:cart_remove' store_type item.id %}"
+                        hx-target="#cart-content"
+                        hx-swap="innerHTML"
+                        title="{% trans 'Remove' %}">
+                    {% icon "trash-outline" %}
+                </button>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {# Cart Summary #}
+    <div class="cart-summary">
+        <div class="cart-summary-row">
+            <span>{% trans "Total" %}</span>
+            <span class="cart-summary-value">
+                {% if cart.total == 0 %}
+                {% trans "Free" %}
+                {% else %}
+                &euro;{{ cart.total|floatformat:2 }}
+                {% endif %}
+            </span>
+        </div>
+    </div>
+
+    {# Cart Actions #}
+    <div class="cart-actions">
+        <button type="button"
+                class="btn btn-lg color-primary"
+                onclick="checkoutCart()">
+            {% icon "card-outline" %}
+            <span>{% trans "Checkout" %}</span>
+        </button>
+        <button type="button"
+                class="btn btn-outline"
+                hx-get="{% url 'marketplace:index' %}"
+                hx-target="#main-content-area"
+                hx-push-url="true">
+            {% icon "arrow-back-outline" %}
+            <span>{% trans "Continue Shopping" %}</span>
+        </button>
     </div>
 
     {% else %}
-    <!-- Empty Cart -->
-    <div class="ion-padding ion-text-center empty-cart">
-        {% icon "cart-outline" style="font-size: 64px; color: var(--ion-color-medium);" %}
+    {# Empty Cart State #}
+    <div class="flex flex-col items-center justify-center py-8">
+        <div>
+            {% icon "cart-outline" %}
+        </div>
         <h3>{% trans "Your cart is empty" %}</h3>
-        <p class="text-medium">{% trans "Add items from the marketplace to get started" %}</p>
-        <ion-button fill="clear" onclick="menuController.close('cart-menu')">
-            {% icon "storefront-outline" slot="start" %}
-            {% trans "Browse Marketplace" %}
-        </ion-button>
+        <p class="text-base-content/60">{% trans "Add items from the marketplace to get started" %}</p>
+        <button type="button"
+                class="btn color-primary mt-6"
+                hx-get="{% url 'marketplace:index' %}"
+                hx-target="#main-content-area"
+                hx-push-url="true">
+            {% icon "storefront-outline" %}
+            <span>{% trans "Browse Marketplace" %}</span>
+        </button>
     </div>
     {% endif %}
 </div>
@@ -102,26 +122,3 @@ function checkoutCart() {
     Toast.info('{% trans "Checkout coming soon!" %}');
 }
 </script>
-
-<style>
-.cart-container {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.cart-summary {
-    background: var(--ion-color-light);
-    border-top: 1px solid var(--ion-color-light-shade);
-    margin-top: auto;
-}
-
-.empty-cart {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    padding-top: 60px;
-}
-</style>

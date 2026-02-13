@@ -18,7 +18,8 @@ urlpatterns = [
     path('<uuid:role_id>/delete/', views.role_delete, name='delete'),
     path('<uuid:role_id>/toggle-active/', views.role_toggle_active, name='toggle_active'),
 
-    # Admin actions
+    # Bulk & admin actions
+    path('bulk/', views.bulk_action, name='bulk_action'),
     path('sync-permissions/', views.sync_permissions, name='sync_permissions'),
     path('create-defaults/', views.create_default_roles, name='create_defaults'),
 

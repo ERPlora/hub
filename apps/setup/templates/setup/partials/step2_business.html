@@ -1,0 +1,131 @@
+{% load i18n djicons %}
+
+{% include "setup/partials/stepper.html" %}
+
+{% if errors %}
+<div class="callout callout-warning" style="margin-bottom: var(--space-4);">
+    {% for error in errors %}
+    <p>{% icon "alert-circle-outline" %} {{ error }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="stepper-content">
+    <div class="setup-step">
+        <div class="setup-step__icon">
+            {% icon "business-outline" %}
+        </div>
+        <h2 class="setup-step__title">{% trans "Business Information" %}</h2>
+        <p class="setup-step__description">{% trans "Tell us about your business" %}</p>
+
+        <form hx-post="{% url 'setup:step' step=2 %}"
+              hx-target="#wizard-step-content"
+              hx-swap="innerHTML">
+            {% csrf_token %}
+
+            <div class="setup-step__fields">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-group-label" for="business_name">{% trans "Business Name" %} *</label>
+                        <input class="input glass"
+                            type="text"
+                            name="business_name"
+                            id="business_name"
+                            value="{{ store_config.business_name }}"
+                            placeholder="{% trans 'Your business name' %}"
+                            required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-group-label" for="business_address">{% trans "Address" %} *</label>
+                        <textarea class="input glass"
+                            name="business_address"
+                            id="business_address"
+                            rows="2"
+                            placeholder="{% trans 'Street, City, Postal Code' %}"
+                            required>{{ store_config.business_address }}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-group-label" for="vat_number">{% trans "VAT/Tax ID" %} *</label>
+                        <input class="input glass"
+                            type="text"
+                            name="vat_number"
+                            id="vat_number"
+                            value="{{ store_config.vat_number }}"
+                            placeholder="{% trans 'e.g., ES12345678A' %}"
+                            required>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <label class="form-group-label">{% trans "Phone" %}</label>
+                        <div class="phone-input phone-input--glass"
+                             x-data="phoneInput()"
+                             :class="{ 'phone-input--open': open }"
+                             @click.outside="open = false"
+                             @keydown.escape="open = false">
+                            <input type="hidden" name="phone" :value="fullNumber">
+                            <button type="button"
+                                    class="phone-input__country"
+                                    @click="toggle()">
+                                <span class="phone-input__flag" x-text="selectedCountry.flag"></span>
+                                <span class="phone-input__code" x-text="selectedCountry.dial"></span>
+                                <svg class="phone-input__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <input type="tel"
+                                   class="input glass"
+                                   x-model="number"
+                                   placeholder="600 000 000">
+                            <div class="phone-input__dropdown">
+                                <div class="phone-input__search">
+                                    <input type="text"
+                                           class="phone-input__search-input"
+                                           x-model="search"
+                                           @input="highlighted = 0"
+                                           placeholder="{% trans 'Search country...' %}"
+                                           x-ref="searchInput">
+                                </div>
+                                <div class="phone-input__list">
+                                    <template x-for="(c, i) in filteredCountries" :key="c.code">
+                                        <div class="phone-input__option"
+                                             :class="{ 'phone-input__option--selected': c.code === selectedCountry.code }"
+                                             @click="selectCountry(c)">
+                                            <span class="phone-input__option-flag" x-text="c.flag"></span>
+                                            <span class="phone-input__option-name" x-text="c.name"></span>
+                                            <span class="phone-input__option-code" x-text="c.dial"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <label class="form-group-label" for="email">{% trans "Email" %}</label>
+                        <input class="input glass"
+                            type="email"
+                            name="email"
+                            id="email"
+                            value="{{ store_config.email }}"
+                            placeholder="info@business.com">
+                    </div>
+                </div>
+            </div>
+
+            <div class="stepper-actions">
+                <div class="stepper-actions-start">
+                    <button type="button"
+                            class="btn btn-outline glass"
+                            hx-get="{% url 'setup:step' step=1 %}"
+                            hx-target="#wizard-step-content"
+                            hx-swap="innerHTML">
+                        {% icon "arrow-back-outline" %}
+                        {% trans "Back" %}
+                    </button>
+                </div>
+                <div class="stepper-actions-end">
+                    <button type="submit" class="btn color-primary">
+                        {% trans "Continue" %}
+                        {% icon "arrow-forward-outline" %}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

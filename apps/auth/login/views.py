@@ -357,6 +357,22 @@ def setup_pin(request):
 
 
 def logout(request):
-    """Logout - clear session"""
+    """Logout - auto-close cash session if configured, then clear session."""
+    hub_id = request.session.get('hub_id')
+    local_user_id = request.session.get('local_user_id')
+
+    if hub_id and local_user_id:
+        try:
+            from cash_register.models import CashRegisterSettings, CashSession
+            config = CashRegisterSettings.get_settings(hub_id)
+            if config.enable_cash_register and config.auto_close_session_on_logout:
+                user = LocalUser.objects.get(pk=local_user_id)
+                open_session = CashSession.get_current_session(hub_id, user)
+                if open_session:
+                    closing_balance = open_session.get_current_balance()
+                    open_session.close_session(closing_balance, notes='Auto-closed on logout')
+        except Exception:
+            pass
+
     request.session.flush()
     return redirect('auth:login')

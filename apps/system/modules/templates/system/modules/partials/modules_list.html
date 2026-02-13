@@ -1,18 +1,31 @@
-{% load i18n %}
-{% load ui %}
+{% load i18n djicons %}
 
-{% ui_grid_start padding=False %}
-    {% ui_row_start %}
-        {% for module in modules %}
-            {% include "system/modules/partials/module_card.html" with module=module mode="installed" %}
-        {% empty %}
-        {% ui_col_start size="12" %}
-            {% if search_query %}
-            {% ui_empty_state title=_("No modules found") description=_("Try a different search term") icon="search-outline" %}
-            {% else %}
-            {% ui_empty_state title=_("No modules installed") description=_("Explore the Marketplace to extend your Hub") icon="extension-puzzle-outline" action_label=_("Browse Marketplace") action_hx_get=marketplace_url action_hx_target="#main-content-area" %}
-            {% endif %}
-        {% ui_col_end %}
-        {% endfor %}
-    {% ui_row_end %}
-{% ui_grid_end %}
+{% if modules %}
+<div class="module-grid module-grid-3">
+    {% for module in modules %}
+    {% include "system/modules/partials/module_card.html" with module=module card_context='installed' %}
+    {% endfor %}
+</div>
+{% else %}
+    {% if search_query %}
+    <div class="flex flex-col items-center justify-center py-16 text-center">
+        {% icon "search-outline" css_class="text-4xl opacity-40 mb-4" %}
+        <h3 class="font-semibold mb-1">{% trans "No modules found" %}</h3>
+        <p class="text-sm opacity-60">{% trans "Try a different search term" %}</p>
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center justify-center py-16 text-center">
+        {% icon "extension-puzzle-outline" css_class="text-4xl opacity-40 mb-4" %}
+        <h3 class="font-semibold mb-1">{% trans "No modules installed" %}</h3>
+        <p class="text-sm opacity-60 mb-4">{% trans "Explore the Marketplace to extend your Hub" %}</p>
+        <a class="btn color-primary"
+           href="{{ marketplace_url }}"
+           hx-get="{{ marketplace_url }}"
+           hx-target="#main-content-area"
+           hx-push-url="true">
+            {% icon "storefront-outline" %}
+            {% trans "Browse Marketplace" %}
+        </a>
+    </div>
+    {% endif %}
+{% endif %}

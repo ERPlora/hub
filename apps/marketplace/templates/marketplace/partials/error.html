@@ -1,13 +1,13 @@
 {% load i18n djicons %}
 
-<div class="ion-padding ion-text-center error-state">
-    {% icon "cloud-offline-outline" style="font-size: 64px; color: var(--ion-color-danger);" %}
+<div class="p-4 error-state" style="text-align: center;">
+    {% icon "cloud-offline-outline" style="font-size: 64px; color: var(--color-error);" %}
     <h3>{% trans "Connection Error" %}</h3>
     <p class="text-medium">{{ error }}</p>
-    <ion-button onclick="location.reload()">
-        {% icon "refresh-outline" slot="start" %}
+    <button class="btn" onclick="location.reload()">
+        {% icon "refresh-outline" %}
         {% trans "Retry" %}
-    </ion-button>
+    </button>
 </div>
 
 <style>

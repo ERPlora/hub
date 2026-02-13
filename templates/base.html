@@ -1,7 +1,7 @@
 {% load static %}
 {% load i18n %}
 <!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE }}">
+<html lang="{{ LANGUAGE_CODE }}" {% if HUB_CONFIG.dark_mode %}data-theme="dark"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -9,7 +9,7 @@
     <title>{% block title %}ERPlora Hub{% endblock %}</title>
 
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#3880ff">
+    <meta name="theme-color" content="#007AFF">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -20,23 +20,17 @@
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
     <link rel="apple-touch-icon" href="{% static 'img/icons/icon-152x152.png' %}">
 
-    <!-- Plus Jakarta Sans Font (local) -->
-    <link rel="stylesheet" href="{% static 'fonts/plus-jakarta-sans/plus-jakarta-sans.css' %}">
+    <!-- @erplora/ux CSS (components + Tailwind utilities) — CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ERPlora/ux@main/dist/ux-full.min.css">
 
-    <!-- Ionic CSS (offline) -->
-    <link rel="stylesheet" href="{% static 'css/ionic.bundle.css' %}" />
-
-    <!-- Theme Colors (from HubConfig) -->
-    <link rel="stylesheet" href="{% static 'css/themes/' %}{{ HUB_CONFIG.color_theme|default:'default' }}/ionic-theme.css" id="theme-stylesheet">
-
-    <!-- ERPlora Base CSS -->
+    <!-- ERPlora Hub Custom CSS (fonts + hub styles) -->
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
 
-    <!-- UI Components CSS -->
-    <link rel="stylesheet" href="{% static 'ui/ui.css' %}">
+    <!-- ERPlora Bridge (hardware: printers, cash drawer, barcode scanner) -->
+    <script src="{% static 'js/bridge.js' %}" defer></script>
 
-    <!-- Alpine.js (offline) -->
-    <script defer src="{% static 'js/alpine.min.js' %}"></script>
+    <!-- Alpine.js (CDN) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <!-- Alpine.js Global Stores -->
     <script>
@@ -100,96 +94,34 @@
                 }
             });
 
-            // Module Grid Component - Used on the home page
-            // Displays installed modules with favorites, recent, and search functionality
-            Alpine.data('moduleGrid', () => ({
-                modules: [],
-                favorites: [],
-                recent: [],
-                searchQuery: '',
-
+            // Bridge Store - Hardware bridge connection state
+            Alpine.store('bridge', {
+                connected: false,
+                printers: [],
                 init() {
-                    // Load modules data from the JSON script tag
-                    const dataEl = document.getElementById('modules-data');
-                    if (dataEl) {
-                        try {
-                            this.modules = JSON.parse(dataEl.textContent) || [];
-                        } catch (e) {
-                            console.error('Error parsing modules data:', e);
-                            this.modules = [];
+                    document.addEventListener('erplora:bridge:connected', () => {
+                        this.connected = true;
+                        // Request printer list on connect
+                        if (window.ERPlora && window.ERPlora.bridge) {
+                            window.ERPlora.bridge.discoverPrinters()
+                                .then(p => { this.printers = p; })
+                                .catch(() => {});
                         }
-                    }
-                    // Load favorites and recent from localStorage
-                    this.favorites = JSON.parse(localStorage.getItem('erplora_favorite_modules') || '[]');
-                    this.recent = JSON.parse(localStorage.getItem('erplora_recent_modules') || '[]');
-                },
-
-                get filteredModules() {
-                    if (!this.searchQuery) {
-                        return this.modules;
-                    }
-                    const query = this.searchQuery.toLowerCase();
-                    return this.modules.filter(mod =>
-                        mod.label.toLowerCase().includes(query)
-                    );
-                },
-
-                get favoritesData() {
-                    return this.modules.filter(mod => this.favorites.includes(mod.id));
-                },
-
-                get recentData() {
-                    // Get last 4 recent modules that exist and are not in favorites
-                    return this.recent
-                        .filter(id => !this.favorites.includes(id))
-                        .map(id => this.modules.find(mod => mod.id === id))
-                        .filter(mod => mod !== undefined)
-                        .slice(0, 4);
-                },
-
-                filterModules(event) {
-                    this.searchQuery = event.target.value || '';
-                },
-
-                isFavorite(moduleId) {
-                    return this.favorites.includes(moduleId);
-                },
-
-                toggleFavorite(moduleId) {
-                    const index = this.favorites.indexOf(moduleId);
-                    if (index === -1) {
-                        this.favorites.push(moduleId);
-                    } else {
-                        this.favorites.splice(index, 1);
-                    }
-                    localStorage.setItem('erplora_favorite_modules', JSON.stringify(this.favorites));
-                },
-
-                trackRecent(moduleId) {
-                    // Remove if already in recent
-                    const index = this.recent.indexOf(moduleId);
-                    if (index !== -1) {
-                        this.recent.splice(index, 1);
-                    }
-                    // Add to beginning
-                    this.recent.unshift(moduleId);
-                    // Keep only last 8
-                    this.recent = this.recent.slice(0, 8);
-                    localStorage.setItem('erplora_recent_modules', JSON.stringify(this.recent));
+                    });
+                    document.addEventListener('erplora:bridge:disconnected', () => {
+                        this.connected = false;
+                        this.printers = [];
+                    });
                 }
-            }));
+            });
 
             // UI Store - Toast notifications, delete confirmations, etc.
             Alpine.store('ui', {
-                // Show toast notification
-                async toast(message, color = 'primary', duration = 2000) {
-                    const toast = document.createElement('ion-toast');
-                    toast.message = message;
-                    toast.duration = duration;
-                    toast.color = color;
-                    toast.position = 'top';
-                    document.body.appendChild(toast);
-                    await toast.present();
+                // Show toast notification (delegates to global showToast)
+                toast(message, type = 'default', duration = 4000) {
+                    if (typeof showToast === 'function') {
+                        showToast(message, type, duration);
+                    }
                 },
 
                 // Show success toast
@@ -199,7 +131,7 @@
 
                 // Show error toast
                 error(message) {
-                    this.toast(message, 'danger', 3000);
+                    this.toast(message, 'error', 5000);
                 },
 
                 // Get CSRF token
@@ -242,110 +174,88 @@
                     }
                 },
 
-                // Confirm delete with Ionic alert
-                async confirmDelete(deleteUrl, itemName, method, buttonElement) {
+                // Confirm delete with UX alert modal
+                confirmDelete(deleteUrl, itemName, method, buttonElement) {
                     const self = this;
-                    const alert = document.createElement('ion-alert');
-                    alert.header = '{% trans "Confirm Delete" %}';
-                    alert.message = '{% trans "Are you sure you want to delete" %}' + ` "${itemName}"?`;
-                    alert.buttons = [
-                        {
-                            text: '{% trans "Cancel" %}',
-                            role: 'cancel',
-                            cssClass: 'secondary'
-                        },
-                        {
-                            text: '{% trans "Delete" %}',
-                            role: 'confirm',
-                            cssClass: 'danger',
-                            handler: async () => {
-                                const row = buttonElement.closest('tr');
-                                const actionsDiv = buttonElement.closest('[x-data]');
 
-                                // Set deleting state if Alpine x-data exists
-                                if (actionsDiv && actionsDiv._x_dataStack) {
-                                    actionsDiv._x_dataStack[0].deleting = true;
+                    // Create modal backdrop
+                    const backdrop = document.createElement('div');
+                    backdrop.className = 'modal-backdrop';
+                    backdrop.setAttribute('data-state', 'open');
+
+                    backdrop.innerHTML = `
+                        <div class="modal modal-sm">
+                            <div class="modal-header">
+                                <h3 class="modal-title">{% trans "Confirm Delete" %}</h3>
+                            </div>
+                            <div class="modal-body">
+                                <p>{% trans "Are you sure you want to delete" %} "${itemName}"?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-outline" data-action="cancel">{% trans "Cancel" %}</button>
+                                <button class="btn color-error" data-action="confirm">{% trans "Delete" %}</button>
+                            </div>
+                        </div>
+                    `;
+
+                    document.body.appendChild(backdrop);
+
+                    backdrop.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+                        backdrop.setAttribute('data-state', 'closed');
+                        setTimeout(() => backdrop.remove(), 300);
+                    });
+
+                    backdrop.querySelector('[data-action="confirm"]').addEventListener('click', async () => {
+                        backdrop.setAttribute('data-state', 'closed');
+                        setTimeout(() => backdrop.remove(), 300);
+
+                        const row = buttonElement.closest('tr');
+                        const actionsDiv = buttonElement.closest('[x-data]');
+
+                        if (actionsDiv && actionsDiv._x_dataStack) {
+                            actionsDiv._x_dataStack[0].deleting = true;
+                        }
+
+                        try {
+                            const response = await fetch(deleteUrl, {
+                                method: method || 'POST',
+                                headers: {
+                                    'X-CSRFToken': self.getCsrfToken(),
+                                    'Content-Type': 'application/json',
                                 }
+                            });
 
-                                try {
-                                    const response = await fetch(deleteUrl, {
-                                        method: method || 'POST',
-                                        headers: {
-                                            'X-CSRFToken': self.getCsrfToken(),
-                                            'Content-Type': 'application/json',
-                                        }
-                                    });
+                            const data = await response.json();
 
-                                    const data = await response.json();
-
-                                    if (data.success) {
-                                        // Animate row removal
-                                        if (row) {
-                                            row.style.transition = 'opacity 0.5s';
-                                            row.style.opacity = '0';
-                                            setTimeout(() => {
-                                                row.remove();
-                                                // Update table counter after row removal
-                                                self.updateTableCounter();
-                                            }, 500);
-                                        }
-                                        self.success(data.message || '{% trans "Deleted successfully" %}');
-                                    } else {
-                                        self.error(data.message || '{% trans "Error deleting" %}');
-                                    }
-                                } catch (error) {
-                                    console.error('Delete error:', error);
-                                    self.error('{% trans "Error deleting" %}');
-                                } finally {
-                                    if (actionsDiv && actionsDiv._x_dataStack) {
-                                        actionsDiv._x_dataStack[0].deleting = false;
-                                    }
+                            if (data.success) {
+                                if (row) {
+                                    row.style.transition = 'opacity 0.5s';
+                                    row.style.opacity = '0';
+                                    setTimeout(() => {
+                                        row.remove();
+                                        self.updateTableCounter();
+                                    }, 500);
                                 }
+                                self.success(data.message || '{% trans "Deleted successfully" %}');
+                            } else {
+                                self.error(data.message || '{% trans "Error deleting" %}');
+                            }
+                        } catch (error) {
+                            console.error('Delete error:', error);
+                            self.error('{% trans "Error deleting" %}');
+                        } finally {
+                            if (actionsDiv && actionsDiv._x_dataStack) {
+                                actionsDiv._x_dataStack[0].deleting = false;
                             }
                         }
-                    ];
-
-                    document.body.appendChild(alert);
-                    await alert.present();
+                    });
                 }
             });
         });
     </script>
 
-    <!-- HTMX (offline) -->
-    <script src="{% static 'js/htmx.min.js' %}"></script>
-
-    <!-- UI Helpers (Toast, Alert, Loading) -->
-    <script src="{% static 'js/ui-helpers.js' %}"></script>
-
-    <!-- Ionic Core (offline) -->
-    <script type="module" src="{% static 'js/ionic/ionic.esm.js' %}"></script>
-
-    <!-- Swiper Element (Web Components - offline) -->
-    <script src="{% static 'js/swiper-element-bundle.min.js' %}"></script>
-
-    <!-- Ionicons (offline) -->
-    <script type="module" src="{% static 'ionicons/dist/esm/ionicons.js' %}"></script>
-    <script nomodule src="{% static 'ionicons/dist/ionicons.js' %}"></script>
-
-    <!-- Ionic Config (iOS mode) -->
-    <script>
-        window.Ionic = { config: { mode: 'ios' } };
-    </script>
-
-    <!-- Theme Switcher -->
-    <script>
-        function setTheme(themeName) {
-            const themeLink = document.getElementById('theme-stylesheet');
-            if (themeLink) {
-                themeLink.href = `/static/css/themes/${themeName}/ionic-theme.css`;
-            }
-        }
-
-        function getCurrentTheme() {
-            return '{{ HUB_CONFIG.color_theme|default:"default" }}';
-        }
-    </script>
+    <!-- HTMX (CDN) -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
     <!-- HTMX Configuration -->
     <script>
@@ -388,7 +298,7 @@
                 var footer = document.getElementById('global-tabbar-footer');
                 if (!footer) return;
 
-                footer.querySelectorAll('ion-tab-button').forEach(function(btn) {
+                footer.querySelectorAll('.tabbar-item').forEach(function(btn) {
                     var btnPath = btn.getAttribute('hx-get');
                     btn.classList.remove('tab-selected');
                     if (btnPath) {
@@ -418,14 +328,6 @@
                 }
             }, 200);
 
-            // Listen for showNotification events from HTMX HX-Trigger headers
-            // Usage in Python: response['HX-Trigger'] = json.dumps({'showNotification': {'title': 'Success', 'message': 'Saved!', 'type': 'success'}})
-            document.body.addEventListener('showNotification', function(event) {
-                const { title, message, type } = event.detail || {};
-                if (typeof Notify !== 'undefined' && type && Notify[type]) {
-                    Notify[type](title || '', message || '');
-                }
-            });
         });
     </script>
 
@@ -550,36 +452,93 @@
             window.ERPlora.isDark = isDark;
             window.ERPlora.darkModeAuto = darkModeAuto;
 
-            // Apply immediately to prevent flash
+            // Apply data-theme attribute immediately to prevent flash
             if (isDark) {
-                document.documentElement.classList.add('dark');
+                document.documentElement.setAttribute('data-theme', 'dark');
             }
         })();
     </script>
 </head>
-<body>
+<body class="app">
     <script>
-        // Apply dark class to body (documentElement already has it if needed)
-        if (window.ERPlora && window.ERPlora.isDark) {
-            document.body.classList.add('dark');
-        }
-
         // Listen for system preference changes (only if auto mode)
         if (window.ERPlora && window.ERPlora.darkModeAuto) {
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                document.body.classList.toggle('dark', e.matches);
-                document.documentElement.classList.toggle('dark', e.matches);
+                if (e.matches) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
                 window.ERPlora.isDark = e.matches;
             });
         }
     </script>
 
-    <ion-app mode="ios">
-        {% block content %}{% endblock %}
-    </ion-app>
+    {% block content %}{% endblock %}
 
-    <!-- Toast container for HTMX OOB swap -->
-    <div id="toast-container"></div>
+    <!-- Toast container -->
+    <div id="toast-container" class="toast toast-bottom toast-center"></div>
+
+    <!-- Toast function & HTMX event listeners (must be after #toast-container) -->
+    <script>
+        (function() {
+            var icons = {
+                info: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>',
+                success: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>',
+                warning: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>',
+                error: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>'
+            };
+            var closeBtn = '<button class="toast-close" onclick="dismissToast(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg></button>';
+
+            window.dismissToast = function(btnOrItem) {
+                var item = btnOrItem.closest ? (btnOrItem.closest('.toast-item') || btnOrItem) : btnOrItem;
+                item.classList.add('toast-removing');
+                item.addEventListener('animationend', function() { item.remove(); });
+            };
+
+            window.showToast = function(message, type, duration) {
+                type = type || 'default';
+                duration = duration || 4000;
+                var container = document.getElementById('toast-container');
+                if (!container) return;
+                var colorClass = (type === 'default' || type === 'primary') ? '' : ' color-' + type;
+                var icon = icons[type] || '';
+                var el = document.createElement('div');
+                el.className = 'toast-item' + colorClass;
+                el.innerHTML = icon + '<span>' + message + '</span>' + closeBtn;
+                container.appendChild(el);
+                setTimeout(function() { dismissToast(el.querySelector('.toast-close')); }, duration);
+            };
+        })();
+
+        // Debug: log ALL HTMX requests and responses
+        document.body.addEventListener('htmx:beforeRequest', function(e) {
+            console.log('[Toast] HTMX request starting:', e.detail.elt.tagName, e.detail.path);
+        });
+        document.body.addEventListener('htmx:beforeOnLoad', function(e) {
+            var xhr = e.detail.xhr;
+            var trigger = xhr.getResponseHeader('HX-Trigger');
+            console.log('[Toast] HTMX response received, status:', xhr.status, 'HX-Trigger:', trigger);
+        });
+        document.body.addEventListener('htmx:afterRequest', function(e) {
+            console.log('[Toast] HTMX afterRequest, successful:', e.detail.successful);
+        });
+
+        // HX-Trigger: {"showMessage": {"message": "...", "type": "success"}}
+        document.body.addEventListener('showMessage', function(e) {
+            console.log('[Toast] showMessage event fired', e.detail);
+            var d = e.detail || {};
+            var msg = d.message || d.value || '';
+            if (msg) showToast(msg, d.type || 'success', d.type === 'error' ? 5000 : 4000);
+        });
+
+        // HX-Trigger: {"showNotification": {"title": "...", "message": "...", "type": "..."}}
+        document.body.addEventListener('showNotification', function(e) {
+            var d = e.detail || {};
+            var text = d.title ? (d.title + ': ' + (d.message || '')) : (d.message || '');
+            if (text) showToast(text, d.type || 'default');
+        });
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>

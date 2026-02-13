@@ -1,7 +1,0 @@
-{% load static %}
-<div id="sidebar-header" class="menu-header ion-padding{% if css_class %} {{ css_class }}{% endif %}">
-    <div class="menu-logo">
-        {% if logo_src %}<img src="{{ logo_src }}" alt="{{ logo_alt }}">{% elif logo_static %}<img src="{% static logo_static %}" alt="{{ logo_alt }}">{% endif %}
-        {% if logo_text %}<span>{{ logo_text }}</span>{% endif %}
-    </div>
-</div>

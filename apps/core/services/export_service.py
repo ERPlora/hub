@@ -152,7 +152,9 @@ def export_to_excel(
         cell.alignment = header_alignment
 
     # Write data
+    row_count = 0
     for row_num, item in enumerate(data, 2):
+        row_count += 1
         for col_num, field in enumerate(fields, 1):
             # Get value from dict or object
             if isinstance(item, dict):
@@ -173,13 +175,14 @@ def export_to_excel(
             sheet.cell(row=row_num, column=col_num, value=value)
 
     # Auto-adjust column widths
+    from openpyxl.utils import get_column_letter
     for col_num, _ in enumerate(headers, 1):
         max_length = len(str(headers[col_num - 1]))
-        for row_num in range(2, len(list(data)) + 2):
+        for row_num in range(2, row_count + 2):
             cell_value = sheet.cell(row=row_num, column=col_num).value
             if cell_value:
                 max_length = max(max_length, len(str(cell_value)))
-        sheet.column_dimensions[chr(64 + col_num)].width = min(max_length + 2, 50)
+        sheet.column_dimensions[get_column_letter(col_num)].width = min(max_length + 2, 50)
 
     # Create response
     response = HttpResponse(

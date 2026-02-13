@@ -1,0 +1,77 @@
+{% load i18n djicons %}
+
+{% include "setup/partials/stepper.html" %}
+
+{% if errors %}
+<div class="callout callout-warning" style="margin-bottom: var(--space-4);">
+    {% for error in errors %}
+    <p>{% icon "alert-circle-outline" %} {{ error }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="stepper-content">
+    <div class="setup-step">
+        <div class="setup-step__icon">
+            {% icon "calculator-outline" %}
+        </div>
+        <h2 class="setup-step__title">{% trans "Tax Configuration" %}</h2>
+        <p class="setup-step__description">{% trans "Set up your default tax settings" %}</p>
+
+        <form hx-post="{% url 'setup:step' step=3 %}"
+              hx-target="#wizard-step-content"
+              hx-swap="innerHTML">
+            {% csrf_token %}
+
+            <div class="setup-step__fields">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-group-label" for="tax_rate">{% trans "Default Tax Rate (%)" %}</label>
+                        <input class="input glass"
+                            type="number"
+                            name="tax_rate"
+                            id="tax_rate"
+                            value="{{ store_config.tax_rate|default:'21' }}"
+                            placeholder="21"
+                            min="0"
+                            max="100"
+                            step="0.01">
+                    </div>
+                    <div class="col-12">
+                        <div class="setup-toggle-row">
+                            <div>
+                                <p class="setup-toggle-row__label">{% trans "Tax included in prices" %}</p>
+                                <p class="setup-toggle-row__hint">{% trans "Prices shown already include tax" %}</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" name="tax_included" {% if store_config.tax_included %}checked{% endif %}>
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stepper-actions">
+                <div class="stepper-actions-start">
+                    <button type="button"
+                            class="btn btn-outline glass"
+                            hx-get="{% url 'setup:step' step=2 %}"
+                            hx-target="#wizard-step-content"
+                            hx-swap="innerHTML">
+                        {% icon "arrow-back-outline" %}
+                        {% trans "Back" %}
+                    </button>
+                </div>
+                <div class="stepper-actions-end">
+                    <button type="submit" class="btn color-primary">
+                        {% icon "checkmark-circle-outline" %}
+                        {% trans "Complete Setup" %}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

@@ -1,45 +1,51 @@
 {% load i18n ui component_tags djicons %}
+<div data-back-url="{% url 'marketplace:index' %}" hidden></div>
 
 {% if error %}
     <!-- Error State -->
-    {% component "page" title=_("Error") %}
-        {% fill "content" %}
-            {% ui_card css_class="card-error" %}
-                <div class="d-flex align-center gap-md">
-                    {% icon "alert-circle-outline" css_class="fs-2xl text-danger" %}
-                    <div>
-                        <h3 class="fw-semibold mb-xs m-0">{% trans "Error" %}</h3>
-                        <p class="m-0 text-medium">{{ error }}</p>
-                    </div>
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                {% icon "alert-circle-outline" css_class="text-2xl" %}
+                <div>
+                    <h3 class="font-semibold mb-1">{% trans "Error" %}</h3>
+                    <p class="text-base-content/60 mb-0">{{ error }}</p>
                 </div>
-            {% endui_card %}
-            {% url 'marketplace:index' as marketplace_url %}
-            {% ui_button label=_("Back to Marketplace") icon="arrow-back-outline" css_class="mt-md" hx_get=marketplace_url hx_target="#main-content-area" hx_swap="innerHTML" hx_push_url="true" %}
-        {% endfill %}
-    {% endcomponent %}
+            </div>
+        </div>
+    </div>
+    <a class="btn btn-outline"
+       href="{% url 'marketplace:index' %}"
+       hx-get="{% url 'marketplace:index' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
+        {% icon "arrow-back-outline" %}
+        {% trans "Back to Marketplace" %}
+    </a>
 
 {% elif no_connection %}
     <!-- No Connection State -->
-    {% component "page" title=_("No Connection") %}
-        {% fill "content" %}
-            {% ui_card css_class="card-warning" %}
-                <div class="d-flex align-center gap-md">
-                    {% icon "cloud-offline-outline" css_class="fs-2xl text-warning" %}
-                    <div>
-                        <h3 class="fw-semibold mb-xs m-0">{% trans "No Connection" %}</h3>
-                        <p class="m-0 text-medium">{% trans "Unable to connect to ERPlora Cloud. Please check your internet connection and try again." %}</p>
-                    </div>
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                {% icon "cloud-offline-outline" css_class="text-2xl" %}
+                <div>
+                    <h3 class="font-semibold mb-1">{% trans "No Connection" %}</h3>
+                    <p class="text-base-content/60 mb-0">{% trans "Unable to connect to ERPlora Cloud. Please check your internet connection and try again." %}</p>
                 </div>
-            {% endui_card %}
-            {% url 'mymodules:installed' as installed_url %}
-            {% ui_button label=_("Back to Modules") icon="arrow-back-outline" css_class="mt-md" hx_get=installed_url hx_target="#main-content-area" hx_swap="innerHTML" hx_push_url="true" %}
-        {% endfill %}
-    {% endcomponent %}
+            </div>
+        </div>
+    </div>
+    <a class="btn btn-outline"
+       href="{% url 'mymodules:installed' %}"
+       hx-get="{% url 'mymodules:installed' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
+        {% icon "arrow-back-outline" %}
+        {% trans "Back to Modules" %}
+    </a>
 
 {% elif module %}
-    {% url 'marketplace:index' as marketplace_url %}
-    {% component "page" title=module.name back_hx_get=marketplace_url back_hx_target="#main-content-area" back_hx_push_url="true" %}
-        {% fill "content" %}
             <!-- Hero Card -->
             {% ui_card css_class="mb-lg" %}
                 <div class="module-detail-header">
@@ -121,17 +127,17 @@
 
             <!-- Tabs -->
             <div x-data="{ activeTab: 'overview' }">
-                <ion-segment :value="activeTab" @ionChange="activeTab = $event.detail.value">
-                    <ion-segment-button value="overview">
-                        <ion-label>{% trans "Overview" %}</ion-label>
-                    </ion-segment-button>
-                    <ion-segment-button value="reviews">
-                        <ion-label>{% trans "Reviews" %} ({{ module.review_count|default:0 }})</ion-label>
-                    </ion-segment-button>
-                    <ion-segment-button value="changelog">
-                        <ion-label>{% trans "Changelog" %}</ion-label>
-                    </ion-segment-button>
-                </ion-segment>
+                <div class="tab-bar">
+                    <button class="tab" :class="{ 'tab-active': activeTab === 'overview' }" @click="activeTab = 'overview'">
+                        <span>{% trans "Overview" %}</span>
+                    </button>
+                    <button class="tab" :class="{ 'tab-active': activeTab === 'reviews' }" @click="activeTab = 'reviews'">
+                        <span>{% trans "Reviews" %} ({{ module.review_count|default:0 }})</span>
+                    </button>
+                    <button class="tab" :class="{ 'tab-active': activeTab === 'changelog' }" @click="activeTab = 'changelog'">
+                        <span>{% trans "Changelog" %}</span>
+                    </button>
+                </div>
 
                 <!-- Overview Tab -->
                 <div x-show="activeTab === 'overview'" class="mt-lg">
@@ -147,54 +153,121 @@
 
                     {% ui_card title=_("Module Information") %}
                         {% ui_list lines="full" %}
-                            <ion-item>
-                                <ion-label>{% trans "Version" %}</ion-label>
-                                <ion-text slot="end">{{ module.version }}</ion-text>
-                            </ion-item>
-                            <ion-item>
-                                <ion-label>{% trans "Author" %}</ion-label>
-                                <ion-text slot="end">{{ module.author|default:"ERPlora" }}</ion-text>
-                            </ion-item>
-                            <ion-item>
-                                <ion-label>{% trans "Category" %}</ion-label>
-                                <ion-text slot="end">{{ module.category_name|default:module.category }}</ion-text>
-                            </ion-item>
-                            <ion-item>
-                                <ion-label>{% trans "License" %}</ion-label>
-                                <ion-text slot="end">{{ module.license|default:"Proprietary" }}</ion-text>
-                            </ion-item>
+                            <div class="list-item d-flex justify-between">
+                                <span>{% trans "Version" %}</span>
+                                <span>{{ module.version }}</span>
+                            </div>
+                            <div class="list-item d-flex justify-between">
+                                <span>{% trans "Author" %}</span>
+                                <span>{{ module.author|default:"ERPlora" }}</span>
+                            </div>
+                            <div class="list-item d-flex justify-between">
+                                <span>{% trans "Category" %}</span>
+                                <span>{{ module.category_name|default:module.category }}</span>
+                            </div>
+                            <div class="list-item d-flex justify-between">
+                                <span>{% trans "License" %}</span>
+                                <span>{{ module.license|default:"Proprietary" }}</span>
+                            </div>
                         {% endui_list %}
                     {% endui_card %}
                 </div>
 
                 <!-- Reviews Tab -->
                 <div x-show="activeTab === 'reviews'" class="mt-lg">
-                    {% if module.recent_reviews %}
-                    {% for review in module.recent_reviews %}
-                    {% ui_card css_class="mb-md" %}
-                        <div class="d-flex justify-between align-start mb-sm">
-                            <div>
-                                <p class="fw-semibold m-0">{{ review.user_name|default:"Anonymous" }}</p>
-                                <div class="d-flex gap-xxs mt-xs text-warning">
+                    {# Review Form #}
+                    <div class="card glass mb-4" x-data="{ rating: 0, hoverRating: 0, comment: '', submitting: false, submitted: false }">
+                        <div class="card-body">
+                            <h3 class="font-semibold text-sm mb-3 m-0">{% trans "Write a Review" %}</h3>
+
+                            {# Star selector #}
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="text-sm opacity-60">{% trans "Your rating:" %}</span>
+                                <div class="flex gap-1">
                                     {% for i in "12345" %}
-                                        {% if forloop.counter <= review.rating %}
-                                        {% icon "star" %}
-                                        {% else %}
-                                        {% icon "star-outline" css_class="text-medium" %}
-                                        {% endif %}
+                                    <button type="button"
+                                            class="p-0 border-none bg-transparent cursor-pointer"
+                                            style="line-height: 0; color: var(--color-warning); opacity: 0.3; transition: opacity 0.15s;"
+                                            :style="(hoverRating >= {{ forloop.counter }} || (!hoverRating && rating >= {{ forloop.counter }})) ? 'opacity: 1' : 'opacity: 0.3'"
+                                            @mouseenter="hoverRating = {{ forloop.counter }}"
+                                            @mouseleave="hoverRating = 0"
+                                            @click="rating = {{ forloop.counter }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24" fill="currentColor">
+                                            <path d="M394 480a16 16 0 01-9.39-3L256 383.76 127.39 477a16 16 0 01-24.55-18.08L153 310.35 23 221.2a16 16 0 019-29.2h160.38l48.4-148.95a16 16 0 0130.44 0l48.4 149H480a16 16 0 019.05 29.2L359 310.35l50.13 148.53A16 16 0 01394 480z"/>
+                                        </svg>
+                                    </button>
                                     {% endfor %}
                                 </div>
                             </div>
-                            <span class="fs-xs text-medium">{{ review.created_at }}</span>
+
+                            {# Comment textarea #}
+                            <textarea class="textarea w-full mb-3"
+                                      rows="3"
+                                      x-model="comment"
+                                      placeholder="{% trans 'Share your experience with this module (optional)...' %}"></textarea>
+
+                            {# Submit button #}
+                            <div class="flex items-center gap-3">
+                                <button class="btn btn-sm color-primary"
+                                        :disabled="!rating || submitting"
+                                        @click="
+                                            submitting = true;
+                                            fetch('{% url 'mymodules:api_rate' %}', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                                                body: JSON.stringify({ module_slug: '{{ module.slug }}', rating: rating, comment: comment })
+                                            })
+                                            .then(r => r.json())
+                                            .then(d => { submitted = true; if (typeof Toast !== 'undefined') Toast.success('{% trans 'Review submitted!' %}'); })
+                                            .catch(() => { if (typeof Toast !== 'undefined') Toast.error('{% trans 'Error submitting review' %}'); })
+                                            .finally(() => { submitting = false; })
+                                        ">
+                                    <template x-if="submitting"><div class="loading loading-sm"></div></template>
+                                    <template x-if="!submitting">
+                                        <span>{% icon "send-outline" %} {% trans "Submit Review" %}</span>
+                                    </template>
+                                </button>
+                                <span class="text-xs text-success" x-show="submitted" x-transition>
+                                    {% icon "checkmark-circle-outline" %} {% trans "Thank you for your review!" %}
+                                </span>
+                            </div>
                         </div>
-                        {% if review.title %}
-                        <h4 class="fw-semibold mb-xs m-0">{{ review.title }}</h4>
-                        {% endif %}
-                        <p class="text-medium m-0">{{ review.comment }}</p>
-                    {% endui_card %}
+                    </div>
+
+                    {# Existing reviews #}
+                    {% if module.recent_reviews %}
+                    {% for review in module.recent_reviews %}
+                    <div class="card glass mb-3">
+                        <div class="card-body">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <p class="font-semibold text-sm m-0">{{ review.user_name|default:"Anonymous" }}</p>
+                                    <div class="flex gap-0.5 mt-1" style="color: var(--color-warning);">
+                                        {% for i in "12345" %}
+                                            {% if forloop.counter <= review.rating %}
+                                            {% icon "star" %}
+                                            {% else %}
+                                            {% icon "star-outline" css_class="opacity-30" %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <span class="text-xs opacity-50">{{ review.created_at }}</span>
+                            </div>
+                            {% if review.title %}
+                            <h4 class="font-semibold text-sm mb-1 m-0">{{ review.title }}</h4>
+                            {% endif %}
+                            {% if review.comment %}
+                            <p class="text-sm opacity-60 m-0">{{ review.comment }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
                     {% endfor %}
                     {% else %}
-                    {% ui_empty_state title=_("No reviews yet") description=_("Be the first to review this module") icon="chatbubbles-outline" %}
+                    <div class="flex flex-col items-center justify-center py-8 text-center">
+                        {% icon "chatbubbles-outline" css_class="text-3xl opacity-40 mb-3" %}
+                        <p class="text-sm opacity-50 m-0">{% trans "No reviews yet — be the first!" %}</p>
+                    </div>
                     {% endif %}
                 </div>
 
@@ -228,15 +301,12 @@
                 {% ui_grid_end %}
             </div>
             {% endif %}
-        {% endfill %}
-    {% endcomponent %}
-
 {% endif %}
 
 <!-- Module action handlers -->
 <script>
 document.addEventListener('click', function(e) {
-    const button = e.target.closest('ion-button[data-action]');
+    const button = e.target.closest('button[data-action], .btn[data-action]');
     if (!button) return;
 
     const action = button.dataset.action;
@@ -351,7 +421,7 @@ function setButtonLoading(button, loading) {
     if (!button) return;
     button.disabled = loading;
     if (loading) {
-        button.innerHTML = '<ion-spinner name="crescent"></ion-spinner>';
+        button.innerHTML = '<div class="loading"></div>';
     }
 }
 </script>
@@ -390,7 +460,7 @@ function setButtonLoading(button, loading) {
 }
 
 .markdown-content code {
-    background: var(--ion-color-light);
+    background: var(--color-base-200);
     padding: 0.2rem 0.4rem;
     border-radius: 4px;
     font-size: 0.875rem;
@@ -398,7 +468,7 @@ function setButtonLoading(button, loading) {
 }
 
 .markdown-content pre {
-    background: var(--ion-color-light);
+    background: var(--color-base-200);
     padding: 1rem;
     border-radius: 8px;
     overflow-x: auto;
@@ -411,10 +481,10 @@ function setButtonLoading(button, loading) {
 }
 
 .markdown-content blockquote {
-    border-left: 4px solid var(--ion-color-primary);
+    border-left: 4px solid var(--color-primary);
     padding-left: 1rem;
     margin: 1rem 0;
-    color: var(--ion-color-medium);
+    color: var(--color-base-content-secondary);
 }
 
 .markdown-content table {
@@ -425,18 +495,18 @@ function setButtonLoading(button, loading) {
 
 .markdown-content table th,
 .markdown-content table td {
-    border: 1px solid var(--ion-color-light);
+    border: 1px solid var(--color-base-200);
     padding: 0.5rem;
     text-align: left;
 }
 
 .markdown-content table th {
-    background: var(--ion-color-light);
+    background: var(--color-base-200);
     font-weight: 600;
 }
 
 .markdown-content a {
-    color: var(--ion-color-primary);
+    color: var(--color-primary);
     text-decoration: none;
 }
 

@@ -1,0 +1,164 @@
+{% load i18n djicons %}
+
+<div x-data="{ confirmDelete: false }">
+
+    <!-- Header -->
+    <div class="side-sheet-header">
+        <h3 class="sheet-title">{% trans "Edit Employee" %}</h3>
+        <button class="sheet-close" @click="closePanel()">
+            {% icon "close-outline" %}
+        </button>
+    </div>
+
+    <!-- Body -->
+    <div class="side-sheet-content">
+        <form id="edit-employee-form"
+              hx-post="{% url 'main:employee_edit' employee.id %}"
+              hx-target="#datatable-body"
+              hx-swap="innerHTML"
+              @htmx:after-request="closePanel()"
+              class="flex flex-col gap-4 p-6">
+            {% csrf_token %}
+
+            <!-- Avatar Preview -->
+            <div class="text-center mb-2">
+                {% if employee.avatar %}
+                <div class="avatar avatar-xl mx-auto" style="background-image: url('{{ employee.avatar.url }}');"></div>
+                {% else %}
+                <div class="avatar avatar-xl avatar-{{ employee.get_role_color|default:'primary' }} mx-auto">
+                    <span>{{ employee.get_initials }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Name -->
+            <div>
+                <label class="text-sm font-medium mb-1 block" for="edit-name">{% trans "Name" %}</label>
+                <input type="text" id="edit-name" name="name" class="input input-sm w-full"
+                       value="{{ employee.name }}" placeholder="{% trans 'Full name' %}" required>
+            </div>
+
+            <!-- Email -->
+            <div>
+                <label class="text-sm font-medium mb-1 block" for="edit-email">{% trans "Email" %}</label>
+                <input type="email" id="edit-email" name="email" class="input input-sm w-full"
+                       value="{{ employee.email }}" placeholder="{% trans 'email@example.com' %}" required>
+            </div>
+
+            <!-- Role -->
+            <div>
+                <label class="text-sm font-medium mb-1 block" for="edit-role">{% trans "Role" %}</label>
+                <select id="edit-role" name="role_id" class="select select-sm w-full">
+                    <option value="">{% trans "Select a role" %}</option>
+                    {% for option in role_options %}
+                    <option value="{{ option.value }}" {% if employee.role_obj.id|slugify == option.value %}selected{% endif %}>
+                        {{ option.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+
+        <!-- Status Toggle -->
+        <div class="border-t border-base-300 pt-4 mt-4 px-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h4 class="font-semibold text-sm">{% trans "Status" %}</h4>
+                    <p class="text-xs text-base-content/50">
+                        {% if employee.is_active %}{% trans "Employee is active" %}{% else %}{% trans "Employee is inactive" %}{% endif %}
+                    </p>
+                </div>
+                <button class="btn btn-sm {% if employee.is_active %}color-success{% else %}btn-outline{% endif %}"
+                        hx-post="{% url 'main:employee_toggle_status' employee.id %}"
+                        hx-target="#datatable-body"
+                        hx-swap="innerHTML">
+                    {% if employee.is_active %}
+                    {% icon "checkmark-circle-outline" %}
+                    {% trans "Active" %}
+                    {% else %}
+                    {% icon "close-circle-outline" %}
+                    {% trans "Inactive" %}
+                    {% endif %}
+                </button>
+            </div>
+        </div>
+
+        <!-- PIN Reset -->
+        <div class="border-t border-base-300 pt-4 mt-4 px-6">
+            <h4 class="font-semibold text-sm mb-3">{% trans "Security" %}</h4>
+            <div id="pin-form-container">
+                <form hx-post="{% url 'main:employee_reset_pin' employee.id %}"
+                      hx-target="#pin-form-container"
+                      hx-swap="innerHTML"
+                      class="flex flex-col gap-3">
+                    {% csrf_token %}
+                    <div>
+                        <label class="text-sm font-medium mb-1 block" for="edit-pin">{% trans "New PIN (4 digits)" %}</label>
+                        <input type="password" id="edit-pin" name="pin" class="input input-sm w-full"
+                               maxlength="4" pattern="[0-9]{4}" inputmode="numeric"
+                               placeholder="****" required>
+                        <span class="text-xs text-base-content/50 mt-1 block">{% trans "4-digit PIN for quick access" %}</span>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-outline color-warning w-full">
+                        {% icon "key-outline" %}
+                        {% trans "Reset PIN" %}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Section -->
+        {% if employee.get_role_name != 'admin' %}
+        <div class="border-t border-base-300 pt-4 mt-4 px-6 pb-6">
+            <h4 class="font-semibold text-sm mb-3 text-error">{% trans "Danger Zone" %}</h4>
+            <p class="text-base-content/60 text-sm mb-3">
+                {% trans "Deleting an employee will deactivate their account." %}
+            </p>
+
+            <template x-if="!confirmDelete">
+                <button type="button" class="btn btn-sm btn-outline color-error w-full"
+                        @click="confirmDelete = true">
+                    {% icon "trash-outline" %}
+                    {% trans "Delete Employee" %}
+                </button>
+            </template>
+
+            <template x-if="confirmDelete">
+                <div>
+                    <p class="text-error text-sm font-semibold mb-3">
+                        {% trans "Are you sure?" %}
+                    </p>
+                    <div class="flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline flex-1"
+                                @click="confirmDelete = false">
+                            {% trans "Cancel" %}
+                        </button>
+                        <button type="button" class="btn btn-sm color-error flex-1"
+                                hx-post="{% url 'main:employee_delete' employee.id %}"
+                                hx-target="#datatable-body"
+                                hx-swap="innerHTML"
+                                @click="closePanel()">
+                            {% icon "trash-outline" %}
+                            {% trans "Delete" %}
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <div class="side-sheet-footer">
+        <div class="flex justify-end gap-2">
+            <button type="button" class="btn btn-ghost btn-sm" @click="closePanel()">
+                {% trans "Cancel" %}
+            </button>
+            <button type="submit" form="edit-employee-form" class="btn btn-sm color-primary">
+                {% icon "checkmark-outline" %}
+                {% trans "Save" %}
+            </button>
+        </div>
+    </div>
+
+</div>

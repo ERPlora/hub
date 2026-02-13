@@ -1,0 +1,68 @@
+{% load i18n djicons %}
+
+<!-- Header -->
+<div class="side-sheet-header">
+    <h3 class="sheet-title">{% trans "Add Employee" %}</h3>
+    <button class="sheet-close" @click="closePanel()">
+        {% icon "close-outline" %}
+    </button>
+</div>
+
+<!-- Body -->
+<div class="side-sheet-content">
+    <form id="add-employee-form"
+          hx-post="{% url 'main:employee_add' %}"
+          hx-target="#datatable-body"
+          hx-swap="innerHTML"
+          @htmx:after-request="closePanel()"
+          class="flex flex-col gap-4 p-6">
+        {% csrf_token %}
+
+        <!-- Name -->
+        <div>
+            <label class="text-sm font-medium mb-1 block" for="add-name">{% trans "Name" %}</label>
+            <input type="text" id="add-name" name="name" class="input input-sm w-full"
+                   placeholder="{% trans 'Full name' %}" required>
+        </div>
+
+        <!-- Email -->
+        <div>
+            <label class="text-sm font-medium mb-1 block" for="add-email">{% trans "Email" %}</label>
+            <input type="email" id="add-email" name="email" class="input input-sm w-full"
+                   placeholder="{% trans 'email@example.com' %}" required>
+        </div>
+
+        <!-- Role -->
+        <div>
+            <label class="text-sm font-medium mb-1 block" for="add-role">{% trans "Role" %}</label>
+            <select id="add-role" name="role_id" class="select select-sm w-full">
+                <option value="">{% trans "Select a role" %}</option>
+                {% for option in role_options %}
+                <option value="{{ option.value }}">{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- PIN -->
+        <div>
+            <label class="text-sm font-medium mb-1 block" for="add-pin">{% trans "PIN (4 digits)" %}</label>
+            <input type="password" id="add-pin" name="pin" class="input input-sm w-full"
+                   maxlength="4" pattern="[0-9]{4}" inputmode="numeric"
+                   placeholder="****" required>
+            <span class="text-xs text-base-content/50 mt-1 block">{% trans "4-digit PIN for quick access" %}</span>
+        </div>
+    </form>
+</div>
+
+<!-- Footer -->
+<div class="side-sheet-footer">
+    <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-ghost btn-sm" @click="closePanel()">
+            {% trans "Cancel" %}
+        </button>
+        <button type="submit" form="add-employee-form" class="btn btn-sm color-primary">
+            {% icon "add-outline" %}
+            {% trans "Add Employee" %}
+        </button>
+    </div>
+</div>

@@ -1,14 +1,11 @@
 """
-Librerías permitidas para modules de CPOS Hub
+Librerías permitidas para modules de ERPlora Hub
 
 Este archivo define las dependencias Python que los modules pueden usar.
-Las librerías están pre-empaquetadas en la aplicación PyInstaller.
+Estas librerías están incluidas en las dependencias del proyecto.
 
-Arquitectura: Opción 2 (Pre-bundled Dependencies)
 - Modules solo pueden usar estas librerías
 - Validación estricta en module.json
-- Instalación instantánea (sin pip)
-- Bundle total: ~245MB
 """
 
 # === CRÍTICAS (13) - Funcionalidad esencial ===
@@ -55,8 +52,6 @@ IMPORTANT_DEPENDENCIES = {
     'pyserial': '>=3.5',           # Puerto serial RS232 (cajón de dinero, displays)
     'pyusb': '>=1.2.1',            # USB devices (impresoras USB, scanners)
     'evdev': '>=1.6.0',            # Barcode scanners HID (Linux)
-    'pywinusb': '>=0.4.2',         # USB HID devices (Windows)
-
     # Email & Validation
     'email-validator': '>=2.1.0',  # Validar emails
 
@@ -110,19 +105,6 @@ def normalize_package_name(pypi_name: str) -> str:
     return PACKAGE_NAME_MAP.get(pkg_name, pkg_name)
 
 
-def get_pyinstaller_imports() -> list[str]:
-    """
-    Retorna lista de nombres de módulos para hiddenimports de PyInstaller
-
-    Returns:
-        list: ['PIL', 'qrcode', 'barcode', 'openpyxl', ...]
-    """
-    return [
-        normalize_package_name(pkg)
-        for pkg in MODULE_ALLOWED_DEPENDENCIES.keys()
-    ]
-
-
 def is_dependency_allowed(package_name: str) -> bool:
     """
     Verifica si una dependencia está permitida
@@ -170,30 +152,23 @@ def get_dependencies_by_category() -> dict:
 
 # === METADATA ===
 TOTAL_DEPENDENCIES = len(MODULE_ALLOWED_DEPENDENCIES)
-ESTIMATED_BUNDLE_SIZE_MB = 245
 
 
 if __name__ == '__main__':
-    print(f"[INFO] CPOS Hub - Module Allowed Dependencies")
+    print(f"[INFO] ERPlora Hub - Module Allowed Dependencies")
     print(f"Total: {TOTAL_DEPENDENCIES} librerias")
-    print(f"Bundle estimado: ~{ESTIMATED_BUNDLE_SIZE_MB}MB")
     print()
 
-    print("[CRITICAL] CRITICAS (13):")
+    print("[CRITICAL] CRITICAS:")
     for pkg, version in CRITICAL_DEPENDENCIES.items():
         print(f"  - {pkg}{version}")
 
     print()
-    print("[IMPORTANT] IMPORTANTES (13):")
+    print("[IMPORTANT] IMPORTANTES:")
     for pkg, version in IMPORTANT_DEPENDENCIES.items():
         print(f"  - {pkg}{version}")
 
     print()
-    print("[USEFUL] UTILES (2):")
+    print("[USEFUL] UTILES:")
     for pkg, version in USEFUL_DEPENDENCIES.items():
         print(f"  - {pkg}{version}")
-
-    print()
-    print("[INFO] PyInstaller imports:")
-    for module in get_pyinstaller_imports():
-        print(f"  - {module}")

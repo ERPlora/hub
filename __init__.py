@@ -1,5 +1,5 @@
 """
-CPOS Hub - Point of Sale Desktop Application
+ERPlora Hub - Point of Sale Web Application
 """
 from importlib.metadata import version, PackageNotFoundError
 

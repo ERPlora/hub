@@ -1,0 +1,210 @@
+{% load i18n djicons %}
+
+{% if roles %}
+
+<div class="datatable-body">
+    <table class="datatable-table">
+        <thead class="datatable-thead">
+            <tr>
+                <th class="datatable-th datatable-th-checkbox">
+                    <label class="checkbox checkbox-sm">
+                        <input type="checkbox"
+                               :checked="selectAll"
+                               @click="toggleAll([{% for role in roles %}'{{ role.id }}'{% if not forloop.last %},{% endif %}{% endfor %}])">
+                        <span class="checkbox-mark"></span>
+                    </label>
+                </th>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'name' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'main:roles:list' %}?sort=name&dir={% if sort_field == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#roles-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Role" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th">{% trans "Type" %}</th>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'users' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'main:roles:list' %}?sort=users&dir={% if sort_field == 'users' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#roles-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Users" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th datatable-th-center datatable-th-sortable{% if sort_field == 'status' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'main:roles:list' %}?sort=status&dir={% if sort_field == 'status' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#roles-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Status" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody class="datatable-tbody">
+            {% for role in roles %}
+            <tr class="datatable-tr"
+                data-id="{{ role.id }}"
+                :class="{ 'datatable-tr-selected': selectedIds.includes('{{ role.id }}') }">
+                <td class="datatable-td datatable-td-checkbox" onclick="event.stopPropagation();">
+                    <label class="checkbox checkbox-sm">
+                        <input type="checkbox"
+                               :checked="selectedIds.includes('{{ role.id }}')"
+                               @click="toggleSelect('{{ role.id }}')">
+                        <span class="checkbox-mark"></span>
+                    </label>
+                </td>
+                <td class="datatable-td" data-label="{% trans 'Role' %}">
+                    <a class="flex items-center gap-3 cursor-pointer"
+                       href="{% url 'main:roles:detail' role_id=role.id %}"
+                       hx-get="{% url 'main:roles:detail' role_id=role.id %}"
+                       hx-target="#main-content-area"
+                       hx-push-url="true">
+                        <span class="opacity-60">
+                            {% if role.name == 'admin' %}
+                                {% icon "shield-checkmark-outline" %}
+                            {% elif role.name == 'manager' %}
+                                {% icon "briefcase-outline" %}
+                            {% else %}
+                                {% icon "person-outline" %}
+                            {% endif %}
+                        </span>
+                        <div>
+                            <span class="font-medium">{{ role.display_name }}</span>
+                            <span class="text-xs text-base-content/50 block">{{ role.description|default:"-"|truncatewords:8 }}</span>
+                        </div>
+                    </a>
+                </td>
+                <td class="datatable-td" data-label="{% trans 'Type' %}">
+                    {% if role.is_system %}
+                    <span class="badge badge-ghost badge-sm">{% trans "System" %}</span>
+                    {% else %}
+                    <span class="badge badge-ghost badge-sm">{% trans "Custom" %}</span>
+                    {% endif %}
+                </td>
+                <td class="datatable-td" data-label="{% trans 'Users' %}">
+                    <span class="badge badge-sm">{{ role.user_count }}</span>
+                </td>
+                <td class="datatable-td datatable-td-center" data-label="{% trans 'Status' %}">
+                    {% if role.is_active %}
+                    <span class="badge badge-sm color-success">{% trans "Active" %}</span>
+                    {% else %}
+                    <span class="badge badge-sm color-warning">{% trans "Inactive" %}</span>
+                    {% endif %}
+                </td>
+                <td class="datatable-td datatable-td-actions" onclick="event.stopPropagation();">
+                    <div class="datatable-row-actions">
+                        <a class="datatable-row-action"
+                           href="{% url 'main:roles:detail' role_id=role.id %}"
+                           hx-get="{% url 'main:roles:detail' role_id=role.id %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true"
+                           title="{% trans 'View' %}">
+                            {% icon "eye-outline" %}
+                        </a>
+                        {% if not role.is_system %}
+                        <a class="datatable-row-action"
+                           href="{% url 'main:roles:edit' role_id=role.id %}"
+                           hx-get="{% url 'main:roles:edit' role_id=role.id %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true"
+                           title="{% trans 'Edit' %}">
+                            {% icon "create-outline" %}
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Footer / Pagination -->
+<div class="datatable-footer">
+    <div class="datatable-per-page">
+        {% trans "Show" %}
+        <select name="per_page"
+                hx-get="{% url 'main:roles:list' %}"
+                hx-target="#datatable-body"
+                hx-include="#roles-datatable"
+                hx-trigger="change">
+            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        </select>
+        {% trans "per page" %}
+    </div>
+    <span class="datatable-info">
+        {% if page_obj.paginator.count > 0 %}
+        {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }} roles{% endblocktrans %}
+        {% endif %}
+    </span>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="pagination pagination-sm">
+        <button class="pagination-btn pagination-prev"
+                {% if page_obj.has_previous %}
+                hx-get="{% url 'main:roles:list' %}?page={{ page_obj.previous_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#roles-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-back-outline" %}
+        </button>
+        {% for num in page_obj.paginator.page_range %}
+        <button class="pagination-btn{% if num == page_obj.number %} pagination-active{% endif %}"
+                hx-get="{% url 'main:roles:list' %}?page={{ num }}"
+                hx-target="#datatable-body"
+                hx-include="#roles-datatable">
+            {{ num }}
+        </button>
+        {% endfor %}
+        <button class="pagination-btn pagination-next"
+                {% if page_obj.has_next %}
+                hx-get="{% url 'main:roles:list' %}?page={{ page_obj.next_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#roles-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-forward-outline" %}
+        </button>
+    </nav>
+    {% endif %}
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="datatable-empty">
+    <div class="datatable-empty-icon">
+        {% if search_query or status_filter or type_filter %}
+        {% icon "search-outline" %}
+        {% else %}
+        {% icon "shield-outline" %}
+        {% endif %}
+    </div>
+    <div class="datatable-empty-title">
+        {% if search_query or status_filter or type_filter %}
+        {% trans "No roles found" %}
+        {% else %}
+        {% trans "No roles yet" %}
+        {% endif %}
+    </div>
+    <div class="datatable-empty-text">
+        {% if search_query or status_filter or type_filter %}
+        {% trans "Try a different search term or filter" %}
+        {% else %}
+        {% trans "Create your first custom role to get started" %}
+        {% endif %}
+    </div>
+    {% if not search_query and not status_filter and not type_filter %}
+    <a class="btn color-primary mt-4"
+       href="{% url 'main:roles:create' %}"
+       hx-get="{% url 'main:roles:create' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
+        {% icon "add-outline" %}
+        {% trans "Create Role" %}
+    </a>
+    {% endif %}
+</div>
+{% endif %}

@@ -1,121 +1,126 @@
-{% load i18n ui component_tags djicons %}
+{% load i18n component_tags djicons %}
 
-{% component "page" title=_("Settings") %}
-    {% fill "content" %}
-    {# Store Information #}
-    <ion-card class="m-0 mb-lg">
-        <ion-card-content>
-            {% component "setting_section" title=_("Store Information") %}
-                <form hx-post="{% url 'main:settings' %}"
-                      hx-target="#store-message"
-                      hx-swap="innerHTML"
-                      hx-indicator="#store-spinner"
-                      enctype="multipart/form-data">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="update_store">
-                    <div id="store-message"></div>
+<div class="flex flex-col gap-6">
 
-                    {% if not store_config.is_configured %}
-                    <div class="d-flex align-center gap-sm mb-md p-sm rounded-md" style="background: var(--ion-color-warning-tint);">
-                        {% icon "alert-circle-outline" color="warning" %}
-                        <span class="fs-sm">{% trans "Store configuration required" %}</span>
+    {# ── Store Information ── #}
+    <section class="card">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "storefront-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Store Information" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Business details for receipts and invoices" %}</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-swap="none"
+                  hx-indicator="#store-spinner"
+                  enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_store">
+
+                {% if not store_config.is_configured %}
+                <div class="callout callout-warning mb-4">
+                    <span class="callout-icon">{% icon "alert-circle-outline" %}</span>
+                    <div class="callout-content">
+                        <div class="callout-text">{% trans "Store configuration required. Please fill in the required fields below." %}</div>
                     </div>
-                    {% endif %}
+                </div>
+                {% endif %}
 
-                    <div class="setting-form-grid">
-                        <ion-item>
-                            <ion-input
-                                type="text"
-                                name="business_name"
-                                label="{% trans 'Business Name' %} *"
-                                label-placement="floating"
-                                value="{{ store_config.business_name }}"
-                                placeholder="{% trans 'Your business name' %}">
-                            </ion-input>
-                        </ion-item>
-                        <ion-item>
-                            <ion-input
-                                type="text"
-                                name="vat_number"
-                                label="{% trans 'VAT/Tax ID' %} *"
-                                label-placement="floating"
-                                value="{{ store_config.vat_number }}"
-                                placeholder="{% trans 'e.g., ES12345678A' %}">
-                            </ion-input>
-                        </ion-item>
-                        <ion-item class="full-width">
-                            <ion-textarea
-                                name="business_address"
-                                label="{% trans 'Address' %} *"
-                                label-placement="floating"
-                                value="{{ store_config.business_address }}"
-                                rows="2"
-                                placeholder="{% trans 'Street, City, Postal Code' %}">
-                            </ion-textarea>
-                        </ion-item>
-                        <ion-item>
-                            <ion-input
-                                type="tel"
-                                name="phone"
-                                label="{% trans 'Phone' %}"
-                                label-placement="floating"
-                                value="{{ store_config.phone }}"
-                                placeholder="+34 600 000 000">
-                            </ion-input>
-                        </ion-item>
-                        <ion-item>
-                            <ion-input
-                                type="email"
-                                name="email"
-                                label="{% trans 'Email' %}"
-                                label-placement="floating"
-                                value="{{ store_config.email }}"
-                                placeholder="info@business.com">
-                            </ion-input>
-                        </ion-item>
-                        <ion-item>
-                            <ion-input
-                                type="url"
-                                name="website"
-                                label="{% trans 'Website' %}"
-                                label-placement="floating"
-                                value="{{ store_config.website }}"
-                                placeholder="https://www.business.com">
-                            </ion-input>
-                        </ion-item>
-                        <ion-item>
-                            <ion-input
-                                type="number"
-                                name="tax_rate"
-                                label="{% trans 'Default Tax Rate (%)' %}"
-                                label-placement="floating"
-                                value="{{ store_config.tax_rate }}"
-                                step="0.01"
-                                min="0"
-                                max="100"
-                                placeholder="21.00">
-                            </ion-input>
-                        </ion-item>
-                    </div>
-
-                    <div class="setting-toggle mt-md">
-                        <div class="setting-toggle__content">
-                            <h3 class="setting-toggle__title">{% trans "Tax included in prices" %}</h3>
-                            <p class="setting-toggle__description">{% trans "Prices already include taxes" %}</p>
+                <div class="flex flex-col gap-4">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Business Name" %} <span class="form-group-label-required">*</span></label>
+                            <input type="text"
+                                   name="business_name"
+                                   class="input"
+                                   value="{{ store_config.business_name }}"
+                                   placeholder="{% trans 'Your business name' %}"
+                                   required>
                         </div>
-                        <ion-toggle
-                            name="tax_included"
-                            value="true"
-                            {% if store_config.tax_included %}checked{% endif %}>
-                        </ion-toggle>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "VAT/Tax ID" %} <span class="form-group-label-required">*</span></label>
+                            <input type="text"
+                                   name="vat_number"
+                                   class="input"
+                                   value="{{ store_config.vat_number }}"
+                                   placeholder="{% trans 'e.g., ES12345678A' %}"
+                                   required>
+                        </div>
                     </div>
 
-                    <div class="setting-input mt-md" style="border-top: 1px solid var(--border-color); padding-top: var(--space-md);">
-                        <div class="setting-input__content">
-                            <h3 class="setting-input__title">{% trans "Logo" %}</h3>
-                            <p class="setting-input__description">{% trans "Business logo for receipts and invoices" %}</p>
+                    <div class="form-group">
+                        <label class="form-group-label">{% trans "Address" %} <span class="form-group-label-required">*</span></label>
+                        <textarea name="business_address"
+                                  class="textarea"
+                                  rows="2"
+                                  placeholder="{% trans 'Street, City, Postal Code' %}"
+                                  required>{{ store_config.business_address }}</textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Phone" %}</label>
+                            <input type="tel"
+                                   name="phone"
+                                   class="input"
+                                   value="{{ store_config.phone }}"
+                                   placeholder="+34 600 000 000">
                         </div>
-                        <div class="d-flex align-center gap-md">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Email" %}</label>
+                            <input type="email"
+                                   name="email"
+                                   class="input"
+                                   value="{{ store_config.email }}"
+                                   placeholder="info@business.com">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-group-label">{% trans "Website" %}</label>
+                        <input type="url"
+                               name="website"
+                               class="input"
+                               value="{{ store_config.website }}"
+                               placeholder="https://www.business.com">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Default Tax Rate (%)" %}</label>
+                            <input type="number"
+                                   name="tax_rate"
+                                   class="input"
+                                   value="{{ store_config.tax_rate }}"
+                                   step="0.01"
+                                   min="0"
+                                   max="100"
+                                   placeholder="21.00">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Tax included in prices" %}</label>
+                            <span class="form-group-helper">{% trans "Prices already include taxes" %}</span>
+                            <label class="toggle mt-2">
+                                <input type="checkbox"
+                                       name="tax_included"
+                                       value="true"
+                                       {% if store_config.tax_included %}checked{% endif %}>
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {# Logo #}
+                    <div class="form-group">
+                        <label class="form-group-label">{% trans "Logo" %}</label>
+                        <span class="form-group-helper">{% trans "Business logo for receipts and invoices" %}</span>
+                        <div class="flex items-center gap-4 mt-2">
                             <div class="logo-preview">
                                 {% if store_config.logo %}
                                 <img src="{{ store_config.logo.url }}" alt="Logo">
@@ -123,473 +128,706 @@
                                 {% icon "image-outline" %}
                                 {% endif %}
                             </div>
-                            {% ui_file_input name="logo" label=_("Choose image") accept="image/*" icon="image-outline" %}
+                            <label class="btn btn-sm btn-outline">
+                                {% icon "image-outline" %}
+                                {% trans "Choose image" %}
+                                <input type="file" name="logo" accept="image/*" class="hidden">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <button type="submit" class="btn color-primary btn-block">
+                        <span class="htmx-indicator" id="store-spinner">
+                            <span class="loading loading-sm mr-2"></span>
+                        </span>
+                        {% trans "Save Store Settings" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    {# ── Tax Classes ── #}
+    <section class="card">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "pricetag-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Tax Classes" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Configure tax rates according to your country's legislation" %}</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="tax-classes-list" class="mb-4">
+                {% include "main/settings/partials/tax_classes_list.html" %}
+            </div>
+
+            <div class="list-header">{% trans "Add Tax Class" %}</div>
+
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-target="#tax-classes-list"
+                  hx-swap="innerHTML"
+                  hx-indicator="#tax-spinner">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_tax_class">
+
+                <div class="flex flex-col gap-4">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Name" %} <span class="form-group-label-required">*</span></label>
+                            <input type="text"
+                                   name="name"
+                                   class="input"
+                                   placeholder="{% trans 'e.g., Standard 21%' %}"
+                                   required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Rate (%)" %} <span class="form-group-label-required">*</span></label>
+                            <input type="number"
+                                   name="rate"
+                                   class="input"
+                                   step="0.01"
+                                   min="0"
+                                   max="100"
+                                   placeholder="21.00"
+                                   required>
                         </div>
                     </div>
 
-                    <div class="mt-lg pt-md" style="border-top: 1px solid var(--border-color);">
-                        <ion-button type="submit" expand="block">
-                            <ion-spinner id="store-spinner" name="crescent" class="htmx-indicator me-sm"></ion-spinner>
-                            {% trans "Save Store Settings" %}
-                        </ion-button>
-                    </div>
-                </form>
-            {% endcomponent %}
-        </ion-card-content>
-    </ion-card>
-
-    {# Hub Configuration #}
-    <ion-card class="m-0 mb-lg">
-        <ion-card-content>
-            {% component "setting_section" title=_("Hub Configuration") %}
-                <form hx-post="{% url 'main:settings' %}"
-                      hx-target="#hub-message"
-                      hx-swap="innerHTML"
-                      hx-indicator="#hub-spinner">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="update_hub">
-                    <div id="hub-message"></div>
-
-                    <div class="setting-select">
-                        <div class="setting-select__content">
-                            <h3 class="setting-select__title">{% trans "System Language" %}</h3>
-                            <p class="setting-select__description">{% trans "Default language for the Hub interface" %}</p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Description" %}</label>
+                            <input type="text"
+                                   name="description"
+                                   class="input"
+                                   placeholder="{% trans 'Optional notes' %}">
                         </div>
-                        <ion-select
-                            name="language"
-                            value="{{ hub_config.language }}"
-                            interface="action-sheet"
-                            class="setting-select__field">
-                            {% for code, name in system_language_choices %}
-                            <ion-select-option value="{{ code }}">{{ name }}</ion-select-option>
-                            {% endfor %}
-                        </ion-select>
-                    </div>
-
-                    <div class="setting-select">
-                        <div class="setting-select__content">
-                            <h3 class="setting-select__title">{% trans "Timezone" %}</h3>
-                            <p class="setting-select__description">{% trans "Timezone for dates and schedules" %}</p>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Set as default" %}</label>
+                            <span class="form-group-helper">{% trans "Use this tax class by default for new products" %}</span>
+                            <label class="toggle mt-2">
+                                <input type="checkbox" name="is_default" value="true">
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
                         </div>
-                        <ion-select
-                            name="timezone"
-                            value="{{ hub_config.timezone }}"
-                            interface="action-sheet"
-                            class="setting-select__field">
-                            {% for tz in timezone_choices %}
-                            <ion-select-option value="{{ tz }}">{{ tz }}</ion-select-option>
-                            {% endfor %}
-                        </ion-select>
                     </div>
+                </div>
 
-                    <div class="setting-select">
-                        <div class="setting-select__content">
-                            <h3 class="setting-select__title">{% trans "Currency" %}</h3>
-                            <p class="setting-select__description">{% trans "Default currency for prices" %}</p>
+                <div class="mt-6">
+                    <button type="submit" class="btn">
+                        <span class="htmx-indicator" id="tax-spinner">
+                            <span class="loading loading-sm mr-2"></span>
+                        </span>
+                        {% icon "add-outline" %}
+                        {% trans "Add Tax Class" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    {# ── Hub Configuration ── #}
+    <section class="card">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "server-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Hub Configuration" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "System language, timezone, and display preferences" %}</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-swap="none"
+                  hx-indicator="#hub-spinner">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_hub">
+
+                <div class="list list-inset">
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "System Language" %}</span>
+                            <span class="list-item-note">{% trans "Default language for the Hub interface" %}</span>
                         </div>
-                        <ion-select
-                            name="currency"
-                            value="{{ hub_config.currency }}"
-                            interface="action-sheet"
-                            placeholder="{% trans 'Select currency' %}"
-                            class="setting-select__field">
-                            {% for code, name in currency_choices %}
-                            <ion-select-option value="{{ code }}">{{ code }} - {{ name }}</ion-select-option>
-                            {% endfor %}
-                        </ion-select>
-                    </div>
-
-                    <div class="setting-toggle">
-                        <div class="setting-toggle__content">
-                            <h3 class="setting-toggle__title">{% trans "Dark Mode" %}</h3>
-                            <p class="setting-toggle__description">{% trans "Use dark theme for the interface" %}</p>
+                        <div class="list-item-end">
+                            <select name="language" class="select w-auto min-w-40">
+                                {% for code, name in system_language_choices %}
+                                <option value="{{ code }}" {% if hub_config.language == code %}selected{% endif %}>{{ name }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
-                        <ion-toggle
-                            name="dark_mode"
-                            value="true"
-                            {% if hub_config.dark_mode %}checked{% endif %}>
-                        </ion-toggle>
                     </div>
 
-                    <div class="mt-lg pt-md" style="border-top: 1px solid var(--border-color);">
-                        <ion-button type="submit" expand="block">
-                            <ion-spinner id="hub-spinner" name="crescent" class="htmx-indicator me-sm"></ion-spinner>
-                            {% trans "Save Hub Settings" %}
-                        </ion-button>
-                    </div>
-                </form>
-            {% endcomponent %}
-        </ion-card-content>
-    </ion-card>
-
-    {# User Preferences #}
-    <ion-card class="m-0 mb-lg">
-        <ion-card-content>
-            {% component "setting_section" title=_("User Preferences") %}
-                <form hx-post="{% url 'main:settings' %}"
-                      hx-target="#user-message"
-                      hx-swap="innerHTML"
-                      hx-indicator="#user-spinner"
-                      enctype="multipart/form-data">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="update_user">
-                    <div id="user-message"></div>
-
-                    <div class="setting-select">
-                        <div class="setting-select__content">
-                            <h3 class="setting-select__title">{% trans "Language" %}</h3>
-                            <p class="setting-select__description">{% trans "Your preferred language" %}</p>
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Timezone" %}</span>
+                            <span class="list-item-note">{% trans "Timezone for dates and schedules" %}</span>
                         </div>
-                        <ion-select
-                            name="language"
-                            value="{{ user.language }}"
-                            interface="popover"
-                            class="setting-select__field">
-                            {% for code, name in language_choices %}
-                            <ion-select-option value="{{ code }}">{{ name }}</ion-select-option>
-                            {% endfor %}
-                        </ion-select>
+                        <div class="list-item-end">
+                            <select name="timezone" class="select w-auto min-w-48">
+                                {% for tz in timezone_choices %}
+                                <option value="{{ tz }}" {% if hub_config.timezone == tz %}selected{% endif %}>{{ tz }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="setting-input" style="border-top: 1px solid var(--border-color); padding-top: var(--space-md);">
-                        <div class="setting-input__content">
-                            <h3 class="setting-input__title">{% trans "Avatar" %}</h3>
-                            <p class="setting-input__description">{% trans "Your profile picture" %}</p>
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Currency" %}</span>
+                            <span class="list-item-note">{% trans "Default currency for prices" %}</span>
                         </div>
-                        <div class="d-flex align-center gap-md">
-                            <ion-avatar>
+                        <div class="list-item-end">
+                            <select name="currency" class="select w-auto min-w-44">
+                                {% for code, name in currency_choices %}
+                                <option value="{{ code }}" {% if hub_config.currency == code %}selected{% endif %}>{{ code }} - {{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Dark Mode" %}</span>
+                            <span class="list-item-note">{% trans "Use dark theme for the interface" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <label class="toggle">
+                                <input type="checkbox"
+                                       name="dark_mode"
+                                       value="true"
+                                       {% if hub_config.dark_mode %}checked{% endif %}>
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <button type="submit" class="btn color-primary btn-block">
+                        <span class="htmx-indicator" id="hub-spinner">
+                            <span class="loading loading-sm mr-2"></span>
+                        </span>
+                        {% trans "Save Hub Settings" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    {# ── Hardware & Printers ── #}
+    <section class="card" x-data="{ discovering: false }">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "print-outline" %}</span>
+                <div class="flex-1">
+                    <h2 class="card-title">{% trans "Hardware & Printers" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Manage printers, cash drawer, and barcode scanner via ERPlora Bridge" %}</p>
+                </div>
+                <span x-show="$store.bridge.connected" class="badge color-success">{% trans "Bridge Connected" %}</span>
+                <span x-show="!$store.bridge.connected" class="badge color-warning">{% trans "Bridge Offline" %}</span>
+            </div>
+        </div>
+        <div class="card-body">
+            {# Bridge status info #}
+            <div x-show="!$store.bridge.connected" class="callout callout-info mb-4">
+                <span class="callout-icon">{% icon "information-circle-outline" %}</span>
+                <div class="callout-content">
+                    <div class="callout-title">{% trans "ERPlora Bridge not detected" %}</div>
+                    <div class="callout-text">{% trans "Install and run the ERPlora Bridge app on this device to enable hardware printing, cash drawer, and barcode scanning." %}</div>
+                </div>
+            </div>
+
+            {# Configured printers #}
+            <div id="printers-list" class="mb-4">
+                {% include "main/settings/partials/printers_list.html" %}
+            </div>
+
+            {# Discover printers button #}
+            <div class="flex gap-2 mb-4" x-show="$store.bridge.connected">
+                <button type="button"
+                        class="btn btn-outline"
+                        :disabled="discovering"
+                        @click="
+                            discovering = true;
+                            ERPlora.bridge.discoverPrinters()
+                                .then(printers => {
+                                    $store.bridge.printers = printers;
+                                    discovering = false;
+                                    if (printers.length === 0) {
+                                        $store.ui.toast('No printers found', 'warning');
+                                    } else {
+                                        $store.ui.success(printers.length + ' printer(s) found');
+                                    }
+                                })
+                                .catch(e => {
+                                    discovering = false;
+                                    $store.ui.error('Discovery failed: ' + e.message);
+                                })
+                        ">
+                    <template x-if="discovering">
+                        <span class="loading loading-sm mr-2"></span>
+                    </template>
+                    {% icon "search-outline" %}
+                    {% trans "Discover Printers" %}
+                </button>
+            </div>
+
+            {# Discovered printers (not yet saved) #}
+            <template x-if="$store.bridge.printers.length > 0">
+                <div class="mb-4">
+                    <div class="list-header">{% trans "Discovered Printers" %}</div>
+                    <div class="list list-inset">
+                        <template x-for="printer in $store.bridge.printers" :key="printer.id">
+                            <div class="list-item">
+                                <div class="list-item-start">
+                                    <template x-if="printer.type === 'usb'">{% icon "print-outline" %}</template>
+                                    <template x-if="printer.type === 'network'">{% icon "wifi-outline" %}</template>
+                                    <template x-if="printer.type === 'bluetooth'">{% icon "bluetooth-outline" %}</template>
+                                </div>
+                                <div class="list-item-content">
+                                    <span class="list-item-label" x-text="printer.name"></span>
+                                    <span class="list-item-note">
+                                        <span x-text="printer.type"></span> &middot;
+                                        <span x-text="printer.id" class="font-mono text-xs"></span>
+                                    </span>
+                                </div>
+                                <div class="list-item-end flex gap-2">
+                                    <button type="button"
+                                            class="btn btn-sm btn-ghost"
+                                            @click="
+                                                ERPlora.bridge.testPrint(printer.id)
+                                                    .then(() => $store.ui.success('Test print OK'))
+                                                    .catch(e => $store.ui.error('Test failed: ' + e.message))
+                                            ">
+                                        {% icon "print-outline" %}
+                                    </button>
+                                    <form hx-post="{% url 'main:settings' %}"
+                                          hx-target="#printers-list"
+                                          hx-swap="innerHTML"
+                                          @submit.prevent="
+                                              let form = $el;
+                                              form.querySelector('[name=bridge_printer_id]').value = printer.id;
+                                              form.querySelector('[name=printer_name]').value = printer.name;
+                                              form.querySelector('[name=printer_type]').value = printer.type;
+                                              form.querySelector('[name=paper_width]').value = printer.paper_width || 80;
+                                              htmx.trigger(form, 'submit');
+                                          ">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="save_printer">
+                                        <input type="hidden" name="bridge_printer_id" value="">
+                                        <input type="hidden" name="printer_name" value="">
+                                        <input type="hidden" name="printer_type" value="">
+                                        <input type="hidden" name="paper_width" value="80">
+                                        <input type="hidden" name="is_active" value="true">
+                                        <button type="submit" class="btn btn-sm color-primary">
+                                            {% icon "add-outline" %}
+                                            {% trans "Add" %}
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            {# Bridge settings #}
+            <div class="list-header">{% trans "Bridge Settings" %}</div>
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-swap="none"
+                  hx-indicator="#bridge-spinner">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_bridge">
+
+                <div class="list list-inset">
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Bridge Port" %}</span>
+                            <span class="list-item-note">{% trans "WebSocket port for the native bridge" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <input type="number"
+                                   name="bridge_port"
+                                   class="input w-24 text-center"
+                                   value="{{ hub_config.bridge_port }}"
+                                   min="1024"
+                                   max="65535">
+                        </div>
+                    </div>
+
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Auto-print" %}</span>
+                            <span class="list-item-note">{% trans "Automatically print via bridge (skip browser preview)" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <label class="toggle">
+                                <input type="checkbox"
+                                       name="bridge_auto_print"
+                                       value="true"
+                                       {% if hub_config.bridge_auto_print %}checked{% endif %}>
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Satellite printing" %}</span>
+                            <span class="list-item-note">{% trans "Allow other terminals to print via this bridge" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <label class="toggle">
+                                <input type="checkbox"
+                                       name="allow_satellite_printing"
+                                       value="true"
+                                       {% if hub_config.allow_satellite_printing %}checked{% endif %}>
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <button type="submit" class="btn color-primary btn-block">
+                        <span class="htmx-indicator" id="bridge-spinner">
+                            <span class="loading loading-sm mr-2"></span>
+                        </span>
+                        {% trans "Save Hardware Settings" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    {# ── User Preferences ── #}
+    <section class="card">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "person-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "User Preferences" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Personal language and profile settings" %}</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-swap="none"
+                  hx-indicator="#user-spinner"
+                  enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_user">
+
+                <div class="list list-inset">
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Language" %}</span>
+                            <span class="list-item-note">{% trans "Your preferred language" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <select name="language" class="select w-auto min-w-40">
+                                {% for code, name in language_choices %}
+                                <option value="{{ code }}" {% if user.language == code %}selected{% endif %}>{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="list-item list-item-multiline">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Avatar" %}</span>
+                            <span class="list-item-note">{% trans "Your profile picture" %}</span>
+                        </div>
+                        <div class="list-item-end flex items-center gap-4">
+                            <div class="avatar">
                                 {% if user.avatar %}
                                 <img src="{{ user.avatar.url }}" alt="{{ user.name }}">
                                 {% else %}
                                 <div class="avatar-initials">{{ user.get_initials }}</div>
                                 {% endif %}
-                            </ion-avatar>
-                            {% ui_file_input name="avatar" label=_("Choose image") accept="image/*" icon="person-outline" %}
-                        </div>
-                    </div>
-
-                    <div class="mt-lg pt-md" style="border-top: 1px solid var(--border-color);">
-                        <ion-button type="submit" expand="block">
-                            <ion-spinner id="user-spinner" name="crescent" class="htmx-indicator me-sm"></ion-spinner>
-                            {% trans "Save Preferences" %}
-                        </ion-button>
-                    </div>
-                </form>
-            {% endcomponent %}
-        </ion-card-content>
-    </ion-card>
-
-    {# Tax Classes #}
-    <ion-card class="m-0 mb-lg">
-        <ion-card-content>
-            {% component "setting_section" title=_("Tax Classes") %}
-                <p class="fs-sm text-secondary mb-md">{% trans "Configure tax rates according to your country's legislation" %}</p>
-
-                <div id="tax-classes-list" class="mb-lg">
-                    {% include "main/settings/partials/tax_classes_list.html" %}
-                </div>
-
-                <div class="pt-md" style="border-top: 1px solid var(--border-color);">
-                    <h4 class="fw-semibold mb-md">{% trans "Add Tax Class" %}</h4>
-                    <form hx-post="{% url 'main:settings' %}"
-                          hx-target="#tax-classes-list"
-                          hx-swap="innerHTML"
-                          hx-indicator="#tax-spinner">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="create_tax_class">
-
-                        <div class="setting-form-grid">
-                            <ion-item>
-                                <ion-input
-                                    type="text"
-                                    name="name"
-                                    label="{% trans 'Name' %} *"
-                                    label-placement="floating"
-                                    placeholder="{% trans 'e.g., Standard 21%' %}"
-                                    required>
-                                </ion-input>
-                            </ion-item>
-                            <ion-item>
-                                <ion-input
-                                    type="number"
-                                    name="rate"
-                                    label="{% trans 'Rate (%)' %} *"
-                                    label-placement="floating"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    placeholder="21.00"
-                                    required>
-                                </ion-input>
-                            </ion-item>
-                            <ion-item class="full-width">
-                                <ion-input
-                                    type="text"
-                                    name="description"
-                                    label="{% trans 'Description' %}"
-                                    label-placement="floating"
-                                    placeholder="{% trans 'Optional notes' %}">
-                                </ion-input>
-                            </ion-item>
-                        </div>
-
-                        <div class="setting-toggle mt-md">
-                            <div class="setting-toggle__content">
-                                <h3 class="setting-toggle__title">{% trans "Set as default" %}</h3>
-                                <p class="setting-toggle__description">{% trans "Use this tax class by default for new products" %}</p>
                             </div>
-                            <ion-toggle name="is_default" value="true"></ion-toggle>
+                            <label class="btn btn-sm btn-outline">
+                                {% icon "person-outline" %}
+                                {% trans "Choose image" %}
+                                <input type="file" name="avatar" accept="image/*" class="hidden">
+                            </label>
                         </div>
-
-                        <div class="mt-md">
-                            <ion-button type="submit">
-                                <ion-spinner id="tax-spinner" name="crescent" class="htmx-indicator me-sm"></ion-spinner>
-                                {% icon "add-outline" slot="start" %}
-                                {% trans "Add Tax Class" %}
-                            </ion-button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
-            {% endcomponent %}
-        </ion-card-content>
-    </ion-card>
 
-    {# Automatic Backups #}
-    <ion-card class="m-0 mb-lg">
-        <ion-card-content>
-            {% component "setting_section" title=_("Automatic Backups") %}
-                <form hx-post="{% url 'main:settings' %}"
-                      hx-target="#backup-message"
-                      hx-swap="innerHTML"
-                      hx-indicator="#backup-spinner">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="update_backup">
-                    <div id="backup-message"></div>
+                <div class="mt-6">
+                    <button type="submit" class="btn color-primary btn-block">
+                        <span class="htmx-indicator" id="user-spinner">
+                            <span class="loading loading-sm mr-2"></span>
+                        </span>
+                        {% trans "Save Preferences" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
 
-                    <div class="setting-toggle">
-                        <div class="setting-toggle__content">
-                            <h3 class="setting-toggle__title">{% trans "Enable automatic backups" %}</h3>
-                            <p class="setting-toggle__description">{% trans "Schedule automatic database backups" %}</p>
+    {# ── Automatic Backups ── #}
+    <section class="card">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "cloud-upload-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Automatic Backups" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Schedule and manage database backups" %}</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-swap="none"
+                  hx-indicator="#backup-spinner">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_backup">
+
+                <div class="list list-inset">
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Enable automatic backups" %}</span>
+                            <span class="list-item-note">{% trans "Schedule automatic database backups" %}</span>
                         </div>
-                        <ion-toggle
-                            name="backup_enabled"
-                            value="true"
-                            {% if backup_config.enabled %}checked{% endif %}>
-                        </ion-toggle>
+                        <div class="list-item-end">
+                            <label class="toggle">
+                                <input type="checkbox"
+                                       name="backup_enabled"
+                                       value="true"
+                                       {% if backup_config.enabled %}checked{% endif %}>
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
+                        </div>
                     </div>
 
-                    <div class="setting-select">
-                        <div class="setting-select__content">
-                            <h3 class="setting-select__title">{% trans "Frequency" %}</h3>
-                            <p class="setting-select__description">{% trans "How often to create backups" %}</p>
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Frequency" %}</span>
+                            <span class="list-item-note">{% trans "How often to create backups" %}</span>
                         </div>
-                        <ion-select
-                            name="backup_frequency"
-                            value="{{ backup_config.frequency }}"
-                            interface="popover"
-                            class="setting-select__field">
-                            {% for value, label in backup_frequency_choices %}
-                            <ion-select-option value="{{ value }}">{{ label }}</ion-select-option>
-                            {% endfor %}
-                        </ion-select>
+                        <div class="list-item-end">
+                            <select name="backup_frequency" class="select w-auto min-w-40">
+                                {% for value, label in backup_frequency_choices %}
+                                <option value="{{ value }}" {% if backup_config.frequency == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="setting-select">
-                        <div class="setting-select__content">
-                            <h3 class="setting-select__title">{% trans "Backup Time" %}</h3>
-                            <p class="setting-select__description">{% trans "Time of day to run backup" %}</p>
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Backup Time" %}</span>
+                            <span class="list-item-note">{% trans "Time of day to run backup" %}</span>
                         </div>
-                        <ion-select
-                            name="backup_hour"
-                            value="{{ backup_config.time_hour }}"
-                            interface="popover"
-                            class="setting-select__field">
-                            <ion-select-option value="0">00:00</ion-select-option>
-                            <ion-select-option value="2">02:00</ion-select-option>
-                            <ion-select-option value="4">04:00</ion-select-option>
-                            <ion-select-option value="6">06:00</ion-select-option>
-                            <ion-select-option value="12">12:00</ion-select-option>
-                            <ion-select-option value="18">18:00</ion-select-option>
-                            <ion-select-option value="22">22:00</ion-select-option>
-                        </ion-select>
+                        <div class="list-item-end">
+                            <select name="backup_hour" class="select w-auto min-w-24">
+                                <option value="0" {% if backup_config.time_hour == 0 %}selected{% endif %}>00:00</option>
+                                <option value="2" {% if backup_config.time_hour == 2 %}selected{% endif %}>02:00</option>
+                                <option value="4" {% if backup_config.time_hour == 4 %}selected{% endif %}>04:00</option>
+                                <option value="6" {% if backup_config.time_hour == 6 %}selected{% endif %}>06:00</option>
+                                <option value="12" {% if backup_config.time_hour == 12 %}selected{% endif %}>12:00</option>
+                                <option value="18" {% if backup_config.time_hour == 18 %}selected{% endif %}>18:00</option>
+                                <option value="22" {% if backup_config.time_hour == 22 %}selected{% endif %}>22:00</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="setting-input">
-                        <div class="setting-input__content">
-                            <h3 class="setting-input__title">{% trans "Keep backups for (days)" %}</h3>
-                            <p class="setting-input__description">{% trans "Number of days to retain backups" %}</p>
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Keep backups for (days)" %}</span>
+                            <span class="list-item-note">{% trans "Number of days to retain backups" %}</span>
                         </div>
-                        <ion-input
-                            type="number"
-                            name="retention_days"
-                            value="{{ backup_config.retention_days }}"
-                            min="0"
-                            max="365"
-                            class="setting-input__field">
-                        </ion-input>
+                        <div class="list-item-end">
+                            <input type="number"
+                                   name="retention_days"
+                                   class="input w-20 text-center"
+                                   value="{{ backup_config.retention_days }}"
+                                   min="0"
+                                   max="365">
+                        </div>
                     </div>
 
-                    <div class="setting-input">
-                        <div class="setting-input__content">
-                            <h3 class="setting-input__title">{% trans "Maximum backups" %}</h3>
-                            <p class="setting-input__description">{% trans "Maximum number of backups to keep" %}</p>
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Maximum backups" %}</span>
+                            <span class="list-item-note">{% trans "Maximum number of backups to keep" %}</span>
                         </div>
-                        <ion-input
-                            type="number"
-                            name="max_backups"
-                            value="{{ backup_config.max_backups }}"
-                            min="0"
-                            max="100"
-                            class="setting-input__field">
-                        </ion-input>
+                        <div class="list-item-end">
+                            <input type="number"
+                                   name="max_backups"
+                                   class="input w-20 text-center"
+                                   value="{{ backup_config.max_backups }}"
+                                   min="0"
+                                   max="100">
+                        </div>
                     </div>
 
-                    <div class="setting-input" style="border-bottom: none;">
-                        <div class="setting-input__content">
-                            <h3 class="setting-input__title">{% trans "Last Backup" %}</h3>
-                            <p class="setting-input__description">
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Last Backup" %}</span>
+                            <span class="list-item-note">
                                 {% if backup_config.last_backup_at %}
                                 {{ backup_config.last_backup_at|date:"M d, Y H:i" }}
                                 ({{ backup_config.last_backup_size|filesizeformat }})
                                 {% else %}
                                 {% trans "No backups yet" %}
                                 {% endif %}
-                            </p>
+                            </span>
                             {% if backup_config.last_error %}
-                            <p class="text-danger fs-xs mt-xs">{{ backup_config.last_error|truncatechars:50 }}</p>
+                            <span class="list-item-note text-error">{{ backup_config.last_error|truncatechars:50 }}</span>
                             {% endif %}
                         </div>
                     </div>
+                </div>
 
-                    <div class="mt-lg pt-md d-flex gap-sm" style="border-top: 1px solid var(--border-color);">
-                        <ion-button type="submit" class="flex-1">
-                            <ion-spinner id="backup-spinner" name="crescent" class="htmx-indicator me-sm"></ion-spinner>
-                            {% trans "Save Backup Settings" %}
-                        </ion-button>
-                        <ion-button
-                            fill="outline"
+                <div class="flex gap-2 mt-6">
+                    <button type="submit" class="btn color-primary flex-1">
+                        <span class="htmx-indicator" id="backup-spinner">
+                            <span class="loading loading-sm mr-2"></span>
+                        </span>
+                        {% trans "Save Backup Settings" %}
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline"
                             hx-post="{% url 'main:settings' %}"
                             hx-vals='{"action": "run_backup"}'
-                            hx-target="#backup-message"
-                            hx-swap="innerHTML"
+                            hx-swap="none"
                             hx-indicator="#backup-now-spinner">
-                            <ion-spinner id="backup-now-spinner" name="crescent" class="htmx-indicator me-sm"></ion-spinner>
-                            {% icon "cloud-upload-outline" slot="start" %}
-                            {% trans "Backup Now" %}
-                        </ion-button>
-                    </div>
-                </form>
-            {% endcomponent %}
-        </ion-card-content>
-    </ion-card>
-
-    {# Hub Information #}
-    <ion-card class="m-0 mb-lg">
-        <ion-card-content>
-            {% component "setting_section" title=_("Hub Information") %}
-                <div class="setting-input" style="border-bottom: 1px solid var(--border-color);">
-                    <div class="setting-input__content">
-                        <h3 class="setting-input__title">{% trans "Hub ID" %}</h3>
-                        <p class="setting-input__description text-mono">{{ hub_config.hub_id|default:"Not configured" }}</p>
-                    </div>
+                        <span class="htmx-indicator" id="backup-now-spinner">
+                            <span class="loading loading-sm mr-2"></span>
+                        </span>
+                        {% icon "download-outline" %}
+                        {% trans "Backup Now" %}
+                    </button>
                 </div>
+            </form>
+        </div>
+    </section>
 
-                <div class="setting-input" style="border-bottom: 1px solid var(--border-color);">
-                    <div class="setting-input__content">
-                        <h3 class="setting-input__title">{% trans "Status" %}</h3>
-                    </div>
-                    {% if hub_config.is_configured %}
-                    <ion-chip color="success">{% trans "Connected" %}</ion-chip>
-                    {% else %}
-                    <ion-chip color="warning">{% trans "Not configured" %}</ion-chip>
-                    {% endif %}
+    {# ── Hub Information ── #}
+    <section class="card">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "information-circle-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Hub Information" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "System status and connection details" %}</p>
                 </div>
-
-                <div class="setting-input" style="border-bottom: 1px solid var(--border-color);">
-                    <div class="setting-input__content">
-                        <h3 class="setting-input__title">{% trans "Cloud URL" %}</h3>
-                        <p class="setting-input__description text-mono">{{ CLOUD_URL }}</p>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="list list-inset">
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <span class="list-item-label">{% trans "Hub ID" %}</span>
+                        <span class="list-item-note font-mono">{{ hub_config.hub_id|default:"—" }}</span>
                     </div>
                 </div>
 
-                <div class="setting-input" style="border-bottom: none;">
-                    <div class="setting-input__content">
-                        <h3 class="setting-input__title">{% trans "Version" %}</h3>
-                        <p class="setting-input__description">1.0.0</p>
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <span class="list-item-label">{% trans "Status" %}</span>
+                    </div>
+                    <div class="list-item-end">
+                        {% if hub_config.is_configured %}
+                        <span class="badge color-success">{% trans "Connected" %}</span>
+                        {% else %}
+                        <span class="badge color-warning">{% trans "Not configured" %}</span>
+                        {% endif %}
                     </div>
                 </div>
 
-                <div class="mt-lg pt-md" style="border-top: 1px solid var(--border-color);">
-                    <ion-button expand="block" fill="outline" href="{{ CLOUD_URL }}" target="_blank">
-                        {% icon "open-outline" slot="start" %}
-                        {% trans "Open Cloud Portal" %}
-                    </ion-button>
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <span class="list-item-label">{% trans "Cloud URL" %}</span>
+                        <span class="list-item-note font-mono">{{ CLOUD_URL }}</span>
+                    </div>
                 </div>
-            {% endcomponent %}
-        </ion-card-content>
-    </ion-card>
 
-    {# Database Maintenance #}
-    <ion-card class="m-0">
-        <ion-card-content>
-            {% component "setting_section" title=_("Database Maintenance") %}
-                <p class="fs-sm text-secondary mb-md">
-                    {% trans "Scan for and remove orphaned database tables, migration records, and media files left behind by deleted modules." %}
-                </p>
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <span class="list-item-label">{% trans "Version" %}</span>
+                        <span class="list-item-note">1.0.0</span>
+                    </div>
+                </div>
+            </div>
 
-                <ion-button
-                    fill="outline"
+            <div class="mt-6">
+                <a href="{{ CLOUD_URL }}" target="_blank" class="btn btn-outline btn-block">
+                    {% icon "open-outline" %}
+                    {% trans "Open Cloud Portal" %}
+                </a>
+            </div>
+        </div>
+    </section>
+
+    {# ── Database Maintenance ── #}
+    <section class="card">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "construct-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Database Maintenance" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Scan for and remove orphaned data left behind by deleted modules" %}</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <button type="button"
+                    class="btn btn-outline"
                     hx-get="{% url 'configuration:scan_orphaned_data' %}"
                     hx-target="#scan-results"
                     hx-indicator="#scan-spinner">
-                    {% icon "search-outline" slot="start" %}
-                    {% trans "Scan for Orphaned Data" %}
-                    <ion-spinner id="scan-spinner" name="crescent" class="htmx-indicator ms-sm"></ion-spinner>
-                </ion-button>
+                {% icon "search-outline" %}
+                {% trans "Scan for Orphaned Data" %}
+                <span class="htmx-indicator ml-2" id="scan-spinner">
+                    <span class="loading loading-sm"></span>
+                </span>
+            </button>
 
-                <div id="scan-results" class="mt-md"></div>
-            {% endcomponent %}
-        </ion-card-content>
-    </ion-card>
+            <div id="scan-results" class="mt-4"></div>
+        </div>
+    </section>
 
     {# Footer info #}
-    <div class="mt-lg p-md rounded-lg" style="background: var(--bg-color-secondary);">
-        <div class="d-flex align-start gap-sm">
-            {% icon "information-circle-outline" style="font-size: 20px; color: var(--color-primary); flex-shrink: 0; margin-top: 2px;" %}
-            <p class="fs-sm text-secondary m-0">
-                {% trans "These settings are saved locally in the Hub. Changes are applied after saving each section." %}
-            </p>
+    <div class="callout callout-info">
+        <span class="callout-icon">{% icon "information-circle-outline" %}</span>
+        <div class="callout-content">
+            <div class="callout-text">{% trans "These settings are saved locally in the Hub. Changes are applied after saving each section." %}</div>
         </div>
     </div>
-    {% endfill %}
-{% endcomponent %}
+
+</div>
 
 <style>
-.setting-form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-sm);
-}
-
-.setting-form-grid .full-width {
-    grid-column: 1 / -1;
-}
-
-@media (max-width: 768px) {
-    .setting-form-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
 .logo-preview {
     width: 48px;
     height: 48px;
-    border-radius: var(--border-radius-md);
-    background: var(--bg-color-secondary);
+    border-radius: var(--radius-box);
+    background: var(--color-base-200);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .logo-preview img {
@@ -598,9 +836,22 @@
     object-fit: cover;
 }
 
-.logo-preview ion-icon {
-    font-size: 24px;
-    color: var(--text-color-secondary);
+.logo-preview svg {
+    width: 24px;
+    height: 24px;
+    color: var(--color-base-content);
+    opacity: 0.4;
+}
+
+.avatar-initials {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    font-weight: 600;
+    font-size: 0.875rem;
 }
 </style>
-

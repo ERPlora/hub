@@ -1,67 +1,100 @@
-{% load i18n ui component_tags djicons %}
+{% load i18n djicons %}
 
-{% component "page" title=_("Files") %}
-    {% fill "content" %}
-        <div class="ui-grid--sidebar">
-            {# Left Column: Database + Storage (stacked) #}
-            <div class="ui-grid__aside">
-                {# Database Download Card #}
-                {% ui_card %}
-                    <div class="d-flex align-center gap-sm mb-sm">
-                        {% icon "server-outline" css_class="fs-xl text-primary" %}
-                        <div>
-                            <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Download backup" %}</p>
-                            <h2 class="fs-base fw-bold m-0">{% trans "Database" %}</h2>
-                        </div>
-                    </div>
-                    <p class="fs-sm text-secondary mb-md">
-                        {% trans "Download a backup of your SQLite database containing all your data." %}
-                    </p>
-                    {% ui_button label=_("Download Database") icon="cloud-download-outline" expand="block" href=download_url %}
-                {% endui_card %}
+<div x-data="{ previewOpen: false }" class="mt-5">
 
-                {# Storage Info Card #}
-                {% ui_card %}
-                    <div class="d-flex align-center gap-sm mb-sm">
-                        {% icon "pie-chart-outline" css_class="fs-xl text-primary" %}
-                        <div>
-                            <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Disk usage" %}</p>
-                            <h2 class="fs-base fw-bold m-0">{% trans "Storage" %}</h2>
-                        </div>
-                    </div>
-                    <div id="storage-info"
-                         hx-get="{% url 'configuration:storage_info' %}"
-                         hx-trigger="load"
-                         hx-swap="innerHTML">
-                        {# Loading state #}
-                        <div class="d-flex justify-center p-md">
-                            <ion-spinner name="crescent"></ion-spinner>
-                        </div>
-                    </div>
-                {% endui_card %}
+    <!-- Top Row: Quick Action Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+        <!-- Database Backup -->
+        <a href="{{ download_url }}" class="card glass hover:shadow-lg transition-shadow group">
+            <div class="card-body p-4 flex flex-row items-center gap-4">
+                <div class="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                    {% icon "server-outline" css_class="text-primary" size=28 %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-sm m-0">{% trans "Database" %}</p>
+                    <p class="text-xs text-base-content/50 m-0">{% trans "Download backup" %}</p>
+                </div>
+                {% icon "cloud-download-outline" css_class="text-base-content/30 group-hover:text-primary transition-colors" %}
             </div>
+        </a>
 
-            {# Right Column: File Browser #}
-            <div class="ui-grid__main">
-                {% ui_card %}
-                    <div class="d-flex align-center gap-sm mb-md">
-                        {% icon "folder-open-outline" css_class="fs-xl text-primary" %}
-                        <div>
-                            <p class="fs-xxs text-secondary text-uppercase fw-semibold m-0">{% trans "Browse and download" %}</p>
-                            <h2 class="fs-base fw-bold m-0">{% trans "File Browser" %}</h2>
-                        </div>
-                    </div>
-                    <div id="file-browser-content"
+        <!-- Storage Info (loaded via HTMX) -->
+        <div class="card glass">
+            <div class="card-body p-4" id="storage-summary"
+                 hx-get="{% url 'configuration:storage_info' %}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <div class="flex items-center justify-center h-11">
+                    <span class="loading loading-sm"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Files -->
+        <div class="card glass">
+            <div class="card-body p-4 flex flex-row items-center gap-4">
+                <div class="w-11 h-11 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+                    {% icon "documents-outline" css_class="text-success" size=28 %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-sm m-0">{% trans "Browse" %}</p>
+                    <p class="text-xs text-base-content/50 m-0">{% trans "5 directories" %}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Location -->
+        <div class="card glass">
+            <div class="card-body p-4 flex flex-row items-center gap-4">
+                <div class="w-11 h-11 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+                    {% icon "folder-outline" css_class="text-warning" size=28 %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-sm m-0 truncate">{% trans "Location" %}</p>
+                    <p class="text-xs text-base-content/50 m-0 truncate font-mono" title="{{ base_path }}">{{ base_path }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Manager -->
+    <div class="card glass">
+        <div class="card-body p-0">
+            <div class="flex h-full" style="min-height: 500px;">
+
+                <!-- File Browser (left side) -->
+                <div class="flex-1 border-r border-base-content/10" :class="previewOpen ? 'hidden lg:block lg:w-1/2' : 'w-full'">
+                    <div class="p-4" id="file-browser-content"
                          hx-get="{% url 'configuration:file_browser' %}?dir=media"
                          hx-trigger="load"
                          hx-swap="innerHTML">
-                        {# Loading state #}
-                        <div class="d-flex justify-center p-lg">
-                            <ion-spinner name="crescent"></ion-spinner>
+                        <div class="flex justify-center p-12">
+                            <span class="loading loading-sm"></span>
                         </div>
                     </div>
-                {% endui_card %}
+                </div>
+
+                <!-- Preview Panel (right side) -->
+                <div class="flex-1 lg:w-1/2" x-show="previewOpen" x-cloak>
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold m-0 text-base-content/70">{% trans "Preview" %}</h3>
+                            <button class="btn btn-ghost btn-sm btn-circle" @click="previewOpen = false" title="{% trans 'Close preview' %}">
+                                {% icon "close-outline" %}
+                            </button>
+                        </div>
+                        <div id="file-preview-content">
+                            <div class="rounded-xl bg-base-200 p-12 text-center">
+                                {% icon "eye-outline" css_class="text-base-content/20 block mb-3" size=48 %}
+                                <p class="text-sm text-base-content/40 m-0">{% trans "Select a file to preview" %}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
-    {% endfill %}
-{% endcomponent %}
+    </div>
+
+</div>
