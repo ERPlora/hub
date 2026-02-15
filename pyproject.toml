@@ -33,7 +33,7 @@ dependencies = [
     "django-extensions>=3.2.0", # Comandos útiles (shell_plus, etc)
     "django-money>=3.0.0", # Currency handling
     "django-htmx>=1.17.0", # HTMX integration for Django
-    "djicons>=0.1.0", # SVG icons for Django templates
+    "djicons>=0.2.3", # SVG icons for Django templates
     "django-health-check>=3.18.0", # Health check endpoint for monitoring
     # === LIBRERÍAS PARA MODULES (25 pre-empaquetadas) ===
     # Ver: config/module_allowed_deps.py para casos de uso
