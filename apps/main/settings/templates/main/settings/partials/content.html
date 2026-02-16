@@ -16,7 +16,7 @@
         <div class="card-body">
             <form hx-post="{% url 'main:settings' %}"
                   hx-swap="none"
-                  hx-indicator="#store-spinner"
+                  hx-trigger="change"
                   enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_store">
@@ -136,15 +136,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="mt-6">
-                    <button type="submit" class="btn color-primary btn-block">
-                        <span class="htmx-indicator" id="store-spinner">
-                            <span class="loading loading-sm mr-2"></span>
-                        </span>
-                        {% trans "Save Store Settings" %}
-                    </button>
-                </div>
             </form>
         </div>
     </section>
@@ -245,7 +236,7 @@
         <div class="card-body">
             <form hx-post="{% url 'main:settings' %}"
                   hx-swap="none"
-                  hx-indicator="#hub-spinner">
+                  hx-trigger="change">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_hub">
 
@@ -291,33 +282,6 @@
                             </select>
                         </div>
                     </div>
-
-                    <div class="list-item">
-                        <div class="list-item-content">
-                            <span class="list-item-label">{% trans "Dark Mode" %}</span>
-                            <span class="list-item-note">{% trans "Use dark theme for the interface" %}</span>
-                        </div>
-                        <div class="list-item-end">
-                            <label class="toggle">
-                                <input type="checkbox"
-                                       name="dark_mode"
-                                       value="true"
-                                       {% if hub_config.dark_mode %}checked{% endif %}>
-                                <span class="toggle-track">
-                                    <span class="toggle-thumb"></span>
-                                </span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-6">
-                    <button type="submit" class="btn color-primary btn-block">
-                        <span class="htmx-indicator" id="hub-spinner">
-                            <span class="loading loading-sm mr-2"></span>
-                        </span>
-                        {% trans "Save Hub Settings" %}
-                    </button>
                 </div>
             </form>
         </div>
@@ -444,7 +408,7 @@
             <div class="list-header">{% trans "Bridge Settings" %}</div>
             <form hx-post="{% url 'main:settings' %}"
                   hx-swap="none"
-                  hx-indicator="#bridge-spinner">
+                  hx-trigger="change">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_bridge">
 
@@ -500,15 +464,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="mt-6">
-                    <button type="submit" class="btn color-primary btn-block">
-                        <span class="htmx-indicator" id="bridge-spinner">
-                            <span class="loading loading-sm mr-2"></span>
-                        </span>
-                        {% trans "Save Hardware Settings" %}
-                    </button>
-                </div>
             </form>
         </div>
     </section>
@@ -527,7 +482,7 @@
         <div class="card-body">
             <form hx-post="{% url 'main:settings' %}"
                   hx-swap="none"
-                  hx-indicator="#user-spinner"
+                  hx-trigger="change"
                   enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_user">
@@ -568,15 +523,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="mt-6">
-                    <button type="submit" class="btn color-primary btn-block">
-                        <span class="htmx-indicator" id="user-spinner">
-                            <span class="loading loading-sm mr-2"></span>
-                        </span>
-                        {% trans "Save Preferences" %}
-                    </button>
-                </div>
             </form>
         </div>
     </section>
@@ -595,7 +541,7 @@
         <div class="card-body">
             <form hx-post="{% url 'main:settings' %}"
                   hx-swap="none"
-                  hx-indicator="#backup-spinner">
+                  hx-trigger="change">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_backup">
 
@@ -697,28 +643,22 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="flex gap-2 mt-6">
-                    <button type="submit" class="btn color-primary flex-1">
-                        <span class="htmx-indicator" id="backup-spinner">
-                            <span class="loading loading-sm mr-2"></span>
-                        </span>
-                        {% trans "Save Backup Settings" %}
-                    </button>
-                    <button type="button"
-                            class="btn btn-outline"
-                            hx-post="{% url 'main:settings' %}"
-                            hx-vals='{"action": "run_backup"}'
-                            hx-swap="none"
-                            hx-indicator="#backup-now-spinner">
-                        <span class="htmx-indicator" id="backup-now-spinner">
-                            <span class="loading loading-sm mr-2"></span>
-                        </span>
-                        {% icon "download-outline" %}
-                        {% trans "Backup Now" %}
-                    </button>
-                </div>
             </form>
+
+            <div class="mt-4">
+                <button type="button"
+                        class="btn btn-outline"
+                        hx-post="{% url 'main:settings' %}"
+                        hx-vals='{"action": "run_backup"}'
+                        hx-swap="none"
+                        hx-indicator="#backup-now-spinner">
+                    <span class="htmx-indicator" id="backup-now-spinner">
+                        <span class="loading loading-sm mr-2"></span>
+                    </span>
+                    {% icon "download-outline" %}
+                    {% trans "Backup Now" %}
+                </button>
+            </div>
         </div>
     </section>
 
@@ -770,6 +710,19 @@
                 </div>
             </div>
 
+            {# ── Connect Device QR ── #}
+            <div class="mt-6 flex flex-col items-center gap-4" x-data="hubQR()" x-init="generate()">
+                <div class="qr qr-bordered">
+                    <div class="qr-wrapper">
+                        <canvas class="qr-canvas" x-ref="qrCanvas" width="180" height="180"></canvas>
+                    </div>
+                    <span class="qr-label" x-text="hubUrl"></span>
+                </div>
+                <p class="text-sm opacity-60 text-center max-w-xs">
+                    {% trans "Scan this QR code from another device to connect to this Hub." %}
+                </p>
+            </div>
+
             <div class="mt-6">
                 <a href="{{ CLOUD_URL }}" target="_blank" class="btn btn-outline btn-block">
                     {% icon "open-outline" %}
@@ -811,7 +764,7 @@
     <div class="callout callout-info">
         <span class="callout-icon">{% icon "information-circle-outline" %}</span>
         <div class="callout-content">
-            <div class="callout-text">{% trans "These settings are saved locally in the Hub. Changes are applied after saving each section." %}</div>
+            <div class="callout-text">{% trans "These settings are saved locally in the Hub. Changes are saved automatically." %}</div>
         </div>
     </div>
 
@@ -855,3 +808,32 @@
     font-size: 0.875rem;
 }
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script>
+function hubQR() {
+    return {
+        hubUrl: window.location.origin,
+        generate() {
+            var qr = qrcode(0, 'M');
+            qr.addData(this.hubUrl);
+            qr.make();
+            var canvas = this.$refs.qrCanvas;
+            var ctx = canvas.getContext('2d');
+            var size = canvas.width;
+            var count = qr.getModuleCount();
+            var cellSize = size / count;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = '#000000';
+            for (var r = 0; r < count; r++) {
+                for (var c = 0; c < count; c++) {
+                    if (qr.isDark(r, c)) {
+                        ctx.fillRect(c * cellSize, r * cellSize, cellSize + 0.5, cellSize + 0.5);
+                    }
+                }
+            }
+        }
+    }
+}
+</script>
