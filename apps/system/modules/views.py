@@ -993,6 +993,10 @@ def install_from_marketplace(request):
                 'error': 'Missing module_slug or download_url'
             }, status=400)
 
+        # Normalize http:// to https:// (Cloud URLs should always be HTTPS)
+        if download_url.startswith('http://'):
+            download_url = download_url.replace('http://', 'https://', 1)
+
         modules_dir = Path(django_settings.MODULES_DIR)
         module_target_dir = modules_dir / module_slug
 

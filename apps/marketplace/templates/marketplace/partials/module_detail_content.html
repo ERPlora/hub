@@ -346,7 +346,7 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
         }
 
         if (downloadUrl) {
-            await downloadAndInstall(moduleSlug, downloadUrl);
+            await downloadAndInstall(moduleSlug, downloadUrl, button);
         } else {
             Toast.warning('{% trans "Module acquired. Download not available yet." %}');
             setTimeout(() => window.location.reload(), 1500);
@@ -394,7 +394,14 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button) {
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ module_slug: moduleSlug, download_url: downloadUrl })
         });
-        const data = await response.json();
+
+        let data;
+        try {
+            data = await response.json();
+        } catch (e) {
+            Toast.error('{% trans "Server error. Please try again later." %}');
+            return;
+        }
 
         if (data.success) {
             Toast.success('{% trans "Module installed successfully!" %}');
