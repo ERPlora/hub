@@ -146,17 +146,20 @@
         return {
             drawerOpen: false,
             drawerCollapsed: false,
-            isDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
+            isDark: (window.ERPlora && window.ERPlora.isDark) || false,
 
             init() {
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                    this.isDark = e.matches;
-                    if (this.isDark) {
-                        document.documentElement.setAttribute('data-theme', 'dark');
-                    } else {
-                        document.documentElement.removeAttribute('data-theme');
-                    }
-                });
+                // Only listen to OS changes if no manual preference is stored
+                if (!localStorage.getItem('erplora-theme')) {
+                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                        this.isDark = e.matches;
+                        if (this.isDark) {
+                            document.documentElement.setAttribute('data-theme', 'dark');
+                        } else {
+                            document.documentElement.removeAttribute('data-theme');
+                        }
+                    });
+                }
 
                 document.body.addEventListener('htmx:afterSettle', () => {
                     if (window.innerWidth < 992) {
@@ -203,6 +206,7 @@
                 } else {
                     document.documentElement.removeAttribute('data-theme');
                 }
+                localStorage.setItem('erplora-theme', this.isDark ? 'dark' : 'light');
             }
         }
     }

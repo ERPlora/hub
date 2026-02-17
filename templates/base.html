@@ -1,7 +1,7 @@
 {% load static %}
 {% load i18n %}
 <!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE }}" {% if HUB_CONFIG.dark_mode %}data-theme="dark"{% endif %}>
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -437,9 +437,13 @@
         (function() {
             const darkModeAuto = {{ HUB_CONFIG.dark_mode_auto|yesno:"true,false" }};
             const darkModeManual = {{ HUB_CONFIG.dark_mode|yesno:"true,false" }};
+            const storedTheme = localStorage.getItem('erplora-theme');
 
             let isDark = false;
-            if (darkModeAuto) {
+            if (storedTheme) {
+                // User has manually toggled — respect their choice
+                isDark = storedTheme === 'dark';
+            } else if (darkModeAuto) {
                 // Use browser/OS preference
                 isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             } else {
@@ -450,20 +454,24 @@
             // Store for Alpine.js components to access
             window.ERPlora = window.ERPlora || {};
             window.ERPlora.isDark = isDark;
-            window.ERPlora.darkModeAuto = darkModeAuto;
+            window.ERPlora.darkModeAuto = darkModeAuto && !storedTheme;
 
             // Apply data-theme attribute immediately to prevent flash
             if (isDark) {
                 document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
             }
         })();
     </script>
 </head>
 <body class="app">
     <script>
-        // Listen for system preference changes (only if auto mode)
+        // Listen for system preference changes (only if auto mode and no manual override)
         if (window.ERPlora && window.ERPlora.darkModeAuto) {
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                // Skip if user has set a manual preference since page load
+                if (localStorage.getItem('erplora-theme')) return;
                 if (e.matches) {
                     document.documentElement.setAttribute('data-theme', 'dark');
                 } else {

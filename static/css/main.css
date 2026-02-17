@@ -11,17 +11,18 @@
 
 /* ==========================================================================
    APP BACKGROUND
-   Decorative gradient so glass components show depth.
+   Decorative gradient + grid inside .page so backdrop-filter (glass) works.
+   Must be INSIDE the .app stacking context, not on body.
    ========================================================================== */
-/*
-.app {
+
+.page {
   background: var(--color-base-200);
   position: relative;
 }
 
-.app::before {
+.page::before {
   content: '';
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   background:
@@ -31,17 +32,11 @@
   z-index: 0;
 }
 
-
-.app>* {
-  position: relative;
-  z-index: 1;
-}
-  */
-
-body::after {
+.page::after {
   content: '';
   position: absolute;
   inset: 0;
+  pointer-events: none;
   background-image:
     linear-gradient(color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px);
@@ -49,25 +44,8 @@ body::after {
   z-index: 0;
 }
 
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
-    radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 40% at 50% 50%, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, transparent 70%);
-  z-index: 0;
-}
-
-/* Subtle grid pattern */
-
-
-.app>* {
-  /*
+.page > * {
   position: relative;
-  */
   z-index: 1;
 }
 
