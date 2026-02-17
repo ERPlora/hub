@@ -43,7 +43,7 @@ from django.shortcuts import redirect
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 from apps.modules_runtime.router import module_urlpatterns
-from apps.core.views import set_language
+from apps.core.views import set_language, health_check
 from apps.configuration.views import pwa_manifest, pwa_serviceworker, pwa_offline
 
 # Import API URL patterns from each app
@@ -73,8 +73,9 @@ urlpatterns = [
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
     # ==========================================================================
-    # Health check endpoint (for Cloud monitoring)
+    # Health check endpoints (for Docker healthcheck and Cloud monitoring)
     # ==========================================================================
+    path('health/', health_check, name='health_check'),
     path('ht/', include('health_check.urls')),
 
     # ==========================================================================

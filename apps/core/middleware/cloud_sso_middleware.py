@@ -44,8 +44,9 @@ class CloudSSOMiddleware:
 
     # URLs que no requieren autenticación
     EXEMPT_URLS = [
-        '/health/',  # Legacy health check endpoint
+        '/health/',  # Health check endpoint
         '/ht/',      # django-health-check endpoint (for Cloud monitoring)
+        '/htmx/',    # HTMX partials (health, connection-status, etc.)
         '/static/',  # Static files
         '/media/',   # Media files
         '/favicon.ico',  # Favicon
@@ -57,7 +58,7 @@ class CloudSSOMiddleware:
         '/verify-pin/',  # PIN verification endpoint
         '/set-language/',  # Language switcher (can be called during setup)
         '/logout/',  # Logout endpoint
-        '/api/backup/',  # Backup API (called by Cloud)
+        '/api/',     # All API endpoints (authenticated via JWT, not cookies)
     ]
 
     def __init__(self, get_response):
@@ -67,14 +68,11 @@ class CloudSSOMiddleware:
         self.hub_id = getattr(settings, 'HUB_ID', '')
         self.demo_mode = getattr(settings, 'DEMO_MODE', False)
 
-        # Build Cloud base URL from PARENT_DOMAIN (preferred) or fallback to CLOUD_API_URL
-        parent_domain = getattr(settings, 'PARENT_DOMAIN', '')
-        if parent_domain:
-            self.cloud_base_url = f'https://{parent_domain}'
-        else:
-            # Fallback: use CLOUD_API_URL but strip /api if present
-            cloud_api_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
-            self.cloud_base_url = cloud_api_url.rstrip('/').replace('/api', '')
+        # Cloud base URL for API calls and login redirects
+        # Use CLOUD_API_URL (set in web.py from CLOUD_BASE_URL env var)
+        # NOT PARENT_DOMAIN (which is the Hub's domain, e.g. a.erplora.com)
+        cloud_api_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
+        self.cloud_base_url = cloud_api_url.rstrip('/')
 
     def __call__(self, request):
         # Solo aplicar middleware en Cloud Hubs
@@ -195,6 +193,9 @@ class CloudSSOMiddleware:
                 # IMPORTANT: Convert UUID to string for JSON serialization
                 request.session['pending_user_id'] = str(local_user.id)
                 request.session['pending_user_email'] = user_email
+                # Force session save before redirect (middleware returns early,
+                # so Django's session middleware won't save automatically)
+                request.session.save()
                 logger.info(f"[SSO] User {user_email} needs to setup PIN, redirecting...")
                 return redirect('/setup-pin/')
 
