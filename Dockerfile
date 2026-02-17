@@ -35,16 +35,8 @@ LABEL org.opencontainers.image.source="https://github.com/ERPlora/hub"
 
 WORKDIR /app
 
-# Install system dependencies
-# - build-essential: required for compiling lxml, numpy, pandas C extensions
-# - curl: required for healthcheck
-# Note: libusb/cups NOT needed in cloud — hardware is handled by Bridge native app
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+# No apt-get needed: all Python deps have precompiled wheels for linux/amd64
+# Healthcheck uses Python instead of curl (see HEALTHCHECK below)
 
 # Install uv (fast Python package manager)
 RUN pip install --no-cache-dir uv
@@ -85,7 +77,7 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000/health/ || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')" || exit 1
 
 # =============================================================================
 # DEFAULT COMMAND
