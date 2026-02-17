@@ -23,6 +23,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      network: host
     restart: unless-stopped
     # Command inline - runs migrations and starts gunicorn
     command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && mkdir -p /app/data/db && python manage.py migrate --noinput && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
