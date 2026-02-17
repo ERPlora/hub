@@ -1,37 +1,27 @@
-{% extends "base.html" %} {% load static i18n djicons %} {% block title%}ERPlora Hub - {% trans "Setup" %}{%endblock %} {% block extra_css %}
-{%endblock %} {% block content %}
-<div class="page">
-  <div class="content p-4">
-    <div class="max-w-screen-lg mx-auto">
-      <div class="flex justify-center">
-        <div class="w-full max-w-3xl">
-          <!-- Logo -->
-          <div class="flex items-center gap-4 mb-6">
-            <div class="shrink-0">
-              <img
-                class="logo"
-                src="{% static 'img/logo.png' %}"
-                alt="ERPlora"/>
-            </div>
+{% extends "base.html" %} {% load static i18n djicons %} {% block title%}ERPlora Hub - {% trans "Setup" %}{%endblock %} {% block content %}
+<div class="min-h-screen flex items-start justify-center p-4 pt-12">
+  <div class="w-full max-w-3xl">
+    <!-- Logo -->
+    <div class="flex items-center gap-4 mb-6">
+      <div class="shrink-0">
+        <img
+          class="w-10 h-10"
+          src="{% static 'img/logo.png' %}"
+          alt="ERPlora"/>
+      </div>
+      <h1 class="text-2xl font-bold">ERPlora</h1>
+    </div>
 
-            <h1>ERPlora</h1>
-          </div>
-
-          <!-- Stepper Wizard -->
-          <div class="card glass setup-card">
-          <div class="card-header">
-             
-            <h2 class="text-lg font-bold mb-4">
-              {% trans "Configure your store to get started" %}
-            </h2>
-     
-          </div>
-            <div class="card-body">
-              <div class="stepper">
-                <div id="wizard-step-content">{% include step_template %}</div>
-              </div>
-            </div>
-          </div>
+    <!-- Stepper Wizard -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          {% trans "Configure your store to get started" %}
+        </h2>
+      </div>
+      <div class="card-body">
+        <div class="stepper">
+          <div id="wizard-step-content">{% include step_template %}</div>
         </div>
       </div>
     </div>
