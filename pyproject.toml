@@ -92,12 +92,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-hardware = [
-    # Only needed for local/desktop Hub with physical hardware (not Docker cloud)
-    "pyserial>=3.5",  # RS232, cash drawer
-    "pyusb>=1.2.1",  # USB printers, scanners
-    "evdev>=1.6.0; sys_platform == 'linux'",  # Barcode scanners (Linux)
-]
 dev = [
     "coverage>=7.11.0",
     "django-browser-reload>=1.21.0",
