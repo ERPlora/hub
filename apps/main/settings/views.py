@@ -125,7 +125,6 @@ def index(request):
             language = request.POST.get('language')
             timezone = request.POST.get('timezone')
             currency = request.POST.get('currency')
-            dark_mode = 'dark_mode' in request.POST
 
             # Validate and set system language
             if language:
@@ -144,25 +143,9 @@ def index(request):
                 if currency in valid_currencies:
                     hub_config.currency = currency
 
-            hub_config.dark_mode = dark_mode
-            hub_config.dark_mode_auto = False
             hub_config.save()
 
             return toast_response('Hub settings saved')
-
-        # Handle theme update form (color_theme, dark_mode, auto_print)
-        if action == 'update_theme':
-            color_theme = request.POST.get('color_theme')
-            dark_mode = request.POST.get('dark_mode') == 'true'
-            auto_print = request.POST.get('auto_print') == 'true'
-
-            if color_theme:
-                hub_config.color_theme = color_theme
-            hub_config.dark_mode = dark_mode
-            hub_config.auto_print = auto_print
-            hub_config.save()
-
-            return toast_response('Theme settings saved')
 
         # Handle backup settings form
         if action == 'update_backup':
