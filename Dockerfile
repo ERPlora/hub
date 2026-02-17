@@ -36,11 +36,12 @@ LABEL org.opencontainers.image.source="https://github.com/ERPlora/hub"
 WORKDIR /app
 
 # Install system dependencies
+# - build-essential: required for compiling lxml, numpy, pandas C extensions
+# - curl: required for healthcheck
+# Note: libusb/cups NOT needed in cloud — hardware is handled by Bridge native app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
-        libusb-1.0-0 \
-        cups \
         curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
