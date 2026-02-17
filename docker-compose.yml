@@ -60,6 +60,9 @@ services:
     #   - "traefik.http.routers.hub-${HUB_NAME}.tls=true"
     #   - "traefik.http.routers.hub-${HUB_NAME}.tls.certresolver=letsencrypt"
     #   - "traefik.http.services.hub-${HUB_NAME}.loadbalancer.server.port=8000"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
       interval: 30s
