@@ -67,12 +67,8 @@ dependencies = [
     # Data & Analysis
     "pandas>=2.1.0",
     "numpy>=1.26.0",
-    # Hardware POS
-    "pyserial>=3.5", # Puerto serial (RS232, cajón de dinero)
-    "pyusb>=1.2.1", # USB devices (impresoras, scanners)
+    # Hardware POS — network printing (ESC/POS over LAN) works without system deps
     "python-escpos>=3.0", # Impresoras térmicas ESC/POS (USB/LAN/Serial)
-    "evdev>=1.6.0; sys_platform == 'linux'", # Barcode scanners (Linux)
-    # "pywinusb>=0.4.2; sys_platform == 'win32'", # USB HID devices (Windows) - web only
     # Email & Validation
     "email-validator>=2.1.0",
     # Utils
@@ -96,6 +92,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+hardware = [
+    # Only needed for local/desktop Hub with physical hardware (not Docker cloud)
+    "pyserial>=3.5",  # RS232, cash drawer
+    "pyusb>=1.2.1",  # USB printers, scanners
+    "evdev>=1.6.0; sys_platform == 'linux'",  # Barcode scanners (Linux)
+]
 dev = [
     "coverage>=7.11.0",
     "django-browser-reload>=1.21.0",
