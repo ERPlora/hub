@@ -33,8 +33,11 @@ class ModuleLoader:
         self.modules_dir = Path(settings.MODULES_DIR)
         self.loaded_modules = {}
 
-        # Ensure modules directory exists
-        self.modules_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure modules directory exists (may fail on read-only FS)
+        try:
+            self.modules_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
 
         # Add modules directory to Python path for dynamic imports
         modules_parent = str(self.modules_dir.parent)

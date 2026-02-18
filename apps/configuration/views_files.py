@@ -9,12 +9,12 @@ import mimetypes
 from pathlib import Path
 from datetime import datetime
 
+from django.conf import settings as django_settings
 from django.http import HttpResponse, FileResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_GET
 
 from apps.accounts.decorators import login_required
-from config.paths import get_data_paths
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -62,13 +62,12 @@ def get_file_icon(filename: str, is_dir: bool = False) -> str:
 
 def get_allowed_directories() -> dict:
     """Get list of browsable directories with their display names."""
-    paths = get_data_paths()
     return {
-        'media': {'path': paths.media_dir, 'name': 'Media Files', 'icon': 'images'},
-        'modules': {'path': paths.modules_dir, 'name': 'Modules', 'icon': 'extension-puzzle'},
-        'reports': {'path': paths.reports_dir, 'name': 'Reports', 'icon': 'document-text'},
-        'backups': {'path': paths.backups_dir, 'name': 'Backups', 'icon': 'cloud-download'},
-        'logs': {'path': paths.logs_dir, 'name': 'Logs', 'icon': 'list'},
+        'media': {'path': Path(django_settings.MEDIA_ROOT), 'name': 'Media Files', 'icon': 'images'},
+        'modules': {'path': Path(django_settings.MODULES_DIR), 'name': 'Modules', 'icon': 'extension-puzzle'},
+        'reports': {'path': Path(django_settings.REPORTS_DIR), 'name': 'Reports', 'icon': 'document-text'},
+        'backups': {'path': Path(django_settings.BACKUPS_DIR), 'name': 'Backups', 'icon': 'cloud-download'},
+        'logs': {'path': Path(django_settings.LOGS_DIR), 'name': 'Logs', 'icon': 'list'},
     }
 
 
@@ -80,8 +79,7 @@ def download_database(request):
 
     Returns the database as a downloadable file with timestamp in filename.
     """
-    paths = get_data_paths()
-    db_path = paths.database_path
+    db_path = Path(django_settings.DATABASES['default']['NAME'])
 
     if not db_path.exists():
         return JsonResponse({'error': 'Database not found'}, status=404)
@@ -365,8 +363,6 @@ def get_storage_info(request):
 
     Returns HTML with storage stats.
     """
-    paths = get_data_paths()
-
     def get_dir_size(path: Path) -> int:
         """Calculate total size of directory."""
         total = 0
@@ -389,7 +385,8 @@ def get_storage_info(request):
         return count
 
     # Get database size (recommended limit: 2 GB)
-    db_size = paths.database_path.stat().st_size if paths.database_path.exists() else 0
+    db_path = Path(django_settings.DATABASES['default']['NAME'])
+    db_size = db_path.stat().st_size if db_path.exists() else 0
     db_limit = 2 * 1024 * 1024 * 1024  # 2 GB
     db_percent = min(100, int((db_size / db_limit) * 100)) if db_limit else 0
     # Color: green < 1 GB, yellow 1-1.7 GB, red > 1.7 GB
@@ -407,7 +404,7 @@ def get_storage_info(request):
             'icon': 'server',
             'size': format_file_size(db_size),
             'size_bytes': db_size,
-            'files': 1 if paths.database_path.exists() else 0,
+            'files': 1 if db_path.exists() else 0,
             'limit': format_file_size(db_limit),
             'percent': db_percent,
             'color': db_color,
@@ -415,37 +412,37 @@ def get_storage_info(request):
         'media': {
             'name': 'Media Files',
             'icon': 'images',
-            'size': format_file_size(get_dir_size(paths.media_dir)),
-            'size_bytes': get_dir_size(paths.media_dir),
-            'files': count_files(paths.media_dir),
+            'size': format_file_size(get_dir_size(Path(django_settings.MEDIA_ROOT))),
+            'size_bytes': get_dir_size(Path(django_settings.MEDIA_ROOT)),
+            'files': count_files(Path(django_settings.MEDIA_ROOT)),
         },
         'modules': {
             'name': 'Modules',
             'icon': 'extension-puzzle',
-            'size': format_file_size(get_dir_size(paths.modules_dir)),
-            'size_bytes': get_dir_size(paths.modules_dir),
-            'files': count_files(paths.modules_dir),
+            'size': format_file_size(get_dir_size(Path(django_settings.MODULES_DIR))),
+            'size_bytes': get_dir_size(Path(django_settings.MODULES_DIR)),
+            'files': count_files(Path(django_settings.MODULES_DIR)),
         },
         'reports': {
             'name': 'Reports',
             'icon': 'document-text',
-            'size': format_file_size(get_dir_size(paths.reports_dir)),
-            'size_bytes': get_dir_size(paths.reports_dir),
-            'files': count_files(paths.reports_dir),
+            'size': format_file_size(get_dir_size(Path(django_settings.REPORTS_DIR))),
+            'size_bytes': get_dir_size(Path(django_settings.REPORTS_DIR)),
+            'files': count_files(Path(django_settings.REPORTS_DIR)),
         },
         'backups': {
             'name': 'Backups',
             'icon': 'cloud-download',
-            'size': format_file_size(get_dir_size(paths.backups_dir)),
-            'size_bytes': get_dir_size(paths.backups_dir),
-            'files': count_files(paths.backups_dir),
+            'size': format_file_size(get_dir_size(Path(django_settings.BACKUPS_DIR))),
+            'size_bytes': get_dir_size(Path(django_settings.BACKUPS_DIR)),
+            'files': count_files(Path(django_settings.BACKUPS_DIR)),
         },
         'logs': {
             'name': 'Logs',
             'icon': 'list',
-            'size': format_file_size(get_dir_size(paths.logs_dir)),
-            'size_bytes': get_dir_size(paths.logs_dir),
-            'files': count_files(paths.logs_dir),
+            'size': format_file_size(get_dir_size(Path(django_settings.LOGS_DIR))),
+            'size_bytes': get_dir_size(Path(django_settings.LOGS_DIR)),
+            'files': count_files(Path(django_settings.LOGS_DIR)),
         },
     }
 
@@ -457,7 +454,7 @@ def get_storage_info(request):
         'storage_info': storage_info,
         'total_size': format_file_size(total_size),
         'total_files': total_files,
-        'base_path': str(paths.base_dir),
+        'base_path': str(django_settings.DATA_DIR),
     })
 
     return HttpResponse(html)

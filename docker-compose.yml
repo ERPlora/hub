@@ -12,7 +12,8 @@
 #   - Todas las demás env vars configuradas en Dokploy
 #
 # Volumen persistente (NVMe local del servidor):
-#   - ${VOLUME_PATH}/hubs/${HUB_ID}:/app/data → SQLite en /app/data/db/db.sqlite3
+#   - ${VOLUME_PATH}/hubs/${HUB_ID}/ montado en el mismo path dentro del contenedor
+#   - DATABASE_PATH apunta directamente: /data/hubs/{hub_id}/db/db.sqlite3
 #   - Cada DB SQLite tiene un límite recomendado de 2 GB
 #
 # Red:
@@ -27,25 +28,25 @@ services:
       network: host
     restart: unless-stopped
     # Command inline - runs migrations and starts gunicorn
-    command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && mkdir -p /app/data/db && python manage.py migrate --noinput && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
+    command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && mkdir -p $(dirname $DATABASE_PATH) && python manage.py migrate --noinput && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
     volumes:
       # Bind mount al NVMe local del servidor
-      # Cada Hub tiene su carpeta: ${VOLUME_PATH}/hubs/${HUB_ID}/
-      - ${VOLUME_PATH}/hubs/${HUB_ID}:/app/data
+      # Monta la carpeta del Hub en el mismo path host=contenedor
+      # para que DATABASE_PATH funcione directamente
+      - ${VOLUME_PATH}/hubs/${HUB_ID}:${VOLUME_PATH}/hubs/${HUB_ID}
     environment:
       # Estas variables son inyectadas por Dokploy via .env
       - HUB_ID=${HUB_ID}
       - HUB_NAME=${HUB_NAME}
-      - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-config.settings.web}
-      - HUB_ENV=${HUB_ENV:-web}
-      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-web}
+      - DEPLOYMENT_MODE=web
+      - VOLUME_PATH=${VOLUME_PATH:-/data}
       - CLOUD_BASE_URL=${CLOUD_BASE_URL}
       - HUB_JWT=${HUB_JWT}
       - PARENT_DOMAIN=${PARENT_DOMAIN}
       - SERVER_DOMAIN=${SERVER_DOMAIN}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
       # Database configuration (SQLite for Starter, PostgreSQL for Business)
-      - DATABASE_PATH=${DATABASE_PATH:-/app/data/db/db.sqlite3}
+      - DATABASE_PATH=${DATABASE_PATH}
       - DATABASE_URL=${DATABASE_URL:-}
       # S3 configuration
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
