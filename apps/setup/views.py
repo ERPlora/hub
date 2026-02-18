@@ -70,11 +70,15 @@ STEP_LABELS = [_('Region'), _('Business'), _('Tax')]
 # =============================================================================
 
 def _get_completed_steps(hub_config, store_config):
-    """Determine which steps are completed based on DB state."""
+    """Determine which steps are completed based on DB state.
+
+    Step 1 (regional) is only marked complete when step 2 has user data,
+    because HubConfig always has default language/timezone values.
+    """
     completed = set()
-    if hub_config.language and hub_config.timezone:
+    has_business = store_config.business_name and store_config.business_address and store_config.vat_number
+    if has_business:
         completed.add(1)
-    if store_config.business_name and store_config.business_address and store_config.vat_number:
         completed.add(2)
     if store_config.is_configured:
         completed.add(3)
