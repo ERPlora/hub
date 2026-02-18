@@ -32,8 +32,6 @@ def scan_orphaned_data(request):
         return HttpResponse(html, status=401)
 
     try:
-        from config.paths import get_database_path, get_media_dir
-
         # Get active modules from filesystem
         modules_dir = Path(django_settings.MODULES_DIR)
         active_modules = set()
@@ -44,7 +42,7 @@ def scan_orphaned_data(request):
                     active_modules.add(module_dir.name)
 
         # Connect to database
-        db_path = get_database_path()
+        db_path = str(django_settings.DATABASES['default']['NAME'])
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
@@ -117,7 +115,7 @@ def scan_orphaned_data(request):
         conn.close()
 
         # Find orphaned media folders
-        media_dir = get_media_dir()
+        media_dir = Path(django_settings.MEDIA_ROOT)
         orphaned_media = []
 
         if media_dir.exists():
@@ -220,8 +218,6 @@ def clean_orphaned_data(request):
         return HttpResponse(html, status=401)
 
     try:
-        from config.paths import get_database_path, get_media_dir
-
         # Get active modules from filesystem
         modules_dir = Path(django_settings.MODULES_DIR)
         active_modules = set()
@@ -232,7 +228,7 @@ def clean_orphaned_data(request):
                     active_modules.add(module_dir.name)
 
         # Connect to database
-        db_path = get_database_path()
+        db_path = str(django_settings.DATABASES['default']['NAME'])
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
@@ -323,7 +319,7 @@ def clean_orphaned_data(request):
         conn.close()
 
         # Find and delete orphaned media folders
-        media_dir = get_media_dir()
+        media_dir = Path(django_settings.MEDIA_ROOT)
         orphaned_media = []
 
         if media_dir.exists():
