@@ -72,8 +72,7 @@ class BackupService:
 
     def _get_local_backups_dir(self) -> Path:
         """Get local backups directory."""
-        from config.paths import get_backups_dir
-        return get_backups_dir()
+        return Path(settings.BACKUPS_DIR)
 
     def _get_database_path(self) -> Optional[Path]:
         """
