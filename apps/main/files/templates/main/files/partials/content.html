@@ -5,19 +5,26 @@
     <!-- Top Row: Quick Action Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
 
-        <!-- Database Backup -->
-        <a href="{{ download_url }}" class="card glass hover:shadow-lg transition-shadow group">
-            <div class="card-body p-4 flex flex-row items-center gap-4">
-                <div class="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                    {% icon "server-outline" css_class="text-primary" size=28 %}
+        <!-- Database -->
+        <div class="card glass">
+            <div class="card-body p-4">
+                <div class="flex flex-row items-center gap-4 mb-3">
+                    <div class="w-11 h-11 rounded-xl bg-{{ db_color }}/10 flex items-center justify-center shrink-0">
+                        {% icon "server-outline" css_class="text-{{ db_color }}" size=28 %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-sm m-0">{{ db_size }} / {{ db_limit }}</p>
+                        <p class="text-xs text-base-content/50 m-0">{% trans "Database" %}</p>
+                    </div>
+                    <a href="{{ download_url }}" title="{% trans 'Download backup' %}">
+                        {% icon "cloud-download-outline" css_class="text-base-content/30 hover:text-primary transition-colors" %}
+                    </a>
                 </div>
-                <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-sm m-0">{% trans "Database" %}</p>
-                    <p class="text-xs text-base-content/50 m-0">{% trans "Download backup" %}</p>
+                <div class="w-full bg-base-200 rounded-full h-2">
+                    <div class="bg-{{ db_color }} h-2 rounded-full transition-all" style="width: {{ db_percent }}%"></div>
                 </div>
-                {% icon "cloud-download-outline" css_class="text-base-content/30 group-hover:text-primary transition-colors" %}
             </div>
-        </a>
+        </div>
 
         <!-- Storage Info (loaded via HTMX) -->
         <div class="card glass">

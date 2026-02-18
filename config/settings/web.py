@@ -21,7 +21,7 @@ Database Configuration:
 
 Storage structure (automatic via HUB_ID):
 
-  Docker Volume /app/data/:
+  NVMe local bind mount /app/data/:
     - db/db.sqlite3 - SQLite (Starter plan only)
 
   S3 hubs/{HUB_ID}/:
@@ -73,7 +73,7 @@ if DATABASE_URL:
     DATA_DIR = Path('/app/data')
 else:
     # Starter plan: SQLite (isolated database per Hub)
-    # Data directory - /app/data is mounted as Docker Volume
+    # Data directory - /app/data is mounted as NVMe local bind mount
     DATA_DIR = Path('/app/data')
 
     # Database (SQLite) - inside the Hub's data directory

@@ -388,8 +388,17 @@ def get_storage_info(request):
                     count += 1
         return count
 
-    # Get database size
+    # Get database size (recommended limit: 2 GB)
     db_size = paths.database_path.stat().st_size if paths.database_path.exists() else 0
+    db_limit = 2 * 1024 * 1024 * 1024  # 2 GB
+    db_percent = min(100, int((db_size / db_limit) * 100)) if db_limit else 0
+    # Color: green < 1 GB, yellow 1-1.7 GB, red > 1.7 GB
+    if db_size < 1 * 1024 * 1024 * 1024:
+        db_color = 'success'
+    elif db_size < 1.7 * 1024 * 1024 * 1024:
+        db_color = 'warning'
+    else:
+        db_color = 'error'
 
     # Get directory sizes
     storage_info = {
@@ -399,6 +408,9 @@ def get_storage_info(request):
             'size': format_file_size(db_size),
             'size_bytes': db_size,
             'files': 1 if paths.database_path.exists() else 0,
+            'limit': format_file_size(db_limit),
+            'percent': db_percent,
+            'color': db_color,
         },
         'media': {
             'name': 'Media Files',
