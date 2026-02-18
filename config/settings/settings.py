@@ -621,7 +621,7 @@ DJICONS = {
 # DEV TOOLS (only when DEBUG=True)
 # =============================================================================
 
-if DEBUG:
+if DEBUG and DEPLOYMENT_MODE == 'local':
     DEBUG_TOOLBAR_ENABLED = os.environ.get('DEBUG_TOOLBAR', 'false').lower() == 'true'
 
     if DEBUG_TOOLBAR_ENABLED:
