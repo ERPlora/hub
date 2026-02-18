@@ -405,6 +405,7 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button) {
 
         if (data.success) {
             Toast.success('{% trans "Module installed successfully!" %}');
+            markAsInstalled(button);
 
             if (data.requires_restart) {
                 showConfirm(
@@ -417,8 +418,6 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button) {
                     '{% trans "Restart" %}',
                     '{% trans "Later" %}'
                 );
-            } else {
-                setTimeout(() => window.location.reload(), 1500);
             }
         } else {
             Toast.error(data.error || '{% trans "Error installing module" %}');
@@ -427,6 +426,51 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button) {
         Toast.error('{% trans "Error downloading module" %}');
     } finally {
         if (button) setButtonLoading(button, false);
+    }
+}
+
+// Mark button and card as installed after successful install
+function markAsInstalled(button) {
+    if (!button) return;
+
+    // Update the clicked button to "Installed" disabled state
+    button.disabled = true;
+    button.className = 'btn btn-sm';
+    button.removeAttribute('data-action');
+    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="16" height="16" fill="currentColor"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg> {% trans "Installed" %}';
+
+    // Also update the module card if on marketplace grid
+    const card = button.closest('.module-card');
+    if (card) {
+        card.classList.add('module-card-installed');
+        // Add "Installed" chip to card meta
+        const meta = card.querySelector('.module-card-meta');
+        if (meta) {
+            const chip = document.createElement('span');
+            chip.className = 'chip chip-sm color-success';
+            chip.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="14" height="14" fill="currentColor"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg> {% trans "Installed" %}';
+            meta.prepend(chip);
+        }
+    }
+
+    // If on detail page, update the hero actions section
+    const detailActions = document.querySelector('.module-detail-actions');
+    if (detailActions) {
+        const actionBtn = detailActions.querySelector('button[data-action]');
+        if (actionBtn) {
+            actionBtn.disabled = true;
+            actionBtn.className = 'btn btn-lg';
+            actionBtn.removeAttribute('data-action');
+            actionBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="20" height="20" fill="currentColor"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg> <span>{% trans "Installed" %}</span>';
+        }
+        // Add installed badge
+        const badges = document.querySelector('.module-detail-info .d-flex.flex-wrap.gap-sm');
+        if (badges && !badges.querySelector('.color-success')) {
+            const chip = document.createElement('span');
+            chip.className = 'chip color-success';
+            chip.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="16" height="16" fill="currentColor"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg> {% trans "Installed" %}';
+            badges.prepend(chip);
+        }
     }
 }
 
