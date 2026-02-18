@@ -22,7 +22,7 @@
 #   HUB_ID            - UUID del Hub
 #   HUB_NAME          - Subdomain del Hub
 #   AWS_*             - S3 credentials
-#   DJANGO_SETTINGS_MODULE=config.settings.web
+#   DJANGO_SETTINGS_MODULE=config.settings
 # ==============================================================================
 
 FROM python:3.11-slim
@@ -51,7 +51,8 @@ RUN uv pip install --system --no-cache .
 # Collect static files during build (don't change between Hubs)
 # Use web settings with dummy values (only needed for settings import, not collectstatic)
 # Real values come from docker-compose.yaml at runtime
-ENV DJANGO_SETTINGS_MODULE=config.settings.web \
+ENV DJANGO_SETTINGS_MODULE=config.settings \
+    DEPLOYMENT_MODE=web \
     HUB_ID=00000000-0000-0000-0000-000000000000 \
     HUB_NAME=build \
     AWS_ACCESS_KEY_ID=dummy \
