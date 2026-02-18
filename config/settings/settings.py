@@ -91,7 +91,13 @@ def get_or_create_secret_key():
 
 
 SECRET_KEY = get_or_create_secret_key()
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '*'] if DEBUG else ['127.0.0.1', 'localhost']
+if DEPLOYMENT_MODE == 'web':
+    # Web: Traefik handles domain routing/security, allow all hosts
+    ALLOWED_HOSTS = ['*']
+elif DEBUG:
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '*']
+else:
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 # CSRF defaults (relaxed for local Hub — security via PIN codes)
 CSRF_COOKIE_SECURE = False
