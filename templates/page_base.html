@@ -26,12 +26,8 @@
             <button class="btn btn-ghost btn-sm"
                     aria-label="{% trans 'Toggle dark mode' %}"
                     @click="toggleTheme()">
-                <template x-if="isDark">
-                    {% icon "sunny-outline" %}
-                </template>
-                <template x-if="!isDark">
-                    {% icon "moon-outline" %}
-                </template>
+                <span x-show="isDark" x-cloak>{% icon "sunny-outline" %}</span>
+                <span x-show="!isDark">{% icon "moon-outline" %}</span>
             </button>
         </div>
     </div>
