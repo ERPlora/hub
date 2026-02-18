@@ -2,17 +2,18 @@
 # ERPlora Hub - Docker Compose for Dokploy
 # ==============================================================================
 # Dokploy usa este archivo para desplegar el Hub como Docker Compose.
-# Los volúmenes persisten entre deploys usando bind mounts al volumen Hetzner.
+# Los volúmenes persisten entre deploys usando bind mounts al NVMe local.
 #
 # Variables de entorno (inyectadas por Dokploy via .env):
 #   - HUB_ID: UUID del Hub
 #   - HUB_NAME: Nombre/subdomain del Hub
-#   - VOLUME_PATH: Ruta del volumen en el host (ej: /mnt/data-a)
+#   - VOLUME_PATH: Ruta local NVMe en el host (ej: /data)
 #   - AWS_*: Credenciales S3
 #   - Todas las demás env vars configuradas en Dokploy
 #
-# Volumen persistente (Hetzner Volume):
+# Volumen persistente (NVMe local del servidor):
 #   - ${VOLUME_PATH}/hubs/${HUB_ID}:/app/data → SQLite en /app/data/db/db.sqlite3
+#   - Cada DB SQLite tiene un límite recomendado de 2 GB
 #
 # Red:
 #   - dokploy-network: Red de Dokploy para Traefik
@@ -28,8 +29,8 @@ services:
     # Command inline - runs migrations and starts gunicorn
     command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && mkdir -p /app/data/db && python manage.py migrate --noinput && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
     volumes:
-      # Bind mount al volumen Hetzner del servidor
-      # Cada Hub tiene su carpeta en el volumen: ${VOLUME_PATH}/hubs/${HUB_ID}/
+      # Bind mount al NVMe local del servidor
+      # Cada Hub tiene su carpeta: ${VOLUME_PATH}/hubs/${HUB_ID}/
       - ${VOLUME_PATH}/hubs/${HUB_ID}:/app/data
     environment:
       # Estas variables son inyectadas por Dokploy via .env
@@ -77,5 +78,5 @@ networks:
   dokploy-network:
     external: true
 
-# No usamos volúmenes Docker nombrados - usamos bind mounts al volumen Hetzner
-# El path del volumen viene de VOLUME_PATH (configurado en el Server model)
+# No usamos volúmenes Docker nombrados - usamos bind mounts al NVMe local
+# El path viene de VOLUME_PATH (configurado en el Server model, ej: /data)
