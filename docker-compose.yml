@@ -12,8 +12,9 @@
 #   - Todas las demás env vars configuradas en Dokploy
 #
 # Volumen persistente (NVMe local del servidor):
-#   - ${VOLUME_PATH}/hubs/${HUB_ID}/ montado en el mismo path dentro del contenedor
-#   - DATABASE_PATH apunta directamente: /data/hubs/{hub_id}/db/db.sqlite3
+#   Host: ${VOLUME_PATH}/hubs/${HUB_ID}/  →  Container: /app/data/
+#   - /app/data/db/db.sqlite3  - SQLite database (PERSISTENT)
+#   - /app/data/modules/       - Installed modules
 #   - Cada DB SQLite tiene un límite recomendado de 2 GB
 #
 # Red:
@@ -27,26 +28,24 @@ services:
       dockerfile: Dockerfile
       network: host
     restart: unless-stopped
-    # Command inline - runs migrations and starts gunicorn
-    command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && mkdir -p $(dirname $DATABASE_PATH) && python manage.py migrate --noinput && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
+    # Command: create data dirs, run migrations, start gunicorn
+    command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && mkdir -p /app/data/db && python manage.py migrate --noinput && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
     volumes:
-      # Bind mount al NVMe local del servidor
-      # Monta la carpeta del Hub en el mismo path host=contenedor
-      # para que DATABASE_PATH funcione directamente
-      - ${VOLUME_PATH}/hubs/${HUB_ID}:${VOLUME_PATH}/hubs/${HUB_ID}
+      # Bind mount: host NVMe → fixed /app/data inside container
+      # Host path uses VOLUME_PATH + HUB_ID for per-hub isolation
+      # Container path is always /app/data (deterministic)
+      - ${VOLUME_PATH:-/data}/hubs/${HUB_ID}:/app/data
     environment:
       # Estas variables son inyectadas por Dokploy via .env
       - HUB_ID=${HUB_ID}
       - HUB_NAME=${HUB_NAME}
       - DEPLOYMENT_MODE=web
-      - VOLUME_PATH=${VOLUME_PATH:-/data}
       - CLOUD_BASE_URL=${CLOUD_BASE_URL}
       - HUB_JWT=${HUB_JWT}
       - PARENT_DOMAIN=${PARENT_DOMAIN}
       - SERVER_DOMAIN=${SERVER_DOMAIN}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
       # Database configuration (SQLite for Starter, PostgreSQL for Business)
-      - DATABASE_PATH=${DATABASE_PATH}
       - DATABASE_URL=${DATABASE_URL:-}
       # S3 configuration
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -55,14 +54,6 @@ services:
       - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL}
       - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME}
       - AWS_LOCATION=${AWS_LOCATION}
-    # Labels de Traefik comentados - Dokploy gestiona dominios via API domain.create
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.http.routers.hub-${HUB_NAME}.rule=Host(`${HUB_NAME}.${SERVER_DOMAIN}`)"
-    #   - "traefik.http.routers.hub-${HUB_NAME}.entrypoints=websecure"
-    #   - "traefik.http.routers.hub-${HUB_NAME}.tls=true"
-    #   - "traefik.http.routers.hub-${HUB_NAME}.tls.certresolver=letsencrypt"
-    #   - "traefik.http.services.hub-${HUB_NAME}.loadbalancer.server.port=8000"
     dns:
       - 8.8.8.8
       - 1.1.1.1
@@ -78,6 +69,3 @@ services:
 networks:
   dokploy-network:
     external: true
-
-# No usamos volúmenes Docker nombrados - usamos bind mounts al NVMe local
-# El path viene de VOLUME_PATH (configurado en el Server model, ej: /data)
