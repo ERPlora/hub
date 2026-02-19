@@ -312,6 +312,8 @@
 
 <!-- Module action handlers -->
 <script>
+if (!window._marketplaceDetailInit) {
+window._marketplaceDetailInit = true;
 document.addEventListener('click', function(e) {
     const button = e.target.closest('button[data-action]');
     if (!button) return;
@@ -486,6 +488,7 @@ function setButtonLoading(button, loading) {
         button.innerHTML = button.dataset.originalContent;
     }
 }
+} // end guard
 </script>
 
 <style>

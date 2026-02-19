@@ -305,6 +305,8 @@
 
 <!-- Module action handlers -->
 <script>
+if (!window._sysModuleDetailInit) {
+window._sysModuleDetailInit = true;
 document.addEventListener('click', function(e) {
     const button = e.target.closest('button[data-action], .btn[data-action]');
     if (!button) return;
@@ -424,6 +426,7 @@ function setButtonLoading(button, loading) {
         button.innerHTML = '<div class="loading"></div>';
     }
 }
+} // end guard
 </script>
 
 <style>
