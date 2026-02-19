@@ -222,6 +222,13 @@ def index(request):
             except TaxClass.DoesNotExist:
                 return toast_response('Tax class not found', 'error', status=404)
 
+        # Toggle bridge on/off (master switch)
+        if action == 'toggle_bridge':
+            hub_config.bridge_enabled = 'bridge_enabled' in request.POST
+            hub_config.save()
+            msg = 'Bridge enabled' if hub_config.bridge_enabled else 'Bridge disabled'
+            return toast_response(msg)
+
         # Handle bridge/hardware settings
         if action == 'update_bridge':
             try:

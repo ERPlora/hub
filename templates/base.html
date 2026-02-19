@@ -26,7 +26,14 @@
     <!-- ERPlora Hub Custom CSS (fonts + hub styles) -->
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
 
-    <!-- ERPlora Bridge (hardware: printers, cash drawer, barcode scanner) -->
+    <!-- ERPlora Bridge config (from HubConfig) + WebSocket client -->
+    <script>
+        window.ERPlora = window.ERPlora || {};
+        window.ERPlora.bridgeConfig = {
+            enabled: {{ HUB_CONFIG.bridge_enabled|yesno:"true,false" }},
+            port: {{ HUB_CONFIG.bridge_port }}
+        };
+    </script>
     <script src="{% static 'js/bridge.js' %}" defer></script>
 
     <!-- Alpine.js (CDN) -->
