@@ -616,17 +616,36 @@ class ModuleInstallView(APIView):
                 from apps.modules_runtime.loader import module_loader
                 module_loader.load_module(module_id)
 
-                if 'modules_pending_restart' not in request.session:
-                    request.session['modules_pending_restart'] = []
+                # Run migrations for the new module
+                try:
+                    from django.core.management import call_command
+                    call_command('migrate', '--run-syncdb')
+                except Exception:
+                    pass  # Non-fatal: migrations will run on next restart
 
-                if module_id not in request.session['modules_pending_restart']:
-                    request.session['modules_pending_restart'].append(module_id)
-                    request.session.modified = True
+                # Send success response, then restart server so URLs are registered
+                import signal
+                import threading
+
+                def _delayed_restart():
+                    """Kill Gunicorn master after response is sent. Docker restarts the container."""
+                    import time
+                    time.sleep(2)
+                    try:
+                        os.kill(1, signal.SIGINT)
+                    except Exception:
+                        try:
+                            os.kill(os.getppid(), signal.SIGTERM)
+                        except Exception:
+                            wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
+                            if wsgi_file.exists():
+                                wsgi_file.touch()
+
+                threading.Thread(target=_delayed_restart, daemon=True).start()
 
                 return Response({
                     'success': True,
-                    'message': f'Module {module_id} installed successfully',
-                    'requires_restart': True
+                    'message': f'Module {module_id} installed successfully. Server restarting...',
                 })
 
             finally:

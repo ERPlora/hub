@@ -53,17 +53,14 @@
         <p class="module-card-description">{{ module.description }}</p>
         {% endif %}
 
-        {# Rating stars — read-only, links to detail/reviews #}
-        <a class="module-card-rating no-underline"
-           {% if card_context == 'marketplace' %}
-           href="{% url 'marketplace:module_detail' module.slug %}"
-           hx-get="{% url 'marketplace:module_detail' module.slug %}"
-           {% else %}
-           href="{{ module.detail_url }}"
-           hx-get="{{ module.detail_url }}"
-           {% endif %}
-           hx-target="#main-content-area"
-           hx-push-url="true">
+        {# Rating stars — marketplace: click to review, installed: read-only #}
+        <div class="module-card-rating"
+             {% if card_context == 'marketplace' %}
+             style="cursor: pointer;"
+             data-module-id="{{ module.id }}"
+             data-module-name="{{ module.name }}"
+             onclick="event.stopPropagation(); if (typeof openReviewModal === 'function') openReviewModal(this);"
+             {% endif %}>
             <div class="module-card-stars">
                 {% for i in "12345" %}
                 <span class="module-card-star{% if module.rating and forloop.counter <= module.rating %} module-card-star-filled{% endif %}">
@@ -79,7 +76,7 @@
             {% if module.review_count %}
             <span class="module-card-rating-count">({{ module.review_count }})</span>
             {% endif %}
-        </a>
+        </div>
 
         {# Footer: Price + Actions #}
         <div class="module-card-footer">
@@ -120,14 +117,6 @@
                             data-module-name="{{ module.name }}">
                         {% icon "trash-outline" %}
                     </button>
-                    <a class="btn btn-sm btn-ghost"
-                       href="{{ module.detail_url }}"
-                       hx-get="{{ module.detail_url }}"
-                       hx-target="#main-content-area"
-                       hx-push-url="true"
-                       onclick="event.stopPropagation()">
-                        {% icon "chevron-forward-outline" %}
-                    </a>
 
                 {% elif card_context == 'marketplace' %}
                     {% if module.is_installed %}
@@ -161,14 +150,6 @@
                     </button>
                     {% endif %}
 
-                    <a class="btn btn-sm btn-ghost"
-                       href="{% url 'marketplace:module_detail' module.slug %}"
-                       hx-get="{% url 'marketplace:module_detail' module.slug %}"
-                       hx-target="#main-content-area"
-                       hx-push-url="true"
-                       onclick="event.stopPropagation()">
-                        {% icon "chevron-forward-outline" %}
-                    </a>
                 {% endif %}
             </div>
         </div>
