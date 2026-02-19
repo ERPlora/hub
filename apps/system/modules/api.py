@@ -323,9 +323,19 @@ class ModuleRestartView(APIView):
                 del request.session['modules_pending_restart']
                 request.session.modified = True
 
-            wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
-            if wsgi_file.exists():
-                wsgi_file.touch()
+            # Trigger server reload:
+            # 1. Gunicorn: SIGHUP to master → graceful worker reload
+            # 2. Fallback: touch wsgi.py (works with runserver --reload)
+            import signal
+            try:
+                gunicorn_pid = os.getppid()
+                os.kill(gunicorn_pid, signal.SIGHUP)
+                print(f"[RESTART] Sent SIGHUP to Gunicorn master (PID {gunicorn_pid})")
+            except (OSError, ProcessLookupError):
+                wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
+                if wsgi_file.exists():
+                    wsgi_file.touch()
+                print("[RESTART] Touched wsgi.py for dev server reload")
 
             return Response({
                 'success': True,

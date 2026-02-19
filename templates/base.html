@@ -526,6 +526,18 @@
             };
         })();
 
+        // Toast shortcuts & Dialog helpers (used by marketplace scripts)
+        window.Toast = {
+            success: function(msg, dur) { showToast(msg, 'success', dur); },
+            error: function(msg, dur) { showToast(msg, 'error', dur || 5000); },
+            warning: function(msg, dur) { showToast(msg, 'warning', dur); },
+            info: function(msg, dur) { showToast(msg, 'primary', dur); }
+        };
+        window.showConfirm = function(header, message, onConfirm) {
+            if (confirm(header + '\n\n' + message)) { if (onConfirm) onConfirm(); return true; }
+            return false;
+        };
+
         // Debug: log ALL HTMX requests and responses
         document.body.addEventListener('htmx:beforeRequest', function(e) {
             console.log('[Toast] HTMX request starting:', e.detail.elt.tagName, e.detail.path);
