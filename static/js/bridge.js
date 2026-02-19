@@ -197,6 +197,9 @@
                 // Could show a toast or log
                 console.log('[Bridge] Cash drawer opened');
 
+            } else if (event === 'keyboard_toggled') {
+                console.log('[Bridge] Keyboard toggled: visible=' + msg.visible);
+
             } else if (event === 'error') {
                 console.error('[Bridge] Error:', msg.message);
             }
@@ -368,6 +371,27 @@
                 }, 5000);
 
                 self._send({ action: 'get_status' });
+            });
+        },
+
+        /**
+         * Toggle the OS virtual keyboard via the bridge.
+         * @param {boolean} visible - true to show, false to hide
+         * @returns {Promise<void>}
+         */
+        toggleKeyboard: function (visible) {
+            var self = this;
+            return new Promise(function (resolve, reject) {
+                if (!self.connected) {
+                    reject(new Error('Bridge not connected'));
+                    return;
+                }
+                var sent = self._send({
+                    action: 'toggle_keyboard',
+                    visible: visible !== false
+                });
+                if (sent) resolve();
+                else reject(new Error('Send failed'));
             });
         },
 

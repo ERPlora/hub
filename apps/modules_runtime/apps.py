@@ -1,6 +1,6 @@
 from django.apps import AppConfig
-
-from config import settings
+from django.conf import settings
+from pathlib import Path
 
 
 class ModulesRuntimeConfig(AppConfig):
@@ -10,24 +10,30 @@ class ModulesRuntimeConfig(AppConfig):
     def ready(self):
         """
         Al arrancar Django:
-        - Escanea /modules y carga todos los activos (sin _ al inicio)
-        - Registra URLs de todos los módulos activos
+        - Modules already in INSTALLED_APPS (added by settings load_modules())
+        - Register URL patterns for each active module
         """
-        from .loader import module_loader
         from .router import register_module_urls
 
         try:
-            # 1) Cargar todos los módulos activos del filesystem
-            loaded_count = module_loader.load_all_active_modules()
-            print(f"[MODULES_RUNTIME] Loaded {loaded_count} active modules")
+            modules_dir = Path(settings.MODULES_DIR)
+            if not modules_dir.exists():
+                return
 
-            # 2) Registrar URLs de cada módulo cargado
-            for module_id, module_info in module_loader.loaded_modules.items():
-                # Registrar URLs del módulo
+            registered = 0
+            for module_dir in sorted(modules_dir.iterdir()):
+                if not module_dir.is_dir():
+                    continue
+                if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
+                    continue
+
+                module_id = module_dir.name
                 register_module_urls(module_id, module_id, f'/m/{module_id}/')
+                registered += 1
+
+            print(f"[MODULES_RUNTIME] Registered URLs for {registered} modules")
 
         except Exception as e:
-            print(f"[MODULES_RUNTIME] Error loading modules: {e}")
+            print(f"[MODULES_RUNTIME] Error registering module URLs: {e}")
             import traceback
             traceback.print_exc()
-            return

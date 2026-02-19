@@ -553,13 +553,6 @@ class ModuleInstallView(APIView):
 
         try:
             modules_dir = Path(django_settings.MODULES_DIR)
-            module_target_dir = modules_dir / module_slug
-
-            if module_target_dir.exists() or (modules_dir / f"_{module_slug}").exists():
-                return Response(
-                    {'success': False, 'error': 'Module already installed'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
 
             response = requests.get(download_url, timeout=60, stream=True)
             response.raise_for_status()
@@ -570,33 +563,47 @@ class ModuleInstallView(APIView):
                 tmp_path = tmp_file.name
 
             try:
-                with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
-                    namelist = zip_ref.namelist()
-                    root_folders = set(name.split('/')[0] for name in namelist if name.split('/')[0])
+                # Extract to temp directory first to discover MODULE_ID
+                with tempfile.TemporaryDirectory() as tmp_extract:
+                    tmp_extract_path = Path(tmp_extract)
 
-                    if len(root_folders) == 1:
-                        root_folder = list(root_folders)[0]
-                        zip_ref.extractall(modules_dir)
-                        extracted_dir = modules_dir / root_folder
-                        if extracted_dir != module_target_dir:
-                            extracted_dir.rename(module_target_dir)
+                    with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
+                        zip_ref.extractall(tmp_extract_path)
+
+                    # Find the extracted module root (may be nested in a folder)
+                    extracted_items = list(tmp_extract_path.iterdir())
+                    if len(extracted_items) == 1 and extracted_items[0].is_dir():
+                        extracted_root = extracted_items[0]
                     else:
-                        module_target_dir.mkdir(parents=True, exist_ok=True)
-                        zip_ref.extractall(module_target_dir)
+                        extracted_root = tmp_extract_path
+
+                    # Read MODULE_ID from module.py (preferred) or module.json
+                    module_id = self._get_module_id(extracted_root, module_slug)
+
+                    # Check if already installed
+                    module_target_dir = modules_dir / module_id
+                    if module_target_dir.exists() or (modules_dir / f"_{module_id}").exists():
+                        return Response(
+                            {'success': False, 'error': f'Module {module_id} already installed'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                    # Move to final location
+                    shutil.copytree(extracted_root, module_target_dir)
 
                 from apps.modules_runtime.loader import module_loader
-                module_loader.load_module(module_slug)
+                module_loader.load_module(module_id)
 
                 if 'modules_pending_restart' not in request.session:
                     request.session['modules_pending_restart'] = []
 
-                if module_slug not in request.session['modules_pending_restart']:
-                    request.session['modules_pending_restart'].append(module_slug)
+                if module_id not in request.session['modules_pending_restart']:
+                    request.session['modules_pending_restart'].append(module_id)
                     request.session.modified = True
 
                 return Response({
                     'success': True,
-                    'message': f'Module {module_slug} installed successfully',
+                    'message': f'Module {module_id} installed successfully',
                     'requires_restart': True
                 })
 
@@ -619,6 +626,37 @@ class ModuleInstallView(APIView):
                 {'success': False, 'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @staticmethod
+    def _get_module_id(extracted_root: Path, fallback: str) -> str:
+        """Read MODULE_ID from module.py or module.json, falling back to slug."""
+        # Try module.py first
+        module_py_path = extracted_root / 'module.py'
+        if module_py_path.exists():
+            try:
+                content = module_py_path.read_text(encoding='utf-8')
+                for line in content.splitlines():
+                    line = line.strip()
+                    if line.startswith('MODULE_ID'):
+                        # Parse: MODULE_ID = 'inventory' or MODULE_ID = "inventory"
+                        value = line.split('=', 1)[1].strip().strip("'\"")
+                        if value:
+                            return value
+            except Exception:
+                pass
+
+        # Try module.json
+        module_json_path = extracted_root / 'module.json'
+        if module_json_path.exists():
+            try:
+                data = json.loads(module_json_path.read_text(encoding='utf-8'))
+                module_id = data.get('id', '')
+                if module_id:
+                    return module_id
+            except Exception:
+                pass
+
+        return fallback
 
 
 # =============================================================================

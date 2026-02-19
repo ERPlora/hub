@@ -485,31 +485,42 @@ DJICONS = {
 # AUTO-LOAD MODULES (common logic)
 # =============================================================================
 
-def load_modules():
-    """Load active modules from MODULES_DIR into INSTALLED_APPS"""
-    import json
+def load_modules(modules_dir=None):
+    """Load active modules from modules_dir into INSTALLED_APPS.
 
-    if not MODULES_DIR.exists():
+    Args:
+        modules_dir: Path to modules directory. Uses MODULES_DIR if not provided.
+    """
+    target_dir = Path(modules_dir) if modules_dir else MODULES_DIR
+
+    if not target_dir.exists():
         return
 
-    for module_dir in MODULES_DIR.iterdir():
+    for module_dir in target_dir.iterdir():
         if not module_dir.is_dir():
             continue
         # Skip disabled modules (start with _ or .)
         if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
             continue
 
-        INSTALLED_APPS.append(module_dir.name)
-        print(f"[SETTINGS] Auto-loaded module: {module_dir.name}")
+        if module_dir.name not in INSTALLED_APPS:
+            INSTALLED_APPS.append(module_dir.name)
+            print(f"[SETTINGS] Auto-loaded module: {module_dir.name}")
 
 
-def load_module_templates():
-    """Add module template directories to Django"""
+def load_module_templates(modules_dir=None):
+    """Add module template directories to Django.
+
+    Args:
+        modules_dir: Path to modules directory. Uses MODULES_DIR if not provided.
+    """
+    target_dir = Path(modules_dir) if modules_dir else MODULES_DIR
+
     # Start with the existing global templates directory
     template_dirs = list(TEMPLATES[0]['DIRS'])
 
-    if MODULES_DIR.exists():
-        for module_dir in MODULES_DIR.iterdir():
+    if target_dir.exists():
+        for module_dir in target_dir.iterdir():
             if module_dir.is_dir() and (module_dir / 'templates').exists():
                 template_dirs.append(module_dir / 'templates')
 

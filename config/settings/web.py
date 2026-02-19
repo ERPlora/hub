@@ -283,9 +283,10 @@ import sys
 if MODULES_DIR.exists() and str(MODULES_DIR) not in sys.path:
     sys.path.insert(0, str(MODULES_DIR))
 
-# Load modules and their templates
-load_modules()
-load_module_templates()
+# Load modules and their templates (pass MODULES_DIR explicitly since
+# base.py's global points to /app/modules/, not /app/data/modules/)
+load_modules(MODULES_DIR)
+load_module_templates(MODULES_DIR)
 
 # =============================================================================
 # STARTUP INFO

@@ -493,6 +493,41 @@
                     </div>
                 </div>
             </form>
+
+            {# Virtual keyboard (only when bridge connected) #}
+            <template x-if="$store.bridge.connected">
+                <div>
+                    <div class="list-header">{% trans "Virtual Keyboard" %}</div>
+                    <div class="list list-inset">
+                        <div class="list-item">
+                            <div class="list-item-content">
+                                <span class="list-item-label">{% trans "On-screen keyboard" %}</span>
+                                <span class="list-item-note">{% trans "Open or close the OS virtual keyboard for touchscreen use" %}</span>
+                            </div>
+                            <div class="list-item-end flex gap-2">
+                                <button type="button"
+                                        class="btn btn-sm color-primary"
+                                        @click="
+                                            ERPlora.bridge.toggleKeyboard(true)
+                                                .catch(e => $dispatch('toast', {message: e.message, type: 'error'}))
+                                        ">
+                                    {% icon "keypad-outline" %}
+                                    {% trans "Show" %}
+                                </button>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline"
+                                        @click="
+                                            ERPlora.bridge.toggleKeyboard(false)
+                                                .catch(e => $dispatch('toast', {message: e.message, type: 'error'}))
+                                        ">
+                                    {% icon "close-outline" %}
+                                    {% trans "Hide" %}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </div>
     </section>
 
