@@ -53,13 +53,12 @@ HUB_ID = config('HUB_ID')  # Required - UUID del Hub
 HUB_NAME = config('HUB_NAME', default='hub')
 
 # =============================================================================
-# DATA PATHS — NVMe local bind mount
+# DATA PATHS — Fixed container path, bind-mounted from host NVMe
 # =============================================================================
-# Docker mounts: ${VOLUME_PATH}/hubs/${HUB_ID} → same path in container
-# So DATA_DIR = /data/hubs/{uuid}/
+# docker-compose mounts: ${VOLUME_PATH}/hubs/${HUB_ID} → /app/data
+# Inside the container we always use /app/data (deterministic, no env dependency)
 
-VOLUME_PATH = config('VOLUME_PATH', default='/data')
-DATA_DIR = Path(VOLUME_PATH) / 'hubs' / HUB_ID
+DATA_DIR = Path('/app/data')
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
@@ -67,7 +66,6 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # =============================================================================
 
 DATABASE_URL = config('DATABASE_URL', default='')
-DATABASE_PATH = config('DATABASE_PATH', default='')
 
 if DATABASE_URL:
     import dj_database_url
@@ -75,14 +73,10 @@ if DATABASE_URL:
         'default': dj_database_url.parse(DATABASE_URL)
     }
 else:
-    if DATABASE_PATH:
-        db_path = Path(DATABASE_PATH)
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        DATABASES['default']['NAME'] = db_path
-    else:
-        DATABASE_DIR = DATA_DIR / 'db'
-        DATABASE_DIR.mkdir(parents=True, exist_ok=True)
-        DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
+    # SQLite: always at /app/data/db/db.sqlite3 (bind-mounted, persistent)
+    DATABASE_DIR = DATA_DIR / 'db'
+    DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+    DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
 
 # Modules - uses base.py config (MODULES_DIR from DataPaths or env var)
 # In Docker: /app/modules/ by default, can be overridden via MODULES_DIR env var
