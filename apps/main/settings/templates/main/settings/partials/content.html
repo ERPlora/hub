@@ -288,20 +288,47 @@
     </section>
 
     {# ── Hardware & Printers ── #}
-    <section class="card" x-data="{ discovering: false }">
+    <section class="card" x-data="{
+        discovering: false,
+        enabled: {{ hub_config.bridge_enabled|yesno:'true,false' }}
+    }">
         <div class="card-header">
             <div class="flex items-center gap-3">
-                <span class="text-xl opacity-60">{% icon "print-outline" %}</span>
+                <span class="text-xl opacity-60">{% icon "hardware-chip-outline" %}</span>
                 <div class="flex-1">
-                    <h2 class="card-title">{% trans "Hardware & Printers" %}</h2>
-                    <p class="text-sm opacity-60 mt-0.5">{% trans "Manage printers, cash drawer, and barcode scanner via ERPlora Bridge" %}</p>
+                    <h2 class="card-title">{% trans "Native Bridge" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Connect to ERPlora Bridge for printers, cash drawer, and scanner" %}</p>
                 </div>
-                <span x-show="$store.bridge.connected" class="badge color-success">{% trans "Bridge Connected" %}</span>
-                <span x-show="!$store.bridge.connected" class="badge color-warning">{% trans "Bridge Offline" %}</span>
+                {# Status badge — only when enabled #}
+                <span x-show="enabled && $store.bridge.connected" x-cloak class="badge color-success">{% trans "Connected" %}</span>
+                <span x-show="enabled && !$store.bridge.connected" x-cloak class="badge color-warning">{% trans "Connecting..." %}</span>
+                {# Master toggle #}
+                <form hx-post="{% url 'main:settings' %}" hx-swap="none">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_bridge">
+                    <label class="toggle">
+                        <input type="checkbox"
+                               name="bridge_enabled"
+                               value="true"
+                               x-model="enabled"
+                               @change="
+                                   if (enabled) {
+                                       window.ERPlora.bridge.init();
+                                   } else {
+                                       window.ERPlora.bridge.disconnect();
+                                   }
+                                   htmx.trigger($el.closest('form'), 'submit');
+                               "
+                               {% if hub_config.bridge_enabled %}checked{% endif %}>
+                        <span class="toggle-track">
+                            <span class="toggle-thumb"></span>
+                        </span>
+                    </label>
+                </form>
             </div>
         </div>
-        <div class="card-body">
-            {# Bridge status info #}
+        <div class="card-body" x-show="enabled" x-transition x-cloak>
+            {# Bridge not detected info #}
             <div x-show="!$store.bridge.connected" class="callout callout-info mb-4">
                 <span class="callout-icon">{% icon "information-circle-outline" %}</span>
                 <div class="callout-content">
@@ -310,99 +337,100 @@
                 </div>
             </div>
 
-            {# Configured printers #}
-            <div id="printers-list" class="mb-4">
-                {% include "main/settings/partials/printers_list.html" %}
-            </div>
-
-            {# Discover printers button #}
-            <div class="flex gap-2 mb-4" x-show="$store.bridge.connected">
-                <button type="button"
-                        class="btn btn-outline"
-                        :disabled="discovering"
-                        @click="
-                            discovering = true;
-                            ERPlora.bridge.discoverPrinters()
-                                .then(printers => {
-                                    $store.bridge.printers = printers;
-                                    discovering = false;
-                                    if (printers.length === 0) {
-                                        $store.ui.toast('No printers found', 'warning');
-                                    } else {
-                                        $store.ui.success(printers.length + ' printer(s) found');
-                                    }
-                                })
-                                .catch(e => {
-                                    discovering = false;
-                                    $store.ui.error('Discovery failed: ' + e.message);
-                                })
-                        ">
-                    <template x-if="discovering">
-                        <span class="loading loading-sm mr-2"></span>
-                    </template>
-                    {% icon "search-outline" %}
-                    {% trans "Discover Printers" %}
-                </button>
-            </div>
-
-            {# Discovered printers (not yet saved) #}
-            <template x-if="$store.bridge.printers.length > 0">
-                <div class="mb-4">
-                    <div class="list-header">{% trans "Discovered Printers" %}</div>
-                    <div class="list list-inset">
-                        <template x-for="printer in $store.bridge.printers" :key="printer.id">
-                            <div class="list-item">
-                                <div class="list-item-start">
-                                    <template x-if="printer.type === 'usb'">{% icon "print-outline" %}</template>
-                                    <template x-if="printer.type === 'network'">{% icon "wifi-outline" %}</template>
-                                    <template x-if="printer.type === 'bluetooth'">{% icon "bluetooth-outline" %}</template>
-                                </div>
-                                <div class="list-item-content">
-                                    <span class="list-item-label" x-text="printer.name"></span>
-                                    <span class="list-item-note">
-                                        <span x-text="printer.type"></span> &middot;
-                                        <span x-text="printer.id" class="font-mono text-xs"></span>
-                                    </span>
-                                </div>
-                                <div class="list-item-end flex gap-2">
-                                    <button type="button"
-                                            class="btn btn-sm btn-ghost"
-                                            @click="
-                                                ERPlora.bridge.testPrint(printer.id)
-                                                    .then(() => $store.ui.success('Test print OK'))
-                                                    .catch(e => $store.ui.error('Test failed: ' + e.message))
-                                            ">
-                                        {% icon "print-outline" %}
-                                    </button>
-                                    <form hx-post="{% url 'main:settings' %}"
-                                          hx-target="#printers-list"
-                                          hx-swap="innerHTML"
-                                          @submit.prevent="
-                                              let form = $el;
-                                              form.querySelector('[name=bridge_printer_id]').value = printer.id;
-                                              form.querySelector('[name=printer_name]').value = printer.name;
-                                              form.querySelector('[name=printer_type]').value = printer.type;
-                                              form.querySelector('[name=paper_width]').value = printer.paper_width || 80;
-                                              htmx.trigger(form, 'submit');
-                                          ">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="save_printer">
-                                        <input type="hidden" name="bridge_printer_id" value="">
-                                        <input type="hidden" name="printer_name" value="">
-                                        <input type="hidden" name="printer_type" value="">
-                                        <input type="hidden" name="paper_width" value="80">
-                                        <input type="hidden" name="is_active" value="true">
-                                        <button type="submit" class="btn btn-sm color-primary">
-                                            {% icon "add-outline" %}
-                                            {% trans "Add" %}
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
+            {# ── Devices ── #}
+            <div x-show="$store.bridge.connected">
+                <div class="list-header flex items-center justify-between">
+                    <span>{% trans "Devices" %}</span>
+                    <button type="button"
+                            class="btn btn-sm btn-outline"
+                            :disabled="discovering"
+                            @click="
+                                discovering = true;
+                                ERPlora.bridge.discoverPrinters()
+                                    .then(printers => {
+                                        $store.bridge.printers = printers;
+                                        discovering = false;
+                                        if (printers.length === 0) {
+                                            $store.ui.toast('{% trans "No devices found" %}', 'warning');
+                                        } else {
+                                            $store.ui.success(printers.length + ' {% trans "device(s) found" %}');
+                                        }
+                                    })
+                                    .catch(e => {
+                                        discovering = false;
+                                        $store.ui.error('{% trans "Discovery failed" %}: ' + e.message);
+                                    })
+                            ">
+                        <span x-show="discovering" class="loading loading-sm mr-1"></span>
+                        {% icon "search-outline" %}
+                        {% trans "Discover" %}
+                    </button>
                 </div>
-            </template>
+
+                {# Configured printers #}
+                <div id="printers-list" class="mb-4">
+                    {% include "main/settings/partials/printers_list.html" %}
+                </div>
+
+                {# Discovered printers (not yet saved) #}
+                <template x-if="$store.bridge.printers.length > 0">
+                    <div class="mb-4">
+                        <div class="list-header">{% trans "Discovered" %}</div>
+                        <div class="list list-inset">
+                            <template x-for="printer in $store.bridge.printers" :key="printer.id">
+                                <div class="list-item">
+                                    <div class="list-item-start">
+                                        <template x-if="printer.type === 'usb'">{% icon "print-outline" %}</template>
+                                        <template x-if="printer.type === 'network'">{% icon "wifi-outline" %}</template>
+                                        <template x-if="printer.type === 'bluetooth'">{% icon "bluetooth-outline" %}</template>
+                                    </div>
+                                    <div class="list-item-content">
+                                        <span class="list-item-label" x-text="printer.name"></span>
+                                        <span class="list-item-note">
+                                            <span x-text="printer.type"></span> &middot;
+                                            <span x-text="printer.id" class="font-mono text-xs"></span>
+                                        </span>
+                                    </div>
+                                    <div class="list-item-end flex gap-2">
+                                        <button type="button"
+                                                class="btn btn-sm btn-ghost"
+                                                @click="
+                                                    ERPlora.bridge.testPrint(printer.id)
+                                                        .then(() => $store.ui.success('Test print OK'))
+                                                        .catch(e => $store.ui.error('Test failed: ' + e.message))
+                                                ">
+                                            {% icon "print-outline" %}
+                                        </button>
+                                        <form hx-post="{% url 'main:settings' %}"
+                                              hx-target="#printers-list"
+                                              hx-swap="innerHTML"
+                                              @submit.prevent="
+                                                  let form = $el;
+                                                  form.querySelector('[name=bridge_printer_id]').value = printer.id;
+                                                  form.querySelector('[name=printer_name]').value = printer.name;
+                                                  form.querySelector('[name=printer_type]').value = printer.type;
+                                                  form.querySelector('[name=paper_width]').value = printer.paper_width || 80;
+                                                  htmx.trigger(form, 'submit');
+                                              ">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="save_printer">
+                                            <input type="hidden" name="bridge_printer_id" value="">
+                                            <input type="hidden" name="printer_name" value="">
+                                            <input type="hidden" name="printer_type" value="">
+                                            <input type="hidden" name="paper_width" value="80">
+                                            <input type="hidden" name="is_active" value="true">
+                                            <button type="submit" class="btn btn-sm color-primary">
+                                                {% icon "add-outline" %}
+                                                {% trans "Add" %}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
 
             {# Bridge settings #}
             <div class="list-header">{% trans "Bridge Settings" %}</div>

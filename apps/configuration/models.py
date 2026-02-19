@@ -247,6 +247,10 @@ class HubConfig(SingletonConfigMixin, models.Model):
     auto_print = models.BooleanField(default=False)
 
     # Hardware Bridge
+    bridge_enabled = models.BooleanField(
+        default=False,
+        help_text='Master switch: enable/disable native bridge connection'
+    )
     bridge_port = models.IntegerField(
         default=12321,
         help_text='WebSocket port for the native hardware bridge'
