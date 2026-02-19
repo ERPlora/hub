@@ -5,7 +5,13 @@
         {# Header: Icon + Name/Meta + Badges #}
         <div class="module-card-header">
             <div class="module-card-icon module-card-icon-soft">
-                {% module_icon module_id=module.module_id icon=module.icon|default:"cube-outline" size="text-xl" %}
+                {% if card_context == 'marketplace' and module.icon %}
+                    <img src="{{ module.icon }}" alt="{{ module.name }}">
+                {% elif card_context == 'marketplace' %}
+                    {% icon module.display_icon|default:"cube-outline" %}
+                {% else %}
+                    {% module_icon module_id=module.module_id icon=module.icon|default:"cube-outline" size="text-xl" %}
+                {% endif %}
             </div>
 
             <div class="module-card-info">
@@ -53,14 +59,13 @@
         <p class="module-card-description">{{ module.description }}</p>
         {% endif %}
 
-        {# Rating stars — marketplace: click to review, installed: read-only #}
+        {# Rating stars — marketplace only, click to review #}
+        {% if card_context == 'marketplace' %}
         <div class="module-card-rating"
-             {% if card_context == 'marketplace' %}
              style="cursor: pointer;"
              data-module-id="{{ module.id }}"
              data-module-name="{{ module.name }}"
-             onclick="event.stopPropagation(); if (typeof openReviewModal === 'function') openReviewModal(this);"
-             {% endif %}>
+             onclick="event.stopPropagation(); if (typeof openReviewModal === 'function') openReviewModal(this);">
             <div class="module-card-stars">
                 {% for i in "12345" %}
                 <span class="module-card-star{% if module.rating and forloop.counter <= module.rating %} module-card-star-filled{% endif %}">
@@ -77,6 +82,7 @@
             <span class="module-card-rating-count">({{ module.review_count }})</span>
             {% endif %}
         </div>
+        {% endif %}
 
         {# Footer: Price + Actions #}
         <div class="module-card-footer">
@@ -92,7 +98,7 @@
             </div>
             {% endif %}
 
-            <div class="module-card-actions">
+            <div class="module-card-actions{% if card_context == 'installed' %} flex-1{% endif %}">
                 {% if card_context == 'installed' %}
                     {% if module.is_active %}
                     <button class="btn btn-sm btn-soft color-warning flex-1"
