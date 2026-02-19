@@ -533,9 +533,34 @@
             warning: function(msg, dur) { showToast(msg, 'warning', dur); },
             info: function(msg, dur) { showToast(msg, 'primary', dur); }
         };
-        window.showConfirm = function(header, message, onConfirm) {
-            if (confirm(header + '\n\n' + message)) { if (onConfirm) onConfirm(); return true; }
-            return false;
+        window.showConfirm = function(header, message, onConfirm, confirmLabel, cancelLabel) {
+            var backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop';
+            backdrop.setAttribute('data-state', 'open');
+            backdrop.innerHTML =
+                '<div class="modal modal-sm">' +
+                    '<div class="modal-header">' +
+                        '<h3 class="modal-title">' + header + '</h3>' +
+                    '</div>' +
+                    '<div class="modal-body"><p>' + message + '</p></div>' +
+                    '<div class="modal-footer">' +
+                        '<button class="btn btn-outline" data-action="cancel">' + (cancelLabel || '{% trans "Cancel" %}') + '</button>' +
+                        '<button class="btn color-primary" data-action="confirm">' + (confirmLabel || '{% trans "Confirm" %}') + '</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(backdrop);
+            function close() {
+                backdrop.setAttribute('data-state', 'closed');
+                setTimeout(function() { backdrop.remove(); }, 300);
+            }
+            backdrop.querySelector('[data-action="cancel"]').addEventListener('click', close);
+            backdrop.querySelector('[data-action="confirm"]').addEventListener('click', function() {
+                close();
+                if (onConfirm) onConfirm();
+            });
+            backdrop.addEventListener('click', function(e) {
+                if (e.target === backdrop) close();
+            });
         };
 
         // Debug: log ALL HTMX requests and responses

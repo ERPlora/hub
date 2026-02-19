@@ -25,90 +25,52 @@
 </div>
 
 <script>
-(function() {
-    // Handle module deactivate
+if (!window._moduleActionsInitialized) {
+    window._moduleActionsInitialized = true;
+
+    function _moduleModalConfirm(btn, action) {
+        var url = btn.dataset.url;
+        var moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
+        var isDelete = action === 'delete';
+
+        var title = isDelete ? '{% trans "Delete Module" %}' : '{% trans "Deactivate Module" %}';
+        var body = isDelete
+            ? '<p>{% trans "This will permanently delete" %} <strong>' + moduleName + '</strong> {% trans "and all its data." %}</p><p class="text-sm opacity-60 mt-2">{% trans "This action cannot be undone." %}</p>'
+            : '<p>{% trans "Are you sure you want to deactivate" %} <strong>' + moduleName + '</strong>?</p>';
+        var confirmLabel = isDelete ? '{% trans "Delete" %}' : '{% trans "Deactivate" %}';
+        var confirmColor = isDelete ? 'color-error' : 'color-warning';
+
+        var backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        backdrop.setAttribute('data-state', 'open');
+        backdrop.innerHTML =
+            '<div class="modal modal-sm">' +
+                '<div class="modal-header"><h3 class="modal-title">' + title + '</h3></div>' +
+                '<div class="modal-body">' + body + '</div>' +
+                '<div class="modal-footer">' +
+                    '<button class="btn btn-outline" data-role="cancel">{% trans "Cancel" %}</button>' +
+                    '<button class="btn ' + confirmColor + '" data-role="confirm">' + confirmLabel + '</button>' +
+                '</div>' +
+            '</div>';
+
+        function close() {
+            backdrop.setAttribute('data-state', 'closed');
+            setTimeout(function() { backdrop.remove(); }, 300);
+        }
+        backdrop.querySelector('[data-role="cancel"]').addEventListener('click', close);
+        backdrop.addEventListener('click', function(e) { if (e.target === backdrop) close(); });
+        backdrop.querySelector('[data-role="confirm"]').addEventListener('click', function() {
+            close();
+            htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
+        });
+        document.body.appendChild(backdrop);
+    }
+
     document.body.addEventListener('click', function(e) {
         var btn = e.target.closest('[data-action="module-deactivate"]');
-        if (!btn) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        var url = btn.dataset.url;
-        var moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
-
-        var backdrop = document.createElement('div');
-        backdrop.className = 'modal-backdrop';
-        backdrop.setAttribute('data-state', 'open');
-        backdrop.innerHTML =
-            '<div class="modal modal-sm">' +
-                '<div class="modal-header">' +
-                    '<h3 class="modal-title">{% trans "Deactivate Module" %}</h3>' +
-                '</div>' +
-                '<div class="modal-body">' +
-                    '<p>{% trans "Are you sure you want to deactivate" %} <strong>' + moduleName + '</strong>?</p>' +
-                '</div>' +
-                '<div class="modal-footer">' +
-                    '<button class="btn btn-outline" data-role="cancel">{% trans "Cancel" %}</button>' +
-                    '<button class="btn color-warning" data-role="confirm">{% trans "Deactivate" %}</button>' +
-                '</div>' +
-            '</div>';
-
-        backdrop.querySelector('[data-role="cancel"]').addEventListener('click', function() {
-            backdrop.setAttribute('data-state', 'closed');
-            setTimeout(function() { backdrop.remove(); }, 300);
-        });
-
-        backdrop.querySelector('[data-role="confirm"]').addEventListener('click', function() {
-            backdrop.setAttribute('data-state', 'closed');
-            setTimeout(function() { backdrop.remove(); }, 300);
-            htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
-        });
-
-        document.body.appendChild(backdrop);
+        if (btn) { e.preventDefault(); e.stopPropagation(); _moduleModalConfirm(btn, 'deactivate'); return; }
+        btn = e.target.closest('[data-action="module-delete"]');
+        if (btn) { e.preventDefault(); e.stopPropagation(); _moduleModalConfirm(btn, 'delete'); }
     });
-
-    // Handle module delete
-    document.body.addEventListener('click', function(e) {
-        var btn = e.target.closest('[data-action="module-delete"]');
-        if (!btn) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        var url = btn.dataset.url;
-        var moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
-
-        var backdrop = document.createElement('div');
-        backdrop.className = 'modal-backdrop';
-        backdrop.setAttribute('data-state', 'open');
-        backdrop.innerHTML =
-            '<div class="modal modal-sm">' +
-                '<div class="modal-header">' +
-                    '<h3 class="modal-title">{% trans "Delete Module" %}</h3>' +
-                '</div>' +
-                '<div class="modal-body">' +
-                    '<p>{% trans "This will permanently delete" %} <strong>' + moduleName + '</strong> {% trans "and all its data." %}</p>' +
-                    '<p class="text-sm opacity-60 mt-2">{% trans "This action cannot be undone." %}</p>' +
-                '</div>' +
-                '<div class="modal-footer">' +
-                    '<button class="btn btn-outline" data-role="cancel">{% trans "Cancel" %}</button>' +
-                    '<button class="btn color-error" data-role="confirm">{% trans "Delete" %}</button>' +
-                '</div>' +
-            '</div>';
-
-        backdrop.querySelector('[data-role="cancel"]').addEventListener('click', function() {
-            backdrop.setAttribute('data-state', 'closed');
-            setTimeout(function() { backdrop.remove(); }, 300);
-        });
-
-        backdrop.querySelector('[data-role="confirm"]').addEventListener('click', function() {
-            backdrop.setAttribute('data-state', 'closed');
-            setTimeout(function() { backdrop.remove(); }, 300);
-            htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
-        });
-
-        document.body.appendChild(backdrop);
-    });
-})();
+}
 </script>

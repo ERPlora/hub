@@ -31,6 +31,8 @@
 
 <!-- Module action handlers -->
 <script>
+if (!window._marketplaceGridInit) {
+window._marketplaceGridInit = true;
 // Handle action button clicks
 document.addEventListener('click', function(e) {
     var button = e.target.closest('button[data-action]');
@@ -154,4 +156,5 @@ function setButtonLoading(button, loading) {
         button.innerHTML = button.dataset.originalContent;
     }
 }
+} // end guard
 </script>
