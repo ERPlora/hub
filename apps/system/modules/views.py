@@ -902,31 +902,42 @@ def rate_module(request):
     """Submit a module review (rating + optional comment) to Cloud API"""
     try:
         data = json.loads(request.body)
-        module_slug = data.get('module_slug')
+        module_id = data.get('module_id')
         rating = data.get('rating')
         comment = data.get('comment', '')
 
-        if not module_slug or not rating:
-            return JsonResponse({'success': False, 'error': 'Missing module_slug or rating'}, status=400)
+        if not module_id or not rating:
+            return JsonResponse({'success': False, 'error': 'Missing module_id or rating'}, status=400)
 
-        # Forward to Cloud API
         from apps.configuration.models import HubConfig
         hub_config = HubConfig.get_solo()
         auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
-        if auth_token:
-            cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
-            try:
-                requests.post(
-                    f"{cloud_api_url}/api/marketplace/modules/{module_slug}/review/",
-                    json={'rating': rating, 'comment': comment},
-                    headers={'X-Hub-Token': auth_token, 'Content-Type': 'application/json'},
-                    timeout=10
-                )
-            except requests.exceptions.RequestException:
-                pass  # Silently fail if cloud is unreachable
+        if not auth_token:
+            return JsonResponse({'success': False, 'error': 'Hub not connected to Cloud'}, status=401)
 
-        return JsonResponse({'success': True, 'message': 'Review submitted'})
+        cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+        response = requests.post(
+            f"{cloud_api_url}/api/marketplace/modules/{module_id}/review/",
+            json={'rating': rating, 'comment': comment},
+            headers={'X-Hub-Token': auth_token, 'Content-Type': 'application/json'},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            return JsonResponse({
+                'success': True,
+                'message': 'Review submitted',
+                'rating': result.get('rating'),
+                'review_count': result.get('review_count'),
+            })
+        else:
+            error = response.json().get('error', f'Cloud returned {response.status_code}')
+            return JsonResponse({'success': False, 'error': error}, status=response.status_code)
+
+    except requests.exceptions.RequestException:
+        return JsonResponse({'success': False, 'error': 'Could not reach Cloud'}, status=503)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
