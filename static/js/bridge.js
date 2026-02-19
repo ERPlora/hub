@@ -19,14 +19,17 @@
 (function () {
     'use strict';
 
-    var BRIDGE_PORT = 12321;
+    window.ERPlora = window.ERPlora || {};
+
+    // Read config injected by base.html (from HubConfig)
+    var cfg = (window.ERPlora && window.ERPlora.bridgeConfig) || {};
+    var BRIDGE_PORT = cfg.port || 12321;
+    var BRIDGE_ENABLED = cfg.enabled !== undefined ? cfg.enabled : false;
     var BRIDGE_URL = 'ws://127.0.0.1:' + BRIDGE_PORT + '/ws';
     var STATUS_URL = 'http://127.0.0.1:' + BRIDGE_PORT + '/status';
     var DETECT_TIMEOUT = 500;       // ms to wait for health check
     var RECONNECT_DELAY = 5000;     // ms between reconnect attempts
     var MAX_RECONNECT_DELAY = 30000;
-
-    window.ERPlora = window.ERPlora || {};
 
     // Pending print promises: jobId -> {resolve, reject}
     var pendingJobs = {};
@@ -369,6 +372,31 @@
         },
 
         /**
+         * Send an OS-level notification via the bridge.
+         * @param {string} title - Notification title
+         * @param {string} body - Notification body text
+         * @param {object} options - Optional: {icon, sound, urgency}
+         * @returns {Promise<void>}
+         */
+        sendNotification: function (title, body, options) {
+            var self = this;
+            return new Promise(function (resolve, reject) {
+                if (!self.connected) {
+                    reject(new Error('Bridge not connected'));
+                    return;
+                }
+                var sent = self._send({
+                    action: 'send_notification',
+                    title: title,
+                    body: body || '',
+                    options: options || {}
+                });
+                if (sent) resolve();
+                else reject(new Error('Send failed'));
+            });
+        },
+
+        /**
          * Disconnect from bridge.
          */
         disconnect: function () {
@@ -430,11 +458,13 @@
         }));
     });
 
-    // ─── Auto-init on DOM ready ─────────────────────────────────────────
+    // ─── Auto-init on DOM ready (only if bridge is enabled) ─────────────
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () { bridge.init(); });
-    } else {
-        bridge.init();
+    if (BRIDGE_ENABLED) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () { bridge.init(); });
+        } else {
+            bridge.init();
+        }
     }
 })();
