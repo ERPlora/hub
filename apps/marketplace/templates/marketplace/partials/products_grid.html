@@ -119,22 +119,8 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button) {
         const data = await response.json();
 
         if (data.success) {
-            Toast.success('{% trans "Module installed successfully!" %}');
-
-            if (data.requires_restart) {
-                showConfirm(
-                    '{% trans "Restart Required" %}',
-                    '{% trans "The server needs to restart to complete module setup. Restart now?" %}',
-                    () => {
-                        fetch('{% url "mymodules:api_restart" %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
-                            .then(() => setTimeout(() => window.location.reload(), 2000));
-                    },
-                    '{% trans "Restart" %}',
-                    '{% trans "Later" %}'
-                );
-            } else {
-                setTimeout(() => window.location.reload(), 1500);
-            }
+            Toast.success('{% trans "Module installed! Reloading..." %}');
+            setTimeout(() => window.location.reload(), 5000);
         } else {
             Toast.error(data.error || '{% trans "Error installing module" %}');
         }
