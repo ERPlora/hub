@@ -334,12 +334,18 @@ class ModuleRestartView(APIView):
                 import time
                 time.sleep(1.5)
                 try:
-                    os.kill(os.getppid(), signal.SIGTERM)
+                    # SIGINT to PID 1 (Gunicorn master in Docker) = fast shutdown
+                    # Docker restart policy will relaunch the container
+                    os.kill(1, signal.SIGINT)
                 except Exception:
-                    # Fallback for dev server
-                    wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
-                    if wsgi_file.exists():
-                        wsgi_file.touch()
+                    try:
+                        # Non-Docker: kill parent process
+                        os.kill(os.getppid(), signal.SIGTERM)
+                    except Exception:
+                        # Fallback for dev server
+                        wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
+                        if wsgi_file.exists():
+                            wsgi_file.touch()
 
             threading.Thread(target=_delayed_restart, daemon=True).start()
 
