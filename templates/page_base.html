@@ -23,12 +23,6 @@
         <div class="header-end">
             <span class="loading loading-sm htmx-indicator"></span>
             {% block page_actions %}{% endblock %}
-            <button class="btn btn-ghost btn-sm"
-                    aria-label="{% trans 'Toggle dark mode' %}"
-                    @click="toggleTheme()">
-                <span x-show="isDark" x-cloak>{% icon "sunny-outline" %}</span>
-                <span x-show="!isDark">{% icon "moon-outline" %}</span>
-            </button>
         </div>
     </div>
     {% endblock %}
