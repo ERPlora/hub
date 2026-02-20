@@ -63,6 +63,7 @@ def role_list(request):
     status_filter = request.GET.get('status', '')
     type_filter = request.GET.get('type', '')
     page_number = request.GET.get('page', 1)
+    current_view = request.GET.get('view', 'table')
     per_page = int(request.GET.get('per_page', 10))
     if per_page not in PER_PAGE_CHOICES:
         per_page = 10
@@ -131,6 +132,7 @@ def role_list(request):
         'sort_dir': sort_dir,
         'status_filter': status_filter,
         'type_filter': type_filter,
+        'current_view': current_view,
         'per_page': per_page,
     }
 

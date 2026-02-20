@@ -343,14 +343,17 @@ def filters_view(request, store_type):
     return HttpResponse(html)
 
 
-# Products list with infinite scroll
+MARKETPLACE_PER_PAGE_CHOICES = [12, 24, 48, 96]
+
+
+# Products list with DataTable pagination
 
 @login_required
 def products_list(request, store_type):
     """
-    HTMX endpoint: Fetch and render products with infinite scroll support.
-    Returns HTML partial with product cards.
-    Supports filters: q (search), category, industry, type, cursor
+    HTMX endpoint: Fetch and render products with DataTable pagination.
+    Returns HTML partial with product cards or table rows.
+    Supports filters: q (search), category, industry, type, page, sort, dir, view
     """
     from apps.configuration.models import HubConfig
 
@@ -359,15 +362,20 @@ def products_list(request, store_type):
     category_filter = request.GET.get('category', '').strip()
     industry_filter = request.GET.get('industry', '').strip()
     type_filter = request.GET.get('type', '').strip()
-    cursor = request.GET.get('cursor', '')
-    page_size = 12
+    sort_field = request.GET.get('sort', 'name')
+    sort_dir = request.GET.get('dir', 'asc')
+    current_view = request.GET.get('view', 'cards')
+    per_page = int(request.GET.get('per_page', 12))
+    if per_page not in MARKETPLACE_PER_PAGE_CHOICES:
+        per_page = 12
+    page_number = request.GET.get('page', 1)
 
     config = get_store_config(store_type)
 
     if store_type == 'modules':
-        return _fetch_modules_list(request, search_query, category_filter, industry_filter, type_filter, cursor, page_size)
+        return _fetch_modules_list(request, search_query, category_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number)
     elif store_type == 'hubs':
-        return _fetch_hubs_list(request, search_query, cursor, page_size)
+        return _fetch_hubs_list(request, search_query, '', 12)
     else:
         # Coming soon stores
         html = render_to_string('marketplace/partials/coming_soon.html', {
@@ -377,8 +385,9 @@ def products_list(request, store_type):
         return HttpResponse(html)
 
 
-def _fetch_modules_list(request, search_query, category_filter, industry_filter, type_filter, cursor, page_size):
-    """Fetch modules from Cloud API"""
+def _fetch_modules_list(request, search_query, category_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
+    """Fetch modules from Cloud API with DataTable pagination"""
+    from django.core.paginator import Paginator
     from apps.configuration.models import HubConfig
 
     # Get installed modules
@@ -442,22 +451,31 @@ def _fetch_modules_list(request, search_query, category_filter, industry_filter,
             module['is_installed'] = module.get('slug', '') in installed_module_ids
             module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
 
-        # Simple cursor-based pagination (using index)
-        start_index = int(cursor) if cursor.isdigit() else 0
-        end_index = start_index + page_size
-        page_modules = modules[start_index:end_index]
-        has_more = end_index < len(modules)
-        next_cursor = str(end_index) if has_more else ''
+        # Sort
+        sort_key_map = {
+            'name': lambda m: m.get('name', '').lower(),
+            'price': lambda m: float(m.get('price', 0)),
+            'rating': lambda m: float(m.get('rating', 0)),
+        }
+        sort_fn = sort_key_map.get(sort_field, sort_key_map['name'])
+        modules.sort(key=sort_fn, reverse=(sort_dir == 'desc'))
+
+        # Page-based pagination
+        paginator = Paginator(modules, per_page)
+        page_obj = paginator.get_page(page_number)
 
         html = render_to_string('marketplace/partials/products_grid.html', {
-            'products': page_modules,
+            'products': page_obj,
+            'page_obj': page_obj,
             'store_type': 'modules',
-            'has_more': has_more,
-            'next_cursor': next_cursor,
             'search_query': search_query,
             'category_filter': category_filter,
             'industry_filter': industry_filter,
             'type_filter': type_filter,
+            'sort_field': sort_field,
+            'sort_dir': sort_dir,
+            'current_view': current_view,
+            'per_page': per_page,
         }, request=request)
 
         return HttpResponse(html)

@@ -2,6 +2,55 @@
 
 {% if roles %}
 
+{% if current_view == 'cards' %}
+<!-- Card View -->
+<div class="datatable-body">
+    <div class="employee-grid p-4">
+        {% for role in roles %}
+        <a class="employee-card glass employee-card-clickable"
+           href="{% url 'main:roles:detail' role_id=role.id %}"
+           hx-get="{% url 'main:roles:detail' role_id=role.id %}"
+           hx-target="#main-content-area"
+           hx-push-url="true">
+            <div class="employee-card-avatar employee-card-avatar-{% if role.name == 'admin' %}primary{% elif role.name == 'manager' %}warning{% elif role.name == 'cashier' %}success{% elif role.name == 'accountant' %}info{% else %}primary{% endif %}">
+                {% if role.name == 'admin' %}
+                    {% icon "shield-checkmark-outline" %}
+                {% elif role.name == 'manager' %}
+                    {% icon "briefcase-outline" %}
+                {% elif role.name == 'cashier' %}
+                    {% icon "card-outline" %}
+                {% elif role.name == 'accountant' %}
+                    {% icon "calculator-outline" %}
+                {% elif role.name == 'warehouse' %}
+                    {% icon "cube-outline" %}
+                {% else %}
+                    {% icon "person-outline" %}
+                {% endif %}
+            </div>
+            <div class="employee-card-info">
+                <h3 class="employee-card-name">{{ role.display_name }}</h3>
+                <span class="employee-card-title">{{ role.description|default:"-"|truncatewords:8 }}</span>
+            </div>
+            <div class="employee-card-actions" @click.stop>
+                {% if role.is_system %}
+                <span class="badge badge-ghost badge-sm">{% trans "System" %}</span>
+                {% else %}
+                <span class="badge badge-ghost badge-sm">{% trans "Custom" %}</span>
+                {% endif %}
+                <span class="badge badge-sm">{{ role.user_count }} {% trans "users" %}</span>
+                {% if role.is_active %}
+                <span class="badge badge-sm color-success">{% trans "Active" %}</span>
+                {% else %}
+                <span class="badge badge-sm color-warning">{% trans "Inactive" %}</span>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+{% else %}
+<!-- Table View (default) -->
 <div class="datatable-body">
     <table class="datatable-table">
         <thead class="datatable-thead">
@@ -120,6 +169,7 @@
         </tbody>
     </table>
 </div>
+{% endif %}
 
 <!-- Footer / Pagination -->
 <div class="datatable-footer">

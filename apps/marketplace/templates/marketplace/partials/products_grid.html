@@ -1,31 +1,221 @@
 {% load i18n djicons %}
 
 {% if products %}
-<div class="module-grid module-grid-3">
-    {% for product in products %}
-    {% include "system/modules/partials/module_card.html" with module=product card_context='marketplace' %}
-    {% endfor %}
+
+{% if current_view == 'table' %}
+<!-- Table View -->
+<div class="datatable-body">
+    <table class="datatable-table">
+        <thead class="datatable-thead">
+            <tr>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'name' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'marketplace:products_list' %}?sort=name&dir={% if sort_field == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#marketplace-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Module" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th" data-col="author">{% trans "Author" %}</th>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'price' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    data-col="price"
+                    hx-get="{% url 'marketplace:products_list' %}?sort=price&dir={% if sort_field == 'price' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#marketplace-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Price" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th datatable-th-sortable datatable-th-center{% if sort_field == 'rating' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    data-col="rating"
+                    hx-get="{% url 'marketplace:products_list' %}?sort=rating&dir={% if sort_field == 'rating' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#marketplace-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Rating" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th datatable-th-center" data-col="status">{% trans "Status" %}</th>
+                <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody class="datatable-tbody">
+            {% for product in products %}
+            <tr class="datatable-tr">
+                <td class="datatable-td" data-label="{% trans 'Module' %}">
+                    <div class="flex items-center gap-3">
+                        {% if product.icon %}
+                        <div class="flex items-center justify-center size-9 rounded-lg bg-base-200 shrink-0">
+                            <img src="{{ product.icon }}" alt="{{ product.name }}" class="size-6">
+                        </div>
+                        {% else %}
+                        <div class="flex items-center justify-center size-9 rounded-lg bg-base-200 shrink-0">
+                            {% icon product.display_icon|default:"cube-outline" %}
+                        </div>
+                        {% endif %}
+                        <div class="min-w-0">
+                            <a href="{{ product.detail_url }}"
+                               hx-get="{{ product.detail_url }}"
+                               hx-target="#main-content-area"
+                               hx-push-url="true"
+                               class="font-medium block hover:text-primary transition-colors">
+                                {{ product.name }}
+                            </a>
+                            {% if product.description %}
+                            <span class="text-xs text-base-content/50 block truncate max-w-xs">{{ product.description }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="datatable-td" data-col="author" data-label="{% trans 'Author' %}">
+                    <span class="text-base-content/60">{{ product.author|default:"-" }}</span>
+                </td>
+                <td class="datatable-td" data-col="price" data-label="{% trans 'Price' %}">
+                    {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
+                    <span class="badge badge-sm color-success">{% trans "Free" %}</span>
+                    {% elif product.module_type == 'subscription' %}
+                    <span class="text-sm font-medium">&euro;{{ product.price }}<span class="text-xs text-base-content/50">/{% trans "mo" %}</span></span>
+                    {% elif product.price %}
+                    <span class="text-sm font-medium">&euro;{{ product.price }}</span>
+                    {% else %}
+                    <span class="text-base-content/40">-</span>
+                    {% endif %}
+                </td>
+                <td class="datatable-td datatable-td-center" data-col="rating" data-label="{% trans 'Rating' %}">
+                    {% if product.rating %}
+                    <div class="flex items-center justify-center gap-1">
+                        {% icon "star" css_class="text-warning" %}
+                        <span class="text-sm">{{ product.rating|floatformat:1 }}</span>
+                        {% if product.review_count %}
+                        <span class="text-xs text-base-content/40">({{ product.review_count }})</span>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span class="text-base-content/40">-</span>
+                    {% endif %}
+                </td>
+                <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}">
+                    {% if product.is_installed %}
+                    <span class="badge badge-sm color-success">{% trans "Installed" %}</span>
+                    {% elif product.is_owned %}
+                    <span class="badge badge-sm color-info">{% trans "Owned" %}</span>
+                    {% else %}
+                    <span class="badge badge-sm badge-ghost">{% trans "Available" %}</span>
+                    {% endif %}
+                </td>
+                <td class="datatable-td datatable-td-actions">
+                    <div class="datatable-row-actions">
+                        {% if product.is_installed %}
+                        <button class="btn btn-sm btn-ghost" disabled title="{% trans 'Installed' %}">
+                            {% icon "checkmark-circle-outline" %}
+                        </button>
+                        {% elif product.is_owned %}
+                        <button class="btn btn-sm btn-ghost color-success"
+                                data-action="download"
+                                data-module-slug="{{ product.slug }}"
+                                data-download-url="{{ product.download_url }}"
+                                title="{% trans 'Install' %}">
+                            {% icon "download-outline" %}
+                        </button>
+                        {% elif product.is_free or product.module_type == 'free' or product.price == 0 %}
+                        <button class="btn btn-sm btn-ghost color-primary"
+                                data-action="install-free"
+                                data-module-id="{{ product.id }}"
+                                data-module-slug="{{ product.slug }}"
+                                data-download-url="{{ product.download_url|default:'' }}"
+                                title="{% trans 'Get Free' %}">
+                            {% icon "download-outline" %}
+                        </button>
+                        {% else %}
+                        <button class="btn btn-sm btn-ghost color-primary"
+                                data-action="purchase"
+                                data-module-id="{{ product.id }}"
+                                title="{% trans 'Purchase' %}">
+                            {% icon "cart-outline" %}
+                        </button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
-{% if has_more %}
-<!-- Infinite Scroll Trigger -->
-<div id="infinite-scroll-trigger"
-     hx-get="{% url 'marketplace:products_list' store_type %}?cursor={{ next_cursor }}{% if search_query %}&q={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if industry_filter %}&industry={{ industry_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}"
-     hx-trigger="intersect once threshold:0.1"
-     hx-swap="outerHTML"
-     class="flex justify-center py-8">
-    <div class="loading"></div>
+{% else %}
+<!-- Card View (default) -->
+<div class="datatable-body">
+    <div class="module-grid module-grid-3 p-4">
+        {% for product in products %}
+        {% include "system/modules/partials/module_card.html" with module=product card_context='marketplace' %}
+        {% endfor %}
+    </div>
 </div>
 {% endif %}
 
+<!-- Footer / Pagination -->
+<div class="datatable-footer">
+    <div class="datatable-per-page">
+        {% trans "Show" %}
+        <select name="per_page"
+                hx-get="{% url 'marketplace:products_list' %}"
+                hx-target="#datatable-body"
+                hx-include="#marketplace-datatable"
+                hx-trigger="change">
+            <option value="12" {% if per_page == 12 %}selected{% endif %}>12</option>
+            <option value="24" {% if per_page == 24 %}selected{% endif %}>24</option>
+            <option value="48" {% if per_page == 48 %}selected{% endif %}>48</option>
+            <option value="96" {% if per_page == 96 %}selected{% endif %}>96</option>
+        </select>
+        {% trans "per page" %}
+    </div>
+    <span class="datatable-info">
+        {% if page_obj.paginator.count > 0 %}
+        {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }} modules{% endblocktrans %}
+        {% endif %}
+    </span>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="pagination pagination-sm">
+        <button class="pagination-btn pagination-prev"
+                {% if page_obj.has_previous %}
+                hx-get="{% url 'marketplace:products_list' %}?page={{ page_obj.previous_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#marketplace-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-back-outline" %}
+        </button>
+        {% for num in page_obj.paginator.page_range %}
+        <button class="pagination-btn{% if num == page_obj.number %} pagination-active{% endif %}"
+                hx-get="{% url 'marketplace:products_list' %}?page={{ num }}"
+                hx-target="#datatable-body"
+                hx-include="#marketplace-datatable">
+            {{ num }}
+        </button>
+        {% endfor %}
+        <button class="pagination-btn pagination-next"
+                {% if page_obj.has_next %}
+                hx-get="{% url 'marketplace:products_list' %}?page={{ page_obj.next_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#marketplace-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-forward-outline" %}
+        </button>
+    </nav>
+    {% endif %}
+</div>
+
 {% else %}
-<!-- No Results -->
-<div class="flex flex-col items-center text-center py-12">
-    <div class="text-4xl mb-4 opacity-40">
+<!-- Empty State -->
+<div class="datatable-empty">
+    <div class="datatable-empty-icon">
         {% icon "search-outline" %}
     </div>
-    <h3 class="text-lg font-semibold mb-2">{% trans "No products found" %}</h3>
-    <p class="text-sm opacity-60">{% trans "Try adjusting your search or filters" %}</p>
+    <div class="datatable-empty-title">
+        {% trans "No modules found" %}
+    </div>
+    <div class="datatable-empty-text">
+        {% trans "Try adjusting your search or filters" %}
+    </div>
 </div>
 {% endif %}
 
@@ -33,7 +223,6 @@
 <script>
 if (!window._marketplaceGridInit) {
 window._marketplaceGridInit = true;
-// Handle action button clicks
 document.addEventListener('click', function(e) {
     var button = e.target.closest('button[data-action]');
     if (!button) return;
@@ -51,7 +240,6 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Install free module
 async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
     setButtonLoading(button, true);
     try {
@@ -80,7 +268,6 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
     }
 }
 
-// Purchase paid module
 async function purchaseModule(moduleId, button) {
     setButtonLoading(button, true);
     try {
@@ -107,7 +294,6 @@ async function purchaseModule(moduleId, button) {
     }
 }
 
-// Download and install module
 async function downloadAndInstall(moduleSlug, downloadUrl, button) {
     if (button) setButtonLoading(button, true);
     try {
@@ -131,7 +317,6 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button) {
     }
 }
 
-// Button loading state helper
 function setButtonLoading(button, loading) {
     if (!button) return;
     button.disabled = loading;
@@ -143,7 +328,6 @@ function setButtonLoading(button, loading) {
     }
 }
 
-// Review modal
 var _reviewApiUrl = '{% url "mymodules:api_rate" %}';
 var _reviewCsrf = '{{ csrf_token }}';
 var _starSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" width="28" height="28"><path d="M394 480a16 16 0 01-9.39-3L256 383.76 127.39 477a16 16 0 01-24.55-18.08L153 310.35 23 221.2a16 16 0 019-29.2h160.38l48.4-148.95a16 16 0 0130.44 0l48.4 149H480a16 16 0 019.05 29.2L359 310.35l50.13 148.53A16 16 0 01394 480z"/></svg>';
@@ -167,7 +351,7 @@ window.openReviewModal = function(trigger) {
                 '<h3 class="modal-title">{% trans "Rate" %} ' + moduleName + '</h3>' +
             '</div>' +
             '<div class="modal-body">' +
-                '<div class="flex justify-center gap-xs mb-md" id="review-stars">' + starsHtml + '</div>' +
+                '<div class="flex justify-center gap-1 mb-4" id="review-stars">' + starsHtml + '</div>' +
                 '<textarea class="textarea w-full" id="review-comment" rows="3" placeholder="{% trans "Write a comment (optional)..." %}"></textarea>' +
             '</div>' +
             '<div class="modal-footer">' +
@@ -222,25 +406,6 @@ window.openReviewModal = function(trigger) {
             var data = await res.json();
             if (data.success) {
                 Toast.success('{% trans "Review submitted!" %}');
-                // Update card stars
-                var cardStars = trigger.querySelectorAll('.module-card-star');
-                if (cardStars.length) {
-                    var newRating = data.rating || selectedRating;
-                    cardStars.forEach(function(s, idx) {
-                        if (idx < Math.round(newRating)) s.classList.add('module-card-star-filled');
-                        else s.classList.remove('module-card-star-filled');
-                    });
-                    var ratingVal = trigger.querySelector('.module-card-rating-value');
-                    if (ratingVal) ratingVal.textContent = parseFloat(newRating).toFixed(1);
-                    else if (newRating > 0) {
-                        var span = document.createElement('span');
-                        span.className = 'module-card-rating-value';
-                        span.textContent = parseFloat(newRating).toFixed(1);
-                        trigger.appendChild(span);
-                    }
-                    var countEl = trigger.querySelector('.module-card-rating-count');
-                    if (countEl && data.review_count) countEl.textContent = '(' + data.review_count + ')';
-                }
                 close();
             } else {
                 Toast.error(data.error || '{% trans "Error submitting review" %}');
