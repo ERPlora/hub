@@ -1,6 +1,7 @@
 {% load i18n djicons %}
 
 <div x-data="{
+    view: '{{ current_view|default:'table' }}',
     selectedIds: [],
     selectAll: false,
     toggleSelect(id) {
@@ -89,6 +90,32 @@
                         </button>
                     </div>
                 </details>
+
+                <!-- View Toggle -->
+                <div class="datatable-view-toggle">
+                    <button type="button"
+                            class="datatable-view-btn"
+                            :class="{ 'datatable-view-btn-active': view === 'table' }"
+                            @click="view = 'table'"
+                            hx-get="{% url 'main:roles:list' %}"
+                            hx-target="#datatable-body"
+                            hx-include="#roles-datatable"
+                            hx-vals='{"view": "table"}'
+                            title="{% trans 'Table view' %}">
+                        {% icon "list-outline" %}
+                    </button>
+                    <button type="button"
+                            class="datatable-view-btn"
+                            :class="{ 'datatable-view-btn-active': view === 'cards' }"
+                            @click="view = 'cards'"
+                            hx-get="{% url 'main:roles:list' %}"
+                            hx-target="#datatable-body"
+                            hx-include="#roles-datatable"
+                            hx-vals='{"view": "cards"}'
+                            title="{% trans 'Card view' %}">
+                        {% icon "grid-outline" %}
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -137,6 +164,7 @@
         <!-- Hidden state inputs -->
         <input type="hidden" name="sort" value="{{ sort_field|default:'name' }}">
         <input type="hidden" name="dir" value="{{ sort_dir|default:'asc' }}">
+        <input type="hidden" name="view" :value="view">
         <input type="hidden" name="per_page" value="{{ per_page|default:'10' }}">
 
         <!-- Datatable Body (HTMX swap target) -->

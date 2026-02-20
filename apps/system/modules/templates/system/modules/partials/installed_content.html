@@ -1,27 +1,126 @@
 {% load i18n djicons %}
 
-<!-- Search -->
-<form id="modules-search-form"
-      hx-get="{% url 'mymodules:index' %}"
-      hx-target="#modules-list"
-      hx-swap="innerHTML"
-      hx-trigger="submit, input from:#modules-search delay:300ms">
-    <div class="mb-4">
-        <label class="input rounded-full">
-            <svg xmlns="http://www.w3.org/2000/svg" class="ionicon icon opacity-50" viewBox="0 0 512 512" width="20" height="20" aria-hidden="true"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"></path><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32" d="M338.29 338.29L448 448"></path></svg>
-            <input type="search"
-                   class="grow"
-                   id="modules-search"
-                   name="q"
-                   placeholder="{% trans 'Search modules...' %}"
-                   value="{{ request.GET.q|default:'' }}">
-        </label>
-    </div>
-</form>
+<div x-data="{
+    view: '{{ current_view|default:'table' }}',
+    columnsModal: false,
+    cols: { author: true, version: true, status: true },
+    toggleCol(col) {
+        this.cols[col] = !this.cols[col];
+        document.querySelectorAll('[data-col=' + col + ']').forEach(el => el.classList.toggle('hidden', !this.cols[col]));
+    }
+}">
 
-<!-- Modules List -->
-<div id="modules-list">
-    {% include "system/modules/partials/modules_list.html" %}
+    <div class="datatable glass mt-5" id="modules-datatable">
+
+        <!-- Toolbar -->
+        <div class="datatable-toolbar">
+            <div class="datatable-toolbar-start">
+                <label class="input input-sm datatable-search">
+                    {% icon "search-outline" %}
+                    <input type="search"
+                           name="q"
+                           placeholder="{% trans 'Search modules...' %}"
+                           value="{{ search_query|default:'' }}"
+                           autocomplete="off"
+                           hx-get="{% url 'mymodules:index' %}"
+                           hx-target="#datatable-body"
+                           hx-include="#modules-datatable"
+                           hx-trigger="input changed delay:300ms, search">
+                </label>
+                <select name="status"
+                        class="select select-sm"
+                        hx-get="{% url 'mymodules:index' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#modules-datatable"
+                        hx-trigger="change">
+                    <option value="">{% trans "All Status" %}</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>{% trans "Active" %}</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>{% trans "Inactive" %}</option>
+                </select>
+            </div>
+            <div class="datatable-toolbar-end">
+                <!-- Column Visibility -->
+                <button class="datatable-column-btn" @click="columnsModal = true" title="{% trans 'Columns' %}">
+                    {% icon "options-outline" %}
+                </button>
+
+                <!-- View Toggle -->
+                <div class="datatable-view-toggle">
+                    <button type="button"
+                            class="datatable-view-btn"
+                            :class="{ 'datatable-view-btn-active': view === 'table' }"
+                            @click="view = 'table'"
+                            hx-get="{% url 'mymodules:index' %}"
+                            hx-target="#datatable-body"
+                            hx-include="#modules-datatable"
+                            hx-vals='{"view": "table"}'
+                            title="{% trans 'Table view' %}">
+                        {% icon "list-outline" %}
+                    </button>
+                    <button type="button"
+                            class="datatable-view-btn"
+                            :class="{ 'datatable-view-btn-active': view === 'cards' }"
+                            @click="view = 'cards'"
+                            hx-get="{% url 'mymodules:index' %}"
+                            hx-target="#datatable-body"
+                            hx-include="#modules-datatable"
+                            hx-vals='{"view": "cards"}'
+                            title="{% trans 'Card view' %}">
+                        {% icon "grid-outline" %}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {% csrf_token %}
+
+        <!-- Hidden state inputs -->
+        <input type="hidden" name="sort" value="{{ sort_field|default:'name' }}">
+        <input type="hidden" name="dir" value="{{ sort_dir|default:'asc' }}">
+        <input type="hidden" name="view" :value="view">
+        <input type="hidden" name="per_page" value="{{ per_page|default:'10' }}">
+
+        <!-- Datatable Body (HTMX swap target) -->
+        <div id="datatable-body">
+            {% include "system/modules/partials/modules_list.html" %}
+        </div>
+    </div>
+
+    <!-- Columns Modal -->
+    <div class="modal-backdrop" :data-state="columnsModal ? 'open' : 'closed'" @click.self="columnsModal = false">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Show / Hide Columns" %}</h3>
+                <button class="modal-close" @click="columnsModal = false">
+                    {% icon "close-outline" %}
+                </button>
+            </div>
+            <div class="modal-body">
+                <label class="flex items-center gap-3 py-2 cursor-not-allowed opacity-50">
+                    <input type="checkbox" class="checkbox checkbox-sm" checked disabled>
+                    <span class="text-sm">{% trans "Module" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('author')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.author" readonly>
+                    <span class="text-sm">{% trans "Author" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('version')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.version" readonly>
+                    <span class="text-sm">{% trans "Version" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('status')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.status" readonly>
+                    <span class="text-sm">{% trans "Status" %}</span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-sm color-primary" @click="columnsModal = false">
+                    {% trans "Done" %}
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>

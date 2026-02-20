@@ -1,31 +1,193 @@
-{% load i18n djicons %}
+{% load i18n djicons module_icons %}
 
 {% if modules %}
-<div class="module-grid module-grid-3">
-    {% for module in modules %}
-    {% include "system/modules/partials/module_card.html" with module=module card_context='installed' %}
-    {% endfor %}
+
+{% if current_view == 'cards' %}
+<!-- Card View -->
+<div class="datatable-body">
+    <div class="module-grid module-grid-3 p-4">
+        {% for module in modules %}
+        {% include "system/modules/partials/module_card.html" with module=module card_context='installed' %}
+        {% endfor %}
+    </div>
 </div>
+
 {% else %}
-    {% if search_query %}
-    <div class="flex flex-col items-center justify-center py-16 text-center">
-        {% icon "search-outline" css_class="text-4xl opacity-40 mb-4" %}
-        <h3 class="font-semibold mb-1">{% trans "No modules found" %}</h3>
-        <p class="text-sm opacity-60">{% trans "Try a different search term" %}</p>
+<!-- Table View (default) -->
+<div class="datatable-body">
+    <table class="datatable-table">
+        <thead class="datatable-thead">
+            <tr>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'name' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'mymodules:index' %}?sort=name&dir={% if sort_field == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#modules-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Module" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th" data-col="author">{% trans "Author" %}</th>
+                <th class="datatable-th" data-col="version">{% trans "Version" %}</th>
+                <th class="datatable-th datatable-th-sortable datatable-th-center{% if sort_field == 'status' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    data-col="status"
+                    hx-get="{% url 'mymodules:index' %}?sort=status&dir={% if sort_field == 'status' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#modules-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Status" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody class="datatable-tbody">
+            {% for module in modules %}
+            <tr class="datatable-tr">
+                <td class="datatable-td" data-label="{% trans 'Module' %}">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center justify-center size-9 rounded-lg bg-base-200 shrink-0">
+                            {% module_icon module_id=module.module_id icon=module.icon|default:"cube-outline" size="text-xl" %}
+                        </div>
+                        <div class="min-w-0">
+                            <span class="font-medium block">{{ module.name }}</span>
+                            {% if module.description %}
+                            <span class="text-xs text-base-content/50 block truncate max-w-xs">{{ module.description }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="datatable-td" data-col="author" data-label="{% trans 'Author' %}">
+                    <span class="text-base-content/60">{{ module.author|default:"-" }}</span>
+                </td>
+                <td class="datatable-td" data-col="version" data-label="{% trans 'Version' %}">
+                    <span class="badge badge-ghost badge-sm">v{{ module.version }}</span>
+                </td>
+                <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}">
+                    {% if module.is_active %}
+                    <span class="badge badge-sm color-success">{% trans "Active" %}</span>
+                    {% else %}
+                    <span class="badge badge-sm">{% trans "Inactive" %}</span>
+                    {% endif %}
+                </td>
+                <td class="datatable-td datatable-td-actions">
+                    <div class="datatable-row-actions">
+                        {% if module.is_active %}
+                        <button class="datatable-row-action"
+                                data-action="module-deactivate"
+                                data-url="{{ module.deactivate_url }}"
+                                data-module-name="{{ module.name }}"
+                                title="{% trans 'Deactivate' %}">
+                            {% icon "pause-outline" %}
+                        </button>
+                        {% else %}
+                        <button class="datatable-row-action"
+                                hx-post="{{ module.activate_url }}"
+                                hx-target="#main-content-area"
+                                hx-swap="innerHTML"
+                                title="{% trans 'Activate' %}">
+                            {% icon "play-outline" %}
+                        </button>
+                        {% endif %}
+                        <button class="datatable-row-action datatable-row-action-danger"
+                                data-action="module-delete"
+                                data-url="{{ module.delete_url }}"
+                                data-module-name="{{ module.name }}"
+                                title="{% trans 'Delete' %}">
+                            {% icon "trash-outline" %}
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Footer / Pagination -->
+<div class="datatable-footer">
+    <div class="datatable-per-page">
+        {% trans "Show" %}
+        <select name="per_page"
+                hx-get="{% url 'mymodules:index' %}"
+                hx-target="#datatable-body"
+                hx-include="#modules-datatable"
+                hx-trigger="change">
+            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        </select>
+        {% trans "per page" %}
     </div>
-    {% else %}
-    <div class="flex flex-col items-center justify-center py-16 text-center">
-        {% icon "extension-puzzle-outline" css_class="text-4xl opacity-40 mb-4" %}
-        <h3 class="font-semibold mb-1">{% trans "No modules installed" %}</h3>
-        <p class="text-sm opacity-60 mb-4">{% trans "Explore the Marketplace to extend your Hub" %}</p>
-        <a class="btn color-primary"
-           href="{{ marketplace_url }}"
-           hx-get="{{ marketplace_url }}"
-           hx-target="#main-content-area"
-           hx-push-url="true">
-            {% icon "storefront-outline" %}
-            {% trans "Browse Marketplace" %}
-        </a>
-    </div>
+    <span class="datatable-info">
+        {% if page_obj.paginator.count > 0 %}
+        {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }} modules{% endblocktrans %}
+        {% endif %}
+    </span>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="pagination pagination-sm">
+        <button class="pagination-btn pagination-prev"
+                {% if page_obj.has_previous %}
+                hx-get="{% url 'mymodules:index' %}?page={{ page_obj.previous_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#modules-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-back-outline" %}
+        </button>
+        {% for num in page_obj.paginator.page_range %}
+        <button class="pagination-btn{% if num == page_obj.number %} pagination-active{% endif %}"
+                hx-get="{% url 'mymodules:index' %}?page={{ num }}"
+                hx-target="#datatable-body"
+                hx-include="#modules-datatable">
+            {{ num }}
+        </button>
+        {% endfor %}
+        <button class="pagination-btn pagination-next"
+                {% if page_obj.has_next %}
+                hx-get="{% url 'mymodules:index' %}?page={{ page_obj.next_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#modules-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-forward-outline" %}
+        </button>
+    </nav>
     {% endif %}
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="datatable-empty">
+    <div class="datatable-empty-icon">
+        {% if search_query or status_filter %}
+        {% icon "search-outline" %}
+        {% else %}
+        {% icon "extension-puzzle-outline" %}
+        {% endif %}
+    </div>
+    <div class="datatable-empty-title">
+        {% if search_query or status_filter %}
+        {% trans "No modules found" %}
+        {% else %}
+        {% trans "No modules installed" %}
+        {% endif %}
+    </div>
+    <div class="datatable-empty-text">
+        {% if search_query or status_filter %}
+        {% trans "Try a different search term or filter" %}
+        {% else %}
+        {% trans "Explore the Marketplace to extend your Hub" %}
+        {% endif %}
+    </div>
+    {% if not search_query and not status_filter %}
+    <a class="btn color-primary mt-4"
+       href="{{ marketplace_url }}"
+       hx-get="{{ marketplace_url }}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
+        {% icon "storefront-outline" %}
+        {% trans "Browse Marketplace" %}
+    </a>
+    {% endif %}
+</div>
 {% endif %}

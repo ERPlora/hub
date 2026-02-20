@@ -125,15 +125,24 @@ class PermissionService:
 
         count = 0
 
-        for perm_tuple in permissions:
-            if len(perm_tuple) == 2:
-                codename_suffix, name = perm_tuple
+        for perm_entry in permissions:
+            if isinstance(perm_entry, str):
+                # String format: 'module.codename_suffix' or just 'codename_suffix'
+                if '.' in perm_entry:
+                    codename = perm_entry
+                    codename_suffix = perm_entry.split('.', 1)[1]
+                else:
+                    codename_suffix = perm_entry
+                    codename = f"{module_id}.{codename_suffix}"
+                name = codename_suffix.replace('_', ' ').title()
                 description = ''
+            elif len(perm_entry) == 2:
+                codename_suffix, name = perm_entry
+                description = ''
+                codename = f"{module_id}.{codename_suffix}"
             else:
-                codename_suffix, name, description = perm_tuple[:3]
-
-            # Full codename includes module prefix
-            codename = f"{module_id}.{codename_suffix}"
+                codename_suffix, name, description = perm_entry[:3]
+                codename = f"{module_id}.{codename_suffix}"
 
             # Create or update permission
             perm, created = Permission.objects.update_or_create(
