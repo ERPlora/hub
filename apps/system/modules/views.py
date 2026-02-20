@@ -20,15 +20,28 @@ from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 
 
+PER_PAGE_CHOICES = [10, 25, 50, 100]
+
+
 @login_required
 @htmx_view('system/modules/pages/installed.html', 'system/modules/partials/installed_content.html')
 def modules_index(request):
-    """Module management page - shows all installed modules"""
+    """Module management page - shows all installed modules with DataTable"""
     from django.shortcuts import render as django_render
+    from django.core.paginator import Paginator
     from apps.modules_runtime.loader import module_loader
     import importlib
 
     search_query = request.GET.get('q', '').strip()
+    sort_field = request.GET.get('sort', 'name')
+    sort_dir = request.GET.get('dir', 'asc')
+    current_view = request.GET.get('view', 'table')
+    per_page = int(request.GET.get('per_page', 10))
+    if per_page not in PER_PAGE_CHOICES:
+        per_page = 10
+    page_number = request.GET.get('page', 1)
+    status_filter = request.GET.get('status', '')
+
     modules_dir = Path(django_settings.MODULES_DIR)
     all_modules = []
 
@@ -101,7 +114,21 @@ def modules_index(request):
             or query_lower in m['module_id'].lower()
         ]
 
-    all_modules.sort(key=lambda x: (not x['is_active'], x['name']))
+    # Filter by status
+    if status_filter == 'active':
+        all_modules = [m for m in all_modules if m['is_active']]
+    elif status_filter == 'inactive':
+        all_modules = [m for m in all_modules if not m['is_active']]
+
+    # Sort
+    sort_key_map = {
+        'name': lambda m: m['name'].lower(),
+        'status': lambda m: (0 if m['is_active'] else 1, m['name'].lower()),
+        'version': lambda m: m['version'],
+        'author': lambda m: m['author'].lower(),
+    }
+    sort_fn = sort_key_map.get(sort_field, sort_key_map['name'])
+    all_modules.sort(key=sort_fn, reverse=(sort_dir == 'desc'))
 
     active_count = sum(1 for p in all_modules if p['is_active'])
     inactive_count = sum(1 for p in all_modules if not p['is_active'])
@@ -114,32 +141,42 @@ def modules_index(request):
     # Add action URLs and slug to each module
     for module in all_modules:
         mid = module['module_id']
-        module['slug'] = mid  # slug matches module_id for installed modules
+        module['slug'] = mid
         module['activate_url'] = reverse('mymodules:api_activate', kwargs={'module_id': mid})
         module['deactivate_url'] = reverse('mymodules:api_deactivate', kwargs={'module_id': mid})
         module['delete_url'] = reverse('mymodules:api_delete', kwargs={'module_id': mid})
         module['detail_url'] = reverse('mymodules:detail', kwargs={'slug': mid})
 
-    # If HTMX request targeting the modules list, return only the list partial
-    if request.htmx and request.htmx.target == 'modules-list':
-        return django_render(request, 'system/modules/partials/modules_list.html', {
-            'modules': all_modules,
-            'search_query': search_query,
-            'marketplace_url': reverse('marketplace:index'),
-        })
+    # Paginate
+    paginator = Paginator(all_modules, per_page)
+    page_obj = paginator.get_page(page_number)
 
-    return {
-        'current_section': 'modules',
-        'current_tab': 'installed',
-        'page_title': 'My Modules',
-        'modules': all_modules,
+    context = {
+        'modules': page_obj,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'sort_field': sort_field,
+        'sort_dir': sort_dir,
+        'status_filter': status_filter,
+        'current_view': current_view,
+        'per_page': per_page,
         'active_count': active_count,
         'inactive_count': inactive_count,
         'requires_restart': requires_restart,
         'modules_pending_restart': modules_pending_restart,
         'marketplace_url': reverse('marketplace:index'),
-        'search_query': search_query,
     }
+
+    # HTMX partial: swap only datatable body (search, sort, filter, paginate)
+    if request.htmx and request.htmx.target == 'datatable-body':
+        return django_render(request, 'system/modules/partials/modules_list.html', context)
+
+    context.update({
+        'current_section': 'modules',
+        'current_tab': 'installed',
+        'page_title': 'My Modules',
+    })
+    return context
 
 
 @login_required
@@ -446,8 +483,9 @@ def module_detail(request, slug):
 # Helper function for HTMX responses
 
 def _render_modules_page(request, error=None):
-    """Render modules page as HTMX partial response"""
+    """Render modules page as HTMX partial response (with DataTable context)"""
     from django.shortcuts import render
+    from django.core.paginator import Paginator
     import importlib
 
     modules_dir = Path(django_settings.MODULES_DIR)
@@ -527,14 +565,28 @@ def _render_modules_page(request, error=None):
     from django.urls import reverse
     for module in all_modules:
         mid = module['module_id']
+        module['slug'] = mid
         module['activate_url'] = reverse('mymodules:api_activate', kwargs={'module_id': mid})
         module['deactivate_url'] = reverse('mymodules:api_deactivate', kwargs={'module_id': mid})
         module['delete_url'] = reverse('mymodules:api_delete', kwargs={'module_id': mid})
+        module['detail_url'] = reverse('mymodules:detail', kwargs={'slug': mid})
+
+    # Paginate for DataTable
+    per_page = 10
+    paginator = Paginator(all_modules, per_page)
+    page_obj = paginator.get_page(1)
 
     context = {
         'current_section': 'modules',
         'page_title': 'Modules',
-        'modules': all_modules,
+        'modules': page_obj,
+        'page_obj': page_obj,
+        'sort_field': 'name',
+        'sort_dir': 'asc',
+        'current_view': 'table',
+        'per_page': per_page,
+        'search_query': '',
+        'status_filter': '',
         'active_count': active_count,
         'inactive_count': inactive_count,
         'requires_restart': requires_restart,

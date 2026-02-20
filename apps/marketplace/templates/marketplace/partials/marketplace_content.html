@@ -1,104 +1,196 @@
 {% load i18n static djicons %}
 
 {# Marketplace tabbar - manual since it's not a module #}
-        <script>
-        (function() {
-            if (typeof window.updateGlobalTabBar === 'function') {
-                window.updateGlobalTabBar([
-                    {
-                        url: '{% url "marketplace:index" %}',
-                        icon: 'cube-outline',
-                        label: '{% trans "Modules" %}',
-                        active: {% if store_type == 'modules' %}true{% else %}false{% endif %}
-                    },
-                    {
-                        url: '{% url "marketplace:store_hubs" %}',
-                        icon: 'server-outline',
-                        label: '{% trans "Hubs" %}',
-                        active: {% if store_type == 'hubs' %}true{% else %}false{% endif %}
-                    },
-                    {
-                        url: '{% url "marketplace:cart_page" %}',
-                        icon: 'cart-outline',
-                        label: '{% trans "Cart" %}',
-                        active: {% if current_view == 'cart' %}true{% else %}false{% endif %}
-                    }
-                ]);
+<script>
+(function() {
+    if (typeof window.updateGlobalTabBar === 'function') {
+        window.updateGlobalTabBar([
+            {
+                url: '{% url "marketplace:index" %}',
+                icon: 'cube-outline',
+                label: '{% trans "Modules" %}',
+                active: {% if store_type == 'modules' %}true{% else %}false{% endif %}
+            },
+            {
+                url: '{% url "marketplace:store_hubs" %}',
+                icon: 'server-outline',
+                label: '{% trans "Hubs" %}',
+                active: {% if store_type == 'hubs' %}true{% else %}false{% endif %}
+            },
+            {
+                url: '{% url "marketplace:cart_page" %}',
+                icon: 'cart-outline',
+                label: '{% trans "Cart" %}',
+                active: {% if current_view == 'cart' %}true{% else %}false{% endif %}
             }
-        })();
-        </script>
-        <form id="marketplace-filters-form"
-            hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
-            hx-target="#products-grid" hx-swap="innerHTML"
-            hx-trigger="submit, change from:input[type=hidden], input from:#search-input delay:300ms">
+        ]);
+    }
+})();
+</script>
 
-            {# Search Bar with Filter Button #}
-            <div class="flex gap-2 mb-4 items-center">
-                <label class="input rounded-full flex-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="ionicon icon opacity-50" viewBox="0 0 512 512" width="20" height="20" aria-hidden="true"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"></path><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32" d="M338.29 338.29L448 448"></path></svg>
+<div x-data="{
+    view: 'cards',
+    columnsModal: false,
+    cols: { author: true, price: true, rating: true, status: true },
+    toggleCol(col) {
+        this.cols[col] = !this.cols[col];
+        document.querySelectorAll('[data-col=' + col + ']').forEach(el => el.classList.toggle('hidden', !this.cols[col]));
+    }
+}">
+
+    <div class="datatable glass mt-5" id="marketplace-datatable">
+
+        <!-- Toolbar -->
+        <div class="datatable-toolbar">
+            <div class="datatable-toolbar-start">
+                <label class="input input-sm datatable-search">
+                    {% icon "search-outline" %}
                     <input type="search"
-                           class="grow"
-                           id="search-input"
                            name="q"
+                           id="search-input"
                            placeholder="{% trans 'Search modules...' %}"
-                           value="{{ request.GET.q|default:'' }}">
+                           value=""
+                           autocomplete="off"
+                           hx-get="{% url 'marketplace:products_list' %}"
+                           hx-target="#datatable-body"
+                           hx-include="#marketplace-datatable"
+                           hx-trigger="input changed delay:300ms, search">
                 </label>
+
+                <!-- Filters button -->
                 <button type="button"
+                        class="datatable-export-btn"
                         id="filter-toggle-btn"
-                        class="btn btn-outline btn-square"
                         onclick="openFiltersModal()"
+                        title="{% trans 'Filters' %}"
                         style="position: relative;">
-                    {% icon "options-outline" %}
-                    {% if active_filters_count %}
-                    <span class="badge badge-sm color-error" style="position: absolute; top: -4px; right: -4px;">
-                        {{ active_filters_count }}
-                    </span>
-                    {% endif %}
+                    {% icon "funnel-outline" %}
                 </button>
             </div>
+            <div class="datatable-toolbar-end">
+                <!-- Column Visibility -->
+                <button class="datatable-column-btn" @click="columnsModal = true" title="{% trans 'Columns' %}">
+                    {% icon "options-outline" %}
+                </button>
 
-            <!-- Hidden inputs for filters -->
-            <input type="hidden" name="category" id="filter-category" value="{{ request.GET.category|default:'' }}">
-            <input type="hidden" name="industry" id="filter-industry" value="{{ request.GET.industry|default:'' }}">
-            <input type="hidden" name="type" id="filter-type" value="{{ request.GET.type|default:'' }}">
-            <input type="hidden" name="region" id="filter-region" value="{{ request.GET.region|default:'' }}">
-            <input type="hidden" name="plan" id="filter-plan" value="{{ request.GET.plan|default:'' }}">
-
-            <!-- Active Filters Display -->
-            <div id="active-filters" class="flex flex-wrap gap-2 mb-4" style="display: none;">
-                <span class="text-sm opacity-60 mr-2">{% trans "Active:" %}</span>
-                <div id="active-filters-chips" class="flex flex-wrap gap-2"></div>
+                <!-- View Toggle -->
+                <div class="datatable-view-toggle">
+                    <button type="button"
+                            class="datatable-view-btn"
+                            :class="{ 'datatable-view-btn-active': view === 'table' }"
+                            @click="view = 'table'"
+                            hx-get="{% url 'marketplace:products_list' %}"
+                            hx-target="#datatable-body"
+                            hx-include="#marketplace-datatable"
+                            hx-vals='{"view": "table"}'
+                            title="{% trans 'Table view' %}">
+                        {% icon "list-outline" %}
+                    </button>
+                    <button type="button"
+                            class="datatable-view-btn datatable-view-btn-active"
+                            :class="{ 'datatable-view-btn-active': view === 'cards' }"
+                            @click="view = 'cards'"
+                            hx-get="{% url 'marketplace:products_list' %}"
+                            hx-target="#datatable-body"
+                            hx-include="#marketplace-datatable"
+                            hx-vals='{"view": "cards"}'
+                            title="{% trans 'Card view' %}">
+                        {% icon "grid-outline" %}
+                    </button>
+                </div>
             </div>
-        </form>
+        </div>
 
-        <!-- Products Grid -->
-        <div id="products-grid"
-            hx-get="{% if store_type == 'hubs' %}{% url 'marketplace:hubs_products_list' %}{% else %}{% url 'marketplace:products_list' %}{% endif %}"
-            hx-trigger="load" hx-swap="innerHTML">
+        <!-- Active Filters Display -->
+        <div id="active-filters" class="datatable-active-filters" style="display: none;">
+            <span class="text-xs font-semibold opacity-60 mr-1">{% trans "Active:" %}</span>
+            <div id="active-filters-chips" class="flex flex-wrap gap-1"></div>
+            <button class="datatable-clear-filters" onclick="clearAllFilters()">
+                {% icon "close-outline" %}
+                {% trans "Clear" %}
+            </button>
+        </div>
+
+        <!-- Hidden state inputs -->
+        <input type="hidden" name="sort" value="name">
+        <input type="hidden" name="dir" value="asc">
+        <input type="hidden" name="view" :value="view">
+        <input type="hidden" name="per_page" value="12">
+        <input type="hidden" name="category" id="filter-category" value="">
+        <input type="hidden" name="industry" id="filter-industry" value="">
+        <input type="hidden" name="type" id="filter-type" value="">
+
+        <!-- Datatable Body (HTMX swap target) -->
+        <div id="datatable-body"
+             hx-get="{% url 'marketplace:products_list' %}"
+             hx-trigger="load"
+             hx-include="#marketplace-datatable"
+             hx-swap="innerHTML">
             <div class="flex justify-center py-8">
                 <div class="loading"></div>
             </div>
         </div>
+    </div>
+
+    <!-- Columns Modal -->
+    <div class="modal-backdrop" :data-state="columnsModal ? 'open' : 'closed'" @click.self="columnsModal = false">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Show / Hide Columns" %}</h3>
+                <button class="modal-close" @click="columnsModal = false">
+                    {% icon "close-outline" %}
+                </button>
+            </div>
+            <div class="modal-body">
+                <label class="flex items-center gap-3 py-2 cursor-not-allowed opacity-50">
+                    <input type="checkbox" class="checkbox checkbox-sm" checked disabled>
+                    <span class="text-sm">{% trans "Module" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('author')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.author" readonly>
+                    <span class="text-sm">{% trans "Author" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('price')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.price" readonly>
+                    <span class="text-sm">{% trans "Price" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('rating')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.rating" readonly>
+                    <span class="text-sm">{% trans "Rating" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('status')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.status" readonly>
+                    <span class="text-sm">{% trans "Status" %}</span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-sm color-primary" @click="columnsModal = false">
+                    {% trans "Done" %}
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
 <!-- Filters Modal -->
 <div class="modal-backdrop" id="filters-modal-backdrop" data-state="closed"
-     x-data="{ open: false }"
-     :data-state="open ? 'open' : 'closed'"
-     @click.self="open = false; closeFiltersModal()">
+     onclick="if (event.target === this) closeFiltersModal()">
     <div class="modal modal-lg">
         <div class="modal-header">
             <h2 class="modal-title">{% trans "Filters" %}</h2>
             <button class="modal-close" onclick="closeFiltersModal()">
-                {% icon "close" %}
+                {% icon "close-outline" %}
             </button>
         </div>
         <div class="modal-body">
             {% if store_type == 'modules' %}
             <!-- Category Filter -->
-            <div class="mb-lg">
-                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Category" %}</h3>
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold mb-2">{% trans "Category" %}</h3>
                 <div class="flex flex-wrap gap-2">
                     <button type="button"
-                            class="chip filter-chip {% if not request.GET.category %}chip-active{% endif %}"
+                            class="filter-chip filter-chip-active"
                             data-filter="category"
                             data-value=""
                             onclick="setFilter('category', '')">
@@ -106,7 +198,7 @@
                     </button>
                     {% for category in filters.categories %}
                     <button type="button"
-                            class="chip filter-chip {% if request.GET.category == category.id %}chip-active{% endif %}"
+                            class="filter-chip"
                             data-filter="category"
                             data-value="{{ category.id }}"
                             onclick="setFilter('category', '{{ category.id }}')">
@@ -117,11 +209,11 @@
             </div>
 
             <!-- Industry Filter -->
-            <div class="mb-lg">
-                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Industry" %}</h3>
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold mb-2">{% trans "Industry" %}</h3>
                 <div class="flex flex-wrap gap-2">
                     <button type="button"
-                            class="chip filter-chip {% if not request.GET.industry %}chip-active{% endif %}"
+                            class="filter-chip filter-chip-active"
                             data-filter="industry"
                             data-value=""
                             onclick="setFilter('industry', '')">
@@ -129,7 +221,7 @@
                     </button>
                     {% for industry in filters.industries %}
                     <button type="button"
-                            class="chip filter-chip {% if request.GET.industry == industry.id %}chip-active{% endif %}"
+                            class="filter-chip"
                             data-filter="industry"
                             data-value="{{ industry.id }}"
                             onclick="setFilter('industry', '{{ industry.id }}')">
@@ -140,11 +232,11 @@
             </div>
 
             <!-- Pricing Type Filter -->
-            <div class="mb-lg">
-                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Pricing" %}</h3>
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold mb-2">{% trans "Pricing" %}</h3>
                 <div class="flex flex-wrap gap-2">
                     <button type="button"
-                            class="chip filter-chip {% if not request.GET.type %}chip-active{% endif %}"
+                            class="filter-chip filter-chip-active"
                             data-filter="type"
                             data-value=""
                             onclick="setFilter('type', '')">
@@ -152,7 +244,7 @@
                     </button>
                     {% for type in filters.types %}
                     <button type="button"
-                            class="chip filter-chip {% if request.GET.type == type.id %}chip-active{% endif %}"
+                            class="filter-chip"
                             data-filter="type"
                             data-value="{{ type.id }}"
                             onclick="setFilter('type', '{{ type.id }}')">
@@ -165,11 +257,11 @@
 
             {% elif store_type == 'hubs' %}
             <!-- Region Filter -->
-            <div class="mb-lg">
-                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Region" %}</h3>
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold mb-2">{% trans "Region" %}</h3>
                 <div class="flex flex-wrap gap-2">
                     <button type="button"
-                            class="chip filter-chip {% if not request.GET.region %}chip-active{% endif %}"
+                            class="filter-chip filter-chip-active"
                             data-filter="region"
                             data-value=""
                             onclick="setFilter('region', '')">
@@ -177,34 +269,11 @@
                     </button>
                     {% for region in filters.regions %}
                     <button type="button"
-                            class="chip filter-chip {% if request.GET.region == region.id %}chip-active{% endif %}"
+                            class="filter-chip"
                             data-filter="region"
                             data-value="{{ region.id }}"
                             onclick="setFilter('region', '{{ region.id }}')">
                         {{ region.name }}
-                    </button>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Plan Filter -->
-            <div class="mb-lg">
-                <h3 class="fs-sm fw-semibold text-medium mb-sm">{% trans "Plan" %}</h3>
-                <div class="flex flex-wrap gap-2">
-                    <button type="button"
-                            class="chip filter-chip {% if not request.GET.plan %}chip-active{% endif %}"
-                            data-filter="plan"
-                            data-value=""
-                            onclick="setFilter('plan', '')">
-                        {% trans "All" %}
-                    </button>
-                    {% for plan in filters.plans %}
-                    <button type="button"
-                            class="chip filter-chip {% if request.GET.plan == plan.id %}chip-active{% endif %}"
-                            data-filter="plan"
-                            data-value="{{ plan.id }}"
-                            onclick="setFilter('plan', '{{ plan.id }}')">
-                        {{ plan.name }}
                     </button>
                     {% endfor %}
                 </div>
@@ -225,121 +294,127 @@
 
 <script>
 (function () {
-    // Modal functions
+    function gatherDatatableParams() {
+        var dt = document.getElementById('marketplace-datatable');
+        if (!dt) return '';
+        var params = [];
+        dt.querySelectorAll('input[name], select[name]').forEach(function (el) {
+            if (el.name && (el.type !== 'search' || el.value)) {
+                params.push(encodeURIComponent(el.name) + '=' + encodeURIComponent(el.value));
+            }
+        });
+        return params.join('&');
+    }
+
+    function fireFilterRequest() {
+        var qs = gatherDatatableParams();
+        var url = '{% url "marketplace:products_list" %}' + (qs ? '?' + qs : '');
+        htmx.ajax('GET', url, { target: '#datatable-body', swap: 'innerHTML' });
+    }
+
     window.openFiltersModal = function () {
-        const backdrop = document.getElementById('filters-modal-backdrop');
-        if (backdrop) {
-            backdrop.setAttribute('data-state', 'open');
-        }
+        var backdrop = document.getElementById('filters-modal-backdrop');
+        if (backdrop) backdrop.setAttribute('data-state', 'open');
     };
 
     window.closeFiltersModal = function () {
-        const backdrop = document.getElementById('filters-modal-backdrop');
-        if (backdrop) {
-            backdrop.setAttribute('data-state', 'closed');
-        }
+        var backdrop = document.getElementById('filters-modal-backdrop');
+        if (backdrop) backdrop.setAttribute('data-state', 'closed');
     };
 
     window.applyFilters = function () {
-        // Trigger HTMX request
-        document.getElementById('filter-category').dispatchEvent(new Event('change', { bubbles: true }));
+        fireFilterRequest();
         updateActiveFilters();
         closeFiltersModal();
     };
 
-    // Set a filter value
     window.setFilter = function (filterName, value) {
-        const input = document.getElementById('filter-' + filterName);
+        var input = document.getElementById('filter-' + filterName);
         if (input) {
             input.value = value;
             updateChipSelection(filterName, value);
         }
     };
 
-    // Update chip selection for a filter
     function updateChipSelection(filterName, activeValue) {
         document.querySelectorAll('.filter-chip[data-filter="' + filterName + '"]').forEach(function (chip) {
-            var chipValue = chip.dataset.value;
-            if (chipValue === activeValue) {
-                chip.classList.add('chip-active');
+            if (chip.dataset.value === activeValue) {
+                chip.classList.add('filter-chip-active');
             } else {
-                chip.classList.remove('chip-active');
+                chip.classList.remove('filter-chip-active');
             }
         });
     }
 
-    // Clear all filters
     window.clearAllFilters = function () {
-        ['category', 'industry', 'type', 'region', 'plan'].forEach(function (filter) {
+        ['category', 'industry', 'type'].forEach(function (filter) {
             var input = document.getElementById('filter-' + filter);
             if (input) {
                 input.value = '';
                 updateChipSelection(filter, '');
             }
         });
-        // Clear search
         var searchInput = document.getElementById('search-input');
         if (searchInput) searchInput.value = '';
-        // Trigger HTMX
-        document.getElementById('filter-category').dispatchEvent(new Event('change', { bubbles: true }));
+        fireFilterRequest();
         updateActiveFilters();
         closeFiltersModal();
     };
 
-    // Update active filters display
+    window.removeFilter = function (filterName) {
+        var input = document.getElementById('filter-' + filterName);
+        if (input) {
+            input.value = '';
+            updateChipSelection(filterName, '');
+        }
+        fireFilterRequest();
+        updateActiveFilters();
+    };
+
     window.updateActiveFilters = function () {
         var container = document.getElementById('active-filters');
         var chipsContainer = document.getElementById('active-filters-chips');
-        var filterToggleBtn = document.getElementById('filter-toggle-btn');
+        if (!container || !chipsContainer) return;
 
         var count = 0;
-
-        // Clear previous chips
         chipsContainer.innerHTML = '';
 
-        // Check search
-        var searchInput = document.getElementById('search-input');
-        var searchValue = searchInput ? searchInput.value : '';
-        if (searchValue) {
-            var searchChip = document.createElement('button');
-            searchChip.type = 'button';
-            searchChip.className = 'chip color-warning';
-            searchChip.innerHTML = (document.querySelector('[data-icon="search-outline"]')?.outerHTML || '<svg></svg>') + ' ' + searchValue + '<button type="button" onclick="clearSearch(); event.stopPropagation();"><svg viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg></button>';
-            searchChip.addEventListener('click', function() { clearSearch(); });
-            chipsContainer.appendChild(searchChip);
-            count++;
+        var filterLabels = {
+            category: '{% trans "Category" %}',
+            industry: '{% trans "Industry" %}',
+            type: '{% trans "Type" %}'
+        };
+
+        // Map filter values to display names from the chip buttons
+        function getChipLabel(filterName, value) {
+            var chip = document.querySelector('.filter-chip[data-filter="' + filterName + '"][data-value="' + value + '"]');
+            return chip ? chip.textContent.trim() : value;
         }
 
-        // Check filters
-        ['category', 'industry', 'type', 'region', 'plan'].forEach(function (filter) {
+        ['category', 'industry', 'type'].forEach(function (filter) {
             var input = document.getElementById('filter-' + filter);
             if (input && input.value) {
-                var chip = document.createElement('button');
-                chip.type = 'button';
-                chip.className = 'chip color-warning';
-                chip.innerHTML = input.value + '<button type="button"><svg viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z"/></svg></button>';
-                chip.addEventListener('click', function() { removeFilter(filter); });
-                chipsContainer.appendChild(chip);
+                var displayValue = getChipLabel(filter, input.value);
+                var tag = document.createElement('span');
+                tag.className = 'datatable-filter-tag';
+                tag.innerHTML = '<span class="datatable-filter-tag-label">' + filterLabels[filter] + ':</span> ' + displayValue +
+                    ' <button class="datatable-filter-tag-remove" onclick="removeFilter(\'' + filter + '\')"><svg viewBox="0 0 512 512" width="12" height="12"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z" fill="currentColor"/></svg></button>';
+                chipsContainer.appendChild(tag);
                 count++;
             }
         });
 
-        // Update UI
-        if (count > 0) {
-            container.style.display = 'flex';
-        } else {
-            container.style.display = 'none';
-        }
+        container.style.display = count > 0 ? 'flex' : 'none';
 
-        // Update badge on filter button
-        if (filterToggleBtn) {
-            var badge = filterToggleBtn.querySelector('.badge');
+        var filterBtn = document.getElementById('filter-toggle-btn');
+        if (filterBtn) {
+            var badge = filterBtn.querySelector('.badge');
             if (count > 0) {
                 if (!badge) {
                     badge = document.createElement('span');
                     badge.className = 'badge badge-sm color-error';
                     badge.style.cssText = 'position: absolute; top: -4px; right: -4px;';
-                    filterToggleBtn.appendChild(badge);
+                    filterBtn.appendChild(badge);
                 }
                 badge.textContent = count;
             } else if (badge) {
@@ -348,30 +423,6 @@
         }
     };
 
-    // Remove a single filter
-    window.removeFilter = function (filterName) {
-        var input = document.getElementById('filter-' + filterName);
-        if (input) {
-            input.value = '';
-            updateChipSelection(filterName, '');
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        updateActiveFilters();
-    };
-
-    // Clear search only
-    window.clearSearch = function () {
-        var searchInput = document.getElementById('search-input');
-        if (searchInput) {
-            searchInput.value = '';
-            document.getElementById('filter-category').dispatchEvent(new Event('change', { bubbles: true }));
-            updateActiveFilters();
-        }
-    };
-
-    // Initialize on load
-    document.addEventListener('DOMContentLoaded', updateActiveFilters);
-    // Also run immediately for HTMX loads
     updateActiveFilters();
 })();
 </script>
