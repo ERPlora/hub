@@ -5,7 +5,7 @@ Defines all available categories and industries for ERPlora modules.
 This file is shared between Cloud (marketplace) and Hub (module management).
 
 Classification System (3 levels):
-1. CATEGORY (1 per module) - Functional category (what the module does)
+1. FUNCTIONS (multiple) - Functional areas (what the module does: POS, HR, CRM, etc.)
 2. INDUSTRIES (multiple) - Business verticals (who uses it)
 3. TAGS (multiple) - Free keywords for search
 
