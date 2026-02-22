@@ -18,6 +18,27 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 
 
+def public_view(view_func):
+    """
+    Decorator that marks a view as public (no authentication required).
+
+    The JWTMiddleware checks for this marker and skips authentication
+    for views decorated with @public_view.
+
+    Usage:
+        @public_view
+        def checkout(request, slug):
+            ...
+
+        @public_view
+        @csrf_exempt
+        def webhook(request):
+            ...
+    """
+    view_func.is_public = True
+    return view_func
+
+
 def login_required(function=None, redirect_url=None):
     """
     Decorator for views that checks if the user is logged in via Hub session.
