@@ -5,7 +5,7 @@ Validates JWT tokens and handles offline mode with PIN authentication.
 """
 import logging
 from django.shortcuts import redirect
-from django.urls import reverse
+from django.urls import resolve, reverse, Resolver404
 from django.http import HttpResponse
 
 from apps.core.services.connectivity import get_connectivity_checker
@@ -63,6 +63,10 @@ class JWTMiddleware:
 
         # Check if path is exempt
         if self._is_exempt_path(request.path):
+            return self.get_response(request)
+
+        # Check if the view is marked as public (via @public_view decorator)
+        if self._is_public_view(request.path):
             return self.get_response(request)
 
         # Check if already authenticated via local PIN login
@@ -137,3 +141,23 @@ class JWTMiddleware:
                 return True
 
         return False
+
+    def _is_public_view(self, path):
+        """
+        Check if the resolved view is marked as public via @public_view decorator.
+
+        Views decorated with @public_view have is_public=True set on the
+        function object. This allows module views (e.g. checkout pages,
+        webhook endpoints) to opt out of authentication.
+
+        Args:
+            path: Request path
+
+        Returns:
+            bool: True if the view is marked as public, False otherwise
+        """
+        try:
+            match = resolve(path)
+            return getattr(match.func, 'is_public', False)
+        except Resolver404:
+            return False
