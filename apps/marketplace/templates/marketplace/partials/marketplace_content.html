@@ -183,55 +183,57 @@
                 {% icon "close-outline" %}
             </button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
             {% if store_type == 'modules' %}
-            <!-- Category Filter -->
+            <!-- Function Filter (multi-select, grouped) -->
             <div class="mb-6">
-                <h3 class="text-sm font-semibold mb-2">{% trans "Category" %}</h3>
-                <div class="flex flex-wrap gap-2">
-                    <button type="button"
-                            class="filter-chip filter-chip-active"
-                            data-filter="category"
-                            data-value=""
-                            onclick="setFilter('category', '')">
-                        {% trans "All" %}
-                    </button>
-                    {% for category in filters.categories %}
-                    <button type="button"
-                            class="filter-chip"
-                            data-filter="category"
-                            data-value="{{ category.id }}"
-                            onclick="setFilter('category', '{{ category.id }}')">
-                        {{ category.name }}
-                    </button>
-                    {% endfor %}
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold m-0">{% trans "Function" %}</h3>
+                    <button type="button" class="text-xs opacity-50 hover:opacity-100" onclick="clearMultiFilter('category')">{% trans "Clear" %}</button>
                 </div>
+                {% for group in filters.categories_grouped %}
+                <div class="mb-3">
+                    <span class="text-xs font-semibold opacity-50 uppercase tracking-wide">{{ group.name }}</span>
+                    <div class="flex flex-wrap gap-2 mt-1">
+                        {% for cat in group.categories %}
+                        <button type="button"
+                                class="filter-chip"
+                                data-filter="category"
+                                data-value="{{ cat.id }}"
+                                onclick="toggleMultiFilter('category', '{{ cat.id }}')">
+                            {{ cat.name }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
             </div>
 
-            <!-- Industry Filter -->
+            <!-- Industry Filter (multi-select, grouped) -->
             <div class="mb-6">
-                <h3 class="text-sm font-semibold mb-2">{% trans "Industry" %}</h3>
-                <div class="flex flex-wrap gap-2">
-                    <button type="button"
-                            class="filter-chip filter-chip-active"
-                            data-filter="industry"
-                            data-value=""
-                            onclick="setFilter('industry', '')">
-                        {% trans "All" %}
-                    </button>
-                    {% for industry in filters.industries %}
-                    <button type="button"
-                            class="filter-chip"
-                            data-filter="industry"
-                            data-value="{{ industry.id }}"
-                            onclick="setFilter('industry', '{{ industry.id }}')">
-                        {{ industry.name }}
-                    </button>
-                    {% endfor %}
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold m-0">{% trans "Industry" %}</h3>
+                    <button type="button" class="text-xs opacity-50 hover:opacity-100" onclick="clearMultiFilter('industry')">{% trans "Clear" %}</button>
                 </div>
+                {% for group in filters.industries_grouped %}
+                <div class="mb-3">
+                    <span class="text-xs font-semibold opacity-50 uppercase tracking-wide">{{ group.name }}</span>
+                    <div class="flex flex-wrap gap-2 mt-1">
+                        {% for ind in group.industries %}
+                        <button type="button"
+                                class="filter-chip"
+                                data-filter="industry"
+                                data-value="{{ ind.id }}"
+                                onclick="toggleMultiFilter('industry', '{{ ind.id }}')">
+                            {{ ind.name }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
             </div>
 
-            <!-- Pricing Type Filter -->
+            <!-- Pricing Type Filter (single-select) -->
             <div class="mb-6">
                 <h3 class="text-sm font-semibold mb-2">{% trans "Pricing" %}</h3>
                 <div class="flex flex-wrap gap-2">
@@ -294,6 +296,9 @@
 
 <script>
 (function () {
+    // Multi-select filters store comma-separated values in hidden inputs
+    // category and industry support multi-select; type is single-select
+
     function gatherDatatableParams() {
         var dt = document.getElementById('marketplace-datatable');
         if (!dt) return '';
@@ -312,6 +317,48 @@
         htmx.ajax('GET', url, { target: '#datatable-body', swap: 'innerHTML' });
     }
 
+    // Get current values for a multi-select filter as an array
+    function getMultiValues(filterName) {
+        var input = document.getElementById('filter-' + filterName);
+        if (!input || !input.value) return [];
+        return input.value.split(',').filter(function(v) { return v; });
+    }
+
+    // Set multi-select filter values (array → comma-separated string)
+    function setMultiValues(filterName, values) {
+        var input = document.getElementById('filter-' + filterName);
+        if (input) input.value = values.join(',');
+        updateMultiChipSelection(filterName, values);
+    }
+
+    // Toggle a value in a multi-select filter
+    window.toggleMultiFilter = function (filterName, value) {
+        var values = getMultiValues(filterName);
+        var idx = values.indexOf(value);
+        if (idx >= 0) {
+            values.splice(idx, 1);
+        } else {
+            values.push(value);
+        }
+        setMultiValues(filterName, values);
+    };
+
+    // Clear all values for a multi-select filter
+    window.clearMultiFilter = function (filterName) {
+        setMultiValues(filterName, []);
+    };
+
+    // Update chip active states for multi-select
+    function updateMultiChipSelection(filterName, activeValues) {
+        document.querySelectorAll('.filter-chip[data-filter="' + filterName + '"]').forEach(function (chip) {
+            if (activeValues.indexOf(chip.dataset.value) >= 0) {
+                chip.classList.add('filter-chip-active');
+            } else {
+                chip.classList.remove('filter-chip-active');
+            }
+        });
+    }
+
     window.openFiltersModal = function () {
         var backdrop = document.getElementById('filters-modal-backdrop');
         if (backdrop) backdrop.setAttribute('data-state', 'open');
@@ -328,15 +375,16 @@
         closeFiltersModal();
     };
 
+    // Single-select filter (for type, region)
     window.setFilter = function (filterName, value) {
         var input = document.getElementById('filter-' + filterName);
         if (input) {
             input.value = value;
-            updateChipSelection(filterName, value);
+            updateSingleChipSelection(filterName, value);
         }
     };
 
-    function updateChipSelection(filterName, activeValue) {
+    function updateSingleChipSelection(filterName, activeValue) {
         document.querySelectorAll('.filter-chip[data-filter="' + filterName + '"]').forEach(function (chip) {
             if (chip.dataset.value === activeValue) {
                 chip.classList.add('filter-chip-active');
@@ -347,11 +395,16 @@
     }
 
     window.clearAllFilters = function () {
-        ['category', 'industry', 'type'].forEach(function (filter) {
+        // Multi-select filters
+        ['category', 'industry'].forEach(function (filter) {
+            setMultiValues(filter, []);
+        });
+        // Single-select filters
+        ['type'].forEach(function (filter) {
             var input = document.getElementById('filter-' + filter);
             if (input) {
                 input.value = '';
-                updateChipSelection(filter, '');
+                updateSingleChipSelection(filter, '');
             }
         });
         var searchInput = document.getElementById('search-input');
@@ -361,11 +414,23 @@
         closeFiltersModal();
     };
 
-    window.removeFilter = function (filterName) {
-        var input = document.getElementById('filter-' + filterName);
-        if (input) {
-            input.value = '';
-            updateChipSelection(filterName, '');
+    window.removeFilter = function (filterName, value) {
+        if (filterName === 'category' || filterName === 'industry') {
+            // Multi-select: remove specific value
+            if (value) {
+                var values = getMultiValues(filterName);
+                var idx = values.indexOf(value);
+                if (idx >= 0) values.splice(idx, 1);
+                setMultiValues(filterName, values);
+            } else {
+                setMultiValues(filterName, []);
+            }
+        } else {
+            var input = document.getElementById('filter-' + filterName);
+            if (input) {
+                input.value = '';
+                updateSingleChipSelection(filterName, '');
+            }
         }
         fireFilterRequest();
         updateActiveFilters();
@@ -380,25 +445,41 @@
         chipsContainer.innerHTML = '';
 
         var filterLabels = {
-            category: '{% trans "Category" %}',
+            category: '{% trans "Function" %}',
             industry: '{% trans "Industry" %}',
             type: '{% trans "Type" %}'
         };
 
-        // Map filter values to display names from the chip buttons
         function getChipLabel(filterName, value) {
-            var chip = document.querySelector('.filter-chip[data-filter="' + filterName + '"][data-value="' + value + '"]');
+            var chip = document.querySelector('.filter-chip[data-filter="' + filterName + '"][data-value="' + CSS.escape(value) + '"]');
             return chip ? chip.textContent.trim() : value;
         }
 
-        ['category', 'industry', 'type'].forEach(function (filter) {
+        var closeSvg = '<svg viewBox="0 0 512 512" width="12" height="12"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z" fill="currentColor"/></svg>';
+
+        // Multi-select filters: one tag per selected value
+        ['category', 'industry'].forEach(function (filter) {
+            var values = getMultiValues(filter);
+            values.forEach(function (val) {
+                var displayValue = getChipLabel(filter, val);
+                var tag = document.createElement('span');
+                tag.className = 'datatable-filter-tag';
+                tag.innerHTML = '<span class="datatable-filter-tag-label">' + filterLabels[filter] + ':</span> ' + displayValue +
+                    ' <button class="datatable-filter-tag-remove" onclick="removeFilter(\'' + filter + '\', \'' + val + '\')">' + closeSvg + '</button>';
+                chipsContainer.appendChild(tag);
+                count++;
+            });
+        });
+
+        // Single-select filters
+        ['type'].forEach(function (filter) {
             var input = document.getElementById('filter-' + filter);
             if (input && input.value) {
                 var displayValue = getChipLabel(filter, input.value);
                 var tag = document.createElement('span');
                 tag.className = 'datatable-filter-tag';
                 tag.innerHTML = '<span class="datatable-filter-tag-label">' + filterLabels[filter] + ':</span> ' + displayValue +
-                    ' <button class="datatable-filter-tag-remove" onclick="removeFilter(\'' + filter + '\')"><svg viewBox="0 0 512 512" width="12" height="12"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z" fill="currentColor"/></svg></button>';
+                    ' <button class="datatable-filter-tag-remove" onclick="removeFilter(\'' + filter + '\')">' + closeSvg + '</button>';
                 chipsContainer.appendChild(tag);
                 count++;
             }
