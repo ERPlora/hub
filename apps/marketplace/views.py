@@ -27,7 +27,7 @@ STORE_TYPES = {
         'icon': 'cube-outline',
         'api_endpoint': '/api/marketplace/modules/',
         'enabled': True,
-        'filters': ['category', 'industry', 'type'],
+        'filters': ['function', 'industry', 'type'],
     },
     'hubs': {
         'name': 'Hubs',
@@ -95,46 +95,76 @@ def store_index(request, store_type='modules'):
     }
 
 
+def _build_grouped_categories(language):
+    """Build grouped categories from local config (fallback when Cloud unavailable)."""
+    from config.module_categories import get_all_categories, get_categories_grouped
+    groups = get_categories_grouped(language)
+    all_cats = {c['id']: c for c in get_all_categories(language)}
+    result = []
+    for group_key, group_data in groups.items():
+        result.append({
+            'key': group_key,
+            'name': group_data['name'],
+            'categories': [all_cats[cid] for cid in group_data['categories'] if cid in all_cats],
+        })
+    return result
+
+
+def _build_grouped_industries(language):
+    """Build grouped industries from local config (fallback when Cloud unavailable)."""
+    from config.module_categories import get_all_industries, get_industries_grouped
+    groups = get_industries_grouped(language)
+    all_inds = {i['id']: i for i in get_all_industries(language)}
+    result = []
+    for group_key, group_data in groups.items():
+        result.append({
+            'key': group_key,
+            'name': group_data['name'],
+            'industries': [all_inds[iid] for iid in group_data['industries'] if iid in all_inds],
+        })
+    return result
+
+
 def _get_filters_for_store(store_type, language, request):
     """Get filter options based on store type"""
     from apps.configuration.models import HubConfig
-    from config.module_categories import get_all_categories, get_all_industries
 
     filters = {}
     hub_config = HubConfig.get_solo()
     auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
     if store_type == 'modules':
-        # Categories and industries for modules
-        categories = get_all_categories(language)
-        industries = get_all_industries(language)
+        # Build grouped categories and industries (local fallback)
+        categories_grouped = _build_grouped_categories(language)
+        industries_grouped = _build_grouped_industries(language)
 
+        # Try fetching grouped data from Cloud API
         if auth_token:
             cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
             headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
             try:
                 cat_response = requests.get(
-                    f"{cloud_api_url}/api/marketplace/categories/",
+                    f"{cloud_api_url}/api/marketplace/categories/grouped/",
                     headers=headers, params={'language': language}, timeout=10
                 )
                 if cat_response.status_code == 200:
-                    cloud_categories = cat_response.json()
-                    if cloud_categories:
-                        categories = cloud_categories
+                    cloud_data = cat_response.json()
+                    if cloud_data:
+                        categories_grouped = cloud_data
 
                 ind_response = requests.get(
-                    f"{cloud_api_url}/api/marketplace/industries/",
+                    f"{cloud_api_url}/api/marketplace/industries/grouped/",
                     headers=headers, params={'language': language}, timeout=10
                 )
                 if ind_response.status_code == 200:
-                    cloud_industries = ind_response.json()
-                    if cloud_industries:
-                        industries = cloud_industries
+                    cloud_data = ind_response.json()
+                    if cloud_data:
+                        industries_grouped = cloud_data
             except Exception:
                 pass
 
-        filters['categories'] = categories
-        filters['industries'] = industries
+        filters['categories_grouped'] = categories_grouped
+        filters['industries_grouped'] = industries_grouped
         filters['types'] = [
             {'id': 'free', 'name': 'Free', 'name_es': 'Gratis', 'icon': 'gift-outline'},
             {'id': 'one_time', 'name': 'One-time', 'name_es': 'Pago único', 'icon': 'card-outline'},
@@ -438,10 +468,17 @@ def _fetch_modules_list(request, search_query, category_filter, industry_filter,
             )]
 
         if category_filter:
-            modules = [m for m in modules if m.get('category') == category_filter]
+            cat_values = [c.strip() for c in category_filter.split(',') if c.strip()]
+            if cat_values:
+                # functions is a list; match if any function is in the selected values
+                modules = [m for m in modules if any(
+                    f in cat_values for f in m.get('functions', [m.get('category', '')])
+                )]
 
         if industry_filter:
-            modules = [m for m in modules if industry_filter in m.get('industries', [])]
+            ind_values = [i.strip() for i in industry_filter.split(',') if i.strip()]
+            if ind_values:
+                modules = [m for m in modules if any(iv in m.get('industries', []) for iv in ind_values)]
 
         if type_filter:
             modules = [m for m in modules if m.get('module_type') == type_filter]
