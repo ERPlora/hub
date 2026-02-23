@@ -28,7 +28,7 @@ def pwa_manifest(request):
         "name": "ERPlora Hub",
         "short_name": "ERPlora",
         "description": "ERPlora Hub - Point of Sale System",
-        "theme_color": "#3880ff",
+        "theme_color": "#ffffff",
         "background_color": "#ffffff",
         "display": "standalone",
         "scope": "/",
