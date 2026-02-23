@@ -35,19 +35,13 @@
                 <p class="module-card-description">{{ solution.tagline }}</p>
 
                 <div class="module-card-footer">
-                    {% if solution.free_module_count %}
-                    <span class="module-card-price module-card-price-free">{{ solution.free_module_count }} {% trans "free" %}</span>
-                    {% else %}
-                    <span class="module-card-price">{{ solution.all_modules_count }} {% trans "modules" %}</span>
-                    {% endif %}
+                    <span class="chip chip-sm">{{ solution.required_module_count|default:solution.all_modules_count }} {% trans "required" %}</span>
 
                     <div class="module-card-actions">
                         <button class="btn btn-sm color-primary"
-                                hx-get="{% url 'marketplace:solution_detail' slug=solution.slug %}"
-                                hx-target="#main-content-area"
-                                hx-push-url="true">
-                            {% icon "eye-outline" %}
-                            {% trans "View" %}
+                                onclick="event.stopPropagation(); installSolution('{{ solution.slug }}', this)">
+                            {% icon "download-outline" %}
+                            {% trans "Install" %}
                         </button>
                     </div>
                 </div>
@@ -55,6 +49,51 @@
         </div>
         {% endfor %}
     </div>
+
+    <script>
+    function installSolution(slug, button) {
+        var originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="loading loading-sm"></span>';
+
+        var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+            || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+        fetch('/marketplace/solutions/' + slug + '/install/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                var msg = data.installed + ' {% trans "of" %} ' + data.total + ' {% trans "modules installed." %}';
+                button.outerHTML = '<span class="badge badge-sm color-success">{% icon "checkmark-circle-outline" %} {% trans "Installed" %}</span>';
+                if (typeof Toast !== 'undefined') Toast.success(msg);
+                if (data.requires_restart) {
+                    if (confirm('{% trans "Server needs to restart to load new modules. Restart now?" %}')) {
+                        fetch('/modules/api/marketplace/restart/', {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrfToken }
+                        });
+                        setTimeout(function() { window.location.reload(); }, 3000);
+                    }
+                }
+            } else {
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+                if (typeof Toast !== 'undefined') Toast.error(data.error || '{% trans "Installation failed." %}');
+            }
+        })
+        .catch(function(e) {
+            button.disabled = false;
+            button.innerHTML = originalHtml;
+            if (typeof Toast !== 'undefined') Toast.error(e.message);
+        });
+    }
+    </script>
     {% else %}
     <div class="text-center py-16">
         {% icon "briefcase-outline" css_class="text-6xl opacity-20 mb-4" %}
