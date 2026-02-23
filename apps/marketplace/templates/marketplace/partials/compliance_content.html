@@ -8,7 +8,7 @@
 
     <div class="list list-inset glass">
         {% for country in countries %}
-        <button class="list-item list-item-clickable list-item-multiline"
+        <button class="list-item list-item-clickable list-item-multiline{% if hub_country == country.country_code %} bg-primary/5 ring-1 ring-primary/20{% endif %}"
                 hx-get="{% url 'marketplace:compliance_detail' country_code=country.country_code %}"
                 hx-target="#main-content-area"
                 hx-push-url="true">
@@ -16,7 +16,12 @@
                 <span class="text-2xl">{{ country.country_code|country_flag }}</span>
             </div>
             <div class="list-item-content">
-                <span class="list-item-label">{{ country.country_name }}</span>
+                <span class="list-item-label">
+                    {{ country.country_name }}
+                    {% if hub_country == country.country_code %}
+                    <span class="badge badge-sm color-primary ml-1">{% trans "Your country" %}</span>
+                    {% endif %}
+                </span>
                 {% if country.description %}
                 <span class="list-item-note">{{ country.description|truncatewords:12 }}</span>
                 {% endif %}

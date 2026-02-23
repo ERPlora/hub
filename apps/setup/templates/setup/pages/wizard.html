@@ -80,6 +80,37 @@
       };
   }
 
+  /* Country search Alpine component (for step 1) */
+  function countrySearch() {
+      const saved = '{{ hub_config.country_code|default:"" }}';
+      const detected = DETECTED_LOCALE.country || '';
+      const initialCode = saved || detected;
+      const initialCountry = COUNTRIES.find(c => c.code === initialCode);
+      return {
+          query: initialCountry ? initialCountry.flag + ' ' + initialCountry.name : '',
+          selected: initialCode,
+          open: false,
+          highlighted: 0,
+
+          get filtered() {
+              if (!this.query || this.query === (COUNTRIES.find(c => c.code === this.selected)?.flag + ' ' + COUNTRIES.find(c => c.code === this.selected)?.name)) {
+                  return COUNTRIES.slice(0, 30);
+              }
+              const q = this.query.toLowerCase();
+              return COUNTRIES.filter(c =>
+                  c.name.toLowerCase().includes(q) ||
+                  c.code.toLowerCase().includes(q)
+              ).slice(0, 30);
+          },
+
+          selectCountry(c) {
+              this.query = c.flag + ' ' + c.name;
+              this.selected = c.code;
+              this.open = false;
+          }
+      };
+  }
+
   /* Phone input Alpine component */
   function phoneInput() {
       const existingPhone = '{{ store_config.phone|default:"" }}';
