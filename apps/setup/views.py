@@ -118,7 +118,11 @@ def _get_step_context(step, hub_config, store_config, errors=None):
     # Step-specific data
     if step == 1:
         timezones = get_sorted_timezones()
+        countries = get_all_countries()
+        locale_map = get_locale_map(settings.LANGUAGES)
         context['timezones_json'] = json.dumps(timezones)
+        context['countries_json'] = json.dumps(countries, ensure_ascii=False)
+        context['locale_map_json'] = json.dumps(locale_map, ensure_ascii=False)
     elif step == 2:
         context['solutions'] = _fetch_solutions()
     elif step == 3:
@@ -208,6 +212,7 @@ def _validate_step4(data):
 def _save_step1(data, hub_config):
     """Save step 1 data to HubConfig."""
     hub_config.language = data.get('language', 'en').strip()
+    hub_config.country_code = data.get('country', '').strip().upper()
     hub_config.timezone = data.get('timezone', 'UTC').strip()
     hub_config.save()
 

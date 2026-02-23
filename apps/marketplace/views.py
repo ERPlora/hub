@@ -7,8 +7,10 @@ Tabs:
 - Compliance: Country-specific required modules
 """
 import json
+import logging
 import requests
 from pathlib import Path
+
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.conf import settings as django_settings
@@ -17,6 +19,8 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
+
+logger = logging.getLogger(__name__)
 
 
 # --- Marketplace navigation (tabbar) ---
@@ -975,6 +979,17 @@ def solution_install(request, slug):
             except Exception as e:
                 errors.append(f"{mod['name']}: {str(e)}")
 
+        # Create solution roles (same as setup wizard does)
+        if installed_count > 0 and hub_config.hub_id:
+            roles_data = solution.get('roles', [])
+            if roles_data:
+                try:
+                    from apps.core.services.permission_service import PermissionService
+                    PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
+                    logger.info(f"Created {len(roles_data)} solution roles for {slug}")
+                except Exception as e:
+                    logger.warning(f"Failed to create solution roles for {slug}: {e}")
+
         result = {
             'success': True,
             'installed': installed_count,
@@ -1013,10 +1028,14 @@ def compliance_index(request):
 
     cart = get_cart(request, 'modules')
 
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_config()
+
     return {
         'current_section': 'marketplace',
         'page_title': _('Compliance'),
         'countries': countries,
+        'hub_country': hub_config.country_code,
         'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('compliance'),
     }
