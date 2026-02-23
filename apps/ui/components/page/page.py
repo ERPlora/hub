@@ -1,4 +1,4 @@
-from django_components import Component
+from django_components import Component, registry
 
 
 class Page(Component):
@@ -14,3 +14,6 @@ class Page(Component):
             "back_hx_target": back_hx_target,
             "back_hx_push_url": back_hx_push_url,
         }
+
+
+registry.register("page", Page)
