@@ -121,9 +121,18 @@
                 </nav>
             </div>
 
-            <!-- Drawer Footer: Logo + Logout -->
+            <!-- Drawer Footer: Install + Logout -->
             <div class="footer">
-                <div class="sidebar-menu">
+                <div class="sidebar-menu"
+                     x-data="{ canInstall: canInstallPWA() }"
+                     @pwa-installable.document="canInstall = true"
+                     @pwa-installed.document="canInstall = false">
+                    <div class="sidebar-menu-item" x-show="canInstall" x-cloak>
+                        <button @click="installPWA().then(() => canInstall = canInstallPWA())" class="sidebar-menu-button">
+                            <span class="sidebar-menu-icon">{% icon "download-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Install App" %}</span>
+                        </button>
+                    </div>
                     <div class="sidebar-menu-item">
                         <a href="{% url 'auth:logout' %}" class="sidebar-menu-button">
                             <span class="sidebar-menu-icon">{% icon "log-out-outline" %}</span>
