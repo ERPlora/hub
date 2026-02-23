@@ -32,17 +32,25 @@
                 <span class="employee-card-title">{{ role.description|default:"-"|truncatewords:8 }}</span>
             </div>
             <div class="employee-card-actions" @click.stop>
-                {% if role.is_system %}
-                <span class="badge badge-ghost badge-sm">{% trans "System" %}</span>
+                {% if role.source == 'basic' %}
+                <span class="badge badge-ghost badge-sm">{% trans "Basic" %}</span>
+                {% elif role.source == 'solution' %}
+                <span class="badge badge-ghost badge-sm color-primary">{% trans "Solution" %}</span>
                 {% else %}
                 <span class="badge badge-ghost badge-sm">{% trans "Custom" %}</span>
                 {% endif %}
                 <span class="badge badge-sm">{{ role.user_count }} {% trans "users" %}</span>
-                {% if role.is_active %}
-                <span class="badge badge-sm color-success">{% trans "Active" %}</span>
-                {% else %}
-                <span class="badge badge-sm color-warning">{% trans "Inactive" %}</span>
-                {% endif %}
+                <label class="toggle toggle-sm {% if role.is_active %}color-success{% endif %}">
+                    <input type="checkbox"
+                           {% if role.is_active %}checked{% endif %}
+                           {% if role.name == 'admin' %}disabled{% endif %}
+                           hx-post="{% url 'main:roles:toggle_active' role_id=role.id %}"
+                           hx-target="#datatable-body"
+                           hx-swap="innerHTML">
+                    <span class="toggle-track">
+                        <span class="toggle-thumb"></span>
+                    </span>
+                </label>
             </div>
         </a>
         {% endfor %}
@@ -71,7 +79,7 @@
                     {% trans "Role" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>
-                <th class="datatable-th">{% trans "Type" %}</th>
+                <th class="datatable-th">{% trans "Source" %}</th>
                 <th class="datatable-th datatable-th-sortable{% if sort_field == 'users' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
                     hx-get="{% url 'main:roles:list' %}?sort=users&dir={% if sort_field == 'users' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
                     hx-target="#datatable-body"
@@ -125,9 +133,11 @@
                         </div>
                     </a>
                 </td>
-                <td class="datatable-td" data-label="{% trans 'Type' %}">
-                    {% if role.is_system %}
-                    <span class="badge badge-ghost badge-sm">{% trans "System" %}</span>
+                <td class="datatable-td" data-label="{% trans 'Source' %}">
+                    {% if role.source == 'basic' %}
+                    <span class="badge badge-ghost badge-sm">{% trans "Basic" %}</span>
+                    {% elif role.source == 'solution' %}
+                    <span class="badge badge-ghost badge-sm color-primary">{% trans "Solution" %}</span>
                     {% else %}
                     <span class="badge badge-ghost badge-sm">{% trans "Custom" %}</span>
                     {% endif %}
@@ -135,12 +145,18 @@
                 <td class="datatable-td" data-label="{% trans 'Users' %}">
                     <span class="badge badge-sm">{{ role.user_count }}</span>
                 </td>
-                <td class="datatable-td datatable-td-center" data-label="{% trans 'Status' %}">
-                    {% if role.is_active %}
-                    <span class="badge badge-sm color-success">{% trans "Active" %}</span>
-                    {% else %}
-                    <span class="badge badge-sm color-warning">{% trans "Inactive" %}</span>
-                    {% endif %}
+                <td class="datatable-td datatable-td-center" data-label="{% trans 'Status' %}" onclick="event.stopPropagation();">
+                    <label class="toggle toggle-sm {% if role.is_active %}color-success{% endif %}">
+                        <input type="checkbox"
+                               {% if role.is_active %}checked{% endif %}
+                               {% if role.name == 'admin' %}disabled{% endif %}
+                               hx-post="{% url 'main:roles:toggle_active' role_id=role.id %}"
+                               hx-target="#datatable-body"
+                               hx-swap="innerHTML">
+                        <span class="toggle-track">
+                            <span class="toggle-thumb"></span>
+                        </span>
+                    </label>
                 </td>
                 <td class="datatable-td datatable-td-actions" onclick="event.stopPropagation();">
                     <div class="datatable-row-actions">
@@ -226,27 +242,27 @@
 <!-- Empty State -->
 <div class="datatable-empty">
     <div class="datatable-empty-icon">
-        {% if search_query or status_filter or type_filter %}
+        {% if search_query or status_filter or source_filter %}
         {% icon "search-outline" %}
         {% else %}
         {% icon "shield-outline" %}
         {% endif %}
     </div>
     <div class="datatable-empty-title">
-        {% if search_query or status_filter or type_filter %}
+        {% if search_query or status_filter or source_filter %}
         {% trans "No roles found" %}
         {% else %}
         {% trans "No roles yet" %}
         {% endif %}
     </div>
     <div class="datatable-empty-text">
-        {% if search_query or status_filter or type_filter %}
+        {% if search_query or status_filter or source_filter %}
         {% trans "Try a different search term or filter" %}
         {% else %}
         {% trans "Create your first custom role to get started" %}
         {% endif %}
     </div>
-    {% if not search_query and not status_filter and not type_filter %}
+    {% if not search_query and not status_filter and not source_filter %}
     <a class="btn color-primary mt-4"
        href="{% url 'main:roles:create' %}"
        hx-get="{% url 'main:roles:create' %}"

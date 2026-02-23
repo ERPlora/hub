@@ -45,15 +45,16 @@
                     <option value="active" {% if status_filter == 'active' %}selected{% endif %}>{% trans "Active" %}</option>
                     <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>{% trans "Inactive" %}</option>
                 </select>
-                <select name="type"
+                <select name="source"
                         class="select select-sm"
                         hx-get="{% url 'main:roles:list' %}"
                         hx-target="#datatable-body"
                         hx-include="#roles-datatable"
                         hx-trigger="change">
-                    <option value="">{% trans "All Types" %}</option>
-                    <option value="system" {% if type_filter == 'system' %}selected{% endif %}>{% trans "System" %}</option>
-                    <option value="custom" {% if type_filter == 'custom' %}selected{% endif %}>{% trans "Custom" %}</option>
+                    <option value="">{% trans "All Sources" %}</option>
+                    <option value="basic" {% if source_filter == 'basic' %}selected{% endif %}>{% trans "Basic" %}</option>
+                    <option value="solution" {% if source_filter == 'solution' %}selected{% endif %}>{% trans "Solution" %}</option>
+                    <option value="custom" {% if source_filter == 'custom' %}selected{% endif %}>{% trans "Custom" %}</option>
                 </select>
             </div>
             <div class="datatable-toolbar-end">
@@ -74,12 +75,12 @@
                     </summary>
                     <div class="dropdown-menu dropdown-menu-right">
                         <a class="dropdown-item" href="#"
-                           @click.prevent="open = false; window.location.href = '{% url 'main:roles:list' %}?export=csv&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', type: document.querySelector('[name=type]')?.value || ''}).toString()">
+                           @click.prevent="open = false; window.location.href = '{% url 'main:roles:list' %}?export=csv&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', type: document.querySelector('[name=source]')?.value || ''}).toString()">
                             {% icon "document-text-outline" %}
                             {% trans "Export as CSV" %}
                         </a>
                         <a class="dropdown-item" href="#"
-                           @click.prevent="open = false; window.location.href = '{% url 'main:roles:list' %}?export=excel&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', type: document.querySelector('[name=type]')?.value || ''}).toString()">
+                           @click.prevent="open = false; window.location.href = '{% url 'main:roles:list' %}?export=excel&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', type: document.querySelector('[name=source]')?.value || ''}).toString()">
                             {% icon "document-text-outline" %}
                             {% trans "Export as Excel" %}
                         </a>

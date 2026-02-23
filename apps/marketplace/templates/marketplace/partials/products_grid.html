@@ -128,9 +128,14 @@
                         </button>
                         {% else %}
                         <button class="btn btn-sm btn-ghost color-primary"
-                                data-action="purchase"
+                                data-action="add-to-cart"
                                 data-module-id="{{ product.id }}"
-                                title="{% trans 'Purchase' %}">
+                                data-module-name="{{ product.name }}"
+                                data-module-slug="{{ product.slug }}"
+                                data-module-price="{{ product.price }}"
+                                data-module-icon="{{ product.display_icon|default:'cube-outline' }}"
+                                data-module-type="{{ product.module_type }}"
+                                title="{% trans 'Add to Cart' %}">
                             {% icon "cart-outline" %}
                         </button>
                         {% endif %}
@@ -235,8 +240,8 @@ document.addEventListener('click', function(e) {
         downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button);
     } else if (action === 'install-free') {
         installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button);
-    } else if (action === 'purchase') {
-        purchaseModule(button.dataset.moduleId, button);
+    } else if (action === 'add-to-cart') {
+        addToCart(button);
     }
 });
 
@@ -268,27 +273,40 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
     }
 }
 
-async function purchaseModule(moduleId, button) {
+async function addToCart(button) {
     setButtonLoading(button, true);
     try {
-        const response = await fetch('{% url "mymodules:api_purchase" %}', {
+        const response = await fetch('{% url "marketplace:cart_add" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ module_id: moduleId })
+            body: JSON.stringify({
+                item_id: button.dataset.moduleSlug,
+                module_id: button.dataset.moduleId,
+                item_name: button.dataset.moduleName,
+                item_price: parseFloat(button.dataset.modulePrice) || 0,
+                item_icon: button.dataset.moduleIcon || 'cube-outline',
+                item_type: button.dataset.moduleType || 'one_time',
+                quantity: 1
+            })
         });
         const data = await response.json();
-
-        if (data.success && data.checkout_url) {
-            window.open(data.checkout_url, '_blank');
-            Toast.info('{% trans "Complete payment in the opened window" %}');
-        } else if (data.already_owned) {
-            Toast.warning('{% trans "You already own this module" %}');
-            setTimeout(() => window.location.reload(), 1500);
+        if (data.success) {
+            Toast.success(button.dataset.moduleName + ' {% trans "added to cart" %}');
+            // Update cart badge
+            var badge = document.getElementById('cart-badge');
+            if (badge) {
+                badge.textContent = data.cart_count;
+                badge.style.display = '';
+            }
+            // Open cart side-sheet
+            document.dispatchEvent(new CustomEvent('cart:open'));
+            // Refresh cart content
+            htmx.trigger(document.body, 'cart:refresh');
         } else {
-            Toast.error(data.error || '{% trans "Error starting purchase" %}');
+            Toast.error(data.error || '{% trans "Error adding to cart" %}');
         }
     } catch (error) {
-        Toast.error('{% trans "Error processing purchase" %}');
+        Toast.error('{% trans "Error adding to cart" %}');
     } finally {
         setButtonLoading(button, false);
     }

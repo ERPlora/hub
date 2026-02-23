@@ -1,33 +1,6 @@
 {% load i18n component_tags djicons %}
 
 {% component "page" title=module.name|default:_("Module Details") back_hx_get="/marketplace/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {# Marketplace tabbar - manual since it's not a module #}
-    <script>
-    (function() {
-        if (typeof window.updateGlobalTabBar === 'function') {
-            window.updateGlobalTabBar([
-                {
-                    url: '{% url "marketplace:index" %}',
-                    icon: 'cube-outline',
-                    label: '{% trans "Modules" %}',
-                    active: true
-                },
-                {
-                    url: '{% url "marketplace:store_hubs" %}',
-                    icon: 'server-outline',
-                    label: '{% trans "Hubs" %}',
-                    active: false
-                },
-                {
-                    url: '{% url "marketplace:cart_page" %}',
-                    icon: 'cart-outline',
-                    label: '{% trans "Cart" %}',
-                    active: false
-                }
-            ]);
-        }
-    })();
-    </script>
     {% fill "content" %}
 
 {% if error %}
@@ -152,10 +125,15 @@
                             {% else %}
                             <button type="button"
                                     class="btn btn-lg color-primary"
-                                    data-action="purchase"
-                                    data-module-id="{{ module.id }}">
+                                    data-action="add-to-cart"
+                                    data-module-id="{{ module.id }}"
+                                    data-module-name="{{ module.name }}"
+                                    data-module-slug="{{ module.slug }}"
+                                    data-module-price="{{ module.price }}"
+                                    data-module-icon="{{ module.display_icon|default:'cube-outline' }}"
+                                    data-module-type="{{ module.module_type }}">
                                 {% icon "cart-outline" %}
-                                <span>{% trans "Purchase" %}</span>
+                                <span>{% trans "Add to Cart" %}</span>
                             </button>
                             {% endif %}
                         </div>

@@ -1,0 +1,125 @@
+{% load i18n djicons marketplace_tags %}
+
+{% if error %}
+<div class="callout callout-warning mt-5">
+    <div class="callout-content">
+        <p class="callout-text">{% icon "alert-circle-outline" %} {{ error }}</p>
+    </div>
+</div>
+{% elif country %}
+
+<div class="mt-5">
+    {# Country header #}
+    <div class="card glass mb-6">
+        <div class="card-body p-6">
+            <div class="flex items-center gap-4">
+                <span class="text-4xl">{{ country.country_code|country_flag }}</span>
+                <div class="flex-1">
+                    <h2 class="text-xl font-bold mb-1">{{ country.country_name }}</h2>
+                    {% if country.description %}
+                    <p class="text-sm opacity-60">{{ country.description }}</p>
+                    {% endif %}
+                </div>
+                {% if all_installed %}
+                <span class="badge color-success">
+                    {% icon "checkmark-circle" %}
+                    {% trans "All Installed" %}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# Required modules #}
+    {% if country.modules %}
+    <h3 class="text-sm font-semibold mb-3">
+        {% icon "shield-checkmark-outline" css_class="text-primary" %}
+        {% trans "Required Modules" %}
+        <span class="badge badge-sm ml-1">{{ country.modules|length }}</span>
+    </h3>
+
+    <div class="list list-inset glass mb-6">
+        {% for mod in country.modules %}
+        <div class="list-item list-item-multiline">
+            <div class="list-item-start">
+                <div class="module-card-icon" style="width: 36px; height: 36px;">
+                    {% icon mod.icon|default:"cube-outline" %}
+                </div>
+            </div>
+            <div class="list-item-content">
+                <div class="flex items-center gap-2">
+                    <span class="list-item-label">{{ mod.name }}</span>
+                    {% if mod.is_mandatory %}
+                    <span class="badge badge-sm color-error">{% trans "Mandatory" %}</span>
+                    {% else %}
+                    <span class="badge badge-sm">{% trans "Recommended" %}</span>
+                    {% endif %}
+                </div>
+                {% if mod.reason %}
+                <span class="list-item-note">{{ mod.reason }}</span>
+                {% elif mod.description %}
+                <span class="list-item-note">{{ mod.description|truncatewords:15 }}</span>
+                {% endif %}
+            </div>
+            <div class="list-item-end">
+                {% if mod.is_installed %}
+                <span class="badge badge-sm color-success">
+                    {% icon "checkmark-circle" %}
+                    {% trans "Installed" %}
+                </span>
+                {% else %}
+                <button class="btn btn-sm color-primary"
+                        onclick="installComplianceModule('{{ mod.slug }}', this)"
+                        data-module-slug="{{ mod.slug }}">
+                    {% icon "download-outline" %}
+                    {% trans "Install" %}
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-8">
+        <p class="text-sm opacity-60">{% trans "No compliance modules defined for this country yet." %}</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function installComplianceModule(moduleSlug, button) {
+    var originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="loading loading-sm"></span>';
+
+    fetch('/modules/api/marketplace/install/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            module_slug: moduleSlug,
+            download_url: '{{ cloud_api_url|default:"https://erplora.com" }}/api/marketplace/modules/' + moduleSlug + '/download/'
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            button.outerHTML = '<span class="badge badge-sm color-success">{% trans "Installed" %}</span>';
+            if (typeof Toast !== 'undefined') Toast.success('{% trans "Module installed successfully" %}');
+        } else {
+            button.disabled = false;
+            button.innerHTML = originalHtml;
+            if (typeof Toast !== 'undefined') Toast.error(data.error || '{% trans "Installation failed" %}');
+        }
+    })
+    .catch(function(e) {
+        button.disabled = false;
+        button.innerHTML = originalHtml;
+        if (typeof Toast !== 'undefined') Toast.error(e.message);
+    });
+}
+</script>
+{% endif %}

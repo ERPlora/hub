@@ -4,19 +4,64 @@
 {% block page_title %}{{ page_title }}{% endblock %}
 
 {% block page_actions %}
-{% if cart_count %}
-<a class="btn btn-sm btn-ghost"
-   href="/marketplace/cart/"
-   hx-get="/marketplace/cart/"
-   hx-target="#main-content-area"
-   hx-push-url="true"
-   style="position: relative;">
+{# Cart button — visible only on Modules tab #}
+{% if active_tab == 'modules' or store_type == 'modules' %}
+<button type="button"
+        class="btn btn-sm btn-ghost"
+        onclick="document.dispatchEvent(new CustomEvent('cart:open'))"
+        style="position: relative;">
     {% icon "cart-outline" %}
-    <span class="badge badge-sm color-error" style="position: absolute; top: -4px; right: -4px;">{{ cart_count }}</span>
-</a>
+    <span id="cart-badge" class="badge badge-sm color-error"
+          style="position: absolute; top: -4px; right: -4px;{% if not cart_count %} display: none;{% endif %}">
+        {{ cart_count|default:0 }}
+    </span>
+</button>
 {% endif %}
 {% endblock %}
 
 {% block page_content %}
 {% include "marketplace/partials/marketplace_content.html" %}
+
+{# Cart Side-Sheet (right sliding panel) #}
+<div x-data="{ cartOpen: false }"
+     @cart:open.document="cartOpen = true"
+     @cart:close.document="cartOpen = false">
+    <div class="sheet-backdrop" :data-state="cartOpen ? 'open' : 'closed'" @click.self="cartOpen = false">
+        <div class="side-sheet side-sheet-right glass">
+            <div class="side-sheet-header">
+                <h2 class="sheet-title">{% trans "Cart" %}</h2>
+                <button class="sheet-close" @click="cartOpen = false">
+                    {% icon "close-outline" %}
+                </button>
+            </div>
+            <div class="side-sheet-content" id="cart-sheet-content"
+                 hx-get="{% url 'marketplace:cart_view' %}"
+                 hx-trigger="load, cart:refresh from:document"
+                 hx-swap="innerHTML">
+                <div class="flex justify-center py-8">
+                    <div class="loading"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_footer %}
+{% if navigation %}
+<footer id="global-tabbar-footer" class="footer tabbar glass">
+    {% for nav in navigation %}
+    <button type="button"
+            class="tabbar-item{% if nav.active %} tabbar-item-active{% endif %}"
+            hx-get="{{ nav.url }}"
+            hx-target="#main-content-area"
+            hx-push-url="true">
+        {% icon nav.icon css_class="tabbar-icon" %}
+        <span class="tabbar-label">{{ nav.label }}</span>
+    </button>
+    {% endfor %}
+</footer>
+{% else %}
+<footer id="global-tabbar-footer"></footer>
+{% endif %}
 {% endblock %}

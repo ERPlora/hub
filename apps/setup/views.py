@@ -11,11 +11,15 @@ from django.http import HttpResponse
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from zoneinfo import available_timezones
+import requests as http_requests
 from apps.accounts.decorators import login_required
 from apps.core.htmx import is_htmx_request
 from apps.core.services.permission_service import PermissionService
 from apps.configuration.models import StoreConfig, HubConfig
 from config.countries import get_all_countries, get_locale_map
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -54,15 +58,16 @@ def get_sorted_timezones():
 # Step configuration
 # =============================================================================
 
-TOTAL_STEPS = 3
+TOTAL_STEPS = 4
 
 STEP_TEMPLATES = {
     1: 'setup/partials/step1_regional.html',
-    2: 'setup/partials/step2_business.html',
-    3: 'setup/partials/step3_tax.html',
+    2: 'setup/partials/step2_solution.html',
+    3: 'setup/partials/step3_business.html',
+    4: 'setup/partials/step4_tax.html',
 }
 
-STEP_LABELS = [_('Region'), _('Business'), _('Tax')]
+STEP_LABELS = [_('Region'), _('Solution'), _('Business'), _('Tax')]
 
 
 # =============================================================================
@@ -72,16 +77,22 @@ STEP_LABELS = [_('Region'), _('Business'), _('Tax')]
 def _get_completed_steps(hub_config, store_config):
     """Determine which steps are completed based on DB state.
 
-    Step 1 (regional) is only marked complete when step 2 has user data,
+    Steps: 1=Regional, 2=Solution, 3=Business, 4=Tax
+    Step 1 is only marked complete when step 3 has user data,
     because HubConfig always has default language/timezone values.
     """
     completed = set()
+    has_solution = bool(hub_config.solution_slug)
     has_business = store_config.business_name and store_config.business_address and store_config.vat_number
     if has_business:
         completed.add(1)
         completed.add(2)
-    if store_config.is_configured:
         completed.add(3)
+    elif has_solution:
+        completed.add(1)
+        completed.add(2)
+    if store_config.is_configured:
+        completed.add(4)
     return completed
 
 
@@ -109,6 +120,8 @@ def _get_step_context(step, hub_config, store_config, errors=None):
         timezones = get_sorted_timezones()
         context['timezones_json'] = json.dumps(timezones)
     elif step == 2:
+        context['solutions'] = _fetch_solutions()
+    elif step == 3:
         countries = get_all_countries()
         locale_map = get_locale_map(settings.LANGUAGES)
         context['countries_json'] = json.dumps(countries, ensure_ascii=False)
@@ -155,7 +168,15 @@ def _validate_step1(data):
 
 
 def _validate_step2(data):
-    """Validate step 2 (business information)."""
+    """Validate step 2 (solution selection)."""
+    errors = []
+    if not data.get('solution_slug', '').strip():
+        errors.append(_('Please select a solution'))
+    return errors
+
+
+def _validate_step3(data):
+    """Validate step 3 (business information)."""
     errors = []
     if not data.get('business_name', '').strip():
         errors.append(_('Business name is required'))
@@ -166,8 +187,8 @@ def _validate_step2(data):
     return errors
 
 
-def _validate_step3(data):
-    """Validate step 3 (tax configuration)."""
+def _validate_step4(data):
+    """Validate step 4 (tax configuration)."""
     errors = []
     tax_rate = data.get('tax_rate', '').strip()
     if tax_rate:
@@ -191,8 +212,25 @@ def _save_step1(data, hub_config):
     hub_config.save()
 
 
-def _save_step2(data, store_config):
-    """Save step 2 data to StoreConfig."""
+def _save_step2(data, hub_config):
+    """Save step 2 data (solution selection) to HubConfig and create solution roles."""
+    solution_slug = data.get('solution_slug', '').strip()
+    solution_name = data.get('solution_name', '').strip()
+
+    hub_config.solution_slug = solution_slug
+    hub_config.solution_name = solution_name
+    hub_config.save()
+
+    # Fetch solution detail from Cloud to get roles
+    if hub_config.hub_id and solution_slug:
+        roles_data = _fetch_solution_roles(solution_slug)
+        if roles_data:
+            PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
+            logger.info(f"Created {len(roles_data)} solution roles for {solution_slug}")
+
+
+def _save_step3(data, store_config):
+    """Save step 3 data (business info) to StoreConfig."""
     store_config.business_name = data.get('business_name', '').strip()
     store_config.business_address = data.get('business_address', '').strip()
     store_config.vat_number = data.get('vat_number', '').strip()
@@ -201,8 +239,8 @@ def _save_step2(data, store_config):
     store_config.save()
 
 
-def _save_step3(data, store_config):
-    """Save step 3 data to StoreConfig and mark as configured."""
+def _save_step4(data, store_config):
+    """Save step 4 data to StoreConfig and mark as configured."""
     tax_rate = data.get('tax_rate', '21').strip()
     try:
         store_config.tax_rate = Decimal(tax_rate) if tax_rate else Decimal('21')
@@ -212,6 +250,40 @@ def _save_step3(data, store_config):
     store_config.tax_included = data.get('tax_included') == 'on'
     store_config.is_configured = True
     store_config.save()
+
+
+# =============================================================================
+# Cloud API helpers
+# =============================================================================
+
+def _get_cloud_base_url():
+    """Get the Cloud API base URL from settings."""
+    return getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
+
+
+def _fetch_solutions():
+    """Fetch available solutions from Cloud API."""
+    try:
+        url = f"{_get_cloud_base_url()}/api/marketplace/solutions/"
+        resp = http_requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        logger.warning(f"Failed to fetch solutions from Cloud: {e}")
+    return []
+
+
+def _fetch_solution_roles(solution_slug):
+    """Fetch roles for a specific solution from Cloud API."""
+    try:
+        url = f"{_get_cloud_base_url()}/api/marketplace/solutions/{solution_slug}/"
+        resp = http_requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get('roles', [])
+    except Exception as e:
+        logger.warning(f"Failed to fetch solution roles from Cloud: {e}")
+    return []
 
 
 # =============================================================================
@@ -233,7 +305,9 @@ def wizard(request):
 
     # Determine which step to show based on completed data
     completed = _get_completed_steps(hub_config, store_config)
-    if 2 in completed:
+    if 3 in completed:
+        initial_step = 4
+    elif 2 in completed:
         initial_step = 3
     elif 1 in completed:
         initial_step = 2
@@ -279,7 +353,7 @@ def _handle_step_post(request, step, hub_config, store_config):
     data = request.POST
 
     # Validate
-    validators = {1: _validate_step1, 2: _validate_step2, 3: _validate_step3}
+    validators = {1: _validate_step1, 2: _validate_step2, 3: _validate_step3, 4: _validate_step4}
     errors = validators[step](data)
 
     if errors:
@@ -287,9 +361,9 @@ def _handle_step_post(request, step, hub_config, store_config):
         context = _get_step_context(step, hub_config, store_config, errors=errors)
         return render(request, STEP_TEMPLATES[step], context)
 
-    # Save
-    savers = {1: _save_step1, 2: _save_step2, 3: _save_step3}
-    if step == 1:
+    # Save — steps 1 & 2 save to hub_config, steps 3 & 4 save to store_config
+    savers = {1: _save_step1, 2: _save_step2, 3: _save_step3, 4: _save_step4}
+    if step in (1, 2):
         savers[step](data, hub_config)
     else:
         savers[step](data, store_config)

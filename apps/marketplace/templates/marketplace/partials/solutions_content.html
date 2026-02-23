@@ -1,0 +1,65 @@
+{% load i18n djicons %}
+
+<div class="mt-5">
+    {% if solutions %}
+    <div class="module-grid module-grid-3">
+        {% for solution in solutions %}
+        <div class="module-card cursor-pointer"
+             hx-get="{% url 'marketplace:solution_detail' slug=solution.slug %}"
+             hx-target="#main-content-area"
+             hx-push-url="true">
+            <div class="module-card-body">
+                <div class="module-card-header">
+                    <div class="module-card-icon" style="background-color: {{ solution.color }}; color: white;">
+                        {% icon solution.icon|default:"briefcase-outline" %}
+                    </div>
+
+                    <div class="module-card-info">
+                        <h4 class="module-card-name">{{ solution.name }}</h4>
+                        <span class="module-card-author">{{ solution.industry_name|default:"Multi-industry" }}</span>
+                        <div class="module-card-meta">
+                            <span class="chip chip-sm">{{ solution.all_modules_count }} {% trans "modules" %}</span>
+                        </div>
+                    </div>
+
+                    {% if solution.is_featured %}
+                    <div class="module-card-badges">
+                        <span class="badge badge-sm color-warning">
+                            {% icon "star" %}
+                            {% trans "Featured" %}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <p class="module-card-description">{{ solution.tagline }}</p>
+
+                <div class="module-card-footer">
+                    {% if solution.free_module_count %}
+                    <span class="module-card-price module-card-price-free">{{ solution.free_module_count }} {% trans "free" %}</span>
+                    {% else %}
+                    <span class="module-card-price">{{ solution.all_modules_count }} {% trans "modules" %}</span>
+                    {% endif %}
+
+                    <div class="module-card-actions">
+                        <button class="btn btn-sm color-primary"
+                                hx-get="{% url 'marketplace:solution_detail' slug=solution.slug %}"
+                                hx-target="#main-content-area"
+                                hx-push-url="true">
+                            {% icon "eye-outline" %}
+                            {% trans "View" %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+        {% icon "briefcase-outline" css_class="text-6xl opacity-20 mb-4" %}
+        <h3 class="text-lg font-semibold mb-2">{% trans "No Solutions Available" %}</h3>
+        <p class="text-sm opacity-60">{% trans "Could not load solutions. Please check your internet connection and try again." %}</p>
+    </div>
+    {% endif %}
+</div>

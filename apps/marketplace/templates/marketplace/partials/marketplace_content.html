@@ -1,33 +1,5 @@
 {% load i18n static djicons %}
 
-{# Marketplace tabbar - manual since it's not a module #}
-<script>
-(function() {
-    if (typeof window.updateGlobalTabBar === 'function') {
-        window.updateGlobalTabBar([
-            {
-                url: '{% url "marketplace:index" %}',
-                icon: 'cube-outline',
-                label: '{% trans "Modules" %}',
-                active: {% if store_type == 'modules' %}true{% else %}false{% endif %}
-            },
-            {
-                url: '{% url "marketplace:store_hubs" %}',
-                icon: 'server-outline',
-                label: '{% trans "Hubs" %}',
-                active: {% if store_type == 'hubs' %}true{% else %}false{% endif %}
-            },
-            {
-                url: '{% url "marketplace:cart_page" %}',
-                icon: 'cart-outline',
-                label: '{% trans "Cart" %}',
-                active: {% if current_view == 'cart' %}true{% else %}false{% endif %}
-            }
-        ]);
-    }
-})();
-</script>
-
 <div x-data="{
     view: 'cards',
     columnsModal: false,
