@@ -330,10 +330,10 @@ def cart_remove(request, store_type, item_id):
     }, request=request)
 
     badge_count = len(cart['items'])
+    hidden_attr = ' style="display:none"' if badge_count == 0 else ''
     badge_html = (
         f'<span id="cart-badge" class="badge badge-sm color-error" hx-swap-oob="true"'
-        f'{" style=\"display:none\"" if badge_count == 0 else ""}'
-        f'>{badge_count}</span>'
+        f'{hidden_attr}>{badge_count}</span>'
     )
 
     return HttpResponse(html + badge_html)
