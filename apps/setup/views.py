@@ -67,7 +67,7 @@ STEP_TEMPLATES = {
     4: 'setup/partials/step4_tax.html',
 }
 
-STEP_LABELS = [_('Region'), _('Solution'), _('Business'), _('Tax')]
+STEP_LABELS = [_('Region'), _('Modules'), _('Business'), _('Tax')]
 
 
 # =============================================================================
@@ -82,7 +82,7 @@ def _get_completed_steps(hub_config, store_config):
     because HubConfig always has default language/timezone values.
     """
     completed = set()
-    has_solution = bool(hub_config.solution_slug)
+    has_solution = bool(hub_config.selected_blocks) or bool(hub_config.solution_slug)
     has_business = store_config.business_name and store_config.business_address and store_config.vat_number
     if has_business:
         completed.add(1)
@@ -124,7 +124,34 @@ def _get_step_context(step, hub_config, store_config, errors=None):
         context['countries_json'] = json.dumps(countries, ensure_ascii=False)
         context['locale_map_json'] = json.dumps(locale_map, ensure_ascii=False)
     elif step == 2:
-        context['solutions'] = _fetch_solutions()
+        solutions = _fetch_solutions()
+        # Group blocks by block_type category for the template
+        category_order = [
+            'core', 'commerce', 'services', 'hospitality', 'hr',
+            'finance', 'operations', 'marketing', 'utility', 'compliance', 'specialized',
+        ]
+        category_labels = {
+            'core': _('Core'), 'commerce': _('Commerce'), 'services': _('Services'),
+            'hospitality': _('Hospitality'), 'hr': _('HR'), 'finance': _('Finance'),
+            'operations': _('Operations'), 'marketing': _('Marketing'),
+            'utility': _('Utility'), 'compliance': _('Compliance'), 'specialized': _('Specialized'),
+        }
+        blocks_by_category = {}
+        for s in solutions:
+            cat = s.get('block_type', '') or 'other'
+            blocks_by_category.setdefault(cat, []).append(s)
+        # Build ordered list of (category_key, category_label, blocks)
+        grouped_blocks = []
+        for cat in category_order:
+            if cat in blocks_by_category:
+                grouped_blocks.append((cat, str(category_labels.get(cat, cat.title())), blocks_by_category[cat]))
+        # Any remaining categories not in the order
+        for cat, blocks in blocks_by_category.items():
+            if cat not in category_order:
+                grouped_blocks.append((cat, cat.title(), blocks))
+        context['grouped_blocks'] = grouped_blocks
+        context['solutions'] = solutions
+        context['selected_blocks_json'] = json.dumps(hub_config.selected_blocks or [])
     elif step == 3:
         countries = get_all_countries()
         locale_map = get_locale_map(settings.LANGUAGES)
@@ -172,10 +199,18 @@ def _validate_step1(data):
 
 
 def _validate_step2(data):
-    """Validate step 2 (solution selection)."""
+    """Validate step 2 (block selection)."""
     errors = []
-    if not data.get('solution_slug', '').strip():
-        errors.append(_('Please select a solution'))
+    blocks_json = data.get('selected_blocks', '').strip()
+    if not blocks_json:
+        errors.append(_('Please select at least one block'))
+        return errors
+    try:
+        blocks = json.loads(blocks_json)
+        if not isinstance(blocks, list) or len(blocks) == 0:
+            errors.append(_('Please select at least one block'))
+    except json.JSONDecodeError:
+        errors.append(_('Invalid selection'))
     return errors
 
 
@@ -218,20 +253,25 @@ def _save_step1(data, hub_config):
 
 
 def _save_step2(data, hub_config):
-    """Save step 2 data (solution selection) to HubConfig and create solution roles."""
-    solution_slug = data.get('solution_slug', '').strip()
-    solution_name = data.get('solution_name', '').strip()
+    """Save step 2 data (block selection) to HubConfig and create roles from all blocks."""
+    blocks = json.loads(data.get('selected_blocks', '[]'))
 
-    hub_config.solution_slug = solution_slug
-    hub_config.solution_name = solution_name
+    hub_config.selected_blocks = blocks
+    # Retrocompat: store first block as solution_slug
+    hub_config.solution_slug = blocks[0] if blocks else ''
+    hub_config.solution_name = ''
     hub_config.save()
 
-    # Fetch solution detail from Cloud to get roles
-    if hub_config.hub_id and solution_slug:
-        roles_data = _fetch_solution_roles(solution_slug)
-        if roles_data:
-            PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
-            logger.info(f"Created {len(roles_data)} solution roles for {solution_slug}")
+    # Fetch roles from ALL selected blocks and create them
+    if hub_config.hub_id and blocks:
+        all_roles = []
+        for slug in blocks:
+            roles_data = _fetch_solution_roles(slug)
+            if roles_data:
+                all_roles.extend(roles_data)
+        if all_roles:
+            PermissionService.create_solution_roles(str(hub_config.hub_id), all_roles)
+            logger.info(f"Created {len(all_roles)} roles from {len(blocks)} blocks")
 
 
 def _save_step3(data, store_config):

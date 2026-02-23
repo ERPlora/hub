@@ -89,7 +89,7 @@
         <input type="hidden" name="view" :value="view">
         <input type="hidden" name="per_page" value="12">
         <input type="hidden" name="category" id="filter-category" value="">
-        <input type="hidden" name="industry" id="filter-industry" value="">
+        <input type="hidden" name="block" id="filter-block" value="">
         <input type="hidden" name="type" id="filter-type" value="">
 
         <!-- Datatable Body (HTMX swap target) -->
@@ -181,23 +181,24 @@
                 {% endfor %}
             </div>
 
-            <!-- Industry Filter (multi-select, grouped) -->
+            <!-- Block Filter (multi-select, grouped by block_type) -->
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-semibold m-0">{% trans "Industry" %}</h3>
-                    <button type="button" class="text-xs opacity-50 hover:opacity-100" onclick="clearMultiFilter('industry')">{% trans "Clear" %}</button>
+                    <h3 class="text-sm font-semibold m-0">{% trans "Block" %}</h3>
+                    <button type="button" class="text-xs opacity-50 hover:opacity-100" onclick="clearMultiFilter('block')">{% trans "Clear" %}</button>
                 </div>
-                {% for group in filters.industries_grouped %}
+                {% for group in filters.blocks_grouped %}
                 <div class="mb-3">
                     <span class="text-xs font-semibold opacity-50 uppercase tracking-wide">{{ group.name }}</span>
                     <div class="flex flex-wrap gap-2 mt-1">
-                        {% for ind in group.industries %}
+                        {% for block in group.blocks %}
                         <button type="button"
-                                class="filter-chip"
-                                data-filter="industry"
-                                data-value="{{ ind.id }}"
-                                onclick="toggleMultiFilter('industry', '{{ ind.id }}')">
-                            {{ ind.name }}
+                                class="filter-chip{% if block.is_active %} filter-chip-accent{% endif %}"
+                                data-filter="block"
+                                data-value="{{ block.id }}"
+                                onclick="toggleMultiFilter('block', '{{ block.id }}')">
+                            {{ block.name }}
+                            {% if block.is_active %}<span class="text-[10px] opacity-60 ml-0.5">●</span>{% endif %}
                         </button>
                         {% endfor %}
                     </div>
@@ -269,7 +270,7 @@
 <script>
 (function () {
     // Multi-select filters store comma-separated values in hidden inputs
-    // category and industry support multi-select; type is single-select
+    // category and block support multi-select; type is single-select
 
     function gatherDatatableParams() {
         var dt = document.getElementById('marketplace-datatable');
@@ -368,7 +369,7 @@
 
     window.clearAllFilters = function () {
         // Multi-select filters
-        ['category', 'industry'].forEach(function (filter) {
+        ['category', 'block'].forEach(function (filter) {
             setMultiValues(filter, []);
         });
         // Single-select filters
@@ -387,7 +388,7 @@
     };
 
     window.removeFilter = function (filterName, value) {
-        if (filterName === 'category' || filterName === 'industry') {
+        if (filterName === 'category' || filterName === 'block') {
             // Multi-select: remove specific value
             if (value) {
                 var values = getMultiValues(filterName);
@@ -418,7 +419,7 @@
 
         var filterLabels = {
             category: '{% trans "Function" %}',
-            industry: '{% trans "Industry" %}',
+            block: '{% trans "Block" %}',
             type: '{% trans "Type" %}'
         };
 
@@ -430,7 +431,7 @@
         var closeSvg = '<svg viewBox="0 0 512 512" width="12" height="12"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z" fill="currentColor"/></svg>';
 
         // Multi-select filters: one tag per selected value
-        ['category', 'industry'].forEach(function (filter) {
+        ['category', 'block'].forEach(function (filter) {
             var values = getMultiValues(filter);
             values.forEach(function (val) {
                 var displayValue = getChipLabel(filter, val);

@@ -23,23 +23,25 @@
         </div>
     </div>
 
-    <!-- Industry Filter -->
+    <!-- Block Filter -->
     <div class="mb-lg">
-        <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Industry" %}</h3>
+        <h3 class="fs-sm fw-semibold text-secondary mb-sm">{% trans "Block" %}</h3>
         <div class="flex flex-wrap gap-2">
             <button type="button"
                     class="chip"
-                    :class="{ 'chip-active': industryFilter === '' }"
-                    @click="setIndustry('')">
-                {% trans "All Industries" %}
+                    :class="{ 'chip-active': blockFilter === '' }"
+                    @click="setBlock('')">
+                {% trans "All Blocks" %}
             </button>
-            {% for industry in filters.industries %}
-            <button type="button"
-                    class="chip"
-                    :class="{ 'chip-active': industryFilter === '{{ industry.id }}' }"
-                    @click="setIndustry('{{ industry.id }}')">
-                {{ industry.name }}
-            </button>
+            {% for group in filters.blocks_grouped %}
+                {% for block in group.blocks %}
+                <button type="button"
+                        class="chip"
+                        :class="{ 'chip-active': blockFilter === '{{ block.id }}' }"
+                        @click="setBlock('{{ block.id }}')">
+                    {{ block.name }}
+                </button>
+                {% endfor %}
             {% endfor %}
         </div>
     </div>
@@ -127,7 +129,7 @@
     const filtersMenuData = () => ({
         // Module filters
         categoryFilter: '',
-        industryFilter: '',
+        blockFilter: '',
         typeFilter: '',
         // Hub filters
         regionFilter: '',
@@ -138,7 +140,7 @@
             window.addEventListener('marketplace:clear-filter', (e) => {
                 const { filterType } = e.detail;
                 if (filterType === 'category') this.categoryFilter = '';
-                if (filterType === 'industry') this.industryFilter = '';
+                if (filterType === 'block') this.blockFilter = '';
                 if (filterType === 'type') this.typeFilter = '';
                 if (filterType === 'region') this.regionFilter = '';
                 if (filterType === 'plan') this.planFilter = '';
@@ -146,7 +148,7 @@
 
             window.addEventListener('marketplace:clear-all-filters', () => {
                 this.categoryFilter = '';
-                this.industryFilter = '';
+                this.blockFilter = '';
                 this.typeFilter = '';
                 this.regionFilter = '';
                 this.planFilter = '';
@@ -158,9 +160,9 @@
             this.emitFilterChange('category', value);
         },
 
-        setIndustry(value) {
-            this.industryFilter = value;
-            this.emitFilterChange('industry', value);
+        setBlock(value) {
+            this.blockFilter = value;
+            this.emitFilterChange('block', value);
         },
 
         setType(value) {
