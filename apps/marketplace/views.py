@@ -1,11 +1,10 @@
 """
 Marketplace Views - Multi-store marketplace with sidebar filters and cart
 
-Supports multiple store types:
-- modules: Software modules from Cloud
-- hubs: Hub instances (coming soon)
-- components: Hardware components (coming soon)
-- products: Third-party products (coming soon)
+Tabs:
+- Modules: Software modules from Cloud marketplace
+- Solutions: Pre-configured module bundles
+- Compliance: Country-specific required modules
 """
 import json
 import requests
@@ -14,9 +13,52 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.conf import settings as django_settings
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
+
+
+# --- Marketplace navigation (tabbar) ---
+
+def _marketplace_navigation(active_tab):
+    """Build navigation context for the marketplace footer tabbar."""
+    return [
+        {
+            'url': reverse('marketplace:index'),
+            'icon': 'cube-outline',
+            'label': str(_('Modules')),
+            'active': active_tab == 'modules',
+        },
+        {
+            'url': reverse('marketplace:solutions'),
+            'icon': 'briefcase-outline',
+            'label': str(_('Solutions')),
+            'active': active_tab == 'solutions',
+        },
+        {
+            'url': reverse('marketplace:compliance'),
+            'icon': 'shield-checkmark-outline',
+            'label': str(_('Compliance')),
+            'active': active_tab == 'compliance',
+        },
+    ]
+
+
+def _get_cloud_api_url():
+    """Get the Cloud API base URL."""
+    return getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+
+
+def _get_installed_module_ids():
+    """Get list of installed module IDs from the modules directory."""
+    modules_dir = Path(django_settings.MODULES_DIR)
+    installed = []
+    if modules_dir.exists():
+        for module_dir in modules_dir.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith('.'):
+                installed.append(module_dir.name.lstrip('_'))
+    return installed
 
 
 # Store type configurations
@@ -92,6 +134,7 @@ def store_index(request, store_type='modules'):
         'filters': filters_data,
         'cart': cart,
         'cart_count': len(cart.get('items', [])),
+        'navigation': _marketplace_navigation('modules'),
     }
 
 
@@ -209,22 +252,30 @@ def save_cart(request, store_type, cart):
 
 @login_required
 def cart_add(request, store_type):
-    """Add item to cart (HTMX endpoint)"""
+    """Add item to cart — returns JSON for JS fetch calls."""
     if request.method != 'POST':
         return HttpResponse(status=405)
 
     try:
         data = json.loads(request.body)
         item_id = data.get('item_id')
+        module_id = data.get('module_id', '')
         item_name = data.get('item_name', '')
         item_price = float(data.get('item_price', 0))
         item_icon = data.get('item_icon', 'cube-outline')
+        item_type = data.get('item_type', 'one_time')
         quantity = int(data.get('quantity', 1))
     except (json.JSONDecodeError, ValueError):
-        return HttpResponse(status=400)
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Invalid data'}),
+            content_type='application/json', status=400,
+        )
 
     if not item_id:
-        return HttpResponse(status=400)
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Missing item_id'}),
+            content_type='application/json', status=400,
+        )
 
     cart = get_cart(request, store_type)
 
@@ -236,9 +287,11 @@ def cart_add(request, store_type):
     else:
         cart['items'].append({
             'id': item_id,
+            'module_id': module_id,
             'name': item_name,
             'price': item_price,
             'icon': item_icon,
+            'module_type': item_type,
             'quantity': quantity,
         })
 
@@ -246,19 +299,14 @@ def cart_add(request, store_type):
     cart['total'] = sum(item['price'] * item['quantity'] for item in cart['items'])
     save_cart(request, store_type, cart)
 
-    # Return updated cart partial + badge OOB swap
-    html = render_to_string('marketplace/partials/cart_content.html', {
-        'cart': cart,
-        'store_type': store_type,
-    }, request=request)
-
-    badge_html = f'''
-    <span id="cart-badge" class="badge color-error" hx-swap-oob="true">
-        {len(cart['items'])}
-    </span>
-    '''
-
-    return HttpResponse(html + badge_html)
+    return HttpResponse(
+        json.dumps({
+            'success': True,
+            'cart_count': len(cart['items']),
+            'cart_total': cart['total'],
+        }),
+        content_type='application/json',
+    )
 
 
 @login_required
@@ -278,11 +326,11 @@ def cart_remove(request, store_type, item_id):
     }, request=request)
 
     badge_count = len(cart['items'])
-    badge_html = f'''
-    <span id="cart-badge" class="badge color-error" hx-swap-oob="true" {'style="display:none"' if badge_count == 0 else ''}>
-        {badge_count}
-    </span>
-    '''
+    badge_html = (
+        f'<span id="cart-badge" class="badge badge-sm color-error" hx-swap-oob="true"'
+        f'{" style=\"display:none\"" if badge_count == 0 else ""}'
+        f'>{badge_count}</span>'
+    )
 
     return HttpResponse(html + badge_html)
 
@@ -300,11 +348,7 @@ def cart_clear(request, store_type):
         'store_type': store_type,
     }, request=request)
 
-    badge_html = '''
-    <span id="cart-badge" class="badge color-error" hx-swap-oob="true" style="display:none">
-        0
-    </span>
-    '''
+    badge_html = '<span id="cart-badge" class="badge badge-sm color-error" hx-swap-oob="true" style="display:none">0</span>'
 
     return HttpResponse(html + badge_html)
 
@@ -354,7 +398,98 @@ def cart_page(request, store_type='modules'):
         'store_config': config,
         'cart': cart_summary,
         'cart_count': cart_summary['count'],
+        'navigation': _marketplace_navigation('modules'),
     }
+
+
+# Cart Checkout
+
+@login_required
+def cart_checkout(request, store_type='modules'):
+    """Create Stripe Checkout session for cart items via Cloud API."""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    cart = get_cart(request, store_type)
+    if not cart['items']:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(_('Cart is empty'))}),
+            content_type='application/json', status=400,
+        )
+
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(_('Hub not connected to Cloud.'))}),
+            content_type='application/json', status=400,
+        )
+
+    cloud_api_url = _get_cloud_api_url()
+
+    try:
+        response = requests.post(
+            f"{cloud_api_url}/api/marketplace/cart/checkout/",
+            json={
+                'items': [
+                    {
+                        'module_id': item.get('module_id', item['id']),
+                        'module_slug': item['id'],
+                        'quantity': item.get('quantity', 1),
+                    }
+                    for item in cart['items']
+                ],
+                'success_url': request.build_absolute_uri('/marketplace/?checkout=success'),
+                'cancel_url': request.build_absolute_uri('/marketplace/?checkout=cancel'),
+            },
+            headers={
+                'X-Hub-Token': auth_token,
+                'Content-Type': 'application/json',
+            },
+            timeout=30,
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('checkout_url'):
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'checkout_url': data['checkout_url'],
+                        'session_id': data.get('session_id'),
+                    }),
+                    content_type='application/json',
+                )
+            else:
+                # All free or already owned
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'message': data.get('message', str(_('No paid items to checkout.'))),
+                    }),
+                    content_type='application/json',
+                )
+        else:
+            error_data = {}
+            try:
+                error_data = response.json()
+            except Exception:
+                pass
+            return HttpResponse(
+                json.dumps({
+                    'success': False,
+                    'error': error_data.get('error', f'Cloud API returned {response.status_code}'),
+                }),
+                content_type='application/json', status=500,
+            )
+
+    except requests.exceptions.RequestException as e:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(e)}),
+            content_type='application/json', status=500,
+        )
 
 
 # Filters endpoint
@@ -672,6 +807,7 @@ def module_detail(request, slug):
             'related_modules': related_modules,
             'back_url': reverse('marketplace:index'),
             'cart_count': len(cart.get('items', [])),
+            'navigation': _marketplace_navigation('modules'),
         }
 
     except requests.exceptions.RequestException as e:
@@ -679,4 +815,264 @@ def module_detail(request, slug):
             'current_section': 'marketplace',
             'error': f'Failed to connect to Cloud: {str(e)}',
             'cart_count': 0,
+        }
+
+
+# --- Solutions views ---
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/solutions_content.html')
+def solutions_index(request):
+    """Solutions list — pre-configured module bundles from Cloud."""
+    cloud_api_url = _get_cloud_api_url()
+    solutions = []
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/solutions/",
+            headers={'Accept': 'application/json'},
+            timeout=15,
+        )
+        if response.status_code == 200:
+            solutions = response.json()
+    except requests.exceptions.RequestException:
+        pass
+
+    cart = get_cart(request, 'modules')
+
+    return {
+        'current_section': 'marketplace',
+        'page_title': _('Solutions'),
+        'solutions': solutions,
+        'cart_count': len(cart.get('items', [])),
+        'navigation': _marketplace_navigation('solutions'),
+    }
+
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/solution_detail_content.html')
+def solution_detail(request, slug):
+    """Solution detail — shows modules + install button."""
+    cloud_api_url = _get_cloud_api_url()
+    installed_ids = _get_installed_module_ids()
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+            headers={'Accept': 'application/json'},
+            timeout=15,
+        )
+        if response.status_code == 404:
+            return {
+                'current_section': 'marketplace',
+                'error': _('Solution not found.'),
+                'navigation': _marketplace_navigation('solutions'),
+            }
+        if response.status_code != 200:
+            return {
+                'current_section': 'marketplace',
+                'error': f'Cloud API returned {response.status_code}',
+                'navigation': _marketplace_navigation('solutions'),
+            }
+
+        solution = response.json()
+
+        # Split modules into required/optional and mark installed
+        required_modules = []
+        optional_modules = []
+        all_installed = True
+        for mod in solution.get('modules', []):
+            mod['is_installed'] = mod.get('slug', '') in installed_ids or mod.get('module_id', '') in installed_ids
+            if mod['role'] == 'required':
+                required_modules.append(mod)
+                if not mod['is_installed']:
+                    all_installed = False
+            else:
+                optional_modules.append(mod)
+
+        cart = get_cart(request, 'modules')
+
+        return {
+            'current_section': 'marketplace',
+            'page_title': solution.get('name', 'Solution'),
+            'solution': solution,
+            'required_modules': required_modules,
+            'optional_modules': optional_modules,
+            'all_installed': all_installed,
+            'back_url': reverse('marketplace:solutions'),
+            'cart_count': len(cart.get('items', [])),
+            'navigation': _marketplace_navigation('solutions'),
+        }
+
+    except requests.exceptions.RequestException as e:
+        return {
+            'current_section': 'marketplace',
+            'error': f'Failed to connect to Cloud: {str(e)}',
+            'navigation': _marketplace_navigation('solutions'),
+        }
+
+
+@login_required
+def solution_install(request, slug):
+    """POST: Install all required modules from a solution."""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    cloud_api_url = _get_cloud_api_url()
+    installed_ids = _get_installed_module_ids()
+
+    try:
+        # Fetch solution detail to get modules
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+            headers={'Accept': 'application/json'},
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return HttpResponse(
+                json.dumps({'success': False, 'error': 'Solution not found'}),
+                content_type='application/json', status=404,
+            )
+
+        solution = response.json()
+        required_modules = [
+            m for m in solution.get('modules', [])
+            if m['role'] == 'required' and m.get('slug', '') not in installed_ids and m.get('module_id', '') not in installed_ids
+        ]
+
+        if not required_modules:
+            return HttpResponse(
+                json.dumps({'success': True, 'message': str(_('All modules are already installed.')), 'installed': 0}),
+                content_type='application/json',
+            )
+
+        # Install each module via the Hub's internal install API
+        installed_count = 0
+        errors = []
+        from apps.configuration.models import HubConfig
+        hub_config = HubConfig.get_solo()
+        auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+        for mod in required_modules:
+            try:
+                # Call the Hub's own install endpoint internally
+                install_response = requests.post(
+                    f"http://localhost:{request.META.get('SERVER_PORT', '8000')}/modules/api/marketplace/install/",
+                    json={
+                        'module_slug': mod['slug'],
+                        'download_url': f"{cloud_api_url}/api/marketplace/modules/{mod.get('slug')}/download/",
+                    },
+                    headers={
+                        'X-CSRFToken': request.META.get('CSRF_COOKIE', ''),
+                        'Cookie': request.META.get('HTTP_COOKIE', ''),
+                    },
+                    timeout=120,
+                )
+                if install_response.status_code == 200:
+                    installed_count += 1
+                else:
+                    errors.append(f"{mod['name']}: {install_response.status_code}")
+            except Exception as e:
+                errors.append(f"{mod['name']}: {str(e)}")
+
+        result = {
+            'success': True,
+            'installed': installed_count,
+            'total': len(required_modules),
+            'errors': errors,
+            'requires_restart': installed_count > 0,
+        }
+        return HttpResponse(json.dumps(result), content_type='application/json')
+
+    except requests.exceptions.RequestException as e:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(e)}),
+            content_type='application/json', status=500,
+        )
+
+
+# --- Compliance views ---
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/compliance_content.html')
+def compliance_index(request):
+    """Country compliance list — legal requirements by country."""
+    cloud_api_url = _get_cloud_api_url()
+    countries = []
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/compliance/",
+            headers={'Accept': 'application/json'},
+            timeout=15,
+        )
+        if response.status_code == 200:
+            countries = response.json()
+    except requests.exceptions.RequestException:
+        pass
+
+    cart = get_cart(request, 'modules')
+
+    return {
+        'current_section': 'marketplace',
+        'page_title': _('Compliance'),
+        'countries': countries,
+        'cart_count': len(cart.get('items', [])),
+        'navigation': _marketplace_navigation('compliance'),
+    }
+
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/compliance_detail_content.html')
+def compliance_detail(request, country_code):
+    """Country compliance detail — required modules for a specific country."""
+    cloud_api_url = _get_cloud_api_url()
+    installed_ids = _get_installed_module_ids()
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/compliance/{country_code}/",
+            headers={'Accept': 'application/json'},
+            timeout=15,
+        )
+        if response.status_code == 404:
+            return {
+                'current_section': 'marketplace',
+                'error': _('Country not found.'),
+                'navigation': _marketplace_navigation('compliance'),
+            }
+        if response.status_code != 200:
+            return {
+                'current_section': 'marketplace',
+                'error': f'Cloud API returned {response.status_code}',
+                'navigation': _marketplace_navigation('compliance'),
+            }
+
+        country = response.json()
+
+        # Mark installed modules
+        all_installed = True
+        for mod in country.get('modules', []):
+            mod['is_installed'] = mod.get('slug', '') in installed_ids or mod.get('module_id', '') in installed_ids
+            if mod.get('is_mandatory') and not mod['is_installed']:
+                all_installed = False
+
+        cart = get_cart(request, 'modules')
+
+        return {
+            'current_section': 'marketplace',
+            'page_title': country.get('country_name', 'Compliance'),
+            'country': country,
+            'all_installed': all_installed,
+            'back_url': reverse('marketplace:compliance'),
+            'cart_count': len(cart.get('items', [])),
+            'cloud_api_url': cloud_api_url,
+            'navigation': _marketplace_navigation('compliance'),
+        }
+
+    except requests.exceptions.RequestException as e:
+        return {
+            'current_section': 'marketplace',
+            'error': f'Failed to connect to Cloud: {str(e)}',
+            'navigation': _marketplace_navigation('compliance'),
         }

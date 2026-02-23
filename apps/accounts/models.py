@@ -94,6 +94,12 @@ class Role(HubBaseModel):
     Custom roles can be created by admin users.
     """
 
+    SOURCE_CHOICES = [
+        ('basic', 'Basic'),
+        ('solution', 'Solution'),
+        ('custom', 'Custom'),
+    ]
+
     name = models.CharField(
         max_length=50,
         help_text="Role name (e.g., 'admin', 'manager', 'cashier')"
@@ -113,6 +119,12 @@ class Role(HubBaseModel):
     is_active = models.BooleanField(
         default=True,
         help_text="Inactive roles cannot be assigned to users"
+    )
+    source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        default='custom',
+        help_text="Origin: basic (always active), solution (from selected solution), custom (user-created)"
     )
 
     # Permissions via through model (supports wildcards)
@@ -263,11 +275,12 @@ class LocalUser(HubBaseModel):
     Additional employees can be either Cloud Users (invited) or Local Employees.
     """
 
-    # Role choices (aligned with Cloud HubAccess model for consistency)
+    # Legacy role choices (basic roles only — solution roles use role_obj)
     ROLE_CHOICES = [
         ('admin', 'Admin'),
         ('manager', 'Manager'),
         ('employee', 'Employee'),
+        ('viewer', 'Viewer'),
     ]
 
     # Link to Cloud user (NULL = local-only employee with PIN auth)

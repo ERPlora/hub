@@ -41,7 +41,7 @@ def _build_list_context(hub_id, per_page=10):
         'sort_field': 'name',
         'sort_dir': 'asc',
         'status_filter': '',
-        'type_filter': '',
+        'source_filter': '',
         'per_page': per_page,
     }
 
@@ -61,7 +61,7 @@ def role_list(request):
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
     status_filter = request.GET.get('status', '')
-    type_filter = request.GET.get('type', '')
+    source_filter = request.GET.get('source', '')
     page_number = request.GET.get('page', 1)
     current_view = request.GET.get('view', 'table')
     per_page = int(request.GET.get('per_page', 10))
@@ -78,11 +78,9 @@ def role_list(request):
     elif status_filter == 'inactive':
         roles = roles.filter(is_active=False)
 
-    # Type filter
-    if type_filter == 'system':
-        roles = roles.filter(is_system=True)
-    elif type_filter == 'custom':
-        roles = roles.filter(is_system=False)
+    # Source filter
+    if source_filter in ('basic', 'solution', 'custom'):
+        roles = roles.filter(source=source_filter)
 
     # Search
     if search_query:
@@ -101,13 +99,13 @@ def role_list(request):
     # Export
     export_format = request.GET.get('export')
     if export_format in ('csv', 'excel'):
-        export_fields = ['display_name', 'name', 'description', 'is_system', 'is_active', 'user_count']
+        export_fields = ['display_name', 'name', 'description', 'source', 'is_active', 'user_count']
         export_headers = [
             str(_('Display Name')), str(_('Name')), str(_('Description')),
-            str(_('System')), str(_('Active')), str(_('Users')),
+            str(_('Source')), str(_('Active')), str(_('Users')),
         ]
         export_formatters = {
-            'is_system': lambda v: str(_('Yes')) if v else str(_('No')),
+            'source': lambda v: str(v).capitalize(),
             'is_active': lambda v: str(_('Active')) if v else str(_('Inactive')),
         }
         if export_format == 'csv':
@@ -131,7 +129,7 @@ def role_list(request):
         'sort_field': sort_field,
         'sort_dir': sort_dir,
         'status_filter': status_filter,
-        'type_filter': type_filter,
+        'source_filter': source_filter,
         'current_view': current_view,
         'per_page': per_page,
     }
@@ -321,6 +319,7 @@ def role_delete(request, role_id):
 
 
 @admin_required
+@require_POST
 def role_toggle_active(request, role_id):
     """Toggle role active status."""
     hub_id = request.session.get('hub_id')
@@ -332,18 +331,22 @@ def role_toggle_active(request, role_id):
         is_deleted=False
     )
 
-    if role.is_system and role.name == 'admin':
+    if role.name == 'admin':
         messages.error(request, _('Admin role cannot be deactivated.'))
+        if request.headers.get('HX-Request'):
+            return _render_list(request, hub_id)
         return redirect('main:roles:detail', role_id=role.id)
 
     role.is_active = not role.is_active
     role.save(update_fields=['is_active', 'updated_at'])
 
+    if request.headers.get('HX-Request'):
+        return _render_list(request, hub_id)
+
     if role.is_active:
         messages.success(request, _('Role activated.'))
     else:
         messages.success(request, _('Role deactivated.'))
-
     return redirect('main:roles:detail', role_id=role.id)
 
 

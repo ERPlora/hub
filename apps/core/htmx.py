@@ -80,9 +80,18 @@ def htmx_view(full_template, partial_template):
                         'pageTitle': str(page_title)
                     })
 
-                # Clear module tabbar when navigating to non-module views
-                # (module views append their own OOB tabbar via @with_module_nav)
-                if not context.get('navigation'):
+                # Update tabbar via OOB swap for HTMX partial responses
+                if context.get('navigation'):
+                    # Views with navigation context render the tabbar OOB
+                    from django.template.loader import render_to_string
+                    oob_html = render_to_string(
+                        'partials/tabbar_oob.html',
+                        {'navigation': context['navigation']},
+                        request=request,
+                    )
+                    response.content = response.content + oob_html.encode('utf-8')
+                else:
+                    # Clear tabbar when navigating to non-module views
                     response.content = (
                         response.content
                         + b'<footer id="global-tabbar-footer" hx-swap-oob="true"></footer>'

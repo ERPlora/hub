@@ -14,7 +14,7 @@
     <h2 class="text-xl font-semibold mb-1">{% trans "Business Information" %}</h2>
     <p class="text-sm opacity-60 mb-6">{% trans "Tell us about your business" %}</p>
 
-    <form hx-post="{% url 'setup:step' step=2 %}"
+    <form hx-post="{% url 'setup:step' step=3 %}"
           hx-target="#wizard-step-content"
           hx-swap="innerHTML">
         {% csrf_token %}
@@ -108,7 +108,7 @@
             <div class="stepper-actions-start">
                 <button type="button"
                         class="btn btn-outline"
-                        hx-get="{% url 'setup:step' step=1 %}"
+                        hx-get="{% url 'setup:step' step=2 %}"
                         hx-target="#wizard-step-content"
                         hx-swap="innerHTML">
                     {% icon "arrow-back-outline" %}
