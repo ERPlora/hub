@@ -1,124 +1,114 @@
 {% load i18n djicons %}
 
-<div class="cart">
-    {% if cart.items %}
-    {# Cart Header #}
-    <div class="cart-header">
-        <h2>
-            {% icon "cart-outline" %}
-            {% trans "Shopping Cart" %}
-            <span class="badge">{{ cart.items|length }}</span>
-        </h2>
+{% if cart.items %}
+{# Cart Items #}
+<div class="p-4">
+    <div class="flex items-center justify-between mb-4">
+        <span class="text-sm opacity-60">{{ cart.items|length }} {% trans "item" %}{{ cart.items|length|pluralize:"s" }}</span>
         <button type="button"
-                class="btn btn-ghost btn-sm"
+                class="btn btn-ghost btn-sm color-error"
                 hx-delete="{% url 'marketplace:cart_clear' %}"
-                hx-target="#cart-content"
+                hx-target="#cart-sheet-content"
                 hx-swap="innerHTML"
-                hx-confirm="{% trans 'Are you sure you want to clear your cart?' %}">
+                hx-confirm="{% trans 'Clear cart?' %}">
             {% icon "trash-outline" %}
-            <span>{% trans "Clear" %}</span>
+            {% trans "Clear" %}
         </button>
     </div>
 
-    {# Cart Items #}
-    <div class="cart-items">
-        <ul>
-            {% for item in cart.items %}
-            <li class="cart-item">
-                {# Item Icon #}
-                <div class="flex items-center justify-center">
+    <div class="list list-inset glass">
+        {% for item in cart.items %}
+        <div class="list-item list-item-multiline">
+            <div class="list-item-start">
+                <span style="font-size: 20px; color: var(--color-primary);">
                     {% icon item.icon|default:"cube-outline" %}
-                </div>
-
-                {# Item Content #}
-                <div class="cart-item-content">
-                    <h3 class="cart-item-name">{{ item.name }}</h3>
-                    {% if item.quantity > 1 %}
-                    <p class="cart-item-meta">{% trans "Qty:" %} {{ item.quantity }}</p>
-                    {% endif %}
-                    {% if item.price > 0 %}
-                    <span class="cart-item-unit">&euro;{{ item.price }} {% trans "each" %}</span>
-                    {% endif %}
-                </div>
-
-                {# Item Price #}
-                <div class="cart-item-price">
-                    {% if item.price == 0 %}
-                    <span style="color: var(--color-success);">{% trans "Free" %}</span>
+                </span>
+            </div>
+            <div class="list-item-content">
+                <span class="list-item-label">{{ item.name }}</span>
+                <span class="list-item-note">
+                    {% if item.module_type == 'subscription' %}
+                    &euro;{{ item.price|floatformat:2 }}/{% trans "mo" %}
+                    {% elif item.price == 0 %}
+                    {% trans "Free" %}
                     {% else %}
-                    &euro;{% widthratio item.price 1 item.quantity %}
+                    &euro;{{ item.price|floatformat:2 }}
                     {% endif %}
-                </div>
-
-                {# Remove Button #}
+                </span>
+            </div>
+            <div class="list-item-end">
                 <button type="button"
                         class="btn btn-ghost btn-sm"
                         hx-delete="{% url 'marketplace:cart_remove' item.id %}"
-                        hx-target="#cart-content"
-                        hx-swap="innerHTML"
-                        title="{% trans 'Remove' %}">
-                    {% icon "trash-outline" %}
+                        hx-target="#cart-sheet-content"
+                        hx-swap="innerHTML">
+                    {% icon "close-outline" %}
                 </button>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-
-    {# Cart Summary #}
-    <div class="cart-summary">
-        <div class="cart-summary-row">
-            <span>{% trans "Total" %}</span>
-            <span class="cart-summary-value">
-                {% if cart.total == 0 %}
-                {% trans "Free" %}
-                {% else %}
-                &euro;{{ cart.total|floatformat:2 }}
-                {% endif %}
-            </span>
+            </div>
         </div>
+        {% endfor %}
     </div>
-
-    {# Cart Actions #}
-    <div class="cart-actions">
-        <button type="button"
-                class="btn btn-lg color-primary"
-                onclick="checkoutCart()">
-            {% icon "card-outline" %}
-            <span>{% trans "Checkout" %}</span>
-        </button>
-        <button type="button"
-                class="btn btn-outline"
-                hx-get="{% url 'marketplace:index' %}"
-                hx-target="#main-content-area"
-                hx-push-url="true">
-            {% icon "arrow-back-outline" %}
-            <span>{% trans "Continue Shopping" %}</span>
-        </button>
-    </div>
-
-    {% else %}
-    {# Empty Cart State #}
-    <div class="flex flex-col items-center justify-center py-8">
-        <div>
-            {% icon "cart-outline" %}
-        </div>
-        <h3>{% trans "Your cart is empty" %}</h3>
-        <p class="text-base-content/60">{% trans "Add items from the marketplace to get started" %}</p>
-        <button type="button"
-                class="btn color-primary mt-6"
-                hx-get="{% url 'marketplace:index' %}"
-                hx-target="#main-content-area"
-                hx-push-url="true">
-            {% icon "storefront-outline" %}
-            <span>{% trans "Browse Marketplace" %}</span>
-        </button>
-    </div>
-    {% endif %}
 </div>
 
+{# Cart Summary + Checkout #}
+<div class="p-4 mt-auto" style="border-top: 0.5px solid var(--color-base-200);">
+    <div class="flex items-center justify-between mb-4">
+        <span class="text-sm font-semibold">{% trans "Total" %}</span>
+        <span class="text-lg font-bold" style="color: var(--color-primary);">
+            {% if cart.total == 0 %}
+            {% trans "Free" %}
+            {% else %}
+            &euro;{{ cart.total|floatformat:2 }}
+            {% endif %}
+        </span>
+    </div>
+
+    <p class="text-xs opacity-50 mb-3">{% trans "Tax will be calculated at checkout." %}</p>
+
+    <button type="button"
+            class="btn btn-lg btn-block color-primary"
+            onclick="checkoutCart(this)">
+        {% icon "card-outline" %}
+        {% trans "Checkout" %}
+    </button>
+</div>
+
+{% else %}
+{# Empty Cart #}
+<div class="flex flex-col items-center justify-center py-12 px-4 text-center">
+    <span style="font-size: 48px; opacity: 0.2; margin-bottom: 1rem;">
+        {% icon "cart-outline" %}
+    </span>
+    <h3 class="text-sm font-semibold mb-1">{% trans "Your cart is empty" %}</h3>
+    <p class="text-xs opacity-50">{% trans "Add paid modules to get started." %}</p>
+</div>
+{% endif %}
+
 <script>
-function checkoutCart() {
-    // TODO: Implement checkout flow
-    Toast.info('{% trans "Checkout coming soon!" %}');
+async function checkoutCart(btn) {
+    var originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-sm"></span> {% trans "Processing..." %}';
+    try {
+        var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+            || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+        var response = await fetch('{% url "marketplace:cart_checkout" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        });
+        var data = await response.json();
+        if (data.checkout_url) {
+            window.open(data.checkout_url, '_blank');
+            if (typeof Toast !== 'undefined') Toast.info('{% trans "Complete payment in the opened window" %}');
+        } else if (data.message) {
+            if (typeof Toast !== 'undefined') Toast.info(data.message);
+        } else {
+            if (typeof Toast !== 'undefined') Toast.error(data.error || '{% trans "Checkout failed" %}');
+        }
+    } catch (e) {
+        if (typeof Toast !== 'undefined') Toast.error('{% trans "Error starting checkout" %}');
+    }
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
 }
 </script>

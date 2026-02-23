@@ -1,0 +1,208 @@
+{% load i18n djicons %}
+
+{% if error %}
+<div class="callout callout-warning mt-5">
+    <div class="callout-content">
+        <p class="callout-text">{% icon "alert-circle-outline" %} {{ error }}</p>
+    </div>
+</div>
+{% elif solution %}
+
+<div class="mt-5" x-data="solutionInstall()">
+    {# Hero card #}
+    <div class="card glass mb-6">
+        <div class="card-body p-6">
+            <div class="flex items-start gap-4">
+                <div class="module-card-icon shrink-0" style="background-color: {{ solution.color }}; color: white; width: 56px; height: 56px;">
+                    {% icon solution.icon|default:"briefcase-outline" css_class="text-2xl" %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-xl font-bold mb-1">{{ solution.name }}</h2>
+                    {% if solution.industry_name %}
+                    <span class="chip chip-sm mb-2">{{ solution.industry_name }}</span>
+                    {% endif %}
+                    <p class="text-sm opacity-60">{{ solution.tagline }}</p>
+                </div>
+                <div class="shrink-0">
+                    {% if all_installed %}
+                    <span class="badge color-success">
+                        {% icon "checkmark-circle" %}
+                        {% trans "Installed" %}
+                    </span>
+                    {% else %}
+                    <button class="btn color-primary"
+                            @click="installSolution()"
+                            :disabled="installing">
+                        <span x-show="!installing">
+                            {% icon "download-outline" %}
+                            {% trans "Install Solution" %}
+                        </span>
+                        <span x-show="installing" class="flex items-center gap-2">
+                            <span class="loading loading-sm"></span>
+                            {% trans "Installing..." %}
+                        </span>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Description #}
+    {% if solution.description %}
+    <div class="card glass mb-6">
+        <div class="card-body p-6">
+            <h3 class="text-sm font-semibold mb-3">{% trans "Description" %}</h3>
+            <div class="text-sm opacity-70 leading-relaxed">{{ solution.description|linebreaksbr }}</div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Required modules #}
+    {% if required_modules %}
+    <div class="mb-6">
+        <h3 class="text-sm font-semibold mb-3">
+            {% icon "checkmark-circle-outline" css_class="text-primary" %}
+            {% trans "Required Modules" %}
+            <span class="badge badge-sm ml-1">{{ required_modules|length }}</span>
+        </h3>
+        <div class="list list-inset glass">
+            {% for mod in required_modules %}
+            <div class="list-item list-item-multiline">
+                <div class="list-item-start">
+                    <div class="module-card-icon" style="width: 36px; height: 36px;">
+                        {% icon mod.icon|default:"cube-outline" %}
+                    </div>
+                </div>
+                <div class="list-item-content">
+                    <span class="list-item-label">{{ mod.name }}</span>
+                    <span class="list-item-note">{{ mod.description|truncatewords:15 }}</span>
+                </div>
+                <div class="list-item-end">
+                    {% if mod.is_installed %}
+                    <span class="badge badge-sm color-success">{% trans "Installed" %}</span>
+                    {% elif mod.module_type == 'free' %}
+                    <span class="badge badge-sm color-success">{% trans "Free" %}</span>
+                    {% else %}
+                    <span class="badge badge-sm">&euro;{{ mod.price }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Optional modules #}
+    {% if optional_modules %}
+    <div class="mb-6">
+        <h3 class="text-sm font-semibold mb-3">
+            {% icon "add-circle-outline" css_class="opacity-50" %}
+            {% trans "Optional Modules" %}
+            <span class="badge badge-sm ml-1">{{ optional_modules|length }}</span>
+        </h3>
+        <div class="list list-inset glass">
+            {% for mod in optional_modules %}
+            <div class="list-item list-item-multiline">
+                <div class="list-item-start">
+                    <div class="module-card-icon" style="width: 36px; height: 36px;">
+                        {% icon mod.icon|default:"cube-outline" %}
+                    </div>
+                </div>
+                <div class="list-item-content">
+                    <span class="list-item-label">{{ mod.name }}</span>
+                    <span class="list-item-note">{{ mod.description|truncatewords:15 }}</span>
+                </div>
+                <div class="list-item-end">
+                    {% if mod.is_installed %}
+                    <span class="badge badge-sm color-success">{% trans "Installed" %}</span>
+                    {% elif mod.module_type == 'free' %}
+                    <span class="badge badge-sm color-success">{% trans "Free" %}</span>
+                    {% else %}
+                    <span class="badge badge-sm">&euro;{{ mod.price }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Roles #}
+    {% if solution.roles %}
+    <div class="mb-6">
+        <h3 class="text-sm font-semibold mb-3">
+            {% icon "people-outline" css_class="opacity-50" %}
+            {% trans "Pre-configured Roles" %}
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {% for role in solution.roles %}
+            <div class="card glass">
+                <div class="card-body p-4">
+                    <h4 class="font-semibold text-sm mb-1">{{ role.role_display_name }}</h4>
+                    {% if role.role_description %}
+                    <p class="text-xs opacity-60 mb-2">{{ role.role_description }}</p>
+                    {% endif %}
+                    <div class="flex flex-wrap gap-1">
+                        {% for wc in role.wildcards %}
+                        <span class="chip chip-sm">{{ wc }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Install progress toast #}
+    <div x-show="installResult" x-cloak class="callout mt-4"
+         :class="installResult?.success ? 'callout-success' : 'callout-error'">
+        <div class="callout-content">
+            <p class="callout-text" x-text="installResult?.message"></p>
+        </div>
+    </div>
+</div>
+
+<script>
+function solutionInstall() {
+    return {
+        installing: false,
+        installResult: null,
+        async installSolution() {
+            this.installing = true;
+            this.installResult = null;
+            try {
+                const response = await fetch('{% url "marketplace:solution_install" slug=solution.slug %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                            || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const msg = data.installed + ' {% trans "of" %} ' + data.total + ' {% trans "modules installed." %}';
+                    this.installResult = { success: true, message: msg };
+                    if (data.requires_restart) {
+                        if (confirm('{% trans "Server needs to restart to load new modules. Restart now?" %}')) {
+                            fetch('/modules/api/marketplace/restart/', { method: 'POST',
+                                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                                    || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '' }
+                            });
+                            setTimeout(() => window.location.reload(), 3000);
+                        }
+                    }
+                } else {
+                    this.installResult = { success: false, message: data.error || '{% trans "Installation failed." %}' };
+                }
+            } catch (e) {
+                this.installResult = { success: false, message: e.message };
+            }
+            this.installing = false;
+        }
+    };
+}
+</script>
+{% endif %}

@@ -149,10 +149,15 @@
                     </button>
                     {% else %}
                     <button class="btn btn-sm color-primary"
-                            data-action="purchase"
-                            data-module-id="{{ module.id }}">
+                            data-action="add-to-cart"
+                            data-module-id="{{ module.id }}"
+                            data-module-name="{{ module.name }}"
+                            data-module-slug="{{ module.slug }}"
+                            data-module-price="{{ module.price }}"
+                            data-module-icon="{{ module.display_icon|default:'cube-outline' }}"
+                            data-module-type="{{ module.module_type }}">
                         {% icon "cart-outline" %}
-                        {% trans "Purchase" %}
+                        {% trans "Add to Cart" %}
                     </button>
                     {% endif %}
 

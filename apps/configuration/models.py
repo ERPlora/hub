@@ -246,6 +246,16 @@ class HubConfig(SingletonConfigMixin, models.Model):
     )
     auto_print = models.BooleanField(default=False)
 
+    # Solution (selected during setup wizard)
+    solution_slug = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text='Selected solution slug from Cloud (e.g., salon-pos)'
+    )
+    solution_name = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text='Selected solution display name (e.g., Salon & Spa)'
+    )
+
     # Hardware Bridge
     bridge_enabled = models.BooleanField(
         default=False,

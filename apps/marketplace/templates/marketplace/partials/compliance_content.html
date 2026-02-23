@@ -1,0 +1,38 @@
+{% load i18n djicons marketplace_tags %}
+
+<div class="mt-5">
+    {% if countries %}
+    <div class="mb-4">
+        <p class="text-sm opacity-60">{% trans "Select your country to see the required modules for legal compliance." %}</p>
+    </div>
+
+    <div class="list list-inset glass">
+        {% for country in countries %}
+        <button class="list-item list-item-clickable list-item-multiline"
+                hx-get="{% url 'marketplace:compliance_detail' country_code=country.country_code %}"
+                hx-target="#main-content-area"
+                hx-push-url="true">
+            <div class="list-item-start">
+                <span class="text-2xl">{{ country.country_code|country_flag }}</span>
+            </div>
+            <div class="list-item-content">
+                <span class="list-item-label">{{ country.country_name }}</span>
+                {% if country.description %}
+                <span class="list-item-note">{{ country.description|truncatewords:12 }}</span>
+                {% endif %}
+            </div>
+            <div class="list-item-end">
+                <span class="badge badge-sm">{{ country.module_count }} {% trans "modules" %}</span>
+                <span class="list-item-chevron"></span>
+            </div>
+        </button>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+        {% icon "shield-checkmark-outline" css_class="text-6xl opacity-20 mb-4" %}
+        <h3 class="text-lg font-semibold mb-2">{% trans "No Compliance Data Available" %}</h3>
+        <p class="text-sm opacity-60">{% trans "Could not load compliance requirements. Please check your internet connection and try again." %}</p>
+    </div>
+    {% endif %}
+</div>

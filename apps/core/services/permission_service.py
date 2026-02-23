@@ -33,15 +33,14 @@ class PermissionService:
         'inventory.view_product', 'inventory.add_product', etc.
     """
 
-    # Default roles configuration for ERP
-    # These are standard roles that cover most business scenarios
+    # Basic roles — always created, always active, not tied to any solution
     DEFAULT_ROLES = [
         {
             'name': 'admin',
             'display_name': 'Administrator',
             'description': 'Full system access. Can manage all settings, users, and data.',
             'is_system': True,
-            'wildcards': ['*'],  # All permissions in all modules
+            'wildcards': ['*'],
         },
         {
             'name': 'manager',
@@ -71,39 +70,12 @@ class PermissionService:
             ],
         },
         {
-            'name': 'accountant',
-            'display_name': 'Accountant',
-            'description': 'Finance access. Invoicing, reports, and financial data.',
+            'name': 'viewer',
+            'display_name': 'Viewer',
+            'description': 'Read-only access. Can view all data but cannot create, edit, or delete anything.',
             'is_system': True,
             'wildcards': [
-                'invoicing.*',
-                'reports.*',
-                'sales.view_*',
-                'customers.view_*',
-                'cash_register.view_*',
-            ],
-        },
-        {
-            'name': 'warehouse',
-            'display_name': 'Warehouse',
-            'description': 'Inventory management. Full inventory access, view sales.',
-            'is_system': True,
-            'wildcards': [
-                'inventory.*',
-                'sales.view_*',
-            ],
-        },
-        {
-            'name': 'cashier',
-            'display_name': 'Cashier',
-            'description': 'Point of sale access. Sales, cash register, and product viewing.',
-            'is_system': True,
-            'wildcards': [
-                'sales.*',
-                'cash_register.*',
-                'inventory.view_*',
-                'customers.view_*',
-                'customers.add_*',
+                '*.view_*',
             ],
         },
     ]
@@ -312,6 +284,7 @@ class PermissionService:
                     'display_name': role_config['display_name'],
                     'description': role_config['description'],
                     'is_system': role_config['is_system'],
+                    'source': 'basic',
                 }
             )
 
@@ -330,6 +303,56 @@ class PermissionService:
             roles.append(role)
 
         return roles
+
+    @classmethod
+    @transaction.atomic
+    def create_solution_roles(cls, hub_id: str, roles_data: list) -> List:
+        """
+        Create/activate roles from a solution's role definitions.
+
+        Called when user selects a solution during setup. Creates the
+        solution-specific roles (e.g., cashier, waiter, kitchen) with
+        their permission wildcards.
+
+        Args:
+            hub_id: Hub UUID
+            roles_data: List of dicts from Cloud API with keys:
+                role_name, role_display_name, role_description, wildcards
+
+        Returns:
+            List of created/updated Role instances
+        """
+        from apps.accounts.models import Role, RolePermission
+
+        created_roles = []
+        for role_data in roles_data:
+            role, created = Role.objects.update_or_create(
+                hub_id=hub_id,
+                name=role_data['role_name'],
+                defaults={
+                    'display_name': role_data['role_display_name'],
+                    'description': role_data.get('role_description', ''),
+                    'is_system': True,
+                    'is_active': True,
+                    'source': 'solution',
+                }
+            )
+
+            if created:
+                logger.info(f"Created solution role: {role.name}")
+
+            # Add wildcard permissions
+            for wildcard in role_data.get('wildcards', []):
+                RolePermission.objects.get_or_create(
+                    hub_id=hub_id,
+                    role=role,
+                    wildcard=wildcard,
+                    defaults={'permission': None}
+                )
+
+            created_roles.append(role)
+
+        return created_roles
 
     @classmethod
     def expand_role_permissions(cls, role) -> Set[str]:

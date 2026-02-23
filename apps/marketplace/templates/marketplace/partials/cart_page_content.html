@@ -1,33 +1,6 @@
 {% load i18n component_tags djicons %}
 
 {% component "page" title=_("Cart") back_hx_get="/marketplace/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {# Marketplace tabbar - manual since it's not a module #}
-    <script>
-    (function() {
-        if (typeof window.updateGlobalTabBar === 'function') {
-            window.updateGlobalTabBar([
-                {
-                    url: '{% url "marketplace:index" %}',
-                    icon: 'cube-outline',
-                    label: '{% trans "Modules" %}',
-                    active: false
-                },
-                {
-                    url: '{% url "marketplace:store_hubs" %}',
-                    icon: 'server-outline',
-                    label: '{% trans "Hubs" %}',
-                    active: false
-                },
-                {
-                    url: '{% url "marketplace:cart_page" %}',
-                    icon: 'cart-outline',
-                    label: '{% trans "Cart" %}',
-                    active: true
-                }
-            ]);
-        }
-    })();
-    </script>
     {% fill "content" %}
         {% if cart.items %}
         <div class="card m-0 mb-lg">
