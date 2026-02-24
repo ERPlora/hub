@@ -5,8 +5,15 @@ Tests the multi-step HTMX wizard for initial Hub configuration.
 URL patterns (app_name='setup'):
 - setup:wizard -> /setup/
 - setup:step -> /setup/step/<int:step>/
+
+Steps:
+1. Regional settings (language, timezone, country)
+2. Modules (functional block selection)
+3. Business information (name, address, VAT)
+4. Tax configuration (rate, included)
 """
 import pytest
+import json
 from decimal import Decimal
 from django.urls import reverse
 
@@ -64,21 +71,58 @@ class TestStep1Regional:
         assert config.timezone == 'Europe/Madrid'
 
 
-class TestStep2Business:
-    """Tests for step 2 (business information)."""
+class TestStep2Modules:
+    """Tests for step 2 (functional block selection)."""
 
-    def test_step2_get_returns_business_form(self, authenticated_client, unconfigured_store, hub_config):
-        """GET step 2 should return the business info form."""
+    def test_step2_get_returns_modules_form(self, authenticated_client, unconfigured_store, hub_config):
+        """GET step 2 should return the modules/blocks form."""
         url = reverse('setup:step', kwargs={'step': 2})
         response = authenticated_client.get(url)
 
         assert response.status_code == 200
 
-    def test_step2_post_saves_business_info(self, authenticated_client, unconfigured_store, hub_config):
-        """POST step 2 should save business information to StoreConfig."""
-        from apps.configuration.models import StoreConfig
+    def test_step2_post_saves_selected_blocks(self, authenticated_client, unconfigured_store, hub_config):
+        """POST step 2 should save selected blocks to HubConfig."""
+        from apps.configuration.models import HubConfig
 
         url = reverse('setup:step', kwargs={'step': 2})
+        response = authenticated_client.post(url, {
+            'selected_blocks': json.dumps(['crm', 'pos', 'invoicing']),
+        })
+
+        assert response.status_code == 200
+
+        # Verify data was saved
+        config = HubConfig.get_solo()
+        assert config.selected_blocks == ['crm', 'pos', 'invoicing']
+
+    def test_step2_post_fails_without_blocks(self, authenticated_client, unconfigured_store, hub_config):
+        """POST step 2 without blocks should re-render with errors."""
+        url = reverse('setup:step', kwargs={'step': 2})
+        response = authenticated_client.post(url, {
+            'selected_blocks': '',
+        })
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'select at least one block' in content.lower() or 'error' in content.lower()
+
+
+class TestStep3Business:
+    """Tests for step 3 (business information)."""
+
+    def test_step3_get_returns_business_form(self, authenticated_client, unconfigured_store, hub_config):
+        """GET step 3 should return the business info form."""
+        url = reverse('setup:step', kwargs={'step': 3})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == 200
+
+    def test_step3_post_saves_business_info(self, authenticated_client, unconfigured_store, hub_config):
+        """POST step 3 should save business information to StoreConfig."""
+        from apps.configuration.models import StoreConfig
+
+        url = reverse('setup:step', kwargs={'step': 3})
         response = authenticated_client.post(url, {
             'business_name': 'My Test Shop',
             'business_address': '456 Commerce Ave',
@@ -95,9 +139,9 @@ class TestStep2Business:
         assert config.business_address == '456 Commerce Ave'
         assert config.vat_number == 'ES87654321B'
 
-    def test_step2_post_fails_without_required_fields(self, authenticated_client, unconfigured_store, hub_config):
-        """POST step 2 without required fields should re-render with errors."""
-        url = reverse('setup:step', kwargs={'step': 2})
+    def test_step3_post_fails_without_required_fields(self, authenticated_client, unconfigured_store, hub_config):
+        """POST step 3 without required fields should re-render with errors."""
+        url = reverse('setup:step', kwargs={'step': 3})
         response = authenticated_client.post(url, {
             'business_name': '',
             'business_address': '',
@@ -106,25 +150,25 @@ class TestStep2Business:
 
         assert response.status_code == 200
         content = response.content.decode()
-        # Should contain error indicators (re-rendered step 2 with errors)
+        # Should contain error indicators (re-rendered step 3 with errors)
         assert 'required' in content.lower() or 'error' in content.lower()
 
 
-class TestStep3Tax:
-    """Tests for step 3 (tax configuration)."""
+class TestStep4Tax:
+    """Tests for step 4 (tax configuration)."""
 
-    def test_step3_get_returns_tax_form(self, authenticated_client, unconfigured_store, hub_config):
-        """GET step 3 should return the tax configuration form."""
-        url = reverse('setup:step', kwargs={'step': 3})
+    def test_step4_get_returns_tax_form(self, authenticated_client, unconfigured_store, hub_config):
+        """GET step 4 should return the tax configuration form."""
+        url = reverse('setup:step', kwargs={'step': 4})
         response = authenticated_client.get(url)
 
         assert response.status_code == 200
 
-    def test_step3_post_completes_setup_with_hx_redirect(self, authenticated_client, unconfigured_store, hub_config):
-        """POST step 3 should complete setup and return HX-Redirect to home."""
+    def test_step4_post_completes_setup_with_hx_redirect(self, authenticated_client, unconfigured_store, hub_config):
+        """POST step 4 should complete setup and return HX-Redirect to home."""
         from apps.configuration.models import StoreConfig
 
-        url = reverse('setup:step', kwargs={'step': 3})
+        url = reverse('setup:step', kwargs={'step': 4})
         response = authenticated_client.post(url, {
             'tax_rate': '21',
             'tax_included': 'on',
@@ -141,10 +185,10 @@ class TestStep3Tax:
 
 
 class TestFullWizardFlow:
-    """Tests for the complete wizard flow from step 1 through step 3."""
+    """Tests for the complete wizard flow from step 1 through step 4."""
 
     def test_full_wizard_flow(self, authenticated_client, unconfigured_store, hub_config):
-        """Complete wizard flow: step 1 -> 2 -> 3 -> redirects to home."""
+        """Complete wizard flow: step 1 -> 2 -> 3 -> 4 -> redirects to home."""
         from apps.configuration.models import HubConfig, StoreConfig
 
         # Step 1: Regional settings
@@ -160,9 +204,20 @@ class TestFullWizardFlow:
         assert hub.language == 'en'
         assert hub.timezone == 'Europe/London'
 
-        # Step 2: Business info
+        # Step 2: Module selection
         step2_url = reverse('setup:step', kwargs={'step': 2})
         response = authenticated_client.post(step2_url, {
+            'selected_blocks': json.dumps(['crm', 'pos', 'invoicing']),
+        })
+        assert response.status_code == 200
+
+        # Verify step 2 saved
+        hub.refresh_from_db()
+        assert hub.selected_blocks == ['crm', 'pos', 'invoicing']
+
+        # Step 3: Business info
+        step3_url = reverse('setup:step', kwargs={'step': 3})
+        response = authenticated_client.post(step3_url, {
             'business_name': 'Flow Test Store',
             'business_address': '789 Flow St',
             'vat_number': 'GB123456789',
@@ -171,13 +226,13 @@ class TestFullWizardFlow:
         })
         assert response.status_code == 200
 
-        # Verify step 2 saved
+        # Verify step 3 saved
         store = StoreConfig.get_solo()
         assert store.business_name == 'Flow Test Store'
 
-        # Step 3: Tax config (final)
-        step3_url = reverse('setup:step', kwargs={'step': 3})
-        response = authenticated_client.post(step3_url, {
+        # Step 4: Tax config (final)
+        step4_url = reverse('setup:step', kwargs={'step': 4})
+        response = authenticated_client.post(step4_url, {
             'tax_rate': '20',
             'tax_included': 'on',
         })

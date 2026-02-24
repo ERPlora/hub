@@ -206,7 +206,7 @@ class TestCreateDefaultRoles:
         """Test that default roles are created."""
         roles = PermissionService.create_default_roles(str(hub_id))
 
-        assert len(roles) == 3  # admin, manager, employee
+        assert len(roles) == 4  # admin, manager, employee, viewer
 
         # Verify admin role
         admin = Role.objects.get(hub_id=hub_id, name='admin')
@@ -220,6 +220,10 @@ class TestCreateDefaultRoles:
         # Verify employee role
         employee = Role.objects.get(hub_id=hub_id, name='employee')
         assert employee.is_system is True
+
+        # Verify viewer role
+        viewer = Role.objects.get(hub_id=hub_id, name='viewer')
+        assert viewer.is_system is True
 
     def test_admin_has_all_wildcard(self, db, hub_id):
         """Test that admin role gets '*' wildcard."""
@@ -246,8 +250,8 @@ class TestCreateDefaultRoles:
 
         roles = PermissionService.create_default_roles(str(hub_id))
 
-        # Should still return 3 roles (including existing)
-        assert len(roles) == 3
+        # Should still return 4 roles (including existing)
+        assert len(roles) == 4
 
         # Only one admin should exist
         assert Role.objects.filter(hub_id=hub_id, name='admin').count() == 1

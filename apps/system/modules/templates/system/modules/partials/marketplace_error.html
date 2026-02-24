@@ -7,7 +7,7 @@
         <p class="mb-4 text-medium">{{ error }}</p>
         <button
             class="btn color-error"
-            hx-get="{% url 'store:modules_list' %}"
+            hx-get="{% url 'mymodules:htmx_list' %}"
             hx-target="#marketplace-modules-grid"
             hx-swap="innerHTML"
             hx-indicator="#loading-spinner">
