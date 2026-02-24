@@ -244,7 +244,6 @@ Esto evita conflictos con las URLs del sistema:
 - Estado visible en el filesystem
 - No requiere base de datos
 - Activar/desactivar = renombrar carpeta
-- Funciona offline
 
 ---
 

@@ -12,6 +12,7 @@ import requests
 from pathlib import Path
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 from django.conf import settings as django_settings
 from django.core.management import call_command
@@ -110,17 +111,17 @@ def module_activate(request, module_id):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+        return JsonResponse({'success': False, 'error': _('Not authenticated')}, status=401)
 
     modules_dir = Path(django_settings.MODULES_DIR)
     disabled_folder = modules_dir / f"_{module_id}"
     active_folder = modules_dir / module_id
 
     if not disabled_folder.exists():
-        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
+        return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
 
     if active_folder.exists():
-        return JsonResponse({'success': False, 'error': 'Module already active'}, status=400)
+        return JsonResponse({'success': False, 'error': _('Module already active')}, status=400)
 
     try:
         # Rename folder to activate
@@ -153,7 +154,7 @@ def module_activate(request, module_id):
 
         return JsonResponse({
             'success': True,
-            'message': 'Module activated and migrations applied. Restart required for URLs.',
+            'message': _('Module activated and migrations applied. Restart required for URLs.'),
             'requires_restart': True
         })
     except Exception as e:
@@ -167,22 +168,22 @@ def module_deactivate(request, module_id):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+        return JsonResponse({'success': False, 'error': _('Not authenticated')}, status=401)
 
     modules_dir = Path(django_settings.MODULES_DIR)
     active_folder = modules_dir / module_id
     disabled_folder = modules_dir / f"_{module_id}"
 
     if not active_folder.exists():
-        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
+        return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
 
     if disabled_folder.exists():
-        return JsonResponse({'success': False, 'error': 'Module already disabled'}, status=400)
+        return JsonResponse({'success': False, 'error': _('Module already disabled')}, status=400)
 
     try:
         # Rename folder to deactivate
         active_folder.rename(disabled_folder)
-        return JsonResponse({'success': True, 'message': 'Module deactivated. Restart required.'})
+        return JsonResponse({'success': True, 'message': _('Module deactivated. Restart required.')})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
@@ -194,7 +195,7 @@ def module_delete(request, module_id):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+        return JsonResponse({'success': False, 'error': _('Not authenticated')}, status=401)
 
     modules_dir = Path(django_settings.MODULES_DIR)
 
@@ -209,12 +210,12 @@ def module_delete(request, module_id):
         folder_to_delete = disabled_folder
 
     if not folder_to_delete:
-        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
+        return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
 
     try:
         # Delete folder completely
         shutil.rmtree(folder_to_delete)
-        return JsonResponse({'success': True, 'message': 'Module deleted successfully.'})
+        return JsonResponse({'success': True, 'message': _('Module deleted successfully.')})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
@@ -226,7 +227,7 @@ def module_restart_server(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+        return JsonResponse({'success': False, 'error': _('Not authenticated')}, status=401)
 
     try:
         # Run migrations for all active modules
@@ -245,7 +246,7 @@ def module_restart_server(request):
 
         return JsonResponse({
             'success': True,
-            'message': 'Server restarting... Migrations applied.'
+            'message': _('Server restarting... Migrations applied.')
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
@@ -294,7 +295,7 @@ def fetch_marketplace(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+        return JsonResponse({'success': False, 'error': _('Not authenticated')}, status=401)
 
     try:
         # Get Hub configuration
@@ -314,7 +315,7 @@ def fetch_marketplace(request):
         if not auth_token:
             return JsonResponse({
                 'success': False,
-                'error': 'Hub not connected to Cloud. Please connect your Hub in Settings to access the marketplace.'
+                'error': _('Hub not connected to Cloud. Please connect your Hub in Settings to access the marketplace.')
             }, status=401)
 
         headers['X-Hub-Token'] = auth_token
@@ -387,7 +388,7 @@ def purchase_module(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+        return JsonResponse({'success': False, 'error': _('Not authenticated')}, status=401)
 
     try:
         data = json.loads(request.body)
@@ -396,7 +397,7 @@ def purchase_module(request):
         if not module_id:
             return JsonResponse({
                 'success': False,
-                'error': 'Missing module_id'
+                'error': _('Missing module_id')
             }, status=400)
 
         # Get Hub configuration to get the cloud_api_token
@@ -406,7 +407,7 @@ def purchase_module(request):
         if not hub_config.hub_jwt and not hub_config.cloud_api_token:
             return JsonResponse({
                 'success': False,
-                'error': 'Hub not connected to Cloud. Please configure your Hub first.'
+                'error': _('Hub not connected to Cloud. Please configure your Hub first.')
             }, status=400)
 
         # Get Cloud API URL
@@ -512,7 +513,7 @@ def check_ownership(request, module_id):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+        return JsonResponse({'success': False, 'error': _('Not authenticated')}, status=401)
 
     try:
         # Get Hub configuration
@@ -523,7 +524,7 @@ def check_ownership(request, module_id):
             return JsonResponse({
                 'success': False,
                 'owned': False,
-                'error': 'Hub not connected to Cloud'
+                'error': _('Hub not connected to Cloud')
             }, status=400)
 
         # Get Cloud API URL
@@ -577,7 +578,7 @@ def install_from_marketplace(request):
     """
     # Check if user is logged in
     if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+        return JsonResponse({'success': False, 'error': _('Not authenticated')}, status=401)
 
     try:
         data = json.loads(request.body)
@@ -588,7 +589,7 @@ def install_from_marketplace(request):
         if not module_slug or not download_url:
             return JsonResponse({
                 'success': False,
-                'error': 'Missing module_slug or download_url'
+                'error': _('Missing module_slug or download_url')
             }, status=400)
 
         modules_dir = Path(django_settings.MODULES_DIR)
@@ -598,7 +599,7 @@ def install_from_marketplace(request):
         if module_target_dir.exists() or (modules_dir / f"_{module_slug}").exists():
             return JsonResponse({
                 'success': False,
-                'error': 'Module already installed'
+                'error': _('Module already installed')
             }, status=400)
 
         # Download the module zip file
@@ -674,7 +675,7 @@ def install_from_marketplace(request):
     except zipfile.BadZipFile:
         return JsonResponse({
             'success': False,
-            'error': 'Invalid module package (not a valid zip file)'
+            'error': _('Invalid module package (not a valid zip file)')
         }, status=400)
     except Exception as e:
         print(f"[MARKETPLACE] Install error: {e}")

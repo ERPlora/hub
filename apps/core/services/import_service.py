@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 from django.core.files.uploadedfile import UploadedFile
+from django.utils.translation import gettext as _
 
 
 @dataclass
@@ -54,7 +55,7 @@ def parse_import_file(
     elif filename.endswith(('.xlsx', '.xls')):
         rows = _parse_excel(file)
     else:
-        raise ValueError("Unsupported file format. Please upload a CSV or Excel file.")
+        raise ValueError(_("Unsupported file format. Please upload a CSV or Excel file."))
 
     if expected_headers and rows:
         actual = set(rows[0].keys())
@@ -77,7 +78,7 @@ def _parse_csv(file: UploadedFile) -> List[dict]:
         except (UnicodeDecodeError, AttributeError):
             continue
     else:
-        raise ValueError("Could not decode file. Please ensure it is UTF-8 encoded.")
+        raise ValueError(_("Could not decode file. Please ensure it is UTF-8 encoded."))
 
     reader = csv.DictReader(io.StringIO(text))
     return list(reader)

@@ -1,12 +1,13 @@
 import os
 import sys
 from django.apps import AppConfig
+from django.utils.translation import gettext_lazy as _
 
 
 class SyncConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.sync'
-    verbose_name = 'Cloud Synchronization'
+    verbose_name = _('Cloud Synchronization')
 
     def ready(self):
         """
