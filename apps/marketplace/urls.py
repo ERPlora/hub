@@ -36,9 +36,10 @@ urlpatterns = [
     # Root: modules store (default)
     path('', views.store_index, {'store_type': 'modules'}, name='index'),
 
-    # Solutions
+    # Solutions (Functional Blocks)
     path('solutions/', views.solutions_index, name='solutions'),
     path('solutions/<slug:slug>/install/', views.solution_install, name='solution_install'),
+    path('solutions/<slug:slug>/toggle/', views.block_toggle, name='block_toggle'),
     path('solutions/<slug:slug>/', views.solution_detail, name='solution_detail'),
 
     # Compliance
