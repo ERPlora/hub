@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import HubBaseModel, HubManager, HubManagerWithDeleted
 
@@ -37,8 +38,8 @@ class TokenCache(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Token Cache'
-        verbose_name_plural = 'Token Cache'
+        verbose_name = _('Token Cache')
+        verbose_name_plural = _('Token Cache')
         db_table = 'sync_tokencache'
 
     def __str__(self):
@@ -132,8 +133,8 @@ class SyncQueue(HubBaseModel):
     all_objects = HubManagerWithDeleted()
 
     class Meta:
-        verbose_name = 'Sync Queue Item'
-        verbose_name_plural = 'Sync Queue'
+        verbose_name = _('Sync Queue Item')
+        verbose_name_plural = _('Sync Queue')
         ordering = ['created_at']
         db_table = 'sync_syncqueue'
         indexes = [

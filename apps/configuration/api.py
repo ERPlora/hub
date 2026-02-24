@@ -4,7 +4,7 @@ Configuration API
 Hub and Store configuration endpoints.
 """
 from django.conf import settings as django_settings
-from django.utils.translation import activate
+from django.utils.translation import activate, gettext as _
 from rest_framework import status, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -58,13 +58,13 @@ class HubConfigUpdateSerializer(serializers.ModelSerializer):
     def validate_currency(self, value):
         valid_currencies = [c[0] for c in django_settings.CURRENCY_CHOICES]
         if value not in valid_currencies:
-            raise serializers.ValidationError(f"Invalid currency")
+            raise serializers.ValidationError(_("Invalid currency"))
         return value
 
     def validate_os_language(self, value):
         valid_languages = [lang[0] for lang in django_settings.LANGUAGES]
         if value not in valid_languages:
-            raise serializers.ValidationError(f"Invalid language. Valid options: {valid_languages}")
+            raise serializers.ValidationError(_("Invalid language"))
         return value
 
 

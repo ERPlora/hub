@@ -17,6 +17,7 @@ import json
 from functools import wraps
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.utils.translation import gettext as _
 from .subscription_checker import get_subscription_checker
 from .loader import get_module_py, get_module_navigation
 import logging
@@ -46,7 +47,7 @@ def require_active_subscription(view_func):
         if 'modules' not in parts:
             logger.error(f"[SUBSCRIPTION] Decorator used outside module context: {view_module}")
             return JsonResponse({
-                'error': 'Invalid module context'
+                'error': _('Invalid module context')
             }, status=500)
 
         # Extraer module_id del módulo (e.g., modules.analytics.views -> analytics)
@@ -56,7 +57,7 @@ def require_active_subscription(view_func):
         except (ValueError, IndexError):
             logger.error(f"[SUBSCRIPTION] Could not extract module_id from module: {view_module}")
             return JsonResponse({
-                'error': 'Invalid module structure'
+                'error': _('Invalid module structure')
             }, status=500)
 
         # Verificar suscripción
@@ -74,15 +75,15 @@ def require_active_subscription(view_func):
             # Si es request AJAX, retornar JSON
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
-                    'error': 'Subscription required',
-                    'message': 'This feature requires an active subscription. Please renew your subscription to continue.',
+                    'error': _('Subscription required'),
+                    'message': _('This feature requires an active subscription. Please renew your subscription to continue.'),
                     'subscription_required': True
                 }, status=402)  # 402 Payment Required
 
             # Si es request normal, renderizar página de error
             return render(request, 'modules/subscription_required.html', {
                 'module_slug': module_slug,
-                'message': 'This feature requires an active subscription.'
+                'message': _('This feature requires an active subscription.')
             }, status=402)
 
         # Si tiene acceso, ejecutar vista normal
@@ -111,13 +112,13 @@ def require_module_purchased(module_type='paid'):
             parts = view_module.split('.')
 
             if 'modules' not in parts:
-                return JsonResponse({'error': 'Invalid module context'}, status=500)
+                return JsonResponse({'error': _('Invalid module context')}, status=500)
 
             try:
                 module_index = parts.index('modules')
                 module_slug = parts[module_index + 1]
             except (ValueError, IndexError):
-                return JsonResponse({'error': 'Invalid module structure'}, status=500)
+                return JsonResponse({'error': _('Invalid module structure')}, status=500)
 
             # Verificar acceso
             checker = get_subscription_checker()
@@ -126,8 +127,8 @@ def require_module_purchased(module_type='paid'):
             if not has_access:
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return JsonResponse({
-                        'error': 'Purchase required',
-                        'message': 'This feature requires purchasing the module.',
+                        'error': _('Purchase required'),
+                        'message': _('This feature requires purchasing the module.'),
                         'purchase_required': True
                     }, status=402)
 

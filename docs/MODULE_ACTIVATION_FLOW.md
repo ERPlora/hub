@@ -683,8 +683,6 @@ python manage.py migrate inventory
 
 ## Related Documentation
 
-- [MODULE_DEPENDENCIES.md](./MODULE_DEPENDENCIES.md) - Allowed libraries
-- [MODULE_DATABASE_CONFLICTS.md](./MODULE_DATABASE_CONFLICTS.md) - Avoiding table conflicts
 - [CLAUDE.md](../../CLAUDE.md) - System architecture overview
 
 ---
