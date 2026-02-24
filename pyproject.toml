@@ -2,7 +2,7 @@
 name = "erplora-hub"
 version = "0.12.1"
 description = "ERPlora Hub - Business Management Web Application with Django"
-readme = "docs/README.md"
+readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "BUSL-1.1" }
 authors = [
