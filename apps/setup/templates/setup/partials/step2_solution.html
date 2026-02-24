@@ -10,46 +10,109 @@
 </div>
 {% endif %}
 
-<div class="stepper-content">
-    <h2 class="text-xl font-semibold mb-1">{% trans "Choose Your Solution" %}</h2>
-    <p class="text-sm opacity-60 mb-6">{% trans "Select the solution that best fits your business" %}</p>
+<div class="stepper-content"
+     x-data="{
+        selected: new Set({{ selected_blocks_json }}),
+
+        toggle(slug) {
+            if (this.selected.has(slug)) {
+                this.selected.delete(slug);
+            } else {
+                this.selected.add(slug);
+            }
+            // Force Alpine reactivity on Set mutation
+            this.selected = new Set(this.selected);
+        },
+
+        applyPreset(slugs) {
+            this.selected = new Set(slugs);
+        },
+
+        clearAll() {
+            this.selected = new Set();
+        },
+
+        get selectedJson() {
+            return JSON.stringify([...this.selected]);
+        },
+
+        get count() {
+            return this.selected.size;
+        }
+     }">
+
+    <h2 class="text-xl font-semibold mb-1">{% trans "Choose Your Modules" %}</h2>
+    <p class="text-sm opacity-60 mb-4">{% trans "Select the functional blocks your business needs. You can always add more later." %}</p>
+
+    {# Quick Start Presets #}
+    <div class="mb-5">
+        <p class="text-xs font-medium opacity-50 uppercase tracking-wide mb-2">{% trans "Quick Start" %}</p>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" class="chip cursor-pointer"
+                    @click="applyPreset(['crm','pos','inventory','invoicing'])">
+                {% icon "storefront-outline" class="text-sm" %} {% trans "Retail" %}
+            </button>
+            <button type="button" class="chip cursor-pointer"
+                    @click="applyPreset(['crm','pos','inventory','hospitality','invoicing'])">
+                {% icon "restaurant-outline" class="text-sm" %} {% trans "Restaurant" %}
+            </button>
+            <button type="button" class="chip cursor-pointer"
+                    @click="applyPreset(['crm','services','appointments','invoicing','commissions','online-booking'])">
+                {% icon "cut-outline" class="text-sm" %} {% trans "Services" %}
+            </button>
+            <button type="button" class="chip cursor-pointer"
+                    @click="applyPreset(['crm','sales-pipeline','contracts','invoicing','tasks','expenses'])">
+                {% icon "briefcase-outline" class="text-sm" %} {% trans "Consulting" %}
+            </button>
+            <button type="button" class="chip cursor-pointer"
+                    @click="applyPreset(['crm','services','appointments','invoicing','tasks','expenses'])">
+                {% icon "build-outline" class="text-sm" %} {% trans "Field Service" %}
+            </button>
+            <button type="button" class="chip cursor-pointer"
+                    @click="clearAll()">
+                {% icon "options-outline" class="text-sm" %} {% trans "Custom" %}
+            </button>
+        </div>
+    </div>
 
     <form hx-post="{% url 'setup:step' step=2 %}"
           hx-target="#wizard-step-content"
-          hx-swap="innerHTML"
-          x-data="{ selected: '{{ hub_config.solution_slug|default:'' }}', selectedName: '{{ hub_config.solution_name|default:'' }}' }">
+          hx-swap="innerHTML">
         {% csrf_token %}
-        <input type="hidden" name="solution_slug" :value="selected">
-        <input type="hidden" name="solution_name" :value="selectedName">
+        <input type="hidden" name="selected_blocks" :value="selectedJson">
 
-        {% if solutions %}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {% for solution in solutions %}
-            <div class="card cursor-pointer transition-all duration-150"
-                 :class="selected === '{{ solution.slug }}' ? 'ring-2 ring-primary border-primary' : 'hover:border-base-content/20'"
-                 @click="selected = '{{ solution.slug }}'; selectedName = '{{ solution.name }}'">
-                <div class="card-body p-4">
-                    <div class="flex items-center gap-3 mb-2">
-                        <div class="flex items-center justify-center w-10 h-10 rounded-lg"
-                             style="background-color: {{ solution.color }}20; color: {{ solution.color }}">
-                            {% icon solution.icon %}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="font-semibold text-sm">{{ solution.name }}</h3>
-                            {% if solution.industry_name %}
-                            <span class="text-xs opacity-50">{{ solution.industry_name }}</span>
-                            {% endif %}
-                        </div>
-                        <div class="size-5 rounded-full border-2 flex items-center justify-center shrink-0"
-                             :class="selected === '{{ solution.slug }}' ? 'border-primary bg-primary text-white' : 'border-base-300'">
-                            <svg x-show="selected === '{{ solution.slug }}'" class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
+        {% if grouped_blocks %}
+        <div class="flex flex-col gap-5">
+            {% for cat_key, cat_label, blocks in grouped_blocks %}
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide opacity-40 mb-2">{{ cat_label }}</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {% for block in blocks %}
+                    <div class="card cursor-pointer transition-all duration-150 border"
+                         :class="selected.has('{{ block.slug }}') ? 'ring-2 ring-primary border-primary' : 'hover:border-base-content/20'"
+                         @click="toggle('{{ block.slug }}')">
+                        <div class="card-body p-3">
+                            <div class="flex items-center gap-3">
+                                <div class="flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
+                                     style="background-color: {{ block.color }}20; color: {{ block.color }}">
+                                    {% icon block.icon class="text-lg" %}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-medium text-sm leading-tight">{{ block.name }}</h4>
+                                    {% if block.tagline %}
+                                    <p class="text-xs opacity-50 line-clamp-1">{{ block.tagline }}</p>
+                                    {% endif %}
+                                </div>
+                                <div class="size-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors"
+                                     :class="selected.has('{{ block.slug }}') ? 'border-primary bg-primary text-white' : 'border-base-300'">
+                                    <svg x-show="selected.has('{{ block.slug }}')" x-cloak class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    {% if solution.tagline %}
-                    <p class="text-xs opacity-60 line-clamp-2">{{ solution.tagline }}</p>
-                    {% endif %}
+                    {% endfor %}
                 </div>
             </div>
             {% endfor %}
@@ -57,7 +120,7 @@
         {% else %}
         <div class="callout callout-info">
             <div class="callout-content">
-                <p class="callout-text">{% trans "Could not load solutions. Please check your internet connection and try again." %}</p>
+                <p class="callout-text">{% trans "Could not load modules. Please check your internet connection and try again." %}</p>
             </div>
         </div>
         {% endif %}
@@ -73,8 +136,11 @@
                     {% trans "Back" %}
                 </button>
             </div>
-            <div class="stepper-actions-end">
-                <button type="submit" class="btn color-primary" :disabled="!selected">
+            <div class="stepper-actions-end flex items-center gap-3">
+                <span class="text-sm opacity-50" x-show="count > 0" x-cloak>
+                    <span x-text="count"></span> {% trans "selected" %}
+                </span>
+                <button type="submit" class="btn color-primary" :disabled="count === 0">
                     {% trans "Continue" %}
                     {% icon "arrow-forward-outline" %}
                 </button>

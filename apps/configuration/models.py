@@ -261,6 +261,10 @@ class HubConfig(SingletonConfigMixin, models.Model):
         max_length=200, blank=True, default='',
         help_text='Selected solution display name (e.g., Salon & Spa)'
     )
+    selected_blocks = models.JSONField(
+        default=list, blank=True,
+        help_text='List of selected block slugs (e.g., ["crm", "pos", "invoicing"])'
+    )
 
     # Hardware Bridge
     bridge_enabled = models.BooleanField(

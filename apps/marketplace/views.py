@@ -36,8 +36,8 @@ def _marketplace_navigation(active_tab):
         },
         {
             'url': reverse('marketplace:solutions'),
-            'icon': 'briefcase-outline',
-            'label': str(_('Solutions')),
+            'icon': 'apps-outline',
+            'label': str(_('Blocks')),
             'active': active_tab == 'solutions',
         },
         {
@@ -172,6 +172,66 @@ def _build_grouped_industries(language):
     return result
 
 
+def _fetch_blocks_for_filters():
+    """Fetch functional blocks from Cloud API and group by block_type for the filter modal."""
+    from apps.configuration.models import HubConfig
+
+    hub_config = HubConfig.get_config()
+    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+    active_blocks = set(hub_config.selected_blocks or [])
+
+    solutions = []
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/solutions/",
+            headers={'Accept': 'application/json'},
+            timeout=10,
+        )
+        if response.status_code == 200:
+            solutions = response.json()
+    except requests.exceptions.RequestException:
+        pass
+
+    if not solutions:
+        return []
+
+    category_order = [
+        'core', 'commerce', 'services', 'hospitality', 'hr',
+        'finance', 'operations', 'marketing', 'utility', 'compliance', 'specialized',
+    ]
+    category_labels = {
+        'core': str(_('Core')), 'commerce': str(_('Commerce')), 'services': str(_('Services')),
+        'hospitality': str(_('Hospitality')), 'hr': str(_('HR')), 'finance': str(_('Finance')),
+        'operations': str(_('Operations')), 'marketing': str(_('Marketing')),
+        'utility': str(_('Utility')), 'compliance': str(_('Compliance')),
+        'specialized': str(_('Specialized')),
+    }
+
+    # Group blocks by category for the filter UI
+    blocks_by_category = {}
+    for s in solutions:
+        cat = s.get('block_type', '') or 'other'
+        blocks_by_category.setdefault(cat, []).append({
+            'id': s.get('slug', ''),
+            'name': s.get('name', ''),
+            'is_active': s.get('slug', '') in active_blocks,
+        })
+
+    grouped = []
+    for cat in category_order:
+        if cat in blocks_by_category:
+            grouped.append({
+                'key': cat,
+                'name': category_labels.get(cat, cat.title()),
+                'blocks': blocks_by_category[cat],
+            })
+    for cat, blocks in blocks_by_category.items():
+        if cat not in category_order:
+            grouped.append({'key': cat, 'name': cat.title(), 'blocks': blocks})
+
+    return grouped
+
+
 def _get_filters_for_store(store_type, language, request):
     """Get filter options based on store type"""
     from apps.configuration.models import HubConfig
@@ -181,11 +241,10 @@ def _get_filters_for_store(store_type, language, request):
     auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
     if store_type == 'modules':
-        # Build grouped categories and industries (local fallback)
+        # Build grouped categories (local fallback)
         categories_grouped = _build_grouped_categories(language)
-        industries_grouped = _build_grouped_industries(language)
 
-        # Try fetching grouped data from Cloud API
+        # Try fetching grouped categories from Cloud API
         if auth_token:
             cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
             headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
@@ -198,20 +257,14 @@ def _get_filters_for_store(store_type, language, request):
                     cloud_data = cat_response.json()
                     if cloud_data:
                         categories_grouped = cloud_data
-
-                ind_response = requests.get(
-                    f"{cloud_api_url}/api/marketplace/industries/grouped/",
-                    headers=headers, params={'language': language}, timeout=10
-                )
-                if ind_response.status_code == 200:
-                    cloud_data = ind_response.json()
-                    if cloud_data:
-                        industries_grouped = cloud_data
             except Exception:
                 pass
 
+        # Fetch functional blocks grouped by block_type
+        blocks_grouped = _fetch_blocks_for_filters()
+
         filters['categories_grouped'] = categories_grouped
-        filters['industries_grouped'] = industries_grouped
+        filters['blocks_grouped'] = blocks_grouped
         filters['types'] = [
             {'id': 'free', 'name': 'Free', 'name_es': 'Gratis', 'icon': 'gift-outline'},
             {'id': 'one_time', 'name': 'One-time', 'name_es': 'Pago único', 'icon': 'card-outline'},
@@ -529,7 +582,7 @@ def products_list(request, store_type):
     # Get filters from query params
     search_query = request.GET.get('q', '').strip()
     category_filter = request.GET.get('category', '').strip()
-    industry_filter = request.GET.get('industry', '').strip()
+    block_filter = request.GET.get('block', '').strip()
     type_filter = request.GET.get('type', '').strip()
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
@@ -542,7 +595,7 @@ def products_list(request, store_type):
     config = get_store_config(store_type)
 
     if store_type == 'modules':
-        return _fetch_modules_list(request, search_query, category_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number)
+        return _fetch_modules_list(request, search_query, category_filter, block_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number)
     elif store_type == 'hubs':
         return _fetch_hubs_list(request, search_query, '', 12)
     else:
@@ -554,7 +607,7 @@ def products_list(request, store_type):
         return HttpResponse(html)
 
 
-def _fetch_modules_list(request, search_query, category_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
+def _fetch_modules_list(request, search_query, category_filter, block_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
     """Fetch modules from Cloud API with DataTable pagination"""
     from django.core.paginator import Paginator
     from apps.configuration.models import HubConfig
@@ -614,10 +667,13 @@ def _fetch_modules_list(request, search_query, category_filter, industry_filter,
                     f in cat_values for f in m.get('functions', [m.get('category', '')])
                 )]
 
-        if industry_filter:
-            ind_values = [i.strip() for i in industry_filter.split(',') if i.strip()]
-            if ind_values:
-                modules = [m for m in modules if any(iv in m.get('industries', []) for iv in ind_values)]
+        if block_filter:
+            block_slugs = [b.strip() for b in block_filter.split(',') if b.strip()]
+            if block_slugs:
+                # Filter modules by solution_slugs field (block membership)
+                modules = [m for m in modules if any(
+                    bs in m.get('solution_slugs', []) for bs in block_slugs
+                )]
 
         if type_filter:
             modules = [m for m in modules if m.get('module_type') == type_filter]
@@ -646,7 +702,7 @@ def _fetch_modules_list(request, search_query, category_filter, industry_filter,
             'store_type': 'modules',
             'search_query': search_query,
             'category_filter': category_filter,
-            'industry_filter': industry_filter,
+            'block_filter': block_filter,
             'type_filter': type_filter,
             'sort_field': sort_field,
             'sort_dir': sort_dir,
@@ -827,7 +883,7 @@ def module_detail(request, slug):
 @login_required
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/solutions_content.html')
 def solutions_index(request):
-    """Solutions list — pre-configured module bundles from Cloud."""
+    """Functional blocks list — composable module bundles from Cloud."""
     cloud_api_url = _get_cloud_api_url()
     solutions = []
 
@@ -842,12 +898,48 @@ def solutions_index(request):
     except requests.exceptions.RequestException:
         pass
 
+    # Get active blocks from HubConfig
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_config()
+    active_blocks = set(hub_config.selected_blocks or [])
+
+    # Mark each block as active/inactive
+    for s in solutions:
+        s['is_active'] = s.get('slug', '') in active_blocks
+
+    # Group by block_type category
+    category_order = [
+        'core', 'commerce', 'services', 'hospitality', 'hr',
+        'finance', 'operations', 'marketing', 'utility', 'compliance', 'specialized',
+    ]
+    category_labels = {
+        'core': str(_('Core')), 'commerce': str(_('Commerce')), 'services': str(_('Services')),
+        'hospitality': str(_('Hospitality')), 'hr': str(_('HR')), 'finance': str(_('Finance')),
+        'operations': str(_('Operations')), 'marketing': str(_('Marketing')),
+        'utility': str(_('Utility')), 'compliance': str(_('Compliance')),
+        'specialized': str(_('Specialized')),
+    }
+    blocks_by_category = {}
+    for s in solutions:
+        cat = s.get('block_type', '') or 'other'
+        blocks_by_category.setdefault(cat, []).append(s)
+    grouped_blocks = []
+    for cat in category_order:
+        if cat in blocks_by_category:
+            grouped_blocks.append((cat, category_labels.get(cat, cat.title()), blocks_by_category[cat]))
+    for cat, blocks in blocks_by_category.items():
+        if cat not in category_order:
+            grouped_blocks.append((cat, cat.title(), blocks))
+
     cart = get_cart(request, 'modules')
 
     return {
         'current_section': 'marketplace',
-        'page_title': _('Solutions'),
+        'page_title': _('Functional Blocks'),
         'solutions': solutions,
+        'grouped_blocks': grouped_blocks,
+        'active_blocks': list(active_blocks),
+        'active_blocks_count': len(active_blocks),
         'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('solutions'),
     }
@@ -856,7 +948,7 @@ def solutions_index(request):
 @login_required
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/solution_detail_content.html')
 def solution_detail(request, slug):
-    """Solution detail — shows modules + install button."""
+    """Block detail — shows modules, roles, and activate/deactivate button."""
     cloud_api_url = _get_cloud_api_url()
     installed_ids = _get_installed_module_ids()
 
@@ -869,7 +961,7 @@ def solution_detail(request, slug):
         if response.status_code == 404:
             return {
                 'current_section': 'marketplace',
-                'error': _('Solution not found.'),
+                'error': _('Block not found.'),
                 'navigation': _marketplace_navigation('solutions'),
             }
         if response.status_code != 200:
@@ -880,6 +972,12 @@ def solution_detail(request, slug):
             }
 
         solution = response.json()
+
+        # Check if this block is active
+        from apps.configuration.models import HubConfig
+        hub_config = HubConfig.get_config()
+        active_blocks = set(hub_config.selected_blocks or [])
+        is_block_active = slug in active_blocks
 
         # Split modules into required/optional and mark installed
         required_modules = []
@@ -898,11 +996,12 @@ def solution_detail(request, slug):
 
         return {
             'current_section': 'marketplace',
-            'page_title': solution.get('name', 'Solution'),
+            'page_title': solution.get('name', 'Block'),
             'solution': solution,
             'required_modules': required_modules,
             'optional_modules': optional_modules,
             'all_installed': all_installed,
+            'is_block_active': is_block_active,
             'back_url': reverse('marketplace:solutions'),
             'cart_count': len(cart.get('items', [])),
             'navigation': _marketplace_navigation('solutions'),
@@ -1003,6 +1102,58 @@ def solution_install(request, slug):
         return HttpResponse(
             json.dumps({'success': False, 'error': str(e)}),
             content_type='application/json', status=500,
+        )
+
+
+@login_required
+def block_toggle(request, slug):
+    """POST: Activate or deactivate a functional block."""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_config()
+    active_blocks = list(hub_config.selected_blocks or [])
+
+    if slug in active_blocks:
+        # Deactivate: remove from list
+        active_blocks.remove(slug)
+        hub_config.selected_blocks = active_blocks
+        hub_config.solution_slug = active_blocks[0] if active_blocks else ''
+        hub_config.save()
+        return HttpResponse(
+            json.dumps({'success': True, 'action': 'deactivated', 'slug': slug, 'active_count': len(active_blocks)}),
+            content_type='application/json',
+        )
+    else:
+        # Activate: add to list + install modules + create roles
+        active_blocks.append(slug)
+        hub_config.selected_blocks = active_blocks
+        hub_config.solution_slug = active_blocks[0] if active_blocks else ''
+        hub_config.save()
+
+        # Create roles for this block
+        if hub_config.hub_id:
+            cloud_api_url = _get_cloud_api_url()
+            try:
+                response = requests.get(
+                    f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+                    headers={'Accept': 'application/json'},
+                    timeout=15,
+                )
+                if response.status_code == 200:
+                    solution = response.json()
+                    roles_data = solution.get('roles', [])
+                    if roles_data:
+                        from apps.core.services.permission_service import PermissionService
+                        PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
+                        logger.info(f"Created {len(roles_data)} roles for block {slug}")
+            except Exception as e:
+                logger.warning(f"Failed to create roles for block {slug}: {e}")
+
+        return HttpResponse(
+            json.dumps({'success': True, 'action': 'activated', 'slug': slug, 'active_count': len(active_blocks)}),
+            content_type='application/json',
         )
 
 

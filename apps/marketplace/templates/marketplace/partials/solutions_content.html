@@ -1,57 +1,79 @@
 {% load i18n djicons %}
 
 <div class="mt-5">
-    {% if solutions %}
-    <div class="module-grid module-grid-3">
-        {% for solution in solutions %}
-        <div class="module-card cursor-pointer"
-             hx-get="{% url 'marketplace:solution_detail' slug=solution.slug %}"
-             hx-target="#main-content-area"
-             hx-push-url="true">
-            <div class="module-card-body">
-                <div class="module-card-header">
-                    <div class="module-card-icon" style="background-color: {{ solution.color }}; color: white;">
-                        {% icon solution.icon|default:"briefcase-outline" %}
-                    </div>
+    {% if active_blocks_count > 0 %}
+    <p class="text-sm opacity-50 mb-4">
+        {% icon "checkmark-circle-outline" css_class="text-primary" %}
+        {{ active_blocks_count }} {% trans "blocks active" %}
+    </p>
+    {% endif %}
 
-                    <div class="module-card-info">
-                        <h4 class="module-card-name">{{ solution.name }}</h4>
-                        <span class="module-card-author">{{ solution.industry_name|default:"Multi-industry" }}</span>
-                        <div class="module-card-meta">
-                            <span class="chip chip-sm">{{ solution.all_modules_count }} {% trans "modules" %}</span>
+    {% if grouped_blocks %}
+    <div class="flex flex-col gap-6">
+        {% for cat_key, cat_label, blocks in grouped_blocks %}
+        <div>
+            <h3 class="text-xs font-semibold uppercase tracking-wide opacity-40 mb-3">{{ cat_label }}</h3>
+            <div class="module-grid module-grid-3">
+                {% for solution in blocks %}
+                <div class="module-card cursor-pointer {% if solution.is_active %}ring-2 ring-primary{% endif %}"
+                     hx-get="{% url 'marketplace:solution_detail' slug=solution.slug %}"
+                     hx-target="#main-content-area"
+                     hx-push-url="true">
+                    <div class="module-card-body">
+                        <div class="module-card-header">
+                            <div class="module-card-icon" style="background-color: {{ solution.color }}; color: white;">
+                                {% icon solution.icon|default:"briefcase-outline" %}
+                            </div>
+
+                            <div class="module-card-info">
+                                <h4 class="module-card-name">{{ solution.name }}</h4>
+                                <div class="module-card-meta">
+                                    <span class="chip chip-sm">{{ solution.all_modules_count }} {% trans "modules" %}</span>
+                                </div>
+                            </div>
+
+                            <div class="module-card-badges">
+                                {% if solution.is_active %}
+                                <span class="badge badge-sm color-success">
+                                    {% icon "checkmark-circle" %}
+                                    {% trans "Active" %}
+                                </span>
+                                {% endif %}
+                                {% if solution.is_featured %}
+                                <span class="badge badge-sm color-warning">
+                                    {% icon "star" %}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <p class="module-card-description">{{ solution.tagline }}</p>
+
+                        <div class="module-card-footer">
+                            <span class="chip chip-sm">{{ solution.required_module_count|default:solution.all_modules_count }} {% trans "required" %}</span>
+
+                            <div class="module-card-actions">
+                                {% if solution.is_active %}
+                                <span class="text-xs opacity-50">{% trans "Active" %}</span>
+                                {% else %}
+                                <button class="btn btn-sm color-primary"
+                                        onclick="event.stopPropagation(); toggleBlock('{{ solution.slug }}', this)">
+                                    {% icon "add-outline" %}
+                                    {% trans "Activate" %}
+                                </button>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
-
-                    {% if solution.is_featured %}
-                    <div class="module-card-badges">
-                        <span class="badge badge-sm color-warning">
-                            {% icon "star" %}
-                            {% trans "Featured" %}
-                        </span>
-                    </div>
-                    {% endif %}
                 </div>
-
-                <p class="module-card-description">{{ solution.tagline }}</p>
-
-                <div class="module-card-footer">
-                    <span class="chip chip-sm">{{ solution.required_module_count|default:solution.all_modules_count }} {% trans "required" %}</span>
-
-                    <div class="module-card-actions">
-                        <button class="btn btn-sm color-primary"
-                                onclick="event.stopPropagation(); installSolution('{{ solution.slug }}', this)">
-                            {% icon "download-outline" %}
-                            {% trans "Install" %}
-                        </button>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
         </div>
         {% endfor %}
     </div>
 
     <script>
-    function installSolution(slug, button) {
+    function toggleBlock(slug, button) {
         var originalHtml = button.innerHTML;
         button.disabled = true;
         button.innerHTML = '<span class="loading loading-sm"></span>';
@@ -59,7 +81,7 @@
         var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
             || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
 
-        fetch('/marketplace/solutions/' + slug + '/install/', {
+        fetch('/marketplace/solutions/' + slug + '/toggle/', {
             method: 'POST',
             headers: {
                 'X-CSRFToken': csrfToken,
@@ -69,22 +91,17 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.success) {
-                var msg = data.installed + ' {% trans "of" %} ' + data.total + ' {% trans "modules installed." %}';
-                button.outerHTML = '<span class="badge badge-sm color-success">{% icon "checkmark-circle-outline" %} {% trans "Installed" %}</span>';
-                if (typeof Toast !== 'undefined') Toast.success(msg);
-                if (data.requires_restart) {
-                    if (confirm('{% trans "Server needs to restart to load new modules. Restart now?" %}')) {
-                        fetch('/modules/api/marketplace/restart/', {
-                            method: 'POST',
-                            headers: { 'X-CSRFToken': csrfToken }
-                        });
-                        setTimeout(function() { window.location.reload(); }, 3000);
-                    }
+                if (typeof Toast !== 'undefined') {
+                    Toast.success(data.action === 'activated'
+                        ? '{% trans "Block activated" %}'
+                        : '{% trans "Block deactivated" %}');
                 }
+                // Reload to refresh active state
+                htmx.ajax('GET', '/marketplace/solutions/', {target: '#main-content-area', swap: 'innerHTML'});
             } else {
                 button.disabled = false;
                 button.innerHTML = originalHtml;
-                if (typeof Toast !== 'undefined') Toast.error(data.error || '{% trans "Installation failed." %}');
+                if (typeof Toast !== 'undefined') Toast.error(data.error || '{% trans "Action failed." %}');
             }
         })
         .catch(function(e) {
@@ -96,9 +113,9 @@
     </script>
     {% else %}
     <div class="text-center py-16">
-        {% icon "briefcase-outline" css_class="text-6xl opacity-20 mb-4" %}
-        <h3 class="text-lg font-semibold mb-2">{% trans "No Solutions Available" %}</h3>
-        <p class="text-sm opacity-60">{% trans "Could not load solutions. Please check your internet connection and try again." %}</p>
+        {% icon "apps-outline" css_class="text-6xl opacity-20 mb-4" %}
+        <h3 class="text-lg font-semibold mb-2">{% trans "No Blocks Available" %}</h3>
+        <p class="text-sm opacity-60">{% trans "Could not load functional blocks. Please check your internet connection and try again." %}</p>
     </div>
     {% endif %}
 </div>
