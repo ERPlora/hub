@@ -211,10 +211,9 @@ sequenceDiagram
 
 ### Ventajas del Sistema Sync-on-Access
 
-- ✅ **Funciona 100% offline** después de primer login
-- ✅ **No requiere conexión constante** - solo verifica cuando puede
-- ✅ **Sin cola de sincronización compleja** - verificación on-demand
-- ✅ **Resiliente** - fallback a estado local si Cloud no disponible
+- ✅ **Verificación on-demand** - solo verifica cuando el usuario hace login
+- ✅ **Sin cola de sincronización compleja** - verificación puntual
+- ✅ **Resiliente** - fallback a estado local si Cloud no disponible temporalmente
 
 ---
 

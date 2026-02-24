@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.cache import cache
+from django.utils.translation import gettext_lazy as _
 from typing import Any, Optional
 from zoneinfo import available_timezones
 
@@ -289,8 +290,8 @@ class HubConfig(SingletonConfigMixin, models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Hub Configuration'
-        verbose_name_plural = 'Hub Configuration'
+        verbose_name = _('Hub Configuration')
+        verbose_name_plural = _('Hub Configuration')
         db_table = 'core_hubconfig'  # Keep existing table name
 
     def __str__(self):
@@ -344,8 +345,8 @@ class TaxClass(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Tax Class'
-        verbose_name_plural = 'Tax Classes'
+        verbose_name = _('Tax Class')
+        verbose_name_plural = _('Tax Classes')
         db_table = 'core_taxclass'
         ordering = ['order', 'rate']
 
@@ -412,8 +413,8 @@ class StoreConfig(SingletonConfigMixin, models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Store Configuration'
-        verbose_name_plural = 'Store Configuration'
+        verbose_name = _('Store Configuration')
+        verbose_name_plural = _('Store Configuration')
         db_table = 'core_storeconfig'  # Keep existing table name
 
     def __str__(self):
@@ -497,8 +498,8 @@ class BackupConfig(SingletonConfigMixin, models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Backup Configuration'
-        verbose_name_plural = 'Backup Configuration'
+        verbose_name = _('Backup Configuration')
+        verbose_name_plural = _('Backup Configuration')
         db_table = 'core_backupconfig'
 
     def __str__(self):
@@ -585,8 +586,8 @@ class PrinterConfig(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Printer'
-        verbose_name_plural = 'Printers'
+        verbose_name = _('Printer')
+        verbose_name_plural = _('Printers')
         db_table = 'core_printerconfig'
         ordering = ['priority', 'name']
 

@@ -146,8 +146,27 @@ pytest --cov=apps --cov-report=html
 
 | Componente | Tecnologia |
 |------------|------------|
-| Backend | Django 5.1 |
+| Backend | Django 5.2 |
 | Database | SQLite |
-| Frontend | @erplora/ux + Alpine.js + HTMX |
+| Frontend | UX CSS + Alpine.js + HTMX |
 | Autenticacion | LocalUser con PIN + JWT (Cloud API) |
 | Deployment | Docker |
+
+---
+
+## Licencia
+
+ERPlora Hub esta licenciado bajo **Business Source License 1.1 (BUSL-1.1)**.
+
+**Usos Permitidos (gratis):**
+- Uso interno en negocios
+- Uso personal y educativo
+- Crear modules para el ecosistema
+- Servicios de consultoria
+
+**Usos Prohibidos:**
+- Ofrecer como SaaS/PaaS
+- Crear plataforma POS competidora
+- Revender o sublicenciar
+
+Despues del **2036-01-02**, se convierte en **Apache License 2.0**.

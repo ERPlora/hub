@@ -7,6 +7,7 @@ Models:
 - RolePermission: Through model for Role-Permission M2M
 - LocalUser: Hub users with role-based permissions
 """
+from django.utils.translation import gettext_lazy as _
 
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
@@ -59,8 +60,8 @@ class Permission(HubBaseModel):
     all_objects = HubManagerWithDeleted()
 
     class Meta:
-        verbose_name = 'Permission'
-        verbose_name_plural = 'Permissions'
+        verbose_name = _('Permission')
+        verbose_name_plural = _('Permissions')
         ordering = ['module_id', 'codename']
         db_table = 'accounts_permissions'
         constraints = [
@@ -139,8 +140,8 @@ class Role(HubBaseModel):
     all_objects = HubManagerWithDeleted()
 
     class Meta:
-        verbose_name = 'Role'
-        verbose_name_plural = 'Roles'
+        verbose_name = _('Role')
+        verbose_name_plural = _('Roles')
         ordering = ['name']
         db_table = 'accounts_roles'
         constraints = [
@@ -212,8 +213,8 @@ class RolePermission(HubBaseModel):
     all_objects = HubManagerWithDeleted()
 
     class Meta:
-        verbose_name = 'Role Permission'
-        verbose_name_plural = 'Role Permissions'
+        verbose_name = _('Role Permission')
+        verbose_name_plural = _('Role Permissions')
         db_table = 'accounts_role_permissions'
         constraints = [
             models.UniqueConstraint(
@@ -237,9 +238,9 @@ class RolePermission(HubBaseModel):
         """Ensure either permission or wildcard is set, not both."""
         from django.core.exceptions import ValidationError
         if self.permission and self.wildcard:
-            raise ValidationError("Set either permission or wildcard, not both.")
+            raise ValidationError(_("Set either permission or wildcard, not both."))
         if not self.permission and not self.wildcard:
-            raise ValidationError("Must set either permission or wildcard.")
+            raise ValidationError(_("Must set either permission or wildcard."))
 
 
 # =============================================================================
@@ -327,8 +328,8 @@ class LocalUser(HubBaseModel):
     all_objects = HubManagerWithDeleted()
 
     class Meta:
-        verbose_name = 'Local User'
-        verbose_name_plural = 'Local Users'
+        verbose_name = _('Local User')
+        verbose_name_plural = _('Local Users')
         ordering = ['name']
         db_table = 'accounts_local_users'
         # Unique constraints per Hub (same email can exist in different Hubs)

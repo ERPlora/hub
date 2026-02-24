@@ -13,6 +13,7 @@ import requests
 from pathlib import Path
 
 from django.http import JsonResponse
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 from django.conf import settings as django_settings
 
@@ -671,13 +672,13 @@ def module_activate(request, module_id):
 
     if not disabled_folder.exists():
         if request.htmx:
-            return _render_modules_page(request, error='Module not found')
-        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
+            return _render_modules_page(request, error=_('Module not found'))
+        return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
 
     if active_folder.exists():
         if request.htmx:
-            return _render_modules_page(request, error='Module already active')
-        return JsonResponse({'success': False, 'error': 'Module already active'}, status=400)
+            return _render_modules_page(request, error=_('Module already active'))
+        return JsonResponse({'success': False, 'error': _('Module already active')}, status=400)
 
     try:
         # Rename folder to activate
@@ -705,7 +706,7 @@ def module_activate(request, module_id):
 
         return JsonResponse({
             'success': True,
-            'message': 'Module activated. Server restarting.',
+            'message': _('Module activated. Server restarting.'),
             'requires_restart': True
         })
     except Exception as e:
@@ -724,13 +725,13 @@ def module_deactivate(request, module_id):
 
     if not active_folder.exists():
         if request.htmx:
-            return _render_modules_page(request, error='Module not found')
-        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
+            return _render_modules_page(request, error=_('Module not found'))
+        return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
 
     if disabled_folder.exists():
         if request.htmx:
-            return _render_modules_page(request, error='Module already disabled')
-        return JsonResponse({'success': False, 'error': 'Module already disabled'}, status=400)
+            return _render_modules_page(request, error=_('Module already disabled'))
+        return JsonResponse({'success': False, 'error': _('Module already disabled')}, status=400)
 
     try:
         active_folder.rename(disabled_folder)
@@ -744,7 +745,7 @@ def module_deactivate(request, module_id):
                 success_message=f"Module {module_id} deactivated"
             )
 
-        return JsonResponse({'success': True, 'message': 'Module deactivated. Server restarting.'})
+        return JsonResponse({'success': True, 'message': _('Module deactivated. Server restarting.')})
     except Exception as e:
         if request.htmx:
             return _render_modules_page(request, error=str(e))
@@ -763,8 +764,8 @@ def module_delete(request, module_id):
 
     if not folder_to_delete:
         if request.htmx:
-            return _render_modules_page(request, error='Module not found')
-        return JsonResponse({'success': False, 'error': 'Module not found'}, status=404)
+            return _render_modules_page(request, error=_('Module not found'))
+        return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
 
     try:
         shutil.rmtree(folder_to_delete)
@@ -772,7 +773,7 @@ def module_delete(request, module_id):
         if request.htmx:
             return _render_modules_page(request)
 
-        return JsonResponse({'success': True, 'message': 'Module deleted successfully.'})
+        return JsonResponse({'success': True, 'message': _('Module deleted successfully.')})
     except Exception as e:
         if request.htmx:
             return _render_modules_page(request, error=str(e))
@@ -915,7 +916,7 @@ def purchase_module(request):
         result = response.json()
 
         if response.status_code == 201 and result.get('is_free'):
-            return JsonResponse({'success': True, 'is_free': True, 'message': 'Free module acquired'})
+            return JsonResponse({'success': True, 'is_free': True, 'message': _('Free module acquired')})
 
         if response.status_code == 200 and result.get('checkout_url'):
             return JsonResponse({

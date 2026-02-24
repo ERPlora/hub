@@ -8,6 +8,7 @@ import hashlib
 from datetime import datetime, timedelta
 from django.core.cache import cache
 from django.conf import settings
+from django.utils.translation import gettext as _
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +49,13 @@ class PINAuth:
         """
         # Validate PIN format
         if not pin or not isinstance(pin, str):
-            raise ValueError("PIN must be a string")
+            raise ValueError(_("PIN must be a string"))
 
         if not pin.isdigit():
-            raise ValueError("PIN must contain only digits")
+            raise ValueError(_("PIN must contain only digits"))
 
         if len(pin) < 4 or len(pin) > 6:
-            raise ValueError("PIN must be 4-6 digits")
+            raise ValueError(_("PIN must be 4-6 digits"))
 
         # Hash PIN with SHA-256
         pin_hash = self._hash_pin(pin)

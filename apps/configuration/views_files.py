@@ -12,6 +12,7 @@ from datetime import datetime
 from django.conf import settings as django_settings
 from django.http import HttpResponse, FileResponse, JsonResponse
 from django.template.loader import render_to_string
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_GET
 
 from apps.accounts.decorators import login_required
@@ -82,7 +83,7 @@ def download_database(request):
     db_path = Path(django_settings.DATABASES['default']['NAME'])
 
     if not db_path.exists():
-        return JsonResponse({'error': 'Database not found'}, status=404)
+        return JsonResponse({'error': _('Database not found')}, status=404)
 
     # Generate filename with timestamp
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -115,7 +116,7 @@ def file_browser(request):
     allowed_dirs = get_allowed_directories()
 
     if dir_key not in allowed_dirs:
-        return HttpResponse('<p class="text-danger">Invalid directory</p>', status=400)
+        return HttpResponse(f'<p class="text-danger">{_("Invalid directory")}</p>', status=400)
 
     base_dir = allowed_dirs[dir_key]['path']
     current_dir = base_dir / rel_path if rel_path else base_dir
@@ -125,9 +126,9 @@ def file_browser(request):
         current_dir = current_dir.resolve()
         base_dir = base_dir.resolve()
         if not str(current_dir).startswith(str(base_dir)):
-            return HttpResponse('<p class="text-danger">Access denied</p>', status=403)
+            return HttpResponse(f'<p class="text-danger">{_("Access denied")}</p>', status=403)
     except Exception:
-        return HttpResponse('<p class="text-danger">Invalid path</p>', status=400)
+        return HttpResponse(f'<p class="text-danger">{_("Invalid path")}</p>', status=400)
 
     # Get files and folders
     items = []
@@ -186,12 +187,12 @@ def download_file(request):
     rel_path = request.GET.get('path', '').strip('/')
 
     if not dir_key or not rel_path:
-        return JsonResponse({'error': 'Missing parameters'}, status=400)
+        return JsonResponse({'error': _('Missing parameters')}, status=400)
 
     allowed_dirs = get_allowed_directories()
 
     if dir_key not in allowed_dirs:
-        return JsonResponse({'error': 'Invalid directory'}, status=400)
+        return JsonResponse({'error': _('Invalid directory')}, status=400)
 
     base_dir = allowed_dirs[dir_key]['path']
     file_path = base_dir / rel_path
@@ -201,12 +202,12 @@ def download_file(request):
         file_path = file_path.resolve()
         base_dir = base_dir.resolve()
         if not str(file_path).startswith(str(base_dir)):
-            return JsonResponse({'error': 'Access denied'}, status=403)
+            return JsonResponse({'error': _('Access denied')}, status=403)
     except Exception:
-        return JsonResponse({'error': 'Invalid path'}, status=400)
+        return JsonResponse({'error': _('Invalid path')}, status=400)
 
     if not file_path.exists() or not file_path.is_file():
-        return JsonResponse({'error': 'File not found'}, status=404)
+        return JsonResponse({'error': _('File not found')}, status=404)
 
     # Determine content type
     content_type, _ = mimetypes.guess_type(str(file_path))
@@ -320,12 +321,12 @@ def serve_file(request):
     rel_path = request.GET.get('path', '').strip('/')
 
     if not dir_key or not rel_path:
-        return JsonResponse({'error': 'Missing parameters'}, status=400)
+        return JsonResponse({'error': _('Missing parameters')}, status=400)
 
     allowed_dirs = get_allowed_directories()
 
     if dir_key not in allowed_dirs:
-        return JsonResponse({'error': 'Invalid directory'}, status=400)
+        return JsonResponse({'error': _('Invalid directory')}, status=400)
 
     base_dir = allowed_dirs[dir_key]['path']
     file_path = base_dir / rel_path
@@ -335,12 +336,12 @@ def serve_file(request):
         file_path = file_path.resolve()
         base_dir = base_dir.resolve()
         if not str(file_path).startswith(str(base_dir)):
-            return JsonResponse({'error': 'Access denied'}, status=403)
+            return JsonResponse({'error': _('Access denied')}, status=403)
     except Exception:
-        return JsonResponse({'error': 'Invalid path'}, status=400)
+        return JsonResponse({'error': _('Invalid path')}, status=400)
 
     if not file_path.exists() or not file_path.is_file():
-        return JsonResponse({'error': 'File not found'}, status=404)
+        return JsonResponse({'error': _('File not found')}, status=404)
 
     content_type, _ = mimetypes.guess_type(str(file_path))
     if content_type is None:
