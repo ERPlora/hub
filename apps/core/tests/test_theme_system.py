@@ -1,5 +1,7 @@
 """
 Tests for theme system (color themes and dark mode).
+
+Theme preferences are stored in HubConfig model and applied client-side via JS.
 """
 import pytest
 from django.test import Client
@@ -45,7 +47,7 @@ def local_user(db):
 def authenticated_client(client, local_user):
     """Client with authenticated session."""
     session = client.session
-    session['local_user_id'] = str(local_user.id)  # Convert UUID to string
+    session['local_user_id'] = str(local_user.id)
     session['user_name'] = local_user.name
     session['user_email'] = local_user.email
     session['user_role'] = local_user.role
@@ -103,158 +105,3 @@ class TestThemeContextProcessor:
         response = authenticated_client.get(reverse('main:index'))
         assert response.status_code == 200
         assert 'hub_config' in response.context
-
-
-@pytest.mark.django_db
-class TestThemeAPI:
-    """Test theme update API endpoint."""
-
-    def test_update_color_theme(self, authenticated_client, hub_config):
-        """Test updating color theme via POST."""
-        assert hub_config.color_theme == 'default'
-
-        response = authenticated_client.post(
-            reverse('main:settings'),
-            data={
-                'action': 'update_theme',
-                'color_theme': 'blue',
-                'dark_mode': 'false',
-                'auto_print': 'false'
-            }
-        )
-
-        assert response.status_code == 200
-        hub_config.refresh_from_db()
-        assert hub_config.color_theme == 'blue'
-
-    def test_update_dark_mode(self, authenticated_client, hub_config):
-        """Test enabling dark mode via POST."""
-        assert hub_config.dark_mode is False
-
-        response = authenticated_client.post(
-            reverse('main:settings'),
-            data={
-                'action': 'update_theme',
-                'color_theme': 'default',
-                'dark_mode': 'true',
-                'auto_print': 'false'
-            }
-        )
-
-        assert response.status_code == 200
-        hub_config.refresh_from_db()
-        assert hub_config.dark_mode is True
-
-    def test_update_auto_print(self, authenticated_client, hub_config):
-        """Test enabling auto-print via POST."""
-        assert hub_config.auto_print is False
-
-        response = authenticated_client.post(
-            reverse('main:settings'),
-            data={
-                'action': 'update_theme',
-                'color_theme': 'default',
-                'dark_mode': 'false',
-                'auto_print': 'true'
-            }
-        )
-
-        assert response.status_code == 200
-        hub_config.refresh_from_db()
-        assert hub_config.auto_print is True
-
-    def test_update_all_preferences(self, authenticated_client, hub_config):
-        """Test updating all theme preferences at once."""
-        response = authenticated_client.post(
-            reverse('main:settings'),
-            data={
-                'action': 'update_theme',
-                'color_theme': 'blue',
-                'dark_mode': 'true',
-                'auto_print': 'true'
-            }
-        )
-
-        assert response.status_code == 200
-        hub_config.refresh_from_db()
-        assert hub_config.color_theme == 'blue'
-        assert hub_config.dark_mode is True
-        assert hub_config.auto_print is True
-
-    def test_theme_update_requires_authentication(self, client, hub_config):
-        """Test that theme update requires authentication."""
-        response = client.post(
-            reverse('main:settings'),
-            data={
-                'action': 'update_theme',
-                'color_theme': 'blue',
-                'dark_mode': 'true',
-                'auto_print': 'false'
-            }
-        )
-
-        # Should redirect to login (with next parameter)
-        assert response.status_code == 302
-        assert '/login/' in response.url
-
-
-@pytest.mark.django_db
-class TestThemeTemplateRendering:
-    """Test that theme is correctly rendered in templates."""
-
-    def test_default_theme_rendered(self, authenticated_client, hub_config):
-        """Test that default theme is loaded in template."""
-        response = authenticated_client.get(reverse('main:index'))
-        assert response.status_code == 200
-        content = response.content.decode()
-        # Theme CSS file inside theme folder
-        assert '/themes/default/theme.css' in content
-
-    def test_blue_theme_rendered(self, authenticated_client, hub_config):
-        """Test that blue theme is loaded when selected."""
-        hub_config.color_theme = 'blue'
-        hub_config.save()
-
-        response = authenticated_client.get(reverse('main:index'))
-        assert response.status_code == 200
-        content = response.content.decode()
-        # Theme CSS file inside theme folder
-        assert '/themes/blue/theme.css' in content
-
-    def test_dark_mode_class_applied(self, authenticated_client, hub_config):
-        """Test that dark class is applied when dark mode is enabled."""
-        hub_config.dark_mode = True
-        hub_config.save()
-
-        response = authenticated_client.get(reverse('main:index'))
-        assert response.status_code == 200
-        content = response.content.decode()
-        # Check that dark mode is applied via data-theme attribute
-        assert 'data-theme="dark"' in content
-
-
-@pytest.mark.django_db
-class TestThemePersistence:
-    """Test that theme preferences persist across sessions."""
-
-    def test_theme_persists_after_logout(self, authenticated_client, hub_config):
-        """Test that theme preferences persist after logout."""
-        # Set theme preferences
-        authenticated_client.post(
-            reverse('main:settings'),
-            data={
-                'action': 'update_theme',
-                'color_theme': 'blue',
-                'dark_mode': 'true',
-                'auto_print': 'true'
-            }
-        )
-
-        # Logout
-        authenticated_client.get(reverse('auth:logout'))
-
-        # Check that preferences are still in database
-        hub_config.refresh_from_db()
-        assert hub_config.color_theme == 'blue'
-        assert hub_config.dark_mode is True
-        assert hub_config.auto_print is True

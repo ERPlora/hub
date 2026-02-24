@@ -2,8 +2,15 @@
 Integration tests for Store Wizard.
 
 Tests the multi-step HTMX wizard flow from unconfigured store to configured.
+
+Steps:
+1. Regional settings (language, timezone, country)
+2. Modules (functional block selection)
+3. Business information (name, address, VAT)
+4. Tax configuration (rate, included)
 """
 import pytest
+import json
 from decimal import Decimal
 
 pytestmark = pytest.mark.integration
@@ -55,7 +62,7 @@ class TestWizardFlow:
         assert config.timezone == 'Europe/Madrid'
 
     def test_step1_returns_step2_partial(self, authenticated_client, unconfigured_store):
-        """Test step 1 POST returns step 2 content."""
+        """Test step 1 POST returns step 2 (modules) content."""
         response = authenticated_client.post('/setup/step/1/', {
             'language': 'en',
             'timezone': 'UTC',
@@ -63,17 +70,45 @@ class TestWizardFlow:
 
         assert response.status_code == 200
         content = response.content.decode()
-        assert 'Business Information' in content or 'business_name' in content
+        # Step 2 is now modules/blocks selection
+        assert 'Modules' in content or 'block' in content.lower() or 'selected_blocks' in content
 
     # =========================================================================
-    # Step 2: Business Information
+    # Step 2: Module Selection
     # =========================================================================
 
-    def test_step2_saves_business_info(self, authenticated_client, unconfigured_store):
-        """Test step 2 POST saves business data to StoreConfig."""
-        from apps.configuration.models import StoreConfig
+    def test_step2_saves_blocks(self, authenticated_client, unconfigured_store):
+        """Test step 2 POST saves selected blocks to HubConfig."""
+        from apps.configuration.models import HubConfig
 
         response = authenticated_client.post('/setup/step/2/', {
+            'selected_blocks': json.dumps(['crm', 'pos', 'invoicing']),
+        }, HTTP_HX_REQUEST='true')
+
+        assert response.status_code == 200
+
+        config = HubConfig.get_solo()
+        assert config.selected_blocks == ['crm', 'pos', 'invoicing']
+
+    def test_step2_returns_step3_partial(self, authenticated_client, unconfigured_store):
+        """Test step 2 POST returns step 3 (business) content."""
+        response = authenticated_client.post('/setup/step/2/', {
+            'selected_blocks': json.dumps(['crm']),
+        }, HTTP_HX_REQUEST='true')
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'Business' in content or 'business_name' in content
+
+    # =========================================================================
+    # Step 3: Business Information
+    # =========================================================================
+
+    def test_step3_saves_business_info(self, authenticated_client, unconfigured_store):
+        """Test step 3 POST saves business data to StoreConfig."""
+        from apps.configuration.models import StoreConfig
+
+        response = authenticated_client.post('/setup/step/3/', {
             'business_name': 'Test Business',
             'business_address': '123 Main St',
             'vat_number': 'ES12345678A',
@@ -89,12 +124,12 @@ class TestWizardFlow:
         assert config.vat_number == 'ES12345678A'
         assert config.phone == '+34 600 000 000'
         assert config.email == 'test@example.com'
-        # Should NOT be configured yet (step 3 not done)
+        # Should NOT be configured yet (step 4 not done)
         assert config.is_configured is False
 
-    def test_step2_returns_step3_partial(self, authenticated_client, unconfigured_store):
-        """Test step 2 POST returns step 3 content."""
-        response = authenticated_client.post('/setup/step/2/', {
+    def test_step3_returns_step4_partial(self, authenticated_client, unconfigured_store):
+        """Test step 3 POST returns step 4 (tax) content."""
+        response = authenticated_client.post('/setup/step/3/', {
             'business_name': 'Test Business',
             'business_address': '123 Main St',
             'vat_number': 'ES12345678A',
@@ -102,11 +137,11 @@ class TestWizardFlow:
 
         assert response.status_code == 200
         content = response.content.decode()
-        assert 'Tax Configuration' in content or 'tax_rate' in content
+        assert 'Tax' in content or 'tax_rate' in content
 
-    def test_step2_fails_without_business_name(self, authenticated_client, unconfigured_store):
-        """Test that step 2 fails without business name."""
-        response = authenticated_client.post('/setup/step/2/', {
+    def test_step3_fails_without_business_name(self, authenticated_client, unconfigured_store):
+        """Test that step 3 fails without business name."""
+        response = authenticated_client.post('/setup/step/3/', {
             'business_address': '123 Main St',
             'vat_number': 'ES12345678A',
         }, HTTP_HX_REQUEST='true')
@@ -115,9 +150,9 @@ class TestWizardFlow:
         content = response.content.decode()
         assert 'Business name is required' in content
 
-    def test_step2_fails_without_address(self, authenticated_client, unconfigured_store):
-        """Test that step 2 fails without address."""
-        response = authenticated_client.post('/setup/step/2/', {
+    def test_step3_fails_without_address(self, authenticated_client, unconfigured_store):
+        """Test that step 3 fails without address."""
+        response = authenticated_client.post('/setup/step/3/', {
             'business_name': 'Test Business',
             'vat_number': 'ES12345678A',
         }, HTTP_HX_REQUEST='true')
@@ -126,9 +161,9 @@ class TestWizardFlow:
         content = response.content.decode()
         assert 'Address is required' in content
 
-    def test_step2_fails_without_vat_number(self, authenticated_client, unconfigured_store):
-        """Test that step 2 fails without VAT number."""
-        response = authenticated_client.post('/setup/step/2/', {
+    def test_step3_fails_without_vat_number(self, authenticated_client, unconfigured_store):
+        """Test that step 3 fails without VAT number."""
+        response = authenticated_client.post('/setup/step/3/', {
             'business_name': 'Test Business',
             'business_address': '123 Main St',
         }, HTTP_HX_REQUEST='true')
@@ -138,38 +173,38 @@ class TestWizardFlow:
         assert 'VAT/Tax ID is required' in content
 
     # =========================================================================
-    # Step 3: Tax Configuration
+    # Step 4: Tax Configuration
     # =========================================================================
 
-    def test_step3_completes_setup(self, authenticated_client, unconfigured_store):
-        """Test step 3 POST marks store as configured and redirects."""
+    def test_step4_completes_setup(self, authenticated_client, unconfigured_store):
+        """Test step 4 POST marks store as configured and redirects."""
         from apps.configuration.models import StoreConfig
 
-        # Need to complete step 2 first (business info required)
-        authenticated_client.post('/setup/step/2/', {
+        # Need to complete step 3 first (business info required)
+        authenticated_client.post('/setup/step/3/', {
             'business_name': 'Test Business',
             'business_address': '123 Main St',
             'vat_number': 'ES12345678A',
         }, HTTP_HX_REQUEST='true')
 
-        response = authenticated_client.post('/setup/step/3/', {
+        response = authenticated_client.post('/setup/step/4/', {
             'tax_rate': '21',
             'tax_included': 'on',
         }, HTTP_HX_REQUEST='true')
 
         assert response.status_code == 200
-        assert response.get('HX-Redirect') == '/home/'
+        assert response.get('HX-Redirect') == '/'
 
         config = StoreConfig.get_solo()
         assert config.is_configured is True
         assert config.tax_rate == Decimal('21')
         assert config.tax_included is True
 
-    def test_step3_defaults_tax_rate(self, authenticated_client, unconfigured_store):
-        """Test that step 3 defaults tax rate to 21 if not provided."""
+    def test_step4_defaults_tax_rate(self, authenticated_client, unconfigured_store):
+        """Test that step 4 defaults tax rate to 21 if not provided."""
         from apps.configuration.models import StoreConfig
 
-        response = authenticated_client.post('/setup/step/3/', {
+        response = authenticated_client.post('/setup/step/4/', {
         }, HTTP_HX_REQUEST='true')
 
         assert response.status_code == 200
@@ -192,8 +227,14 @@ class TestWizardFlow:
         }, HTTP_HX_REQUEST='true')
         assert response.status_code == 200
 
-        # Step 2: Business info
+        # Step 2: Module selection
         response = authenticated_client.post('/setup/step/2/', {
+            'selected_blocks': json.dumps(['crm', 'pos', 'invoicing']),
+        }, HTTP_HX_REQUEST='true')
+        assert response.status_code == 200
+
+        # Step 3: Business info
+        response = authenticated_client.post('/setup/step/3/', {
             'business_name': 'Test Business',
             'business_address': '123 Main St',
             'vat_number': 'ES12345678A',
@@ -202,18 +243,19 @@ class TestWizardFlow:
         }, HTTP_HX_REQUEST='true')
         assert response.status_code == 200
 
-        # Step 3: Tax config
-        response = authenticated_client.post('/setup/step/3/', {
+        # Step 4: Tax config
+        response = authenticated_client.post('/setup/step/4/', {
             'tax_rate': '10',
             'tax_included': 'on',
         }, HTTP_HX_REQUEST='true')
         assert response.status_code == 200
-        assert response.get('HX-Redirect') == '/home/'
+        assert response.get('HX-Redirect') == '/'
 
         # Verify all data saved
         hub = HubConfig.get_solo()
         assert hub.language == 'es'
         assert hub.timezone == 'Europe/Madrid'
+        assert hub.selected_blocks == ['crm', 'pos', 'invoicing']
 
         store = StoreConfig.get_solo()
         assert store.is_configured is True
@@ -241,7 +283,7 @@ class TestWizardFlow:
 
     def test_direct_url_returns_full_page(self, authenticated_client, unconfigured_store):
         """Test GET step without HX-Request returns full page."""
-        response = authenticated_client.get('/setup/step/2/')
+        response = authenticated_client.get('/setup/step/3/')
         assert response.status_code == 200
         content = response.content.decode()
         # Should return full page
@@ -278,7 +320,7 @@ class TestWizardFlow:
 
         # Should redirect to home
         assert response.status_code == 302
-        assert 'home' in response.url
+        assert 'home' in response.url or response.url == '/'
 
 
 class TestMiddleware:

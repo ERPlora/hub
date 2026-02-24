@@ -93,7 +93,14 @@ def store_config(db):
 @pytest.fixture
 def unconfigured_store(db):
     """Unconfigured StoreConfig for wizard tests."""
-    from apps.configuration.models import StoreConfig
+    from apps.configuration.models import StoreConfig, HubConfig
+
+    # Clear singleton caches to avoid stale instances from rolled-back transactions
+    StoreConfig._clear_cache()
+    HubConfig._clear_cache()
+
+    # Ensure HubConfig exists (wizard_step calls hub_config.refresh_from_db())
+    HubConfig.get_solo()
 
     config = StoreConfig.get_solo()
     config.business_name = ''

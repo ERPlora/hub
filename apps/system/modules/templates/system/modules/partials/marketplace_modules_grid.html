@@ -1,34 +1,62 @@
 {% load i18n %}
-{% load ui %}
+{% load djicons %}
 
 {% if modules %}
-{% ui_grid_start padding=False %}
-    {% ui_row_start %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for module in modules %}
         {% include "system/modules/partials/module_card.html" with module=module mode="marketplace" %}
     {% endfor %}
-    {% ui_row_end %}
-{% ui_grid_end %}
+</div>
 
 <!-- Pagination -->
 {% if page_obj.has_other_pages %}
-<div class="d-flex align-center justify-center gap-sm mt-lg flex-wrap">
+<div class="flex items-center justify-center gap-2 mt-6 flex-wrap">
     {% if page_obj.has_previous %}
-    {% ui_button label=_("First") fill="outline" size="small" icon="chevron-back-outline" hx_get=first_page_url hx_target="#marketplace-modules-grid" hx_swap="innerHTML" hx_indicator="#loading-spinner" %}
-    {% ui_button label="" fill="outline" size="small" icon="chevron-back-outline" icon_slot="icon-only" hx_get=prev_page_url hx_target="#marketplace-modules-grid" hx_swap="innerHTML" hx_indicator="#loading-spinner" %}
+    <button class="btn btn-outline btn-sm"
+            hx-get="{{ first_page_url }}"
+            hx-target="#marketplace-modules-grid"
+            hx-swap="innerHTML"
+            hx-indicator="#loading-spinner">
+        {% icon "chevron-back-outline" %}
+        {% trans "First" %}
+    </button>
+    <button class="btn btn-outline btn-sm"
+            hx-get="{{ prev_page_url }}"
+            hx-target="#marketplace-modules-grid"
+            hx-swap="innerHTML"
+            hx-indicator="#loading-spinner">
+        {% icon "chevron-back-outline" %}
+    </button>
     {% endif %}
 
-    <span class="text-medium px-md">
+    <span class="text-sm px-3">
         {% trans "Page" %} {{ page_obj.number }} {% trans "of" %} {{ page_obj.paginator.num_pages }}
     </span>
 
     {% if page_obj.has_next %}
-    {% ui_button label="" fill="outline" size="small" icon="chevron-forward-outline" icon_slot="icon-only" hx_get=next_page_url hx_target="#marketplace-modules-grid" hx_swap="innerHTML" hx_indicator="#loading-spinner" %}
-    {% ui_button label=_("Last") fill="outline" size="small" icon="chevron-forward-outline" icon_position="end" hx_get=last_page_url hx_target="#marketplace-modules-grid" hx_swap="innerHTML" hx_indicator="#loading-spinner" %}
+    <button class="btn btn-outline btn-sm"
+            hx-get="{{ next_page_url }}"
+            hx-target="#marketplace-modules-grid"
+            hx-swap="innerHTML"
+            hx-indicator="#loading-spinner">
+        {% icon "chevron-forward-outline" %}
+    </button>
+    <button class="btn btn-outline btn-sm"
+            hx-get="{{ last_page_url }}"
+            hx-target="#marketplace-modules-grid"
+            hx-swap="innerHTML"
+            hx-indicator="#loading-spinner">
+        {% trans "Last" %}
+        {% icon "chevron-forward-outline" %}
+    </button>
     {% endif %}
 </div>
 {% endif %}
 
 {% else %}
-{% ui_empty_state title=_("No modules found") description=_("Try adjusting your search or filters") icon="search-outline" %}
+<div class="flex flex-col items-center justify-center py-12 text-center opacity-60">
+    {% icon "search-outline" class="text-4xl mb-3" %}
+    <h3 class="text-lg font-semibold mb-1">{% trans "No modules found" %}</h3>
+    <p class="text-sm">{% trans "Try adjusting your search or filters" %}</p>
+</div>
 {% endif %}

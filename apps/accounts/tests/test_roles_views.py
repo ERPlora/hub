@@ -31,13 +31,13 @@ class TestRoleListView:
         session['hub_id'] = str(hub_id)
         session.save()
 
-        response = client.get('/main/roles/')
+        response = client.get('/roles/')
 
         assert response.status_code == 403
 
     def test_role_list_displays_roles(self, authenticated_client, db, hub_id, role_admin, role_manager):
         """Test that role list displays all roles."""
-        response = authenticated_client.get('/main/roles/')
+        response = authenticated_client.get('/roles/')
 
         assert response.status_code == 200
         assert b'Administrator' in response.content or b'admin' in response.content
@@ -47,7 +47,7 @@ class TestRoleListView:
         admin_user.role_obj = role_admin
         admin_user.save()
 
-        response = authenticated_client.get('/main/roles/')
+        response = authenticated_client.get('/roles/')
 
         assert response.status_code == 200
 
@@ -65,7 +65,7 @@ class TestRoleDetailView:
             permission=permission_view_product,
         )
 
-        response = authenticated_client.get(f'/main/roles/{role_custom.id}/')
+        response = authenticated_client.get(f'/roles/{role_custom.id}/')
 
         assert response.status_code == 200
 
@@ -77,7 +77,7 @@ class TestRoleDetailView:
             wildcard='*',
         )
 
-        response = authenticated_client.get(f'/main/roles/{role_admin.id}/')
+        response = authenticated_client.get(f'/roles/{role_admin.id}/')
 
         assert response.status_code == 200
 
@@ -87,13 +87,13 @@ class TestRoleCreateView:
 
     def test_create_role_get(self, authenticated_client):
         """Test GET request shows create form."""
-        response = authenticated_client.get('/main/roles/create/')
+        response = authenticated_client.get('/roles/create/')
 
         assert response.status_code == 200
 
     def test_create_role_post_success(self, authenticated_client, db, hub_id):
         """Test POST creates new role."""
-        response = authenticated_client.post('/main/roles/create/', {
+        response = authenticated_client.post('/roles/create/', {
             'name': 'cashier',
             'display_name': 'Cashier',
             'description': 'Can process sales',
@@ -104,7 +104,7 @@ class TestRoleCreateView:
 
     def test_create_role_duplicate_name(self, authenticated_client, db, hub_id, role_admin):
         """Test creating role with existing name fails."""
-        response = authenticated_client.post('/main/roles/create/', {
+        response = authenticated_client.post('/roles/create/', {
             'name': 'admin',  # Already exists
             'display_name': 'Another Admin',
         })
@@ -118,13 +118,13 @@ class TestRoleEditView:
 
     def test_edit_role_get(self, authenticated_client, role_custom):
         """Test GET shows edit form."""
-        response = authenticated_client.get(f'/main/roles/{role_custom.id}/edit/')
+        response = authenticated_client.get(f'/roles/{role_custom.id}/edit/')
 
         assert response.status_code == 200
 
     def test_edit_role_post_success(self, authenticated_client, role_custom):
         """Test POST updates role."""
-        response = authenticated_client.post(f'/main/roles/{role_custom.id}/edit/', {
+        response = authenticated_client.post(f'/roles/{role_custom.id}/edit/', {
             'display_name': 'Updated Name',
             'description': 'Updated description',
         })
@@ -139,7 +139,7 @@ class TestRoleDeleteView:
 
     def test_delete_role_get(self, authenticated_client, role_custom):
         """Test GET shows confirmation."""
-        response = authenticated_client.get(f'/main/roles/{role_custom.id}/delete/')
+        response = authenticated_client.get(f'/roles/{role_custom.id}/delete/')
 
         assert response.status_code == 200
 
@@ -147,14 +147,14 @@ class TestRoleDeleteView:
         """Test deleting custom role."""
         role_id = role_custom.id
 
-        response = authenticated_client.post(f'/main/roles/{role_id}/delete/')
+        response = authenticated_client.post(f'/roles/{role_id}/delete/')
 
         assert response.status_code == 302
         assert not Role.objects.filter(id=role_id).exists()
 
     def test_cannot_delete_system_role(self, authenticated_client, role_admin):
         """Test that system roles cannot be deleted."""
-        response = authenticated_client.post(f'/main/roles/{role_admin.id}/delete/')
+        response = authenticated_client.post(f'/roles/{role_admin.id}/delete/')
 
         # Should redirect with error
         assert response.status_code == 302
@@ -165,7 +165,7 @@ class TestRoleDeleteView:
         employee_user.role_obj = role_custom
         employee_user.save()
 
-        response = authenticated_client.post(f'/main/roles/{role_custom.id}/delete/')
+        response = authenticated_client.post(f'/roles/{role_custom.id}/delete/')
 
         # Should redirect with error
         assert response.status_code == 302
@@ -179,7 +179,7 @@ class TestRoleToggleActive:
         """Test toggling role active status."""
         assert role_custom.is_active is True
 
-        response = authenticated_client.get(f'/main/roles/{role_custom.id}/toggle-active/')
+        response = authenticated_client.post(f'/roles/{role_custom.id}/toggle-active/')
 
         assert response.status_code == 302
         role_custom.refresh_from_db()
@@ -187,7 +187,7 @@ class TestRoleToggleActive:
 
     def test_cannot_deactivate_admin(self, authenticated_client, role_admin):
         """Test that admin role cannot be deactivated."""
-        response = authenticated_client.get(f'/main/roles/{role_admin.id}/toggle-active/')
+        response = authenticated_client.post(f'/roles/{role_admin.id}/toggle-active/')
 
         assert response.status_code == 302
         role_admin.refresh_from_db()
@@ -202,7 +202,7 @@ class TestRolePermissionsAPI:
     ):
         """Test adding permission via API."""
         response = authenticated_client.post(
-            f'/main/roles/api/{role_custom.id}/permissions/',
+            f'/roles/api/{role_custom.id}/permissions/',
             data=json.dumps({
                 'add': ['inventory.view_product'],
                 'remove': [],
@@ -226,7 +226,7 @@ class TestRolePermissionsAPI:
         )
 
         response = authenticated_client.post(
-            f'/main/roles/api/{role_custom.id}/permissions/',
+            f'/roles/api/{role_custom.id}/permissions/',
             data=json.dumps({
                 'add': [],
                 'remove': ['inventory.view_product'],
@@ -246,7 +246,7 @@ class TestWildcardAPI:
     def test_add_wildcard(self, authenticated_client, db, hub_id, role_custom):
         """Test adding wildcard permission."""
         response = authenticated_client.post(
-            f'/main/roles/api/{role_custom.id}/wildcard/',
+            f'/roles/api/{role_custom.id}/wildcard/',
             data=json.dumps({'wildcard': 'inventory.*'}),
             content_type='application/json'
         )
@@ -263,7 +263,7 @@ class TestWildcardAPI:
     def test_add_invalid_wildcard(self, authenticated_client, role_custom):
         """Test adding invalid wildcard pattern."""
         response = authenticated_client.post(
-            f'/main/roles/api/{role_custom.id}/wildcard/',
+            f'/roles/api/{role_custom.id}/wildcard/',
             data=json.dumps({'wildcard': 'no_asterisk'}),
             content_type='application/json'
         )
@@ -279,7 +279,7 @@ class TestWildcardAPI:
         )
 
         response = authenticated_client.post(
-            f'/main/roles/api/{role_custom.id}/wildcard/inventory.*/'
+            f'/roles/api/{role_custom.id}/wildcard/inventory.*/'
         )
 
         assert response.status_code == 200
@@ -293,7 +293,7 @@ class TestWildcardAPI:
         )
 
         response = authenticated_client.post(
-            f'/main/roles/api/{role_admin.id}/wildcard/*/'
+            f'/roles/api/{role_admin.id}/wildcard/*/'
         )
 
         assert response.status_code == 400
@@ -304,7 +304,7 @@ class TestSyncPermissions:
 
     def test_sync_permissions(self, authenticated_client):
         """Test syncing permissions from modules."""
-        response = authenticated_client.get('/main/roles/sync-permissions/')
+        response = authenticated_client.get('/roles/sync-permissions/')
 
         assert response.status_code == 302  # Redirect on success
 
@@ -314,7 +314,7 @@ class TestCreateDefaultRoles:
 
     def test_create_default_roles(self, authenticated_client, db, hub_id):
         """Test creating default roles."""
-        response = authenticated_client.get('/main/roles/create-defaults/')
+        response = authenticated_client.get('/roles/create-defaults/')
 
         assert response.status_code == 302
 

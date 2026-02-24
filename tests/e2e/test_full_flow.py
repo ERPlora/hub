@@ -2,8 +2,11 @@
 End-to-end tests for complete user flows.
 
 Tests full scenarios from login to using features.
+
+Wizard steps: 1=Regional, 2=Modules, 3=Business, 4=Tax
 """
 import pytest
+import json
 from decimal import Decimal
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
@@ -35,36 +38,53 @@ class TestNewUserSetup:
 
         # 2. Login
         session = client.session
-        session['local_user_id'] = str(user.id)  # Convert UUID to string
+        session['local_user_id'] = str(user.id)
         session['user_name'] = user.name
         session['user_email'] = user.email
         session['user_role'] = user.role
         session.save()
 
         # 3. Access home - should redirect to wizard
-        response = client.get('/home/', follow=True)
-        # Either loads wizard or redirects to setup
+        response = client.get('/', follow=True)
         assert response.status_code == 200
 
-        # 4. Complete wizard (single form with HTMX)
-        response = client.post('/setup/', {
+        # 4. Complete wizard step by step via HTMX
+        # Step 1: Regional
+        response = client.post('/setup/step/1/', {
+            'language': 'es',
+            'timezone': 'Europe/Madrid',
+        }, HTTP_HX_REQUEST='true')
+        assert response.status_code == 200
+
+        # Step 2: Modules
+        response = client.post('/setup/step/2/', {
+            'selected_blocks': json.dumps(['crm', 'pos', 'invoicing']),
+        }, HTTP_HX_REQUEST='true')
+        assert response.status_code == 200
+
+        # Step 3: Business
+        response = client.post('/setup/step/3/', {
             'business_name': 'My New Store',
             'business_address': '456 Commerce Ave',
             'vat_number': 'ES98765432B',
             'phone': '+34 611 222 333',
             'email': 'store@example.com',
-            'tax_rate': '21',
-            'tax_included': 'on'
-        })
-        # Success returns 200 with HX-Redirect header
+        }, HTTP_HX_REQUEST='true')
         assert response.status_code == 200
-        assert response.get('HX-Redirect') == '/home/'
+
+        # Step 4: Tax (final)
+        response = client.post('/setup/step/4/', {
+            'tax_rate': '21',
+            'tax_included': 'on',
+        }, HTTP_HX_REQUEST='true')
+        assert response.status_code == 200
+        assert response.get('HX-Redirect') == '/'
 
         # 5. Verify store is configured
         store_config = StoreConfig.get_solo()
         assert store_config.is_configured is True
         assert store_config.business_name == 'My New Store'
-        assert store_config.tax_rate == 21
+        assert store_config.tax_rate == Decimal('21')
 
 
 class TestConfigurationFlow:
@@ -72,7 +92,6 @@ class TestConfigurationFlow:
 
     def test_change_currency_and_verify(self, authenticated_client, hub_config, store_config):
         """Test changing currency and verify it reflects in system."""
-        import json
 
         # 1. Change currency via API
         response = authenticated_client.patch(
@@ -94,7 +113,6 @@ class TestConfigurationFlow:
 
     def test_change_tax_and_verify_calculations(self, authenticated_client, store_config):
         """Test changing tax rate and verify calculations."""
-        import json
 
         # 1. Change tax rate
         response = authenticated_client.patch(
@@ -120,7 +138,7 @@ class TestModuleFlow:
 
     def test_view_modules_list(self, authenticated_client, store_config):
         """Test viewing installed modules."""
-        response = authenticated_client.get('/store/')
+        response = authenticated_client.get('/modules/')
 
         assert response.status_code == 200
         # Should show modules page
@@ -128,7 +146,7 @@ class TestModuleFlow:
 
     def test_access_active_module(self, authenticated_client, store_config):
         """Test accessing an active module (inventory)."""
-        response = authenticated_client.get('/modules/inventory/')
+        response = authenticated_client.get('/m/inventory/')
 
         # Should either work (200) or redirect to another page
         # If module is active, should be accessible
@@ -140,7 +158,7 @@ class TestDashboardFlow:
 
     def test_home_loads(self, authenticated_client, store_config):
         """Test home page loads for configured store."""
-        response = authenticated_client.get('/home/')
+        response = authenticated_client.get('/')
 
         assert response.status_code == 200
         # Should contain dashboard content

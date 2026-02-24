@@ -185,6 +185,9 @@ class ModuleDetailViewTest(TestCase):
             'author': 'ERPlora',
             'is_owned': False,
             'is_free': True,
+            'category': 'default',
+            'category_name': 'Default',
+            'icon': 'cube-outline',
         }
 
         # Mock related modules response

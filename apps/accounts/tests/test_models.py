@@ -45,7 +45,7 @@ class TestPermissionModel:
     def test_permission_soft_delete(self, permission_view_product):
         """Test soft delete on permission."""
         perm_id = permission_view_product.pk
-        permission_view_product.soft_delete()
+        permission_view_product.delete()
 
         # Should not be found with default manager
         assert not Permission.objects.filter(pk=perm_id).exists()
@@ -100,7 +100,7 @@ class TestRoleModel:
     def test_role_soft_delete(self, role_custom):
         """Test soft delete on role."""
         role_id = role_custom.pk
-        role_custom.soft_delete()
+        role_custom.delete()
 
         assert not Role.objects.filter(pk=role_id).exists()
         assert Role.all_objects.filter(pk=role_id).exists()

@@ -290,12 +290,21 @@ class TestSlotsIntegration:
             module_id='retail'
         )
 
-        content = self.slots.get_slot_content('pos.header')
-        # Both are registered (conditions checked at render time)
-        assert len(content) == 2
+        # With a mock request in tables mode, only tables slot passes
+        mock_request = MagicMock()
+        mock_request.session = {'mode': 'tables'}
+        content = self.slots.get_slot_content('pos.header', request=mock_request)
+        assert len(content) == 1
+        assert content[0]['module_id'] == 'tables'
+
+        # With retail mode, only retail slot passes
+        mock_request.session = {'mode': 'retail'}
+        content = self.slots.get_slot_content('pos.header', request=mock_request)
+        assert len(content) == 1
+        assert content[0]['module_id'] == 'retail'
 
     def test_slot_with_dynamic_context(self):
-        """Test slot content with dynamic context."""
+        """Test slot content with dynamic context function."""
         def get_table_context(request):
             table_id = request.session.get('current_table_id')
             return {
@@ -306,13 +315,17 @@ class TestSlotsIntegration:
         self.slots.register(
             'pos.cart_header',
             template='tables/table_badge.html',
-            context_callable=get_table_context,
+            context_fn=get_table_context,
             module_id='tables'
         )
 
-        content = self.slots.get_slot_content('pos.cart_header')
+        # With a mock request, context_fn should provide dynamic context
+        mock_request = MagicMock()
+        mock_request.session = {'current_table_id': 5}
+        content = self.slots.get_slot_content('pos.cart_header', request=mock_request)
         assert len(content) == 1
-        assert content[0]['context_callable'] is not None
+        assert content[0]['context']['table_id'] == 5
+        assert content[0]['context']['table_status'] == 'occupied'
 
 
 class TestFullIntegrationScenario:
