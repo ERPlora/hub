@@ -20,7 +20,7 @@ ERPlora Hub es una aplicación Django que funciona como punto de venta (POS). Se
 - 📦 Marketplace único de modules
 
 **Stack tecnológico:**
-- Django 5.1
+- Django 5.2
 - SQLite
 - Alpine.js + HTMX para UI
 - Python 3.11+
@@ -316,5 +316,5 @@ Después del **2036-01-02**, se convierte en **Apache License 2.0**.
 ---
 
 **Última actualización**: 2026-01-02
-**Django**: 5.1
+**Django**: 5.2
 **Python**: 3.11+
