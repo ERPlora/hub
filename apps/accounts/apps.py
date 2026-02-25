@@ -8,9 +8,4 @@ class AccountsConfig(AppConfig):
     verbose_name = _('Accounts & Authentication')
 
     def ready(self):
-        """
-        Initialize accounts app.
-        Import signals and perform app-level initialization.
-        """
-        # Import signals here if needed
         pass

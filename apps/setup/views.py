@@ -709,11 +709,8 @@ def _handle_step_post(request, step, hub_config, store_config):
         context = _get_step_context(next_step, hub_config, store_config)
         return render(request, STEP_TEMPLATES[next_step], context)
     else:
-        # Final step complete → save config, show progress screen for module install
-        hub_id = _get_hub_id(hub_config)
-        PermissionService.create_default_roles(hub_id)
-        logger.info("Setup complete: created default roles")
-
+        # Final step complete → show progress screen for module install
+        # Default roles are seeded automatically via post_migrate signal
         # Return the progress screen partial (handles module install via HTMX)
         blocks = hub_config.selected_blocks or []
         context = _get_step_context(step, hub_config, store_config)
