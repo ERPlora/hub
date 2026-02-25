@@ -4,10 +4,7 @@ Modules API
 Module management, marketplace, and installation endpoints.
 """
 import json
-import os
 import shutil
-import tempfile
-import zipfile
 import requests
 from pathlib import Path
 
@@ -545,109 +542,39 @@ class ModuleInstallView(APIView):
         responses={200: ModuleActionSerializer, 400: ErrorResponseSerializer}
     )
     def post(self, request):
+        from apps.core.services.module_install_service import ModuleInstallService
+
         serializer = ModuleInstallSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         module_slug = serializer.validated_data['module_slug']
         download_url = serializer.validated_data['download_url']
 
-        try:
-            modules_dir = Path(django_settings.MODULES_DIR)
+        hub_token = ModuleInstallService.get_hub_token()
+        result = ModuleInstallService.download_and_install(
+            module_slug, download_url, hub_token
+        )
 
-            response = requests.get(download_url, timeout=60, stream=True)
-            response.raise_for_status()
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    tmp_file.write(chunk)
-                tmp_path = tmp_file.name
-
-            try:
-                # Extract to temp directory first to discover MODULE_ID
-                with tempfile.TemporaryDirectory() as tmp_extract:
-                    tmp_extract_path = Path(tmp_extract)
-
-                    with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
-                        zip_ref.extractall(tmp_extract_path)
-
-                    # Find the extracted module root (may be nested in a folder)
-                    extracted_items = list(tmp_extract_path.iterdir())
-                    if len(extracted_items) == 1 and extracted_items[0].is_dir():
-                        extracted_root = extracted_items[0]
-                    else:
-                        extracted_root = tmp_extract_path
-
-                    # Read MODULE_ID from module.py
-                    module_id = self._get_module_id(extracted_root, module_slug)
-
-                    # Check if already installed
-                    module_target_dir = modules_dir / module_id
-                    if module_target_dir.exists() or (modules_dir / f"_{module_id}").exists():
-                        return Response(
-                            {'success': False, 'error': f'Module {module_id} already installed'},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
-
-                    # Move to final location
-                    shutil.copytree(extracted_root, module_target_dir)
-
-                from apps.modules_runtime.loader import module_loader
-                module_loader.load_module(module_id)
-
-                # Run migrations for the new module
-                try:
-                    from django.core.management import call_command
-                    call_command('migrate', '--run-syncdb')
-                except Exception:
-                    pass  # Non-fatal: migrations will run on next restart
-
-                from apps.core.utils import schedule_server_restart
-                schedule_server_restart()
-
-                return Response({
-                    'success': True,
-                    'message': f'Module {module_id} installed successfully. Server restarting...',
-                })
-
-            finally:
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
-
-        except requests.exceptions.RequestException as e:
-            return Response(
-                {'success': False, 'error': f'Failed to download module: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        if not result.success:
+            err_status = (
+                status.HTTP_400_BAD_REQUEST
+                if 'already installed' in result.message
+                else status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        except zipfile.BadZipFile:
             return Response(
-                {'success': False, 'error': 'Invalid module package'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            return Response(
-                {'success': False, 'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {'success': False, 'error': result.message}, status=err_status
             )
 
-    @staticmethod
-    def _get_module_id(extracted_root: Path, fallback: str) -> str:
-        """Read MODULE_ID from module.py, falling back to slug."""
-        # Try module.py first
-        module_py_path = extracted_root / 'module.py'
-        if module_py_path.exists():
-            try:
-                content = module_py_path.read_text(encoding='utf-8')
-                for line in content.splitlines():
-                    line = line.strip()
-                    if line.startswith('MODULE_ID'):
-                        # Parse: MODULE_ID = 'inventory' or MODULE_ID = "inventory"
-                        value = line.split('=', 1)[1].strip().strip("'\"")
-                        if value:
-                            return value
-            except Exception:
-                pass
+        ModuleInstallService.run_post_install(
+            load_single=result.module_id,
+            run_migrations=True,
+            schedule_restart=True,
+        )
 
-        return fallback
+        return Response({
+            'success': True,
+            'message': f'Module {result.module_id} installed successfully. Server restarting...',
+        })
 
 
 # =============================================================================

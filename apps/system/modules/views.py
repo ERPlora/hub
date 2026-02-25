@@ -6,9 +6,6 @@ All views support SPA navigation via HTMX.
 """
 import json
 import shutil
-import os
-import tempfile
-import zipfile
 import requests
 from pathlib import Path
 
@@ -1012,6 +1009,8 @@ def check_ownership(request, module_id):
 @require_http_methods(["POST"])
 def install_from_marketplace(request):
     """Download and install module from Cloud"""
+    from apps.core.services.module_install_service import ModuleInstallService
+
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
@@ -1026,100 +1025,38 @@ def install_from_marketplace(request):
                 'error': 'Missing module_slug or download_url'
             }, status=400)
 
-        # Use module_id (local directory name) if provided, fall back to slug
-        module_dir_name = data.get('module_id') or module_slug
-
-        # Normalize http:// to https:// (Cloud URLs should always be HTTPS)
-        if download_url.startswith('http://'):
-            download_url = download_url.replace('http://', 'https://', 1)
-
-        modules_dir = Path(django_settings.MODULES_DIR)
-        module_target_dir = modules_dir / module_dir_name
-
-        if module_target_dir.exists() or (modules_dir / f"_{module_dir_name}").exists():
-            return JsonResponse({
-                'success': False,
-                'error': 'Module already installed'
-            }, status=400)
-
-        # Get Hub JWT token for authentication with Cloud
-        from apps.configuration.models import HubConfig
-        config = HubConfig.get_solo()
-        if not config.hub_jwt:
+        hub_token = ModuleInstallService.get_hub_token()
+        if not hub_token:
             return JsonResponse({
                 'success': False,
                 'error': 'Hub not authenticated with Cloud. Please login again.'
             }, status=401)
 
-        # Download with X-Hub-Token header
-        headers = {
-            'X-Hub-Token': config.hub_jwt
-        }
-        response = requests.get(download_url, headers=headers, timeout=60, stream=True)
-        response.raise_for_status()
+        result = ModuleInstallService.download_and_install(
+            module_slug, download_url, hub_token
+        )
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
-            for chunk in response.iter_content(chunk_size=8192):
-                tmp_file.write(chunk)
-            tmp_path = tmp_file.name
-
-        try:
-            with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
-                namelist = zip_ref.namelist()
-                root_folders = set(name.split('/')[0] for name in namelist if name.split('/')[0])
-
-                if len(root_folders) == 1:
-                    root_folder = list(root_folders)[0]
-                    zip_ref.extractall(modules_dir)
-                    extracted_dir = modules_dir / root_folder
-                    if extracted_dir != module_target_dir:
-                        extracted_dir.rename(module_target_dir)
-                else:
-                    module_target_dir.mkdir(parents=True, exist_ok=True)
-                    zip_ref.extractall(module_target_dir)
-
-            from apps.modules_runtime.loader import module_loader
-            module_loader.load_module(module_dir_name)
-
-            # Run migrations for the new module
-            try:
-                from django.core.management import call_command
-                import io
-                output = io.StringIO()
-                call_command('migrate', module_dir_name, '--run-syncdb', stdout=output, stderr=output)
-                migration_output = output.getvalue()
-                if migration_output:
-                    print(f"[MODULES] Migrations for {module_dir_name}: {migration_output}")
-            except Exception as migrate_error:
-                print(f"[MODULES] Migration error for {module_dir_name}: {migrate_error}")
-                # Continue anyway - migrations might not exist
-
-            if 'modules_pending_restart' not in request.session:
-                request.session['modules_pending_restart'] = []
-
-            if module_dir_name not in request.session['modules_pending_restart']:
-                request.session['modules_pending_restart'].append(module_dir_name)
-                request.session.modified = True
-
+        if not result.success:
             return JsonResponse({
-                'success': True,
-                'message': f'Module {module_slug} installed successfully',
-                'requires_restart': True
-            })
+                'success': False,
+                'error': result.message
+            }, status=400 if 'already installed' in result.message else 500)
 
-        finally:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
+        ModuleInstallService.run_post_install(
+            load_single=result.module_id, run_migrations=True
+        )
 
-    except requests.exceptions.RequestException as e:
+        # Track pending restart in session
+        request.session.setdefault('modules_pending_restart', [])
+        if result.module_id not in request.session['modules_pending_restart']:
+            request.session['modules_pending_restart'].append(result.module_id)
+            request.session.modified = True
+
         return JsonResponse({
-            'success': False,
-            'error': f'Failed to download module: {str(e)}'
-        }, status=500)
-    except zipfile.BadZipFile:
-        return JsonResponse({
-            'success': False,
-            'error': 'Invalid module package'
-        }, status=400)
+            'success': True,
+            'message': f'Module {module_slug} installed successfully',
+            'requires_restart': True
+        })
+
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

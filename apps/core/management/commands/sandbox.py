@@ -1,23 +1,22 @@
 """
 Management command: sandbox
 
-Wipes the sandbox directories (DB + modules), runs migrate, and starts
-the development server with auto-reload enabled.
+Runs migrate and starts gunicorn with --reload (same server as production,
+but with auto-reload so it survives wsgi.py touches after module installs).
 
-- First launch: wipes DB + modules, runs migrate, starts server
-- Reloader restart (after module install): runs migrate, starts server (NO wipe)
-- Next manual launch (Ctrl+C + sandbox again): wipes everything again
-
-Requires HUB_ENV=sandbox in .env (or as env var).
+The sandbox wipe happens in sandbox_run.py BEFORE Django loads (to avoid
+SystemCheckErrors from partially-installed modules with missing deps).
 
 Usage:
-    HUB_ENV=sandbox python manage.py sandbox           # wipe + migrate + runserver
-    HUB_ENV=sandbox python manage.py sandbox 8080      # custom port
-    HUB_ENV=sandbox python manage.py sandbox --no-run  # wipe + migrate only
+    HUB_ENV=sandbox python sandbox_run.py              # wipe + migrate + gunicorn (recommended)
+    HUB_ENV=sandbox python sandbox_run.py 8080         # custom port
+    HUB_ENV=sandbox python manage.py sandbox           # migrate + gunicorn (no wipe)
+    HUB_ENV=sandbox python manage.py sandbox --no-run  # migrate only
 """
 
 import os
-import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 from django.conf import settings
@@ -26,12 +25,12 @@ from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
-    help = 'Wipe sandbox, migrate, and start dev server (requires HUB_ENV=sandbox)'
+    help = 'Migrate and start gunicorn for sandbox (requires HUB_ENV=sandbox)'
 
     def add_arguments(self, parser):
         parser.add_argument(
             'port', nargs='?', default='8000',
-            help='Port for runserver (default: 8000)',
+            help='Port for gunicorn (default: 8000)',
         )
         parser.add_argument(
             '--no-run', action='store_true',
@@ -46,34 +45,38 @@ class Command(BaseCommand):
             ))
             return
 
-        # RUN_MAIN=true means this is a reloader restart (not a fresh launch)
-        is_reloader = os.environ.get('RUN_MAIN') == 'true'
-
-        if not is_reloader:
-            # Fresh launch — wipe everything
-            from django.db import connections
-            for conn in connections.all():
-                conn.close()
-
-            db_path = Path(str(settings.DATABASES['default']['NAME']))
-            db_dir = db_path.parent
-            modules_dir = Path(str(settings.MODULES_DIR))
-
-            for d in [db_dir, modules_dir]:
-                if d.exists():
-                    shutil.rmtree(d)
-                    self.stdout.write(f'[SANDBOX] Wiped {d}')
-                d.mkdir(parents=True, exist_ok=True)
-
-            self.stdout.write(self.style.SUCCESS('[SANDBOX] Clean environment ready'))
-
-        # Migrate (always — fresh DB or new module migrations)
+        # Migrate (DB was just wiped, needs fresh schema)
         self.stdout.write('[SANDBOX] Running migrations...')
         call_command('migrate', '--run-syncdb', verbosity=0)
         self.stdout.write(self.style.SUCCESS('[SANDBOX] Migrations applied'))
 
-        # Run server with reloader enabled
-        if not options['no_run']:
-            port = options['port']
-            self.stdout.write(f'[SANDBOX] Starting server on :{port}')
-            call_command('runserver', port)
+        if options['no_run']:
+            return
+
+        # Start gunicorn with --reload (same as production, survives file changes)
+        port = options['port']
+        self.stdout.write(f'[SANDBOX] Starting gunicorn on :{port} with --reload')
+
+        gunicorn_bin = Path(sys.executable).parent / 'gunicorn'
+        hub_dir = str(settings.BASE_DIR)
+
+        cmd = [
+            str(gunicorn_bin),
+            'config.wsgi:application',
+            '--bind', f'0.0.0.0:{port}',
+            '--workers', '1',
+            '--threads', '2',
+            '--worker-class', 'gthread',
+            '--timeout', '120',
+            '--reload',
+            '--reload-extra-file', str(Path(hub_dir) / 'config' / 'wsgi.py'),
+            '--access-logfile', '-',
+            '--error-logfile', '-',
+        ]
+
+        env = os.environ.copy()
+        env['HUB_ENV'] = 'sandbox'
+        env['DJANGO_SETTINGS_MODULE'] = 'config.settings'
+
+        self.stdout.write(f'[SANDBOX] {" ".join(cmd)}')
+        subprocess.run(cmd, cwd=hub_dir, env=env)
