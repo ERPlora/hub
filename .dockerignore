@@ -56,14 +56,13 @@ Thumbs.db
 .gitignore
 .gitattributes
 
-# Documentation (not needed in runtime, except docs/README.md for pyproject.toml)
+# Documentation (not needed in runtime)
 docs/*
-!docs/README.md
 CLAUDE.md
 DOCKER.md
-README.md
 CHANGELOG.md
 LICENSE
+# NOTE: README.md is NOT excluded — pyproject.toml references it (readme = "README.md")
 
 # CI/CD
 .github/
