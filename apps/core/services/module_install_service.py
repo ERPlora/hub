@@ -227,7 +227,8 @@ class ModuleInstallService:
 
                 modules_to_install = [
                     m for m in all_modules
-                    if m.get('slug', '') not in installed_ids
+                    if m.get('role') == 'required'
+                    and m.get('slug', '') not in installed_ids
                     and m.get('module_id', '') not in installed_ids
                     and not m.get('is_coming_soon', False)
                 ]
