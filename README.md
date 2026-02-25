@@ -1,172 +1,235 @@
 # ERPlora Hub
 
-Sistema POS (Point of Sale) modular Django desplegado como **web application**.
+Modular POS (Point of Sale) system built with Django, deployed as a **web application**.
 
-## Modos de Despliegue
+## Deployment Modes
 
-### 1. Local (Desarrollo)
-- Django runserver con SQLite local
-- Datos persisten en `~/Library/Application Support/ERPloraHub/` (macOS)
-- Extensible con modules (gratuitos o de pago)
+### 1. Local (Development)
+- Django runserver with local SQLite
+- Data persists in `~/Library/Application Support/ERPloraHub/` (macOS)
+- Extensible with modules (free or paid)
 
 ### 2. Cloud Hub (SaaS)
-- Contenedor Docker
-- SQLite en volumen persistente
-- Acceso via subdominio: `{subdomain}.erplora.com`
-- Planes de suscripcion
+- Docker container
+- SQLite on persistent volume
+- Access via subdomain: `{subdomain}.erplora.com`
+- Subscription plans
 
 ---
 
-## Requisitos (Desarrollo Local)
+## Requirements (Local Development)
 
 - Python 3.11+
-- SQLite 3+ (incluido con Python)
-- uv (gestor de paquetes Python)
+- SQLite 3+ (included with Python)
+- uv (Python package manager)
 
-## Instalacion (Desarrollo)
+## Installation (Development)
 
 ```bash
 cd hub
 
-# Crear entorno virtual con uv
+# Create virtual environment with uv
 uv venv
 source .venv/bin/activate  # Linux/macOS
 
-# Instalar dependencias
+# Install dependencies
 uv pip install -e ".[dev]"
 
-# Aplicar migraciones
+# Apply migrations
 python manage.py migrate
 
-# Servidor de desarrollo
+# Development server
 python manage.py runserver
 ```
 
-El Hub corre en puerto **8000** por defecto (Cloud Portal usa 8001).
+The Hub runs on port **8000** by default (Cloud Portal uses 8001).
 
 ---
 
-## Estructura del Proyecto
+## Configuration
+
+The Hub works **without any `.env` file** — all settings have sensible defaults.
+
+Optionally, create a `hub/.env` to override specific variables. See `.env.example` for all available options.
+
+### Key Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HUB_ENV` | `local` | Environment: `local`, `sandbox`, `web` |
+| `CLOUD_API_URL` | `https://erplora.com` | Cloud URL (marketplace, sync) |
+| `DATABASE_PATH` | auto (DataPaths) | Path to SQLite file |
+| `MODULES_DIR` | auto (DataPaths) | Installed modules directory |
+| `ERPLORA_DEV_MODE` | `true` | Relaxes module validation |
+| `DEBUG_TOOLBAR` | `false` | Enables Django Debug Toolbar |
+| `SECRET_KEY` | auto-generated | Django secret key |
+
+### Default Paths (auto-detected per platform)
+
+| Platform | Base Directory |
+|----------|---------------|
+| macOS | `~/Library/Application Support/ERPloraHub/` |
+| Linux | `~/.erplora-hub/` |
+| Docker | `/app/data/` |
+
+Subdirectories: `db/`, `modules/`, `media/`, `logs/`, `backups/`, `reports/`
+
+---
+
+## Sandbox (Clean Environment)
+
+For testing the setup wizard, module installation, or any flow that requires starting from scratch **without touching your development data**.
+
+The sandbox uses a dedicated settings file (`config/settings/sandbox.py`) with isolated paths in `ERPloraHub-sandbox/`.
+
+### How to use
+
+```bash
+cd hub
+source .venv/bin/activate
+
+# Start sandbox (wipes DB + modules, runs migrate, starts server)
+HUB_ENV=sandbox python manage.py sandbox
+
+# Custom port
+HUB_ENV=sandbox python manage.py sandbox 8080
+
+# Wipe + migrate only (no server)
+HUB_ENV=sandbox python manage.py sandbox --no-run
+```
+
+### Behavior
+
+- **First launch**: wipes DB and modules, runs migrate, starts server with auto-reload
+- **Reloader restart** (after module install via setup wizard): runs migrate, loads new modules — NO wipe
+- **Manual restart** (Ctrl+C + run `sandbox` again): wipes everything, starts fresh
+
+Console output:
+
+```
+[SANDBOX] Wiped .../ERPloraHub-sandbox/db
+[SANDBOX] Wiped .../ERPloraHub-sandbox/modules
+[SANDBOX] Clean environment ready
+[SANDBOX] Running migrations...
+[SANDBOX] Migrations applied
+[SANDBOX] Starting server on :8000
+```
+
+Your development data in `ERPloraHub/` is never touched.
+
+---
+
+## Project Structure
 
 ```
 hub/
-├── apps/                      # Aplicaciones Django
-│   ├── accounts/             # LocalUser, autenticacion con PIN
+├── apps/                      # Django applications
+│   ├── accounts/             # LocalUser, PIN authentication
 │   ├── configuration/        # HubConfig, StoreConfig (singleton)
-│   ├── modules/              # Module model, runtime manager
-│   ├── sync/                 # Sincronizacion con Cloud
-│   └── core/                 # Utilidades compartidas
+│   ├── modules_runtime/      # Dynamic module loading
+│   ├── sync/                 # Cloud synchronization
+│   └── core/                 # Shared utilities
 │
-├── config/                   # Configuracion Django
+├── config/                   # Django configuration
 │   ├── settings/
-│   │   ├── local.py         # Desarrollo local
+│   │   ├── __init__.py      # Environment selector (HUB_ENV)
+│   │   ├── base.py          # Common settings
+│   │   ├── local.py         # Local development
+│   │   ├── sandbox.py       # Sandbox (isolated testing)
 │   │   └── web.py           # Docker/Cloud
-│   ├── urls.py
-│   └── module_allowed_deps.py
+│   ├── paths.py             # DataPaths (cross-platform paths)
+│   └── urls.py
 │
-├── modules/                  # Modules instalados
-│   ├── .template/           # Template base para nuevos modules
-│   └── ...                  # Modules activos
-│
-├── templates/               # Django templates (@erplora/ux + HTMX)
+├── templates/               # Django templates (UX + HTMX)
 ├── static/                  # CSS/JS
-├── Dockerfile               # Build para Cloud Hub
-└── pyproject.toml           # Dependencias (uv)
+├── .env                     # Local overrides (git-ignored, optional)
+├── .env.example             # Variable reference
+├── Dockerfile               # Build for Cloud Hub
+└── pyproject.toml           # Dependencies (uv)
 ```
 
 ---
 
 ## Cloud Hub (Docker)
 
-### Variables de Entorno
+### Environment Variables (injected by Dokploy)
 
 ```bash
-# Identificacion
+# Identification
 HUB_ID=a1b2c3d4-e5f6-7890-abcd-ef1234567890
+HUB_NAME=tienda-de-maria
+DEPLOYMENT_MODE=web
 
-# Conexion con Cloud
-CLOUD_API_URL=https://erplora.com/api
-CLOUD_API_TOKEN=jwt_token_del_hub
+# Cloud
+CLOUD_BASE_URL=https://erplora.com
+HUB_JWT=hub_jwt_token
+PARENT_DOMAIN=erplora.com
 
-# Django
-DEBUG=false
-SECRET_KEY=auto_generated_or_from_env
-ALLOWED_HOSTS=erplora.com
+# S3 Storage
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_STORAGE_BUCKET_NAME=erplora
+AWS_S3_ENDPOINT_URL=https://fsn1.your-objectstorage.com
+
+# Database (PostgreSQL for Hub plan, empty = SQLite)
+DATABASE_URL=
 ```
 
-### Build Local (Docker)
+### Local Docker Build
 
 ```bash
 docker build -t erplora/hub:latest .
 docker run -d -p 8000:8000 -e HUB_ID=test-hub-123 erplora/hub:latest
 ```
 
-### Volumenes Persistentes
+### Persistent Volumes
 
 ```
-/app/data/{HUB_ID}/
+Host: ${VOLUME_PATH}/${HUB_ID}/ → Container: /app/data/
 ├── db/
-│   └── db.sqlite3        # Base de datos
-├── media/                # Archivos subidos
-├── logs/                 # Logs
-├── backups/              # Backups automaticos
-└── temp/                 # Archivos temporales
+│   └── db.sqlite3        # Database
+└── modules/              # Installed modules
 ```
-
----
-
-## Sistema de Modules
-
-El Hub soporta modules dinamicos con dependencias pre-aprobadas.
-
-**Dependencias permitidas**:
-- `Pillow` - Imagenes
-- `qrcode` - QR codes
-- `python-barcode` - Codigos de barras
-- `openpyxl` - Excel
-- `reportlab` - PDFs
-- Y mas...
-
-Ver lista completa en [config/module_allowed_deps.py](config/module_allowed_deps.py).
 
 ---
 
 ## Testing
 
 ```bash
-pytest
-pytest tests/unit
-pytest tests/integration
-pytest --cov=apps --cov-report=html
+pytest                              # All tests
+pytest tests/unit                   # Unit tests only
+pytest tests/integration            # Integration tests only
+pytest --cov=apps --cov-report=html # With coverage
 ```
 
 ---
 
-## Stack Tecnologico
+## Tech Stack
 
-| Componente | Tecnologia |
-|------------|------------|
+| Component | Technology |
+|-----------|------------|
 | Backend | Django 5.2 |
 | Database | SQLite |
 | Frontend | UX CSS + Alpine.js + HTMX |
-| Autenticacion | LocalUser con PIN + JWT (Cloud API) |
-| Deployment | Docker |
+| Icons | djicons |
+| Auth | LocalUser with PIN + JWT (Cloud API) |
+| Deployment | Docker (Dokploy) |
 
 ---
 
-## Licencia
+## License
 
-ERPlora Hub esta licenciado bajo **Business Source License 1.1 (BUSL-1.1)**.
+ERPlora Hub is licensed under **Business Source License 1.1 (BUSL-1.1)**.
 
-**Usos Permitidos (gratis):**
-- Uso interno en negocios
-- Uso personal y educativo
-- Crear modules para el ecosistema
-- Servicios de consultoria
+**Permitted uses (free):**
+- Internal business use
+- Personal and educational use
+- Building modules for the ecosystem
+- Consulting services
 
-**Usos Prohibidos:**
-- Ofrecer como SaaS/PaaS
-- Crear plataforma POS competidora
-- Revender o sublicenciar
+**Prohibited uses:**
+- Offering as SaaS/PaaS
+- Creating a competing POS platform
+- Reselling or sublicensing
 
-Despues del **2036-01-02**, se convierte en **Apache License 2.0**.
+After **2036-01-02**, it converts to **Apache License 2.0**.
