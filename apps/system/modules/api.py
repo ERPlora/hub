@@ -324,31 +324,8 @@ class ModuleRestartView(APIView):
                 del request.session['modules_pending_restart']
                 request.session.modified = True
 
-            # Trigger full server restart after response is sent:
-            # - Gunicorn/Docker: kill master → Docker restarts container
-            # - Dev (runserver): touch wsgi.py → auto-reload
-            import signal
-            import threading
-
-            def _delayed_restart():
-                """Kill Gunicorn master after response is sent. Docker restarts the container."""
-                import time
-                time.sleep(1.5)
-                try:
-                    # SIGINT to PID 1 (Gunicorn master in Docker) = fast shutdown
-                    # Docker restart policy will relaunch the container
-                    os.kill(1, signal.SIGINT)
-                except Exception:
-                    try:
-                        # Non-Docker: kill parent process
-                        os.kill(os.getppid(), signal.SIGTERM)
-                    except Exception:
-                        # Fallback for dev server
-                        wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
-                        if wsgi_file.exists():
-                            wsgi_file.touch()
-
-            threading.Thread(target=_delayed_restart, daemon=True).start()
+            from apps.core.utils import schedule_server_restart
+            schedule_server_restart(delay=1)
 
             return Response({
                 'success': True,
@@ -624,25 +601,8 @@ class ModuleInstallView(APIView):
                 except Exception:
                     pass  # Non-fatal: migrations will run on next restart
 
-                # Send success response, then restart server so URLs are registered
-                import signal
-                import threading
-
-                def _delayed_restart():
-                    """Kill Gunicorn master after response is sent. Docker restarts the container."""
-                    import time
-                    time.sleep(2)
-                    try:
-                        os.kill(1, signal.SIGINT)
-                    except Exception:
-                        try:
-                            os.kill(os.getppid(), signal.SIGTERM)
-                        except Exception:
-                            wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
-                            if wsgi_file.exists():
-                                wsgi_file.touch()
-
-                threading.Thread(target=_delayed_restart, daemon=True).start()
+                from apps.core.utils import schedule_server_restart
+                schedule_server_restart()
 
                 return Response({
                     'success': True,

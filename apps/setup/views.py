@@ -577,32 +577,9 @@ def _fetch_solutions():
 
 
 def _schedule_restart():
-    """Schedule a server restart so newly installed module URLs are registered.
-
-    In Docker (Gunicorn), sends SIGHUP to PID 1 for graceful reload.
-    In local dev (runserver), touches wsgi.py to trigger autoreload.
-    """
-    import signal
-    import threading
-    from config.paths import is_docker_environment
-
-    def _restart():
-        import time
-        time.sleep(3)  # Let the response be sent first
-        if is_docker_environment():
-            try:
-                os.kill(1, signal.SIGHUP)
-            except Exception:
-                pass
-        else:
-            # Local dev: touch a file to trigger runserver autoreload
-            wsgi_file = Path(settings.BASE_DIR) / 'config' / 'wsgi.py'
-            if wsgi_file.exists():
-                wsgi_file.touch()
-                logger.info("Touched wsgi.py to trigger autoreload")
-
-    threading.Thread(target=_restart, daemon=True).start()
-    logger.info("Scheduled server restart for module URL registration")
+    """Schedule a server restart so newly installed module URLs are registered."""
+    from apps.core.utils import schedule_server_restart
+    schedule_server_restart()
 
 
 def _fetch_solution_roles(solution_slug):

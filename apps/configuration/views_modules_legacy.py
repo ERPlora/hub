@@ -238,11 +238,8 @@ def module_restart_server(request):
             del request.session['modules_pending_restart']
             request.session.modified = True
 
-        # Trigger server restart by touching wsgi.py or main file
-        # In development, Django's autoreload will detect this
-        wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
-        if wsgi_file.exists():
-            wsgi_file.touch()
+        from apps.core.utils import schedule_server_restart
+        schedule_server_restart(delay=1)
 
         return JsonResponse({
             'success': True,

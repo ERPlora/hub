@@ -752,7 +752,7 @@ def module_delete(request, module_id):
 
 @require_http_methods(["POST"])
 def module_restart_server(request):
-    """Restart server and run migrations"""
+    """Restart server and run migrations."""
     if 'local_user_id' not in request.session:
         return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
@@ -764,9 +764,8 @@ def module_restart_server(request):
             del request.session['modules_pending_restart']
             request.session.modified = True
 
-        wsgi_file = Path(django_settings.BASE_DIR) / 'config' / 'wsgi.py'
-        if wsgi_file.exists():
-            wsgi_file.touch()
+        from apps.core.utils import schedule_server_restart
+        schedule_server_restart(delay=1)
 
         return JsonResponse({
             'success': True,
