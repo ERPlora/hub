@@ -27,16 +27,16 @@ msgid "Administrator access required."
 msgstr "Se requiere acceso de administrador."
 
 msgid "Permission"
-msgstr "Versión"
+msgstr "Permiso"
 
 msgid "Permissions"
-msgstr "Versión"
+msgstr "Permisos"
 
 msgid "Role"
 msgstr "Rol"
 
 msgid "Roles"
-msgstr "Rol"
+msgstr "Roles"
 
 msgid "Role Permission"
 msgstr "Permiso de rol"
@@ -117,16 +117,16 @@ msgid "PIN configured successfully!"
 msgstr "¡PIN configurado correctamente!"
 
 msgid "Invalid currency"
-msgstr "Selecciona moneda"
+msgstr "Moneda no válida"
 
 msgid "Invalid language"
 msgstr "Idioma no válido"
 
 msgid "Hub & Store Configuration"
-msgstr "Configuración de Impuestos"
+msgstr "Configuración del Hub y la Tienda"
 
 msgid "Hub Configuration"
-msgstr "Configuración de Impuestos"
+msgstr "Configuración del Hub"
 
 msgid "Tax Class"
 msgstr "Clases de Impuestos"
@@ -135,10 +135,10 @@ msgid "Tax Classes"
 msgstr "Clases de Impuestos"
 
 msgid "Store Configuration"
-msgstr "Configuración de Impuestos"
+msgstr "Configuración de la Tienda"
 
 msgid "Backup Configuration"
-msgstr "Configuración de Impuestos"
+msgstr "Configuración de Copias de Seguridad"
 
 msgid "Printer"
 msgstr "Impresora"
@@ -171,10 +171,10 @@ msgid "Disk usage"
 msgstr "Uso de disco por categoría"
 
 msgid "Database not found"
-msgstr "Mantenimiento de Base de Datos"
+msgstr "Base de datos no encontrada"
 
 msgid "Invalid directory"
-msgstr "Selección de mesa inválida"
+msgstr "Directorio no válido"
 
 msgid "Access denied"
 msgstr "Acceso denegado"
@@ -192,7 +192,7 @@ msgid "Not authenticated"
 msgstr "No autenticado"
 
 msgid "Module not found"
-msgstr "No se encontraron módulos"
+msgstr "Módulo no encontrado"
 
 msgid "Module already active"
 msgstr "El módulo ya está activo"
@@ -202,13 +202,13 @@ msgstr ""
 "Módulo activado y migraciones aplicadas. Se requiere reinicio para las URLs."
 
 msgid "Module already disabled"
-msgstr "Ya tienes este módulo"
+msgstr "El módulo ya está desactivado"
 
 msgid "Module deactivated. Restart required."
 msgstr "Módulo desactivado. Se requiere reinicio."
 
 msgid "Module deleted successfully."
-msgstr "¡Módulo instalado correctamente!"
+msgstr "Módulo eliminado correctamente."
 
 msgid "Server restarting... Migrations applied."
 msgstr "Reiniciando servidor... Migraciones aplicadas."
@@ -219,19 +219,19 @@ msgid ""
 msgstr ""
 
 msgid "Missing module_id"
-msgstr "Error al instalar el módulo"
+msgstr "Falta module_id"
 
 msgid "Hub not connected to Cloud. Please configure your Hub first."
 msgstr "Hub no conectado a la nube. Configure su Hub primero."
 
 msgid "Hub not connected to Cloud"
-msgstr "Tu Hub está conectado a ERPlora Cloud"
+msgstr "Hub no conectado a Cloud"
 
 msgid "Missing module_slug or download_url"
 msgstr "Falta module_slug o download_url"
 
 msgid "Module already installed"
-msgstr "No hay módulos instalados"
+msgstr "El módulo ya está instalado"
 
 msgid "Invalid module package (not a valid zip file)"
 msgstr "Paquete de módulo no válido (no es un archivo zip válido)"
@@ -253,7 +253,7 @@ msgid "PIN must contain only digits"
 msgstr "El PIN solo debe contener dígitos"
 
 msgid "PIN must be 4-6 digits"
-msgstr "PIN (4 dígitos)"
+msgstr "El PIN debe tener entre 4 y 6 dígitos"
 
 msgid "Employees"
 msgstr "Empleados"
@@ -268,7 +268,7 @@ msgstr "Añadir Empleado"
 # SETTINGS
 # =============================================================================
 msgid "Employee Information"
-msgstr "Información de la Tienda"
+msgstr "Información del Empleado"
 
 msgid "Name"
 msgstr "Nombre"
@@ -280,7 +280,7 @@ msgid "email@example.com"
 msgstr "correo@ejemplo.com"
 
 msgid "Select a role"
-msgstr "Selecciona una mesa"
+msgstr "Selecciona un rol"
 
 msgid "Security"
 msgstr "Seguridad"
@@ -292,7 +292,7 @@ msgid "4-digit PIN for quick access"
 msgstr "Configura un PIN de 4 dígitos para acceso rápido"
 
 msgid "Search employees..."
-msgstr "Buscar módulos..."
+msgstr "Buscar empleados..."
 
 msgid "All Status"
 msgstr "Estado"
@@ -310,7 +310,7 @@ msgid "Columns"
 msgstr "Columnas"
 
 msgid "Export"
-msgstr "Soporte"
+msgstr "Exportar"
 
 msgid "Export as CSV"
 msgstr "Exportar como CSV"
@@ -322,16 +322,16 @@ msgid "Print"
 msgstr "Imprimir"
 
 msgid "Import"
-msgstr "Soporte"
+msgstr "Importar"
 
 msgid "Table view"
-msgstr "Mesa"
+msgstr "Vista de tabla"
 
 msgid "Card view"
-msgstr "reseñas"
+msgstr "Vista de tarjetas"
 
 msgid "selected"
-msgstr "No hay mesa seleccionada"
+msgstr "seleccionado"
 
 msgid "Activate"
 msgstr "Activar"
@@ -343,7 +343,7 @@ msgid "Delete"
 msgstr "Eliminar"
 
 msgid "Clear selection"
-msgstr "Selección de mesa inválida"
+msgstr "Limpiar selección"
 
 msgid "Delete Employee"
 msgstr "Eliminar Empleado"
@@ -358,7 +358,7 @@ msgid "Cancel"
 msgstr "Cancelar"
 
 msgid "Import Employees"
-msgstr "Empleados"
+msgstr "Importar Empleados"
 
 msgid "Upload a CSV or Excel file with columns:"
 msgstr "Suba un archivo CSV o Excel con las columnas:"
@@ -404,7 +404,7 @@ msgid "Yes, Delete"
 msgstr "Sí, Eliminar"
 
 msgid "Actions"
-msgstr "Secciones"
+msgstr "Acciones"
 
 msgid "Edit"
 msgstr "Editar"
@@ -435,18 +435,18 @@ msgid "Add First Employee"
 msgstr "Añadir Primer Empleado"
 
 msgid "Employee is active"
-msgstr "Empleados"
+msgstr "El empleado está activo"
 
 msgid "Employee is inactive"
-msgstr "Empleados"
+msgstr "El empleado está inactivo"
 
 msgid "Deleting an employee will deactivate their account."
 msgstr ""
-"Eliminar un empleado desactivará su cuenta.Eliminar un empleado desactivará "
-"su cuenta. Esta acción puede ser revertida por un administrador."
+"Eliminar un empleado desactivará su cuenta. Esta acción puede ser revertida "
+"por un administrador."
 
 msgid "Are you sure?"
-msgstr "Configura tu tienda"
+msgstr "¿Estás seguro?"
 
 msgid "Save"
 msgstr "Guardar"
@@ -458,16 +458,16 @@ msgid "Please fill all required fields"
 msgstr "Por favor completa todos los campos"
 
 msgid "PIN must be 4 digits"
-msgstr "PIN (4 dígitos)"
+msgstr "El PIN debe tener 4 dígitos"
 
 msgid "Email already exists"
 msgstr "El correo electrónico ya existe"
 
 msgid "Employee added successfully"
-msgstr "¡Módulo instalado correctamente!"
+msgstr "Empleado añadido correctamente"
 
 msgid "Employee updated successfully"
-msgstr "¡Módulo instalado correctamente!"
+msgstr "Empleado actualizado correctamente"
 
 msgid "Cannot deactivate admin users"
 msgstr "No se pueden desactivar usuarios administradores"
@@ -476,10 +476,10 @@ msgid "Cannot deactivate the last active employee"
 msgstr "No se puede desactivar el último empleado activo"
 
 msgid "activated"
-msgstr "Desactivar"
+msgstr "activado"
 
 msgid "deactivated"
-msgstr "Desactivar"
+msgstr "desactivado"
 
 #, python-format
 msgid "Employee %(status)s successfully"
@@ -504,13 +504,13 @@ msgid "Cannot delete admin users"
 msgstr "No se pueden eliminar usuarios administradores"
 
 msgid "Employee deleted successfully"
-msgstr "¡Módulo instalado correctamente!"
+msgstr "Empleado eliminado correctamente"
 
 msgid "Please select a file"
-msgstr "Por favor completa todos los campos"
+msgstr "Por favor selecciona un archivo"
 
 msgid "The file is empty"
-msgstr "El carrito está vacío"
+msgstr "El archivo está vacío"
 
 msgid "Missing name or email"
 msgstr "Falta nombre o correo electrónico"
@@ -543,16 +543,16 @@ msgid "5 directories"
 msgstr "5 directorios"
 
 msgid "Location"
-msgstr "Rotación"
+msgstr "Ubicación"
 
 msgid "Preview"
-msgstr "reseñas"
+msgstr "Vista previa"
 
 msgid "Close preview"
-msgstr "reseñas"
+msgstr "Cerrar vista previa"
 
 msgid "Select a file to preview"
-msgstr "Selecciona un área para ver las mesas"
+msgstr "Selecciona un archivo para previsualizar"
 
 msgid "Dashboard"
 msgstr "Panel"
@@ -561,7 +561,7 @@ msgid "Search modules..."
 msgstr "Buscar módulos..."
 
 msgid "Get More"
-msgstr "Obtener Gratis"
+msgstr "Obtener Más"
 
 msgid "No modules installed"
 msgstr "No hay módulos instalados"
@@ -579,10 +579,10 @@ msgid "Delete Role"
 msgstr "Eliminar"
 
 msgid "Edit Role"
-msgstr "Editar Empleado"
+msgstr "Editar Rol"
 
 msgid "Create Role"
-msgstr "Crear Área"
+msgstr "Crear Rol"
 
 #, python-format
 msgid ""
@@ -593,25 +593,25 @@ msgid ""
 msgstr ""
 
 msgid "Search roles..."
-msgstr "Buscar módulos..."
+msgstr "Buscar roles..."
 
 msgid "All Sources"
-msgstr "Todas las Categorías"
+msgstr "Todos los Orígenes"
 
 msgid "Basic"
 msgstr "Básico"
 
 msgid "Solution"
-msgstr "Secciones"
+msgstr "Solución"
 
 msgid "Custom"
-msgstr "Clientes"
+msgstr "Personalizado"
 
 msgid "Add Role"
-msgstr "Rol"
+msgstr "Añadir Rol"
 
 msgid "No description"
-msgstr "Descripción"
+msgstr "Sin descripción"
 
 msgid "System"
 msgstr "Sistema"
@@ -665,7 +665,7 @@ msgid "Lowercase letters and underscores only. Cannot be changed later."
 msgstr "Solo letras minúsculas y guiones bajos. No se puede cambiar después."
 
 msgid "Display Name"
-msgstr "Orden de Visualización"
+msgstr "Nombre para Mostrar"
 
 msgid "e.g., Warehouse Staff"
 msgstr "ej., Personal de almacén"
@@ -677,13 +677,13 @@ msgid "Optional description for this role"
 msgstr "Descripción opcional para este rol"
 
 msgid "No roles yet"
-msgstr "Aún no hay áreas"
+msgstr "Aún no hay roles"
 
 msgid "Create your first custom role to get started."
-msgstr "Configura tu tienda para comenzar"
+msgstr "Crea tu primer rol personalizado para comenzar."
 
 msgid "permissions"
-msgstr "Versión"
+msgstr "permisos"
 
 msgid "No permissions defined for this module."
 msgstr "No hay permisos definidos para este módulo."
@@ -705,10 +705,10 @@ msgid "Showing %(start)s-%(end)s of %(total)s roles"
 msgstr "Mostrando %(start)s-%(end)s de %(total)s roles"
 
 msgid "No roles found"
-msgstr "No se encontraron módulos"
+msgstr "No se encontraron roles"
 
 msgid "Create your first custom role to get started"
-msgstr "Configura tu tienda para comenzar"
+msgstr "Crea tu primer rol personalizado para comenzar"
 
 msgid "Role name is required."
 msgstr "El nombre del rol es obligatorio."
@@ -717,10 +717,10 @@ msgid "A role with this name already exists."
 msgstr "Ya existe un rol con este nombre."
 
 msgid "Role created successfully."
-msgstr "¡Módulo instalado correctamente!"
+msgstr "Rol creado correctamente."
 
 msgid "Role updated successfully."
-msgstr "¡Módulo instalado correctamente!"
+msgstr "Rol actualizado correctamente."
 
 msgid "System roles cannot be deleted."
 msgstr "Los roles del sistema no se pueden eliminar."
@@ -730,16 +730,16 @@ msgid "Cannot delete role. It is assigned to %(count)d user(s)."
 msgstr "No se puede eliminar el rol. Está asignado a %(count)d usuario(s)."
 
 msgid "Role deleted successfully."
-msgstr "¡Módulo instalado correctamente!"
+msgstr "Rol eliminado correctamente."
 
 msgid "Admin role cannot be deactivated."
 msgstr "El rol de administrador no se puede desactivar."
 
 msgid "Role activated."
-msgstr "Desactivar"
+msgstr "Rol activado."
 
 msgid "Role deactivated."
-msgstr "Desactivar"
+msgstr "Rol desactivado."
 
 msgid "System roles were excluded from this action."
 msgstr "Los roles del sistema fueron excluidos de esta acción."
@@ -823,10 +823,10 @@ msgid "Logo"
 msgstr "Logo"
 
 msgid "Business logo for receipts and invoices"
-msgstr "Datos del negocio para facturas y recibos"
+msgstr "Logo del negocio para facturas y recibos"
 
 msgid "Choose image"
-msgstr "Cerrar Mesa"
+msgstr "Elegir imagen"
 
 msgid "Configure tax rates according to your country's legislation"
 msgstr "Configura las tasas de impuestos según la legislación de tu país"
@@ -873,7 +873,7 @@ msgid "Default currency for prices"
 msgstr "Moneda predeterminada para precios"
 
 msgid "Native Bridge"
-msgstr "Sin módulos activos"
+msgstr "Bridge Nativo"
 
 msgid "Connect to ERPlora Bridge for printers, cash drawer, and scanner"
 msgstr "Conectar a ERPlora Bridge para impresoras, cajón de dinero y escáner"
@@ -882,7 +882,7 @@ msgid "Connected"
 msgstr "Conectado"
 
 msgid "Connecting..."
-msgstr "Conectado"
+msgstr "Conectando..."
 
 msgid "ERPlora Bridge not detected"
 msgstr "ERPlora Bridge no detectado"
@@ -896,7 +896,7 @@ msgid "Devices"
 msgstr "Dispositivos"
 
 msgid "No devices found"
-msgstr "No se encontraron módulos"
+msgstr "No se encontraron dispositivos"
 
 msgid "device(s) found"
 msgstr "dispositivo(s) encontrado(s)"
@@ -1037,9 +1037,7 @@ msgstr "Mantenimiento de Base de Datos"
 
 msgid "Scan for and remove orphaned data left behind by deleted modules"
 msgstr ""
-"Buscar y eliminar datos huérfanos dejados por módulos eliminadosBuscar y "
-"eliminar tablas de base de datos huérfanas, registros de migración y "
-"archivos multimedia dejados por módulos eliminados."
+"Buscar y eliminar datos huérfanos dejados por módulos eliminados"
 
 msgid "Scan for Orphaned Data"
 msgstr "Buscar Datos Huérfanos"
@@ -1052,7 +1050,7 @@ msgid "Default"
 msgstr "Predeterminado"
 
 msgid "No printers configured"
-msgstr "No configurado"
+msgstr "No hay impresoras configuradas"
 
 msgid "Use Discover Printers to find connected hardware"
 msgstr "Use Detectar impresoras para encontrar hardware conectado"
@@ -1108,7 +1106,7 @@ msgid "Your cart is empty"
 msgstr "El carrito está vacío"
 
 msgid "Add paid modules to get started."
-msgstr "Añade tu primer empleado para comenzar"
+msgstr "Añade módulos de pago para comenzar."
 
 msgid "Processing..."
 msgstr "Procesando..."
@@ -1170,13 +1168,13 @@ msgid ""
 msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
 
 msgid "Compliance"
-msgstr "Cancelar"
+msgstr "Cumplimiento"
 
 msgid "All Installed"
 msgstr "Instalado"
 
 msgid "Required Modules"
-msgstr "Módulos Relacionados"
+msgstr "Módulos Requeridos"
 
 msgid "Mandatory"
 msgstr "Obligatorio"
@@ -1197,7 +1195,7 @@ msgid "Module installed successfully"
 msgstr "¡Módulo instalado correctamente!"
 
 msgid "Installation failed"
-msgstr "Instalado"
+msgstr "Instalación fallida"
 
 msgid "Connection Error"
 msgstr "Error de Conexión"
@@ -1212,7 +1210,7 @@ msgid "All Categories"
 msgstr "Todas las Categorías"
 
 msgid "Block"
-msgstr "Bloqueado"
+msgstr "Bloque"
 
 msgid "All Blocks"
 msgstr "Todos los bloques"
@@ -1227,7 +1225,7 @@ msgid "Region"
 msgstr "Región"
 
 msgid "All Regions"
-msgstr "Todas las Categorías"
+msgstr "Todas las Regiones"
 
 msgid "Plan"
 msgstr "Plan"
@@ -1257,7 +1255,7 @@ msgid "Rating"
 msgstr "Valoración"
 
 msgid "Function"
-msgstr "Secciones"
+msgstr "Función"
 
 msgid "All"
 msgstr "Todos"
@@ -1269,7 +1267,7 @@ msgid "Type"
 msgstr "Tipo"
 
 msgid "Module Details"
-msgstr "Módulos"
+msgstr "Detalles del Módulo"
 
 msgid "Error"
 msgstr "Error"
@@ -1299,10 +1297,10 @@ msgid "Get Free Module"
 msgstr "Obtener Módulo Gratis"
 
 msgid "Add to Cart"
-msgstr "Añade productos para comenzar"
+msgstr "Añadir al carrito"
 
 msgid "Overview"
-msgstr "reseñas"
+msgstr "Resumen"
 
 msgid "Reviews"
 msgstr "Reseñas"
@@ -1311,25 +1309,25 @@ msgid "Changelog"
 msgstr "Registro de cambios"
 
 msgid "About this module"
-msgstr "Sin módulos activos"
+msgstr "Acerca de este módulo"
 
 # =============================================================================
 # SETTINGS
 # =============================================================================
 msgid "Module Information"
-msgstr "Información de la Tienda"
+msgstr "Información del Módulo"
 
 msgid "License"
 msgstr "Licencia"
 
 msgid "No reviews yet"
-msgstr "Aún no hay áreas"
+msgstr "Aún no hay valoraciones"
 
 msgid "Be the first to review this module"
 msgstr "Sea el primero en valorar este módulo"
 
 msgid "No changelog available"
-msgstr "Nueva versión disponible"
+msgstr "No hay registro de cambios disponible"
 
 msgid "Related Modules"
 msgstr "Módulos Relacionados"
@@ -1362,7 +1360,7 @@ msgid "Error downloading module"
 msgstr "Error al descargar el módulo"
 
 msgid "Rate"
-msgstr "Tasa (%%)"
+msgstr "Valorar"
 
 msgid "Write a comment (optional)..."
 msgstr "Escriba un comentario (opcional)..."
@@ -1374,7 +1372,7 @@ msgid "Review submitted!"
 msgstr "¡Valoración enviada!"
 
 msgid "Error submitting review"
-msgstr "Error al iniciar la compra"
+msgstr "Error al enviar la valoración"
 
 msgid "Available"
 msgstr "Disponible"
@@ -1393,13 +1391,13 @@ msgid "added to cart"
 msgstr "añadido al carrito"
 
 msgid "Error adding to cart"
-msgstr "Error al iniciar la compra"
+msgstr "Error al añadir al carrito"
 
 msgid "Activate Block"
-msgstr "Activar"
+msgstr "Activar Bloque"
 
 msgid "Activating..."
-msgstr "Activar"
+msgstr "Activando..."
 
 msgid "Coming soon"
 msgstr "Próximamente"
@@ -1408,19 +1406,19 @@ msgid "Planned"
 msgstr "Planificado"
 
 msgid "Optional Modules"
-msgstr "Notas opcionales"
+msgstr "Módulos Opcionales"
 
 msgid "Pre-configured Roles"
 msgstr "Roles preconfigurados"
 
 msgid "Block activated successfully"
-msgstr "¡Módulo instalado correctamente!"
+msgstr "Bloque activado correctamente"
 
 msgid "Block deactivated"
-msgstr "Desactivar"
+msgstr "Bloque desactivado"
 
 msgid "Action failed."
-msgstr "Error al iniciar sesión"
+msgstr "Error en la acción."
 
 msgid "blocks active"
 msgstr "bloques activos"
@@ -1429,10 +1427,10 @@ msgid "required"
 msgstr "Requerido"
 
 msgid "Block activated"
-msgstr "Desactivar"
+msgstr "Bloque activado"
 
 msgid "No Blocks Available"
-msgstr "Disponible"
+msgstr "No hay bloques disponibles"
 
 msgid ""
 "Could not load functional blocks. Please check your internet connection and "
@@ -1452,7 +1450,7 @@ msgid "Soon"
 msgstr "Pronto"
 
 msgid "Blocks"
-msgstr "Bloqueado"
+msgstr "Bloques"
 
 msgid "Commerce"
 msgstr "Comercio"
@@ -1467,16 +1465,16 @@ msgid "HR"
 msgstr "RRHH"
 
 msgid "Finance"
-msgstr "Cancelar"
+msgstr "Finanzas"
 
 msgid "Operations"
-msgstr "Secciones"
+msgstr "Operaciones"
 
 # =============================================================================
 # MODULES / MARKETPLACE
 # =============================================================================
 msgid "Marketing"
-msgstr "Tienda"
+msgstr "Marketing"
 
 msgid "Utility"
 msgstr "Utilidad"
@@ -1488,7 +1486,7 @@ msgid "Cart is empty"
 msgstr "El carrito está vacío"
 
 msgid "Hub not connected to Cloud."
-msgstr "Tu Hub está conectado a ERPlora Cloud"
+msgstr "Hub no conectado a Cloud."
 
 msgid "No paid items to checkout."
 msgstr "No hay artículos de pago para finalizar."
@@ -1500,19 +1498,19 @@ msgid "Block not found."
 msgstr "Bloque no encontrado."
 
 msgid "All modules are already installed."
-msgstr "No hay módulos instalados"
+msgstr "Todos los módulos ya están instalados."
 
 msgid "Country not found."
 msgstr "País no encontrado."
 
 msgid "Invalid module context"
-msgstr "Selección de mesa inválida"
+msgstr "Contexto de módulo no válido"
 
 msgid "Invalid module structure"
-msgstr "Instalar módulos"
+msgstr "Estructura de módulo no válida"
 
 msgid "Subscription required"
-msgstr "Suscripción"
+msgstr "Suscripción requerida"
 
 msgid ""
 "This feature requires an active subscription. Please renew your subscription "
@@ -1523,7 +1521,7 @@ msgid "This feature requires an active subscription."
 msgstr "Esta función requiere una suscripción activa."
 
 msgid "Purchase required"
-msgstr "Comprar"
+msgstr "Compra requerida"
 
 msgid "This feature requires purchasing the module."
 msgstr "Esta función requiere la compra del módulo."
@@ -1538,7 +1536,7 @@ msgid "Configure your store to get started"
 msgstr "Configura tu tienda para comenzar"
 
 msgid "Regional Settings"
-msgstr "Configuración"
+msgstr "Configuración Regional"
 
 msgid "Set your language, country, and timezone"
 msgstr "Configure su idioma, país y zona horaria"
@@ -1550,10 +1548,10 @@ msgstr "País"
 # POS / SALES
 # =============================================================================
 msgid "Search country..."
-msgstr "Buscar productos..."
+msgstr "Buscar país..."
 
 msgid "Search timezone..."
-msgstr "Buscar módulos..."
+msgstr "Buscar zona horaria..."
 
 msgid "Continue"
 msgstr "Continuar"
@@ -1573,7 +1571,7 @@ msgid "Retail"
 msgstr "Comercio minorista"
 
 msgid "Restaurant"
-msgstr "Reiniciar"
+msgstr "Restaurante"
 
 msgid "Consulting"
 msgstr "Consultoría"
@@ -1610,34 +1608,34 @@ msgid "Complete Setup"
 msgstr "Completar Configuración"
 
 msgid "Business"
-msgstr "Nombre del Negocio"
+msgstr "Negocio"
 
 msgid "Invalid language selection."
-msgstr "Selección de mesa inválida"
+msgstr "Selección de idioma no válida."
 
 msgid "Invalid timezone."
-msgstr "Selección de mesa inválida"
+msgstr "Zona horaria no válida."
 
 msgid "Please select at least one block"
-msgstr "Por favor selecciona una mesa antes de pagar."
+msgstr "Por favor selecciona al menos un bloque"
 
 msgid "Invalid selection"
-msgstr "Selección de mesa inválida"
+msgstr "Selección no válida"
 
 msgid "Business name is required"
-msgstr "Nombre del Negocio"
+msgstr "El nombre del negocio es obligatorio"
 
 msgid "Address is required"
 msgstr "La dirección es obligatoria"
 
 msgid "VAT/Tax ID is required"
-msgstr "NIF/CIF"
+msgstr "El NIF/CIF es obligatorio"
 
 msgid "Tax rate must be between 0 and 100."
 msgstr "La tasa de impuesto debe estar entre 0 y 100."
 
 msgid "Invalid tax rate."
-msgstr "Selección de mesa inválida"
+msgstr "Tasa de impuesto no válida."
 
 msgid "Cloud Synchronization"
 msgstr "Conexión Cloud"
@@ -1652,10 +1650,10 @@ msgid "Sync Queue"
 msgstr "Cola de sincronización"
 
 msgid "this module"
-msgstr "Sin módulos activos"
+msgstr "este módulo"
 
 msgid "Delete Module"
-msgstr "Módulos Relacionados"
+msgstr "Eliminar Módulo"
 
 msgid "Deactivate Module"
 msgstr "Desactivar"
@@ -1696,8 +1694,7 @@ msgstr "Reinicio Requerido"
 msgid "The server needs to restart to complete module setup. Restart now?"
 msgstr ""
 "El servidor necesita reiniciarse para completar la configuración del módulo. "
-"¿Reiniciar ahora?El servidor necesita reiniciarse para completar la "
-"configuración del módulo. ¿Reiniciar ahora?"
+"¿Reiniciar ahora?"
 
 msgid "Restart"
 msgstr "Reiniciar"
@@ -1724,7 +1721,7 @@ msgid "Back to Marketplace"
 msgstr "Volver a la Tienda"
 
 msgid "No Connection"
-msgstr "Conexión Cloud"
+msgstr "Sin Conexión"
 
 msgid ""
 "Unable to connect to ERPlora Cloud. Please check your internet connection "
@@ -1732,7 +1729,7 @@ msgid ""
 msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
 
 msgid "Back to Modules"
-msgstr "Módulos Relacionados"
+msgstr "Volver a Módulos"
 
 msgid "Purchase"
 msgstr "Comprar"
@@ -1747,7 +1744,7 @@ msgid "Share your experience with this module (optional)..."
 msgstr "Comparta su experiencia con este módulo (opcional)..."
 
 msgid "Submit Review"
-msgstr "Reseñas"
+msgstr "Enviar Valoración"
 
 msgid "Thank you for your review!"
 msgstr "¡Gracias por su valoración!"
@@ -1759,7 +1756,7 @@ msgid "Explore the Marketplace to extend your Hub"
 msgstr "Explora la Tienda de Módulos para ampliar tu Hub"
 
 msgid "My Modules"
-msgstr "Módulos"
+msgstr "Mis Módulos"
 
 # =============================================================================
 # DASHBOARD
@@ -1786,16 +1783,16 @@ msgid "Log Out"
 msgstr "Cerrar Sesión"
 
 msgid "Confirm Delete"
-msgstr "Eliminar"
+msgstr "Confirmar Eliminación"
 
 msgid "Deleted successfully"
-msgstr "PIN restablecido correctamente"
+msgstr "Eliminado correctamente"
 
 msgid "Error deleting"
 msgstr "Error al eliminar"
 
 msgid "Confirm"
-msgstr "Confirma tu PIN"
+msgstr "Confirmar"
 
 # =============================================================================
 # OFFLINE

@@ -27,17 +27,17 @@
                     <p class="text-sm opacity-60">{{ solution.tagline }}</p>
                 </div>
                 <div class="shrink-0 flex items-center gap-2">
-                    {% if is_block_active %}
+                    {% if all_installed and is_block_active %}
                     <span class="badge color-success mr-2">
                         {% icon "checkmark-circle" %}
-                        {% trans "Active" %}
+                        {% trans "Installed" %}
                     </span>
                     <button class="btn btn-outline btn-sm color-error"
                             @click="toggleBlock()"
                             :disabled="toggling">
                         <span x-show="!toggling">
                             {% icon "close-outline" %}
-                            {% trans "Deactivate" %}
+                            {% trans "Uninstall" %}
                         </span>
                         <span x-show="toggling" class="flex items-center gap-2">
                             <span class="loading loading-sm"></span>
@@ -48,12 +48,12 @@
                             @click="toggleBlock()"
                             :disabled="toggling">
                         <span x-show="!toggling">
-                            {% icon "add-outline" %}
-                            {% trans "Activate Block" %}
+                            {% icon "download-outline" %}
+                            {% trans "Install" %}
                         </span>
                         <span x-show="toggling" class="flex items-center gap-2">
                             <span class="loading loading-sm"></span>
-                            {% trans "Activating..." %}
+                            {% trans "Installing..." %}
                         </span>
                     </button>
                     {% endif %}
@@ -211,14 +211,20 @@ function blockDetail() {
                 });
                 const data = await response.json();
                 if (data.success) {
-                    const msg = data.action === 'activated'
-                        ? '{% trans "Block activated successfully" %}'
-                        : '{% trans "Block deactivated" %}';
+                    let msg;
+                    if (data.action === 'installed') {
+                        const count = data.modules_installed || 0;
+                        msg = count > 0
+                            ? '{% trans "Block installed successfully" %} (' + count + ' {% trans "modules" %})'
+                            : '{% trans "Block activated" %}';
+                    } else {
+                        msg = '{% trans "Block uninstalled" %}';
+                    }
                     this.toggleResult = { success: true, message: msg };
                     // Reload detail page to refresh state
                     setTimeout(() => {
                         htmx.ajax('GET', '/marketplace/solutions/{{ solution.slug }}/', {target: '#main-content-area', swap: 'innerHTML'});
-                    }, 800);
+                    }, data.requires_restart ? 2000 : 800);
                 } else {
                     this.toggleResult = { success: false, message: data.error || '{% trans "Action failed." %}' };
                 }

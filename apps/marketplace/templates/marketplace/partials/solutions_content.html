@@ -4,7 +4,7 @@
     {% if active_blocks_count > 0 %}
     <p class="text-sm opacity-50 mb-4">
         {% icon "checkmark-circle-outline" css_class="text-primary" %}
-        {{ active_blocks_count }} {% trans "blocks active" %}
+        {{ active_blocks_count }} {% trans "blocks installed" %}
     </p>
     {% endif %}
 
@@ -36,7 +36,7 @@
                                 {% if solution.is_active %}
                                 <span class="badge badge-sm color-success">
                                     {% icon "checkmark-circle" %}
-                                    {% trans "Active" %}
+                                    {% trans "Installed" %}
                                 </span>
                                 {% endif %}
                                 {% if solution.is_featured %}
@@ -54,12 +54,12 @@
 
                             <div class="module-card-actions">
                                 {% if solution.is_active %}
-                                <span class="text-xs opacity-50">{% trans "Active" %}</span>
+                                <span class="text-xs opacity-50">{% trans "Installed" %}</span>
                                 {% else %}
                                 <button class="btn btn-sm color-primary"
                                         onclick="event.stopPropagation(); toggleBlock('{{ solution.slug }}', this)">
-                                    {% icon "add-outline" %}
-                                    {% trans "Activate" %}
+                                    {% icon "download-outline" %}
+                                    {% trans "Install" %}
                                 </button>
                                 {% endif %}
                             </div>
@@ -92,12 +92,16 @@
         .then(function(data) {
             if (data.success) {
                 if (typeof Toast !== 'undefined') {
-                    Toast.success(data.action === 'activated'
-                        ? '{% trans "Block activated" %}'
-                        : '{% trans "Block deactivated" %}');
+                    var count = data.modules_installed || 0;
+                    var msg = data.action === 'installed'
+                        ? (count > 0 ? '{% trans "Block installed" %} (' + count + ' {% trans "modules" %})' : '{% trans "Block installed" %}')
+                        : '{% trans "Block uninstalled" %}';
+                    Toast.success(msg);
                 }
                 // Reload to refresh active state
-                htmx.ajax('GET', '/marketplace/solutions/', {target: '#main-content-area', swap: 'innerHTML'});
+                setTimeout(function() {
+                    htmx.ajax('GET', '/marketplace/solutions/', {target: '#main-content-area', swap: 'innerHTML'});
+                }, data.requires_restart ? 2000 : 500);
             } else {
                 button.disabled = false;
                 button.innerHTML = originalHtml;

@@ -385,10 +385,10 @@ Después del login, las cookies de sesión se incluyen automáticamente en las p
 }
 
 # =============================================================================
-# DJANGO MONEY
+# CURRENCY CONFIGURATION
 # =============================================================================
 
-# Import all currencies from django-money (308 ISO 4217 currencies)
+# Import all currencies from Babel (ISO 4217 currencies)
 from config.currencies import CURRENCY_CHOICES, POPULAR_CURRENCY_CHOICES
 
 # Default currency for Hub
