@@ -1116,21 +1116,52 @@ def block_toggle(request, slug):
     active_blocks = list(hub_config.selected_blocks or [])
 
     if slug in active_blocks:
-        # Deactivate: remove from list
+        # Uninstall: remove from list
         active_blocks.remove(slug)
         hub_config.selected_blocks = active_blocks
         hub_config.solution_slug = active_blocks[0] if active_blocks else ''
         hub_config.save()
         return HttpResponse(
-            json.dumps({'success': True, 'action': 'deactivated', 'slug': slug, 'active_count': len(active_blocks)}),
+            json.dumps({'success': True, 'action': 'uninstalled', 'slug': slug, 'active_count': len(active_blocks)}),
             content_type='application/json',
         )
     else:
-        # Activate: add to list + install modules + create roles
+        # Install: add to list + install modules + create roles
         active_blocks.append(slug)
         hub_config.selected_blocks = active_blocks
         hub_config.solution_slug = active_blocks[0] if active_blocks else ''
         hub_config.save()
+
+        installed_count = 0
+        install_errors = []
+
+        # Install required modules for this block
+        try:
+            from apps.setup.views import _install_block_modules
+            installed_count, install_errors = _install_block_modules([slug], hub_config)
+
+            if installed_count > 0:
+                # Load modules + run migrations
+                try:
+                    from apps.modules_runtime.loader import module_loader
+                    module_loader.load_all_active_modules()
+                    from django.core.management import call_command
+                    call_command('migrate', '--run-syncdb')
+                except Exception as e:
+                    logger.warning(f"Module loading/migration after block activate: {e}")
+
+                # Sync permissions
+                if hub_config.hub_id:
+                    from apps.core.services.permission_service import PermissionService
+                    PermissionService.sync_all_module_permissions(str(hub_config.hub_id))
+
+                # Schedule restart for URL registration
+                from apps.setup.views import _schedule_restart
+                _schedule_restart()
+
+        except Exception as e:
+            logger.warning(f"Failed to install modules for block {slug}: {e}")
+            install_errors.append(str(e))
 
         # Create roles for this block
         if hub_config.hub_id:
@@ -1152,7 +1183,15 @@ def block_toggle(request, slug):
                 logger.warning(f"Failed to create roles for block {slug}: {e}")
 
         return HttpResponse(
-            json.dumps({'success': True, 'action': 'activated', 'slug': slug, 'active_count': len(active_blocks)}),
+            json.dumps({
+                'success': True,
+                'action': 'installed',
+                'slug': slug,
+                'active_count': len(active_blocks),
+                'modules_installed': installed_count,
+                'install_errors': install_errors,
+                'requires_restart': installed_count > 0,
+            }),
             content_type='application/json',
         )
 

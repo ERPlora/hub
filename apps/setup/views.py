@@ -325,8 +325,13 @@ def _install_module_from_url(module_slug, download_url, hub_token):
 
     try:
         resp = http_requests.get(download_url, headers=headers, timeout=120, stream=True)
+        if resp.status_code != 200:
+            body = resp.text[:300] if not resp.headers.get('content-type', '').startswith('application/') else ''
+            logger.warning(f"[INSTALL] Download HTTP {resp.status_code}: {download_url} - {body}")
+            return False, f"Download failed: HTTP {resp.status_code}"
         resp.raise_for_status()
-    except Exception as e:
+    except http_requests.exceptions.RequestException as e:
+        logger.warning(f"[INSTALL] Download error: {download_url} - {e}")
         return False, f"Download failed: {e}"
 
     tmp_path = None
@@ -364,17 +369,26 @@ def _install_module_from_url(module_slug, download_url, hub_token):
 
 
 def _get_dev_modules_dir():
-    """Get the development modules directory (non-sandbox).
+    """Get the fallback modules directory.
 
-    Used as fallback when Cloud download fails — copies module source
-    from the dev environment instead.
+    Checks multiple locations in order:
+    1. DEV_MODULES_DIR setting (sandbox mode)
+    2. /app/bundled_modules/ (Docker image bundled modules)
+    3. Default platform-specific dev path (macOS/Linux)
     """
-    from config.paths import DataPaths
-    paths = DataPaths.__new__(DataPaths)
-    paths.platform = __import__('sys').platform
-    paths._base_dir = None
-    # Force non-sandbox base dir
-    if paths.platform == "darwin":
+    # 1. Check settings (sandbox mode sets DEV_MODULES_DIR)
+    dev_dir = getattr(settings, 'DEV_MODULES_DIR', None)
+    if dev_dir and Path(dev_dir).exists():
+        return Path(dev_dir)
+
+    # 2. Check Docker bundled modules
+    bundled = Path('/app/bundled_modules')
+    if bundled.exists() and any(bundled.iterdir()):
+        return bundled
+
+    # 3. Default platform-specific path
+    import sys
+    if sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support" / "ERPloraHub"
     else:
         base = Path.home() / ".erplora-hub"
@@ -401,53 +415,77 @@ def _install_block_modules(block_slugs, hub_config):
     Fetches each block's module list from Cloud API and downloads/installs
     the required modules that aren't already installed.
 
-    Fallback: if Cloud download fails (no ZIP available), copies the module
-    from the development modules directory.
+    Download priority:
+    1. Cloud API download endpoint (authenticated, tracks downloads)
+    2. Local dev modules directory (development fallback)
     """
     cloud_url = _get_cloud_base_url()
     installed_ids = _get_installed_module_ids()
     hub_token = hub_config.hub_jwt if hasattr(hub_config, 'hub_jwt') else ''
+
+    # If hub_jwt is empty, try reading from settings (env var)
+    if not hub_token:
+        hub_token = getattr(settings, 'HUB_JWT', '')
+        if hub_token:
+            logger.info("[INSTALL] Using HUB_JWT from settings (env var)")
+
     modules_dir = Path(settings.MODULES_DIR)
     dev_modules = _get_dev_modules_dir()
+
+    logger.info(
+        f"[INSTALL] Starting module install: blocks={block_slugs}, "
+        f"cloud_url={cloud_url}, modules_dir={modules_dir}, "
+        f"hub_token={'set' if hub_token else 'EMPTY'}, "
+        f"dev_modules={dev_modules}, installed={installed_ids}"
+    )
 
     total_installed = 0
     errors = []
 
     for slug in block_slugs:
         try:
-            resp = http_requests.get(
-                f"{cloud_url}/api/marketplace/solutions/{slug}/",
-                timeout=15,
-            )
+            solution_url = f"{cloud_url}/api/marketplace/solutions/{slug}/"
+            logger.info(f"[INSTALL] Fetching solution: {solution_url}")
+            resp = http_requests.get(solution_url, timeout=15)
             if resp.status_code != 200:
-                logger.warning(f"Failed to fetch solution {slug}: HTTP {resp.status_code}")
+                logger.warning(f"[INSTALL] Failed to fetch solution {slug}: HTTP {resp.status_code} - {resp.text[:200]}")
+                errors.append(f"Solution {slug}: HTTP {resp.status_code}")
                 continue
 
             solution = resp.json()
+            all_modules = solution.get('modules', [])
+            logger.info(f"[INSTALL] Solution {slug}: {len(all_modules)} modules total")
+
             required_modules = [
-                m for m in solution.get('modules', [])
+                m for m in all_modules
                 if m.get('role') == 'required'
                 and m.get('slug', '') not in installed_ids
                 and m.get('module_id', '') not in installed_ids
                 and not m.get('is_coming_soon', False)
             ]
+            logger.info(f"[INSTALL] Solution {slug}: {len(required_modules)} modules to install")
 
             for mod in required_modules:
                 mod_slug = mod.get('slug', '')
                 module_id = mod.get('module_id', '') or mod_slug
+                version = mod.get('version', '1.0.0')
                 if not mod_slug:
                     continue
 
                 # Skip if already installed (by module_id or slug)
                 if module_id in installed_ids or mod_slug in installed_ids:
+                    logger.info(f"[INSTALL] Skipping {module_id} (already installed)")
                     continue
 
-                # Try 1: Download from Cloud
+                # Try 1: Download from Cloud API
                 download_url = f"{cloud_url}/api/marketplace/modules/{mod_slug}/download/"
+                logger.info(f"[INSTALL] Downloading: {download_url}")
                 ok, msg = _install_module_from_url(mod_slug, download_url, hub_token)
+                logger.info(f"[INSTALL] Download result for {mod_slug}: ok={ok}, msg={msg}")
 
                 # Try 2: Fallback to local dev copy
                 if not ok and dev_modules:
+                    logger.info(f"[INSTALL] Trying local fallback for {module_id} from {dev_modules}")
                     ok, msg = _install_module_local(module_id, dev_modules, modules_dir)
                     if ok:
                         msg += " (local fallback)"
@@ -458,16 +496,15 @@ def _install_block_modules(block_slugs, hub_config):
                     installed_ids.append(mod_slug)
                 else:
                     errors.append(f"{mod.get('name', mod_slug)}: {msg}")
-                    logger.warning(f"Failed to install module {mod_slug}: {msg}")
+                    logger.warning(f"[INSTALL] Failed to install module {mod_slug}: {msg}")
 
         except Exception as e:
-            logger.warning(f"Error processing block {slug}: {e}")
+            logger.warning(f"[INSTALL] Error processing block {slug}: {e}", exc_info=True)
             errors.append(f"Block {slug}: {e}")
 
-    if total_installed:
-        logger.info(f"Installed {total_installed} modules from {len(block_slugs)} blocks")
+    logger.info(f"[INSTALL] Complete: {total_installed} installed, {len(errors)} errors")
     if errors:
-        logger.warning(f"Module install errors: {errors}")
+        logger.warning(f"[INSTALL] Errors: {errors}")
 
     return total_installed, errors
 
