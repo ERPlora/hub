@@ -1,14 +1,14 @@
 """
-Currency configuration using django-money.
+Currency configuration using Babel.
 
 Provides all ISO 4217 currency codes with localized names.
 """
-from moneyed import list_all_currencies
+from babel.numbers import list_currencies, get_currency_name
 
 
 def get_all_currency_choices():
     """
-    Get all available currencies from django-money.
+    Get all available currencies from Babel.
 
     Returns:
         list: List of tuples (code, name) for all currencies
@@ -21,9 +21,12 @@ def get_all_currency_choices():
             ...
         ]
     """
-    currencies = list_all_currencies()
+    currencies = list_currencies()
     # Sort by currency code for easier navigation
-    return sorted([(c.code, c.name) for c in currencies], key=lambda x: x[0])
+    return sorted(
+        [(code, get_currency_name(code, locale='en')) for code in currencies],
+        key=lambda x: x[0],
+    )
 
 
 def get_popular_currency_choices():

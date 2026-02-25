@@ -9,6 +9,7 @@ Import them in your module like:
 from .sync_service import get_sync_service, SyncService
 from .currency_service import (
     get_currency,
+    get_currency_symbol,
     format_currency,
     format_number,
     parse_currency,
@@ -45,6 +46,7 @@ __all__ = [
     "SyncService",
     # Currency
     "get_currency",
+    "get_currency_symbol",
     "format_currency",
     "format_number",
     "parse_currency",
