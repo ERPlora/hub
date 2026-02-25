@@ -66,15 +66,20 @@ class Command(BaseCommand):
         if not module_dir:
             raise CommandError(f'Module {module_id} no encontrado en rutas de desarrollo')
 
-        # Leer module.json
-        module_json_path = module_dir / 'module.json'
-        if not module_json_path.exists():
-            raise CommandError(f'module.json no encontrado en {module_dir}')
+        # Read module.py
+        module_py_path = module_dir / 'module.py'
+        if not module_py_path.exists():
+            raise CommandError(f'module.py not found in {module_dir}')
 
-        with open(module_json_path, 'r') as f:
-            module_data = json.load(f)
-
-        module_version = module_data.get('version', '0.0.0')
+        module_version = '1.0.0'
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(f"{module_id}.module", module_py_path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            module_version = getattr(mod, 'MODULE_VERSION', '1.0.0')
+        except Exception:
+            pass
 
         self.stdout.write(self.style.SUCCESS(f'\n📦 Empaquetando module: {module_id}'))
         self.stdout.write(f'   Versión: {module_version}')

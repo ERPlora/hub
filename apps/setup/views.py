@@ -298,7 +298,7 @@ def _get_installed_module_ids():
 
 
 def _get_module_id_from_zip(extracted_root, fallback):
-    """Read MODULE_ID from module.py or module.json, falling back to slug."""
+    """Read MODULE_ID from module.py, falling back to slug."""
     module_py = extracted_root / 'module.py'
     if module_py.exists():
         try:
@@ -308,14 +308,6 @@ def _get_module_id_from_zip(extracted_root, fallback):
                     value = line.split('=', 1)[1].strip().strip("'\"")
                     if value:
                         return value
-        except Exception:
-            pass
-    module_json = extracted_root / 'module.json'
-    if module_json.exists():
-        try:
-            data = json.loads(module_json.read_text(encoding='utf-8'))
-            if data.get('id'):
-                return data['id']
         except Exception:
             pass
     return fallback

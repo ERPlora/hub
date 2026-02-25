@@ -8,7 +8,7 @@ but that has been removed. Module metadata is now loaded entirely from the files
 - Inactive modules: modules/_{module_id}/ (underscore prefix)
 - Hidden modules: modules/.{module_id}/ (dot prefix)
 
-All module metadata comes from module.json files in each module directory.
+All module metadata comes from module.py files in each module directory.
 
 Other models have been refactored to their respective apps:
 - LocalUser → apps.accounts.models

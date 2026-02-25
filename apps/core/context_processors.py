@@ -155,7 +155,7 @@ def module_context(request):
     - {{ current_view }} - Current view within module (e.g., 'dashboard', 'products')
 
     The tabbar component uses these to:
-    1. Load tabs from module.json using current_module_id
+    1. Load tabs from module.py using current_module_id
     2. Highlight the active tab using current_view
     """
     import re

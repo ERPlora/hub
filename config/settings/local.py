@@ -134,7 +134,6 @@ MODULE_STRICT_VALIDATION = False
 def reload_local_modules():
     """Reload modules with dependency resolution."""
     global INSTALLED_APPS
-    import json
     import re
 
     # Remove any modules previously loaded by base.py
@@ -178,21 +177,6 @@ def reload_local_modules():
                 raw_deps = getattr(mod, 'DEPENDENCIES', [])
             except Exception:
                 pass
-
-        # Fallback to module.json
-        if not raw_deps:
-            module_json = MODULES_DIR / mid / 'module.json'
-            if module_json.exists():
-                try:
-                    with open(module_json, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                    deps_value = data.get('dependencies', data.get('requires', []))
-                    if isinstance(deps_value, dict):
-                        raw_deps = deps_value.get('modules', [])
-                    else:
-                        raw_deps = deps_value
-                except Exception:
-                    pass
 
         # Strip version specifiers
         deps[mid] = [re.split(r'[><=!]', d)[0].strip() for d in raw_deps if d]

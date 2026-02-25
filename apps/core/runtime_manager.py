@@ -34,7 +34,7 @@ class ModuleRuntimeManager:
 
         Steps:
         1. Extract ZIP to modules directory
-        2. Read module.json metadata
+        2. Read module.py metadata
         3. Install Python dependencies from requirements.txt
         4. Run migrations
         5. Compile translations
@@ -57,7 +57,7 @@ class ModuleRuntimeManager:
             module_data = self._extract_module(zip_path)
 
             if not module_data:
-                result['errors'].append('Failed to extract module or read module.json')
+                result['errors'].append('Failed to extract module or read module.py')
                 return result
 
             module_id = module_data.get('module_id')
@@ -131,32 +131,32 @@ class ModuleRuntimeManager:
         Expected ZIP structure:
         cpos-module-products.zip
         └── products/
-            ├── module.json
+            ├── module.py
             ├── models.py
             ├── views.py
             └── ...
 
         Returns:
-            module.json data or None if failed
+            module.py data or None if failed
         """
         try:
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 # Get root folder name from ZIP
                 zip_contents = zip_ref.namelist()
 
-                # Find module.json to determine module_id
-                module_json_path = None
+                # Find module.py to determine module_id
+                module_py_path = None
                 for file in zip_contents:
-                    if file.endswith('module.json') and '/' in file:
-                        module_json_path = file
+                    if file.endswith('module.py') and '/' in file:
+                        module_py_path = file
                         break
 
-                if not module_json_path:
+                if not module_py_path:
                     return None
 
-                # Extract module.json to read metadata
-                module_json_content = zip_ref.read(module_json_path)
-                module_data = json.loads(module_json_content)
+                # Extract module.py to read metadata
+                module_py_content = zip_ref.read(module_py_path).decode('utf-8')
+                module_data = self._parse_module_py(module_py_content)
                 module_id = module_data.get('module_id')
 
                 if not module_id:
@@ -354,19 +354,18 @@ class ModuleRuntimeManager:
             'warnings': []
         }
 
-        # Read module.json
-        module_json = module_path / 'module.json'
-        if not module_json.exists():
+        # Read module.py
+        module_py = module_path / 'module.py'
+        if not module_py.exists():
             result['valid'] = False
-            result['errors'].append('module.json not found')
+            result['errors'].append('module.py not found')
             return result
 
         try:
-            with open(module_json, 'r') as f:
-                module_data = json.load(f)
+            module_data = self._parse_module_py(module_py.read_text(encoding='utf-8'))
         except Exception as e:
             result['valid'] = False
-            result['errors'].append(f'Invalid module.json: {str(e)}')
+            result['errors'].append(f'Invalid module.py: {str(e)}')
             return result
 
         # Check dependencies
@@ -390,6 +389,46 @@ class ModuleRuntimeManager:
                 result['errors'].append(f'Required module not installed: {dep_id}')
 
         return result
+
+    @staticmethod
+    def _parse_module_py(content: str) -> dict:
+        """Parse module.py content using AST to extract metadata."""
+        import ast
+        tree = ast.parse(content)
+        metadata = {}
+        field_mapping = {
+            'MODULE_ID': 'module_id',
+            'MODULE_NAME': 'name',
+            'MODULE_VERSION': 'version',
+            'MODULE_ICON': 'icon',
+            'MODULE_AUTHOR': 'author',
+            'MODULE_DESCRIPTION': 'description',
+            'MODULE_CATEGORY': 'category',
+            'DEPENDENCIES': 'dependencies',
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in field_mapping:
+                        value = ast.literal_eval(node.value) if isinstance(node.value, (ast.Constant, ast.List, ast.Dict)) else None
+                        if isinstance(node.value, ast.Call) and hasattr(node.value, 'args') and node.value.args:
+                            # Handle gettext_lazy calls: _("string")
+                            try:
+                                value = ast.literal_eval(node.value.args[0])
+                            except Exception:
+                                pass
+                        if value is not None:
+                            metadata[field_mapping[target.id]] = value
+        # Extract MENU
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == 'MENU':
+                        try:
+                            metadata['menu'] = ast.literal_eval(node.value)
+                        except Exception:
+                            pass
+        return metadata
 
     def _validate_database_conflicts(self, module_id: str, module_path: Path) -> Dict:
         """

@@ -2,7 +2,7 @@
 Validador de modules para CPOS Hub
 
 Valida que los modules cumplan con:
-1. Estructura correcta de module.json
+1. Estructura correcta de module.py
 2. Dependencias permitidas (whitelist)
 3. Compatibilidad con versión de CPOS
 4. Seguridad (no código malicioso)
@@ -60,7 +60,7 @@ class ModuleValidator:
             module_path: Ruta al directorio del module
         """
         self.module_path = Path(module_path)
-        self.module_json_path = self.module_path / 'module.json'
+        self.module_py_path = self.module_path / 'module.py'
         self.module_data: Optional[Dict] = None
         self.errors: List[str] = []
         self.warnings: List[str] = []
@@ -76,8 +76,8 @@ class ModuleValidator:
             # 1. Validar estructura de archivos
             self._validate_structure()
 
-            # 2. Validar module.json
-            self._validate_module_json()
+            # 2. Validar module.py
+            self._validate_module_py()
 
             # 3. Validar dependencias
             self._validate_dependencies()
@@ -104,22 +104,31 @@ class ModuleValidator:
         if not self.module_path.is_dir():
             raise ModuleValidationError(f"No es un directorio: {self.module_path}")
 
-        # module.json es obligatorio
-        if not self.module_json_path.exists():
-            raise ModuleValidationError("Archivo module.json no encontrado")
+        # module.py is required
+        if not self.module_py_path.exists():
+            raise ModuleValidationError("module.py not found")
 
         # __init__.py es obligatorio (debe ser un paquete Python)
         init_file = self.module_path / '__init__.py'
         if not init_file.exists():
             self.errors.append("Archivo __init__.py no encontrado")
 
-    def _validate_module_json(self):
-        """Valida el contenido de module.json"""
+    def _validate_module_py(self):
+        """Validate module.py content"""
         try:
-            with open(self.module_json_path, 'r', encoding='utf-8') as f:
-                self.module_data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ModuleValidationError(f"module.json inválido: {e}")
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                f"{self.module_path.name}.module", self.module_py_path
+            )
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            self.module_data = {
+                'module_id': getattr(mod, 'MODULE_ID', None),
+                'name': str(getattr(mod, 'MODULE_NAME', '')),
+                'version': getattr(mod, 'MODULE_VERSION', None),
+            }
+        except Exception as e:
+            raise ModuleValidationError(f"Error loading module.py: {e}")
 
         # Validar campos requeridos
         for field in self.REQUIRED_FIELDS:

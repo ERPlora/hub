@@ -14,7 +14,6 @@ This loader discovers ALL modules (active and inactive) and reports their status
 """
 import os
 import sys
-import json
 import shutil
 import importlib
 from pathlib import Path
@@ -81,10 +80,10 @@ class ModuleLoader:
             # Get the actual module name (without underscore prefix)
             module_name = module_dir.name.lstrip('_')
 
-            # Check for module.json
-            module_json = module_dir / 'module.json'
-            if not module_json.exists():
-                # Create basic metadata for modules without module.json
+            # Check for module.py
+            module_py = module_dir / 'module.py'
+            if not module_py.exists():
+                # Create basic metadata for modules without module.py
                 metadata = {
                     'module_id': module_name,
                     'name': module_name.replace('_', ' ').title(),
@@ -101,20 +100,25 @@ class ModuleLoader:
                 continue
 
             try:
-                with open(module_json, 'r', encoding='utf-8') as f:
-                    metadata = json.load(f)
-                    metadata['install_path'] = str(module_dir)
-                    metadata['dir_name'] = module_dir.name
-                    metadata['is_active'] = is_active
-                    # Ensure module_id matches directory name
-                    if 'module_id' not in metadata:
-                        metadata['module_id'] = module_name
-                    # Get icon from root or menu.icon, fallback to default
-                    if 'icon' not in metadata:
-                        menu_config = metadata.get('menu', {})
-                        metadata['icon'] = menu_config.get('icon', 'cube-outline')
-                    discovered.append(metadata)
-            except (json.JSONDecodeError, Exception) as e:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(f"{module_name}.module", module_py)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                menu_config = getattr(mod, 'MENU', {})
+                metadata = {
+                    'module_id': getattr(mod, 'MODULE_ID', module_name),
+                    'name': str(getattr(mod, 'MODULE_NAME', module_name.replace('_', ' ').title())),
+                    'description': str(getattr(mod, 'MODULE_DESCRIPTION', '')),
+                    'version': getattr(mod, 'MODULE_VERSION', '1.0.0'),
+                    'author': getattr(mod, 'MODULE_AUTHOR', ''),
+                    'icon': getattr(mod, 'MODULE_ICON', menu_config.get('icon', 'cube-outline')),
+                    'category': getattr(mod, 'MODULE_CATEGORY', 'general'),
+                    'install_path': str(module_dir),
+                    'dir_name': module_dir.name,
+                    'is_active': is_active,
+                }
+                discovered.append(metadata)
+            except Exception as e:
                 print(f"[WARNING] Error loading module {module_dir.name}: {e}")
                 # Still include it with basic metadata
                 metadata = {

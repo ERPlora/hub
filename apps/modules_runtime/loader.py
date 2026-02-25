@@ -11,7 +11,6 @@ This allows modules to persist across app updates and reinstalls.
 """
 import os
 import sys
-import json
 import importlib
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -119,8 +118,8 @@ class ModuleLoader:
 
     def _get_module_dependencies(self, module_id: str) -> list:
         """
-        Read dependencies from a module's module.py or module.json.
-        Supports: DEPENDENCIES in module.py, 'dependencies'/'requires' in module.json.
+        Read dependencies from a module's module.py.
+        Supports: DEPENDENCIES list in module.py.
         Version specifiers (e.g. 'sales>=1.0.0') are stripped to plain module IDs.
         """
         import re
@@ -133,22 +132,6 @@ class ModuleLoader:
             pass
         except Exception:
             pass
-
-        # Fallback to module.json if no deps found from module.py
-        if not raw_deps:
-            module_json = self.modules_dir / module_id / 'module.json'
-            if module_json.exists():
-                try:
-                    with open(module_json, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                    deps_value = data.get('dependencies', data.get('requires', []))
-                    # Handle dict format: {"python": [...], "modules": [...]}
-                    if isinstance(deps_value, dict):
-                        raw_deps = deps_value.get('modules', [])
-                    else:
-                        raw_deps = deps_value
-                except Exception:
-                    pass
 
         # Strip version specifiers: 'sales>=1.0.0' -> 'sales'
         deps = []
@@ -248,7 +231,7 @@ class ModuleLoader:
         Get all active module menu items from module.py configuration.
         Scans modules directory and imports module.py for each active module.
 
-        Uses module.py instead of module.json to support Django translations.
+        Uses module.py to support Django translations.
 
         Returns list of menu items sorted by order
         """
@@ -301,29 +284,7 @@ class ModuleLoader:
                     menu_items.append(menu_item)
 
             except ImportError as e:
-                # Fallback to module.json if module.py doesn't exist
-                module_json_path = module_dir / 'module.json'
-                if module_json_path.exists():
-                    try:
-                        with open(module_json_path, 'r', encoding='utf-8') as f:
-                            module_data = json.load(f)
-                            menu_config = module_data.get('menu', {})
-
-                        menu_item = {
-                            'module_id': module_id,
-                            'label': menu_config.get('label', module_id.title()),
-                            'icon': menu_config.get('icon', 'cube-outline'),
-                            'order': menu_config.get('order', 100),
-                            'url': f'/m/{module_id}/',
-                            'has_submenu': False,
-                        }
-
-                        if menu_config.get('show', True):
-                            menu_items.append(menu_item)
-                    except Exception as json_error:
-                        print(f"[WARNING] Error reading module.json for {module_id}: {json_error}")
-                else:
-                    print(f"[WARNING] No module.py or module.json found for {module_id}: {e}")
+                print(f"[WARNING] No module.py found for {module_id}: {e}")
 
             except Exception as e:
                 print(f"[WARNING] Error loading menu config for {module_id}: {e}")
