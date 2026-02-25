@@ -9,6 +9,10 @@
 
 @import '../fonts/plus-jakarta-sans/plus-jakarta-sans.css';
 
+body {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
 /* ==========================================================================
    APP BACKGROUND
    Decorative gradient + grid inside .page so backdrop-filter (glass) works.
