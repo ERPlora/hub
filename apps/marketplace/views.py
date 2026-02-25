@@ -680,7 +680,7 @@ def _fetch_modules_list(request, search_query, category_filter, block_filter, ty
 
         # Mark installed and add URLs
         for module in modules:
-            module['is_installed'] = module.get('slug', '') in installed_module_ids
+            module['is_installed'] = module.get('slug', '') in installed_module_ids or module.get('module_id', '') in installed_module_ids
             module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
 
         # Sort
@@ -817,8 +817,8 @@ def module_detail(request, slug):
 
         module = response.json()
 
-        # Check if installed
-        is_installed = slug in installed_module_ids
+        # Check if installed (compare both slug and module_id)
+        is_installed = slug in installed_module_ids or module.get('module_id', '') in installed_module_ids
 
         # Check ownership
         is_owned = False

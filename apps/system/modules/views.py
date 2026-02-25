@@ -1027,14 +1027,17 @@ def install_from_marketplace(request):
                 'error': 'Missing module_slug or download_url'
             }, status=400)
 
+        # Use module_id (local directory name) if provided, fall back to slug
+        module_dir_name = data.get('module_id') or module_slug
+
         # Normalize http:// to https:// (Cloud URLs should always be HTTPS)
         if download_url.startswith('http://'):
             download_url = download_url.replace('http://', 'https://', 1)
 
         modules_dir = Path(django_settings.MODULES_DIR)
-        module_target_dir = modules_dir / module_slug
+        module_target_dir = modules_dir / module_dir_name
 
-        if module_target_dir.exists() or (modules_dir / f"_{module_slug}").exists():
+        if module_target_dir.exists() or (modules_dir / f"_{module_dir_name}").exists():
             return JsonResponse({
                 'success': False,
                 'error': 'Module already installed'
@@ -1077,26 +1080,26 @@ def install_from_marketplace(request):
                     zip_ref.extractall(module_target_dir)
 
             from apps.modules_runtime.loader import module_loader
-            module_loader.load_module(module_slug)
+            module_loader.load_module(module_dir_name)
 
             # Run migrations for the new module
             try:
                 from django.core.management import call_command
                 import io
                 output = io.StringIO()
-                call_command('migrate', module_slug, '--run-syncdb', stdout=output, stderr=output)
+                call_command('migrate', module_dir_name, '--run-syncdb', stdout=output, stderr=output)
                 migration_output = output.getvalue()
                 if migration_output:
-                    print(f"[MODULES] Migrations for {module_slug}: {migration_output}")
+                    print(f"[MODULES] Migrations for {module_dir_name}: {migration_output}")
             except Exception as migrate_error:
-                print(f"[MODULES] Migration error for {module_slug}: {migrate_error}")
+                print(f"[MODULES] Migration error for {module_dir_name}: {migrate_error}")
                 # Continue anyway - migrations might not exist
 
             if 'modules_pending_restart' not in request.session:
                 request.session['modules_pending_restart'] = []
 
-            if module_slug not in request.session['modules_pending_restart']:
-                request.session['modules_pending_restart'].append(module_slug)
+            if module_dir_name not in request.session['modules_pending_restart']:
+                request.session['modules_pending_restart'].append(module_dir_name)
                 request.session.modified = True
 
             return JsonResponse({

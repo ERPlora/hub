@@ -267,7 +267,7 @@
 <!-- Marketplace module actions (uses global UI helpers from toast-helper.js) -->
 <script>
 // Install free module
-async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
+async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, moduleDir) {
     setButtonLoading(button, true);
     try {
         // First acquire the free module
@@ -285,7 +285,7 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
 
         // Now download and install
         if (downloadUrl) {
-            await downloadAndInstall(moduleSlug, downloadUrl);
+            await downloadAndInstall(moduleSlug, downloadUrl, null, moduleDir);
         } else {
             Toast.warning('{% trans "Module acquired. Download not available yet." %}');
         }
@@ -323,13 +323,15 @@ async function purchaseModule(moduleId, button) {
 }
 
 // Download and install module (for owned modules)
-async function downloadAndInstall(moduleSlug, downloadUrl, button) {
+async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir) {
     if (button) setButtonLoading(button, true);
     try {
+        const payload = { module_slug: moduleSlug, download_url: downloadUrl };
+        if (moduleDir) payload.module_id = moduleDir;
         const response = await fetch('{% url "mymodules:api_install" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ module_slug: moduleSlug, download_url: downloadUrl })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
 
