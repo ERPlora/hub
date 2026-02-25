@@ -28,7 +28,7 @@
                 {% if mod.has_svg and mod.svg_path %}
                 <img src="{{ mod.svg_path }}" alt="{{ mod.label }}" class="w-7 h-7">
                 {% else %}
-                {% icon mod.icon size=28 %}
+                {% icon mod.icon css_class="text-3xl" %}
                 {% endif %}
             </div>
             <span class="text-sm font-medium">{{ mod.label }}</span>
@@ -44,7 +44,7 @@
            x-show="!searchQuery"
            style="background: transparent;">
             <div class="app-icon" style="background: transparent;">
-                {% icon "add" size=28 %}
+                {% icon "add" css_class="text-3xl" %}
             </div>
             <span class="text-sm font-medium">{% trans "Get More" %}</span>
         </a>

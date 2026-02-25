@@ -10,7 +10,7 @@
             <div class="card-body p-4">
                 <div class="flex flex-row items-center gap-4 mb-3">
                     <div class="w-11 h-11 rounded-xl bg-{{ db_color }}/10 flex items-center justify-center shrink-0">
-                        {% icon "server-outline" css_class="text-{{ db_color }}" size=28 %}
+                        {% icon "server-outline" css_class="text-3xl text-{{ db_color }}" %}
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-semibold text-sm m-0">{{ db_size }} / {{ db_limit }}</p>
@@ -42,7 +42,7 @@
         <div class="card glass">
             <div class="card-body p-4 flex flex-row items-center gap-4">
                 <div class="w-11 h-11 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
-                    {% icon "documents-outline" css_class="text-success" size=28 %}
+                    {% icon "documents-outline" css_class="text-3xl text-success" %}
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="font-semibold text-sm m-0">{% trans "Browse" %}</p>
@@ -55,7 +55,7 @@
         <div class="card glass">
             <div class="card-body p-4 flex flex-row items-center gap-4">
                 <div class="w-11 h-11 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
-                    {% icon "folder-outline" css_class="text-warning" size=28 %}
+                    {% icon "folder-outline" css_class="text-3xl text-warning" %}
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="font-semibold text-sm m-0 truncate">{% trans "Location" %}</p>
@@ -93,7 +93,7 @@
                         </div>
                         <div id="file-preview-content">
                             <div class="rounded-xl bg-base-200 p-12 text-center">
-                                {% icon "eye-outline" css_class="text-base-content/20 block mb-3" size=48 %}
+                                {% icon "eye-outline" css_class="text-5xl text-base-content/20 block mb-3" %}
                                 <p class="text-sm text-base-content/40 m-0">{% trans "Select a file to preview" %}</p>
                             </div>
                         </div>
