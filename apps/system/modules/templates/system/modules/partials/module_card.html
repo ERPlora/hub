@@ -134,6 +134,7 @@
                     <button class="btn btn-sm btn-soft color-success"
                             data-action="download"
                             data-module-slug="{{ module.slug }}"
+                            data-module-dir="{{ module.module_id }}"
                             data-download-url="{{ module.download_url }}">
                         {% icon "download-outline" %}
                         {% trans "Install" %}
@@ -143,6 +144,7 @@
                             data-action="install-free"
                             data-module-id="{{ module.id }}"
                             data-module-slug="{{ module.slug }}"
+                            data-module-dir="{{ module.module_id }}"
                             data-download-url="{{ module.download_url|default:'' }}">
                         {% icon "download-outline" %}
                         {% trans "Get Free" %}
