@@ -8,9 +8,4 @@ class AccountsConfig(AppConfig):
     verbose_name = _('Accounts & Authentication')
 
     def ready(self):
-        """
-        Initialize accounts app.
-        Connects post_migrate signal to seed default roles.
-        """
-        from .signals import connect_signals
-        connect_signals()
+        pass
