@@ -680,10 +680,8 @@ def _fetch_modules_list(request, search_query, category_filter, block_filter, ty
 
         # Mark installed and add URLs
         for module in modules:
-            slug = module.get('slug', '')
-            module['is_installed'] = slug in installed_module_ids
-            module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': slug})
-            module['download_url'] = f"{cloud_api_url}/api/marketplace/modules/{slug}/download/"
+            module['is_installed'] = module.get('slug', '') in installed_module_ids
+            module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
 
         # Sort
         sort_key_map = {
@@ -818,7 +816,6 @@ def module_detail(request, slug):
             }
 
         module = response.json()
-        module['download_url'] = f"{cloud_api_url}/api/marketplace/modules/{slug}/download/"
 
         # Check if installed
         is_installed = slug in installed_module_ids
