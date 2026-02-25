@@ -1,9 +1,9 @@
 """
 ERPlora Hub - Local Development Settings
 
-Configuración para desarrollo local.
-Usa DataPaths para rutas consistentes con producción.
-Modules desde ./modules/ del proyecto (para desarrollo).
+Local development configuration.
+Uses DataPaths for consistent paths with production.
+Modules loaded from external directory (for development).
 """
 
 from .base import *
@@ -22,29 +22,41 @@ OFFLINE_ENABLED = True
 CLOUD_SYNC_REQUIRED = False
 DEVELOPMENT_MODE = True
 
-# Use production Cloud API for local development
-CLOUD_API_URL = 'https://erplora.com'
+# CLOUD_API_URL defaults to https://erplora.com (in base.py), overridable via .env
 
 # =============================================================================
-# PATHS - Using DataPaths (same as production)
+# PATHS - configurable via .env, fallback to DataPaths auto-detection
 # =============================================================================
 
-# Get all paths from DataPaths (auto-detects OS)
 _paths = get_data_paths()
 DATA_DIR = _paths.base_dir
 
-# Database - same location as production
-DATABASE_DIR = _paths.database_dir
-DATABASES['default']['NAME'] = _paths.database_path
+# Database
+_db_path_env = config('DATABASE_PATH', default='')
+if _db_path_env:
+    DATABASES['default']['NAME'] = Path(_db_path_env)
+    DATABASE_DIR = Path(_db_path_env).parent
+else:
+    DATABASE_DIR = _paths.database_dir
+    DATABASES['default']['NAME'] = _paths.database_path
 
-# Media
+# Modules
+_modules_dir_env = config('MODULES_DIR', default='')
+if _modules_dir_env:
+    MODULES_DIR = Path(_modules_dir_env)
+else:
+    MODULES_DIR = _paths.modules_dir
+MODULES_ROOT = MODULES_DIR
+MODULE_DISCOVERY_PATHS = [MODULES_DIR]
+
+# Ensure all directories exist
+DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+MODULES_DIR.mkdir(parents=True, exist_ok=True)
+
+# Media, Logs, Backups, Reports
 MEDIA_ROOT = _paths.media_dir
-
-# Logs
 LOGS_DIR = _paths.logs_dir
 LOGGING['handlers']['file']['filename'] = str(LOGS_DIR / 'hub.log')
-
-# Backups & Reports
 BACKUPS_DIR = _paths.backups_dir
 REPORTS_DIR = _paths.reports_dir
 
@@ -53,16 +65,6 @@ MODULE_DATA_ROOT = DATA_DIR / 'module_data'
 MODULE_DATA_ROOT.mkdir(parents=True, exist_ok=True)
 MODULE_MEDIA_ROOT = MEDIA_ROOT / 'modules'
 MODULE_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-
-# =============================================================================
-# MODULES - Same as production (from DataPaths)
-# =============================================================================
-# Uses ~/Library/.../ERPloraHub/modules/ (same as desktop builds)
-# A symlink at ./modules -> real location makes development easier
-
-MODULES_DIR = _paths.modules_dir
-MODULES_ROOT = MODULES_DIR
-MODULE_DISCOVERY_PATHS = [MODULES_DIR]
 
 # Add modules to sys.path
 if MODULES_DIR.exists() and str(MODULES_DIR) not in sys.path:

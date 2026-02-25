@@ -101,7 +101,6 @@ class DataPaths:
                 - Linux: /home/<user>/.erplora-hub
         """
         if self._base_dir is None:
-            # Detectar si estamos en Docker
             if is_docker_environment():
                 # Docker: Usar /app como base (montado como volumen persistente)
                 self._base_dir = Path("/app")

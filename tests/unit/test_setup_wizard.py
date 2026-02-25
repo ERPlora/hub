@@ -164,8 +164,8 @@ class TestStep4Tax:
 
         assert response.status_code == 200
 
-    def test_step4_post_completes_setup_with_hx_redirect(self, authenticated_client, unconfigured_store, hub_config):
-        """POST step 4 should complete setup and return HX-Redirect to home."""
+    def test_step4_post_completes_setup_with_progress_screen(self, authenticated_client, unconfigured_store, hub_config):
+        """POST step 4 should complete setup and show the module install progress screen."""
         from apps.configuration.models import StoreConfig
 
         url = reverse('setup:step', kwargs={'step': 4})
@@ -175,7 +175,9 @@ class TestStep4Tax:
         })
 
         assert response.status_code == 200
-        assert response.get('HX-Redirect') == '/'
+        content = response.content.decode()
+        # Should render the installing progress screen
+        assert 'install' in content.lower() or 'setting up' in content.lower()
 
         # Verify store is now configured
         config = StoreConfig.get_solo()
@@ -237,7 +239,9 @@ class TestFullWizardFlow:
             'tax_included': 'on',
         })
         assert response.status_code == 200
-        assert response.get('HX-Redirect') == '/'
+        # Step 4 now shows progress screen instead of HX-Redirect
+        content = response.content.decode()
+        assert 'install' in content.lower() or 'setting up' in content.lower()
 
         # Verify setup is complete
         store.refresh_from_db()

@@ -3,7 +3,8 @@ ERPlora Hub - Settings Selector
 
 When DJANGO_SETTINGS_MODULE=config.settings (the package), this __init__.py
 selects the right sub-module based on HUB_ENV:
-- local: Desarrollo local (default si no se especifica)
+- local: Local development (default if not specified)
+- sandbox: Isolated environment for testing (wipes on each startup)
 - web: Docker/Cloud deployment
 
 When DJANGO_SETTINGS_MODULE=config.settings.web (or .local), Python still
@@ -21,11 +22,12 @@ if _settings_module == 'config.settings':
 
     if env == 'web':
         from .web import *
+    elif env == 'sandbox':
+        from .sandbox import *
     elif env in ('', 'local', 'dev', 'development'):
-        # Default: local development
         from .local import *
     else:
         raise ValueError(
             f"Invalid HUB_ENV: '{env}'. "
-            f"Valid options: local, web"
+            f"Valid options: local, sandbox, web"
         )
