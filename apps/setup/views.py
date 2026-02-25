@@ -5,7 +5,13 @@ Multi-step HTMX wizard for initial Hub configuration.
 Each step saves to DB on "Next" and loads the next step partial.
 """
 import json
+import os
+import shutil
+import tempfile
+import uuid
+import zipfile
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.conf import settings
@@ -252,8 +258,230 @@ def _save_step1(data, hub_config):
     hub_config.save()
 
 
+def _get_hub_id(hub_config):
+    """Get hub_id from HubConfig or fall back to settings.HUB_ID.
+
+    HubConfig.hub_id is set during Cloud SSO login, but during setup
+    it may not be populated yet. In Cloud Hubs, settings.HUB_ID is
+    always set from the environment variable. In local dev, generate
+    a deterministic UUID so roles/permissions can still be created.
+    """
+    if hub_config.hub_id:
+        return str(hub_config.hub_id)
+
+    # Fall back to settings.HUB_ID (set in web.py from env var)
+    settings_hub_id = getattr(settings, 'HUB_ID', None)
+    if settings_hub_id:
+        # Persist it to HubConfig so future lookups work
+        hub_config.hub_id = settings_hub_id
+        hub_config.save(update_fields=['hub_id'])
+        logger.info(f"Set hub_id from settings.HUB_ID: {settings_hub_id}")
+        return str(settings_hub_id)
+
+    # Local development without HUB_ID — generate a deterministic one
+    generated_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, 'erplora.local'))
+    hub_config.hub_id = generated_id
+    hub_config.save(update_fields=['hub_id'])
+    logger.info(f"Generated local hub_id: {generated_id}")
+    return generated_id
+
+
+def _get_installed_module_ids():
+    """Get list of installed module IDs from the modules directory."""
+    modules_dir = Path(settings.MODULES_DIR)
+    installed = []
+    if modules_dir.exists():
+        for module_dir in modules_dir.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith('.'):
+                installed.append(module_dir.name.lstrip('_'))
+    return installed
+
+
+def _get_module_id_from_zip(extracted_root, fallback):
+    """Read MODULE_ID from module.py or module.json, falling back to slug."""
+    module_py = extracted_root / 'module.py'
+    if module_py.exists():
+        try:
+            for line in module_py.read_text(encoding='utf-8').splitlines():
+                line = line.strip()
+                if line.startswith('MODULE_ID'):
+                    value = line.split('=', 1)[1].strip().strip("'\"")
+                    if value:
+                        return value
+        except Exception:
+            pass
+    module_json = extracted_root / 'module.json'
+    if module_json.exists():
+        try:
+            data = json.loads(module_json.read_text(encoding='utf-8'))
+            if data.get('id'):
+                return data['id']
+        except Exception:
+            pass
+    return fallback
+
+
+def _install_module_from_url(module_slug, download_url, hub_token):
+    """Download and install a single module from Cloud.
+
+    Returns (success: bool, message: str).
+    """
+    modules_dir = Path(settings.MODULES_DIR)
+    headers = {}
+    if hub_token:
+        headers['X-Hub-Token'] = hub_token
+
+    try:
+        resp = http_requests.get(download_url, headers=headers, timeout=120, stream=True)
+        resp.raise_for_status()
+    except Exception as e:
+        return False, f"Download failed: {e}"
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp:
+            for chunk in resp.iter_content(chunk_size=8192):
+                tmp.write(chunk)
+            tmp_path = tmp.name
+
+        with tempfile.TemporaryDirectory() as tmp_extract:
+            tmp_extract_path = Path(tmp_extract)
+            with zipfile.ZipFile(tmp_path, 'r') as zf:
+                zf.extractall(tmp_extract_path)
+
+            items = list(tmp_extract_path.iterdir())
+            extracted_root = items[0] if len(items) == 1 and items[0].is_dir() else tmp_extract_path
+
+            module_id = _get_module_id_from_zip(extracted_root, module_slug)
+
+            target = modules_dir / module_id
+            if target.exists() or (modules_dir / f"_{module_id}").exists():
+                return True, f"{module_id} already installed"
+
+            shutil.copytree(extracted_root, target)
+            logger.info(f"Installed module {module_id} to {target}")
+            return True, f"{module_id} installed"
+
+    except zipfile.BadZipFile:
+        return False, "Invalid ZIP"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
+def _get_dev_modules_dir():
+    """Get the development modules directory (non-sandbox).
+
+    Used as fallback when Cloud download fails — copies module source
+    from the dev environment instead.
+    """
+    from config.paths import DataPaths
+    paths = DataPaths.__new__(DataPaths)
+    paths.platform = __import__('sys').platform
+    paths._base_dir = None
+    # Force non-sandbox base dir
+    if paths.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support" / "ERPloraHub"
+    else:
+        base = Path.home() / ".erplora-hub"
+    modules = base / "modules"
+    return modules if modules.exists() else None
+
+
+def _install_module_local(module_id, dev_modules_dir, target_dir):
+    """Copy a module from the dev modules directory to the target."""
+    source = dev_modules_dir / module_id
+    if not source.exists():
+        return False, f"{module_id} not found in dev modules"
+    target = target_dir / module_id
+    if target.exists():
+        return True, f"{module_id} already installed"
+    shutil.copytree(source, target)
+    logger.info(f"Copied module {module_id} from dev: {source} -> {target}")
+    return True, f"{module_id} copied from dev"
+
+
+def _install_block_modules(block_slugs, hub_config):
+    """Install required modules for all selected blocks.
+
+    Fetches each block's module list from Cloud API and downloads/installs
+    the required modules that aren't already installed.
+
+    Fallback: if Cloud download fails (no ZIP available), copies the module
+    from the development modules directory.
+    """
+    cloud_url = _get_cloud_base_url()
+    installed_ids = _get_installed_module_ids()
+    hub_token = hub_config.hub_jwt if hasattr(hub_config, 'hub_jwt') else ''
+    modules_dir = Path(settings.MODULES_DIR)
+    dev_modules = _get_dev_modules_dir()
+
+    total_installed = 0
+    errors = []
+
+    for slug in block_slugs:
+        try:
+            resp = http_requests.get(
+                f"{cloud_url}/api/marketplace/solutions/{slug}/",
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                logger.warning(f"Failed to fetch solution {slug}: HTTP {resp.status_code}")
+                continue
+
+            solution = resp.json()
+            required_modules = [
+                m for m in solution.get('modules', [])
+                if m.get('role') == 'required'
+                and m.get('slug', '') not in installed_ids
+                and m.get('module_id', '') not in installed_ids
+                and not m.get('is_coming_soon', False)
+            ]
+
+            for mod in required_modules:
+                mod_slug = mod.get('slug', '')
+                module_id = mod.get('module_id', '') or mod_slug
+                if not mod_slug:
+                    continue
+
+                # Skip if already installed (by module_id or slug)
+                if module_id in installed_ids or mod_slug in installed_ids:
+                    continue
+
+                # Try 1: Download from Cloud
+                download_url = f"{cloud_url}/api/marketplace/modules/{mod_slug}/download/"
+                ok, msg = _install_module_from_url(mod_slug, download_url, hub_token)
+
+                # Try 2: Fallback to local dev copy
+                if not ok and dev_modules:
+                    ok, msg = _install_module_local(module_id, dev_modules, modules_dir)
+                    if ok:
+                        msg += " (local fallback)"
+
+                if ok:
+                    total_installed += 1
+                    installed_ids.append(module_id)
+                    installed_ids.append(mod_slug)
+                else:
+                    errors.append(f"{mod.get('name', mod_slug)}: {msg}")
+                    logger.warning(f"Failed to install module {mod_slug}: {msg}")
+
+        except Exception as e:
+            logger.warning(f"Error processing block {slug}: {e}")
+            errors.append(f"Block {slug}: {e}")
+
+    if total_installed:
+        logger.info(f"Installed {total_installed} modules from {len(block_slugs)} blocks")
+    if errors:
+        logger.warning(f"Module install errors: {errors}")
+
+    return total_installed, errors
+
+
 def _save_step2(data, hub_config):
-    """Save step 2 data (block selection) to HubConfig and create roles from all blocks."""
+    """Save step 2 data (block selection) to HubConfig and create roles."""
     blocks = json.loads(data.get('selected_blocks', '[]'))
 
     hub_config.selected_blocks = blocks
@@ -263,14 +491,15 @@ def _save_step2(data, hub_config):
     hub_config.save()
 
     # Fetch roles from ALL selected blocks and create them
-    if hub_config.hub_id and blocks:
+    if blocks:
+        hub_id = _get_hub_id(hub_config)
         all_roles = []
         for slug in blocks:
             roles_data = _fetch_solution_roles(slug)
             if roles_data:
                 all_roles.extend(roles_data)
         if all_roles:
-            PermissionService.create_solution_roles(str(hub_config.hub_id), all_roles)
+            PermissionService.create_solution_roles(hub_id, all_roles)
             logger.info(f"Created {len(all_roles)} roles from {len(blocks)} blocks")
 
 
@@ -316,6 +545,35 @@ def _fetch_solutions():
     except Exception as e:
         logger.warning(f"Failed to fetch solutions from Cloud: {e}")
     return []
+
+
+def _schedule_restart():
+    """Schedule a server restart so newly installed module URLs are registered.
+
+    In Docker (Gunicorn), sends SIGHUP to PID 1 for graceful reload.
+    In local dev (runserver), touches wsgi.py to trigger autoreload.
+    """
+    import signal
+    import threading
+    from config.paths import is_docker_environment
+
+    def _restart():
+        import time
+        time.sleep(3)  # Let the response be sent first
+        if is_docker_environment():
+            try:
+                os.kill(1, signal.SIGHUP)
+            except Exception:
+                pass
+        else:
+            # Local dev: touch a file to trigger runserver autoreload
+            wsgi_file = Path(settings.BASE_DIR) / 'config' / 'wsgi.py'
+            if wsgi_file.exists():
+                wsgi_file.touch()
+                logger.info("Touched wsgi.py to trigger autoreload")
+
+    threading.Thread(target=_restart, daemon=True).start()
+    logger.info("Scheduled server restart for module URL registration")
 
 
 def _fetch_solution_roles(solution_slug):
@@ -422,10 +680,63 @@ def _handle_step_post(request, step, hub_config, store_config):
         context = _get_step_context(next_step, hub_config, store_config)
         return render(request, STEP_TEMPLATES[next_step], context)
     else:
-        # Final step complete → create default roles and redirect to home
-        hub_id = hub_config.hub_id
-        if hub_id:
-            PermissionService.create_default_roles(str(hub_id))
-        response = HttpResponse(status=200)
-        response['HX-Redirect'] = '/'
-        return response
+        # Final step complete → save config, show progress screen for module install
+        hub_id = _get_hub_id(hub_config)
+        PermissionService.create_default_roles(hub_id)
+        logger.info("Setup complete: created default roles")
+
+        # Return the progress screen partial (handles module install via HTMX)
+        blocks = hub_config.selected_blocks or []
+        context = _get_step_context(step, hub_config, store_config)
+        context['has_blocks'] = len(blocks) > 0
+        return render(request, 'setup/partials/step_installing.html', context)
+
+
+@login_required
+def install_modules(request):
+    """POST /setup/install-modules/ — Download & install modules for selected blocks.
+
+    Called by the progress screen after Step 4.
+    Returns JSON with results so the frontend can update the progress UI.
+    """
+    import json as json_mod
+    hub_config = HubConfig.get_config()
+    store_config = StoreConfig.get_config()
+    blocks = hub_config.selected_blocks or []
+
+    if not blocks:
+        return HttpResponse(
+            json_mod.dumps({'status': 'done', 'installed': 0, 'errors': []}),
+            content_type='application/json',
+        )
+
+    hub_id = _get_hub_id(hub_config)
+
+    # Install modules from selected blocks
+    installed_count, errors = _install_block_modules(blocks, hub_config)
+
+    # Load modules + run migrations + sync permissions
+    try:
+        from apps.modules_runtime.loader import module_loader
+        module_loader.load_all_active_modules()
+        from django.core.management import call_command
+        call_command('migrate', '--run-syncdb')
+    except Exception as e:
+        logger.warning(f"Module loading/migration error (non-fatal): {e}")
+
+    PermissionService.sync_all_module_permissions(hub_id)
+    logger.info(f"Post-install: {installed_count} modules, permissions synced")
+
+    # Schedule gentle restart so module URLs get registered on next page load
+    if installed_count > 0:
+        _schedule_restart()
+
+    return HttpResponse(
+        json_mod.dumps({
+            'status': 'done',
+            'installed': installed_count,
+            'errors': errors,
+            'requires_restart': installed_count > 0,
+        }),
+        content_type='application/json',
+    )

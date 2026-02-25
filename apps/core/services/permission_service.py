@@ -138,7 +138,8 @@ class PermissionService:
         """
         Sync permissions from all active modules.
 
-        Uses the dynamic ModuleLoader to find loaded modules.
+        Discovers modules from Django's app registry (INSTALLED_APPS).
+        Modules are external Django apps loaded at startup into INSTALLED_APPS.
         Also applies ROLE_PERMISSIONS defaults for each module.
 
         Args:
@@ -147,13 +148,31 @@ class PermissionService:
         Returns:
             Total number of permissions synced
         """
-        from apps.modules_runtime.loader import module_loader
+        from django.apps import apps
+        from django.conf import settings
         from importlib import import_module
 
         total = 0
 
-        # Get all loaded modules from the dynamic loader
-        for module_id, module_info in module_loader.loaded_modules.items():
+        # Discover module IDs from INSTALLED_APPS — modules are apps
+        # whose path is inside the MODULES_DIR
+        modules_dir = str(getattr(settings, 'MODULES_DIR', ''))
+        module_ids = []
+        for app_config in apps.get_app_configs():
+            try:
+                app_path = getattr(app_config.module, '__file__', '') or ''
+                if modules_dir and modules_dir in app_path:
+                    module_ids.append(app_config.label)
+            except Exception:
+                pass
+
+        if not module_ids:
+            logger.warning("No modules found in app registry, skipping permission sync")
+            return 0
+
+        logger.info(f"Found {len(module_ids)} modules for permission sync")
+
+        for module_id in module_ids:
             try:
                 # Import module.py from the module
                 mod = import_module(f"{module_id}.module")
@@ -671,24 +690,32 @@ class PermissionService:
             List of dicts with module info and permissions
         """
         from apps.accounts.models import Permission
-        from apps.modules_runtime.loader import module_loader
+        from django.apps import apps
+        from django.conf import settings
         from importlib import import_module
         from collections import defaultdict
 
-        # Get module metadata from dynamically loaded modules
+        # Get module metadata from Django app registry
+        modules_dir = str(getattr(settings, 'MODULES_DIR', ''))
         module_metadata = {}
-        for module_id in module_loader.loaded_modules.keys():
+        for app_config in apps.get_app_configs():
             try:
-                mod = import_module(f"{module_id}.module")
-                module_metadata[module_id] = {
-                    'name': str(getattr(mod, 'MODULE_NAME', module_id.title())),
-                    'icon': getattr(mod, 'MODULE_ICON', 'cube-outline'),
-                }
-            except ImportError:
-                module_metadata[module_id] = {
-                    'name': module_id.title(),
-                    'icon': 'cube-outline',
-                }
+                app_path = getattr(app_config.module, '__file__', '') or ''
+                if modules_dir and modules_dir in app_path:
+                    module_id = app_config.label
+                    try:
+                        mod = import_module(f"{module_id}.module")
+                        module_metadata[module_id] = {
+                            'name': str(getattr(mod, 'MODULE_NAME', module_id.title())),
+                            'icon': getattr(mod, 'MODULE_ICON', 'cube-outline'),
+                        }
+                    except ImportError:
+                        module_metadata[module_id] = {
+                            'name': module_id.title(),
+                            'icon': 'cube-outline',
+                        }
+            except Exception:
+                pass
 
         # Get permissions grouped by module
         permissions_by_module = defaultdict(list)

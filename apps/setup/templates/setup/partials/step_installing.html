@@ -1,0 +1,162 @@
+{% load i18n djicons %}
+
+<div class="stepper-content"
+     x-data="{
+        status: 'installing',
+        installed: 0,
+        errors: [],
+        progress: 10,
+        message: '{% trans "Preparing installation..." %}',
+
+        init() {
+            if (!{{ has_blocks|yesno:'true,false' }}) {
+                this.status = 'done';
+                this.message = '{% trans "Setup complete!" %}';
+                this.progress = 100;
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+                return;
+            }
+            this.startInstall();
+        },
+
+        async startInstall() {
+            this.message = '{% trans "Downloading and installing modules..." %}';
+            this.progress = 20;
+
+            // Animate progress bar while waiting
+            const ticker = setInterval(() => {
+                if (this.progress < 85) this.progress += Math.random() * 5;
+            }, 800);
+
+            try {
+                const resp = await fetch('{% url "setup:install_modules" %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const data = await resp.json();
+
+                clearInterval(ticker);
+                this.progress = 100;
+                this.installed = data.installed || 0;
+                this.errors = data.errors || [];
+
+                if (this.installed > 0) {
+                    this.message = this.installed + ' {% trans "modules installed successfully" %}';
+                } else {
+                    this.message = '{% trans "Setup complete!" %}';
+                }
+                this.status = 'done';
+
+                // If server needs restart, wait for it to come back
+                if (data.requires_restart) {
+                    this.message += '. {% trans "Restarting..." %}';
+                    await this.waitForServer();
+                }
+                window.location.href = '/';
+
+            } catch (err) {
+                clearInterval(ticker);
+                this.status = 'done';
+                this.progress = 100;
+                this.message = '{% trans "Setup complete! Some modules could not be installed." %}';
+                setTimeout(() => { window.location.href = '/'; }, 2000);
+            }
+        },
+
+        async waitForServer() {
+            // Poll until the server responds (after restart)
+            for (let i = 0; i < 20; i++) {
+                await new Promise(r => setTimeout(r, 1000));
+                try {
+                    const r = await fetch('/login/', { method: 'HEAD' });
+                    if (r.ok) return;
+                } catch (e) { /* server still restarting */ }
+            }
+        }
+     }">
+
+    <div class="flex flex-col items-center text-center py-8">
+        <!-- Icon -->
+        <div class="mb-6">
+            <template x-if="status === 'installing'">
+                <div class="loading loading-lg"></div>
+            </template>
+            <template x-if="status === 'done'">
+                <div class="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center">
+                    {% icon "checkmark-circle" css_class="text-4xl text-success" %}
+                </div>
+            </template>
+        </div>
+
+        <!-- Title -->
+        <h2 class="text-xl font-semibold mb-2">
+            <span x-show="status === 'installing'">{% trans "Setting Up Your Hub" %}</span>
+            <span x-show="status === 'done'" x-cloak>{% trans "All Done!" %}</span>
+        </h2>
+
+        <!-- Message -->
+        <p class="text-sm opacity-60 mb-6" x-text="message"></p>
+
+        <!-- Progress bar -->
+        <div class="w-full max-w-sm mb-4" x-show="status === 'installing'">
+            <div class="w-full bg-base-200 rounded-full h-2 overflow-hidden">
+                <div class="bg-primary h-full rounded-full transition-all duration-500 ease-out"
+                     :style="'width: ' + progress + '%'"></div>
+            </div>
+        </div>
+
+        <!-- Steps being done -->
+        <div class="w-full max-w-sm text-left" x-show="status === 'installing'">
+            <div class="flex flex-col gap-2 text-sm">
+                <div class="flex items-center gap-2 opacity-60">
+                    {% icon "checkmark-circle" css_class="text-success" %}
+                    <span>{% trans "Configuration saved" %}</span>
+                </div>
+                <div class="flex items-center gap-2 opacity-60">
+                    {% icon "checkmark-circle" css_class="text-success" %}
+                    <span>{% trans "Roles created" %}</span>
+                </div>
+                <div class="flex items-center gap-2" :class="progress > 50 ? 'opacity-60' : ''">
+                    <template x-if="progress <= 50">
+                        <span class="loading loading-sm"></span>
+                    </template>
+                    <template x-if="progress > 50">
+                        {% icon "checkmark-circle" css_class="text-success" %}
+                    </template>
+                    <span>{% trans "Downloading modules" %}</span>
+                </div>
+                <div class="flex items-center gap-2" :class="progress >= 100 ? 'opacity-60' : 'opacity-30'">
+                    <template x-if="progress < 100">
+                        <span x-show="progress > 50" class="loading loading-sm"></span>
+                    </template>
+                    <template x-if="progress >= 100">
+                        {% icon "checkmark-circle" css_class="text-success" %}
+                    </template>
+                    <span x-show="progress <= 50" class="opacity-30">{% trans "Finalizing" %}</span>
+                    <span x-show="progress > 50">{% trans "Finalizing" %}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Errors (if any) -->
+        <template x-if="errors.length > 0">
+            <div class="callout callout-warning mt-4 w-full max-w-sm text-left">
+                <div class="callout-content">
+                    <p class="callout-title text-sm">{% trans "Some modules could not be installed" %}</p>
+                    <template x-for="err in errors">
+                        <p class="callout-text text-xs" x-text="err"></p>
+                    </template>
+                    <p class="callout-text text-xs mt-1">{% trans "You can install them later from the Marketplace." %}</p>
+                </div>
+            </div>
+        </template>
+
+        <!-- Success redirect notice -->
+        <p x-show="status === 'done'" x-cloak class="text-xs opacity-40 mt-4">
+            {% trans "Redirecting to your dashboard..." %}
+        </p>
+    </div>
+</div>
