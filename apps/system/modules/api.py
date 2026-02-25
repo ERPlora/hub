@@ -134,18 +134,19 @@ class ModuleListView(APIView):
                     'is_active': is_active,
                 }
 
-                # Read module.json if exists
-                module_json_path = module_dir / 'module.json'
-                if module_json_path.exists():
+                # Read module.py if exists
+                module_py_path = module_dir / 'module.py'
+                if module_py_path.exists():
                     try:
-                        with open(module_json_path, 'r', encoding='utf-8') as f:
-                            json_data = json.load(f)
-                            module_data['name'] = json_data.get('name', module_data['name'])
-                            module_data['description'] = json_data.get('description', '')
-                            module_data['version'] = json_data.get('version', '1.0.0')
-                            module_data['author'] = json_data.get('author', '')
-                            menu_config = json_data.get('menu', {})
-                            module_data['icon'] = menu_config.get('icon', 'cube-outline')
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location(f"{display_id}.module", module_py_path)
+                        mod = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(mod)
+                        module_data['name'] = str(getattr(mod, 'MODULE_NAME', module_data['name']))
+                        module_data['description'] = str(getattr(mod, 'MODULE_DESCRIPTION', ''))
+                        module_data['version'] = getattr(mod, 'MODULE_VERSION', '1.0.0')
+                        module_data['author'] = getattr(mod, 'MODULE_AUTHOR', '')
+                        module_data['icon'] = getattr(mod, 'MODULE_ICON', 'cube-outline')
                     except Exception:
                         pass
 
@@ -599,7 +600,7 @@ class ModuleInstallView(APIView):
                     else:
                         extracted_root = tmp_extract_path
 
-                    # Read MODULE_ID from module.py (preferred) or module.json
+                    # Read MODULE_ID from module.py
                     module_id = self._get_module_id(extracted_root, module_slug)
 
                     # Check if already installed
@@ -670,7 +671,7 @@ class ModuleInstallView(APIView):
 
     @staticmethod
     def _get_module_id(extracted_root: Path, fallback: str) -> str:
-        """Read MODULE_ID from module.py or module.json, falling back to slug."""
+        """Read MODULE_ID from module.py, falling back to slug."""
         # Try module.py first
         module_py_path = extracted_root / 'module.py'
         if module_py_path.exists():
@@ -683,17 +684,6 @@ class ModuleInstallView(APIView):
                         value = line.split('=', 1)[1].strip().strip("'\"")
                         if value:
                             return value
-            except Exception:
-                pass
-
-        # Try module.json
-        module_json_path = extracted_root / 'module.json'
-        if module_json_path.exists():
-            try:
-                data = json.loads(module_json_path.read_text(encoding='utf-8'))
-                module_id = data.get('id', '')
-                if module_id:
-                    return module_id
             except Exception:
                 pass
 

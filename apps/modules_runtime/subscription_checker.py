@@ -137,7 +137,6 @@ class SubscriptionChecker:
             True si el módulo puede ejecutarse, False si no
         """
         from pathlib import Path
-        import json
 
         try:
             # Verificar módulo desde filesystem
@@ -156,17 +155,18 @@ class SubscriptionChecker:
                     return False
 
             # Module exists and is active (no _ prefix)
-            # Read module.json for metadata
-            module_json_path = module_dir / 'module.json'
-            if module_json_path.exists():
+            # Read module.py for metadata
+            module_py_path = module_dir / 'module.py'
+            if module_py_path.exists():
                 try:
-                    with open(module_json_path, 'r', encoding='utf-8') as f:
-                        metadata = json.load(f)
-                        # Get module type from metadata if not provided
-                        if not module_type:
-                            module_type = metadata.get('type', 'free')
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location(f"{module_slug}.module", module_py_path)
+                    mod = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(mod)
+                    if not module_type:
+                        module_type = getattr(mod, 'MODULE_TYPE', 'free')
                 except Exception as e:
-                    logger.warning(f"[SUBSCRIPTION] Error reading module.json for {module_slug}: {e}")
+                    logger.warning(f"[SUBSCRIPTION] Error reading module.py for {module_slug}: {e}")
                     module_type = module_type or 'free'
 
             # Si es gratuito, siempre permitir
@@ -180,20 +180,17 @@ class SubscriptionChecker:
             # Si es de suscripción, verificar estado online
             if module_type == 'subscription':
                 # Get cloud_module_id from metadata
-                if module_json_path.exists():
+                if module_py_path.exists():
                     try:
-                        with open(module_json_path, 'r', encoding='utf-8') as f:
-                            metadata = json.load(f)
-                            cloud_module_id = metadata.get('cloud_module_id')
-
-                            if not cloud_module_id:
-                                logger.error(f"[SUBSCRIPTION] Module {module_slug} has no cloud_module_id")
-                                return False
+                        cloud_module_id = getattr(mod, 'CLOUD_MODULE_ID', None)
+                        if not cloud_module_id:
+                            logger.error(f"[SUBSCRIPTION] Module {module_slug} has no CLOUD_MODULE_ID")
+                            return False
                     except Exception as e:
-                        logger.error(f"[SUBSCRIPTION] Error reading cloud_module_id: {e}")
+                        logger.error(f"[SUBSCRIPTION] Error reading CLOUD_MODULE_ID: {e}")
                         return False
                 else:
-                    logger.error(f"[SUBSCRIPTION] Module {module_slug} has no module.json")
+                    logger.error(f"[SUBSCRIPTION] Module {module_slug} has no module.py")
                     return False
 
                 status = self.check_subscription_status(cloud_module_id)

@@ -5,7 +5,7 @@ Este archivo define las dependencias Python que los modules pueden usar.
 Estas librerías están incluidas en las dependencias del proyecto.
 
 - Modules solo pueden usar estas librerías
-- Validación estricta en module.json
+- Validación estricta en module.py
 """
 
 # === CRÍTICAS (13) - Funcionalidad esencial ===

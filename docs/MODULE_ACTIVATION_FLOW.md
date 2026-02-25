@@ -20,7 +20,7 @@ When Django starts, `apps.modules_runtime` automatically:
 3. Registers in INSTALLED_APPS
 4. Runs migrations
 5. Registers URLs dynamically
-6. Generates menu items from module.json
+6. Generates menu items from module.py
 
 ### 3. No Database Dependency
 
@@ -48,7 +48,7 @@ User → Cloud Marketplace → Purchase Module → Download ZIP
 ```
 hub/modules/
 ├── _inventory/           ← Downloaded as INACTIVE (with underscore)
-│   ├── module.json
+│   ├── module.py
 │   ├── models.py
 │   ├── views.py
 │   ├── urls.py
@@ -209,7 +209,7 @@ Result: 2 modules loaded (products, reports)
 def load_module(self, module_id: str) -> bool:
     """
     Loads a single module:
-    1. Read module.json metadata
+    1. Read module.py metadata
     2. Add to Django's INSTALLED_APPS
     3. Import models (triggers migrations)
     4. Store in loaded_modules dict
@@ -220,15 +220,14 @@ def load_module(self, module_id: str) -> bool:
         print(f"[ERROR] Module '{module_id}' not found")
         return False
 
-    # Read module.json
-    module_json = module_path / 'module.json'
-    if not module_json.exists():
-        print(f"[ERROR] Module '{module_id}' missing module.json")
+    # Read module.py
+    module_py = module_path / 'module.py'
+    if not module_py.exists():
+        print(f"[ERROR] Module '{module_id}' missing module.py")
         return False
 
     try:
-        with open(module_json, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
+        metadata = parse_module_py(module_py)
 
         # Add to INSTALLED_APPS (so Django recognizes it as an app)
         app_name = module_id
@@ -323,7 +322,7 @@ urlpatterns = [
 ```python
 def module_menu_items(request):
     """
-    Generates menu items from loaded modules' module.json
+    Generates menu items from loaded modules' module.py
 
     Each module can define:
     {
@@ -502,7 +501,7 @@ modules/inventory/  →  DELETED (folder removed)
 
 ```
 modules/inventory/
-├── module.json          # Required metadata
+├── module.py          # Required metadata
 ├── __init__.py          # Empty (makes it a Python package)
 ├── views.py             # Django views
 ├── urls.py              # URL patterns
@@ -511,34 +510,31 @@ modules/inventory/
         └── index.html
 ```
 
-**module.json:**
-```json
-{
-    "module_id": "inventory",
-    "name": "Inventory Manager",
-    "version": "1.0.0",
-    "description": "Manage product inventory",
-    "author": "ERPlora Team",
-    "menu": {
-        "label": "Inventory",
-        "icon": "cube-outline",
-        "order": 10,
-        "items": [
-            {
-                "label": "Products",
-                "url": "/m/inventory/",
-                "icon": "list-outline"
-            }
-        ]
-    }
+**module.py:**
+```python
+from django.utils.translation import gettext_lazy as _
+
+MODULE_ID = 'inventory'
+MODULE_NAME = _('Inventory Manager')
+MODULE_VERSION = '1.0.0'
+MODULE_ICON = 'cube-outline'
+
+MENU = {
+    'label': _('Inventory'),
+    'icon': 'cube-outline',
+    'order': 10,
 }
+
+NAVIGATION = [
+    {'label': _('Products'), 'icon': 'storefront-outline', 'id': 'products'},
+]
 ```
 
 ### Full Module (With Database)
 
 ```
 modules/inventory/
-├── module.json
+├── module.py
 ├── __init__.py
 ├── models.py            # Django models
 ├── views.py
@@ -578,7 +574,7 @@ class Product(models.Model):
 **Check:**
 1. Folder name has NO underscore: `inventory/` ✅ NOT `_inventory/` ❌
 2. Server was restarted after activation
-3. `module.json` exists and is valid JSON
+3. `module.py` exists and has valid Python syntax
 4. Check console logs for errors during startup
 
 **Console Output:**
@@ -611,7 +607,7 @@ class Product(models.Model):
 ### Menu Items Not Showing
 
 **Check:**
-1. `module.json` has valid `menu` section
+1. `module.py` has valid `menu` section
 2. Module is loaded (check console logs)
 3. Context processor is registered in settings.py:
    ```python
