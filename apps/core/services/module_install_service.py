@@ -225,19 +225,18 @@ class ModuleInstallService:
                 solution = resp.json()
                 all_modules = solution.get('modules', [])
 
-                required_modules = [
+                modules_to_install = [
                     m for m in all_modules
-                    if m.get('role') == 'required'
-                    and m.get('slug', '') not in installed_ids
+                    if m.get('slug', '') not in installed_ids
                     and m.get('module_id', '') not in installed_ids
                     and not m.get('is_coming_soon', False)
                 ]
                 logger.info(
                     "[INSTALL] Solution %s: %d total, %d to install",
-                    slug, len(all_modules), len(required_modules),
+                    slug, len(all_modules), len(modules_to_install),
                 )
 
-                for mod in required_modules:
+                for mod in modules_to_install:
                     mod_slug = mod.get('slug', '')
                     module_id = mod.get('module_id', '') or mod_slug
                     if not mod_slug:
