@@ -1051,11 +1051,16 @@ def install_from_marketplace(request):
         module_slug = data.get('module_slug')
         download_url = data.get('download_url')
 
-        if not module_slug or not download_url:
+        if not module_slug:
             return JsonResponse({
                 'success': False,
-                'error': 'Missing module_slug or download_url'
+                'error': 'Missing module_slug'
             }, status=400)
+
+        # Build download URL if not provided or invalid
+        if not download_url or download_url in ('None', 'null', ''):
+            cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+            download_url = f"{cloud_api_url}/api/marketplace/modules/{module_slug}/download/"
 
         # Normalize http:// to https:// (Cloud URLs should always be HTTPS)
         if download_url.startswith('http://'):
