@@ -582,7 +582,6 @@ def install_from_marketplace(request):
 
     try:
         data = json.loads(request.body)
-        module_id = data.get('module_id')
         module_slug = data.get('module_slug')
         download_url = data.get('download_url')
 
@@ -592,11 +591,14 @@ def install_from_marketplace(request):
                 'error': _('Missing module_slug or download_url')
             }, status=400)
 
+        # Use module_id (local directory name) if provided, fall back to slug
+        module_dir_name = data.get('module_id') or module_slug
+
         modules_dir = Path(django_settings.MODULES_DIR)
-        module_target_dir = modules_dir / module_slug
+        module_target_dir = modules_dir / module_dir_name
 
         # Check if already installed
-        if module_target_dir.exists() or (modules_dir / f"_{module_slug}").exists():
+        if module_target_dir.exists() or (modules_dir / f"_{module_dir_name}").exists():
             return JsonResponse({
                 'success': False,
                 'error': _('Module already installed')
@@ -640,24 +642,24 @@ def install_from_marketplace(request):
 
             # Try to load the module dynamically
             from apps.modules_runtime.loader import module_loader
-            module_loaded = module_loader.load_module(module_slug)
+            module_loaded = module_loader.load_module(module_dir_name)
 
             if module_loaded:
-                print(f"[MARKETPLACE] Module {module_slug} loaded successfully")
+                print(f"[MARKETPLACE] Module {module_dir_name} loaded successfully")
             else:
-                print(f"[MARKETPLACE] Module {module_slug} installed but requires restart")
+                print(f"[MARKETPLACE] Module {module_dir_name} installed but requires restart")
 
             # Mark that restart is needed
             if 'modules_pending_restart' not in request.session:
                 request.session['modules_pending_restart'] = []
 
-            if module_slug not in request.session['modules_pending_restart']:
-                request.session['modules_pending_restart'].append(module_slug)
+            if module_dir_name not in request.session['modules_pending_restart']:
+                request.session['modules_pending_restart'].append(module_dir_name)
                 request.session.modified = True
 
             return JsonResponse({
                 'success': True,
-                'message': f'Module {module_slug} installed successfully',
+                'message': f'Module {module_dir_name} installed successfully',
                 'requires_restart': True
             })
 

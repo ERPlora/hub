@@ -120,6 +120,7 @@
                         <button class="btn btn-block color-success"
                                 data-action="download"
                                 data-module-slug="{{ module.slug }}"
+                                data-module-dir="{{ module.module_id }}"
                                 data-download-url="{{ module.download_url }}">
                             {% icon "download-outline" %} {% trans "Download & Install" %}
                         </button>
@@ -128,6 +129,7 @@
                                 data-action="install-free"
                                 data-module-id="{{ module.id }}"
                                 data-module-slug="{{ module.slug }}"
+                                data-module-dir="{{ module.module_id }}"
                                 data-download-url="{{ module.download_url|default:'' }}">
                             {% icon "download-outline" %} {% trans "Get Free Module" %}
                         </button>
@@ -364,16 +366,16 @@ document.addEventListener('click', function(e) {
     e.stopPropagation();
 
     if (action === 'download') {
-        downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button);
+        downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
     } else if (action === 'install-free') {
-        installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button);
+        installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
     } else if (action === 'purchase') {
         purchaseModule(button.dataset.moduleId, button);
     }
 });
 
 // Install free module
-async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
+async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, moduleDir) {
     setButtonLoading(button, true);
     try {
         const purchaseResponse = await fetch('{% url "mymodules:api_purchase" %}', {
@@ -389,7 +391,7 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button) {
         }
 
         if (downloadUrl) {
-            await downloadAndInstall(moduleSlug, downloadUrl);
+            await downloadAndInstall(moduleSlug, downloadUrl, null, moduleDir);
         } else {
             Toast.warning('{% trans "Module acquired. Download not available yet." %}');
             setTimeout(() => window.location.reload(), 1500);
@@ -429,13 +431,15 @@ async function purchaseModule(moduleId, button) {
 }
 
 // Download and install module
-async function downloadAndInstall(moduleSlug, downloadUrl, button) {
+async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir) {
     if (button) setButtonLoading(button, true);
     try {
+        const payload = { module_slug: moduleSlug, download_url: downloadUrl };
+        if (moduleDir) payload.module_id = moduleDir;
         const response = await fetch('{% url "mymodules:api_install" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ module_slug: moduleSlug, download_url: downloadUrl })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
 
