@@ -76,36 +76,30 @@ class Command(BaseCommand):
         (module_dir / 'management' / 'commands').mkdir(parents=True, exist_ok=True)
         (module_dir / 'tests').mkdir(parents=True, exist_ok=True)
 
-        # Crear module.json
-        module_json = {
-            "module_id": module_id,
-            "name": module_name,
-            "version": "0.1.0",
-            "description": description,
-            "author": author,
-            "dependencies": {
-                "python": [],
-                "modules": []
-            },
-            "compatibility": {
-                "min_cpos_version": settings.HUB_VERSION,
-                "max_cpos_version": "99.0.0"
-            },
-            "permissions": {
-                "database": True,
-                "filesystem": False,
-                "network": False,
-                "hardware": False
-            },
-            "menu": {
-                "label": module_name,
-                "icon": "cube-outline",
-                "url": f"/{module_id}/"
-            }
-        }
+        # Create module.py
+        module_py_content = f"""from django.utils.translation import gettext_lazy as _
 
-        with open(module_dir / 'module.json', 'w') as f:
-            json.dump(module_json, f, indent=2)
+MODULE_ID = '{module_id}'
+MODULE_NAME = _('{module_name}')
+MODULE_VERSION = '0.1.0'
+MODULE_ICON = 'cube-outline'
+
+MENU = {{
+    'label': _('{module_name}'),
+    'icon': 'cube-outline',
+    'order': 50,
+}}
+
+NAVIGATION = [
+    {{'label': _('Dashboard'), 'icon': 'speedometer-outline', 'id': 'dashboard'}},
+]
+
+PERMISSIONS = [
+    '{module_id}.view',
+    '{module_id}.change',
+]
+"""
+        (module_dir / 'module.py').write_text(module_py_content)
 
         # Crear __init__.py
         with open(module_dir / '__init__.py', 'w') as f:
@@ -264,7 +258,7 @@ Este module está en desarrollo. Para probarlo:
 
 ```
 {module_id}/
-├── module.json          # Metadata del module
+├── module.py            # Module metadata (MODULE_ID, MODULE_NAME, MENU, etc.)
 ├── apps.py             # Configuración Django
 ├── models.py           # Modelos de datos
 ├── views.py            # Vistas

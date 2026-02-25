@@ -85,22 +85,7 @@ def modules_index(request):
                 module_data['color'] = getattr(module_py, 'MODULE_COLOR', 'primary')
                 module_data['category'] = getattr(module_py, 'MODULE_CATEGORY', 'default')
             except ImportError:
-                # Fallback to module.json
-                module_json_path = module_dir / 'module.json'
-                if module_json_path.exists():
-                    try:
-                        with open(module_json_path, 'r', encoding='utf-8') as f:
-                            json_data = json.load(f)
-                            module_data['name'] = json_data.get('name', module_data['name'])
-                            module_data['description'] = json_data.get('description', '')
-                            module_data['version'] = json_data.get('version', '1.0.0')
-                            module_data['author'] = json_data.get('author', '')
-                            module_data['category'] = json_data.get('category', 'default')
-                            menu_config = json_data.get('menu', {})
-                            module_data['icon'] = menu_config.get('icon', 'cube-outline')
-                            module_data['color'] = menu_config.get('color', 'primary')
-                    except Exception as e:
-                        print(f"[WARNING] Error reading module.json for {module_id}: {e}")
+                pass  # No module.py found, use defaults
 
             all_modules.append(module_data)
 
@@ -531,22 +516,7 @@ def _render_modules_page(request, error=None):
                 module_data['color'] = getattr(module_py, 'MODULE_COLOR', 'primary')
                 module_data['category'] = getattr(module_py, 'MODULE_CATEGORY', 'default')
             except ImportError:
-                # Fallback to module.json
-                module_json_path = module_dir / 'module.json'
-                if module_json_path.exists():
-                    try:
-                        with open(module_json_path, 'r', encoding='utf-8') as f:
-                            json_data = json.load(f)
-                            module_data['name'] = json_data.get('name', module_data['name'])
-                            module_data['description'] = json_data.get('description', '')
-                            module_data['version'] = json_data.get('version', '1.0.0')
-                            module_data['author'] = json_data.get('author', '')
-                            module_data['category'] = json_data.get('category', 'default')
-                            menu_config = json_data.get('menu', {})
-                            module_data['icon'] = menu_config.get('icon', 'cube-outline')
-                            module_data['color'] = menu_config.get('color', 'primary')
-                    except Exception:
-                        pass
+                pass  # No module.py found, use defaults
 
             all_modules.append(module_data)
 

@@ -85,30 +85,30 @@ class Command(BaseCommand):
         (module_dir / 'static' / module_id / 'js').mkdir(parents=True)
         (module_dir / 'migrations').mkdir(parents=True)
 
-        # Create module.json
-        module_json = {
-            'module_id': module_id,
-            'name': module_name,
-            'version': '1.0.0',
-            'description': f'{module_name} module for CPOS Hub',
-            'author': author,
-            'author_email': email,
-            'license': 'MIT',
-            'icon': 'cube-outline',
-            'category': 'general',
-            'menu': {
-                'label': module_name,
-                'icon': 'cube-outline',
-                'order': 100,
-                'show': True
-            },
-            'main_url': f'{module_id}:index',
-            'dependencies': [],
-            'min_hub_version': '1.0.0'
-        }
+        # Create module.py
+        module_py_content = f"""from django.utils.translation import gettext_lazy as _
 
-        with open(module_dir / 'module.json', 'w') as f:
-            json.dump(module_json, f, indent=4)
+MODULE_ID = '{module_id}'
+MODULE_NAME = _('{module_name}')
+MODULE_VERSION = '1.0.0'
+MODULE_ICON = 'cube-outline'
+
+MENU = {{
+    'label': _('{module_name}'),
+    'icon': 'cube-outline',
+    'order': 100,
+}}
+
+NAVIGATION = [
+    {{'label': _('Dashboard'), 'icon': 'speedometer-outline', 'id': 'dashboard'}},
+]
+
+PERMISSIONS = [
+    '{module_id}.view',
+    '{module_id}.change',
+]
+"""
+        (module_dir / 'module.py').write_text(module_py_content)
 
         # Create __init__.py
         with open(module_dir / '__init__.py', 'w') as f:
@@ -162,7 +162,7 @@ class Command(BaseCommand):
         # Create README.md
         with open(module_dir / 'README.md', 'w') as f:
             f.write(f'# {module_name}\n\n')
-            f.write(f'{module_json["description"]}\n\n')
+            f.write(f'{module_name} module for ERPlora Hub.\n\n')
             f.write('## Installation\n\n')
             f.write('This module can be installed via CPOS Cloud marketplace.\n\n')
             f.write('## Development\n\n')
@@ -200,23 +200,25 @@ class Command(BaseCommand):
             is_active = not module_id.startswith('_')
             clean_id = module_id.lstrip('_')
 
-            # Read module.json
-            module_json_path = module_dir / 'module.json'
-            if module_json_path.exists():
+            # Read module.py metadata
+            module_py_path = module_dir / 'module.py'
+            if module_py_path.exists():
                 try:
-                    with open(module_json_path, 'r', encoding='utf-8') as f:
-                        metadata = json.load(f)
-                        name = metadata.get('name', clean_id.title())
-                        version = metadata.get('version', '1.0.0')
-                        modules.append({
-                            'id': clean_id,
-                            'name': name,
-                            'version': version,
-                            'is_active': is_active
-                        })
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location(f"{clean_id}.module", module_py_path)
+                    mod = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(mod)
+                    name = str(getattr(mod, 'MODULE_NAME', clean_id.title()))
+                    version = getattr(mod, 'MODULE_VERSION', '1.0.0')
+                    modules.append({
+                        'id': clean_id,
+                        'name': name,
+                        'version': version,
+                        'is_active': is_active
+                    })
                 except Exception as e:
                     self.stdout.write(self.style.WARNING(
-                        f'Warning: Error reading module.json for {module_id}: {e}'
+                        f'Warning: Error reading module.py for {module_id}: {e}'
                     ))
 
         if not modules:
@@ -267,10 +269,18 @@ class Command(BaseCommand):
         # Create output directory
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Read version from module.json
-        with open(module_dir / 'module.json', 'r') as f:
-            metadata = json.load(f)
-            version = metadata.get('version', '1.0.0')
+        # Read version from module.py
+        version = '1.0.0'
+        module_py_path = module_dir / 'module.py'
+        if module_py_path.exists():
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(f"{module_id}.module", module_py_path)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                version = getattr(mod, 'MODULE_VERSION', '1.0.0')
+            except Exception:
+                pass
 
         # Create ZIP file
         zip_filename = output_dir / f'{module_id}-{version}.zip'
@@ -311,37 +321,44 @@ class Command(BaseCommand):
 
     def _validate_module_structure(self, module_dir):
         """Validate module structure"""
-        required_files = ['module.json', '__init__.py', 'apps.py']
+        required_files = ['module.py', '__init__.py', 'apps.py']
 
         valid = True
         for file in required_files:
             file_path = module_dir / file
             if not file_path.exists():
-                self.stdout.write(self.style.ERROR(f'✗ Missing required file: {file}'))
+                self.stdout.write(self.style.ERROR(f'  Missing required file: {file}'))
                 valid = False
             else:
-                self.stdout.write(self.style.SUCCESS(f'✓ Found: {file}'))
+                self.stdout.write(self.style.SUCCESS(f'  Found: {file}'))
 
-        # Validate module.json
-        module_json = module_dir / 'module.json'
-        if module_json.exists():
+        # Validate module.py
+        module_py = module_dir / 'module.py'
+        if module_py.exists():
             try:
-                with open(module_json, 'r') as f:
-                    metadata = json.load(f)
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(
+                    f"{module_dir.name}.module", module_py
+                )
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
 
-                required_fields = ['module_id', 'name', 'version']
-                for field in required_fields:
-                    if field not in metadata:
+                required_attrs = {
+                    'MODULE_ID': getattr(mod, 'MODULE_ID', None),
+                    'MODULE_NAME': getattr(mod, 'MODULE_NAME', None),
+                }
+                for attr, value in required_attrs.items():
+                    if value is None:
                         self.stdout.write(self.style.ERROR(
-                            f'✗ module.json missing required field: {field}'
+                            f'  module.py missing: {attr}'
                         ))
                         valid = False
                     else:
                         self.stdout.write(self.style.SUCCESS(
-                            f'✓ module.json has {field}: {metadata[field]}'
+                            f'  module.py {attr}: {value}'
                         ))
-            except json.JSONDecodeError:
-                self.stdout.write(self.style.ERROR('✗ Invalid JSON in module.json'))
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f'  Error loading module.py: {e}'))
                 valid = False
 
         return valid

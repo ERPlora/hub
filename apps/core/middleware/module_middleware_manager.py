@@ -8,7 +8,6 @@ and only runs middlewares for those modules.
 This solves the problem of modules being deactivated but their middleware still running.
 """
 
-import json
 from pathlib import Path
 from django.conf import settings
 from django.utils.module_loading import import_string
@@ -20,7 +19,7 @@ class ModuleMiddlewareManager:
 
     Flow:
     1. On each request, check which modules are active in filesystem
-    2. For each active module, check if it has middleware defined in module.json
+    2. For each active module, check if it has middleware defined in module.py
     3. Execute those middlewares in order
     """
 
@@ -49,22 +48,24 @@ class ModuleMiddlewareManager:
             if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
                 continue
 
-            # Check for middleware in module.json
-            module_json_path = module_dir / 'module.json'
-            if not module_json_path.exists():
+            # Check for middleware in module.py
+            module_py_path = module_dir / 'module.py'
+            if not module_py_path.exists():
                 continue
 
             try:
-                with open(module_json_path, 'r') as f:
-                    module_metadata = json.load(f)
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(f"{module_dir.name}.module", module_py_path)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
 
                 # Store middleware path if defined
-                if 'middleware' in module_metadata:
-                    middleware_class = module_metadata['middleware']
+                middleware_class = getattr(mod, 'MIDDLEWARE', None)
+                if middleware_class:
                     middleware_path = f"{module_dir.name}.{middleware_class}"
                     self._module_middleware_map[module_dir.name] = middleware_path
-            except (json.JSONDecodeError, KeyError) as e:
-                print(f"[MODULE_MIDDLEWARE_MANAGER] Warning: Could not load middleware from {module_dir.name}/module.json: {e}")
+            except Exception as e:
+                print(f"[MODULE_MIDDLEWARE_MANAGER] Warning: Could not load middleware from {module_dir.name}/module.py: {e}")
 
     def _get_active_module_ids(self):
         """

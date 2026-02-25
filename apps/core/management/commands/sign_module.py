@@ -201,13 +201,22 @@ class Command(BaseCommand):
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         ).decode('utf-8')
 
-        # Leer module.json para metadata
-        with open(module_dir / 'module.json', 'r') as f:
-            module_data = json.load(f)
+        # Read module.py for metadata
+        module_version = '0.0.0'
+        module_py_path = module_dir / 'module.py'
+        if module_py_path.exists():
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(f"{module_id}.module", module_py_path)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                module_version = getattr(mod, 'MODULE_VERSION', '0.0.0')
+            except Exception:
+                pass
 
         signature_data = {
             'module_id': module_id,
-            'version': module_data.get('version', '0.0.0'),
+            'version': module_version,
             'hash': module_hash,
             'algorithm': settings.MODULE_SIGNATURE_ALGORITHM,
             'signature': signature_b64,

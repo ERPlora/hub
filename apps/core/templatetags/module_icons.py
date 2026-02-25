@@ -183,7 +183,7 @@ def module_icon(module_id: str = None, icon: str = None, css_class: str = '', si
     Priority:
     1. SVG from module's static/icons/icon.svg (inline)
     2. PNG from module's static/icons/icon.png (base64 img)
-    3. djicons icon from module.json
+    3. djicons icon from module.py
     4. Default cube-outline icon
 
     Args:

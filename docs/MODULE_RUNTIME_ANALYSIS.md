@@ -16,7 +16,7 @@ El sistema de modules está **100% implementado** con una arquitectura completam
 | Fuente | Información |
 |--------|-------------|
 | **Carpeta** | Estado activo/inactivo (`module/` vs `_module/` vs `.module/`) |
-| **module.json** | Metadata (nombre, versión, autor, menú, etc.) |
+| **module.py** | Metadata (nombre, versión, autor, menú, etc.) |
 | **Código Python** | Funcionalidad, modelos, vistas, URLs |
 
 ### Estados de Módulos por Convención de Nombres
@@ -57,7 +57,7 @@ class ModuleLoader:
     ✅ activate_module(module_id)                # Renombra _module → module
     ✅ deactivate_module(module_id)              # Renombra module → _module
     ✅ delete_module(module_id)                  # Elimina carpeta
-    ✅ get_menu_items()                          # Lee menu de module.json
+    ✅ get_menu_items()                          # Lee menu de module.py
 ```
 
 **Flujo de descubrimiento:**
@@ -65,7 +65,7 @@ class ModuleLoader:
 1. Lee directorio `MODULES_DIR`
 2. Filtra carpetas (ignora `.` prefix = ocultas)
 3. Determina estado por prefijo `_`
-4. Lee `module.json` para metadata
+4. Lee `module.py` para metadata
 5. Genera menu items para sidebar
 
 ### 2. Modules Runtime (`apps/modules_runtime/`)
@@ -132,7 +132,7 @@ def module_menu_items(request):
 
 ```
 {module_id}/
-├── module.json          # Metadata (REQUERIDO)
+├── module.py          # Metadata (REQUERIDO)
 ├── __init__.py          # Module init
 ├── apps.py              # AppConfig
 ├── models.py            # Modelos Django
@@ -150,25 +150,26 @@ def module_menu_items(request):
 └── README.md
 ```
 
-### module.json (Ejemplo)
+### module.py (Ejemplo)
 
-```json
-{
-    "module_id": "inventory",
-    "name": "Inventory",
-    "description": "Product and stock management",
-    "version": "1.0.0",
-    "author": "ERPlora",
-    "icon": "cube-outline",
-    "category": "operations",
-    "menu": {
-        "label": "Inventory",
-        "label_es": "Inventario",
-        "icon": "cube-outline",
-        "order": 20,
-        "show": true
-    }
+```python
+from django.utils.translation import gettext_lazy as _
+
+MODULE_ID = 'inventory'
+MODULE_NAME = _('Inventory')
+MODULE_VERSION = '1.0.0'
+MODULE_ICON = 'cube-outline'
+
+MENU = {
+    'label': _('Inventory'),
+    'icon': 'cube-outline',
+    'order': 20,
 }
+
+NAVIGATION = [
+    {'label': _('Products'), 'icon': 'storefront-outline', 'id': 'products'},
+    {'label': _('Stock'), 'icon': 'layers-outline', 'id': 'stock'},
+]
 ```
 
 ---

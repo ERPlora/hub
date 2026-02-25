@@ -6,8 +6,6 @@ and a decorator to inject it into views automatically.
 """
 import json
 from functools import wraps
-from pathlib import Path
-from django.conf import settings
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
@@ -16,28 +14,13 @@ from .loader import get_module_py
 
 def get_module_navigation_items(module_id: str) -> list:
     """
-    Get navigation items for a module, trying module.py first, then module.json.
+    Get navigation items for a module from module.py.
 
     Returns list of nav dicts with keys: label, icon, id, url
     """
     # Try module.py first
     module_py = get_module_py(module_id)
     navigation = getattr(module_py, 'NAVIGATION', [])
-
-    # Fallback to module.json if NAVIGATION is empty
-    if not navigation:
-        modules_dir = Path(settings.MODULES_DIR)
-        # Try both enabled and disabled module names
-        for name in [module_id, f'_{module_id}']:
-            json_path = modules_dir / name / 'module.json'
-            if json_path.exists():
-                try:
-                    with open(json_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                    navigation = data.get('navigation', [])
-                    break
-                except Exception:
-                    pass
 
     # Build items with resolved URLs
     nav_items = []

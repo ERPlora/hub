@@ -10,18 +10,17 @@ ERPlora soporta 3 tipos de modules:
 2. **Paid** - Pago único, verificado en instalación
 3. **Subscription** - Suscripción mensual, verificado en runtime
 
-## Configuración en module.json
+## Configuración en module.py
 
-```json
-{
-  "module_id": "analytics",
-  "name": "Advanced Analytics",
-  "version": "1.0.0",
-  "module_type": "subscription",
-  "price": 9.99,
-  "cloud_module_id": 123,  // ID del module en Cloud
-  ...
-}
+```python
+from django.utils.translation import gettext_lazy as _
+
+MODULE_ID = 'analytics'
+MODULE_NAME = _('Advanced Analytics')
+MODULE_VERSION = '1.0.0'
+MODULE_ICON = 'analytics-outline'
+
+# Pricing is managed in Cloud, not in module.py
 ```
 
 ## Verificación de Suscripciones en Views

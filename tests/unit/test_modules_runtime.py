@@ -4,7 +4,6 @@ Unit tests for modules runtime system.
 Tests module loading, activation, and URL registration.
 """
 import pytest
-import json
 from pathlib import Path
 
 pytestmark = pytest.mark.unit
@@ -19,12 +18,12 @@ class TestModuleDiscovery:
         module_dir = tmp_path / 'inventory'
         module_dir.mkdir()
 
-        module_json = module_dir / 'module.json'
-        module_json.write_text(json.dumps({
-            'module_id': 'inventory',
-            'name': 'Inventory',
-            'version': '1.0.0'
-        }))
+        module_py = module_dir / 'module.py'
+        module_py.write_text(
+            "MODULE_ID = 'inventory'\n"
+            "MODULE_NAME = 'Inventory'\n"
+            "MODULE_VERSION = '1.0.0'\n"
+        )
 
         # Module without underscore should be active
         assert not module_dir.name.startswith('_')
@@ -46,71 +45,79 @@ class TestModuleDiscovery:
         assert module_dir.name.startswith('.')
 
 
-class TestModuleJson:
-    """Tests for module.json parsing."""
+class TestModulePy:
+    """Tests for module.py parsing."""
 
-    def test_valid_module_json(self, tmp_path):
-        """Test parsing valid module.json."""
-        module_json = tmp_path / 'module.json'
-        data = {
-            'module_id': 'test_module',
-            'name': 'Test Module',
-            'name_es': 'Módulo de Prueba',
-            'version': '1.0.0',
-            'description': 'A test module',
-            'author': 'Test Author',
-            'icon': 'cube-outline',
-            'category': 'inventory',
-            'tags': ['test', 'inventory'],
-            'menu': {
-                'label': 'Test',
-                'icon': 'cube-outline',
-                'url': '/modules/test_module/',
-                'order': 10
-            }
-        }
-        module_json.write_text(json.dumps(data))
+    def test_valid_module_py(self, tmp_path):
+        """Test parsing valid module.py."""
+        module_py = tmp_path / 'module.py'
+        module_py.write_text(
+            "MODULE_ID = 'test_module'\n"
+            "MODULE_NAME = 'Test Module'\n"
+            "MODULE_VERSION = '1.0.0'\n"
+            "MODULE_DESCRIPTION = 'A test module'\n"
+            "MODULE_AUTHOR = 'Test Author'\n"
+            "MODULE_ICON = 'cube-outline'\n"
+            "MODULE_CATEGORY = 'inventory'\n"
+            "MENU = {\n"
+            "    'label': 'Test',\n"
+            "    'icon': 'cube-outline',\n"
+            "    'order': 10,\n"
+            "}\n"
+        )
 
-        loaded = json.loads(module_json.read_text())
+        import ast
+        content = module_py.read_text()
+        tree = ast.parse(content)
 
-        assert loaded['module_id'] == 'test_module'
-        assert loaded['name'] == 'Test Module'
-        assert loaded['tags'] == ['test', 'inventory']
-        assert loaded['menu']['order'] == 10
+        metadata = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == 'MODULE_ID':
+                        metadata['module_id'] = ast.literal_eval(node.value)
+                    elif isinstance(target, ast.Name) and target.id == 'MODULE_NAME':
+                        metadata['name'] = ast.literal_eval(node.value)
+                    elif isinstance(target, ast.Name) and target.id == 'MENU':
+                        metadata['menu'] = ast.literal_eval(node.value)
 
-    def test_minimal_module_json(self, tmp_path):
-        """Test parsing minimal module.json."""
-        module_json = tmp_path / 'module.json'
-        data = {
-            'module_id': 'minimal',
-            'name': 'Minimal Module',
-            'version': '1.0.0'
-        }
-        module_json.write_text(json.dumps(data))
+        assert metadata['module_id'] == 'test_module'
+        assert metadata['name'] == 'Test Module'
+        assert metadata['menu']['order'] == 10
 
-        loaded = json.loads(module_json.read_text())
+    def test_minimal_module_py(self, tmp_path):
+        """Test parsing minimal module.py."""
+        module_py = tmp_path / 'module.py'
+        module_py.write_text(
+            "MODULE_ID = 'minimal'\n"
+            "MODULE_NAME = 'Minimal Module'\n"
+            "MODULE_VERSION = '1.0.0'\n"
+        )
 
-        assert loaded['module_id'] == 'minimal'
-        assert loaded['version'] == '1.0.0'
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("minimal.module", module_py)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
 
-    def test_module_json_with_dependencies(self, tmp_path):
-        """Test parsing module.json with dependencies."""
-        module_json = tmp_path / 'module.json'
-        data = {
-            'module_id': 'sales',
-            'name': 'Sales',
-            'version': '1.0.0',
-            'dependencies': {
-                'python': ['requests>=2.0.0'],
-                'modules': ['inventory>=1.0.0']
-            }
-        }
-        module_json.write_text(json.dumps(data))
+        assert mod.MODULE_ID == 'minimal'
+        assert mod.MODULE_VERSION == '1.0.0'
 
-        loaded = json.loads(module_json.read_text())
+    def test_module_py_with_dependencies(self, tmp_path):
+        """Test parsing module.py with dependencies."""
+        module_py = tmp_path / 'module.py'
+        module_py.write_text(
+            "MODULE_ID = 'sales'\n"
+            "MODULE_NAME = 'Sales'\n"
+            "MODULE_VERSION = '1.0.0'\n"
+            "DEPENDENCIES = ['inventory']\n"
+        )
 
-        assert 'requests>=2.0.0' in loaded['dependencies']['python']
-        assert 'inventory>=1.0.0' in loaded['dependencies']['modules']
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("sales.module", module_py)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        assert 'inventory' in mod.DEPENDENCIES
 
 
 class TestModuleURLPatterns:

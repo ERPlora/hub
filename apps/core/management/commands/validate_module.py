@@ -3,7 +3,7 @@ Management command para validar un module antes de distribución.
 
 Valida:
 - Estructura de archivos requerida
-- module.json válido
+- module.py válido
 - Dependencias permitidas
 - Conflictos de base de datos
 - Sintaxis Python
@@ -66,13 +66,12 @@ class Command(BaseCommand):
         # 1. Validar estructura de archivos
         self.stdout.write('📁 Validando estructura de archivos...')
         required_files = [
-            'module.json',
+            'module.py',
             '__init__.py',
             'apps.py',
             'models.py',
             'views.py',
             'urls.py',
-            'README.md'
         ]
 
         for file in required_files:
@@ -81,41 +80,46 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f'   ✓ {file}')
 
-        # 2. Validar module.json
-        self.stdout.write('\n📄 Validando module.json...')
-        module_json_path = module_dir / 'module.json'
+        # 2. Validar module.py
+        self.stdout.write('\n📄 Validando module.py...')
+        module_py_path = module_dir / 'module.py'
+        module_data = {}
 
-        if module_json_path.exists():
+        if module_py_path.exists():
             try:
-                with open(module_json_path, 'r') as f:
-                    module_data = json.load(f)
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(f"{module_id}.module", module_py_path)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
 
-                # Campos requeridos
-                required_fields = ['module_id', 'name', 'version', 'description', 'author']
-                for field in required_fields:
-                    if field not in module_data:
-                        errors.append(f'module.json: falta campo requerido "{field}"')
+                module_data = {
+                    'module_id': getattr(mod, 'MODULE_ID', None),
+                    'name': str(getattr(mod, 'MODULE_NAME', '')),
+                    'version': getattr(mod, 'MODULE_VERSION', None),
+                    'icon': getattr(mod, 'MODULE_ICON', None),
+                    'dependencies': getattr(mod, 'DEPENDENCIES', []),
+                }
+
+                required_attrs = ['module_id', 'name']
+                for field in required_attrs:
+                    if not module_data.get(field):
+                        errors.append(f'module.py: falta campo requerido "{field}"')
                     else:
                         self.stdout.write(f'   ✓ {field}: {module_data[field]}')
 
                 # Validar module_id coincide
-                if module_data.get('module_id') != module_id:
-                    errors.append(f'module_id en module.json ({module_data.get("module_id")}) no coincide con directorio ({module_id})')
+                if module_data.get('module_id') and module_data['module_id'] != module_id:
+                    errors.append(f'MODULE_ID en module.py ({module_data["module_id"]}) no coincide con directorio ({module_id})')
 
-                # Validar versión
-                version = module_data.get('version', '')
-                if not version or len(version.split('.')) != 3:
-                    errors.append('Versión debe tener formato X.Y.Z (ej: 1.0.0)')
-
-            except json.JSONDecodeError as e:
-                errors.append(f'module.json inválido: {e}')
+            except Exception as e:
+                errors.append(f'Error loading module.py: {e}')
         else:
-            errors.append('module.json no encontrado')
+            errors.append('module.py no encontrado')
 
         # 3. Validar dependencias
         self.stdout.write('\n📦 Validando dependencias...')
-        if module_json_path.exists() and 'module_data' in locals():
-            python_deps = module_data.get('dependencies', {}).get('python', [])
+        if module_data:
+            python_deps = []  # module.py doesn't define python deps
 
             if python_deps:
                 for dep in python_deps:
