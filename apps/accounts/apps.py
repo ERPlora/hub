@@ -10,7 +10,7 @@ class AccountsConfig(AppConfig):
     def ready(self):
         """
         Initialize accounts app.
-        Import signals and perform app-level initialization.
+        Connects post_migrate signal to seed default roles.
         """
-        # Import signals here if needed
-        pass
+        from .signals import connect_signals
+        connect_signals()
