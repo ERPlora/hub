@@ -323,11 +323,13 @@ def marketplace_modules_list(request):
         if type_filter:
             modules = [p for p in modules if p.get('module_type') == type_filter]
 
-        # Mark installed modules and add detail URL
+        # Mark installed modules and add detail/download URLs
         from django.urls import reverse
         for module in modules:
             module['is_installed'] = module.get('slug', '') in installed_module_ids
             module['detail_url'] = reverse('mymodules:detail', kwargs={'slug': module.get('slug', '')})
+            if not module.get('download_url'):
+                module['download_url'] = f"{cloud_api_url}/api/marketplace/modules/{module['slug']}/download/"
 
         # Pagination (12 modules per page)
         paginator = Paginator(modules, 12)
@@ -422,6 +424,8 @@ def module_detail(request, slug):
 
         module = response.json()
         module['is_installed'] = is_installed
+        if not module.get('download_url'):
+            module['download_url'] = f"{cloud_api_url}/api/marketplace/modules/{slug}/download/"
 
         # Fetch related modules (same category)
         related_modules = []

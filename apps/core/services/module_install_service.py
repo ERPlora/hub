@@ -307,11 +307,24 @@ class ModuleInstallService:
             except Exception as e:
                 logger.warning("[POST-INSTALL] load_module(%s) error: %s", load_single, e)
 
-        # Run migrations
+        # Run migrations via subprocess so the new process sees the new modules
+        # in INSTALLED_APPS (the current process already loaded settings at startup)
         if run_migrations:
             try:
-                from django.core.management import call_command
-                call_command('migrate', '--run-syncdb')
+                import subprocess
+                import sys
+                manage_py = str(Path(settings.BASE_DIR) / 'manage.py')
+                subprocess.check_call(
+                    [sys.executable, manage_py, 'makemigrations', '--no-input'],
+                    cwd=str(settings.BASE_DIR),
+                )
+                subprocess.check_call(
+                    [sys.executable, manage_py, 'migrate', '--run-syncdb', '--no-input'],
+                    cwd=str(settings.BASE_DIR),
+                )
+                logger.info("[POST-INSTALL] Migrations applied via subprocess")
+            except subprocess.CalledProcessError as e:
+                logger.warning("[POST-INSTALL] Migration error (non-fatal): %s", e)
             except Exception as e:
                 logger.warning("[POST-INSTALL] Migration error (non-fatal): %s", e)
 

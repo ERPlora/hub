@@ -8,26 +8,40 @@ logger = logging.getLogger(__name__)
 
 
 def schedule_server_restart(delay=2):
-    """Schedule a server restart after sending the current response.
+    """Schedule a graceful server reload after sending the current response.
 
-    In Docker: os._exit(0) terminates the process. Docker's restart policy
-    (restart: unless-stopped) brings the container back with all new modules
-    loaded fresh from settings.
+    In Docker/gunicorn: sends SIGHUP to the gunicorn master process for
+    graceful worker reload (zero downtime). Reads PID from /run/gunicorn.pid.
 
     In local dev: touches wsgi.py to trigger runserver's autoreload.
 
     Args:
         delay: Seconds to wait before restarting (lets the response be sent).
     """
-    from config.paths import is_docker_environment
+    import signal
 
     def _restart():
         import time
         time.sleep(delay)
+
+        # Try gunicorn graceful reload via SIGHUP
+        pidfile = Path('/run/gunicorn.pid')
+        if pidfile.exists():
+            try:
+                master_pid = int(pidfile.read_text().strip())
+                os.kill(master_pid, signal.SIGHUP)
+                logger.info("Sent SIGHUP to gunicorn master (pid=%d)", master_pid)
+                return
+            except (ValueError, ProcessLookupError, PermissionError) as e:
+                logger.warning("SIGHUP failed: %s, falling back", e)
+
+        # Fallback: Docker without pidfile → os._exit
+        from config.paths import is_docker_environment
         if is_docker_environment():
-            logger.info("Exiting process for Docker restart")
+            logger.info("No gunicorn pidfile, exiting for Docker restart")
             os._exit(0)
         else:
+            # Local dev: touch wsgi.py for runserver autoreload
             from django.conf import settings
             wsgi_file = Path(settings.BASE_DIR) / 'config' / 'wsgi.py'
             if wsgi_file.exists():
@@ -35,7 +49,7 @@ def schedule_server_restart(delay=2):
                 logger.info("Touched wsgi.py to trigger autoreload")
 
     threading.Thread(target=_restart, daemon=True).start()
-    logger.info("Server restart scheduled in %ds", delay)
+    logger.info("Server reload scheduled in %ds", delay)
 
 
 def detect_os_language():
