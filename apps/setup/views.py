@@ -5,11 +5,7 @@ Multi-step HTMX wizard for initial Hub configuration.
 Each step saves to DB on "Next" and loads the next step partial.
 """
 import json
-import os
-import shutil
-import tempfile
 import uuid
-import zipfile
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from django.shortcuts import render, redirect
@@ -286,227 +282,6 @@ def _get_hub_id(hub_config):
     return generated_id
 
 
-def _get_installed_module_ids():
-    """Get list of installed module IDs from the modules directory."""
-    modules_dir = Path(settings.MODULES_DIR)
-    installed = []
-    if modules_dir.exists():
-        for module_dir in modules_dir.iterdir():
-            if module_dir.is_dir() and not module_dir.name.startswith('.'):
-                installed.append(module_dir.name.lstrip('_'))
-    return installed
-
-
-def _get_module_id_from_zip(extracted_root, fallback):
-    """Read MODULE_ID from module.py, falling back to slug."""
-    module_py = extracted_root / 'module.py'
-    if module_py.exists():
-        try:
-            for line in module_py.read_text(encoding='utf-8').splitlines():
-                line = line.strip()
-                if line.startswith('MODULE_ID'):
-                    value = line.split('=', 1)[1].strip().strip("'\"")
-                    if value:
-                        return value
-        except Exception:
-            pass
-    return fallback
-
-
-def _install_module_from_url(module_slug, download_url, hub_token):
-    """Download and install a single module from Cloud.
-
-    Returns (success: bool, message: str).
-    """
-    modules_dir = Path(settings.MODULES_DIR)
-    headers = {}
-    if hub_token:
-        headers['X-Hub-Token'] = hub_token
-
-    try:
-        resp = http_requests.get(download_url, headers=headers, timeout=120, stream=True)
-        if resp.status_code != 200:
-            body = resp.text[:300] if not resp.headers.get('content-type', '').startswith('application/') else ''
-            logger.warning(f"[INSTALL] Download HTTP {resp.status_code}: {download_url} - {body}")
-            return False, f"Download failed: HTTP {resp.status_code}"
-        resp.raise_for_status()
-    except http_requests.exceptions.RequestException as e:
-        logger.warning(f"[INSTALL] Download error: {download_url} - {e}")
-        return False, f"Download failed: {e}"
-
-    tmp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp:
-            for chunk in resp.iter_content(chunk_size=8192):
-                tmp.write(chunk)
-            tmp_path = tmp.name
-
-        with tempfile.TemporaryDirectory() as tmp_extract:
-            tmp_extract_path = Path(tmp_extract)
-            with zipfile.ZipFile(tmp_path, 'r') as zf:
-                zf.extractall(tmp_extract_path)
-
-            items = list(tmp_extract_path.iterdir())
-            extracted_root = items[0] if len(items) == 1 and items[0].is_dir() else tmp_extract_path
-
-            module_id = _get_module_id_from_zip(extracted_root, module_slug)
-
-            target = modules_dir / module_id
-            if target.exists() or (modules_dir / f"_{module_id}").exists():
-                return True, f"{module_id} already installed"
-
-            shutil.copytree(extracted_root, target)
-            logger.info(f"Installed module {module_id} to {target}")
-            return True, f"{module_id} installed"
-
-    except zipfile.BadZipFile:
-        return False, "Invalid ZIP"
-    except Exception as e:
-        return False, str(e)
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-
-
-def _get_dev_modules_dir():
-    """Get the fallback modules directory.
-
-    Checks multiple locations in order:
-    1. DEV_MODULES_DIR setting (sandbox mode)
-    2. /app/bundled_modules/ (Docker image bundled modules)
-    3. Default platform-specific dev path (macOS/Linux)
-    """
-    # 1. Check settings (sandbox mode sets DEV_MODULES_DIR)
-    dev_dir = getattr(settings, 'DEV_MODULES_DIR', None)
-    if dev_dir and Path(dev_dir).exists():
-        return Path(dev_dir)
-
-    # 2. Check Docker bundled modules
-    bundled = Path('/app/bundled_modules')
-    if bundled.exists() and any(bundled.iterdir()):
-        return bundled
-
-    # 3. Default platform-specific path
-    import sys
-    if sys.platform == "darwin":
-        base = Path.home() / "Library" / "Application Support" / "ERPloraHub"
-    else:
-        base = Path.home() / ".erplora-hub"
-    modules = base / "modules"
-    return modules if modules.exists() else None
-
-
-def _install_module_local(module_id, dev_modules_dir, target_dir):
-    """Copy a module from the dev modules directory to the target."""
-    source = dev_modules_dir / module_id
-    if not source.exists():
-        return False, f"{module_id} not found in dev modules"
-    target = target_dir / module_id
-    if target.exists():
-        return True, f"{module_id} already installed"
-    shutil.copytree(source, target)
-    logger.info(f"Copied module {module_id} from dev: {source} -> {target}")
-    return True, f"{module_id} copied from dev"
-
-
-def _install_block_modules(block_slugs, hub_config):
-    """Install required modules for all selected blocks.
-
-    Fetches each block's module list from Cloud API and downloads/installs
-    the required modules that aren't already installed.
-
-    Download priority:
-    1. Cloud API download endpoint (authenticated, tracks downloads)
-    2. Local dev modules directory (development fallback)
-    """
-    cloud_url = _get_cloud_base_url()
-    installed_ids = _get_installed_module_ids()
-    hub_token = hub_config.hub_jwt if hasattr(hub_config, 'hub_jwt') else ''
-
-    # If hub_jwt is empty, try reading from settings (env var)
-    if not hub_token:
-        hub_token = getattr(settings, 'HUB_JWT', '')
-        if hub_token:
-            logger.info("[INSTALL] Using HUB_JWT from settings (env var)")
-
-    modules_dir = Path(settings.MODULES_DIR)
-    dev_modules = _get_dev_modules_dir()
-
-    logger.info(
-        f"[INSTALL] Starting module install: blocks={block_slugs}, "
-        f"cloud_url={cloud_url}, modules_dir={modules_dir}, "
-        f"hub_token={'set' if hub_token else 'EMPTY'}, "
-        f"dev_modules={dev_modules}, installed={installed_ids}"
-    )
-
-    total_installed = 0
-    errors = []
-
-    for slug in block_slugs:
-        try:
-            solution_url = f"{cloud_url}/api/marketplace/solutions/{slug}/"
-            logger.info(f"[INSTALL] Fetching solution: {solution_url}")
-            resp = http_requests.get(solution_url, timeout=15)
-            if resp.status_code != 200:
-                logger.warning(f"[INSTALL] Failed to fetch solution {slug}: HTTP {resp.status_code} - {resp.text[:200]}")
-                errors.append(f"Solution {slug}: HTTP {resp.status_code}")
-                continue
-
-            solution = resp.json()
-            all_modules = solution.get('modules', [])
-            logger.info(f"[INSTALL] Solution {slug}: {len(all_modules)} modules total")
-
-            required_modules = [
-                m for m in all_modules
-                if m.get('role') == 'required'
-                and m.get('slug', '') not in installed_ids
-                and m.get('module_id', '') not in installed_ids
-                and not m.get('is_coming_soon', False)
-            ]
-            logger.info(f"[INSTALL] Solution {slug}: {len(required_modules)} modules to install")
-
-            for mod in required_modules:
-                mod_slug = mod.get('slug', '')
-                module_id = mod.get('module_id', '') or mod_slug
-                version = mod.get('version', '1.0.0')
-                if not mod_slug:
-                    continue
-
-                # Skip if already installed (by module_id or slug)
-                if module_id in installed_ids or mod_slug in installed_ids:
-                    logger.info(f"[INSTALL] Skipping {module_id} (already installed)")
-                    continue
-
-                # Try 1: Download from Cloud API
-                download_url = f"{cloud_url}/api/marketplace/modules/{mod_slug}/download/"
-                logger.info(f"[INSTALL] Downloading: {download_url}")
-                ok, msg = _install_module_from_url(mod_slug, download_url, hub_token)
-                logger.info(f"[INSTALL] Download result for {mod_slug}: ok={ok}, msg={msg}")
-
-                # Try 2: Fallback to local dev copy
-                if not ok and dev_modules:
-                    logger.info(f"[INSTALL] Trying local fallback for {module_id} from {dev_modules}")
-                    ok, msg = _install_module_local(module_id, dev_modules, modules_dir)
-                    if ok:
-                        msg += " (local fallback)"
-
-                if ok:
-                    total_installed += 1
-                    installed_ids.append(module_id)
-                    installed_ids.append(mod_slug)
-                else:
-                    errors.append(f"{mod.get('name', mod_slug)}: {msg}")
-                    logger.warning(f"[INSTALL] Failed to install module {mod_slug}: {msg}")
-
-        except Exception as e:
-            logger.warning(f"[INSTALL] Error processing block {slug}: {e}", exc_info=True)
-            errors.append(f"Block {slug}: {e}")
-
-    logger.info(f"[INSTALL] Complete: {total_installed} installed, {len(errors)} errors")
-    if errors:
-        logger.warning(f"[INSTALL] Errors: {errors}")
-
-    return total_installed, errors
 
 
 def _save_step2(data, hub_config):
@@ -575,34 +350,6 @@ def _fetch_solutions():
         logger.warning(f"Failed to fetch solutions from Cloud: {e}")
     return []
 
-
-def _schedule_restart():
-    """Schedule a server restart so newly installed module URLs are registered.
-
-    In Docker (Gunicorn), sends SIGHUP to PID 1 for graceful reload.
-    In local dev (runserver), touches wsgi.py to trigger autoreload.
-    """
-    import signal
-    import threading
-    from config.paths import is_docker_environment
-
-    def _restart():
-        import time
-        time.sleep(3)  # Let the response be sent first
-        if is_docker_environment():
-            try:
-                os.kill(1, signal.SIGHUP)
-            except Exception:
-                pass
-        else:
-            # Local dev: touch a file to trigger runserver autoreload
-            wsgi_file = Path(settings.BASE_DIR) / 'config' / 'wsgi.py'
-            if wsgi_file.exists():
-                wsgi_file.touch()
-                logger.info("Touched wsgi.py to trigger autoreload")
-
-    threading.Thread(target=_restart, daemon=True).start()
-    logger.info("Scheduled server restart for module URL registration")
 
 
 def _fetch_solution_roles(solution_slug):
@@ -725,44 +472,38 @@ def install_modules(request):
     Called by the progress screen after Step 4.
     Returns JSON with results so the frontend can update the progress UI.
     """
-    import json as json_mod
+    from apps.core.services.module_install_service import ModuleInstallService
+
     hub_config = HubConfig.get_config()
-    store_config = StoreConfig.get_config()
     blocks = hub_config.selected_blocks or []
 
     if not blocks:
         return HttpResponse(
-            json_mod.dumps({'status': 'done', 'installed': 0, 'errors': []}),
+            json.dumps({'status': 'done', 'installed': 0, 'errors': []}),
             content_type='application/json',
         )
 
     hub_id = _get_hub_id(hub_config)
 
     # Install modules from selected blocks
-    installed_count, errors = _install_block_modules(blocks, hub_config)
+    result = ModuleInstallService.install_block_modules(blocks, hub_config)
 
-    # Load modules + run migrations + sync permissions
-    try:
-        from apps.modules_runtime.loader import module_loader
-        module_loader.load_all_active_modules()
-        from django.core.management import call_command
-        call_command('migrate', '--run-syncdb')
-    except Exception as e:
-        logger.warning(f"Module loading/migration error (non-fatal): {e}")
-
-    PermissionService.sync_all_module_permissions(hub_id)
-    logger.info(f"Post-install: {installed_count} modules, permissions synced")
-
-    # Schedule gentle restart so module URLs get registered on next page load
-    if installed_count > 0:
-        _schedule_restart()
+    # Post-install: load, migrate, sync permissions, restart
+    ModuleInstallService.run_post_install(
+        load_all=True,
+        run_migrations=True,
+        sync_permissions=True,
+        hub_id=hub_id,
+        schedule_restart=(result.installed > 0),
+    )
+    logger.info("Post-install: %d modules, permissions synced", result.installed)
 
     return HttpResponse(
-        json_mod.dumps({
+        json.dumps({
             'status': 'done',
-            'installed': installed_count,
-            'errors': errors,
-            'requires_restart': installed_count > 0,
+            'installed': result.installed,
+            'errors': result.errors,
+            'requires_restart': result.installed > 0,
         }),
         content_type='application/json',
     )

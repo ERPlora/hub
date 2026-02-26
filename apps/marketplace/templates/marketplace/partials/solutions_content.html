@@ -15,7 +15,7 @@
             <h3 class="text-xs font-semibold uppercase tracking-wide opacity-40 mb-3">{{ cat_label }}</h3>
             <div class="module-grid module-grid-3">
                 {% for solution in blocks %}
-                <div class="module-card cursor-pointer {% if solution.is_active %}ring-2 ring-primary{% endif %}"
+                <div class="module-card cursor-pointer {% if solution.all_installed %}ring-2 ring-primary{% endif %}"
                      hx-get="{% url 'marketplace:solution_detail' slug=solution.slug %}"
                      hx-target="#main-content-area"
                      hx-push-url="true">
@@ -33,10 +33,14 @@
                             </div>
 
                             <div class="module-card-badges">
-                                {% if solution.is_active %}
+                                {% if solution.all_installed %}
                                 <span class="badge badge-sm color-success">
                                     {% icon "checkmark-circle" %}
                                     {% trans "Installed" %}
+                                </span>
+                                {% elif solution.partially_installed %}
+                                <span class="badge badge-sm color-warning">
+                                    {{ solution.installed_count }}/{{ solution.required_count }}
                                 </span>
                                 {% endif %}
                                 {% if solution.is_featured %}
@@ -50,10 +54,10 @@
                         <p class="module-card-description">{{ solution.tagline }}</p>
 
                         <div class="module-card-footer">
-                            <span class="chip chip-sm">{{ solution.required_module_count|default:solution.all_modules_count }} {% trans "required" %}</span>
+                            <span class="chip chip-sm">{{ solution.required_count|default:solution.all_modules_count }} {% trans "required" %}</span>
 
                             <div class="module-card-actions">
-                                {% if solution.is_active %}
+                                {% if solution.all_installed %}
                                 <span class="text-xs opacity-50">{% trans "Installed" %}</span>
                                 {% else %}
                                 <button class="btn btn-sm color-primary"

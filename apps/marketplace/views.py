@@ -898,14 +898,22 @@ def solutions_index(request):
     except requests.exceptions.RequestException:
         pass
 
-    # Get active blocks from HubConfig
-    from apps.configuration.models import HubConfig
-    hub_config = HubConfig.get_config()
-    active_blocks = set(hub_config.selected_blocks or [])
+    # Check installed modules from filesystem (not DB)
+    installed_ids = set(_get_installed_module_ids())
 
-    # Mark each block as active/inactive
+    # For each solution, calculate how many required modules are installed
+    installed_blocks = 0
     for s in solutions:
-        s['is_active'] = s.get('slug', '') in active_blocks
+        required_ids = s.get('required_module_ids', [])
+        required_count = s.get('required_module_count', 0) or len(required_ids)
+        installed_count = sum(1 for mid in required_ids if mid in installed_ids)
+        s['installed_count'] = installed_count
+        s['required_count'] = required_count
+        s['all_installed'] = required_count > 0 and installed_count >= required_count
+        s['partially_installed'] = installed_count > 0 and installed_count < required_count
+        s['is_active'] = s['all_installed']
+        if s['all_installed']:
+            installed_blocks += 1
 
     # Group by block_type category
     category_order = [
@@ -938,8 +946,7 @@ def solutions_index(request):
         'page_title': _('Functional Blocks'),
         'solutions': solutions,
         'grouped_blocks': grouped_blocks,
-        'active_blocks': list(active_blocks),
-        'active_blocks_count': len(active_blocks),
+        'active_blocks_count': installed_blocks,
         'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('solutions'),
     }
@@ -1049,43 +1056,35 @@ def solution_install(request, slug):
                 content_type='application/json',
             )
 
-        # Install each module via the Hub's internal install API
-        installed_count = 0
-        errors = []
+        # Install modules via ModuleInstallService
+        from apps.core.services.module_install_service import ModuleInstallService
         from apps.configuration.models import HubConfig
         hub_config = HubConfig.get_solo()
-        auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+        hub_token = ModuleInstallService.get_hub_token(hub_config)
 
+        installed_count = 0
+        errors = []
         for mod in required_modules:
-            try:
-                # Call the Hub's own install endpoint internally
-                install_response = requests.post(
-                    f"http://localhost:{request.META.get('SERVER_PORT', '8000')}/modules/api/marketplace/install/",
-                    json={
-                        'module_slug': mod['slug'],
-                        'download_url': f"{cloud_api_url}/api/marketplace/modules/{mod.get('slug')}/download/",
-                    },
-                    headers={
-                        'X-CSRFToken': request.META.get('CSRF_COOKIE', ''),
-                        'Cookie': request.META.get('HTTP_COOKIE', ''),
-                    },
-                    timeout=120,
-                )
-                if install_response.status_code == 200:
-                    installed_count += 1
-                else:
-                    errors.append(f"{mod['name']}: {install_response.status_code}")
-            except Exception as e:
-                errors.append(f"{mod['name']}: {str(e)}")
+            download_url = f"{cloud_api_url}/api/marketplace/modules/{mod['slug']}/download/"
+            result = ModuleInstallService.download_and_install(mod['slug'], download_url, hub_token)
+            if result.success and 'already installed' not in result.message:
+                installed_count += 1
+            elif not result.success:
+                errors.append(f"{mod['name']}: {result.message}")
 
-        # Create solution roles (same as setup wizard does)
-        if installed_count > 0 and hub_config.hub_id:
+        # Post-install: load, migrate, create roles
+        if installed_count > 0:
+            ModuleInstallService.run_post_install(
+                load_all=True, run_migrations=True,
+                schedule_restart=True,
+            )
+
+            # Create solution roles
             roles_data = solution.get('roles', [])
-            if roles_data:
+            if roles_data and hub_config.hub_id:
                 try:
                     from apps.core.services.permission_service import PermissionService
                     PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
-                    logger.info(f"Created {len(roles_data)} solution roles for {slug}")
                 except Exception as e:
                     logger.warning(f"Failed to create solution roles for {slug}: {e}")
 
@@ -1132,36 +1131,17 @@ def block_toggle(request, slug):
         hub_config.solution_slug = active_blocks[0] if active_blocks else ''
         hub_config.save()
 
-        installed_count = 0
-        install_errors = []
-
         # Install required modules for this block
-        try:
-            from apps.setup.views import _install_block_modules
-            installed_count, install_errors = _install_block_modules([slug], hub_config)
+        from apps.core.services.module_install_service import ModuleInstallService
+        result = ModuleInstallService.install_block_modules([slug], hub_config)
 
-            if installed_count > 0:
-                # Load modules + run migrations
-                try:
-                    from apps.modules_runtime.loader import module_loader
-                    module_loader.load_all_active_modules()
-                    from django.core.management import call_command
-                    call_command('migrate', '--run-syncdb')
-                except Exception as e:
-                    logger.warning(f"Module loading/migration after block activate: {e}")
-
-                # Sync permissions
-                if hub_config.hub_id:
-                    from apps.core.services.permission_service import PermissionService
-                    PermissionService.sync_all_module_permissions(str(hub_config.hub_id))
-
-                # Schedule restart for URL registration
-                from apps.setup.views import _schedule_restart
-                _schedule_restart()
-
-        except Exception as e:
-            logger.warning(f"Failed to install modules for block {slug}: {e}")
-            install_errors.append(str(e))
+        if result.installed > 0:
+            ModuleInstallService.run_post_install(
+                load_all=True, run_migrations=True,
+                sync_permissions=bool(hub_config.hub_id),
+                hub_id=str(hub_config.hub_id) if hub_config.hub_id else None,
+                schedule_restart=True,
+            )
 
         # Create roles for this block
         if hub_config.hub_id:
@@ -1178,7 +1158,6 @@ def block_toggle(request, slug):
                     if roles_data:
                         from apps.core.services.permission_service import PermissionService
                         PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
-                        logger.info(f"Created {len(roles_data)} roles for block {slug}")
             except Exception as e:
                 logger.warning(f"Failed to create roles for block {slug}: {e}")
 
@@ -1188,9 +1167,9 @@ def block_toggle(request, slug):
                 'action': 'installed',
                 'slug': slug,
                 'active_count': len(active_blocks),
-                'modules_installed': installed_count,
-                'install_errors': install_errors,
-                'requires_restart': installed_count > 0,
+                'modules_installed': result.installed,
+                'install_errors': result.errors,
+                'requires_restart': result.installed > 0,
             }),
             content_type='application/json',
         )

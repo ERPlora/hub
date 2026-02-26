@@ -84,4 +84,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # =============================================================================
 # Command is defined in docker-compose.yml for flexibility
 # This is a fallback for running the container directly
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--pid", "/run/gunicorn.pid"]

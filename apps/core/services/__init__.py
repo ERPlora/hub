@@ -39,6 +39,11 @@ from .print_service import (
     render_receipt,
     render_report,
 )
+from .module_install_service import (
+    ModuleInstallService,
+    InstallResult,
+    BulkInstallResult,
+)
 
 __all__ = [
     # Sync
@@ -71,4 +76,8 @@ __all__ = [
     "render_print_page",
     "render_receipt",
     "render_report",
+    # Module Install
+    "ModuleInstallService",
+    "InstallResult",
+    "BulkInstallResult",
 ]

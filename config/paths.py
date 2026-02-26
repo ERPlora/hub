@@ -101,7 +101,12 @@ class DataPaths:
                 - Linux: /home/<user>/.erplora-hub
         """
         if self._base_dir is None:
-            if is_docker_environment():
+            # DATA_PATH from .env overrides platform defaults (local dev only)
+            custom_path = config('DATA_PATH', default='')
+            if custom_path:
+                self._base_dir = Path(custom_path)
+
+            elif is_docker_environment():
                 # Docker: Usar /app como base (montado como volumen persistente)
                 self._base_dir = Path("/app")
 
