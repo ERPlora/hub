@@ -1,4 +1,4 @@
-{% load i18n djicons %}
+{% load i18n djicons static %}
 
 {% include "setup/partials/stepper.html" %}
 
@@ -40,6 +40,11 @@
             return this.selected.size;
         }
      }">
+
+    <div class="flex gap-6 {% if assistant_active %}flex-col lg:flex-row{% endif %}">
+
+    {# ===== Left column: Block selection ===== #}
+    <div class="{% if assistant_active %}flex-1 min-w-0{% endif %}">
 
     <h2 class="text-xl font-semibold mb-1">{% trans "Choose Your Modules" %}</h2>
     <p class="text-sm opacity-60 mb-1">{% trans "Select the functional blocks your business needs. You can always add more later." %}</p>
@@ -87,7 +92,7 @@
             {% for cat_key, cat_label, blocks in grouped_blocks %}
             <div>
                 <h3 class="text-xs font-semibold uppercase tracking-wide opacity-40 mb-2">{{ cat_label }}</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 {% if not assistant_active %}lg:grid-cols-3{% endif %} gap-2">
                     {% for block in blocks %}
                     <div class="card cursor-pointer transition-all duration-150 border"
                          :class="selected.has('{{ block.slug }}') ? 'ring-2 ring-primary border-primary' : 'hover:border-base-content/20'"
@@ -148,4 +153,24 @@
             </div>
         </div>
     </form>
+
+    </div>{# end left column #}
+
+    {% if assistant_active %}
+    {# ===== Right column: AI Assistant chat ===== #}
+    <div class="w-full lg:w-[380px] shrink-0">
+        <div class="card sticky top-4" style="height: calc(100vh - 240px);">
+            <div class="card-header p-3 border-b border-base-200">
+                <div class="flex items-center gap-2">
+                    {% icon "sparkles-outline" css_class="text-primary" %}
+                    <h3 class="card-title text-sm">{% trans "AI Assistant" %}</h3>
+                </div>
+                <p class="text-xs opacity-50 mt-1">{% trans "Need help choosing? Ask me about your business!" %}</p>
+            </div>
+            {% include "assistant/partials/chat_panel.html" with context="setup" %}
+        </div>
+    </div>
+    {% endif %}
+
+    </div>{# end flex container #}
 </div>

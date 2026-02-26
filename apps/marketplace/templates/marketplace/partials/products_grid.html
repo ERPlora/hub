@@ -37,11 +37,12 @@
                 </th>
                 <th class="datatable-th datatable-th-center" data-col="status">{% trans "Status" %}</th>
                 <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
+                <th class="datatable-th datatable-th-center" style="width: 70px;">{% trans "Select" %}</th>
             </tr>
         </thead>
         <tbody class="datatable-tbody">
             {% for product in products %}
-            <tr class="datatable-tr">
+            <tr class="datatable-tr" :class="{ 'bg-primary/5': selected.has('{{ product.slug }}') }">
                 <td class="datatable-td" data-label="{% trans 'Module' %}">
                     <div class="flex items-center gap-3">
                         {% if product.icon %}
@@ -60,6 +61,13 @@
                                hx-push-url="true"
                                class="font-medium block hover:text-primary transition-colors">
                                 {{ product.name }}
+                                {% if industry_filter %}
+                                    {% if product.is_essential %}
+                                    <span class="badge badge-sm color-success ml-1">{% trans "Essential" %}</span>
+                                    {% else %}
+                                    <span class="badge badge-sm color-info ml-1">{% trans "Recommended" %}</span>
+                                    {% endif %}
+                                {% endif %}
                             </a>
                             {% if product.description %}
                             <span class="text-xs text-base-content/50 block truncate max-w-xs">{{ product.description }}</span>
@@ -143,6 +151,16 @@
                         {% endif %}
                     </div>
                 </td>
+                <td class="datatable-td datatable-td-center" style="width: 70px;">
+                    <label class="checkbox" @click.stop>
+                        <input type="checkbox" class="checkbox-input"
+                               @change="toggle('{{ product.slug }}')"
+                               :checked="selected.has('{{ product.slug }}')">
+                        <span class="checkbox-box">
+                            <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </span>
+                    </label>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -164,15 +182,16 @@
 <div class="datatable-footer">
     <div class="datatable-per-page">
         {% trans "Show" %}
-        <select name="per_page"
+        <select @change="perPage = $el.value; $nextTick(() => htmx.trigger($el, 'perPageChanged'))"
                 hx-get="{% url 'marketplace:products_list' %}"
                 hx-target="#datatable-body"
                 hx-include="#marketplace-datatable"
-                hx-trigger="change">
-            <option value="12" {% if per_page == 12 %}selected{% endif %}>12</option>
-            <option value="24" {% if per_page == 24 %}selected{% endif %}>24</option>
-            <option value="48" {% if per_page == 48 %}selected{% endif %}>48</option>
-            <option value="96" {% if per_page == 96 %}selected{% endif %}>96</option>
+                hx-trigger="perPageChanged"
+                x-init="$el.value = perPage">
+            <option value="12">12</option>
+            <option value="24">24</option>
+            <option value="48">48</option>
+            <option value="96">96</option>
         </select>
         {% trans "per page" %}
     </div>

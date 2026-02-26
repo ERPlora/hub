@@ -1,12 +1,90 @@
 {% load i18n static djicons %}
 
 <div x-data="{
-    view: 'cards',
+    view: localStorage.getItem('mp_view') || 'cards',
+    perPage: localStorage.getItem('mp_per_page') || '12',
     columnsModal: false,
     cols: { author: true, price: true, rating: true, status: true },
+    selected: new Set(),
+    installing: false,
+    init() {
+        this.$watch('view', v => localStorage.setItem('mp_view', v));
+        this.$watch('perPage', v => localStorage.setItem('mp_per_page', v));
+        this.$nextTick(() => {
+            htmx.trigger(document.getElementById('datatable-body'), 'mpReady');
+        });
+    },
     toggleCol(col) {
         this.cols[col] = !this.cols[col];
         document.querySelectorAll('[data-col=' + col + ']').forEach(el => el.classList.toggle('hidden', !this.cols[col]));
+    },
+    toggle(slug) {
+        if (this.selected.has(slug)) this.selected.delete(slug);
+        else this.selected.add(slug);
+        this.selected = new Set(this.selected);
+    },
+    clearSelection() { this.selected = new Set(); },
+    get selectedCount() { return this.selected.size; },
+    async bulkInstallModules() {
+        if (this.selectedCount === 0) return;
+        this.installing = true;
+        var modules = [...this.selected].map(function(slug) { return { slug: slug }; });
+        var self = this;
+        try {
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+            var response = await fetch('{% url "marketplace:modules_bulk_install" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ modules: modules })
+            });
+            var data = await response.json();
+            if (data.success) {
+                if (data.installed > 0) {
+                    Toast.success(data.installed + ' {% trans "modules installed" %}');
+                } else {
+                    Toast.info('{% trans "All modules already installed" %}');
+                }
+                if (data.errors && data.errors.length > 0) {
+                    data.errors.forEach(function(err) { Toast.error(err); });
+                }
+                self.clearSelection();
+                if (data.requires_restart) {
+                    Toast.info('{% trans "Server restarting..." %}');
+                    self._waitForRestart();
+                } else {
+                    self.installing = false;
+                    htmx.ajax('GET', '{% url "marketplace:products_list" %}', {target: '#datatable-body', swap: 'innerHTML'});
+                }
+            } else {
+                Toast.error(data.error || '{% trans "Install failed" %}');
+                self.installing = false;
+            }
+        } catch (e) {
+            Toast.info('{% trans "Server restarting..." %}');
+            self._waitForRestart();
+        }
+    },
+    _waitForRestart() {
+        var self = this;
+        var attempts = 0;
+        var interval = setInterval(async function() {
+            attempts++;
+            try {
+                var r = await fetch('{% url "marketplace:products_list" %}', {method: 'HEAD'});
+                if (r.ok || r.status === 302) {
+                    clearInterval(interval);
+                    self.installing = false;
+                    self.clearSelection();
+                    window.location.reload();
+                }
+            } catch(e) { /* server still down */ }
+            if (attempts > 30) {
+                clearInterval(interval);
+                self.installing = false;
+                Toast.error('{% trans "Server did not restart. Please reload manually." %}');
+            }
+        }, 2000);
     }
 }">
 
@@ -29,6 +107,41 @@
                            hx-trigger="input changed delay:300ms, search">
                 </label>
 
+                <!-- Industry search select -->
+                <div class="relative"
+                     x-data="industrySearch()"
+                     @click.outside="showDropdown = false">
+                    <label class="input input-sm" style="min-width: 180px;">
+                        {% icon "business-outline" css_class="opacity-50 shrink-0" %}
+                        <input type="text"
+                               class="grow"
+                               placeholder="{% trans 'Business type...' %}"
+                               x-model="query"
+                               @focus="showDropdown = true"
+                               @input="showDropdown = true"
+                               autocomplete="off">
+                        <button type="button"
+                                x-show="selectedSlug"
+                                @click="clearIndustry()"
+                                class="opacity-50 hover:opacity-100"
+                                x-cloak>
+                            {% icon "close-outline" css_class="text-sm" %}
+                        </button>
+                    </label>
+                    <div x-show="showDropdown && filtered.length > 0"
+                         x-cloak
+                         class="absolute top-full left-0 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                        <template x-for="ind in filtered" :key="ind.id">
+                            <button type="button"
+                                    class="w-full text-left px-3 py-2 text-sm hover:bg-base-200 flex items-center gap-2"
+                                    @click="selectIndustry(ind)">
+                                <span x-text="ind.name"></span>
+                                <span class="text-xs opacity-40 ml-auto" x-text="ind.module_count + ' modules'"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
                 <!-- Filters button -->
                 <button type="button"
                         class="datatable-export-btn"
@@ -50,27 +163,45 @@
                     <button type="button"
                             class="datatable-view-btn"
                             :class="{ 'datatable-view-btn-active': view === 'table' }"
-                            @click="view = 'table'"
+                            @click="view = 'table'; $nextTick(() => htmx.trigger($el, 'viewChanged'))"
                             hx-get="{% url 'marketplace:products_list' %}"
                             hx-target="#datatable-body"
                             hx-include="#marketplace-datatable"
-                            hx-vals='{"view": "table"}'
+                            hx-trigger="viewChanged"
                             title="{% trans 'Table view' %}">
                         {% icon "list-outline" %}
                     </button>
                     <button type="button"
-                            class="datatable-view-btn datatable-view-btn-active"
+                            class="datatable-view-btn"
                             :class="{ 'datatable-view-btn-active': view === 'cards' }"
-                            @click="view = 'cards'"
+                            @click="view = 'cards'; $nextTick(() => htmx.trigger($el, 'viewChanged'))"
                             hx-get="{% url 'marketplace:products_list' %}"
                             hx-target="#datatable-body"
                             hx-include="#marketplace-datatable"
-                            hx-vals='{"view": "cards"}'
+                            hx-trigger="viewChanged"
                             title="{% trans 'Card view' %}">
                         {% icon "grid-outline" %}
                     </button>
                 </div>
             </div>
+        </div>
+
+        <!-- Bulk actions bar -->
+        <div class="datatable-bulk" x-show="selectedCount > 0" x-cloak>
+            <span class="text-sm font-medium">
+                <span x-text="selectedCount"></span> {% trans "selected" %}
+            </span>
+            <button class="btn btn-sm color-primary"
+                    @click="bulkInstallModules()"
+                    :disabled="installing">
+                <template x-if="!installing">
+                    <span class="flex items-center gap-1">{% icon "download-outline" %} {% trans "Install Selected" %}</span>
+                </template>
+                <template x-if="installing">
+                    <span class="flex items-center gap-2"><span class="loading loading-sm"></span> {% trans "Installing..." %}</span>
+                </template>
+            </button>
+            <button class="btn btn-sm btn-ghost" @click="clearSelection()">{% icon "close-outline" %}</button>
         </div>
 
         <!-- Active Filters Display -->
@@ -87,15 +218,15 @@
         <input type="hidden" name="sort" value="name">
         <input type="hidden" name="dir" value="asc">
         <input type="hidden" name="view" :value="view">
-        <input type="hidden" name="per_page" value="12">
-        <input type="hidden" name="category" id="filter-category" value="">
-        <input type="hidden" name="block" id="filter-block" value="">
+        <input type="hidden" name="per_page" id="hidden-per-page" :value="perPage">
+        <input type="hidden" name="solution" id="filter-solution" value="">
+        <input type="hidden" name="industry" id="filter-industry" value="">
         <input type="hidden" name="type" id="filter-type" value="">
 
         <!-- Datatable Body (HTMX swap target) -->
         <div id="datatable-body"
              hx-get="{% url 'marketplace:products_list' %}"
-             hx-trigger="load"
+             hx-trigger="mpReady"
              hx-include="#marketplace-datatable"
              hx-swap="innerHTML">
             <div class="flex justify-center py-8">
@@ -157,46 +288,22 @@
         </div>
         <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
             {% if store_type == 'modules' %}
-            <!-- Function Filter (multi-select, grouped) -->
+            <!-- Solution Filter (multi-select, grouped by block_type) -->
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-semibold m-0">{% trans "Function" %}</h3>
-                    <button type="button" class="text-xs opacity-50 hover:opacity-100" onclick="clearMultiFilter('category')">{% trans "Clear" %}</button>
+                    <h3 class="text-sm font-semibold m-0">{% trans "Solution" %}</h3>
+                    <button type="button" class="text-xs opacity-50 hover:opacity-100" onclick="clearMultiFilter('solution')">{% trans "Clear" %}</button>
                 </div>
-                {% for group in filters.categories_grouped %}
-                <div class="mb-3">
-                    <span class="text-xs font-semibold opacity-50 uppercase tracking-wide">{{ group.name }}</span>
-                    <div class="flex flex-wrap gap-2 mt-1">
-                        {% for cat in group.categories %}
-                        <button type="button"
-                                class="filter-chip"
-                                data-filter="category"
-                                data-value="{{ cat.id }}"
-                                onclick="toggleMultiFilter('category', '{{ cat.id }}')">
-                            {{ cat.name }}
-                        </button>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Block Filter (multi-select, grouped by block_type) -->
-            <div class="mb-6">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-semibold m-0">{% trans "Block" %}</h3>
-                    <button type="button" class="text-xs opacity-50 hover:opacity-100" onclick="clearMultiFilter('block')">{% trans "Clear" %}</button>
-                </div>
-                {% for group in filters.blocks_grouped %}
+                {% for group in filters.solutions_grouped %}
                 <div class="mb-3">
                     <span class="text-xs font-semibold opacity-50 uppercase tracking-wide">{{ group.name }}</span>
                     <div class="flex flex-wrap gap-2 mt-1">
                         {% for block in group.blocks %}
                         <button type="button"
                                 class="filter-chip{% if block.is_active %} filter-chip-accent{% endif %}"
-                                data-filter="block"
+                                data-filter="solution"
                                 data-value="{{ block.id }}"
-                                onclick="toggleMultiFilter('block', '{{ block.id }}')">
+                                onclick="toggleMultiFilter('solution', '{{ block.id }}')">
                             {{ block.name }}
                             {% if block.is_active %}<span class="text-[10px] opacity-60 ml-0.5">●</span>{% endif %}
                         </button>
@@ -270,9 +377,9 @@
 <script>
 (function () {
     // Multi-select filters store comma-separated values in hidden inputs
-    // category and block support multi-select; type is single-select
+    // solution supports multi-select; type is single-select
 
-    function gatherDatatableParams() {
+    window.gatherDatatableParams = function () {
         var dt = document.getElementById('marketplace-datatable');
         if (!dt) return '';
         var params = [];
@@ -284,7 +391,7 @@
         return params.join('&');
     }
 
-    function fireFilterRequest() {
+    window.fireFilterRequest = function () {
         var qs = gatherDatatableParams();
         var url = '{% url "marketplace:products_list" %}' + (qs ? '?' + qs : '');
         htmx.ajax('GET', url, { target: '#datatable-body', swap: 'innerHTML' });
@@ -369,7 +476,7 @@
 
     window.clearAllFilters = function () {
         // Multi-select filters
-        ['category', 'block'].forEach(function (filter) {
+        ['solution'].forEach(function (filter) {
             setMultiValues(filter, []);
         });
         // Single-select filters
@@ -380,6 +487,11 @@
                 updateSingleChipSelection(filter, '');
             }
         });
+        // Clear industry filter
+        var industryInput = document.getElementById('filter-industry');
+        if (industryInput) industryInput.value = '';
+        // Dispatch event so Alpine picks up the clear
+        document.dispatchEvent(new CustomEvent('industry-cleared'));
         var searchInput = document.getElementById('search-input');
         if (searchInput) searchInput.value = '';
         fireFilterRequest();
@@ -388,7 +500,7 @@
     };
 
     window.removeFilter = function (filterName, value) {
-        if (filterName === 'category' || filterName === 'block') {
+        if (filterName === 'solution') {
             // Multi-select: remove specific value
             if (value) {
                 var values = getMultiValues(filterName);
@@ -398,6 +510,10 @@
             } else {
                 setMultiValues(filterName, []);
             }
+        } else if (filterName === 'industry') {
+            var industryInput = document.getElementById('filter-industry');
+            if (industryInput) industryInput.value = '';
+            document.dispatchEvent(new CustomEvent('industry-cleared'));
         } else {
             var input = document.getElementById('filter-' + filterName);
             if (input) {
@@ -418,8 +534,8 @@
         chipsContainer.innerHTML = '';
 
         var filterLabels = {
-            category: '{% trans "Function" %}',
-            block: '{% trans "Block" %}',
+            solution: '{% trans "Solution" %}',
+            industry: '{% trans "Industry" %}',
             type: '{% trans "Type" %}'
         };
 
@@ -431,7 +547,7 @@
         var closeSvg = '<svg viewBox="0 0 512 512" width="12" height="12"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z" fill="currentColor"/></svg>';
 
         // Multi-select filters: one tag per selected value
-        ['category', 'block'].forEach(function (filter) {
+        ['solution'].forEach(function (filter) {
             var values = getMultiValues(filter);
             values.forEach(function (val) {
                 var displayValue = getChipLabel(filter, val);
@@ -443,6 +559,17 @@
                 count++;
             });
         });
+
+        // Industry filter (special — value from hidden input)
+        var industryInput = document.getElementById('filter-industry');
+        if (industryInput && industryInput.value) {
+            var tag = document.createElement('span');
+            tag.className = 'datatable-filter-tag';
+            tag.innerHTML = '<span class="datatable-filter-tag-label">' + filterLabels['industry'] + ':</span> ' + industryInput.value +
+                ' <button class="datatable-filter-tag-remove" onclick="removeFilter(\'industry\')">' + closeSvg + '</button>';
+            chipsContainer.appendChild(tag);
+            count++;
+        }
 
         // Single-select filters
         ['type'].forEach(function (filter) {
@@ -479,4 +606,41 @@
 
     updateActiveFilters();
 })();
+
+function industrySearch() {
+    var allIndustries = JSON.parse('{{ filters.industries|escapejs }}' || '[]');
+    return {
+        query: '',
+        showDropdown: false,
+        selectedSlug: '',
+        industries: allIndustries,
+        get filtered() {
+            if (!this.query || this.query.length < 1) return this.industries;
+            var q = this.query.toLowerCase();
+            return this.industries.filter(function(i) { return i.name.toLowerCase().indexOf(q) >= 0; });
+        },
+        init() {
+            var self = this;
+            document.addEventListener('industry-cleared', function() {
+                self.query = '';
+                self.selectedSlug = '';
+            });
+        },
+        selectIndustry(ind) {
+            this.selectedSlug = ind.id;
+            this.query = ind.name;
+            this.showDropdown = false;
+            document.getElementById('filter-industry').value = ind.id;
+            updateActiveFilters();
+            fireFilterRequest();
+        },
+        clearIndustry() {
+            this.selectedSlug = '';
+            this.query = '';
+            document.getElementById('filter-industry').value = '';
+            updateActiveFilters();
+            fireFilterRequest();
+        }
+    };
+}
 </script>

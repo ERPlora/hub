@@ -1,0 +1,123 @@
+{% load i18n component_tags djicons %}
+
+{% component "page" title=industry.name|default:_("Business Type") back_hx_get="/marketplace/business-types/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
+    {% fill "content" %}
+
+{% if error %}
+<div class="callout callout-warning mt-5">
+    <div class="callout-content">
+        <p class="callout-text">{% icon "alert-circle-outline" %} {{ error }}</p>
+    </div>
+</div>
+{% elif industry %}
+
+<div class="mt-5">
+    {# Industry header #}
+    <div class="card glass mb-6">
+        <div class="card-body p-6">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center justify-center size-14 rounded-xl shrink-0"
+                     style="background-color: {{ industry.color|default:'var(--color-primary)' }}; color: white;">
+                    {% icon industry.icon|default:"business-outline" css_class="text-2xl" %}
+                </div>
+                <div class="flex-1">
+                    <h2 class="text-xl font-bold mb-1">{{ industry.name }}</h2>
+                    {% if industry.description %}
+                    <p class="text-sm opacity-60">{{ industry.description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Recommended modules #}
+    {% if industry.modules %}
+    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+        {% icon "cube-outline" css_class="text-primary" %}
+        {% trans "Recommended Modules" %}
+        <span class="badge badge-sm">{{ industry.modules|length }}</span>
+    </h3>
+
+    <div class="list list-inset glass mb-6">
+        {% for mod in industry.modules %}
+        <div class="list-item list-item-multiline">
+            <div class="list-item-start">
+                <div class="module-card-icon" style="width: 36px; height: 36px;">
+                    {% icon mod.icon|default:"cube-outline" %}
+                </div>
+            </div>
+            <div class="list-item-content">
+                <div class="flex items-center gap-2">
+                    <span class="list-item-label">{{ mod.name }}</span>
+                    {% if mod.is_essential %}
+                    <span class="badge badge-sm color-success">{% trans "Essential" %}</span>
+                    {% else %}
+                    <span class="badge badge-sm color-info">{% trans "Recommended" %}</span>
+                    {% endif %}
+                </div>
+                {% if mod.description %}
+                <span class="list-item-note">{{ mod.description|truncatewords:20 }}</span>
+                {% endif %}
+            </div>
+            <div class="list-item-end">
+                {% if mod.is_installed %}
+                <span class="badge badge-sm color-success">
+                    {% icon "checkmark-circle" %}
+                    {% trans "Installed" %}
+                </span>
+                {% else %}
+                {% if mod.module_type == 'free' or mod.price == '0' or mod.price == '0.00' %}
+                <span class="chip chip-sm">{% trans "Free" %}</span>
+                {% elif mod.module_type == 'subscription' %}
+                <span class="chip chip-sm">&euro;{{ mod.price }}/{% trans "mo" %}</span>
+                {% elif mod.price %}
+                <span class="chip chip-sm">&euro;{{ mod.price }}</span>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Roles #}
+    {% if industry.roles %}
+    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+        {% icon "people-outline" css_class="text-primary" %}
+        {% trans "Roles" %}
+        <span class="badge badge-sm">{{ industry.roles|length }}</span>
+    </h3>
+
+    <div class="list list-inset glass mb-6">
+        {% for role in industry.roles %}
+        <div class="list-item list-item-multiline">
+            <div class="list-item-start">
+                <div class="flex items-center justify-center size-9 rounded-lg shrink-0 bg-base-200">
+                    {% icon "person-outline" %}
+                </div>
+            </div>
+            <div class="list-item-content">
+                <span class="list-item-label">{{ role.role_display_name }}</span>
+                {% if role.role_description %}
+                <span class="list-item-note">{{ role.role_description }}</span>
+                {% endif %}
+            </div>
+            <div class="list-item-end">
+                <span class="chip chip-sm opacity-60">{{ role.solution_name }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not industry.modules and not industry.roles %}
+    <div class="text-center py-8">
+        <p class="text-sm opacity-60">{% trans "No modules or roles configured for this business type yet." %}</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endif %}
+
+    {% endfill %}
+{% endcomponent %}

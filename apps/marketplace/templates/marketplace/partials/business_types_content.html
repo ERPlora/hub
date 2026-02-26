@@ -1,0 +1,43 @@
+{% load i18n djicons %}
+
+<div class="mt-5">
+    <div class="mb-4">
+        <p class="text-sm opacity-60">{% trans "Browse business types to see the recommended modules and roles for your type of business." %}</p>
+    </div>
+
+    {% if industries %}
+    <div class="list list-inset glass">
+        {% for industry in industries %}
+        <button class="list-item list-item-clickable list-item-multiline"
+                hx-get="{% url 'marketplace:business_type_detail' slug=industry.id %}"
+                hx-target="#main-content-area"
+                hx-push-url="true">
+            <div class="list-item-start">
+                <div class="flex items-center justify-center size-10 rounded-lg shrink-0"
+                     style="background-color: {{ industry.color|default:'var(--color-primary)' }}; color: white;">
+                    {% icon industry.icon|default:"business-outline" %}
+                </div>
+            </div>
+            <div class="list-item-content">
+                <span class="list-item-label">{{ industry.name }}</span>
+                {% if industry.description %}
+                <span class="list-item-note">{{ industry.description|truncatewords:15 }}</span>
+                {% endif %}
+            </div>
+            <div class="list-item-end">
+                {% if industry.module_count %}
+                <span class="badge badge-sm">{{ industry.module_count }} {% trans "modules" %}</span>
+                {% endif %}
+                <span class="list-item-chevron"></span>
+            </div>
+        </button>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+        {% icon "business-outline" css_class="text-6xl opacity-20 mb-4" %}
+        <h3 class="text-lg font-semibold mb-2">{% trans "No Business Types Available" %}</h3>
+        <p class="text-sm opacity-60">{% trans "Could not load business type data. Please check your internet connection and try again." %}</p>
+    </div>
+    {% endif %}
+</div>

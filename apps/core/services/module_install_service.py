@@ -175,11 +175,147 @@ class ModuleInstallService:
                 os.unlink(tmp_path)
 
     @classmethod
+    def bulk_download_and_install(cls, modules_to_install, hub_token='', max_workers=4):
+        """Download and install multiple modules in parallel.
+
+        Thread-safe: each download_and_install() uses isolated temp files.
+
+        Args:
+            modules_to_install: List of dicts with 'slug', 'download_url', and
+                optionally 'name' keys
+            hub_token: Hub JWT token for authentication
+            max_workers: Max concurrent downloads (default 4)
+
+        Returns:
+            BulkInstallResult with counts and per-module results
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        if not modules_to_install:
+            return BulkInstallResult(installed=0)
+
+        logger.info(
+            "[INSTALL] Bulk downloading %d modules (max_workers=%d)",
+            len(modules_to_install), max_workers,
+        )
+
+        results = []
+        installed = 0
+        errors = []
+
+        def _install_one(mod_info):
+            return cls.download_and_install(
+                mod_info['slug'], mod_info['download_url'], hub_token
+            )
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_mod = {
+                executor.submit(_install_one, mod): mod
+                for mod in modules_to_install
+            }
+            for future in as_completed(future_to_mod):
+                mod = future_to_mod[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                    if result.success and 'already installed' not in result.message:
+                        installed += 1
+                    elif not result.success:
+                        errors.append(f"{mod.get('name', mod['slug'])}: {result.message}")
+                except Exception as e:
+                    logger.warning("[INSTALL] Thread error for %s: %s", mod['slug'], e)
+                    errors.append(f"{mod.get('name', mod['slug'])}: {e}")
+
+        logger.info("[INSTALL] Bulk complete: %d installed, %d errors", installed, len(errors))
+        return BulkInstallResult(installed=installed, errors=errors, results=results)
+
+    @classmethod
+    def _resolve_dependencies(cls, module_slugs, installed_ids, cloud_url, hub_token=''):
+        """Resolve transitive dependencies for a set of modules.
+
+        Fetches dependency_ids from Cloud API for each module and recursively
+        includes any uninstalled dependencies.
+
+        Args:
+            module_slugs: Set of module slugs to resolve dependencies for
+            installed_ids: Set of already-installed module IDs
+            cloud_url: Cloud API base URL
+            hub_token: Hub JWT token for authentication
+
+        Returns:
+            List of dicts with 'slug', 'name', 'download_url' for dependency
+            modules that are not already in module_slugs or installed_ids
+        """
+        headers = {}
+        if hub_token:
+            headers['X-Hub-Token'] = hub_token
+        headers['Accept'] = 'application/json'
+
+        # Cache of module_slug -> dependency_ids to avoid duplicate API calls
+        dep_cache = {}
+        extra_modules = []
+        extra_slugs = set()
+
+        # Modules we still need to check dependencies for
+        to_check = set(module_slugs)
+        checked = set()
+
+        while to_check:
+            slug = to_check.pop()
+            if slug in checked:
+                continue
+            checked.add(slug)
+
+            if slug in dep_cache:
+                dep_ids = dep_cache[slug]
+            else:
+                try:
+                    resp = http_requests.get(
+                        f"{cloud_url}/api/marketplace/modules/?slug={slug}",
+                        headers=headers, timeout=15,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        results = data.get('results', data) if isinstance(data, dict) else data
+                        if isinstance(results, list) and results:
+                            dep_ids = results[0].get('dependency_ids', [])
+                        else:
+                            dep_ids = []
+                    else:
+                        dep_ids = []
+                except Exception as e:
+                    logger.warning("[INSTALL] Could not fetch deps for %s: %s", slug, e)
+                    dep_ids = []
+                dep_cache[slug] = dep_ids
+
+            for dep_id in dep_ids:
+                # dep_id is a module_id (e.g. 'sales', 'customers')
+                if dep_id in installed_ids:
+                    continue
+                if dep_id in module_slugs or dep_id in extra_slugs:
+                    # Already in install list, but check its deps too
+                    to_check.add(dep_id)
+                    continue
+                # New dependency — add to install list
+                extra_slugs.add(dep_id)
+                extra_modules.append({
+                    'slug': dep_id,
+                    'name': dep_id,
+                    'download_url': f"{cloud_url}/api/marketplace/modules/{dep_id}/download/",
+                })
+                # Check this dependency's deps too (transitive)
+                to_check.add(dep_id)
+                logger.info("[INSTALL] Resolved dependency: %s (required by %s)", dep_id, slug)
+
+        return extra_modules
+
+    @classmethod
     def install_block_modules(cls, block_slugs, hub_config):
         """Install required modules for all selected functional blocks.
 
-        Fetches each block's module list from Cloud API and downloads the
-        required modules that aren't already installed.
+        Phase 1: Collect all modules to install from all blocks.
+        Phase 2: Resolve transitive dependencies.
+        Phase 3: Download them in parallel via bulk_download_and_install().
 
         Args:
             block_slugs: List of functional block slugs
@@ -206,9 +342,10 @@ class ModuleInstallService:
             len(installed_ids),
         )
 
-        total_installed = 0
+        # Phase 1: Collect all modules to install from all blocks
+        modules_to_install = []
+        seen_slugs = set()
         errors = []
-        results = []
 
         for slug in block_slugs:
             try:
@@ -223,48 +360,21 @@ class ModuleInstallService:
                     continue
 
                 solution = resp.json()
-                all_modules = solution.get('modules', [])
-
-                modules_to_install = [
-                    m for m in all_modules
-                    if m.get('role') == 'required'
-                    and m.get('slug', '') not in installed_ids
-                    and m.get('module_id', '') not in installed_ids
-                    and not m.get('is_coming_soon', False)
-                ]
-                logger.info(
-                    "[INSTALL] Solution %s: %d total, %d to install",
-                    slug, len(all_modules), len(modules_to_install),
-                )
-
-                for mod in modules_to_install:
+                for mod in solution.get('modules', []):
+                    if mod.get('role') != 'required' or mod.get('is_coming_soon'):
+                        continue
                     mod_slug = mod.get('slug', '')
                     module_id = mod.get('module_id', '') or mod_slug
-                    if not mod_slug:
+                    if not mod_slug or mod_slug in seen_slugs:
                         continue
-
-                    # Skip if already installed
                     if module_id in installed_ids or mod_slug in installed_ids:
-                        logger.info("[INSTALL] Skipping %s (already installed)", module_id)
                         continue
-
-                    download_url = (
-                        f"{cloud_url}/api/marketplace/modules/{mod_slug}/download/"
-                    )
-                    result = cls.download_and_install(mod_slug, download_url, hub_token)
-                    results.append(result)
-
-                    if result.success:
-                        total_installed += 1
-                        installed_ids.add(result.module_id)
-                        installed_ids.add(mod_slug)
-                    else:
-                        errors.append(
-                            f"{mod.get('name', mod_slug)}: {result.message}"
-                        )
-                        logger.warning(
-                            "[INSTALL] Failed %s: %s", mod_slug, result.message
-                        )
+                    seen_slugs.add(mod_slug)
+                    modules_to_install.append({
+                        'slug': mod_slug,
+                        'name': mod.get('name', mod_slug),
+                        'download_url': f"{cloud_url}/api/marketplace/modules/{mod_slug}/download/",
+                    })
 
             except Exception as e:
                 logger.warning(
@@ -273,11 +383,35 @@ class ModuleInstallService:
                 errors.append(f"Block {slug}: {e}")
 
         logger.info(
-            "[INSTALL] Complete: %d installed, %d errors", total_installed, len(errors)
+            "[INSTALL] Collected %d modules to install from %d blocks",
+            len(modules_to_install), len(block_slugs),
         )
-        return BulkInstallResult(
-            installed=total_installed, errors=errors, results=results
-        )
+
+        # Phase 2: Resolve transitive dependencies
+        if modules_to_install:
+            all_slugs = {m['slug'] for m in modules_to_install}
+            dep_modules = cls._resolve_dependencies(
+                all_slugs, installed_ids, cloud_url, hub_token
+            )
+            if dep_modules:
+                logger.info(
+                    "[INSTALL] Adding %d dependency modules: %s",
+                    len(dep_modules), [m['slug'] for m in dep_modules],
+                )
+                modules_to_install.extend(dep_modules)
+
+        # Phase 3: Download all modules in parallel
+        if modules_to_install:
+            bulk_result = cls.bulk_download_and_install(
+                modules_to_install, hub_token, max_workers=4
+            )
+            return BulkInstallResult(
+                installed=bulk_result.installed,
+                errors=errors + bulk_result.errors,
+                results=bulk_result.results,
+            )
+
+        return BulkInstallResult(installed=0, errors=errors, results=[])
 
     @classmethod
     def run_post_install(cls, *, load_all=False, load_single=None,
@@ -293,6 +427,8 @@ class ModuleInstallService:
             hub_id: Hub ID (required if sync_permissions=True)
             schedule_restart: Schedule server restart after install
         """
+        import subprocess
+        import sys
         from apps.modules_runtime.loader import module_loader
 
         # Load modules
@@ -309,24 +445,32 @@ class ModuleInstallService:
 
         # Run migrations via subprocess so the new process sees the new modules
         # in INSTALLED_APPS (the current process already loaded settings at startup)
+        migrations_ok = True
         if run_migrations:
+            manage_py = str(Path(settings.BASE_DIR) / 'manage.py')
             try:
-                import subprocess
-                import sys
-                manage_py = str(Path(settings.BASE_DIR) / 'manage.py')
                 subprocess.check_call(
                     [sys.executable, manage_py, 'makemigrations', '--no-input'],
                     cwd=str(settings.BASE_DIR),
+                    timeout=120,
                 )
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+                logger.warning("[POST-INSTALL] makemigrations error: %s", e)
+                # makemigrations failure is not critical — modules may ship their own
+
+            try:
                 subprocess.check_call(
                     [sys.executable, manage_py, 'migrate', '--run-syncdb', '--no-input'],
                     cwd=str(settings.BASE_DIR),
+                    timeout=120,
                 )
                 logger.info("[POST-INSTALL] Migrations applied via subprocess")
-            except subprocess.CalledProcessError as e:
-                logger.warning("[POST-INSTALL] Migration error (non-fatal): %s", e)
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+                logger.error("[POST-INSTALL] migrate FAILED: %s", e)
+                migrations_ok = False
             except Exception as e:
-                logger.warning("[POST-INSTALL] Migration error (non-fatal): %s", e)
+                logger.error("[POST-INSTALL] migrate FAILED: %s", e)
+                migrations_ok = False
 
         # Sync permissions
         if sync_permissions and hub_id:
@@ -337,17 +481,23 @@ class ModuleInstallService:
             except Exception as e:
                 logger.warning("[POST-INSTALL] Permission sync error: %s", e)
 
-        # Schedule restart
+        # Schedule restart — only if migrations succeeded
         if schedule_restart:
-            from apps.core.utils import schedule_server_restart
-            schedule_server_restart()
+            if not migrations_ok:
+                logger.error(
+                    "[POST-INSTALL] Skipping restart because migrations failed. "
+                    "Fix the migration errors and restart manually."
+                )
+            else:
+                from apps.core.utils import schedule_server_restart
+                schedule_server_restart()
 
     @staticmethod
     def _get_module_id_from_extracted(extracted_root, fallback):
         """Read MODULE_ID from module.py in the extracted directory.
 
-        Falls back to the provided slug if module.py doesn't exist or
-        doesn't contain MODULE_ID.
+        Falls back to the provided slug (with hyphens converted to underscores)
+        if module.py doesn't exist or doesn't contain MODULE_ID.
         """
         module_py = extracted_root / 'module.py'
         if module_py.exists():
@@ -360,4 +510,5 @@ class ModuleInstallService:
                             return value
             except Exception:
                 pass
-        return fallback
+        # Slugs use hyphens, Python identifiers use underscores
+        return fallback.replace('-', '_')
