@@ -302,6 +302,7 @@ def _get_filters_for_store(store_type, language, request):
 
         filters['solutions_grouped'] = solutions_grouped
         filters['industries'] = industries
+        filters['industries_list'] = industries if isinstance(industries, list) else []
         filters['types'] = [
             {'id': 'free', 'name': 'Free', 'name_es': 'Gratis', 'icon': 'gift-outline'},
             {'id': 'one_time', 'name': 'One-time', 'name_es': 'Pago único', 'icon': 'card-outline'},
@@ -757,15 +758,21 @@ def _fetch_modules_list(request, search_query, solution_filter, industry_filter,
                     ss in m.get('solution_slugs', []) for ss in solution_slugs
                 )]
 
-        # Industry filter: fetch recommended modules for the industry and annotate
+        # Industry filter: fetch recommended modules for selected industries
         industry_module_map = {}
         if industry_filter:
-            industry_module_map = _fetch_industry_modules(industry_filter)
+            industry_slugs = [s.strip() for s in industry_filter.split(',') if s.strip()]
+            for ind_slug in industry_slugs:
+                ind_map = _fetch_industry_modules(ind_slug)
+                for mid, is_essential in ind_map.items():
+                    # Keep essential=True if any industry marks it essential
+                    if mid not in industry_module_map:
+                        industry_module_map[mid] = is_essential
+                    elif is_essential:
+                        industry_module_map[mid] = True
             if industry_module_map:
-                # Filter to only show modules recommended for this industry
                 industry_module_ids = set(industry_module_map.keys())
                 modules = [m for m in modules if m.get('module_id', '') in industry_module_ids]
-                # Annotate each module with is_essential flag
                 for m in modules:
                     m['is_essential'] = industry_module_map.get(m.get('module_id', ''), False)
 

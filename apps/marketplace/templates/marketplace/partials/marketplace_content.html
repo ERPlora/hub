@@ -107,41 +107,6 @@
                            hx-trigger="input changed delay:300ms, search">
                 </label>
 
-                <!-- Industry search select -->
-                <div class="relative"
-                     x-data="industrySearch()"
-                     @click.outside="showDropdown = false">
-                    <label class="input input-sm" style="min-width: 180px;">
-                        {% icon "business-outline" css_class="opacity-50 shrink-0" %}
-                        <input type="text"
-                               class="grow"
-                               placeholder="{% trans 'Business type...' %}"
-                               x-model="query"
-                               @focus="showDropdown = true"
-                               @input="showDropdown = true"
-                               autocomplete="off">
-                        <button type="button"
-                                x-show="selectedSlug"
-                                @click="clearIndustry()"
-                                class="opacity-50 hover:opacity-100"
-                                x-cloak>
-                            {% icon "close-outline" css_class="text-sm" %}
-                        </button>
-                    </label>
-                    <div x-show="showDropdown && filtered.length > 0"
-                         x-cloak
-                         class="absolute top-full left-0 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                        <template x-for="ind in filtered" :key="ind.id">
-                            <button type="button"
-                                    class="w-full text-left px-3 py-2 text-sm hover:bg-base-200 flex items-center gap-2"
-                                    @click="selectIndustry(ind)">
-                                <span x-text="ind.name"></span>
-                                <span class="text-xs opacity-40 ml-auto" x-text="ind.module_count + ' modules'"></span>
-                            </button>
-                        </template>
-                    </div>
-                </div>
-
                 <!-- Filters button -->
                 <button type="button"
                         class="datatable-export-btn"
@@ -288,6 +253,27 @@
         </div>
         <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
             {% if store_type == 'modules' %}
+            <!-- Business Types Filter (multi-select) -->
+            {% if filters.industries %}
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold m-0">{% trans "Business Types" %}</h3>
+                    <button type="button" class="text-xs opacity-50 hover:opacity-100" onclick="clearMultiFilter('industry')">{% trans "Clear" %}</button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    {% for ind in filters.industries_list %}
+                    <button type="button"
+                            class="filter-chip"
+                            data-filter="industry"
+                            data-value="{{ ind.id }}"
+                            onclick="toggleMultiFilter('industry', '{{ ind.id }}')">
+                        {{ ind.name }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Solution Filter (multi-select, grouped by block_type) -->
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-2">
@@ -377,7 +363,7 @@
 <script>
 (function () {
     // Multi-select filters store comma-separated values in hidden inputs
-    // solution supports multi-select; type is single-select
+    // solution and industry support multi-select; type is single-select
 
     window.gatherDatatableParams = function () {
         var dt = document.getElementById('marketplace-datatable');
@@ -476,7 +462,7 @@
 
     window.clearAllFilters = function () {
         // Multi-select filters
-        ['solution'].forEach(function (filter) {
+        ['solution', 'industry'].forEach(function (filter) {
             setMultiValues(filter, []);
         });
         // Single-select filters
@@ -487,11 +473,6 @@
                 updateSingleChipSelection(filter, '');
             }
         });
-        // Clear industry filter
-        var industryInput = document.getElementById('filter-industry');
-        if (industryInput) industryInput.value = '';
-        // Dispatch event so Alpine picks up the clear
-        document.dispatchEvent(new CustomEvent('industry-cleared'));
         var searchInput = document.getElementById('search-input');
         if (searchInput) searchInput.value = '';
         fireFilterRequest();
@@ -500,7 +481,7 @@
     };
 
     window.removeFilter = function (filterName, value) {
-        if (filterName === 'solution') {
+        if (filterName === 'solution' || filterName === 'industry') {
             // Multi-select: remove specific value
             if (value) {
                 var values = getMultiValues(filterName);
@@ -510,10 +491,6 @@
             } else {
                 setMultiValues(filterName, []);
             }
-        } else if (filterName === 'industry') {
-            var industryInput = document.getElementById('filter-industry');
-            if (industryInput) industryInput.value = '';
-            document.dispatchEvent(new CustomEvent('industry-cleared'));
         } else {
             var input = document.getElementById('filter-' + filterName);
             if (input) {
@@ -535,7 +512,7 @@
 
         var filterLabels = {
             solution: '{% trans "Solution" %}',
-            industry: '{% trans "Industry" %}',
+            industry: '{% trans "Business Type" %}',
             type: '{% trans "Type" %}'
         };
 
@@ -547,7 +524,7 @@
         var closeSvg = '<svg viewBox="0 0 512 512" width="12" height="12"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z" fill="currentColor"/></svg>';
 
         // Multi-select filters: one tag per selected value
-        ['solution'].forEach(function (filter) {
+        ['industry', 'solution'].forEach(function (filter) {
             var values = getMultiValues(filter);
             values.forEach(function (val) {
                 var displayValue = getChipLabel(filter, val);
@@ -559,17 +536,6 @@
                 count++;
             });
         });
-
-        // Industry filter (special — value from hidden input)
-        var industryInput = document.getElementById('filter-industry');
-        if (industryInput && industryInput.value) {
-            var tag = document.createElement('span');
-            tag.className = 'datatable-filter-tag';
-            tag.innerHTML = '<span class="datatable-filter-tag-label">' + filterLabels['industry'] + ':</span> ' + industryInput.value +
-                ' <button class="datatable-filter-tag-remove" onclick="removeFilter(\'industry\')">' + closeSvg + '</button>';
-            chipsContainer.appendChild(tag);
-            count++;
-        }
 
         // Single-select filters
         ['type'].forEach(function (filter) {
@@ -606,41 +572,4 @@
 
     updateActiveFilters();
 })();
-
-function industrySearch() {
-    var allIndustries = JSON.parse('{{ filters.industries|escapejs }}' || '[]');
-    return {
-        query: '',
-        showDropdown: false,
-        selectedSlug: '',
-        industries: allIndustries,
-        get filtered() {
-            if (!this.query || this.query.length < 1) return this.industries;
-            var q = this.query.toLowerCase();
-            return this.industries.filter(function(i) { return i.name.toLowerCase().indexOf(q) >= 0; });
-        },
-        init() {
-            var self = this;
-            document.addEventListener('industry-cleared', function() {
-                self.query = '';
-                self.selectedSlug = '';
-            });
-        },
-        selectIndustry(ind) {
-            this.selectedSlug = ind.id;
-            this.query = ind.name;
-            this.showDropdown = false;
-            document.getElementById('filter-industry').value = ind.id;
-            updateActiveFilters();
-            fireFilterRequest();
-        },
-        clearIndustry() {
-            this.selectedSlug = '';
-            this.query = '';
-            document.getElementById('filter-industry').value = '';
-            updateActiveFilters();
-            fireFilterRequest();
-        }
-    };
-}
 </script>
