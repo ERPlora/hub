@@ -121,7 +121,7 @@
                                 data-action="download"
                                 data-module-slug="{{ module.slug }}"
                                 data-module-dir="{{ module.module_id }}"
-                                data-download-url="{{ module.download_url }}">
+                                data-download-url="{{ module.download_url|default:'' }}">
                             {% icon "download-outline" %} {% trans "Download & Install" %}
                         </button>
                         {% elif module.module_type == 'free' or is_free %}

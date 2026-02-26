@@ -21,6 +21,8 @@ class ModulesRuntimeConfig(AppConfig):
                 return
 
             registered = 0
+            installed_apps = set(settings.INSTALLED_APPS)
+
             for module_dir in sorted(modules_dir.iterdir()):
                 if not module_dir.is_dir():
                     continue
@@ -28,8 +30,14 @@ class ModulesRuntimeConfig(AppConfig):
                     continue
 
                 module_id = module_dir.name
-                register_module_urls(module_id, module_id, f'/m/{module_id}/')
-                registered += 1
+                if module_id not in installed_apps:
+                    continue
+
+                try:
+                    register_module_urls(module_id, module_id, f'/m/{module_id}/')
+                    registered += 1
+                except Exception as e:
+                    print(f"[MODULES_RUNTIME] Failed to register URLs for '{module_id}': {e}")
 
             print(f"[MODULES_RUNTIME] Registered URLs for {registered} modules")
 
