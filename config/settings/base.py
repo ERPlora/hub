@@ -502,6 +502,10 @@ def load_modules(modules_dir=None):
         # Skip disabled modules (start with _ or .)
         if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
             continue
+        # Skip directories that aren't valid Python identifiers (e.g. hyphens)
+        if not module_dir.name.isidentifier():
+            print(f"[SETTINGS] Skipping invalid module dir: {module_dir.name}")
+            continue
 
         if module_dir.name not in INSTALLED_APPS:
             INSTALLED_APPS.append(module_dir.name)
