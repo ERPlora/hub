@@ -31,6 +31,12 @@
                     {% endif %}
 
                     {% if card_context == 'marketplace' %}
+                        {% if module.is_essential is not None and module.is_essential %}
+                        <span class="badge badge-sm color-success">{% trans "Essential" %}</span>
+                        {% elif module.is_essential is not None and not module.is_essential %}
+                        <span class="badge badge-sm color-info">{% trans "Recommended" %}</span>
+                        {% endif %}
+
                         {% if module.is_installed %}
                         <span class="chip chip-sm color-success">
                             {% icon "checkmark-circle-outline" %}
@@ -46,12 +52,20 @@
                         {% if module.is_featured %}
                         <span class="badge badge-sm color-warning">{% trans "Featured" %}</span>
                         {% endif %}
-                        {% if module.category_name %}
-                        <span class="chip chip-sm">{{ module.category_name }}</span>
-                        {% endif %}
                     {% endif %}
                 </div>
             </div>
+
+            {% if card_context == 'marketplace' %}
+            <label class="checkbox shrink-0 ml-auto" @click.stop>
+                <input type="checkbox" class="checkbox-input"
+                       @change="toggle('{{ module.slug }}')"
+                       :checked="selected.has('{{ module.slug }}')">
+                <span class="checkbox-box">
+                    <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+            </label>
+            {% endif %}
         </div>
 
         {# Description #}

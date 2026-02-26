@@ -1,6 +1,6 @@
 {% load i18n component_tags djicons %}
 
-{% component "page" title=solution.name|default:_("Block") back_hx_get="/marketplace/solutions/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
+{% component "page" title=solution.name|default:_("Solution") back_hx_get="/marketplace/solutions/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
     {% fill "content" %}
 
 {% if error %}
@@ -215,10 +215,10 @@ function blockDetail() {
                     if (data.action === 'installed') {
                         const count = data.modules_installed || 0;
                         msg = count > 0
-                            ? '{% trans "Block installed successfully" %} (' + count + ' {% trans "modules" %})'
-                            : '{% trans "Block activated" %}';
+                            ? '{% trans "Solution installed successfully" %} (' + count + ' {% trans "modules" %})'
+                            : '{% trans "Solution activated" %}';
                     } else {
-                        msg = '{% trans "Block uninstalled" %}';
+                        msg = '{% trans "Solution deactivated" %}';
                     }
                     this.toggleResult = { success: true, message: msg };
                     // Reload detail page to refresh state

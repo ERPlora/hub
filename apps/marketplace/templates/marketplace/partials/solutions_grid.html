@@ -1,0 +1,205 @@
+{% load i18n djicons %}
+
+{% if solutions %}
+
+{% if current_view == 'table' %}
+<!-- Table View -->
+<div class="datatable-body">
+    <table class="datatable-table">
+        <thead class="datatable-thead">
+            <tr>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'name' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'marketplace:solutions_list' %}?sort=name&dir={% if sort_field == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#solutions-body"
+                    hx-include="#solutions-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Solution" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th" data-col="type">{% trans "Type" %}</th>
+                <th class="datatable-th datatable-th-sortable datatable-th-center{% if sort_field == 'modules' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    data-col="modules"
+                    hx-get="{% url 'marketplace:solutions_list' %}?sort=modules&dir={% if sort_field == 'modules' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#solutions-body"
+                    hx-include="#solutions-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Modules" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th datatable-th-center" data-col="status">{% trans "Status" %}</th>
+                <th class="datatable-th datatable-th-center" style="width: 70px;">{% trans "Select" %}</th>
+            </tr>
+        </thead>
+        <tbody class="datatable-tbody">
+            {% for solution in solutions %}
+            <tr class="datatable-tr" :class="{ 'bg-primary/5': selected.has('{{ solution.slug }}') }">
+                <td class="datatable-td" data-label="{% trans 'Solution' %}">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center justify-center size-9 rounded-lg shrink-0"
+                             style="background-color: {{ solution.color|default:'var(--color-base-200)' }}; color: white;">
+                            {% icon solution.icon|default:"briefcase-outline" %}
+                        </div>
+                        <div class="min-w-0">
+                            <a href="{{ solution.detail_url }}"
+                               hx-get="{{ solution.detail_url }}"
+                               hx-target="#main-content-area"
+                               hx-push-url="true"
+                               class="font-medium block hover:text-primary transition-colors">
+                                {{ solution.name }}
+                            </a>
+                            {% if solution.tagline %}
+                            <span class="text-xs text-base-content/50 block truncate max-w-xs">{{ solution.tagline }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="datatable-td" data-col="type" data-label="{% trans 'Type' %}">
+                    <span class="chip chip-sm">{{ solution.block_type|default:"-"|title }}</span>
+                </td>
+                <td class="datatable-td datatable-td-center" data-col="modules" data-label="{% trans 'Modules' %}">
+                    <span class="text-sm">{{ solution.all_modules_count|default:0 }}</span>
+                </td>
+                <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}">
+                    {% if solution.all_installed %}
+                    <span class="badge badge-sm color-success">{% trans "Installed" %}</span>
+                    {% elif solution.partially_installed %}
+                    <span class="badge badge-sm color-warning">{{ solution.installed_count }}/{{ solution.required_count }}</span>
+                    {% else %}
+                    <span class="badge badge-sm badge-ghost">{% trans "Available" %}</span>
+                    {% endif %}
+                </td>
+                <td class="datatable-td datatable-td-center" style="width: 70px;">
+                    <label class="checkbox" @click.stop>
+                        <input type="checkbox" class="checkbox-input"
+                               @change="toggle('{{ solution.slug }}')"
+                               :checked="selected.has('{{ solution.slug }}')">
+                        <span class="checkbox-box">
+                            <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </span>
+                    </label>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<!-- Card View (default) -->
+<div class="datatable-body">
+    <div class="module-grid module-grid-3 p-4">
+        {% for solution in solutions %}
+        <div class="module-card cursor-pointer {% if solution.all_installed %}ring-2 ring-primary{% endif %}"
+             :class="{ 'ring-2 ring-primary': selected.has('{{ solution.slug }}') }"
+             hx-get="{{ solution.detail_url }}"
+             hx-target="#main-content-area"
+             hx-push-url="true">
+            <div class="module-card-body">
+                <div class="module-card-header">
+                    <div class="module-card-icon" style="background-color: {{ solution.color }}; color: white;">
+                        {% icon solution.icon|default:"briefcase-outline" %}
+                    </div>
+
+                    <div class="module-card-info">
+                        <h4 class="module-card-name">{{ solution.name }}</h4>
+                        <div class="module-card-meta">
+                            <span class="chip chip-sm">{{ solution.all_modules_count }} {% trans "modules" %}</span>
+                            {% if solution.all_installed %}
+                            <span class="badge badge-sm color-success">
+                                {% icon "checkmark-circle" %}
+                                {% trans "Installed" %}
+                            </span>
+                            {% elif solution.partially_installed %}
+                            <span class="badge badge-sm color-warning">
+                                {{ solution.installed_count }}/{{ solution.required_count }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <label class="checkbox" @click.stop>
+                        <input type="checkbox" class="checkbox-input"
+                               @change="toggle('{{ solution.slug }}')"
+                               :checked="selected.has('{{ solution.slug }}')">
+                        <span class="checkbox-box">
+                            <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </span>
+                    </label>
+                </div>
+
+                <p class="module-card-description">{{ solution.tagline }}</p>
+
+                <div class="module-card-footer">
+                    <span class="chip chip-sm">{{ solution.block_type|default:""|title }}</span>
+                    <div class="module-card-actions">
+                        {% if solution.all_installed %}
+                        <span class="text-xs opacity-50">{% trans "Installed" %}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Footer / Pagination -->
+<div class="datatable-footer">
+    <div class="datatable-per-page">
+        {% trans "Show" %}
+        <select name="per_page"
+                hx-get="{% url 'marketplace:solutions_list' %}"
+                hx-target="#solutions-body"
+                hx-include="#solutions-datatable"
+                hx-trigger="change">
+            <option value="12" {% if per_page == 12 %}selected{% endif %}>12</option>
+            <option value="24" {% if per_page == 24 %}selected{% endif %}>24</option>
+            <option value="48" {% if per_page == 48 %}selected{% endif %}>48</option>
+            <option value="96" {% if per_page == 96 %}selected{% endif %}>96</option>
+        </select>
+        {% trans "per page" %}
+    </div>
+    <span class="datatable-info">
+        {% if page_obj.paginator.count > 0 %}
+        {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }} solutions{% endblocktrans %}
+        {% endif %}
+    </span>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="pagination pagination-sm">
+        <button class="pagination-btn pagination-prev"
+                {% if page_obj.has_previous %}
+                hx-get="{% url 'marketplace:solutions_list' %}?page={{ page_obj.previous_page_number }}"
+                hx-target="#solutions-body"
+                hx-include="#solutions-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-back-outline" %}
+        </button>
+        {% for num in page_obj.paginator.page_range %}
+        <button class="pagination-btn{% if num == page_obj.number %} pagination-active{% endif %}"
+                hx-get="{% url 'marketplace:solutions_list' %}?page={{ num }}"
+                hx-target="#solutions-body"
+                hx-include="#solutions-datatable">
+            {{ num }}
+        </button>
+        {% endfor %}
+        <button class="pagination-btn pagination-next"
+                {% if page_obj.has_next %}
+                hx-get="{% url 'marketplace:solutions_list' %}?page={{ page_obj.next_page_number }}"
+                hx-target="#solutions-body"
+                hx-include="#solutions-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-forward-outline" %}
+        </button>
+    </nav>
+    {% endif %}
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="datatable-empty">
+    <div class="datatable-empty-icon">{% icon "apps-outline" %}</div>
+    <div class="datatable-empty-title">{% trans "No solutions found" %}</div>
+    <div class="datatable-empty-text">{% trans "Try adjusting your search or filters" %}</div>
+</div>
+{% endif %}

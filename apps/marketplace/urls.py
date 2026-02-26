@@ -5,9 +5,8 @@ Mounted at /marketplace/ in config/urls.py
 
 URL Structure:
 /marketplace/                            -> marketplace:index (modules store)
-/marketplace/solutions/                  -> marketplace:solutions (solution bundles)
-/marketplace/solutions/<slug>/           -> marketplace:solution_detail
-/marketplace/solutions/<slug>/install/   -> marketplace:solution_install (POST)
+/marketplace/business-types/             -> marketplace:business_types (informational)
+/marketplace/business-types/<slug>/      -> marketplace:business_type_detail
 /marketplace/compliance/                 -> marketplace:compliance (country requirements)
 /marketplace/compliance/<code>/          -> marketplace:compliance_detail
 /marketplace/cart/                       -> marketplace:cart_page
@@ -21,6 +20,11 @@ HTMX Endpoints:
 /marketplace/cart/remove/<item_id>/ -> marketplace:cart_remove
 /marketplace/cart/checkout/         -> marketplace:cart_checkout (POST)
 /marketplace/cart/clear/            -> marketplace:cart_clear
+
+Internal API (used by install flows):
+/marketplace/solutions/bulk-install/     -> marketplace:solutions_bulk_install (POST)
+/marketplace/solutions/<slug>/install/   -> marketplace:solution_install (POST)
+/marketplace/solutions/<slug>/toggle/    -> marketplace:block_toggle (POST)
 
 Legacy (hubs):
 /marketplace/hubs/                  -> marketplace:store_hubs
@@ -36,11 +40,14 @@ urlpatterns = [
     # Root: modules store (default)
     path('', views.store_index, {'store_type': 'modules'}, name='index'),
 
-    # Solutions (Functional Blocks)
-    path('solutions/', views.solutions_index, name='solutions'),
+    # Business Types (informational — modules & roles per business type)
+    path('business-types/', views.business_types_index, name='business_types'),
+    path('business-types/<slug:slug>/', views.business_type_detail, name='business_type_detail'),
+
+    # Solutions (internal API only — no browseable page)
+    path('solutions/bulk-install/', views.solutions_bulk_install, name='solutions_bulk_install'),
     path('solutions/<slug:slug>/install/', views.solution_install, name='solution_install'),
     path('solutions/<slug:slug>/toggle/', views.block_toggle, name='block_toggle'),
-    path('solutions/<slug:slug>/', views.solution_detail, name='solution_detail'),
 
     # Compliance
     path('compliance/', views.compliance_index, name='compliance'),
@@ -50,6 +57,7 @@ urlpatterns = [
     path('cart/', views.cart_page, {'store_type': 'modules'}, name='cart_page'),
 
     # HTMX endpoints for modules (default store)
+    path('modules/bulk-install/', views.modules_bulk_install, name='modules_bulk_install'),
     path('products/', views.products_list, {'store_type': 'modules'}, name='products_list'),
     path('filters/', views.filters_view, {'store_type': 'modules'}, name='filters_view'),
     path('cart/view/', views.cart_view, {'store_type': 'modules'}, name='cart_view'),

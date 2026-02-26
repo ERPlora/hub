@@ -35,10 +35,10 @@ def _marketplace_navigation(active_tab):
             'active': active_tab == 'modules',
         },
         {
-            'url': reverse('marketplace:solutions'),
-            'icon': 'apps-outline',
-            'label': str(_('Blocks')),
-            'active': active_tab == 'solutions',
+            'url': reverse('marketplace:business_types'),
+            'icon': 'business-outline',
+            'label': str(_('Business Types')),
+            'active': active_tab == 'business_types',
         },
         {
             'url': reverse('marketplace:compliance'),
@@ -172,8 +172,61 @@ def _build_grouped_industries(language):
     return result
 
 
-def _fetch_blocks_for_filters():
-    """Fetch functional blocks from Cloud API and group by block_type for the filter modal."""
+def _fetch_industries_for_filters():
+    """Fetch active industries from Cloud API for the marketplace filter."""
+    from apps.configuration.models import HubConfig
+
+    hub_config = HubConfig.get_solo()
+    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return []
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/industries/",
+            headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
+            timeout=10,
+        )
+        if response.status_code == 200:
+            return response.json()
+    except requests.exceptions.RequestException:
+        pass
+    return []
+
+
+def _fetch_industry_modules(slug):
+    """Fetch recommended modules for an industry from Cloud API."""
+    from apps.configuration.models import HubConfig
+
+    hub_config = HubConfig.get_solo()
+    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return {}
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/industries/{slug}/",
+            headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
+            timeout=10,
+        )
+        if response.status_code == 200:
+            data = response.json()
+            # Build a dict: module_id → is_essential
+            result = {}
+            for m in data.get('modules', []):
+                result[m.get('module_id', '')] = m.get('is_essential', False)
+            return result
+    except requests.exceptions.RequestException:
+        pass
+    return {}
+
+
+def _fetch_solutions_for_filters():
+    """Fetch solutions from Cloud API and group by block_type for the filter modal."""
     from apps.configuration.models import HubConfig
 
     hub_config = HubConfig.get_config()
@@ -241,30 +294,14 @@ def _get_filters_for_store(store_type, language, request):
     auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
     if store_type == 'modules':
-        # Build grouped categories (local fallback)
-        categories_grouped = _build_grouped_categories(language)
+        # Fetch solutions grouped by block_type
+        solutions_grouped = _fetch_solutions_for_filters()
 
-        # Try fetching grouped categories from Cloud API
-        if auth_token:
-            cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
-            headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
-            try:
-                cat_response = requests.get(
-                    f"{cloud_api_url}/api/marketplace/categories/grouped/",
-                    headers=headers, params={'language': language}, timeout=10
-                )
-                if cat_response.status_code == 200:
-                    cloud_data = cat_response.json()
-                    if cloud_data:
-                        categories_grouped = cloud_data
-            except Exception:
-                pass
+        # Fetch industries for the search select
+        industries = _fetch_industries_for_filters()
 
-        # Fetch functional blocks grouped by block_type
-        blocks_grouped = _fetch_blocks_for_filters()
-
-        filters['categories_grouped'] = categories_grouped
-        filters['blocks_grouped'] = blocks_grouped
+        filters['solutions_grouped'] = solutions_grouped
+        filters['industries'] = industries
         filters['types'] = [
             {'id': 'free', 'name': 'Free', 'name_es': 'Gratis', 'icon': 'gift-outline'},
             {'id': 'one_time', 'name': 'One-time', 'name_es': 'Pago único', 'icon': 'card-outline'},
@@ -568,6 +605,59 @@ def filters_view(request, store_type):
 MARKETPLACE_PER_PAGE_CHOICES = [12, 24, 48, 96]
 
 
+def _create_roles_for_installed_modules(module_slugs):
+    """
+    After installing modules, look up which solutions they belong to
+    and auto-create the corresponding roles.
+    """
+    from apps.configuration.models import HubConfig
+
+    hub_config = HubConfig.get_solo()
+    if not hub_config.hub_id:
+        return
+
+    cloud_api_url = _get_cloud_api_url()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+    if not auth_token:
+        return
+
+    # Fetch module details to find solution_slugs
+    solution_slugs_to_fetch = set()
+    for slug in module_slugs:
+        try:
+            response = requests.get(
+                f"{cloud_api_url}/api/marketplace/modules/{slug}/",
+                headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
+                timeout=10,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                for sol_slug in data.get('solution_slugs', []):
+                    solution_slugs_to_fetch.add(sol_slug)
+        except Exception:
+            pass
+
+    if not solution_slugs_to_fetch:
+        return
+
+    # Fetch roles for each solution and create them
+    from apps.core.services.permission_service import PermissionService
+    for sol_slug in solution_slugs_to_fetch:
+        try:
+            resp = requests.get(
+                f"{cloud_api_url}/api/marketplace/solutions/{sol_slug}/",
+                headers={'Accept': 'application/json'},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                roles_data = resp.json().get('roles', [])
+                if roles_data:
+                    PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
+                    logger.info("[AUTO ROLES] Created roles for solution %s", sol_slug)
+        except Exception as e:
+            logger.warning("[AUTO ROLES] Failed for solution %s: %s", sol_slug, e)
+
+
 # Products list with DataTable pagination
 
 @login_required
@@ -581,8 +671,8 @@ def products_list(request, store_type):
 
     # Get filters from query params
     search_query = request.GET.get('q', '').strip()
-    category_filter = request.GET.get('category', '').strip()
-    block_filter = request.GET.get('block', '').strip()
+    solution_filter = request.GET.get('solution', '').strip()
+    industry_filter = request.GET.get('industry', '').strip()
     type_filter = request.GET.get('type', '').strip()
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
@@ -595,7 +685,7 @@ def products_list(request, store_type):
     config = get_store_config(store_type)
 
     if store_type == 'modules':
-        return _fetch_modules_list(request, search_query, category_filter, block_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number)
+        return _fetch_modules_list(request, search_query, solution_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number)
     elif store_type == 'hubs':
         return _fetch_hubs_list(request, search_query, '', 12)
     else:
@@ -607,7 +697,7 @@ def products_list(request, store_type):
         return HttpResponse(html)
 
 
-def _fetch_modules_list(request, search_query, category_filter, block_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
+def _fetch_modules_list(request, search_query, solution_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
     """Fetch modules from Cloud API with DataTable pagination"""
     from django.core.paginator import Paginator
     from apps.configuration.models import HubConfig
@@ -659,21 +749,25 @@ def _fetch_modules_list(request, search_query, category_filter, block_filter, ty
                 any(query_lower in str(tag).lower() for tag in m.get('tags', []))
             )]
 
-        if category_filter:
-            cat_values = [c.strip() for c in category_filter.split(',') if c.strip()]
-            if cat_values:
-                # functions is a list; match if any function is in the selected values
+        if solution_filter:
+            solution_slugs = [s.strip() for s in solution_filter.split(',') if s.strip()]
+            if solution_slugs:
+                # Filter modules by solution_slugs field (solution membership)
                 modules = [m for m in modules if any(
-                    f in cat_values for f in m.get('functions', [m.get('category', '')])
+                    ss in m.get('solution_slugs', []) for ss in solution_slugs
                 )]
 
-        if block_filter:
-            block_slugs = [b.strip() for b in block_filter.split(',') if b.strip()]
-            if block_slugs:
-                # Filter modules by solution_slugs field (block membership)
-                modules = [m for m in modules if any(
-                    bs in m.get('solution_slugs', []) for bs in block_slugs
-                )]
+        # Industry filter: fetch recommended modules for the industry and annotate
+        industry_module_map = {}
+        if industry_filter:
+            industry_module_map = _fetch_industry_modules(industry_filter)
+            if industry_module_map:
+                # Filter to only show modules recommended for this industry
+                industry_module_ids = set(industry_module_map.keys())
+                modules = [m for m in modules if m.get('module_id', '') in industry_module_ids]
+                # Annotate each module with is_essential flag
+                for m in modules:
+                    m['is_essential'] = industry_module_map.get(m.get('module_id', ''), False)
 
         if type_filter:
             modules = [m for m in modules if m.get('module_type') == type_filter]
@@ -682,6 +776,8 @@ def _fetch_modules_list(request, search_query, category_filter, block_filter, ty
         for module in modules:
             module['is_installed'] = module.get('slug', '') in installed_module_ids or module.get('module_id', '') in installed_module_ids
             module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
+            if not module.get('download_url'):
+                module['download_url'] = f"{cloud_api_url}/api/marketplace/modules/{module.get('slug', '')}/download/"
 
         # Sort
         sort_key_map = {
@@ -701,8 +797,8 @@ def _fetch_modules_list(request, search_query, category_filter, block_filter, ty
             'page_obj': page_obj,
             'store_type': 'modules',
             'search_query': search_query,
-            'category_filter': category_filter,
-            'block_filter': block_filter,
+            'solution_filter': solution_filter,
+            'industry_filter': industry_filter,
             'type_filter': type_filter,
             'sort_field': sort_field,
             'sort_dir': sort_dir,
@@ -880,30 +976,102 @@ def module_detail(request, slug):
 
 # --- Solutions views ---
 
+SOLUTIONS_BLOCK_TYPES = [
+    ('core', _('Core')), ('commerce', _('Commerce')), ('services', _('Services')),
+    ('hospitality', _('Hospitality')), ('hr', _('HR')), ('finance', _('Finance')),
+    ('operations', _('Operations')), ('marketing', _('Marketing')),
+    ('utility', _('Utility')), ('compliance', _('Compliance')),
+    ('specialized', _('Specialized')),
+]
+
+
 @login_required
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/solutions_content.html')
 def solutions_index(request):
-    """Functional blocks list — composable module bundles from Cloud."""
+    """Functional blocks DataTable wrapper — content loads via HTMX from solutions_list."""
+    cart = get_cart(request, 'modules')
+    return {
+        'current_section': 'marketplace',
+        'page_title': _('Solutions'),
+        'block_types': SOLUTIONS_BLOCK_TYPES,
+        'cart_count': len(cart.get('items', [])),
+        'navigation': _marketplace_navigation('modules'),
+    }
+
+
+def _fetch_solution_modules(slug, cloud_api_url):
+    """Fetch module list for a single solution from Cloud API."""
+    try:
+        r = requests.get(
+            f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+            headers={'Accept': 'application/json'}, timeout=15,
+        )
+        if r.status_code == 200:
+            return slug, r.json().get('modules', [])
+    except Exception:
+        pass
+    return slug, []
+
+
+@login_required
+def solutions_list(request):
+    """HTMX endpoint: Fetch and render solutions with DataTable features."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from django.core.paginator import Paginator
+
+    search_query = request.GET.get('q', '').strip()
+    block_type_filter = request.GET.get('block_type', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    sort_field = request.GET.get('sort', 'name')
+    sort_dir = request.GET.get('dir', 'asc')
+    current_view = request.GET.get('view', 'cards')
+    per_page = int(request.GET.get('per_page', 12))
+    if per_page not in MARKETPLACE_PER_PAGE_CHOICES:
+        per_page = 12
+    page_number = request.GET.get('page', 1)
+
     cloud_api_url = _get_cloud_api_url()
     solutions = []
-
     try:
         response = requests.get(
             f"{cloud_api_url}/api/marketplace/solutions/",
-            headers={'Accept': 'application/json'},
-            timeout=15,
+            headers={'Accept': 'application/json'}, timeout=15,
         )
         if response.status_code == 200:
             solutions = response.json()
     except requests.exceptions.RequestException:
         pass
 
-    # Check installed modules from filesystem (not DB)
     installed_ids = set(_get_installed_module_ids())
 
-    # For each solution, calculate how many required modules are installed
-    installed_blocks = 0
+    # Fetch module details for each solution in parallel
+    if solutions:
+        slugs_to_fetch = [s['slug'] for s in solutions if s.get('slug')]
+        modules_by_slug = {}
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {
+                executor.submit(_fetch_solution_modules, slug, cloud_api_url): slug
+                for slug in slugs_to_fetch
+            }
+            for future in as_completed(futures):
+                slug, modules = future.result()
+                modules_by_slug[slug] = modules
+
     for s in solutions:
+        # Attach modules list and mark install status
+        sol_modules = modules_by_slug.get(s.get('slug', ''), [])
+        for m in sol_modules:
+            m['is_installed'] = (
+                m.get('module_id', '') in installed_ids
+                or m.get('slug', '') in installed_ids
+            )
+        s['modules'] = sol_modules
+        # Compact JSON for Alpine.js (only fields needed by toggleSolution/isSolutionFullySelected)
+        s['modules_json'] = json.dumps([
+            {'slug': m.get('slug', ''), 'is_installed': m.get('is_installed', False)}
+            for m in sol_modules if not m.get('is_coming_soon')
+        ])
+
         required_ids = s.get('required_module_ids', [])
         required_count = s.get('required_module_count', 0) or len(required_ids)
         installed_count = sum(1 for mid in required_ids if mid in installed_ids)
@@ -911,45 +1079,196 @@ def solutions_index(request):
         s['required_count'] = required_count
         s['all_installed'] = required_count > 0 and installed_count >= required_count
         s['partially_installed'] = installed_count > 0 and installed_count < required_count
-        s['is_active'] = s['all_installed']
-        if s['all_installed']:
-            installed_blocks += 1
+        s.setdefault('all_modules_count', 0)
+        s['detail_url'] = reverse('marketplace:solution_detail', kwargs={'slug': s.get('slug', '')})
 
-    # Group by block_type category
-    category_order = [
-        'core', 'commerce', 'services', 'hospitality', 'hr',
-        'finance', 'operations', 'marketing', 'utility', 'compliance', 'specialized',
+    # Filters
+    if search_query:
+        q = search_query.lower()
+        solutions = [s for s in solutions if q in s.get('name', '').lower() or q in s.get('tagline', '').lower()]
+    if block_type_filter:
+        types = [t.strip() for t in block_type_filter.split(',') if t.strip()]
+        solutions = [s for s in solutions if s.get('block_type', '') in types]
+    if status_filter:
+        if status_filter == 'installed':
+            solutions = [s for s in solutions if s['all_installed']]
+        elif status_filter == 'partial':
+            solutions = [s for s in solutions if s['partially_installed']]
+        elif status_filter == 'available':
+            solutions = [s for s in solutions if not s['all_installed'] and not s['partially_installed']]
+
+    # Sort
+    sort_map = {
+        'name': lambda x: x.get('name', '').lower(),
+        'modules': lambda x: x.get('all_modules_count', 0) or 0,
+        'type': lambda x: x.get('block_type', ''),
+    }
+    solutions.sort(key=sort_map.get(sort_field, sort_map['name']), reverse=(sort_dir == 'desc'))
+
+    paginator = Paginator(solutions, per_page)
+    page_obj = paginator.get_page(page_number)
+
+    html = render_to_string('marketplace/partials/solutions_grid.html', {
+        'solutions': page_obj,
+        'page_obj': page_obj,
+        'current_view': current_view,
+        'search_query': search_query,
+        'block_type_filter': block_type_filter,
+        'status_filter': status_filter,
+        'sort_field': sort_field,
+        'sort_dir': sort_dir,
+        'per_page': per_page,
+    }, request=request)
+    return HttpResponse(html)
+
+
+@login_required
+def solutions_bulk_install(request):
+    """POST: Install multiple blocks at once."""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Invalid JSON'}),
+            content_type='application/json', status=400,
+        )
+
+    block_slugs = data.get('block_slugs', [])
+    if not block_slugs:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'No blocks specified'}),
+            content_type='application/json', status=400,
+        )
+
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_config()
+    active_blocks = list(hub_config.selected_blocks or [])
+    for slug in block_slugs:
+        if slug not in active_blocks:
+            active_blocks.append(slug)
+    hub_config.selected_blocks = active_blocks
+    hub_config.solution_slug = active_blocks[0] if active_blocks else ''
+    hub_config.save()
+
+    from apps.core.services.module_install_service import ModuleInstallService
+    result = ModuleInstallService.install_block_modules(block_slugs, hub_config)
+
+    if result.installed > 0:
+        ModuleInstallService.run_post_install(
+            load_all=True, run_migrations=True, schedule_restart=True,
+        )
+
+    # Create roles for all installed blocks
+    if hub_config.hub_id:
+        cloud_api_url = _get_cloud_api_url()
+        for slug in block_slugs:
+            try:
+                resp = requests.get(
+                    f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+                    headers={'Accept': 'application/json'}, timeout=15,
+                )
+                if resp.status_code == 200:
+                    roles_data = resp.json().get('roles', [])
+                    if roles_data:
+                        from apps.core.services.permission_service import PermissionService
+                        PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
+            except Exception as e:
+                logger.warning("Failed to create roles for block %s: %s", slug, e)
+
+    return HttpResponse(json.dumps({
+        'success': True,
+        'installed': result.installed,
+        'errors': result.errors,
+        'requires_restart': result.installed > 0,
+    }), content_type='application/json')
+
+
+@login_required
+def modules_bulk_install(request):
+    """POST: Install multiple modules at once."""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Invalid JSON'}),
+            content_type='application/json', status=400,
+        )
+
+    modules = data.get('modules', [])
+    if not modules:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'No modules specified'}),
+            content_type='application/json', status=400,
+        )
+
+    from apps.core.services.module_install_service import ModuleInstallService
+    hub_token = ModuleInstallService.get_hub_token()
+    cloud_api_url = _get_cloud_api_url()
+
+    modules_to_install = [
+        {
+            'slug': m['slug'],
+            'name': m.get('name', m['slug']),
+            'download_url': m.get('download_url', f"{cloud_api_url}/api/marketplace/modules/{m['slug']}/download/"),
+        }
+        for m in modules if m.get('slug')
     ]
-    category_labels = {
-        'core': str(_('Core')), 'commerce': str(_('Commerce')), 'services': str(_('Services')),
-        'hospitality': str(_('Hospitality')), 'hr': str(_('HR')), 'finance': str(_('Finance')),
-        'operations': str(_('Operations')), 'marketing': str(_('Marketing')),
-        'utility': str(_('Utility')), 'compliance': str(_('Compliance')),
-        'specialized': str(_('Specialized')),
-    }
-    blocks_by_category = {}
-    for s in solutions:
-        cat = s.get('block_type', '') or 'other'
-        blocks_by_category.setdefault(cat, []).append(s)
-    grouped_blocks = []
-    for cat in category_order:
-        if cat in blocks_by_category:
-            grouped_blocks.append((cat, category_labels.get(cat, cat.title()), blocks_by_category[cat]))
-    for cat, blocks in blocks_by_category.items():
-        if cat not in category_order:
-            grouped_blocks.append((cat, cat.title(), blocks))
 
-    cart = get_cart(request, 'modules')
+    # Resolve transitive dependencies
+    modules_dir = Path(django_settings.MODULES_DIR)
+    installed_ids = set()
+    if modules_dir.exists():
+        for d in modules_dir.iterdir():
+            if d.is_dir() and not d.name.startswith('.'):
+                installed_ids.add(d.name.lstrip('_'))
 
-    return {
-        'current_section': 'marketplace',
-        'page_title': _('Functional Blocks'),
-        'solutions': solutions,
-        'grouped_blocks': grouped_blocks,
-        'active_blocks_count': installed_blocks,
-        'cart_count': len(cart.get('items', [])),
-        'navigation': _marketplace_navigation('solutions'),
-    }
+    all_slugs = {m['slug'] for m in modules_to_install}
+    dep_modules = ModuleInstallService._resolve_dependencies(
+        all_slugs, installed_ids, cloud_api_url, hub_token
+    )
+    if dep_modules:
+        logger.info(
+            "[BULK INSTALL] Adding %d dependency modules: %s",
+            len(dep_modules), [m['slug'] for m in dep_modules],
+        )
+        modules_to_install.extend(dep_modules)
+
+    logger.info(
+        "[BULK INSTALL] Installing %d modules: %s",
+        len(modules_to_install),
+        [m['slug'] for m in modules_to_install],
+    )
+
+    result = ModuleInstallService.bulk_download_and_install(modules_to_install, hub_token)
+
+    logger.info(
+        "[BULK INSTALL] Result: installed=%d, errors=%s, results=%s",
+        result.installed,
+        result.errors,
+        [(r.module_id, r.success, r.message) for r in (result.results or [])],
+    )
+
+    if result.installed > 0:
+        ModuleInstallService.run_post_install(
+            load_all=True, run_migrations=True, schedule_restart=True,
+        )
+
+        # Auto-create roles for newly installed modules
+        installed_slugs = [m['slug'] for m in modules_to_install]
+        _create_roles_for_installed_modules(installed_slugs)
+
+    return HttpResponse(json.dumps({
+        'success': True,
+        'installed': result.installed,
+        'errors': result.errors,
+        'requires_restart': result.installed > 0,
+    }), content_type='application/json')
 
 
 @login_required
@@ -969,13 +1288,13 @@ def solution_detail(request, slug):
             return {
                 'current_section': 'marketplace',
                 'error': _('Block not found.'),
-                'navigation': _marketplace_navigation('solutions'),
+                'navigation': _marketplace_navigation('modules'),
             }
         if response.status_code != 200:
             return {
                 'current_section': 'marketplace',
                 'error': f'Cloud API returned {response.status_code}',
-                'navigation': _marketplace_navigation('solutions'),
+                'navigation': _marketplace_navigation('modules'),
             }
 
         solution = response.json()
@@ -1009,16 +1328,16 @@ def solution_detail(request, slug):
             'optional_modules': optional_modules,
             'all_installed': all_installed,
             'is_block_active': is_block_active,
-            'back_url': reverse('marketplace:solutions'),
+            'back_url': reverse('marketplace:index'),
             'cart_count': len(cart.get('items', [])),
-            'navigation': _marketplace_navigation('solutions'),
+            'navigation': _marketplace_navigation('modules'),
         }
 
     except requests.exceptions.RequestException as e:
         return {
             'current_section': 'marketplace',
             'error': f'Failed to connect to Cloud: {str(e)}',
-            'navigation': _marketplace_navigation('solutions'),
+            'navigation': _marketplace_navigation('modules'),
         }
 
 
@@ -1056,21 +1375,35 @@ def solution_install(request, slug):
                 content_type='application/json',
             )
 
-        # Install modules via ModuleInstallService
+        # Install modules via ModuleInstallService (parallel bulk download)
         from apps.core.services.module_install_service import ModuleInstallService
         from apps.configuration.models import HubConfig
         hub_config = HubConfig.get_solo()
         hub_token = ModuleInstallService.get_hub_token(hub_config)
 
-        installed_count = 0
-        errors = []
-        for mod in required_modules:
-            download_url = f"{cloud_api_url}/api/marketplace/modules/{mod['slug']}/download/"
-            result = ModuleInstallService.download_and_install(mod['slug'], download_url, hub_token)
-            if result.success and 'already installed' not in result.message:
-                installed_count += 1
-            elif not result.success:
-                errors.append(f"{mod['name']}: {result.message}")
+        modules_to_install = [
+            {
+                'slug': mod['slug'],
+                'name': mod.get('name', mod['slug']),
+                'download_url': f"{cloud_api_url}/api/marketplace/modules/{mod['slug']}/download/",
+            }
+            for mod in required_modules
+        ]
+
+        # Resolve transitive dependencies
+        installed_set = set(installed_ids)
+        all_slugs = {m['slug'] for m in modules_to_install}
+        dep_modules = ModuleInstallService._resolve_dependencies(
+            all_slugs, installed_set, cloud_api_url, hub_token
+        )
+        if dep_modules:
+            modules_to_install.extend(dep_modules)
+
+        bulk_result = ModuleInstallService.bulk_download_and_install(
+            modules_to_install, hub_token
+        )
+        installed_count = bulk_result.installed
+        errors = bulk_result.errors
 
         # Post-install: load, migrate, create roles
         if installed_count > 0:
@@ -1173,6 +1506,90 @@ def block_toggle(request, slug):
             }),
             content_type='application/json',
         )
+
+
+# --- Business Types views (informational) ---
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/business_types_content.html')
+def business_types_index(request):
+    """Business types list — browse by type to see recommended modules and roles."""
+    industries = _fetch_industries_for_filters()
+
+    cart = get_cart(request, 'modules')
+
+    return {
+        'current_section': 'marketplace',
+        'page_title': _('Business Types'),
+        'industries': industries,
+        'cart_count': len(cart.get('items', [])),
+        'navigation': _marketplace_navigation('business_types'),
+    }
+
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/business_type_detail_content.html')
+def business_type_detail(request, slug):
+    """Business type detail — shows recommended modules and roles (informational only)."""
+    from apps.configuration.models import HubConfig
+
+    hub_config = HubConfig.get_solo()
+    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return {
+            'current_section': 'marketplace',
+            'error': _('Hub not connected to Cloud. Please connect in Settings.'),
+            'navigation': _marketplace_navigation('business_types'),
+        }
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/industries/{slug}/",
+            headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
+            timeout=15,
+        )
+        if response.status_code == 404:
+            return {
+                'current_section': 'marketplace',
+                'error': _('Business type not found.'),
+                'navigation': _marketplace_navigation('business_types'),
+            }
+        if response.status_code != 200:
+            return {
+                'current_section': 'marketplace',
+                'error': f'Cloud API returned {response.status_code}',
+                'navigation': _marketplace_navigation('business_types'),
+            }
+
+        industry = response.json()
+
+        # Mark installed modules
+        installed_ids = _get_installed_module_ids()
+        for mod in industry.get('modules', []):
+            mod['is_installed'] = (
+                mod.get('slug', '') in installed_ids
+                or mod.get('module_id', '') in installed_ids
+            )
+
+        cart = get_cart(request, 'modules')
+
+        return {
+            'current_section': 'marketplace',
+            'page_title': industry.get('name', _('Business Type')),
+            'industry': industry,
+            'back_url': reverse('marketplace:business_types'),
+            'cart_count': len(cart.get('items', [])),
+            'navigation': _marketplace_navigation('business_types'),
+        }
+
+    except requests.exceptions.RequestException as e:
+        return {
+            'current_section': 'marketplace',
+            'error': f'Failed to connect to Cloud: {str(e)}',
+            'navigation': _marketplace_navigation('business_types'),
+        }
 
 
 # --- Compliance views ---
