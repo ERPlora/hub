@@ -1,6 +1,32 @@
 {% load i18n djicons %}
 
 <div x-data="{ searchQuery: '' }">
+    {% if alerts %}
+    <div class="accordion mb-6">
+        {% for alert in alerts %}
+        <details class="accordion-item" {% if forloop.first %}open{% endif %}>
+            <summary class="accordion-header">
+                <span class="accordion-title flex items-center gap-2">
+                    {% icon alert.icon %}
+                    {{ alert.title }}
+                </span>
+                <span class="accordion-chevron">{% icon "chevron-down-outline" %}</span>
+            </summary>
+            <div class="accordion-body">
+                <p class="mb-3">{{ alert.description }}</p>
+                <a class="btn btn-sm color-{{ alert.color }}"
+                   href="{{ alert.link }}"
+                   hx-get="{{ alert.link }}"
+                   hx-target="#main-content-area"
+                   hx-push-url="true">
+                    {{ alert.link_text }}
+                </a>
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     {% if modules %}
     <!-- Search -->
     <div class="mb-4">

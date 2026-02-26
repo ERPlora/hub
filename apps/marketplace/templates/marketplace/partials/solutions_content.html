@@ -1,129 +1,399 @@
 {% load i18n djicons %}
 
-<div class="mt-5">
-    {% if active_blocks_count > 0 %}
-    <p class="text-sm opacity-50 mb-4">
-        {% icon "checkmark-circle-outline" css_class="text-primary" %}
-        {{ active_blocks_count }} {% trans "blocks installed" %}
-    </p>
-    {% endif %}
+<div x-data="{
+    view: 'cards',
+    columnsModal: false,
+    cols: { type: true, modules: true, status: true },
+    selectedModules: new Set(),
+    installing: false,
+    toggleCol(col) {
+        this.cols[col] = !this.cols[col];
+        document.querySelectorAll('[data-col=' + col + ']').forEach(el => el.classList.toggle('hidden', !this.cols[col]));
+    },
+    toggleModule(slug) {
+        if (this.selectedModules.has(slug)) this.selectedModules.delete(slug);
+        else this.selectedModules.add(slug);
+        this.selectedModules = new Set(this.selectedModules);
+    },
+    toggleSolution(slug, modules) {
+        var nonInstalled = modules.filter(m => !m.is_installed).map(m => m.slug);
+        var allSelected = nonInstalled.length > 0 && nonInstalled.every(s => this.selectedModules.has(s));
+        if (allSelected) {
+            nonInstalled.forEach(s => this.selectedModules.delete(s));
+        } else {
+            nonInstalled.forEach(s => this.selectedModules.add(s));
+        }
+        this.selectedModules = new Set(this.selectedModules);
+    },
+    isSolutionFullySelected(slug, modules) {
+        var nonInstalled = modules.filter(m => !m.is_installed);
+        if (nonInstalled.length === 0) return false;
+        return nonInstalled.every(m => this.selectedModules.has(m.slug));
+    },
+    clearSelection() { this.selectedModules = new Set(); },
+    get count() { return this.selectedModules.size; },
+    async bulkInstall() {
+        if (this.count === 0) return;
+        this.installing = true;
+        var modulesList = [...this.selectedModules].map(slug => ({slug: slug}));
+        var self = this;
+        try {
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+            var response = await fetch('{% url 'marketplace:modules_bulk_install' %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ modules: modulesList })
+            });
+            var data = await response.json();
+            if (data.success) {
+                if (data.installed > 0) {
+                    Toast.success(data.installed + ' {% trans "modules installed" %}');
+                } else {
+                    Toast.info('{% trans "All modules already installed" %}');
+                }
+                if (data.errors && data.errors.length > 0) {
+                    data.errors.forEach(function(err) { Toast.error(err); });
+                }
+                self.clearSelection();
+                if (data.requires_restart) {
+                    Toast.info('{% trans "Server restarting..." %}');
+                    self._waitForRestart();
+                } else {
+                    self.installing = false;
+                    htmx.ajax('GET', '{% url "marketplace:solutions_list" %}', {target: '#solutions-body', swap: 'innerHTML'});
+                }
+            } else {
+                Toast.error(data.error || '{% trans "Install failed" %}');
+                self.installing = false;
+            }
+        } catch (e) {
+            Toast.info('{% trans "Server restarting..." %}');
+            self._waitForRestart();
+        }
+    },
+    _waitForRestart() {
+        var self = this;
+        var attempts = 0;
+        var interval = setInterval(async function() {
+            attempts++;
+            try {
+                var r = await fetch('{% url "marketplace:solutions_list" %}', {method: 'HEAD'});
+                if (r.ok || r.status === 302) {
+                    clearInterval(interval);
+                    self.installing = false;
+                    self.clearSelection();
+                    window.location.reload();
+                }
+            } catch(e) { /* server still down */ }
+            if (attempts > 30) {
+                clearInterval(interval);
+                self.installing = false;
+                Toast.error('{% trans "Server did not restart. Please reload manually." %}');
+            }
+        }, 2000);
+    }
+}">
 
-    {% if grouped_blocks %}
-    <div class="flex flex-col gap-6">
-        {% for cat_key, cat_label, blocks in grouped_blocks %}
-        <div>
-            <h3 class="text-xs font-semibold uppercase tracking-wide opacity-40 mb-3">{{ cat_label }}</h3>
-            <div class="module-grid module-grid-3">
-                {% for solution in blocks %}
-                <div class="module-card cursor-pointer {% if solution.all_installed %}ring-2 ring-primary{% endif %}"
-                     hx-get="{% url 'marketplace:solution_detail' slug=solution.slug %}"
-                     hx-target="#main-content-area"
-                     hx-push-url="true">
-                    <div class="module-card-body">
-                        <div class="module-card-header">
-                            <div class="module-card-icon" style="background-color: {{ solution.color }}; color: white;">
-                                {% icon solution.icon|default:"briefcase-outline" %}
-                            </div>
+    <div class="datatable glass mt-5" id="solutions-datatable">
 
-                            <div class="module-card-info">
-                                <h4 class="module-card-name">{{ solution.name }}</h4>
-                                <div class="module-card-meta">
-                                    <span class="chip chip-sm">{{ solution.all_modules_count }} {% trans "modules" %}</span>
-                                </div>
-                            </div>
+        <!-- Toolbar -->
+        <div class="datatable-toolbar">
+            <div class="datatable-toolbar-start">
+                <label class="input input-sm datatable-search">
+                    {% icon "search-outline" %}
+                    <input type="search"
+                           name="q"
+                           id="solutions-search-input"
+                           placeholder="{% trans 'Search solutions...' %}"
+                           value=""
+                           autocomplete="off"
+                           hx-get="{% url 'marketplace:solutions_list' %}"
+                           hx-target="#solutions-body"
+                           hx-include="#solutions-datatable"
+                           hx-trigger="input changed delay:300ms, search">
+                </label>
 
-                            <div class="module-card-badges">
-                                {% if solution.all_installed %}
-                                <span class="badge badge-sm color-success">
-                                    {% icon "checkmark-circle" %}
-                                    {% trans "Installed" %}
-                                </span>
-                                {% elif solution.partially_installed %}
-                                <span class="badge badge-sm color-warning">
-                                    {{ solution.installed_count }}/{{ solution.required_count }}
-                                </span>
-                                {% endif %}
-                                {% if solution.is_featured %}
-                                <span class="badge badge-sm color-warning">
-                                    {% icon "star" %}
-                                </span>
-                                {% endif %}
-                            </div>
-                        </div>
+                <button type="button"
+                        class="datatable-export-btn"
+                        id="solutions-filter-btn"
+                        onclick="openSolutionFiltersModal()"
+                        title="{% trans 'Filters' %}"
+                        style="position: relative;">
+                    {% icon "funnel-outline" %}
+                </button>
+            </div>
+            <div class="datatable-toolbar-end">
+                <button class="datatable-column-btn" @click="columnsModal = true" title="{% trans 'Columns' %}">
+                    {% icon "options-outline" %}
+                </button>
 
-                        <p class="module-card-description">{{ solution.tagline }}</p>
-
-                        <div class="module-card-footer">
-                            <span class="chip chip-sm">{{ solution.required_count|default:solution.all_modules_count }} {% trans "required" %}</span>
-
-                            <div class="module-card-actions">
-                                {% if solution.all_installed %}
-                                <span class="text-xs opacity-50">{% trans "Installed" %}</span>
-                                {% else %}
-                                <button class="btn btn-sm color-primary"
-                                        onclick="event.stopPropagation(); toggleBlock('{{ solution.slug }}', this)">
-                                    {% icon "download-outline" %}
-                                    {% trans "Install" %}
-                                </button>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+                <div class="datatable-view-toggle">
+                    <button type="button"
+                            class="datatable-view-btn"
+                            :class="{ 'datatable-view-btn-active': view === 'table' }"
+                            @click="view = 'table'"
+                            hx-get="{% url 'marketplace:solutions_list' %}"
+                            hx-target="#solutions-body"
+                            hx-include="#solutions-datatable"
+                            hx-vals='{"view": "table"}'
+                            title="{% trans 'Table view' %}">
+                        {% icon "list-outline" %}
+                    </button>
+                    <button type="button"
+                            class="datatable-view-btn datatable-view-btn-active"
+                            :class="{ 'datatable-view-btn-active': view === 'cards' }"
+                            @click="view = 'cards'"
+                            hx-get="{% url 'marketplace:solutions_list' %}"
+                            hx-target="#solutions-body"
+                            hx-include="#solutions-datatable"
+                            hx-vals='{"view": "cards"}'
+                            title="{% trans 'Card view' %}">
+                        {% icon "grid-outline" %}
+                    </button>
                 </div>
-                {% endfor %}
             </div>
         </div>
-        {% endfor %}
+
+        <!-- Bulk actions bar -->
+        <div class="datatable-bulk" x-show="count > 0" x-cloak>
+            <span class="text-sm font-medium">
+                <span x-text="count"></span> {% trans "modules selected" %}
+            </span>
+            <button class="btn btn-sm color-primary"
+                    @click="bulkInstall()"
+                    :disabled="installing">
+                <template x-if="!installing">
+                    <span class="flex items-center gap-1">{% icon "download-outline" %} {% trans "Install Selected" %}</span>
+                </template>
+                <template x-if="installing">
+                    <span class="flex items-center gap-2"><span class="loading loading-sm"></span> {% trans "Installing..." %}</span>
+                </template>
+            </button>
+            <button class="btn btn-sm btn-ghost" @click="clearSelection()">{% icon "close-outline" %}</button>
+        </div>
+
+        <!-- Active Filters Display -->
+        <div id="solutions-active-filters" class="datatable-active-filters" style="display: none;">
+            <span class="text-xs font-semibold opacity-60 mr-1">{% trans "Active:" %}</span>
+            <div id="solutions-active-filters-chips" class="flex flex-wrap gap-1"></div>
+            <button class="datatable-clear-filters" onclick="clearAllSolutionFilters()">
+                {% icon "close-outline" %} {% trans "Clear" %}
+            </button>
+        </div>
+
+        <!-- Hidden state inputs -->
+        <input type="hidden" name="sort" value="name">
+        <input type="hidden" name="dir" value="asc">
+        <input type="hidden" name="view" :value="view">
+        <input type="hidden" name="per_page" value="12">
+        <input type="hidden" name="block_type" id="filter-block-type" value="">
+        <input type="hidden" name="status" id="filter-status" value="">
+
+        <!-- Body (HTMX swap target) -->
+        <div id="solutions-body"
+             hx-get="{% url 'marketplace:solutions_list' %}"
+             hx-trigger="load"
+             hx-include="#solutions-datatable"
+             hx-swap="innerHTML">
+            <div class="flex justify-center py-8">
+                <div class="loading"></div>
+            </div>
+        </div>
     </div>
 
-    <script>
-    function toggleBlock(slug, button) {
-        var originalHtml = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<span class="loading loading-sm"></span>';
+    <!-- Columns Modal -->
+    <div class="modal-backdrop" :data-state="columnsModal ? 'open' : 'closed'" @click.self="columnsModal = false">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Show / Hide Columns" %}</h3>
+                <button class="modal-close" @click="columnsModal = false">{% icon "close-outline" %}</button>
+            </div>
+            <div class="modal-body">
+                <label class="flex items-center gap-3 py-2 cursor-not-allowed opacity-50">
+                    <input type="checkbox" class="checkbox checkbox-sm" checked disabled>
+                    <span class="text-sm">{% trans "Solution" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('type')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.type" readonly>
+                    <span class="text-sm">{% trans "Type" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('modules')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.modules" readonly>
+                    <span class="text-sm">{% trans "Modules" %}</span>
+                </label>
+                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('status')">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.status" readonly>
+                    <span class="text-sm">{% trans "Status" %}</span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-sm color-primary" @click="columnsModal = false">{% trans "Done" %}</button>
+            </div>
+        </div>
+    </div>
 
-        var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
-            || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+</div>
 
-        fetch('/marketplace/solutions/' + slug + '/toggle/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': csrfToken,
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.success) {
-                if (typeof Toast !== 'undefined') {
-                    var count = data.modules_installed || 0;
-                    var msg = data.action === 'installed'
-                        ? (count > 0 ? '{% trans "Block installed" %} (' + count + ' {% trans "modules" %})' : '{% trans "Block installed" %}')
-                        : '{% trans "Block uninstalled" %}';
-                    Toast.success(msg);
-                }
-                // Reload to refresh active state
-                setTimeout(function() {
-                    htmx.ajax('GET', '/marketplace/solutions/', {target: '#main-content-area', swap: 'innerHTML'});
-                }, data.requires_restart ? 2000 : 500);
-            } else {
-                button.disabled = false;
-                button.innerHTML = originalHtml;
-                if (typeof Toast !== 'undefined') Toast.error(data.error || '{% trans "Action failed." %}');
-            }
-        })
-        .catch(function(e) {
-            button.disabled = false;
-            button.innerHTML = originalHtml;
-            if (typeof Toast !== 'undefined') Toast.error(e.message);
+<!-- Filters Modal -->
+<div class="modal-backdrop" id="solutions-filters-modal" data-state="closed"
+     onclick="if (event.target === this) closeSolutionFiltersModal()">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2 class="modal-title">{% trans "Filters" %}</h2>
+            <button class="modal-close" onclick="closeSolutionFiltersModal()">{% icon "close-outline" %}</button>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <!-- Block Type Filter -->
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold m-0">{% trans "Category" %}</h3>
+                    <button type="button" class="text-xs opacity-50 hover:opacity-100"
+                            onclick="clearSolutionMultiFilter('block_type')">{% trans "Clear" %}</button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    {% for type_key, type_label in block_types %}
+                    <button type="button" class="filter-chip"
+                            data-filter="block_type" data-value="{{ type_key }}"
+                            onclick="toggleSolutionMultiFilter('block_type', '{{ type_key }}')">
+                        {{ type_label }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold mb-2">{% trans "Status" %}</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="filter-chip filter-chip-active"
+                            data-filter="status" data-value=""
+                            onclick="setSolutionFilter('status', '')">{% trans "All" %}</button>
+                    <button type="button" class="filter-chip"
+                            data-filter="status" data-value="installed"
+                            onclick="setSolutionFilter('status', 'installed')">{% trans "Installed" %}</button>
+                    <button type="button" class="filter-chip"
+                            data-filter="status" data-value="partial"
+                            onclick="setSolutionFilter('status', 'partial')">{% trans "Partial" %}</button>
+                    <button type="button" class="filter-chip"
+                            data-filter="status" data-value="available"
+                            onclick="setSolutionFilter('status', 'available')">{% trans "Available" %}</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline color-error" onclick="clearAllSolutionFilters()">
+                {% icon "trash-outline" %} <span>{% trans "Clear" %}</span>
+            </button>
+            <button type="button" class="btn color-primary" onclick="applySolutionFilters()">{% trans "Apply" %}</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    function gatherParams() {
+        var dt = document.getElementById('solutions-datatable');
+        if (!dt) return '';
+        var params = [];
+        dt.querySelectorAll('input[name], select[name]').forEach(function (el) {
+            if (el.name && (el.type !== 'search' || el.value))
+                params.push(encodeURIComponent(el.name) + '=' + encodeURIComponent(el.value));
+        });
+        return params.join('&');
+    }
+
+    function fireRequest() {
+        var qs = gatherParams();
+        htmx.ajax('GET', '{% url "marketplace:solutions_list" %}' + (qs ? '?' + qs : ''), { target: '#solutions-body', swap: 'innerHTML' });
+    }
+
+    function getMultiValues(filterName) {
+        var input = document.getElementById('filter-' + filterName.replace('_', '-'));
+        if (!input || !input.value) return [];
+        return input.value.split(',').filter(Boolean);
+    }
+
+    function setMultiValues(filterName, values) {
+        var input = document.getElementById('filter-' + filterName.replace('_', '-'));
+        if (input) input.value = values.join(',');
+        document.querySelectorAll('.filter-chip[data-filter="' + filterName + '"]').forEach(function (chip) {
+            chip.classList.toggle('filter-chip-active', values.indexOf(chip.dataset.value) >= 0);
         });
     }
-    </script>
-    {% else %}
-    <div class="text-center py-16">
-        {% icon "apps-outline" css_class="text-6xl opacity-20 mb-4" %}
-        <h3 class="text-lg font-semibold mb-2">{% trans "No Blocks Available" %}</h3>
-        <p class="text-sm opacity-60">{% trans "Could not load functional blocks. Please check your internet connection and try again." %}</p>
-    </div>
-    {% endif %}
-</div>
+
+    window.toggleSolutionMultiFilter = function (filterName, value) {
+        var values = getMultiValues(filterName);
+        var idx = values.indexOf(value);
+        if (idx >= 0) values.splice(idx, 1); else values.push(value);
+        setMultiValues(filterName, values);
+    };
+    window.clearSolutionMultiFilter = function (filterName) { setMultiValues(filterName, []); };
+
+    window.setSolutionFilter = function (filterName, value) {
+        var input = document.getElementById('filter-' + filterName);
+        if (input) input.value = value;
+        document.querySelectorAll('.filter-chip[data-filter="' + filterName + '"]').forEach(function (chip) {
+            chip.classList.toggle('filter-chip-active', chip.dataset.value === value);
+        });
+    };
+
+    window.openSolutionFiltersModal = function () { document.getElementById('solutions-filters-modal')?.setAttribute('data-state', 'open'); };
+    window.closeSolutionFiltersModal = function () { document.getElementById('solutions-filters-modal')?.setAttribute('data-state', 'closed'); };
+
+    window.applySolutionFilters = function () { fireRequest(); updateDisplay(); closeSolutionFiltersModal(); };
+
+    window.clearAllSolutionFilters = function () {
+        setMultiValues('block_type', []);
+        setSolutionFilter('status', '');
+        var s = document.getElementById('solutions-search-input'); if (s) s.value = '';
+        fireRequest(); updateDisplay(); closeSolutionFiltersModal();
+    };
+
+    window.removeSolutionFilter = function (filterName, value) {
+        if (filterName === 'block_type' && value) {
+            var values = getMultiValues(filterName);
+            var idx = values.indexOf(value);
+            if (idx >= 0) values.splice(idx, 1);
+            setMultiValues(filterName, values);
+        } else {
+            var input = document.getElementById('filter-' + filterName);
+            if (input) input.value = '';
+            document.querySelectorAll('.filter-chip[data-filter="' + filterName + '"]').forEach(function (c) {
+                c.classList.toggle('filter-chip-active', c.dataset.value === '');
+            });
+        }
+        fireRequest(); updateDisplay();
+    };
+
+    function updateDisplay() {
+        var container = document.getElementById('solutions-active-filters');
+        var chips = document.getElementById('solutions-active-filters-chips');
+        if (!container || !chips) return;
+        var count = 0;
+        chips.innerHTML = '';
+        var svg = '<svg viewBox="0 0 512 512" width="12" height="12"><path d="M289.94 256l95-95A24 24 0 00351 127l-95 95-95-95a24 24 0 00-34 34l95 95-95 95a24 24 0 1034 34l95-95 95 95a24 24 0 0034-34z" fill="currentColor"/></svg>';
+
+        getMultiValues('block_type').forEach(function (val) {
+            var c = document.querySelector('.filter-chip[data-filter="block_type"][data-value="' + val + '"]');
+            var tag = document.createElement('span');
+            tag.className = 'datatable-filter-tag';
+            tag.innerHTML = '<span class="datatable-filter-tag-label">{% trans "Category" %}:</span> ' + (c ? c.textContent.trim() : val) +
+                ' <button class="datatable-filter-tag-remove" onclick="removeSolutionFilter(\'block_type\', \'' + val + '\')">' + svg + '</button>';
+            chips.appendChild(tag); count++;
+        });
+
+        var si = document.getElementById('filter-status');
+        if (si && si.value) {
+            var c = document.querySelector('.filter-chip[data-filter="status"][data-value="' + si.value + '"]');
+            var tag = document.createElement('span');
+            tag.className = 'datatable-filter-tag';
+            tag.innerHTML = '<span class="datatable-filter-tag-label">{% trans "Status" %}:</span> ' + (c ? c.textContent.trim() : si.value) +
+                ' <button class="datatable-filter-tag-remove" onclick="removeSolutionFilter(\'status\')">' + svg + '</button>';
+            chips.appendChild(tag); count++;
+        }
+        container.style.display = count > 0 ? 'flex' : 'none';
+    }
+    updateDisplay();
+})();
+</script>

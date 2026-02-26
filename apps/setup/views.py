@@ -154,6 +154,9 @@ def _get_step_context(step, hub_config, store_config, errors=None):
         context['grouped_blocks'] = grouped_blocks
         context['solutions'] = solutions
         context['selected_blocks_json'] = json.dumps(hub_config.selected_blocks or [])
+        # Check if AI assistant module is installed
+        assistant_dir = Path(settings.MODULES_DIR) / 'assistant'
+        context['assistant_active'] = assistant_dir.is_dir()
     elif step == 3:
         countries = get_all_countries()
         locale_map = get_locale_map(settings.LANGUAGES)
