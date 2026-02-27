@@ -5,20 +5,25 @@ Module management and marketplace - similar to WordPress modules page.
 All views support SPA navigation via HTMX.
 """
 import json
+import re
 import shutil
 import requests
 from pathlib import Path
 
 from django.http import JsonResponse
+from django.utils.html import escape as html_escape
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 from django.conf import settings as django_settings
 
 from apps.core.htmx import htmx_view
-from apps.accounts.decorators import login_required
+from apps.accounts.decorators import login_required, admin_required
 
 
 PER_PAGE_CHOICES = [10, 25, 50, 100]
+
+# Valid module_id: alphanumeric, underscores, hyphens only (no path separators)
+_MODULE_ID_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
 
 
 @login_required
@@ -34,7 +39,10 @@ def modules_index(request):
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
     current_view = request.GET.get('view', 'table')
-    per_page = int(request.GET.get('per_page', 10))
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+    except (ValueError, TypeError):
+        per_page = 10
     if per_page not in PER_PAGE_CHOICES:
         per_page = 10
     page_number = request.GET.get('page', 1)
@@ -584,16 +592,18 @@ def _trigger_server_reload():
 
 def _render_reload_response(message="Applying changes...", success_message="Module activated successfully"):
     """Return HTML that shows a loading spinner and reloads the page after server restarts"""
+    safe_message = html_escape(message)
+    safe_success = html_escape(success_message)
     html = f'''
     <div class="flex flex-col items-center justify-center py-24">
         <div class="loading" style="width: 48px; height: 48px;"></div>
-        <h2 class="mt-6">{message}</h2>
+        <h2 class="mt-6">{safe_message}</h2>
         <p class="text-sm opacity-60">The page will reload automatically.</p>
     </div>
     <script>
         (function() {{
             if (typeof showToast === 'function') {{
-                showToast('{message}', 'primary');
+                showToast('{safe_message}', 'primary');
             }}
 
             var attempts = 0;
@@ -604,7 +614,7 @@ def _render_reload_response(message="Applying changes...", success_message="Modu
                     .then(function(response) {{
                         if (response.ok) {{
                             if (typeof showToast === 'function') {{
-                                showToast('{success_message}', 'success');
+                                showToast('{safe_success}', 'success');
                             }}
                             setTimeout(function() {{
                                 window.location.href = '/modules/';
@@ -631,11 +641,14 @@ def _render_reload_response(message="Applying changes...", success_message="Modu
 
 
 @require_http_methods(["POST"])
-@login_required
+@admin_required
 def module_activate(request, module_id):
     """Activate a module by renaming folder and running migrations"""
     from django.core.management import call_command
     import io
+
+    if not _MODULE_ID_RE.match(module_id):
+        return JsonResponse({'success': False, 'error': 'Invalid module ID'}, status=400)
 
     modules_dir = Path(django_settings.MODULES_DIR)
     disabled_folder = modules_dir / f"_{module_id}"
@@ -687,9 +700,12 @@ def module_activate(request, module_id):
 
 
 @require_http_methods(["POST"])
-@login_required
+@admin_required
 def module_deactivate(request, module_id):
     """Deactivate a module by renaming folder"""
+    if not _MODULE_ID_RE.match(module_id):
+        return JsonResponse({'success': False, 'error': 'Invalid module ID'}, status=400)
+
     modules_dir = Path(django_settings.MODULES_DIR)
     active_folder = modules_dir / module_id
     disabled_folder = modules_dir / f"_{module_id}"
@@ -724,9 +740,12 @@ def module_deactivate(request, module_id):
 
 
 @require_http_methods(["POST"])
-@login_required
+@admin_required
 def module_delete(request, module_id):
     """Delete a module completely"""
+    if not _MODULE_ID_RE.match(module_id):
+        return JsonResponse({'success': False, 'error': 'Invalid module ID'}, status=400)
+
     modules_dir = Path(django_settings.MODULES_DIR)
     active_folder = modules_dir / module_id
     disabled_folder = modules_dir / f"_{module_id}"
@@ -752,10 +771,9 @@ def module_delete(request, module_id):
 
 
 @require_http_methods(["POST"])
+@admin_required
 def module_restart_server(request):
     """Restart server and run migrations."""
-    if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
     try:
         from django.core.management import call_command
@@ -777,10 +795,9 @@ def module_restart_server(request):
 
 
 @require_http_methods(["GET"])
+@login_required
 def fetch_marketplace(request):
     """Proxy to fetch modules from Cloud API"""
-    if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
     try:
         from apps.configuration.models import HubConfig
@@ -846,11 +863,9 @@ def fetch_marketplace(request):
 
 
 @require_http_methods(["POST"])
+@login_required
 def purchase_module(request):
     """Initiate module purchase via Cloud API"""
-    if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
-
     try:
         data = json.loads(request.body)
         module_id = data.get('module_id')
@@ -969,8 +984,6 @@ def rate_module(request):
 @login_required
 def check_ownership(request, module_id):
     """Check if Hub owner owns a specific module"""
-    if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
     try:
         from apps.configuration.models import HubConfig
@@ -1011,12 +1024,10 @@ def check_ownership(request, module_id):
 
 
 @require_http_methods(["POST"])
+@admin_required
 def install_from_marketplace(request):
     """Download and install module from Cloud"""
     from apps.core.services.module_install_service import ModuleInstallService
-
-    if 'local_user_id' not in request.session:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
     try:
         data = json.loads(request.body)

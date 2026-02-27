@@ -64,7 +64,10 @@ def role_list(request):
     source_filter = request.GET.get('source', '')
     page_number = request.GET.get('page', 1)
     current_view = request.GET.get('view', 'table')
-    per_page = int(request.GET.get('per_page', 10))
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+    except (ValueError, TypeError):
+        per_page = 10
     if per_page not in PER_PAGE_CHOICES:
         per_page = 10
 

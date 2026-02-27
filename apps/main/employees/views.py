@@ -15,7 +15,7 @@ from django.utils.translation import gettext_lazy as _
 from apps.core.htmx import htmx_view
 from apps.core.services import export_to_csv, export_to_excel
 from apps.core.services.import_service import parse_import_file, ImportResult
-from apps.accounts.decorators import login_required
+from apps.accounts.decorators import login_required, admin_required
 from apps.accounts.models import LocalUser, Role
 
 SORT_FIELDS = {
@@ -75,7 +75,10 @@ def index(request):
     status_filter = request.GET.get('status', '')
     page_number = request.GET.get('page', 1)
     current_view = request.GET.get('view', 'table')
-    per_page = int(request.GET.get('per_page', 10))
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+    except (ValueError, TypeError):
+        per_page = 10
     if per_page not in PER_PAGE_CHOICES:
         per_page = 10
 
@@ -163,7 +166,7 @@ def index(request):
     return context
 
 
-@login_required
+@admin_required
 def add(request):
     """Add employee — renders in side panel via HTMX."""
     hub_id = request.session.get('hub_id')
@@ -221,7 +224,7 @@ def add(request):
     })
 
 
-@login_required
+@admin_required
 def edit(request, employee_id):
     """Edit employee — renders in side panel via HTMX."""
     hub_id = request.session.get('hub_id')
@@ -270,7 +273,7 @@ def edit(request, employee_id):
     })
 
 
-@login_required
+@admin_required
 @require_POST
 def toggle_status(request, employee_id):
     """Toggle employee active/inactive status."""
@@ -297,7 +300,7 @@ def toggle_status(request, employee_id):
     return _render_list(request, hub_id)
 
 
-@login_required
+@admin_required
 @require_POST
 def bulk_toggle(request):
     """Bulk activate/deactivate/delete employees."""
@@ -327,13 +330,14 @@ def bulk_toggle(request):
         employees.update(is_active=False)
         messages.success(request, _('%(count)d employees deactivated') % {'count': count})
     elif action == 'delete':
-        employees.update(is_active=False)
+        # Soft-delete: deactivate and mark as deleted
+        employees.update(is_active=False, is_deleted=True)
         messages.success(request, _('%(count)d employees deleted') % {'count': count})
 
     return _render_list(request, hub_id)
 
 
-@login_required
+@admin_required
 @require_POST
 def reset_pin(request, employee_id):
     """Reset employee PIN."""
@@ -354,7 +358,7 @@ def reset_pin(request, employee_id):
     )
 
 
-@login_required
+@admin_required
 @require_POST
 def delete(request, employee_id):
     """Delete (deactivate) employee."""
@@ -374,7 +378,7 @@ def delete(request, employee_id):
     return _render_list(request, hub_id)
 
 
-@login_required
+@admin_required
 @require_POST
 def import_employees(request):
     """Import employees from CSV or Excel file."""
@@ -437,6 +441,7 @@ def import_employees(request):
             role=role_obj.name if role_obj else 'employee',
         )
         user.set_pin(pin)
+        user.save(update_fields=['pin_hash'])
         result.created += 1
 
     # Build result message
