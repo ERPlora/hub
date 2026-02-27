@@ -25,7 +25,7 @@
                 </span>
             </div>
             <div class="list-item-content">
-                <span class="list-item-label">{{ item.name }}</span>
+                <span class="list-item-label">{{ item.name }}{% if item.tier_slug %} <span class="badge badge-sm">{{ item.tier_slug|title }}</span>{% endif %}</span>
                 <span class="list-item-note">
                     {% if item.module_type == 'subscription' %}
                     &euro;{{ item.price|floatformat:2 }}/{% trans "mo" %}

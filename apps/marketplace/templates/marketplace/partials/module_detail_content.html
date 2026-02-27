@@ -84,7 +84,17 @@
                     <div class="module-detail-actions">
                         {% if not is_installed and not is_owned %}
                         <div class="mb-md text-right">
-                            {% if module.module_type == 'free' or is_free %}
+                            {% if module.assistant_tiers %}
+                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);" id="assistant-tier-price-display">&euro;{{ module.assistant_tiers.0.price_monthly }}/{% trans "mo" %}</div>
+                            <div class="fs-sm text-secondary mb-sm">{% trans "monthly subscription" %}</div>
+                            <select class="select w-full"
+                                    id="assistant-tier-select"
+                                    onchange="document.getElementById('assistant-tier-price-display').innerHTML = '&euro;' + this.selectedOptions[0].dataset.price + '/{% trans "mo" %}'">
+                                {% for tier in module.assistant_tiers %}
+                                <option value="{{ tier.slug }}" data-price="{{ tier.price_monthly }}">{{ tier.name }} — &euro;{{ tier.price_monthly }}/{% trans "mo" %}</option>
+                                {% endfor %}
+                            </select>
+                            {% elif module.module_type == 'free' or is_free %}
                             <div class="fs-2xl fw-bold" style="color: var(--color-success);">{% trans "Free" %}</div>
                             {% elif module.module_type == 'one_time' %}
                             <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.price }}</div>
@@ -308,6 +318,8 @@ document.addEventListener('click', function(e) {
         installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
     } else if (action === 'purchase') {
         purchaseModule(button.dataset.moduleId, button);
+    } else if (action === 'add-to-cart') {
+        addToCartDetail(button);
     }
 });
 
@@ -456,6 +468,51 @@ function setButtonLoading(button, loading) {
         button.innerHTML = '<div class="loading loading-sm"></div>';
     } else if (button.dataset.originalContent) {
         button.innerHTML = button.dataset.originalContent;
+    }
+}
+
+// Add to cart (detail page)
+async function addToCartDetail(button) {
+    setButtonLoading(button, true);
+    try {
+        var tierSelect = document.getElementById('assistant-tier-select');
+        var tierSlug = tierSelect ? tierSelect.value : '';
+        var dynamicPrice = tierSelect ? parseFloat(tierSelect.selectedOptions[0].dataset.price) : null;
+        var itemPrice = dynamicPrice || (parseFloat(button.dataset.modulePrice) || 0);
+
+        var payload = {
+            item_id: button.dataset.moduleSlug,
+            module_id: button.dataset.moduleId,
+            item_name: button.dataset.moduleName,
+            item_price: itemPrice,
+            item_icon: button.dataset.moduleIcon || 'cube-outline',
+            item_type: button.dataset.moduleType || 'one_time',
+            quantity: 1
+        };
+        if (tierSlug) payload.tier_slug = tierSlug;
+
+        const response = await fetch('{% url "marketplace:cart_add" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (data.success) {
+            Toast.success(button.dataset.moduleName + ' {% trans "added to cart" %}');
+            var badge = document.getElementById('cart-badge');
+            if (badge) {
+                badge.textContent = data.cart_count;
+                badge.style.display = '';
+            }
+            document.dispatchEvent(new CustomEvent('cart:open'));
+            htmx.trigger(document.body, 'cart:refresh');
+        } else {
+            Toast.error(data.error || '{% trans "Error adding to cart" %}');
+        }
+    } catch (error) {
+        Toast.error('{% trans "Error adding to cart" %}');
+    } finally {
+        setButtonLoading(button, false);
     }
 }
 

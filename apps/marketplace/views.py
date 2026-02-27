@@ -360,6 +360,7 @@ def cart_add(request, store_type):
         item_icon = data.get('item_icon', 'cube-outline')
         item_type = data.get('item_type', 'one_time')
         quantity = int(data.get('quantity', 1))
+        tier_slug = data.get('tier_slug', '')
     except (json.JSONDecodeError, ValueError):
         return HttpResponse(
             json.dumps({'success': False, 'error': 'Invalid data'}),
@@ -374,13 +375,13 @@ def cart_add(request, store_type):
 
     cart = get_cart(request, store_type)
 
-    # Check if item already in cart
+    # Check if item already in cart (for tiered modules, different tiers = different items)
     for item in cart['items']:
-        if item['id'] == item_id:
+        if item['id'] == item_id and item.get('tier_slug', '') == tier_slug:
             item['quantity'] += quantity
             break
     else:
-        cart['items'].append({
+        cart_item = {
             'id': item_id,
             'module_id': module_id,
             'name': item_name,
@@ -388,7 +389,10 @@ def cart_add(request, store_type):
             'icon': item_icon,
             'module_type': item_type,
             'quantity': quantity,
-        })
+        }
+        if tier_slug:
+            cart_item['tier_slug'] = tier_slug
+        cart['items'].append(cart_item)
 
     # Recalculate total
     cart['total'] = sum(item['price'] * item['quantity'] for item in cart['items'])
@@ -533,6 +537,7 @@ def cart_checkout(request, store_type='modules'):
                         'module_id': item.get('module_id', item['id']),
                         'module_slug': item['id'],
                         'quantity': item.get('quantity', 1),
+                        **(({'tier_slug': item['tier_slug']} if item.get('tier_slug') else {})),
                     }
                     for item in cart['items']
                 ],
