@@ -44,10 +44,11 @@ urlpatterns = [
     path('business-types/', views.business_types_index, name='business_types'),
     path('business-types/<slug:slug>/', views.business_type_detail, name='business_type_detail'),
 
-    # Solutions (internal API only — no browseable page)
+    # Solutions
     path('solutions/bulk-install/', views.solutions_bulk_install, name='solutions_bulk_install'),
     path('solutions/<slug:slug>/install/', views.solution_install, name='solution_install'),
     path('solutions/<slug:slug>/toggle/', views.block_toggle, name='block_toggle'),
+    path('solutions/<slug:slug>/', views.solution_detail, name='solution_detail'),
 
     # Compliance
     path('compliance/', views.compliance_index, name='compliance'),

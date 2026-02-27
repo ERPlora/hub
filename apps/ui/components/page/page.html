@@ -1,5 +1,0 @@
-{% load component_tags %}
-<div {% if back_hx_get %}data-back-url="{{ back_hx_get }}"{% endif %}
-     {% if title %}data-page-title="{{ title }}"{% endif %}>
-    {% slot "content" %}{% endslot %}
-</div>
