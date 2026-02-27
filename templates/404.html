@@ -1,0 +1,99 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% trans "Page Not Found" %} - ERPlora Hub</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ERPlora/ux@main/dist/ux-full.min.css">
+
+    <style>
+        .error-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            position: relative;
+            background: var(--color-base-200);
+        }
+
+        .error-container::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
+                radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 40% at 50% 50%, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .error-container::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px),
+                linear-gradient(90deg, color-mix(in oklch, var(--color-base-content) 3%, transparent) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .error-container > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .error-card {
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .error-code {
+            font-size: 8rem;
+            font-weight: 900;
+            color: var(--color-error);
+            margin: 0;
+            line-height: 1;
+        }
+
+        .error-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 1rem 0;
+        }
+
+        .error-message {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--color-base-content-secondary, #92949c);
+            margin-bottom: 2rem;
+        }
+    </style>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark' ||
+            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+</head>
+<body>
+    <div class="error-container">
+        <div class="card glass error-card">
+            <div class="card-body">
+                <h1 class="error-code">404</h1>
+                <h2 class="error-title">{% trans "Page Not Found" %}</h2>
+                <p class="error-message">{% trans "The page you're looking for doesn't exist or has been moved." %}</p>
+                <a href="/" class="btn color-primary">{% trans "Go to Home" %}</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
