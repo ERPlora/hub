@@ -72,7 +72,6 @@ LICENSE
 *.spec
 main.py
 build.py
-kiosk/
 installers/
 assets/
 
