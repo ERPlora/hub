@@ -928,19 +928,20 @@ def module_detail(request, slug):
         # Check if installed (compare both slug and module_id)
         is_installed = slug in installed_module_ids or module.get('module_id', '') in installed_module_ids
 
-        # Check ownership
-        is_owned = False
-        try:
-            ownership_response = requests.get(
-                f"{cloud_api_url}/api/marketplace/ownership/{module.get('id', '')}/",
-                headers=headers,
-                timeout=10
-            )
-            if ownership_response.status_code == 200:
-                ownership_data = ownership_response.json()
-                is_owned = ownership_data.get('is_owned', False)
-        except Exception:
-            pass
+        # Check ownership (from API response or via check_ownership endpoint)
+        is_owned = module.get('is_owned', False)
+        if not is_owned:
+            try:
+                ownership_response = requests.get(
+                    f"{cloud_api_url}/api/marketplace/modules/{module.get('id', '')}/check_ownership/",
+                    headers=headers,
+                    timeout=10
+                )
+                if ownership_response.status_code == 200:
+                    ownership_data = ownership_response.json()
+                    is_owned = ownership_data.get('is_owned', False)
+            except Exception:
+                pass
 
         # Determine if free
         is_free = module.get('module_type') == 'free' or module.get('price', 0) == 0
