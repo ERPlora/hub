@@ -106,7 +106,6 @@ INSTALLED_APPS = [
     'apps.main.files.apps.FilesConfig',
     'apps.main.settings.apps.MainSettingsConfig',
     'apps.main.employees.apps.MainEmployeesConfig',
-    'apps.setup.apps.SetupConfig',
     'apps.main.roles.apps.RolesConfig',
     # Hub apps - System
     'apps.system.modules.apps.SystemModulesConfig',
@@ -215,6 +214,10 @@ LOCALE_PATHS = [BASE_DIR / 'locale']
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
+
+# Force dot as decimal separator regardless of locale (required for JS interop)
+DECIMAL_SEPARATOR = '.'
+USE_THOUSAND_SEPARATOR = False
 
 # Language cookie settings (for auto-detection and persistence)
 # Middleware priority: 1. LocaleMiddleware checks URL (not used)

@@ -11,7 +11,45 @@
 </div>
 {% elif solution %}
 
-<div class="mt-5" x-data="blockDetail()">
+<div class="mt-5" x-data="{
+        toggling: false,
+        toggleResult: null,
+        async toggleBlock() {
+            this.toggling = true;
+            this.toggleResult = null;
+            try {
+                const response = await fetch('{% url 'marketplace:block_toggle' slug=solution.slug %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                            || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    var msg;
+                    if (data.action === 'installed') {
+                        var count = data.modules_installed || 0;
+                        msg = count > 0
+                            ? '{% trans 'Solution installed successfully' %} (' + count + ' {% trans 'modules' %})'
+                            : '{% trans 'Solution activated' %}';
+                    } else {
+                        msg = '{% trans 'Solution deactivated' %}';
+                    }
+                    this.toggleResult = { success: true, message: msg };
+                    setTimeout(function() {
+                        htmx.ajax('GET', '/marketplace/solutions/{{ solution.slug }}/', {target: '#main-content-area', swap: 'innerHTML'});
+                    }, data.requires_restart ? 2000 : 800);
+                } else {
+                    this.toggleResult = { success: false, message: data.error || '{% trans 'Action failed.' %}' };
+                }
+            } catch (e) {
+                this.toggleResult = { success: false, message: e.message };
+            }
+            this.toggling = false;
+        }
+    }">
     {# Hero card #}
     <div class="card glass mb-6">
         <div class="card-body p-6">
@@ -192,50 +230,6 @@
     </div>
 </div>
 
-<script>
-function blockDetail() {
-    return {
-        toggling: false,
-        toggleResult: null,
-        async toggleBlock() {
-            this.toggling = true;
-            this.toggleResult = null;
-            try {
-                const response = await fetch('{% url "marketplace:block_toggle" slug=solution.slug %}', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
-                            || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
-                        'Content-Type': 'application/json',
-                    },
-                });
-                const data = await response.json();
-                if (data.success) {
-                    let msg;
-                    if (data.action === 'installed') {
-                        const count = data.modules_installed || 0;
-                        msg = count > 0
-                            ? '{% trans "Solution installed successfully" %} (' + count + ' {% trans "modules" %})'
-                            : '{% trans "Solution activated" %}';
-                    } else {
-                        msg = '{% trans "Solution deactivated" %}';
-                    }
-                    this.toggleResult = { success: true, message: msg };
-                    // Reload detail page to refresh state
-                    setTimeout(() => {
-                        htmx.ajax('GET', '/marketplace/solutions/{{ solution.slug }}/', {target: '#main-content-area', swap: 'innerHTML'});
-                    }, data.requires_restart ? 2000 : 800);
-                } else {
-                    this.toggleResult = { success: false, message: data.error || '{% trans "Action failed." %}' };
-                }
-            } catch (e) {
-                this.toggleResult = { success: false, message: e.message };
-            }
-            this.toggling = false;
-        }
-    };
-}
-</script>
 {% endif %}
 
     {% endfill %}

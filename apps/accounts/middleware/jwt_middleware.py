@@ -34,7 +34,6 @@ class JWTMiddleware:
         '/verify-pin/',
         '/cloud-login/',
         '/setup-pin/',
-        '/setup/',  # Setup wizard (before first login)
         '/static/',
         '/media/',
         '/api/',  # API endpoints handle their own auth

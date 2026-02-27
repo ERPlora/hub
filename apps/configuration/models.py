@@ -240,11 +240,15 @@ class HubConfig(SingletonConfigMixin, models.Model):
         ('default', 'Default (Gray)'),
         ('blue', 'Blue'),
     ])
+    THEME_CHOICES = [
+        ('system', 'System (auto)'),
+        ('light', 'Light'),
+        ('dark', 'Dark'),
+    ]
+    theme = models.CharField(max_length=10, default='system', choices=THEME_CHOICES)
+    # Legacy fields — kept for migration compatibility
     dark_mode = models.BooleanField(default=False)
-    dark_mode_auto = models.BooleanField(
-        default=True,
-        help_text='Use browser/OS preference for dark mode (ignores dark_mode field)'
-    )
+    dark_mode_auto = models.BooleanField(default=True)
     auto_print = models.BooleanField(default=False)
 
     # Country (selected during setup wizard step 1)
@@ -377,6 +381,7 @@ class StoreConfig(SingletonConfigMixin, models.Model):
     """
     # Business Information
     business_name = models.CharField(max_length=255, blank=True)
+    tagline = models.CharField(max_length=255, blank=True, help_text='Tagline shown on login screen')
 
     # Default Tax Class (for products without category or category without tax_class)
     default_tax_class = models.ForeignKey(

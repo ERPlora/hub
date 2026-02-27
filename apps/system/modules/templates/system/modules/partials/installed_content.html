@@ -10,6 +10,28 @@
     }
 }">
 
+    {% if skipped_dependencies %}
+    <div class="callout callout-warning mb-4 mt-5">
+        <div class="callout-icon">{% icon "warning-outline" %}</div>
+        <div class="callout-content">
+            <div class="callout-title">{% trans "Modules with missing dependencies" %}</div>
+            <div class="callout-text">
+                {% for module_id, missing in skipped_dependencies.items %}
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="badge badge-sm">{{ module_id }}</span>
+                    <span class="text-sm opacity-70">
+                        {% trans "requires" %}:
+                        {% for dep in missing %}
+                        <span class="badge badge-sm color-error">{{ dep }}</span>{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="datatable glass mt-5" id="modules-datatable">
 
         <!-- Toolbar -->

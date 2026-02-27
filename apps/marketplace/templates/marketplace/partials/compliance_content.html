@@ -3,40 +3,172 @@
 <div class="mt-5">
     {% if countries %}
     <div class="mb-4">
-        <p class="text-sm opacity-60">{% trans "Select your country to see the required modules for legal compliance." %}</p>
+        <p class="text-sm opacity-60">{% trans "Legal and regulatory requirements for POS, invoicing, and tax reporting by country. Check if ERPlora meets the requirements in your region." %}</p>
     </div>
 
-    <div class="list list-inset glass">
+    <div class="accordion">
         {% for country in countries %}
-        <button class="list-item list-item-clickable list-item-multiline{% if hub_country == country.country_code %} bg-primary/5 ring-1 ring-primary/20{% endif %}"
-                hx-get="{% url 'marketplace:compliance_detail' country_code=country.country_code %}"
-                hx-target="#main-content-area"
-                hx-push-url="true">
-            <div class="list-item-start">
-                <span class="text-2xl">{{ country.country_code|country_flag }}</span>
-            </div>
-            <div class="list-item-content">
-                <span class="list-item-label">
-                    {{ country.country_name }}
-                    {% if hub_country == country.country_code %}
-                    <span class="badge badge-sm color-primary ml-1">{% trans "Your country" %}</span>
+        <details class="accordion-item{% if hub_country == country.country_code %} ring-1 ring-primary/20{% endif %}"
+                 {% if hub_country == country.country_code %}open{% endif %}>
+            <summary class="accordion-header">
+                <div class="flex items-center gap-3 flex-1">
+                    <span class="text-xl">{{ country.country_code|country_flag }}</span>
+                    <span class="accordion-title">
+                        {{ country.country_name }}
+                        {% if hub_country == country.country_code %}
+                        <span class="badge badge-sm color-primary ml-1">{% trans "Your country" %}</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if country.requirement_count > 0 %}
+                        {% if country.supported_count == country.requirement_count %}
+                        <span class="badge badge-sm color-success">
+                            {% icon "checkmark-circle-outline" %}
+                            {{ country.supported_count }}/{{ country.requirement_count }}
+                        </span>
+                        {% elif country.supported_count > 0 %}
+                        <span class="badge badge-sm color-warning">
+                            {{ country.supported_count }}/{{ country.requirement_count }}
+                        </span>
+                        {% else %}
+                        <span class="badge badge-sm color-error">
+                            0/{{ country.requirement_count }}
+                        </span>
+                        {% endif %}
+                    {% else %}
+                    <span class="badge badge-sm color-success">
+                        {% icon "checkmark-circle-outline" %}
+                        OK
+                    </span>
                     {% endif %}
-                </span>
+                    <span class="accordion-chevron"></span>
+                </div>
+            </summary>
+            <div class="accordion-body">
                 {% if country.description %}
-                <span class="list-item-note">{{ country.description|truncatewords:12 }}</span>
+                <p class="text-sm opacity-60 mb-4">{{ country.description }}</p>
+                {% endif %}
+
+                {% if country.requirements %}
+                    {% if country.supported_count < country.requirement_count %}
+                    <div class="callout callout-warning mb-4">
+                        <span class="callout-icon">{% icon "warning-outline" %}</span>
+                        <div class="callout-content">
+                            <span class="callout-text">{% trans "ERPlora does not yet meet all legal requirements in this country. Some features may not comply with local regulations." %}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                <div class="list">
+                    {% for req in country.requirements %}
+                    <div class="list-item list-item-multiline">
+                        <div class="list-item-content">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="list-item-label">{{ req.name }}</span>
+                                {% if req.is_mandatory %}
+                                <span class="badge badge-sm color-error">{% trans "Mandatory" %}</span>
+                                {% else %}
+                                <span class="badge badge-sm">{% trans "Recommended" %}</span>
+                                {% endif %}
+                                {% if req.status == 'enforced' %}
+                                <span class="badge badge-sm color-success">{% trans "In force" %}</span>
+                                {% elif req.status == 'upcoming' %}
+                                <span class="badge badge-sm color-warning">{% trans "Upcoming" %}{% if req.effective_date %} {{ req.effective_date }}{% endif %}</span>
+                                {% elif req.status == 'planned' %}
+                                <span class="badge badge-sm">{% trans "Planned" %}{% if req.effective_date %} {{ req.effective_date }}{% endif %}</span>
+                                {% endif %}
+                                {% if req.region %}
+                                <span class="badge badge-sm color-primary">{{ req.region }}</span>
+                                {% endif %}
+                            </div>
+                            {% if req.description %}
+                            <span class="list-item-note mt-1">{{ req.description }}</span>
+                            {% endif %}
+                            {% if req.scope %}
+                            <div class="flex items-center gap-1 mt-1">
+                                <span class="text-xs opacity-50">{% trans "Applies to:" %} {{ req.scope }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="list-item-end">
+                            {% if req.module_slug %}
+                                {% if req.is_installed %}
+                                <span class="badge badge-sm color-success">
+                                    {% icon "checkmark-circle" %}
+                                    {% trans "Installed" %}
+                                </span>
+                                {% else %}
+                                <button class="btn btn-sm color-primary"
+                                        onclick="installComplianceModule('{{ req.module_slug }}', this)"
+                                        data-module-slug="{{ req.module_slug }}">
+                                    {% icon "download-outline" %}
+                                    {% trans "Install" %}
+                                </button>
+                                {% endif %}
+                            {% else %}
+                            <span class="badge badge-sm color-error">
+                                {% icon "close-circle-outline" %}
+                                {% trans "Not available" %}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="callout callout-success">
+                    <span class="callout-icon">{% icon "checkmark-circle-outline" %}</span>
+                    <div class="callout-content">
+                        <span class="callout-text">{% trans "No specific requirements beyond EU-wide regulations. ERPlora is compatible with this country." %}</span>
+                    </div>
+                </div>
                 {% endif %}
             </div>
-            <div class="list-item-end">
-                <span class="badge badge-sm">{{ country.module_count }} {% trans "modules" %}</span>
-                <span class="list-item-chevron"></span>
-            </div>
-        </button>
+        </details>
         {% endfor %}
     </div>
+
+    <script>
+    function installComplianceModule(moduleSlug, button) {
+        var originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="loading loading-sm"></span>';
+
+        fetch('/modules/api/marketplace/install/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                module_slug: moduleSlug,
+                download_url: '{{ cloud_api_url|default:"https://erplora.com" }}/api/marketplace/modules/' + moduleSlug + '/download/'
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                button.outerHTML = '<span class="badge badge-sm color-success">{% icon "checkmark-circle" %} {% trans "Installed" %}</span>';
+                if (typeof Toast !== 'undefined') Toast.success('{% trans "Module installed successfully" %}');
+            } else {
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+                if (typeof Toast !== 'undefined') Toast.error(data.error || '{% trans "Installation failed" %}');
+            }
+        })
+        .catch(function(e) {
+            button.disabled = false;
+            button.innerHTML = originalHtml;
+            if (typeof Toast !== 'undefined') Toast.error(e.message);
+        });
+    }
+    </script>
     {% else %}
     <div class="text-center py-16">
         {% icon "shield-checkmark-outline" css_class="text-6xl opacity-20 mb-4" %}
-        <h3 class="text-lg font-semibold mb-2">{% trans "No Compliance Data Available" %}</h3>
+        <h3 class="text-lg font-semibold mb-2">{% trans "No compliance data available" %}</h3>
         <p class="text-sm opacity-60">{% trans "Could not load compliance requirements. Please check your internet connection and try again." %}</p>
     </div>
     {% endif %}

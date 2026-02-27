@@ -6,7 +6,7 @@ from apps.configuration.models import StoreConfig
 class StoreConfigCheckMiddleware:
     """
     Middleware to check if store is configured after login.
-    If store is not configured, redirect to setup wizard.
+    If not configured, auto-marks it as configured.
     """
 
     def __init__(self, get_response):
@@ -18,7 +18,6 @@ class StoreConfigCheckMiddleware:
             reverse('auth:cloud_login'),
             reverse('auth:verify_pin'),
             reverse('auth:setup_pin'),
-            reverse('setup:wizard'),
             reverse('main:settings'),
             '/api/',  # API endpoints
             '/static/',  # Static files

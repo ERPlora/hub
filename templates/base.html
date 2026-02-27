@@ -37,8 +37,8 @@
     </script>
     <script src="{% static 'js/bridge.js' %}" defer></script>
 
-    <!-- Alpine.js (CDN) -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Alpine.js (local) -->
+    <script defer src="{% static 'js/alpine.min.js' %}"></script>
 
     <!-- Alpine.js Global Stores -->
     <script>
@@ -262,8 +262,8 @@
         });
     </script>
 
-    <!-- HTMX (CDN) -->
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- HTMX (local) -->
+    <script src="{% static 'js/htmx.min.js' %}"></script>
 
     <!-- HTMX Configuration -->
     <script>
@@ -287,8 +287,15 @@
             // Using 'afterSettle' instead of 'afterSwap' to ensure scripts have executed
             document.body.addEventListener('htmx:afterSettle', function(event) {
                 // Let Alpine process any new x-data elements
+                // try-catch prevents errors from HTMX history cache replaying DOM
+                // that references functions defined in <script> tags no longer present
+                // (e.g. posApp() from the POS full-page template)
                 if (typeof Alpine !== 'undefined') {
-                    Alpine.initTree(event.detail.target);
+                    try {
+                        Alpine.initTree(event.detail.target);
+                    } catch (e) {
+                        // Silently ignore — stale x-data references from cached pages
+                    }
                 }
             });
 
@@ -443,28 +450,22 @@
     <!-- Auto dark mode detection (runs before body renders to prevent flash) -->
     <script>
         (function() {
-            const darkModeAuto = {{ HUB_CONFIG.dark_mode_auto|yesno:"true,false" }};
-            const darkModeManual = {{ HUB_CONFIG.dark_mode|yesno:"true,false" }};
-            const storedTheme = localStorage.getItem('erplora-theme');
+            var theme = '{{ HUB_CONFIG.theme|default:"system" }}';
+            var isDark = false;
 
-            let isDark = false;
-            if (storedTheme) {
-                // User has manually toggled — respect their choice
-                isDark = storedTheme === 'dark';
-            } else if (darkModeAuto) {
-                // Use browser/OS preference
-                isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (theme === 'dark') {
+                isDark = true;
+            } else if (theme === 'light') {
+                isDark = false;
             } else {
-                // Use manual setting from database
-                isDark = darkModeManual;
+                // system: follow OS preference
+                isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             }
 
-            // Store for Alpine.js components to access
             window.ERPlora = window.ERPlora || {};
             window.ERPlora.isDark = isDark;
-            window.ERPlora.darkModeAuto = darkModeAuto && !storedTheme;
+            window.ERPlora.theme = theme;
 
-            // Apply data-theme attribute immediately to prevent flash
             if (isDark) {
                 document.documentElement.setAttribute('data-theme', 'dark');
             } else {
@@ -473,13 +474,11 @@
         })();
     </script>
 </head>
-<body class="app">
+<body class="app" {% block body_attrs %}{% endblock %}>
     <script>
-        // Listen for system preference changes (only if auto mode and no manual override)
-        if (window.ERPlora && window.ERPlora.darkModeAuto) {
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                // Skip if user has set a manual preference since page load
-                if (localStorage.getItem('erplora-theme')) return;
+        // Listen for system preference changes (only in system mode)
+        if (window.ERPlora && window.ERPlora.theme === 'system') {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
                 if (e.matches) {
                     document.documentElement.setAttribute('data-theme', 'dark');
                 } else {

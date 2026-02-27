@@ -282,6 +282,20 @@
                             </select>
                         </div>
                     </div>
+
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Theme" %}</span>
+                            <span class="list-item-note">{% trans "Appearance mode for the interface" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <select name="theme" class="select w-auto min-w-44">
+                                <option value="system" {% if hub_config.theme == 'system' %}selected{% endif %}>{% trans "System (auto)" %}</option>
+                                <option value="light" {% if hub_config.theme == 'light' %}selected{% endif %}>{% trans "Light" %}</option>
+                                <option value="dark" {% if hub_config.theme == 'dark' %}selected{% endif %}>{% trans "Dark" %}</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
@@ -774,7 +788,30 @@
             </div>
 
             {# ── Connect Device QR ── #}
-            <div class="mt-6 flex flex-col items-center gap-4" x-data="hubQR()" x-init="generate()">
+            <div class="mt-6 flex flex-col items-center gap-4" x-data="{
+                hubUrl: window.location.origin,
+                generate() {
+                    if (typeof qrcode === 'undefined') return;
+                    var qr = qrcode(0, 'M');
+                    qr.addData(this.hubUrl);
+                    qr.make();
+                    var canvas = this.$refs.qrCanvas;
+                    var ctx = canvas.getContext('2d');
+                    var size = canvas.width;
+                    var count = qr.getModuleCount();
+                    var cellSize = size / count;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, size, size);
+                    ctx.fillStyle = '#000000';
+                    for (var r = 0; r < count; r++) {
+                        for (var c = 0; c < count; c++) {
+                            if (qr.isDark(r, c)) {
+                                ctx.fillRect(c * cellSize, r * cellSize, cellSize + 0.5, cellSize + 0.5);
+                            }
+                        }
+                    }
+                }
+            }" x-init="generate()">
                 <div class="qr qr-bordered">
                     <div class="qr-wrapper">
                         <canvas class="qr-canvas" x-ref="qrCanvas" width="180" height="180"></canvas>
@@ -873,30 +910,3 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script>
-function hubQR() {
-    return {
-        hubUrl: window.location.origin,
-        generate() {
-            var qr = qrcode(0, 'M');
-            qr.addData(this.hubUrl);
-            qr.make();
-            var canvas = this.$refs.qrCanvas;
-            var ctx = canvas.getContext('2d');
-            var size = canvas.width;
-            var count = qr.getModuleCount();
-            var cellSize = size / count;
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, size, size);
-            ctx.fillStyle = '#000000';
-            for (var r = 0; r < count; r++) {
-                for (var c = 0; c < count; c++) {
-                    if (qr.isDark(r, c)) {
-                        ctx.fillRect(c * cellSize, r * cellSize, cellSize + 0.5, cellSize + 0.5);
-                    }
-                }
-            }
-        }
-    }
-}
-</script>

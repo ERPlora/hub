@@ -1613,16 +1613,37 @@ def business_type_detail(request, slug):
 
 # --- Compliance views ---
 
+# Category display labels (keep in sync with Cloud ComplianceRequirement.CATEGORY_CHOICES)
+COMPLIANCE_CATEGORY_LABELS = {
+    'invoicing': _('Electronic Invoicing'),
+    'tax_reporting': _('Tax Reporting'),
+    'pos_fiscal': _('POS / Cash Register'),
+    'data_protection': _('Data Protection'),
+    'accounting': _('Accounting'),
+    'other': _('Other'),
+}
+
+COMPLIANCE_CATEGORY_ICONS = {
+    'invoicing': 'document-text-outline',
+    'tax_reporting': 'calculator-outline',
+    'pos_fiscal': 'card-outline',
+    'data_protection': 'shield-outline',
+    'accounting': 'book-outline',
+    'other': 'ellipsis-horizontal-outline',
+}
+
+
 @login_required
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/compliance_content.html')
 def compliance_index(request):
-    """Country compliance list — legal requirements by country."""
+    """Country compliance accordion — all countries with requirements on one page."""
     cloud_api_url = _get_cloud_api_url()
+    installed_ids = _get_installed_module_ids()
     countries = []
 
     try:
         response = requests.get(
-            f"{cloud_api_url}/api/marketplace/compliance/",
+            f"{cloud_api_url}/api/marketplace/compliance/?detail=true",
             headers={'Accept': 'application/json'},
             timeout=15,
         )
@@ -1630,6 +1651,12 @@ def compliance_index(request):
             countries = response.json()
     except requests.exceptions.RequestException:
         pass
+
+    # Mark installed modules in each country's requirements
+    for country in countries:
+        for req in country.get('requirements', []):
+            slug = req.get('module_slug')
+            req['is_installed'] = slug in installed_ids if slug else False
 
     cart = get_cart(request, 'modules')
 
@@ -1642,61 +1669,13 @@ def compliance_index(request):
         'countries': countries,
         'hub_country': hub_config.country_code,
         'cart_count': len(cart.get('items', [])),
+        'cloud_api_url': cloud_api_url,
         'navigation': _marketplace_navigation('compliance'),
     }
 
 
 @login_required
-@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/compliance_detail_content.html')
 def compliance_detail(request, country_code):
-    """Country compliance detail — required modules for a specific country."""
-    cloud_api_url = _get_cloud_api_url()
-    installed_ids = _get_installed_module_ids()
-
-    try:
-        response = requests.get(
-            f"{cloud_api_url}/api/marketplace/compliance/{country_code}/",
-            headers={'Accept': 'application/json'},
-            timeout=15,
-        )
-        if response.status_code == 404:
-            return {
-                'current_section': 'marketplace',
-                'error': _('Country not found.'),
-                'navigation': _marketplace_navigation('compliance'),
-            }
-        if response.status_code != 200:
-            return {
-                'current_section': 'marketplace',
-                'error': f'Cloud API returned {response.status_code}',
-                'navigation': _marketplace_navigation('compliance'),
-            }
-
-        country = response.json()
-
-        # Mark installed modules
-        all_installed = True
-        for mod in country.get('modules', []):
-            mod['is_installed'] = mod.get('slug', '') in installed_ids or mod.get('module_id', '') in installed_ids
-            if mod.get('is_mandatory') and not mod['is_installed']:
-                all_installed = False
-
-        cart = get_cart(request, 'modules')
-
-        return {
-            'current_section': 'marketplace',
-            'page_title': country.get('country_name', 'Compliance'),
-            'country': country,
-            'all_installed': all_installed,
-            'back_url': reverse('marketplace:compliance'),
-            'cart_count': len(cart.get('items', [])),
-            'cloud_api_url': cloud_api_url,
-            'navigation': _marketplace_navigation('compliance'),
-        }
-
-    except requests.exceptions.RequestException as e:
-        return {
-            'current_section': 'marketplace',
-            'error': f'Failed to connect to Cloud: {str(e)}',
-            'navigation': _marketplace_navigation('compliance'),
-        }
+    """Redirect to the main compliance page (accordion view)."""
+    from django.shortcuts import redirect
+    return redirect('marketplace:compliance')

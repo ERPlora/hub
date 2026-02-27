@@ -125,68 +125,6 @@ body {
    UTILITY
    ========================================================================== */
 
-.hub-loading {
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-
 body.hub-modal-open {
   overflow: hidden;
 }
-
-/* ==========================================================================
-   MODULE ICON COLORS
-   Colored backgrounds for module grid icons on the home dashboard.
-   ========================================================================== */
-/*
-.app-icon {
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-}
-
-.app-icon-primary {
-  background: var(--color-primary);
-}
-
-.app-icon-secondary {
-  background: var(--color-secondary);
-}
-
-.app-icon-success {
-  background: var(--color-success);
-}
-
-.app-icon-warning {
-  background: var(--color-warning);
-}
-
-.app-icon-error {
-  background: var(--color-error);
-}
-
-.app-icon-accent {
-  background: var(--color-accent, var(--color-secondary));
-}
-
-.app-icon-tertiary {
-  background: color-mix(in oklch, var(--color-primary) 60%, var(--color-secondary));
-}
-
-.app-icon-danger {
-  background: var(--color-error);
-}
-
-.app-icon-medium {
-  background: var(--color-base-400, #9ca3af);
-}
-
-.app-icon-dark {
-  background: var(--color-base-700, #374151);
-}
-*/
