@@ -683,7 +683,10 @@ def products_list(request, store_type):
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
     current_view = request.GET.get('view', 'cards')
-    per_page = int(request.GET.get('per_page', 12))
+    try:
+        per_page = int(request.GET.get('per_page', 12))
+    except (ValueError, TypeError):
+        per_page = 12
     if per_page not in MARKETPLACE_PER_PAGE_CHOICES:
         per_page = 12
     page_number = request.GET.get('page', 1)
@@ -1038,7 +1041,10 @@ def solutions_list(request):
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
     current_view = request.GET.get('view', 'cards')
-    per_page = int(request.GET.get('per_page', 12))
+    try:
+        per_page = int(request.GET.get('per_page', 12))
+    except (ValueError, TypeError):
+        per_page = 12
     if per_page not in MARKETPLACE_PER_PAGE_CHOICES:
         per_page = 12
     page_number = request.GET.get('page', 1)

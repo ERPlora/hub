@@ -224,7 +224,7 @@ def cloud_login(request):
                                 cloud_user_id=cloud_user_id,
                                 email=email,
                                 name=user_info.get('name', email.split('@')[0]),
-                                role='admin' if is_first_user else 'cashier',
+                                role='admin' if is_first_user else 'employee',
                                 pin_hash='',
                                 language=user_info.get('language', hub_config.os_language),
                             )
