@@ -89,6 +89,14 @@ class ModuleInstallService:
         """
         modules_dir = Path(settings.MODULES_DIR)
 
+        # Validate URL scheme
+        if not download_url.startswith(('http://', 'https://')):
+            return InstallResult(
+                success=False,
+                module_id=module_slug,
+                message="Invalid download URL scheme",
+            )
+
         # Normalize URL
         if download_url.startswith('http://'):
             download_url = download_url.replace('http://', 'https://', 1)
@@ -131,6 +139,15 @@ class ModuleInstallService:
                 tmp_extract_path = Path(tmp_extract)
 
                 with zipfile.ZipFile(tmp_path, 'r') as zf:
+                    # Zip slip protection: reject entries with path traversal
+                    for member in zf.namelist():
+                        member_path = (tmp_extract_path / member).resolve()
+                        if not str(member_path).startswith(str(tmp_extract_path.resolve())):
+                            return InstallResult(
+                                success=False,
+                                module_id=module_slug,
+                                message="ZIP contains path traversal entry",
+                            )
                     zf.extractall(tmp_extract_path)
 
                 # Detect single root folder

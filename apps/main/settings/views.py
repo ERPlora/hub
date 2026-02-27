@@ -9,7 +9,7 @@ from django.conf import settings as django_settings
 from django.utils import translation
 from zoneinfo import available_timezones
 from apps.core.htmx import htmx_view
-from apps.accounts.decorators import login_required
+from apps.accounts.decorators import login_required, admin_required
 from apps.accounts.models import LocalUser
 from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass, PrinterConfig
 
@@ -53,7 +53,7 @@ def toast_response(message, msg_type='success', status=200, **extra_triggers):
     return response
 
 
-@login_required
+@admin_required
 @htmx_view('main/settings/pages/index.html', 'main/settings/partials/content.html')
 def index(request):
     """Settings page"""
