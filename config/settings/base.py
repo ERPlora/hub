@@ -474,7 +474,7 @@ DJICONS = {
     "ICON_DIRS": {
         "ion": BASE_DIR / "static" / "icons" / "ionicons",
     },
-    "PACKS": [],  # Disable bundled packs, use ICON_DIRS instead
+    "PACKS": ["material"],  # Material Symbols via CDN for material:icon_name
     "MISSING_ICON_SILENT": False,  # Show error in development
     "CACHE_TIMEOUT": 86400,  # 24 hours
     "DEFAULT_CLASS": "icon",  # Base CSS class for all icons
@@ -485,31 +485,93 @@ DJICONS = {
 # AUTO-LOAD MODULES (common logic)
 # =============================================================================
 
+MODULES_SKIPPED_DEPENDENCIES = {}
+
+
 def load_modules(modules_dir=None):
-    """Load active modules from modules_dir into INSTALLED_APPS.
+    """Load active modules into INSTALLED_APPS with dependency resolution.
+
+    Reads DEPENDENCIES from each module's module.py, performs cascading removal
+    of modules with unmet dependencies, and adds modules in topological order.
+
+    Skipped modules are stored in MODULES_SKIPPED_DEPENDENCIES as:
+        {module_id: [list_of_missing_dep_ids]}
 
     Args:
         modules_dir: Path to modules directory. Uses MODULES_DIR if not provided.
     """
-    target_dir = Path(modules_dir) if modules_dir else MODULES_DIR
+    import re
+    import importlib.util
 
+    global MODULES_SKIPPED_DEPENDENCIES
+    MODULES_SKIPPED_DEPENDENCIES = {}
+
+    target_dir = Path(modules_dir) if modules_dir else MODULES_DIR
     if not target_dir.exists():
         return
 
+    # 1. Discover enabled modules (skip _ and . prefixes, invalid identifiers)
+    enabled_ids = set()
     for module_dir in target_dir.iterdir():
         if not module_dir.is_dir():
             continue
-        # Skip disabled modules (start with _ or .)
         if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
             continue
-        # Skip directories that aren't valid Python identifiers (e.g. hyphens)
         if not module_dir.name.isidentifier():
             print(f"[SETTINGS] Skipping invalid module dir: {module_dir.name}")
             continue
+        enabled_ids.add(module_dir.name)
 
-        if module_dir.name not in INSTALLED_APPS:
-            INSTALLED_APPS.append(module_dir.name)
-            print(f"[SETTINGS] Auto-loaded module: {module_dir.name}")
+    # 2. Read DEPENDENCIES from each module's module.py
+    deps = {}
+    for mid in enabled_ids:
+        raw_deps = []
+        module_py_path = target_dir / mid / 'module.py'
+        if module_py_path.exists():
+            try:
+                spec = importlib.util.spec_from_file_location(
+                    f"{mid}._module_meta", module_py_path
+                )
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                raw_deps = getattr(mod, 'DEPENDENCIES', [])
+            except Exception:
+                pass
+        # Strip version specifiers: 'sales>=1.0.0' -> 'sales'
+        deps[mid] = [re.split(r'[><=!]', d)[0].strip() for d in raw_deps if d]
+
+    # 3. Cascading removal of modules with unmet dependencies
+    to_load = set(enabled_ids)
+    changed = True
+    while changed:
+        changed = False
+        for mid in list(to_load):
+            missing = [d for d in deps.get(mid, []) if d not in to_load]
+            if missing:
+                to_load.discard(mid)
+                MODULES_SKIPPED_DEPENDENCIES[mid] = missing
+                print(f"[SETTINGS] Module '{mid}' skipped: missing deps {missing}")
+                changed = True
+
+    # 4. Topological sort (dependencies loaded before dependents)
+    ordered = []
+    visited = set()
+
+    def visit(mid):
+        if mid in visited or mid not in to_load:
+            return
+        visited.add(mid)
+        for dep in deps.get(mid, []):
+            visit(dep)
+        ordered.append(mid)
+
+    for mid in sorted(to_load):
+        visit(mid)
+
+    # 5. Add to INSTALLED_APPS in dependency order
+    for mid in ordered:
+        if mid not in INSTALLED_APPS:
+            INSTALLED_APPS.append(mid)
 
 
 def load_module_templates(modules_dir=None):
