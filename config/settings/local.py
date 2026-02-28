@@ -127,103 +127,11 @@ MODULE_AUTO_RELOAD = True
 MODULE_STRICT_VALIDATION = False
 
 # =============================================================================
-# RE-LOAD MODULES (override base.py loading)
+# LOAD MODULES (delegates to base.py load_modules with full dependency resolution)
 # =============================================================================
 
-# Clear any modules that base.py may have loaded, then reload with dependency checks
-def reload_local_modules():
-    """Reload modules with dependency resolution."""
-    global INSTALLED_APPS
-    import re
-
-    # Remove any modules previously loaded by base.py
-    third_party_apps = [
-        'djmoney', 'django_htmx', 'djicons', 'django_components',
-        'rest_framework', 'drf_spectacular', 'drf_spectacular_sidecar',
-        'health_check',
-    ]
-    INSTALLED_APPS = [app for app in INSTALLED_APPS if not (
-        isinstance(app, str) and
-        not app.startswith('django') and
-        not app.startswith('apps.') and
-        not app.startswith('health_check') and
-        app not in third_party_apps
-    )]
-
-    if not MODULES_DIR.exists():
-        return
-
-    # 1. Discover enabled modules
-    enabled_ids = set()
-    for module_dir in MODULES_DIR.iterdir():
-        if not module_dir.is_dir():
-            continue
-        if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
-            continue
-        enabled_ids.add(module_dir.name)
-
-    # 2. Read dependencies for each module
-    deps = {}
-    for mid in enabled_ids:
-        raw_deps = []
-        # Try module.py first
-        module_py_path = MODULES_DIR / mid / 'module.py'
-        if module_py_path.exists():
-            try:
-                import importlib.util
-                spec = importlib.util.spec_from_file_location(f"{mid}.module", module_py_path)
-                mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(mod)
-                raw_deps = getattr(mod, 'DEPENDENCIES', [])
-            except Exception:
-                pass
-
-        # Strip version specifiers
-        deps[mid] = [re.split(r'[><=!]', d)[0].strip() for d in raw_deps if d]
-
-    # 3. Remove modules with unmet dependencies (cascading)
-    to_load = set(enabled_ids)
-    changed = True
-    while changed:
-        changed = False
-        for mid in list(to_load):
-            missing = [d for d in deps.get(mid, []) if d not in to_load]
-            if missing:
-                to_load.discard(mid)
-                print(f"[LOCAL] Module '{mid}' skipped: missing dependencies {missing}")
-                changed = True
-
-    # 4. Topological sort
-    ordered = []
-    visited = set()
-    def visit(mid):
-        if mid in visited or mid not in to_load:
-            return
-        visited.add(mid)
-        for dep in deps.get(mid, []):
-            visit(dep)
-        ordered.append(mid)
-    for mid in sorted(to_load):
-        visit(mid)
-
-    # 5. Add to INSTALLED_APPS
-    for mid in ordered:
-        if mid not in INSTALLED_APPS:
-            INSTALLED_APPS.append(mid)
-            print(f"[LOCAL] Loaded module: {mid}")
-
-reload_local_modules()
-
-# Add module templates (keeping global templates directory)
-if MODULES_DIR.exists():
-    # Start with existing global templates directory
-    template_dirs = [str(d) for d in TEMPLATES[0]['DIRS']]
-
-    for module_dir in MODULES_DIR.iterdir():
-        if module_dir.is_dir() and (module_dir / 'templates').exists():
-            template_dirs.append(str(module_dir / 'templates'))
-
-    TEMPLATES[0]['DIRS'] = template_dirs
+load_modules(MODULES_DIR)
+load_module_templates(MODULES_DIR)
 
 print(f"[LOCAL] Development mode")
 print(f"[LOCAL] Modules: {MODULES_DIR}")

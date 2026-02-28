@@ -1613,23 +1613,265 @@ def business_type_detail(request, slug):
 
 # --- Compliance views ---
 
+# Category display labels (keep in sync with Cloud ComplianceRequirement.CATEGORY_CHOICES)
+COMPLIANCE_CATEGORY_LABELS = {
+    'invoicing': _('Electronic Invoicing'),
+    'tax_reporting': _('Tax Reporting'),
+    'pos_fiscal': _('POS / Cash Register'),
+    'data_protection': _('Data Protection'),
+    'accounting': _('Accounting'),
+    'other': _('Other'),
+}
+
+COMPLIANCE_CATEGORY_ICONS = {
+    'invoicing': 'document-text-outline',
+    'tax_reporting': 'calculator-outline',
+    'pos_fiscal': 'card-outline',
+    'data_protection': 'shield-outline',
+    'accounting': 'book-outline',
+    'other': 'ellipsis-horizontal-outline',
+}
+
+
+def _get_compliance_data():
+    """
+    Local compliance data — regulatory modules required per country.
+    module_id: the module_id of the ERPlora module that covers this requirement, or None.
+    """
+    return [
+        {
+            'country_code': 'ES',
+            'country_name': 'España',
+            'description': 'España tiene requisitos nacionales (VeriFactu, SII) y regionales (TicketBAI en País Vasco). También se prevé facturación electrónica B2B obligatoria.',
+            'requirements': [
+                {
+                    'name': 'VeriFactu',
+                    'description': 'Sistema antifraude de facturación electrónica. Requiere software certificado que garantice integridad, inmutabilidad y trazabilidad de los registros de facturación.',
+                    'module_id': 'verifactu',
+                    'region': '',
+                },
+                {
+                    'name': 'SII',
+                    'description': 'Suministro Inmediato de Información. Comunicación electrónica en tiempo real de datos de IVA a la AEAT.',
+                    'module_id': 'sii',
+                    'region': '',
+                },
+                {
+                    'name': 'TicketBAI',
+                    'description': 'Sistema de facturación regional del País Vasco. Cada factura se firma digitalmente y se encadena con la anterior.',
+                    'module_id': None,
+                    'region': 'País Vasco (Álava, Gipuzkoa, Bizkaia)',
+                },
+                {
+                    'name': 'Factura-e B2B',
+                    'description': 'Facturación electrónica B2B obligatoria en formato estructurado EN 16931.',
+                    'module_id': 'facturae_b2b',
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'PT',
+            'country_name': 'Portugal',
+            'description': 'Portugal requiere software de facturación certificado (SAF-T) para todas las empresas. Códigos QR y ATCUD obligatorios en todas las facturas.',
+            'requirements': [
+                {
+                    'name': 'SAF-T PT',
+                    'description': 'Envío mensual del fichero SAF-T de facturación a la Autoridade Tributária. Requiere software certificado por la AT.',
+                    'module_id': None,
+                    'region': '',
+                },
+                {
+                    'name': 'ATCUD',
+                    'description': 'Código único de documento (ATCUD) y código QR obligatorios en todas las facturas.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'FR',
+            'country_name': 'Francia',
+            'description': 'Francia requiere certificación NF525/LNE para todo software de TPV. La facturación electrónica B2B obligatoria entra en vigor desde septiembre de 2026.',
+            'requirements': [
+                {
+                    'name': 'NF525 TPV',
+                    'description': 'Certificación antifraude IVA para software de TPV/caja registradora.',
+                    'module_id': None,
+                    'region': '',
+                },
+                {
+                    'name': 'Facture-X B2B',
+                    'description': 'Facturación electrónica B2B obligatoria a través de plataformas certificadas (PDP).',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'IT',
+            'country_name': 'Italia',
+            'description': 'Italia tiene un sistema centralizado de facturación electrónica (SDI) obligatorio para todas las empresas desde 2019.',
+            'requirements': [
+                {
+                    'name': 'FatturaPA',
+                    'description': 'Sistema centralizado de facturación electrónica. Todas las facturas en formato FatturaPA XML transmitidas a través de SDI.',
+                    'module_id': None,
+                    'region': '',
+                },
+                {
+                    'name': 'Corrispettivi',
+                    'description': 'Cajas registradoras electrónicas certificadas para comercio minorista.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'DE',
+            'country_name': 'Alemania',
+            'description': 'Alemania requiere TSE certificado para todas las cajas registradoras electrónicas. La facturación electrónica B2B se está implementando.',
+            'requirements': [
+                {
+                    'name': 'TSE KassenSichV',
+                    'description': 'Todas las cajas registradoras electrónicas deben tener un TSE certificado que registra y firma digitalmente cada transacción.',
+                    'module_id': None,
+                    'region': '',
+                },
+                {
+                    'name': 'XRechnung',
+                    'description': 'Facturación electrónica B2B obligatoria en formatos EN 16931.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'PL',
+            'country_name': 'Polonia',
+            'description': 'Polonia implementa KSeF, una plataforma gubernamental centralizada de facturación electrónica obligatoria.',
+            'requirements': [
+                {
+                    'name': 'KSeF',
+                    'description': 'Plataforma gubernamental centralizada de facturación electrónica. Formato XML FA(3) obligatorio.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'GR',
+            'country_name': 'Grecia',
+            'description': 'Grecia implementa facturación electrónica B2B obligatoria a través de la plataforma myDATA.',
+            'requirements': [
+                {
+                    'name': 'myDATA',
+                    'description': 'Facturación electrónica B2B obligatoria via myDATA.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'RO',
+            'country_name': 'Rumanía',
+            'description': 'Rumanía tiene facturación electrónica obligatoria (RO e-Factura) para todas las transacciones B2B y B2C.',
+            'requirements': [
+                {
+                    'name': 'e-Factura RO',
+                    'description': 'Facturación electrónica obligatoria a través de la plataforma RO e-Factura.',
+                    'module_id': None,
+                    'region': '',
+                },
+                {
+                    'name': 'SAF-T RO',
+                    'description': 'Fichero estándar de auditoría fiscal, enviado electrónicamente mediante Declaración Informativa D406 a ANAF.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'HU',
+            'country_name': 'Hungría',
+            'description': 'Hungría tiene informes de facturas en tiempo real (RTIR) obligatorios para todos los contribuyentes de IVA.',
+            'requirements': [
+                {
+                    'name': 'NAV Online',
+                    'description': 'Comunicación en tiempo real de datos de facturas a NAV mediante el sistema Online Számla.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'BE',
+            'country_name': 'Bélgica',
+            'description': 'Bélgica obliga a la facturación electrónica B2B a través de Peppol desde enero de 2026.',
+            'requirements': [
+                {
+                    'name': 'Peppol BE',
+                    'description': 'Facturación electrónica B2B estructurada obligatoria en formato EN 16931 a través de la red Peppol.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'AT',
+            'country_name': 'Austria',
+            'description': 'Austria requiere cajas registradoras a prueba de manipulaciones (RKSV) con unidades de firma digital.',
+            'requirements': [
+                {
+                    'name': 'RKSV',
+                    'description': 'Cajas registradoras a prueba de manipulaciones con unidades de firma digital.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+        {
+            'country_code': 'HR',
+            'country_name': 'Croacia',
+            'description': 'Croacia implementa Fiscalización 2.0 con facturación electrónica B2B obligatoria e informes en tiempo real.',
+            'requirements': [
+                {
+                    'name': 'Fiscalización HR',
+                    'description': 'Facturación electrónica B2B y B2G obligatoria e informes en tiempo real.',
+                    'module_id': None,
+                    'region': '',
+                },
+            ],
+        },
+    ]
+
+
 @login_required
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/compliance_content.html')
 def compliance_index(request):
-    """Country compliance list — legal requirements by country."""
-    cloud_api_url = _get_cloud_api_url()
-    countries = []
+    """Country compliance — local data, no Cloud dependency."""
+    installed_ids = _get_installed_module_ids()
+    countries = _get_compliance_data()
 
-    try:
-        response = requests.get(
-            f"{cloud_api_url}/api/marketplace/compliance/",
-            headers={'Accept': 'application/json'},
-            timeout=15,
-        )
-        if response.status_code == 200:
-            countries = response.json()
-    except requests.exceptions.RequestException:
-        pass
+    # Mark which modules exist (installed locally)
+    for country in countries:
+        supported = 0
+        for req in country['requirements']:
+            module_id = req.get('module_id')
+            if module_id and module_id in installed_ids:
+                req['is_available'] = True
+                req['is_installed'] = True
+                supported += 1
+            elif module_id:
+                # Module exists in ERPlora but not installed on this Hub
+                req['is_available'] = True
+                req['is_installed'] = False
+                supported += 1
+            else:
+                req['is_available'] = False
+                req['is_installed'] = False
+        country['supported_count'] = supported
+        country['requirement_count'] = len(country['requirements'])
 
     cart = get_cart(request, 'modules')
 
@@ -1647,56 +1889,7 @@ def compliance_index(request):
 
 
 @login_required
-@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/compliance_detail_content.html')
 def compliance_detail(request, country_code):
-    """Country compliance detail — required modules for a specific country."""
-    cloud_api_url = _get_cloud_api_url()
-    installed_ids = _get_installed_module_ids()
-
-    try:
-        response = requests.get(
-            f"{cloud_api_url}/api/marketplace/compliance/{country_code}/",
-            headers={'Accept': 'application/json'},
-            timeout=15,
-        )
-        if response.status_code == 404:
-            return {
-                'current_section': 'marketplace',
-                'error': _('Country not found.'),
-                'navigation': _marketplace_navigation('compliance'),
-            }
-        if response.status_code != 200:
-            return {
-                'current_section': 'marketplace',
-                'error': f'Cloud API returned {response.status_code}',
-                'navigation': _marketplace_navigation('compliance'),
-            }
-
-        country = response.json()
-
-        # Mark installed modules
-        all_installed = True
-        for mod in country.get('modules', []):
-            mod['is_installed'] = mod.get('slug', '') in installed_ids or mod.get('module_id', '') in installed_ids
-            if mod.get('is_mandatory') and not mod['is_installed']:
-                all_installed = False
-
-        cart = get_cart(request, 'modules')
-
-        return {
-            'current_section': 'marketplace',
-            'page_title': country.get('country_name', 'Compliance'),
-            'country': country,
-            'all_installed': all_installed,
-            'back_url': reverse('marketplace:compliance'),
-            'cart_count': len(cart.get('items', [])),
-            'cloud_api_url': cloud_api_url,
-            'navigation': _marketplace_navigation('compliance'),
-        }
-
-    except requests.exceptions.RequestException as e:
-        return {
-            'current_section': 'marketplace',
-            'error': f'Failed to connect to Cloud: {str(e)}',
-            'navigation': _marketplace_navigation('compliance'),
-        }
+    """Redirect to the main compliance page (accordion view)."""
+    from django.shortcuts import redirect
+    return redirect('marketplace:compliance')

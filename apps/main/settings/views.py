@@ -125,6 +125,7 @@ def index(request):
             language = request.POST.get('language')
             timezone = request.POST.get('timezone')
             currency = request.POST.get('currency')
+            theme = request.POST.get('theme')
 
             # Validate and set system language
             if language:
@@ -143,7 +144,15 @@ def index(request):
                 if currency in valid_currencies:
                     hub_config.currency = currency
 
+            if theme and theme in ('system', 'light', 'dark'):
+                hub_config.theme = theme
+
             hub_config.save()
+
+            if theme:
+                response = toast_response('Hub settings saved')
+                response['HX-Refresh'] = 'true'
+                return response
 
             return toast_response('Hub settings saved')
 
