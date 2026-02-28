@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static i18n djicons %}
 
-{% block title %}ERPlora Hub - {% trans "Login" %}{% endblock %}
+{% block title %}{{ store_config.business_name|default:"ERPlora Hub" }} - {% trans "Login" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -68,21 +68,19 @@
 
 {% block content %}
 <div x-data="loginApp()" x-init="init()">
-    <!-- Theme Toggle -->
-    <button class="btn btn-glass btn-circle fixed top-6 right-6 z-50" @click="toggleTheme()">
-        <span x-show="isDark">{% icon "sunny-outline" %}</span>
-        <span x-show="!isDark">{% icon "moon-outline" %}</span>
-    </button>
-
     <!-- Page (.page = fixed viewport grid, .content = scrollable) -->
     <div class="page login-bg" style="height: 100dvh;">
       <div class="content login-content">
         <div class="w-full max-w-md">
             <!-- Logo -->
             <div class="login-logo flex flex-col items-center text-center mb-8">
-                <img src="{% static 'img/logo.png' %}" alt="ERPlora">
-                <h1>ERPlora</h1>
-                <p>{% trans "Business Management System" %}</p>
+                {% if store_config.logo %}
+                    <img src="{{ store_config.logo.url }}" alt="{{ store_config.business_name|default:'ERPlora' }}">
+                {% else %}
+                    <img src="{% static 'img/logo.png' %}" alt="ERPlora">
+                {% endif %}
+                <h1>{{ store_config.business_name|default:"ERPlora" }}</h1>
+                <p>{{ store_config.tagline|default:_("Business Management System") }}</p>
             </div>
 
             <!-- Login Card -->
@@ -455,29 +453,6 @@
                     this.setupPinFirst = '';
                     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                     setTimeout(() => this.setupPinError = false, 2000);
-                }
-            },
-
-            async toggleTheme() {
-                this.isDark = !this.isDark;
-                if (this.isDark) {
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                } else {
-                    document.documentElement.removeAttribute('data-theme');
-                }
-                localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
-
-                try {
-                    await fetch('{% url "main:settings" %}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        },
-                        body: `action=update_theme&dark_mode=${this.isDark}`
-                    });
-                } catch (e) {
-                    console.log('Theme saved locally only');
                 }
             },
 

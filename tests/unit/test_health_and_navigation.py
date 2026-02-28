@@ -156,10 +156,3 @@ class TestAuthRedirects:
         assert response.status_code == 302
         assert '/login/' in response.url
 
-    def test_unauthenticated_redirected_from_setup(self, client, db, store_config):
-        """Unauthenticated users should be redirected from the setup wizard."""
-        url = reverse('setup:wizard')
-        response = client.get(url)
-
-        assert response.status_code == 302
-        assert '/login/' in response.url

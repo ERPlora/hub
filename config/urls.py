@@ -15,7 +15,6 @@ URL Structure
 /                           Web UI (HTML + HTMX)
 ├── /                       Root redirect (→ /home/ or /login/)
 ├── /login/, /logout/       Authentication pages
-├── /setup/                 First-time setup wizard
 ├── /home/                  Home dashboard
 ├── /files/                 File browser
 ├── /settings/              Settings page
@@ -33,7 +32,7 @@ URL Structure
 Namespaces
 ==========
 API:  api_auth, api_employees, api_config, api_modules, api_system, api_sync
-UI:   auth, main, store, setup, configuration, htmx
+UI:   auth, main, store, configuration, htmx
 """
 from django.contrib import admin
 from django.urls import path, include
@@ -94,9 +93,6 @@ urlpatterns = [
 
     # Auth routes (login, logout, etc.)
     path('', include('apps.auth.login.urls')),
-
-    # Setup wizard (initial configuration)
-    path('setup/', include('apps.setup.urls')),
 
     # Main UI routes (flat structure for clear active states)
     path('', include('apps.main.urls')),  # Home at /

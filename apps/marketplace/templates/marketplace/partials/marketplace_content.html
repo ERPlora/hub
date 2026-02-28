@@ -19,9 +19,39 @@
         document.querySelectorAll('[data-col=' + col + ']').forEach(el => el.classList.toggle('hidden', !this.cols[col]));
     },
     toggle(slug) {
-        if (this.selected.has(slug)) this.selected.delete(slug);
-        else this.selected.add(slug);
+        if (this.selected.has(slug)) {
+            this.selected.delete(slug);
+            this.removeOrphanDeps();
+        } else {
+            this.selected.add(slug);
+            this.addDependencies(slug);
+        }
         this.selected = new Set(this.selected);
+    },
+    getDeps(slug) {
+        var cards = document.querySelectorAll('[data-module-slug]');
+        for (var i = 0; i < cards.length; i++) {
+            if (cards[i].dataset.moduleSlug === slug) return (cards[i].dataset.dependencies || '').split(',').filter(Boolean);
+        }
+        return [];
+    },
+    addDependencies(slug) {
+        this.getDeps(slug).forEach(dep => {
+            if (!this.selected.has(dep)) {
+                this.selected.add(dep);
+                this.addDependencies(dep);
+            }
+        });
+    },
+    removeOrphanDeps() {
+        var fresh = new Set();
+        this.selected.forEach(slug => {
+            fresh.add(slug);
+            this.getDeps(slug).forEach(dep => fresh.add(dep));
+        });
+        this.selected.forEach(slug => {
+            if (!fresh.has(slug)) this.selected.delete(slug);
+        });
     },
     clearSelection() { this.selected = new Set(); },
     get selectedCount() { return this.selected.size; },

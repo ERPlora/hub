@@ -37,7 +37,7 @@
             </div>
 
             <!-- Drawer Content: Navigation -->
-            <div class="content scroll-area-viewport" style="padding: 0.5rem;">
+            <div class="content scroll-area-viewport p-2">
                 <nav class="sidebar-menu">
                     <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
@@ -158,8 +158,8 @@
             isDark: (window.ERPlora && window.ERPlora.isDark) || false,
 
             init() {
-                // Only listen to OS changes if no manual preference is stored
-                if (!localStorage.getItem('erplora-theme')) {
+                // Listen to OS changes only in system mode
+                if (window.ERPlora && window.ERPlora.theme === 'system') {
                     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
                         this.isDark = e.matches;
                         if (this.isDark) {
@@ -208,14 +208,14 @@
                 }
             },
 
-            toggleTheme() {
-                this.isDark = !this.isDark;
-                if (this.isDark) {
+            applyTheme(theme) {
+                var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                this.isDark = isDark;
+                if (isDark) {
                     document.documentElement.setAttribute('data-theme', 'dark');
                 } else {
                     document.documentElement.removeAttribute('data-theme');
                 }
-                localStorage.setItem('erplora-theme', this.isDark ? 'dark' : 'light');
             }
         }
     }

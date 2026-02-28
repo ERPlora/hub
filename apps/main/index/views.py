@@ -86,6 +86,21 @@ def _build_setup_alerts(menu_items):
             'color': 'info',
         })
 
+    # Alert 4: Modules skipped due to missing dependencies
+    from django.conf import settings as django_settings
+    skipped = getattr(django_settings, 'MODULES_SKIPPED_DEPENDENCIES', {})
+    if skipped:
+        count = len(skipped)
+        alerts.append({
+            'id': 'skipped_modules',
+            'icon': 'warning-outline',
+            'title': _('%(count)d modules skipped due to missing dependencies') % {'count': count},
+            'description': _('Some modules could not load because their dependencies are not active. Check My Modules for details.'),
+            'link': reverse('mymodules:index'),
+            'link_text': _('View Details'),
+            'color': 'warning',
+        })
+
     return alerts
 
 

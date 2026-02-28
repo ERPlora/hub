@@ -142,6 +142,8 @@ def modules_index(request):
     paginator = Paginator(all_modules, per_page)
     page_obj = paginator.get_page(page_number)
 
+    skipped_deps = getattr(django_settings, 'MODULES_SKIPPED_DEPENDENCIES', {})
+
     context = {
         'modules': page_obj,
         'page_obj': page_obj,
@@ -156,6 +158,7 @@ def modules_index(request):
         'requires_restart': requires_restart,
         'modules_pending_restart': modules_pending_restart,
         'marketplace_url': reverse('marketplace:index'),
+        'skipped_dependencies': skipped_deps,
     }
 
     # HTMX partial: swap only datatable body (search, sort, filter, paginate)
@@ -556,6 +559,8 @@ def _render_modules_page(request, error=None):
     paginator = Paginator(all_modules, per_page)
     page_obj = paginator.get_page(1)
 
+    skipped_deps = getattr(django_settings, 'MODULES_SKIPPED_DEPENDENCIES', {})
+
     context = {
         'current_section': 'modules',
         'page_title': 'Modules',
@@ -574,12 +579,93 @@ def _render_modules_page(request, error=None):
         'error': error,
         'MODULE_MENU_ITEMS': menu_items,
         'marketplace_url': reverse('marketplace:index'),
+        'skipped_dependencies': skipped_deps,
     }
 
     return render(request, 'system/modules/partials/installed_content.html', context)
 
 
+# =============================================================================
+# Dependency helpers
+# =============================================================================
+
+def _get_module_dependencies(module_id, modules_dir):
+    """Read DEPENDENCIES from a module's module.py. Returns list of dep IDs."""
+    import importlib.util as ilu
+
+    # Check both active and disabled paths
+    for prefix in ('', '_'):
+        module_py = modules_dir / f"{prefix}{module_id}" / 'module.py'
+        if module_py.exists():
+            try:
+                spec = ilu.spec_from_file_location(f"{module_id}._meta", module_py)
+                mod = ilu.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                raw = getattr(mod, 'DEPENDENCIES', [])
+                return [re.split(r'[><=!]', d)[0].strip() for d in raw if d]
+            except Exception:
+                pass
+    return []
+
+
+def _resolve_activation_order(module_ids, modules_dir):
+    """Resolve recursive dependencies and return topologically sorted list."""
+    to_activate = set(module_ids)
+    deps = {}
+
+    # Recursively collect all dependencies
+    queue = list(to_activate)
+    visited = set()
+    while queue:
+        mid = queue.pop(0)
+        if mid in visited:
+            continue
+        visited.add(mid)
+        mid_deps = _get_module_dependencies(mid, modules_dir)
+        deps[mid] = mid_deps
+        for dep in mid_deps:
+            if dep not in visited:
+                to_activate.add(dep)
+                queue.append(dep)
+
+    # Topological sort
+    ordered = []
+    topo_visited = set()
+
+    def visit(mid):
+        if mid in topo_visited or mid not in to_activate:
+            return
+        topo_visited.add(mid)
+        for dep in deps.get(mid, []):
+            visit(dep)
+        ordered.append(mid)
+
+    for mid in sorted(to_activate):
+        visit(mid)
+    return ordered
+
+
+def _get_active_dependents(module_id, modules_dir):
+    """Find active modules that depend on module_id."""
+    dependents = []
+    for module_dir in modules_dir.iterdir():
+        if not module_dir.is_dir():
+            continue
+        # Only check active modules (no _ prefix)
+        if module_dir.name.startswith('.') or module_dir.name.startswith('_'):
+            continue
+        mid = module_dir.name
+        if mid == module_id:
+            continue
+        mid_deps = _get_module_dependencies(mid, modules_dir)
+        if module_id in mid_deps:
+            dependents.append(mid)
+    return dependents
+
+
+# =============================================================================
 # API endpoints (support both HTMX and JSON)
+# =============================================================================
 
 def _trigger_server_reload():
     """Touch a file to trigger Django's auto-reload in development"""
@@ -643,8 +729,9 @@ def _render_reload_response(message="Applying changes...", success_message="Modu
 @require_http_methods(["POST"])
 @admin_required
 def module_activate(request, module_id):
-    """Activate a module by renaming folder and running migrations"""
+    """Activate a module — auto-activates dependencies first."""
     from django.core.management import call_command
+    from django.http import HttpResponse
     import io
 
     if not _MODULE_ID_RE.match(module_id):
@@ -655,42 +742,63 @@ def module_activate(request, module_id):
     active_folder = modules_dir / module_id
 
     if not disabled_folder.exists():
+        if active_folder.exists():
+            error_msg = _('Module already active')
+        else:
+            error_msg = _('Module not found')
         if request.htmx:
-            return _render_modules_page(request, error=_('Module not found'))
-        return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
+            return _render_modules_page(request, error=error_msg)
+        return JsonResponse({'success': False, 'error': error_msg}, status=400)
 
-    if active_folder.exists():
-        if request.htmx:
-            return _render_modules_page(request, error=_('Module already active'))
-        return JsonResponse({'success': False, 'error': _('Module already active')}, status=400)
+    # Check dependencies — verify all are installed (active or disabled)
+    deps = _get_module_dependencies(module_id, modules_dir)
+    for dep in deps:
+        dep_active = modules_dir / dep
+        dep_inactive = modules_dir / f"_{dep}"
+        if not dep_active.exists() and not dep_inactive.exists():
+            error_msg = _("Cannot activate: dependency '%(dep)s' is not installed.") % {'dep': dep}
+            if request.htmx:
+                return _render_modules_page(request, error=error_msg)
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
 
     try:
-        # Rename folder to activate
-        disabled_folder.rename(active_folder)
+        # Resolve activation order (auto-activate deps recursively)
+        activation_order = _resolve_activation_order([module_id], modules_dir)
+        activated = []
 
-        # Run migrations for the module
-        try:
-            output = io.StringIO()
-            call_command('migrate', module_id, '--run-syncdb', stdout=output, stderr=output)
-            migration_output = output.getvalue()
-            if migration_output:
-                print(f"[MODULES] Migrations for {module_id}: {migration_output}")
-        except Exception as migrate_error:
-            print(f"[MODULES] Migration error for {module_id}: {migrate_error}")
-            # Continue anyway - migrations might not exist or already applied
+        for mid in activation_order:
+            disabled = modules_dir / f"_{mid}"
+            active = modules_dir / mid
+            if disabled.exists() and not active.exists():
+                disabled.rename(active)
+                # Run migrations
+                try:
+                    output = io.StringIO()
+                    call_command('migrate', mid, '--run-syncdb', stdout=output, stderr=output)
+                    migration_output = output.getvalue()
+                    if migration_output:
+                        print(f"[MODULES] Migrations for {mid}: {migration_output}")
+                except Exception as migrate_error:
+                    print(f"[MODULES] Migration error for {mid}: {migrate_error}")
+                activated.append(mid)
 
-        # Trigger server reload to register new URLs
         _trigger_server_reload()
 
+        if activated:
+            names = ', '.join(activated)
+            message = f"Activating {names}..."
+            success_msg = f"{names} activated successfully"
+        else:
+            message = f"Activating {module_id}..."
+            success_msg = f"Module {module_id} activated successfully"
+
         if request.htmx:
-            return _render_reload_response(
-                message=f"Activating {module_id}...",
-                success_message=f"Module {module_id} activated successfully"
-            )
+            return _render_reload_response(message=message, success_message=success_msg)
 
         return JsonResponse({
             'success': True,
             'message': _('Module activated. Server restarting.'),
+            'activated': activated,
             'requires_restart': True
         })
     except Exception as e:
@@ -702,7 +810,7 @@ def module_activate(request, module_id):
 @require_http_methods(["POST"])
 @admin_required
 def module_deactivate(request, module_id):
-    """Deactivate a module by renaming folder"""
+    """Deactivate a module — blocks if other active modules depend on it."""
     if not _MODULE_ID_RE.match(module_id):
         return JsonResponse({'success': False, 'error': 'Invalid module ID'}, status=400)
 
@@ -711,14 +819,19 @@ def module_deactivate(request, module_id):
     disabled_folder = modules_dir / f"_{module_id}"
 
     if not active_folder.exists():
+        error_msg = _('Module already disabled') if disabled_folder.exists() else _('Module not found')
         if request.htmx:
-            return _render_modules_page(request, error=_('Module not found'))
-        return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
+            return _render_modules_page(request, error=error_msg)
+        return JsonResponse({'success': False, 'error': error_msg}, status=400)
 
-    if disabled_folder.exists():
+    # Block deactivation if other active modules depend on this one
+    dependents = _get_active_dependents(module_id, modules_dir)
+    if dependents:
+        names = ', '.join(dependents)
+        error_msg = _("Cannot deactivate: %(names)s depend on this module. Deactivate them first.") % {'names': names}
         if request.htmx:
-            return _render_modules_page(request, error=_('Module already disabled'))
-        return JsonResponse({'success': False, 'error': _('Module already disabled')}, status=400)
+            return _render_modules_page(request, error=error_msg)
+        return JsonResponse({'success': False, 'error': error_msg}, status=400)
 
     try:
         active_folder.rename(disabled_folder)

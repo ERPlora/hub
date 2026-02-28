@@ -3,41 +3,84 @@
 <div class="mt-5">
     {% if countries %}
     <div class="mb-4">
-        <p class="text-sm opacity-60">{% trans "Select your country to see the required modules for legal compliance." %}</p>
+        <p class="text-sm opacity-60">{% trans "Regulatory modules required to use ERPlora for sales in each country. Modules marked as not available mean the POS cannot be used in that region." %}</p>
     </div>
 
-    <div class="list list-inset glass">
-        {% for country in countries %}
-        <button class="list-item list-item-clickable list-item-multiline{% if hub_country == country.country_code %} bg-primary/5 ring-1 ring-primary/20{% endif %}"
-                hx-get="{% url 'marketplace:compliance_detail' country_code=country.country_code %}"
-                hx-target="#main-content-area"
-                hx-push-url="true">
-            <div class="list-item-start">
+    {% for country in countries %}
+    {% if country.requirements %}
+    <div class="card mb-4{% if hub_country == country.country_code %} ring-1 ring-primary/20{% endif %}">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
                 <span class="text-2xl">{{ country.country_code|country_flag }}</span>
+                <div>
+                    <h3 class="card-title">
+                        {{ country.country_name }}
+                        {% if hub_country == country.country_code %}
+                        <span class="badge badge-sm color-primary ml-1">{% trans "Your country" %}</span>
+                        {% endif %}
+                    </h3>
+                    <p class="text-sm opacity-60 mt-0.5">{{ country.description }}</p>
+                </div>
             </div>
-            <div class="list-item-content">
-                <span class="list-item-label">
-                    {{ country.country_name }}
-                    {% if hub_country == country.country_code %}
-                    <span class="badge badge-sm color-primary ml-1">{% trans "Your country" %}</span>
+        </div>
+        <div class="card-body pt-0">
+            {% for req in country.requirements %}
+            <div class="flex items-start gap-3 py-2 {% if not forloop.last %}border-b border-base-200{% endif %}">
+                <div class="pt-0.5">
+                    {% if req.is_available %}
+                    <span class="text-success text-lg">{% icon "checkmark-circle" %}</span>
+                    {% else %}
+                    <span class="text-error text-lg">{% icon "close-circle" %}</span>
                     {% endif %}
-                </span>
-                {% if country.description %}
-                <span class="list-item-note">{{ country.description|truncatewords:12 }}</span>
-                {% endif %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium">{{ req.name }}</div>
+                    <div class="text-xs opacity-60 mt-0.5">{{ req.description }}</div>
+                    {% if req.region %}
+                    <div class="text-xs font-medium mt-1" style="color: var(--color-primary)">{{ req.region }}</div>
+                    {% endif %}
+                </div>
+                <div class="pt-0.5">
+                    {% if req.is_available %}
+                    <span class="badge badge-sm color-success">{% trans "OK" %}</span>
+                    {% else %}
+                    <span class="badge badge-sm color-error">{% trans "No" %}</span>
+                    {% endif %}
+                </div>
             </div>
-            <div class="list-item-end">
-                <span class="badge badge-sm">{{ country.module_count }} {% trans "modules" %}</span>
-                <span class="list-item-chevron"></span>
+            {% endfor %}
+        </div>
+
+        {% if country.supported_count < country.requirement_count %}
+        <div class="card-body border-t border-base-200 pt-3">
+            {% if country.supported_count > 0 %}
+            <div class="callout callout-warning">
+                <span class="callout-icon">{% icon "warning-outline" %}</span>
+                <div class="callout-content">
+                    <span class="callout-title">{% trans "POS partially compliant" %}</span>
+                    <span class="callout-text">{% trans "ERPlora does not yet have all the required modules for this country. The POS cannot be used for sales in regions where required modules are not available." %}</span>
+                </div>
             </div>
-        </button>
-        {% endfor %}
+            {% else %}
+            <div class="callout callout-error">
+                <span class="callout-icon">{% icon "warning-outline" %}</span>
+                <div class="callout-content">
+                    <span class="callout-title">{% trans "POS not compliant" %}</span>
+                    <span class="callout-text">{% trans "ERPlora does not yet have any of the required modules for this country. The POS cannot be used for sales." %}</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
+    {% endif %}
+    {% endfor %}
+
     {% else %}
     <div class="text-center py-16">
         {% icon "shield-checkmark-outline" css_class="text-6xl opacity-20 mb-4" %}
-        <h3 class="text-lg font-semibold mb-2">{% trans "No Compliance Data Available" %}</h3>
-        <p class="text-sm opacity-60">{% trans "Could not load compliance requirements. Please check your internet connection and try again." %}</p>
+        <h3 class="text-lg font-semibold mb-2">{% trans "No compliance data available" %}</h3>
+        <p class="text-sm opacity-60">{% trans "Compliance information is being prepared." %}</p>
     </div>
     {% endif %}
 </div>
