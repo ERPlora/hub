@@ -13,8 +13,12 @@ All other views have been moved to their respective apps:
 - Modules → apps/system/modules/views.py
 - PWA → apps/configuration/views.py
 """
+import json
+import logging
+
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings as django_settings
 
@@ -181,3 +185,22 @@ def sidebar_partial(request):
     return render(request, 'dashboard/partials/sidebar_nav.html', {
         'MODULE_MENU_ITEMS': menu_items,
     })
+
+
+# =============================================================================
+# CSP Report Endpoint
+# =============================================================================
+
+csp_logger = logging.getLogger('csp')
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def csp_report(request):
+    """Receive and log CSP violation reports from browsers."""
+    try:
+        report = json.loads(request.body)
+        csp_logger.warning('CSP Violation: %s', report.get('csp-report', report))
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return HttpResponse(status=204)

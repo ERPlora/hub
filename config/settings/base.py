@@ -9,6 +9,7 @@ import sys
 import secrets
 from pathlib import Path
 from decouple import config
+from django.utils.csp import CSP
 
 # =============================================================================
 # PATHS
@@ -70,6 +71,25 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # =============================================================================
+# CONTENT SECURITY POLICY (CSP) — report-only mode
+# =============================================================================
+SECURE_CSP = None  # Not enforcing yet
+
+SECURE_CSP_REPORT_ONLY = {
+    "default-src": [CSP.SELF],
+    "script-src": [CSP.SELF, CSP.NONCE, CSP.UNSAFE_EVAL, "unpkg.com"],
+    "style-src": [CSP.SELF, CSP.UNSAFE_INLINE, "cdn.jsdelivr.net", "unpkg.com"],
+    "font-src": [CSP.SELF],
+    "img-src": [CSP.SELF, "data:"],
+    "connect-src": [CSP.SELF, "ws://localhost:12321"],
+    "manifest-src": [CSP.SELF],
+    "frame-ancestors": [CSP.NONE],
+    "base-uri": [CSP.SELF],
+    "form-action": [CSP.SELF],
+    "report-uri": ["/csp-report/"],
+}
+
+# =============================================================================
 # APPLICATION DEFINITION
 # =============================================================================
 
@@ -114,6 +134,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.csp.ContentSecurityPolicyMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'apps.accounts.middleware.LanguageMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -143,6 +164,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.template.context_processors.i18n',
                 'django.template.context_processors.static',
+                'django.template.context_processors.csp',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.core.context_processors.cloud_url',

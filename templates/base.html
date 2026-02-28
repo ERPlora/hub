@@ -28,20 +28,20 @@
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
 
     <!-- ERPlora Bridge config (from HubConfig) + WebSocket client -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         window.ERPlora = window.ERPlora || {};
         window.ERPlora.bridgeConfig = {
             enabled: {{ HUB_CONFIG.bridge_enabled|yesno:"true,false" }},
             port: {{ HUB_CONFIG.bridge_port }}
         };
     </script>
-    <script src="{% static 'js/bridge.js' %}" defer></script>
+    <script src="{% static 'js/bridge.js' %}" defer nonce="{{ csp_nonce }}"></script>
 
     <!-- Alpine.js (local) -->
-    <script defer src="{% static 'js/alpine.min.js' %}"></script>
+    <script defer src="{% static 'js/alpine.min.js' %}" nonce="{{ csp_nonce }}"></script>
 
     <!-- Alpine.js Global Stores -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         document.addEventListener('alpine:init', () => {
             // Navigation Store - Tracks current active section/module
             Alpine.store('nav', {
@@ -263,10 +263,10 @@
     </script>
 
     <!-- HTMX (local) -->
-    <script src="{% static 'js/htmx.min.js' %}"></script>
+    <script src="{% static 'js/htmx.min.js' %}" nonce="{{ csp_nonce }}"></script>
 
     <!-- HTMX Configuration -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Enable HTMX to process inline scripts
         htmx.config.allowScriptTags = true;
 
@@ -288,7 +288,7 @@
             document.body.addEventListener('htmx:afterSettle', function(event) {
                 // Let Alpine process any new x-data elements
                 // try-catch prevents errors from HTMX history cache replaying DOM
-                // that references functions defined in <script> tags no longer present
+                // that references functions defined in script tags no longer present
                 // (e.g. posApp() from the POS full-page template)
                 if (typeof Alpine !== 'undefined') {
                     try {
@@ -347,7 +347,7 @@
     </script>
 
     <!-- Automatic Language Detection -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         (function() {
             // Check if user already has a language preference (cookie or session flag)
             function getCookie(name) {
@@ -388,7 +388,7 @@
     {% block extra_head %}{% endblock %}
 
     <!-- PWA Install Handler -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Store the install prompt event
         let deferredPrompt = null;
         let pwaInstalled = false;
@@ -448,7 +448,7 @@
         }
     </script>
     <!-- Auto dark mode detection (runs before body renders to prevent flash) -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         (function() {
             var theme = '{{ HUB_CONFIG.theme|default:"system" }}';
             var isDark = false;
@@ -475,7 +475,7 @@
     </script>
 </head>
 <body class="app" {% block body_attrs %}{% endblock %}>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Listen for system preference changes (only in system mode)
         if (window.ERPlora && window.ERPlora.theme === 'system') {
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
@@ -495,7 +495,7 @@
     <div id="toast-container" class="toast toast-bottom toast-center"></div>
 
     <!-- Toast function & HTMX event listeners (must be after #toast-container) -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         (function() {
             var icons = {
                 info: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>',
