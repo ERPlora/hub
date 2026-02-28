@@ -175,13 +175,17 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # =============================================================================
-# DATABASE (default SQLite - overridden per environment)
+# DATABASE (default PostgreSQL - overridden per environment)
 # =============================================================================
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'erplora_hub',
+        'USER': 'erplora',
+        'PASSWORD': 'erplora',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 

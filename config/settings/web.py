@@ -7,22 +7,10 @@ Desplegado automáticamente via Dokploy API cuando el cliente compra un Hub.
 Variables de entorno (configuradas por Cloud durante deploy):
   - HUB_ID: UUID del Hub
   - HUB_NAME: Nombre del Hub (subdomain)
-  - DATABASE_URL: PostgreSQL connection (Hub plan - shared per org)
-  - DATABASE_PATH: SQLite path (Starter plan - isolated per hub)
+  - DATABASE_URL: PostgreSQL connection string
   - AWS_* : Credenciales S3
 
-Database Configuration:
-  - Starter plan: SQLite per Hub (DATABASE_PATH)
-    Each Hub has its own isolated database.
-
-  - Hub plan: PostgreSQL per Organization (DATABASE_URL)
-    All Hubs in the same organization share one PostgreSQL database.
-    Products, clients, and inventory are shared across stores.
-
 Storage structure (automatic via HUB_ID):
-
-  NVMe local bind mount /app/data/:
-    - db/db.sqlite3 - SQLite (Starter plan only)
 
   S3 hubs/{HUB_ID}/:
     - backups/     - Database backups
@@ -62,21 +50,12 @@ DATA_DIR = Path('/app/data')
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
-# DATABASE - PostgreSQL (Hub plan) or SQLite (Starter plan)
+# DATABASE - PostgreSQL (required)
 # =============================================================================
 
-DATABASE_URL = config('DATABASE_URL', default='')
-
-if DATABASE_URL:
-    import dj_database_url
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL)
-    }
-else:
-    # SQLite: always at /app/data/db/db.sqlite3 (bind-mounted, persistent)
-    DATABASE_DIR = DATA_DIR / 'db'
-    DATABASE_DIR.mkdir(parents=True, exist_ok=True)
-    DATABASES['default']['NAME'] = DATABASE_DIR / 'db.sqlite3'
+DATABASE_URL = config('DATABASE_URL')
+import dj_database_url
+DATABASES = {'default': dj_database_url.parse(DATABASE_URL)}
 
 # Modules - uses base.py config (MODULES_DIR from DataPaths or env var)
 # In Docker: /app/modules/ by default, can be overridden via MODULES_DIR env var
@@ -292,9 +271,8 @@ load_module_templates(MODULES_DIR)
 # STARTUP INFO
 # =============================================================================
 
-_db_type = 'PostgreSQL' if DATABASE_URL else 'SQLite'
-_db_name = DATABASES['default'].get('NAME', DATABASE_URL.split('/')[-1] if DATABASE_URL else 'unknown')
+_db_name = DATABASES['default'].get('NAME', DATABASE_URL.split('/')[-1])
 print(f"[HUB] {HUB_NAME} ({HUB_ID})")
-print(f"[HUB] Database: {_db_type} - {_db_name}")
+print(f"[HUB] Database: PostgreSQL - {_db_name}")
 print(f"[HUB] Data: {DATA_DIR}")
 print(f"[HUB] S3: {AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/")

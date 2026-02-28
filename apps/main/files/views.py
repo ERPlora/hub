@@ -4,9 +4,7 @@ Main Files Views
 Local file browser and database download page.
 """
 from django.urls import reverse
-
-from pathlib import Path
-
+from django.db import connection
 from django.conf import settings
 
 from apps.core.htmx import htmx_view
@@ -17,14 +15,20 @@ from apps.configuration.views_files import format_file_size
 DB_LIMIT = 2 * 1024 * 1024 * 1024
 
 
+def _get_database_size():
+    """Get PostgreSQL database size in bytes."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_database_size(current_database())")
+        return cursor.fetchone()[0]
+
+
 @login_required
 @htmx_view('main/files/pages/index.html', 'main/files/partials/content.html')
 def index(request):
     """Files management page - browse local files and download database."""
-    db_path = Path(settings.DATABASES['default']['NAME'])
+    db_size = _get_database_size()
 
     # Database size indicator
-    db_size = db_path.stat().st_size if db_path.exists() else 0
     db_percent = min(100, int((db_size / DB_LIMIT) * 100)) if DB_LIMIT else 0
     if db_size < 1 * 1024 * 1024 * 1024:
         db_color = 'success'

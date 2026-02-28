@@ -17,7 +17,7 @@ The monitor prints a line every 2 seconds showing:
     - CPU % (over the interval)
     - Thread count
     - Open file descriptors
-    - SQLite connections (if applicable)
+    - Database connections
 
 Press Ctrl+C to stop and see the summary.
 """

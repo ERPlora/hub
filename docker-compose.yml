@@ -13,9 +13,7 @@
 #
 # Volumen persistente (NVMe local del servidor):
 #   Host: ${VOLUME_PATH}/${HUB_ID}/  →  Container: /app/data/
-#   - /app/data/db/db.sqlite3  - SQLite database (PERSISTENT)
 #   - /app/data/modules/       - Installed modules
-#   - Cada DB SQLite tiene un límite recomendado de 2 GB
 #
 # Red:
 #   - dokploy-network: Red de Dokploy para Traefik
@@ -29,7 +27,7 @@ services:
       network: host
     restart: unless-stopped
     # Command: create data dirs, run migrations, start gunicorn
-    command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && mkdir -p /app/data/db && python manage.py migrate --noinput && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --pid /run/gunicorn.pid --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
+    command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && python manage.py migrate --noinput && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --pid /run/gunicorn.pid --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
     volumes:
       # Bind mount: host NVMe → fixed /app/data inside container
       # VOLUME_PATH should include the full base path (e.g. /data/hubs)
@@ -46,8 +44,8 @@ services:
       - PARENT_DOMAIN=${PARENT_DOMAIN}
       - SERVER_DOMAIN=${SERVER_DOMAIN}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      # Database configuration (SQLite for Starter, PostgreSQL for Business)
-      - DATABASE_URL=${DATABASE_URL:-}
+      # Database configuration (PostgreSQL)
+      - DATABASE_URL=${DATABASE_URL}
       # S3 configuration
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
