@@ -191,12 +191,63 @@ class HeartbeatService:
         # Get installed modules
         installed_modules = self._get_installed_modules()
 
-        return {
+        metadata = {
             'version': getattr(settings, 'HUB_VERSION', '1.0.0'),
             'modules': installed_modules,
             'status': 'healthy',
             'configured': config.is_configured,
         }
+
+        # Include system metrics (CPU/RAM from cgroups v2)
+        metrics = self._get_system_metrics()
+        if metrics:
+            metadata['metrics'] = metrics
+
+        return metadata
+
+    def _get_system_metrics(self) -> Optional[Dict[str, Any]]:
+        """
+        Collect container resource metrics from cgroups v2.
+
+        Returns memory and CPU usage for Docker containers.
+        Returns None if not running inside a container.
+        """
+        import os
+
+        metrics = {}
+
+        # Memory: read from cgroup v2
+        try:
+            with open('/sys/fs/cgroup/memory.current', 'r') as f:
+                memory_used = int(f.read().strip())
+            with open('/sys/fs/cgroup/memory.max', 'r') as f:
+                val = f.read().strip()
+                memory_limit = int(val) if val != 'max' else 0
+            metrics['memory_used_mb'] = round(memory_used / (1024 * 1024))
+            metrics['memory_limit_mb'] = round(memory_limit / (1024 * 1024)) if memory_limit else 0
+        except (FileNotFoundError, ValueError, PermissionError):
+            return None
+
+        # CPU: read from cgroup v2
+        try:
+            with open('/sys/fs/cgroup/cpu.stat', 'r') as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) == 2 and parts[0] == 'usage_usec':
+                        metrics['cpu_usage_usec'] = int(parts[1])
+                        break
+        except (FileNotFoundError, ValueError, PermissionError):
+            metrics['cpu_usage_usec'] = 0
+
+        # CPU limit from env var (set by docker-compose)
+        cpu_limit = os.environ.get('CPU_LIMIT', '')
+        if cpu_limit:
+            try:
+                metrics['cpu_limit'] = float(cpu_limit)
+            except ValueError:
+                pass
+
+        return metrics
 
     def _get_installed_modules(self) -> list:
         """Get list of installed module IDs."""
