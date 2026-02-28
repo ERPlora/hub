@@ -14,7 +14,6 @@ PATHS POR ENTORNO:
 
     DOCKER (Web/Cloud):
         Base:     /app/
-        DB:       /app/db/db.sqlite3
         Media:    /app/media/
         Modules:  /app/modules/
         Logs:     /app/logs/
@@ -31,7 +30,6 @@ PATHS POR ENTORNO:
             Base:     /home/<usuario>/.erplora-hub/
 
 Subdirectorios (comunes a todos los entornos):
-    - db/              Base de datos SQLite
     - media/           Archivos subidos (imágenes, logos, etc.)
     - modules/         Modules instalados y sus datos
     - reports/         Reportes generados (PDF, Excel)
@@ -121,16 +119,6 @@ class DataPaths:
         return self._base_dir
 
     @property
-    def database_dir(self) -> Path:
-        """Directorio de la base de datos"""
-        return self.base_dir / "db"
-
-    @property
-    def database_path(self) -> Path:
-        """Ruta completa a db.sqlite3"""
-        return self.database_dir / "db.sqlite3"
-
-    @property
     def media_dir(self) -> Path:
         """Directorio de archivos media (imágenes subidas, etc.)"""
         return self.base_dir / "media"
@@ -169,8 +157,6 @@ class DataPaths:
         """
         return {
             "base": self.base_dir,
-            "database": self.database_path,
-            "database_dir": self.database_dir,
             "media": self.media_dir,
             "modules": self.modules_dir,
             "reports": self.reports_dir,
@@ -185,7 +171,6 @@ class DataPaths:
         """
         directories = [
             self.base_dir,
-            self.database_dir,
             self.media_dir,
             self.modules_dir,
             self.reports_dir,
@@ -268,11 +253,6 @@ def get_data_paths() -> DataPaths:
 
 
 # Para uso directo
-def get_database_path() -> Path:
-    """Retorna la ruta de la base de datos"""
-    return data_paths.database_path
-
-
 def get_media_dir() -> Path:
     """Retorna el directorio de media"""
     return data_paths.media_dir

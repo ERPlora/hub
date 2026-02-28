@@ -1,7 +1,6 @@
-{% load i18n component_tags djicons %}
+{% load i18n djicons %}
 
-{% component "page" title=module.name|default:_("Module Details") back_hx_get="/marketplace/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {% fill "content" %}
+<div hidden data-back-url="/marketplace/"></div>
 
 {% if error %}
     <!-- Error State -->
@@ -296,9 +295,6 @@
     </div>
 
 {% endif %}
-
-    {% endfill %}
-{% endcomponent %}
 
 <!-- Module action handlers -->
 <script>

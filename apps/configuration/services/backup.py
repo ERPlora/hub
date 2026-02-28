@@ -2,7 +2,7 @@
 Backup Service - Automated database backups with S3/local storage support.
 
 This service handles:
-- Database backups (SQLite copy or PostgreSQL pg_dump)
+- Database backups (PostgreSQL pg_dump)
 - Storage to S3 (web/cloud) or local filesystem (desktop)
 - Retention policies (days and max count)
 - Scheduling via APScheduler
@@ -10,7 +10,6 @@ This service handles:
 
 import logging
 import os
-import shutil
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -74,41 +73,11 @@ class BackupService:
         """Get local backups directory."""
         return Path(settings.BACKUPS_DIR)
 
-    def _get_database_path(self) -> Optional[Path]:
-        """
-        Get path to SQLite database file.
-
-        Returns:
-            Path to SQLite database, or None if using PostgreSQL
-        """
-        db_config = settings.DATABASES.get('default', {})
-
-        # Check if PostgreSQL
-        engine = db_config.get('ENGINE', '')
-        if 'postgresql' in engine:
-            return None
-
-        # SQLite - return the database file path
-        db_name = db_config.get('NAME')
-        if db_name:
-            return Path(db_name)
-
-        return None
-
-    def _is_postgresql(self) -> bool:
-        """Check if using PostgreSQL database."""
-        engine = settings.DATABASES.get('default', {}).get('ENGINE', '')
-        return 'postgresql' in engine
-
     def _generate_backup_filename(self) -> str:
         """Generate timestamped backup filename."""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         hub_id = getattr(settings, 'HUB_ID', 'local')
-
-        if self._is_postgresql():
-            return f"backup_{hub_id}_{timestamp}.sql.gz"
-        else:
-            return f"backup_{hub_id}_{timestamp}.sqlite3"
+        return f"backup_{hub_id}_{timestamp}.sql.gz"
 
     def run_backup(self) -> Tuple[bool, str, int]:
         """
@@ -123,10 +92,7 @@ class BackupService:
         filename = self._generate_backup_filename()
 
         try:
-            if self._is_postgresql():
-                success, path, size = self._backup_postgresql(filename)
-            else:
-                success, path, size = self._backup_sqlite(filename)
+            success, path, size = self._backup_postgresql(filename)
 
             if success:
                 # Update backup config with success info
@@ -153,59 +119,6 @@ class BackupService:
             backup_config.save()
             logger.exception(f"[BACKUP] Exception during backup: {e}")
             return False, error_msg, 0
-
-    def _backup_sqlite(self, filename: str) -> Tuple[bool, str, int]:
-        """
-        Backup SQLite database.
-
-        Returns:
-            Tuple of (success, path_or_error, size)
-        """
-        db_path = self._get_database_path()
-        if not db_path or not db_path.exists():
-            return False, "Database file not found", 0
-
-        if self._is_s3_mode:
-            return self._backup_sqlite_to_s3(db_path, filename)
-        else:
-            return self._backup_sqlite_to_local(db_path, filename)
-
-    def _backup_sqlite_to_local(self, db_path: Path, filename: str) -> Tuple[bool, str, int]:
-        """Backup SQLite to local filesystem."""
-        backups_dir = self._get_local_backups_dir()
-        backup_path = backups_dir / filename
-
-        try:
-            # Copy database file
-            shutil.copy2(db_path, backup_path)
-            size = backup_path.stat().st_size
-            return True, str(backup_path), size
-        except Exception as e:
-            return False, f"Failed to copy database: {e}", 0
-
-    def _backup_sqlite_to_s3(self, db_path: Path, filename: str) -> Tuple[bool, str, int]:
-        """Backup SQLite to S3."""
-        try:
-            s3_client = self._get_s3_client()
-            bucket = settings.AWS_STORAGE_BUCKET_NAME
-            aws_location = getattr(settings, 'AWS_LOCATION', 'hubs/unknown')
-            s3_key = f"{aws_location}/backups/{filename}"
-
-            # Get file size
-            size = db_path.stat().st_size
-
-            # Upload to S3
-            with open(db_path, 'rb') as f:
-                s3_client.upload_fileobj(
-                    f,
-                    bucket,
-                    s3_key,
-                    ExtraArgs={'ContentType': 'application/x-sqlite3'}
-                )
-
-            return True, s3_key, size
-        except Exception as e:
-            return False, f"Failed to upload to S3: {e}", 0
 
     def _backup_postgresql(self, filename: str) -> Tuple[bool, str, int]:
         """

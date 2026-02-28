@@ -6,7 +6,6 @@
 # STORAGE (automatic via HUB_ID):
 #   Docker Volume (bind mount isolates by HUB_ID):
 #     Host: ${VOLUME_PATH}/hubs/${HUB_ID}/ -> Container: /app/data/
-#     - /app/data/db/db.sqlite3 - SQLite database (PERSISTENT)
 #
 #   S3 hubs/{HUB_ID}/:
 #     - backups/     - Database backups
@@ -54,6 +53,7 @@ RUN uv pip install --system --no-cache .
 ENV DJANGO_SETTINGS_MODULE=config.settings.web \
     HUB_ID=00000000-0000-0000-0000-000000000000 \
     HUB_NAME=build \
+    DATABASE_URL=postgres://build:build@localhost:5432/build \
     AWS_ACCESS_KEY_ID=dummy \
     AWS_SECRET_ACCESS_KEY=dummy \
     AWS_STORAGE_BUCKET_NAME=dummy \

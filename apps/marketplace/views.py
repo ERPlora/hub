@@ -11,6 +11,7 @@ import logging
 import requests
 from pathlib import Path
 
+from django.core.cache import cache
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.conf import settings as django_settings
@@ -21,6 +22,18 @@ from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 
 logger = logging.getLogger(__name__)
+
+# Cache TTL (seconds)
+_CACHE_TTL = getattr(django_settings, 'MARKETPLACE_CACHE_TTL', 300)
+
+# Cache key prefixes
+_CK_MODULES_LIST = 'mp:modules_list'
+_CK_SOLUTIONS_LIST = 'mp:solutions_list'
+_CK_INDUSTRIES_LIST = 'mp:industries_list'
+_CK_INDUSTRY_DETAIL = 'mp:industry:'       # + slug
+_CK_SOLUTION_DETAIL = 'mp:solution:'       # + slug
+_CK_MODULE_DETAIL = 'mp:module:'           # + slug
+_CK_INSTALLED_IDS = 'mp:installed_ids'
 
 
 # --- Marketplace navigation (tabbar) ---
@@ -55,14 +68,23 @@ def _get_cloud_api_url():
 
 
 def _get_installed_module_ids():
-    """Get list of installed module IDs from the modules directory."""
+    """Get list of installed module IDs from the modules directory (cached 60s)."""
+    cached = cache.get(_CK_INSTALLED_IDS)
+    if cached is not None:
+        return cached
     modules_dir = Path(django_settings.MODULES_DIR)
     installed = []
     if modules_dir.exists():
         for module_dir in modules_dir.iterdir():
             if module_dir.is_dir() and not module_dir.name.startswith('.'):
                 installed.append(module_dir.name.lstrip('_'))
+    cache.set(_CK_INSTALLED_IDS, installed, 60)
     return installed
+
+
+def _invalidate_installed_cache():
+    """Invalidate the installed modules cache (call after install/uninstall)."""
+    cache.delete(_CK_INSTALLED_IDS)
 
 
 # Store type configurations
@@ -173,7 +195,11 @@ def _build_grouped_industries(language):
 
 
 def _fetch_industries_for_filters():
-    """Fetch active industries from Cloud API for the marketplace filter."""
+    """Fetch active industries from Cloud API for the marketplace filter (cached)."""
+    cached = cache.get(_CK_INDUSTRIES_LIST)
+    if cached is not None:
+        return cached
+
     from apps.configuration.models import HubConfig
 
     hub_config = HubConfig.get_solo()
@@ -190,14 +216,21 @@ def _fetch_industries_for_filters():
             timeout=10,
         )
         if response.status_code == 200:
-            return response.json()
+            data = response.json()
+            cache.set(_CK_INDUSTRIES_LIST, data, _CACHE_TTL)
+            return data
     except requests.exceptions.RequestException:
         pass
     return []
 
 
 def _fetch_industry_modules(slug):
-    """Fetch recommended modules for an industry from Cloud API."""
+    """Fetch recommended modules for an industry from Cloud API (cached)."""
+    cache_key = f"{_CK_INDUSTRY_DETAIL}{slug}:modules"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     from apps.configuration.models import HubConfig
 
     hub_config = HubConfig.get_solo()
@@ -219,6 +252,7 @@ def _fetch_industry_modules(slug):
             result = {}
             for m in data.get('modules', []):
                 result[m.get('module_id', '')] = m.get('is_essential', False)
+            cache.set(cache_key, result, _CACHE_TTL)
             return result
     except requests.exceptions.RequestException:
         pass
@@ -226,24 +260,28 @@ def _fetch_industry_modules(slug):
 
 
 def _fetch_solutions_for_filters():
-    """Fetch solutions from Cloud API and group by block_type for the filter modal."""
+    """Fetch solutions from Cloud API and group by block_type for the filter modal (cached)."""
     from apps.configuration.models import HubConfig
 
     hub_config = HubConfig.get_config()
-    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
     active_blocks = set(hub_config.selected_blocks or [])
 
-    solutions = []
-    try:
-        response = requests.get(
-            f"{cloud_api_url}/api/marketplace/solutions/",
-            headers={'Accept': 'application/json'},
-            timeout=10,
-        )
-        if response.status_code == 200:
-            solutions = response.json()
-    except requests.exceptions.RequestException:
-        pass
+    # Cache the raw solutions list from Cloud API
+    solutions = cache.get(_CK_SOLUTIONS_LIST)
+    if solutions is None:
+        cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+        solutions = []
+        try:
+            response = requests.get(
+                f"{cloud_api_url}/api/marketplace/solutions/",
+                headers={'Accept': 'application/json'},
+                timeout=10,
+            )
+            if response.status_code == 200:
+                solutions = response.json()
+                cache.set(_CK_SOLUTIONS_LIST, solutions, _CACHE_TTL)
+        except requests.exceptions.RequestException:
+            pass
 
     if not solutions:
         return []
@@ -706,27 +744,18 @@ def products_list(request, store_type):
         return HttpResponse(html)
 
 
-def _fetch_modules_list(request, search_query, solution_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
-    """Fetch modules from Cloud API with DataTable pagination"""
-    from django.core.paginator import Paginator
+def _fetch_all_modules():
+    """Fetch all modules from Cloud API (cached). Returns list or None on auth error."""
+    cached = cache.get(_CK_MODULES_LIST)
+    if cached is not None:
+        return cached
+
     from apps.configuration.models import HubConfig
-
-    # Get installed modules
-    modules_dir = Path(django_settings.MODULES_DIR)
-    installed_module_ids = []
-    if modules_dir.exists():
-        for module_dir in modules_dir.iterdir():
-            if module_dir.is_dir() and not module_dir.name.startswith('.'):
-                installed_module_ids.append(module_dir.name.lstrip('_'))
-
     hub_config = HubConfig.get_solo()
     auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
     if not auth_token:
-        html = render_to_string('marketplace/partials/error.html', {
-            'error': 'Hub not connected to Cloud. Please connect in Settings.'
-        }, request=request)
-        return HttpResponse(html)
+        return None
 
     cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
     headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
@@ -735,99 +764,110 @@ def _fetch_modules_list(request, search_query, solution_filter, industry_filter,
         response = requests.get(
             f"{cloud_api_url}/api/marketplace/modules/",
             headers=headers,
-            timeout=30
+            timeout=30,
         )
-
         if response.status_code != 200:
-            html = render_to_string('marketplace/partials/error.html', {
-                'error': f'Cloud API returned {response.status_code}'
-            }, request=request)
-            return HttpResponse(html)
+            return None
 
         data = response.json()
         modules = data.get('results', data) if isinstance(data, dict) else data
         if not isinstance(modules, list):
             modules = []
+        cache.set(_CK_MODULES_LIST, modules, _CACHE_TTL)
+        return modules
+    except requests.exceptions.RequestException:
+        return None
 
-        # Apply filters
-        if search_query:
-            query_lower = search_query.lower()
-            modules = [m for m in modules if (
-                query_lower in m.get('name', '').lower() or
-                query_lower in m.get('description', '').lower() or
-                any(query_lower in str(tag).lower() for tag in m.get('tags', []))
+
+def _fetch_modules_list(request, search_query, solution_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
+    """Fetch modules from Cloud API with DataTable pagination"""
+    from django.core.paginator import Paginator
+
+    installed_module_ids = _get_installed_module_ids()
+
+    modules = _fetch_all_modules()
+    if modules is None:
+        html = render_to_string('marketplace/partials/error.html', {
+            'error': 'Hub not connected to Cloud. Please connect in Settings.'
+        }, request=request)
+        return HttpResponse(html)
+
+    # Work on a copy so cache stays clean
+    modules = [dict(m) for m in modules]
+
+    # Apply filters
+    if search_query:
+        query_lower = search_query.lower()
+        modules = [m for m in modules if (
+            query_lower in m.get('name', '').lower() or
+            query_lower in m.get('description', '').lower() or
+            any(query_lower in str(tag).lower() for tag in m.get('tags', []))
+        )]
+
+    if solution_filter:
+        solution_slugs = [s.strip() for s in solution_filter.split(',') if s.strip()]
+        if solution_slugs:
+            # Filter modules by solution_slugs field (solution membership)
+            modules = [m for m in modules if any(
+                ss in m.get('solution_slugs', []) for ss in solution_slugs
             )]
 
-        if solution_filter:
-            solution_slugs = [s.strip() for s in solution_filter.split(',') if s.strip()]
-            if solution_slugs:
-                # Filter modules by solution_slugs field (solution membership)
-                modules = [m for m in modules if any(
-                    ss in m.get('solution_slugs', []) for ss in solution_slugs
-                )]
+    # Industry filter: fetch recommended modules for selected industries
+    industry_module_map = {}
+    if industry_filter:
+        industry_slugs = [s.strip() for s in industry_filter.split(',') if s.strip()]
+        for ind_slug in industry_slugs:
+            ind_map = _fetch_industry_modules(ind_slug)
+            for mid, is_essential in ind_map.items():
+                # Keep essential=True if any industry marks it essential
+                if mid not in industry_module_map:
+                    industry_module_map[mid] = is_essential
+                elif is_essential:
+                    industry_module_map[mid] = True
+        if industry_module_map:
+            industry_module_ids = set(industry_module_map.keys())
+            modules = [m for m in modules if m.get('module_id', '') in industry_module_ids]
+            for m in modules:
+                m['is_essential'] = industry_module_map.get(m.get('module_id', ''), False)
 
-        # Industry filter: fetch recommended modules for selected industries
-        industry_module_map = {}
-        if industry_filter:
-            industry_slugs = [s.strip() for s in industry_filter.split(',') if s.strip()]
-            for ind_slug in industry_slugs:
-                ind_map = _fetch_industry_modules(ind_slug)
-                for mid, is_essential in ind_map.items():
-                    # Keep essential=True if any industry marks it essential
-                    if mid not in industry_module_map:
-                        industry_module_map[mid] = is_essential
-                    elif is_essential:
-                        industry_module_map[mid] = True
-            if industry_module_map:
-                industry_module_ids = set(industry_module_map.keys())
-                modules = [m for m in modules if m.get('module_id', '') in industry_module_ids]
-                for m in modules:
-                    m['is_essential'] = industry_module_map.get(m.get('module_id', ''), False)
+    if type_filter:
+        modules = [m for m in modules if m.get('module_type') == type_filter]
 
-        if type_filter:
-            modules = [m for m in modules if m.get('module_type') == type_filter]
+    # Mark installed and add URLs
+    for module in modules:
+        module['is_installed'] = module.get('slug', '') in installed_module_ids or module.get('module_id', '') in installed_module_ids
+        module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
+        if not module.get('download_url'):
+            module['download_url'] = f"{_get_cloud_api_url()}/api/marketplace/modules/{module.get('slug', '')}/download/"
 
-        # Mark installed and add URLs
-        for module in modules:
-            module['is_installed'] = module.get('slug', '') in installed_module_ids or module.get('module_id', '') in installed_module_ids
-            module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
-            if not module.get('download_url'):
-                module['download_url'] = f"{cloud_api_url}/api/marketplace/modules/{module.get('slug', '')}/download/"
+    # Sort
+    sort_key_map = {
+        'name': lambda m: m.get('name', '').lower(),
+        'price': lambda m: float(m.get('price', 0)),
+        'rating': lambda m: float(m.get('rating', 0)),
+    }
+    sort_fn = sort_key_map.get(sort_field, sort_key_map['name'])
+    modules.sort(key=sort_fn, reverse=(sort_dir == 'desc'))
 
-        # Sort
-        sort_key_map = {
-            'name': lambda m: m.get('name', '').lower(),
-            'price': lambda m: float(m.get('price', 0)),
-            'rating': lambda m: float(m.get('rating', 0)),
-        }
-        sort_fn = sort_key_map.get(sort_field, sort_key_map['name'])
-        modules.sort(key=sort_fn, reverse=(sort_dir == 'desc'))
+    # Page-based pagination
+    paginator = Paginator(modules, per_page)
+    page_obj = paginator.get_page(page_number)
 
-        # Page-based pagination
-        paginator = Paginator(modules, per_page)
-        page_obj = paginator.get_page(page_number)
+    html = render_to_string('marketplace/partials/products_grid.html', {
+        'products': page_obj,
+        'page_obj': page_obj,
+        'store_type': 'modules',
+        'search_query': search_query,
+        'solution_filter': solution_filter,
+        'industry_filter': industry_filter,
+        'type_filter': type_filter,
+        'sort_field': sort_field,
+        'sort_dir': sort_dir,
+        'current_view': current_view,
+        'per_page': per_page,
+    }, request=request)
 
-        html = render_to_string('marketplace/partials/products_grid.html', {
-            'products': page_obj,
-            'page_obj': page_obj,
-            'store_type': 'modules',
-            'search_query': search_query,
-            'solution_filter': solution_filter,
-            'industry_filter': industry_filter,
-            'type_filter': type_filter,
-            'sort_field': sort_field,
-            'sort_dir': sort_dir,
-            'current_view': current_view,
-            'per_page': per_page,
-        }, request=request)
-
-        return HttpResponse(html)
-
-    except requests.exceptions.RequestException as e:
-        html = render_to_string('marketplace/partials/error.html', {
-            'error': f'Failed to connect to Cloud: {str(e)}'
-        }, request=request)
-        return HttpResponse(html)
+    return HttpResponse(html)
 
 
 def _fetch_hubs_list(request, search_query, cursor, page_size):
@@ -893,40 +933,38 @@ def module_detail(request, slug):
             'cart_count': 0,
         }
 
-    # Get installed modules
-    modules_dir = Path(django_settings.MODULES_DIR)
-    installed_module_ids = []
-    if modules_dir.exists():
-        for module_dir in modules_dir.iterdir():
-            if module_dir.is_dir() and not module_dir.name.startswith('.'):
-                installed_module_ids.append(module_dir.name.lstrip('_'))
+    installed_module_ids = _get_installed_module_ids()
 
-    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
+    cloud_api_url = _get_cloud_api_url()
     headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
 
     try:
-        # Fetch module details from Cloud API
-        response = requests.get(
-            f"{cloud_api_url}/api/marketplace/modules/{slug}/",
-            headers=headers,
-            timeout=30
-        )
+        # Fetch module details from Cloud API (cached)
+        cache_key = f"{_CK_MODULE_DETAIL}{slug}"
+        module = cache.get(cache_key)
+        if module is None:
+            response = requests.get(
+                f"{cloud_api_url}/api/marketplace/modules/{slug}/",
+                headers=headers,
+                timeout=30
+            )
 
-        if response.status_code == 404:
-            return {
-                'current_section': 'marketplace',
-                'error': f'Module "{slug}" not found.',
-                'cart_count': 0,
-            }
+            if response.status_code == 404:
+                return {
+                    'current_section': 'marketplace',
+                    'error': f'Module "{slug}" not found.',
+                    'cart_count': 0,
+                }
 
-        if response.status_code != 200:
-            return {
-                'current_section': 'marketplace',
-                'error': f'Cloud API returned {response.status_code}',
-                'cart_count': 0,
-            }
+            if response.status_code != 200:
+                return {
+                    'current_section': 'marketplace',
+                    'error': f'Cloud API returned {response.status_code}',
+                    'cart_count': 0,
+                }
 
-        module = response.json()
+            module = response.json()
+            cache.set(cache_key, module, _CACHE_TTL)
 
         # Check if installed (compare both slug and module_id)
         is_installed = slug in installed_module_ids or module.get('module_id', '') in installed_module_ids
@@ -952,22 +990,15 @@ def module_detail(request, slug):
         # Get cart count
         cart = get_cart(request, 'modules')
 
-        # Related modules (same category)
+        # Related modules (same category) — use cached modules list
         related_modules = []
-        try:
-            related_response = requests.get(
-                f"{cloud_api_url}/api/marketplace/modules/",
-                headers=headers,
-                params={'category': module.get('category'), 'limit': 3},
-                timeout=10
-            )
-            if related_response.status_code == 200:
-                related_data = related_response.json()
-                related_list = related_data.get('results', related_data) if isinstance(related_data, dict) else related_data
-                # Exclude current module
-                related_modules = [m for m in related_list if m.get('slug') != slug][:3]
-        except Exception:
-            pass
+        all_modules = _fetch_all_modules()
+        if all_modules:
+            category = module.get('category', '')
+            related_modules = [
+                m for m in all_modules
+                if m.get('category') == category and m.get('slug') != slug
+            ][:3]
 
         return {
             'current_section': 'marketplace',
@@ -1016,14 +1047,21 @@ def solutions_index(request):
 
 
 def _fetch_solution_modules(slug, cloud_api_url):
-    """Fetch module list for a single solution from Cloud API."""
+    """Fetch module list for a single solution from Cloud API (cached)."""
+    cache_key = f"{_CK_SOLUTION_DETAIL}{slug}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return slug, cached
+
     try:
         r = requests.get(
             f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
             headers={'Accept': 'application/json'}, timeout=15,
         )
         if r.status_code == 200:
-            return slug, r.json().get('modules', [])
+            modules = r.json().get('modules', [])
+            cache.set(cache_key, modules, _CACHE_TTL)
+            return slug, modules
     except Exception:
         pass
     return slug, []
@@ -1050,31 +1088,50 @@ def solutions_list(request):
     page_number = request.GET.get('page', 1)
 
     cloud_api_url = _get_cloud_api_url()
-    solutions = []
-    try:
-        response = requests.get(
-            f"{cloud_api_url}/api/marketplace/solutions/",
-            headers={'Accept': 'application/json'}, timeout=15,
-        )
-        if response.status_code == 200:
-            solutions = response.json()
-    except requests.exceptions.RequestException:
-        pass
+
+    # Use the same cached solutions list
+    solutions = cache.get(_CK_SOLUTIONS_LIST)
+    if solutions is None:
+        try:
+            response = requests.get(
+                f"{cloud_api_url}/api/marketplace/solutions/",
+                headers={'Accept': 'application/json'}, timeout=15,
+            )
+            if response.status_code == 200:
+                solutions = response.json()
+                cache.set(_CK_SOLUTIONS_LIST, solutions, _CACHE_TTL)
+            else:
+                solutions = []
+        except requests.exceptions.RequestException:
+            solutions = []
+
+    # Work on copies
+    solutions = [dict(s) for s in solutions]
 
     installed_ids = set(_get_installed_module_ids())
 
-    # Fetch module details for each solution in parallel
+    # Fetch module details for each solution (individually cached)
     if solutions:
         slugs_to_fetch = [s['slug'] for s in solutions if s.get('slug')]
         modules_by_slug = {}
-        with ThreadPoolExecutor(max_workers=6) as executor:
-            futures = {
-                executor.submit(_fetch_solution_modules, slug, cloud_api_url): slug
-                for slug in slugs_to_fetch
-            }
-            for future in as_completed(futures):
-                slug, modules = future.result()
-                modules_by_slug[slug] = modules
+        # Only fetch uncached ones in parallel
+        uncached_slugs = []
+        for slug in slugs_to_fetch:
+            cached_mods = cache.get(f"{_CK_SOLUTION_DETAIL}{slug}")
+            if cached_mods is not None:
+                modules_by_slug[slug] = cached_mods
+            else:
+                uncached_slugs.append(slug)
+
+        if uncached_slugs:
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                futures = {
+                    executor.submit(_fetch_solution_modules, slug, cloud_api_url): slug
+                    for slug in uncached_slugs
+                }
+                for future in as_completed(futures):
+                    slug, modules = future.result()
+                    modules_by_slug[slug] = modules
 
     for s in solutions:
         # Attach modules list and mark install status
@@ -1176,6 +1233,7 @@ def solutions_bulk_install(request):
     result = ModuleInstallService.install_block_modules(block_slugs, hub_config)
 
     if result.installed > 0:
+        _invalidate_installed_cache()
         ModuleInstallService.run_post_install(
             load_all=True, run_migrations=True, schedule_restart=True,
         )
@@ -1240,12 +1298,7 @@ def modules_bulk_install(request):
     ]
 
     # Resolve transitive dependencies
-    modules_dir = Path(django_settings.MODULES_DIR)
-    installed_ids = set()
-    if modules_dir.exists():
-        for d in modules_dir.iterdir():
-            if d.is_dir() and not d.name.startswith('.'):
-                installed_ids.add(d.name.lstrip('_'))
+    installed_ids = set(_get_installed_module_ids())
 
     all_slugs = {m['slug'] for m in modules_to_install}
     dep_modules = ModuleInstallService._resolve_dependencies(
@@ -1274,6 +1327,7 @@ def modules_bulk_install(request):
     )
 
     if result.installed > 0:
+        _invalidate_installed_cache()
         ModuleInstallService.run_post_install(
             load_all=True, run_migrations=True, schedule_restart=True,
         )
@@ -1298,25 +1352,29 @@ def solution_detail(request, slug):
     installed_ids = _get_installed_module_ids()
 
     try:
-        response = requests.get(
-            f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
-            headers={'Accept': 'application/json'},
-            timeout=15,
-        )
-        if response.status_code == 404:
-            return {
-                'current_section': 'marketplace',
-                'error': _('Block not found.'),
-                'navigation': _marketplace_navigation('modules'),
-            }
-        if response.status_code != 200:
-            return {
-                'current_section': 'marketplace',
-                'error': f'Cloud API returned {response.status_code}',
-                'navigation': _marketplace_navigation('modules'),
-            }
-
-        solution = response.json()
+        # Cached solution detail
+        sol_cache_key = f"{_CK_SOLUTION_DETAIL}{slug}:full"
+        solution = cache.get(sol_cache_key)
+        if solution is None:
+            response = requests.get(
+                f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+                headers={'Accept': 'application/json'},
+                timeout=15,
+            )
+            if response.status_code == 404:
+                return {
+                    'current_section': 'marketplace',
+                    'error': _('Block not found.'),
+                    'navigation': _marketplace_navigation('modules'),
+                }
+            if response.status_code != 200:
+                return {
+                    'current_section': 'marketplace',
+                    'error': f'Cloud API returned {response.status_code}',
+                    'navigation': _marketplace_navigation('modules'),
+                }
+            solution = response.json()
+            cache.set(sol_cache_key, solution, _CACHE_TTL)
 
         # Check if this block is active
         from apps.configuration.models import HubConfig
@@ -1426,6 +1484,7 @@ def solution_install(request, slug):
 
         # Post-install: load, migrate, create roles
         if installed_count > 0:
+            _invalidate_installed_cache()
             ModuleInstallService.run_post_install(
                 load_all=True, run_migrations=True,
                 schedule_restart=True,
@@ -1488,6 +1547,7 @@ def block_toggle(request, slug):
         result = ModuleInstallService.install_block_modules([slug], hub_config)
 
         if result.installed > 0:
+            _invalidate_installed_cache()
             ModuleInstallService.run_post_install(
                 load_all=True, run_migrations=True,
                 sync_permissions=bool(hub_config.hub_id),
@@ -1564,25 +1624,33 @@ def business_type_detail(request, slug):
         }
 
     try:
-        response = requests.get(
-            f"{cloud_api_url}/api/marketplace/industries/{slug}/",
-            headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
-            timeout=15,
-        )
-        if response.status_code == 404:
-            return {
-                'current_section': 'marketplace',
-                'error': _('Business type not found.'),
-                'navigation': _marketplace_navigation('business_types'),
-            }
-        if response.status_code != 200:
-            return {
-                'current_section': 'marketplace',
-                'error': f'Cloud API returned {response.status_code}',
-                'navigation': _marketplace_navigation('business_types'),
-            }
+        # Cached industry detail
+        ind_cache_key = f"{_CK_INDUSTRY_DETAIL}{slug}:full"
+        industry = cache.get(ind_cache_key)
+        if industry is None:
+            response = requests.get(
+                f"{cloud_api_url}/api/marketplace/industries/{slug}/",
+                headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
+                timeout=15,
+            )
+            if response.status_code == 404:
+                return {
+                    'current_section': 'marketplace',
+                    'error': _('Business type not found.'),
+                    'navigation': _marketplace_navigation('business_types'),
+                }
+            if response.status_code != 200:
+                return {
+                    'current_section': 'marketplace',
+                    'error': f'Cloud API returned {response.status_code}',
+                    'navigation': _marketplace_navigation('business_types'),
+                }
+            industry = response.json()
+            cache.set(ind_cache_key, industry, _CACHE_TTL)
 
-        industry = response.json()
+        # Work on a copy so cache stays clean
+        industry = dict(industry)
+        industry['modules'] = [dict(m) for m in industry.get('modules', [])]
 
         # Mark installed modules
         installed_ids = _get_installed_module_ids()
