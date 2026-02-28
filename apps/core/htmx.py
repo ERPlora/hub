@@ -99,7 +99,10 @@ def htmx_view(full_template, partial_template):
 
                 return response
 
-            # Full page request
+            # Full page request — inject the partial template so the
+            # full-page template can {% include content_template %} and
+            # render the correct content on browser refresh / deep links.
+            context.setdefault('content_template', template_override or partial_template)
             return render(request, full_template, context)
 
         return wrapper

@@ -176,7 +176,7 @@ class SingletonConfigMixin:
 
 class HubConfig(SingletonConfigMixin, models.Model):
     """
-    Hub configuration stored locally in SQLite.
+    Hub configuration stored in PostgreSQL.
     Contains hub credentials and configuration from Cloud.
     """
     # Cloud connection credentials

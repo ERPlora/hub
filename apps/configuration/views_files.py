@@ -75,29 +75,33 @@ def get_allowed_directories() -> dict:
 @login_required
 @require_GET
 def download_database(request):
-    """
-    Download the SQLite database file.
+    """Download PostgreSQL backup via pg_dump."""
+    import subprocess
+    import tempfile
 
-    Returns the database as a downloadable file with timestamp in filename.
-    """
-    db_path = Path(django_settings.DATABASES['default']['NAME'])
-
-    if not db_path.exists():
-        return JsonResponse({'error': _('Database not found')}, status=404)
-
-    # Generate filename with timestamp
+    db = django_settings.DATABASES['default']
+    env = os.environ.copy()
+    env['PGPASSWORD'] = db.get('PASSWORD', '')
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"hub_database_{timestamp}.sqlite3"
+    filename = f"hub_database_{timestamp}.dump"
 
-    # Return file as download
-    response = FileResponse(
-        open(db_path, 'rb'),
-        as_attachment=True,
-        filename=filename
-    )
-    response['Content-Type'] = 'application/x-sqlite3'
+    with tempfile.NamedTemporaryFile(suffix='.dump', delete=False) as tmp:
+        tmp_path = tmp.name
 
-    return response
+    try:
+        result = subprocess.run(
+            ['pg_dump', '-h', db.get('HOST', 'localhost'), '-p', str(db.get('PORT', '5432')),
+             '-U', db.get('USER', ''), '-d', db['NAME'], '-Fc'],
+            env=env, stdout=open(tmp_path, 'wb'), stderr=subprocess.PIPE, timeout=600
+        )
+        if result.returncode != 0:
+            return JsonResponse({'error': 'Backup failed'}, status=500)
+
+        response = FileResponse(open(tmp_path, 'rb'), as_attachment=True, filename=filename)
+        response['Content-Type'] = 'application/octet-stream'
+        return response
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required
@@ -386,8 +390,10 @@ def get_storage_info(request):
         return count
 
     # Get database size (recommended limit: 2 GB)
-    db_path = Path(django_settings.DATABASES['default']['NAME'])
-    db_size = db_path.stat().st_size if db_path.exists() else 0
+    from django.db import connection as db_connection
+    with db_connection.cursor() as cursor:
+        cursor.execute("SELECT pg_database_size(current_database())")
+        db_size = cursor.fetchone()[0]
     db_limit = 2 * 1024 * 1024 * 1024  # 2 GB
     db_percent = min(100, int((db_size / db_limit) * 100)) if db_limit else 0
     # Color: green < 1 GB, yellow 1-1.7 GB, red > 1.7 GB
@@ -405,7 +411,7 @@ def get_storage_info(request):
             'icon': 'server',
             'size': format_file_size(db_size),
             'size_bytes': db_size,
-            'files': 1 if db_path.exists() else 0,
+            'files': 1,
             'limit': format_file_size(db_limit),
             'percent': db_percent,
             'color': db_color,

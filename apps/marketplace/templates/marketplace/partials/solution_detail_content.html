@@ -1,7 +1,6 @@
-{% load i18n component_tags djicons %}
+{% load i18n djicons %}
 
-{% component "page" title=solution.name|default:_("Solution") back_hx_get="/marketplace/solutions/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {% fill "content" %}
+<div hidden data-back-url="/marketplace/solutions/"></div>
 
 {% if error %}
 <div class="callout callout-warning mt-5">
@@ -231,6 +230,3 @@
 </div>
 
 {% endif %}
-
-    {% endfill %}
-{% endcomponent %}
