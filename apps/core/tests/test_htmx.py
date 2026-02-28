@@ -37,7 +37,7 @@ class TestHtmxViewDecorator:
             response = my_view(request)
 
             mock_render.assert_called_once_with(
-                request, 'pages/full.html', {'data': 'test'}
+                request, 'pages/full.html', {'data': 'test', 'content_template': 'partials/content.html'}
             )
 
     def test_partial_with_htmx_header(self):
@@ -88,7 +88,7 @@ class TestHtmxViewDecorator:
             response = my_view(request)
 
             mock_render.assert_called_once_with(
-                request, 'pages/full.html', {'data': 'test'}
+                request, 'pages/full.html', {'data': 'test', 'content_template': 'partials/content.html'}
             )
 
     def test_htmx_takes_precedence_over_query_param(self):
@@ -136,7 +136,7 @@ class TestHtmxViewDecorator:
             response = my_view(request)
 
             mock_render.assert_called_once_with(
-                request, 'pages/full.html', {}
+                request, 'pages/full.html', {'content_template': 'partials/content.html'}
             )
 
     def test_preserves_function_metadata(self):

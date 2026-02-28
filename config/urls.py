@@ -42,7 +42,7 @@ from django.shortcuts import redirect
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 from apps.modules_runtime.router import module_urlpatterns
-from apps.core.views import set_language, health_check
+from apps.core.views import set_language, health_check, csp_report
 from apps.configuration.views import pwa_manifest, pwa_serviceworker, pwa_offline
 
 # Import API URL patterns from each app
@@ -86,6 +86,9 @@ urlpatterns = [
 
     # Language switcher (auto-detected from browser)
     path('set-language/', set_language, name='set_language'),
+
+    # CSP violation reports
+    path('csp-report/', csp_report, name='csp_report'),
 
     # ==========================================================================
     # Web UI Routes - Clean URLs without /dashboard/ prefix
