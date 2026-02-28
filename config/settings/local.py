@@ -31,14 +31,11 @@ DEVELOPMENT_MODE = True
 _paths = get_data_paths()
 DATA_DIR = _paths.base_dir
 
-# Database
-_db_path_env = config('DATABASE_PATH', default='')
-if _db_path_env:
-    DATABASES['default']['NAME'] = Path(_db_path_env)
-    DATABASE_DIR = Path(_db_path_env).parent
-else:
-    DATABASE_DIR = _paths.database_dir
-    DATABASES['default']['NAME'] = _paths.database_path
+# Database — PostgreSQL (defaults from base.py, overridable via DATABASE_URL)
+_database_url = config('DATABASE_URL', default='')
+if _database_url:
+    import dj_database_url
+    DATABASES = {'default': dj_database_url.parse(_database_url)}
 
 # Modules
 _modules_dir_env = config('MODULES_DIR', default='')
@@ -49,8 +46,7 @@ else:
 MODULES_ROOT = MODULES_DIR
 MODULE_DISCOVERY_PATHS = [MODULES_DIR]
 
-# Ensure all directories exist
-DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+# Ensure directories exist
 MODULES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Media, Logs, Backups, Reports

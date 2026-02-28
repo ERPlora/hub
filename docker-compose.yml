@@ -26,6 +26,10 @@ services:
       dockerfile: Dockerfile
       network: host
     restart: unless-stopped
+    # Resource limits (injected by Cloud via Dokploy env vars)
+    cpus: ${CPU_LIMIT:-0.25}
+    mem_limit: ${MEMORY_LIMIT:-256m}
+    mem_reservation: ${MEMORY_LIMIT:-256m}
     # Command: create data dirs, run migrations, start gunicorn
     command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && python manage.py migrate --noinput && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --pid /run/gunicorn.pid --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
     volumes:

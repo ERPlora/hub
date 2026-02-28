@@ -113,7 +113,6 @@ PERMISSIONS = [
         # Create __init__.py
         with open(module_dir / '__init__.py', 'w') as f:
             f.write(f'"""\n{module_name}\n"""\n')
-            f.write(f"default_app_config = '{module_id}.apps.{module_id.replace('-', '').title()}Config'\n")
 
         # Create apps.py
         app_config_class = module_id.replace('-', '').title() + 'Config'

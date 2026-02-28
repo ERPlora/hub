@@ -3,7 +3,7 @@ name = "erplora-hub"
 version = "0.12.1"
 description = "ERPlora Hub - Business Management Web Application with Django"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "BUSL-1.1" }
 authors = [
     { name = "ERPlora Team", email = "dev@erplora.com" }
@@ -11,18 +11,19 @@ authors = [
 keywords = ["erp", "business-management", "pos", "django", "web"]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
     "Intended Audience :: End Users/Desktop",
     "Environment :: Web Environment",
     "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 
 dependencies = [
     # === CORE HUB ===
-    "Django>=5.2.7",
+    "Django>=6.0",
     "python-decouple>=3.8",
     "gunicorn>=21.0.0", # WSGI server
     # === PAQUETES DJANGO COMUNES ===
@@ -194,7 +195,7 @@ exclude_lines = [
 
 [tool.black]
 line-length = 88
-target-version = ['py311']
+target-version = ['py312']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -221,7 +222,7 @@ known_first_party = ["apps", "config"]
 sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 check_untyped_defs = true
 ignore_missing_imports = true
 warn_unused_ignores = true
@@ -238,7 +239,7 @@ django_settings_module = "config.settings"
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 extend-exclude = [
     "migrations",
     "*.pyc",
