@@ -86,8 +86,7 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',
     'djmoney',
     'django_htmx',
-    'djicons',  # SVG icons for Django templates (must be before django_components)
-    'django_components',
+    'djicons',  # SVG icons for Django templates
     # Health Check
     'health_check',
     'health_check.db',
@@ -160,12 +159,10 @@ TEMPLATES = [
                     [
                         'django.template.loaders.filesystem.Loader',
                         'django.template.loaders.app_directories.Loader',
-                        'django_components.template_loader.Loader',
                     ],
                 ),
             ],
             'builtins': [
-                'django_components.templatetags.component_tags',
                 'djicons.templatetags.djicons',  # SVG icons
             ],
             'libraries': {
@@ -246,6 +243,21 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# =============================================================================
+# CACHE
+# =============================================================================
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'erplora-hub',
+        'TIMEOUT': 300,  # 5 minutes default
+    }
+}
+
+# Marketplace cache TTL (seconds)
+MARKETPLACE_CACHE_TTL = 300  # 5 minutes
 
 # =============================================================================
 # CLOUD API
@@ -452,20 +464,6 @@ LOGGING = {
             'propagate': False,
         },
     },
-}
-
-# =============================================================================
-# DJANGO COMPONENTS
-# =============================================================================
-
-COMPONENTS = {
-    "dirs": [
-        BASE_DIR / "apps" / "ui" / "components",
-    ],
-    "autodiscover": True,
-    "libraries": [],
-    "template_cache_size": 128,
-    "context_behavior": "django",  # or "isolated"
 }
 
 # =============================================================================

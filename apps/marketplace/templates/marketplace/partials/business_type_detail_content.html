@@ -1,7 +1,6 @@
-{% load i18n component_tags djicons %}
+{% load i18n djicons %}
 
-{% component "page" title=industry.name|default:_("Business Type") back_hx_get="/marketplace/business-types/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {% fill "content" %}
+<div hidden data-back-url="/marketplace/business-types/"></div>
 
 {% if error %}
 <div class="callout callout-warning mt-5">
@@ -118,6 +117,3 @@
 </div>
 
 {% endif %}
-
-    {% endfill %}
-{% endcomponent %}

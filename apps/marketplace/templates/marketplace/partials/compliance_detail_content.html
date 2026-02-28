@@ -1,7 +1,6 @@
-{% load i18n component_tags djicons marketplace_tags %}
+{% load i18n djicons marketplace_tags %}
 
-{% component "page" title=country.country_name|default:_("Compliance") back_hx_get="/marketplace/compliance/" back_hx_target="#main-content-area" back_hx_push_url="true" %}
-    {% fill "content" %}
+<div hidden data-back-url="/marketplace/compliance/"></div>
 
 {% if error %}
 <div class="callout callout-warning mt-5">
@@ -182,6 +181,3 @@ function installComplianceModule(moduleSlug, button) {
 }
 </script>
 {% endif %}
-
-    {% endfill %}
-{% endcomponent %}

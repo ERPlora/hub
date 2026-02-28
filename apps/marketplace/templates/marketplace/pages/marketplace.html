@@ -20,7 +20,7 @@
 {% endblock %}
 
 {% block page_content %}
-{% include "marketplace/partials/marketplace_content.html" %}
+{% include content_template|default:"marketplace/partials/marketplace_content.html" %}
 
 {# Cart Side-Sheet (right sliding panel) #}
 <div x-data="{ cartOpen: false }"

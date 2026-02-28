@@ -4,7 +4,7 @@
 {% block page_title %}{{ page_title }}{% endblock %}
 
 {% block page_content %}
-{% block module_content %}{% endblock %}
+{% if content_template %}{% include content_template %}{% else %}{% block module_content %}{% endblock %}{% endif %}
 {% endblock %}
 
 {% block page_footer %}
