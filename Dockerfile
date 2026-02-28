@@ -24,7 +24,7 @@
 #   DJANGO_SETTINGS_MODULE=config.settings.web
 # ==============================================================================
 
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Labels for container metadata
 LABEL org.opencontainers.image.title="ERPlora Hub"
