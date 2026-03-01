@@ -2,69 +2,22 @@
 
 <div x-data="{ previewOpen: false }" class="mt-5">
 
-    {% if metrics %}
-    <!-- Resources Section -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-
-        <!-- RAM Usage -->
-        <div class="card glass">
-            <div class="card-body p-4">
-                <div class="flex flex-row items-center gap-4 mb-3">
-                    <div class="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        {% icon "hardware-chip-outline" css_class="text-3xl text-primary" %}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-semibold text-sm m-0">{{ metrics.memory_used_mb }} / {{ metrics.memory_limit_mb }} MB</p>
-                        <p class="text-xs text-base-content/50 m-0">{% trans "Memory (RAM)" %}</p>
-                    </div>
-                </div>
-                <div class="w-full bg-base-200 rounded-full h-2">
-                    <div class="bg-{% if metrics.memory_percent > 85 %}error{% elif metrics.memory_percent > 70 %}warning{% else %}primary{% endif %} h-2 rounded-full transition-all" style="width: {{ metrics.memory_percent }}%"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- CPU Info -->
-        <div class="card glass">
-            <div class="card-body p-4 flex flex-row items-center gap-4">
-                <div class="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    {% icon "speedometer-outline" css_class="text-3xl text-primary" %}
-                </div>
-                <div class="flex-1 min-w-0">
-                    {% if metrics.cpu_limit %}
-                    <p class="font-semibold text-sm m-0">{{ metrics.cpu_limit }} {% trans "cores" %}</p>
-                    {% else %}
-                    <p class="font-semibold text-sm m-0">—</p>
-                    {% endif %}
-                    <p class="text-xs text-base-content/50 m-0">{% trans "CPU Limit" %}</p>
-                </div>
-            </div>
-        </div>
-
-    </div>
-    {% endif %}
-
     <!-- Storage Section -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
 
         <!-- Database -->
         <div class="card glass">
-            <div class="card-body p-4">
-                <div class="flex flex-row items-center gap-4 mb-3">
-                    <div class="w-11 h-11 rounded-xl bg-{{ db_color }}/10 flex items-center justify-center shrink-0">
-                        {% icon "server-outline" css_class="text-3xl text-{{ db_color }}" %}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-semibold text-sm m-0">{{ db_size }} / {{ db_limit }}</p>
-                        <p class="text-xs text-base-content/50 m-0">{% trans "Database" %}{% if plan_name %} · {{ plan_name }}{% endif %}</p>
-                    </div>
-                    <a href="{{ download_url }}" title="{% trans 'Download backup' %}">
-                        {% icon "cloud-download-outline" css_class="text-base-content/30 hover:text-primary transition-colors" %}
-                    </a>
+            <div class="card-body p-4 flex flex-row items-center gap-4">
+                <div class="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    {% icon "server-outline" css_class="text-3xl text-primary" %}
                 </div>
-                <div class="w-full bg-base-200 rounded-full h-2">
-                    <div class="bg-{{ db_color }} h-2 rounded-full transition-all" style="width: {{ db_percent }}%"></div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-sm m-0">{{ db_size }}</p>
+                    <p class="text-xs text-base-content/50 m-0">{% trans "Database" %}</p>
                 </div>
+                <a href="{{ download_url }}" title="{% trans 'Download backup' %}">
+                    {% icon "cloud-download-outline" css_class="text-base-content/30 hover:text-primary transition-colors" %}
+                </a>
             </div>
         </div>
 
@@ -76,32 +29,6 @@
                  hx-swap="innerHTML">
                 <div class="flex items-center justify-center h-11">
                     <span class="loading loading-sm"></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Total Files -->
-        <div class="card glass">
-            <div class="card-body p-4 flex flex-row items-center gap-4">
-                <div class="w-11 h-11 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
-                    {% icon "documents-outline" css_class="text-3xl text-success" %}
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-sm m-0">{% trans "Browse" %}</p>
-                    <p class="text-xs text-base-content/50 m-0">{% trans "4 directories" %}</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Data Location -->
-        <div class="card glass">
-            <div class="card-body p-4 flex flex-row items-center gap-4">
-                <div class="w-11 h-11 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
-                    {% icon "folder-outline" css_class="text-3xl text-warning" %}
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-sm m-0 truncate">{% trans "Location" %}</p>
-                    <p class="text-xs text-base-content/50 m-0 truncate">{% trans "Local data directory" %}</p>
                 </div>
             </div>
         </div>
