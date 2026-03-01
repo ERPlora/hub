@@ -2,11 +2,10 @@
 
 <div x-data="{ previewOpen: false }" class="mt-5">
 
-    {% if metrics.memory_limit_mb or metrics.cpu_limit %}
+    {% if metrics.is_cloud %}
     <!-- Resources Section -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
 
-        {% if metrics.memory_limit_mb %}
         <!-- RAM Usage -->
         <div class="card glass">
             <div class="card-body p-4 flex flex-row items-center gap-4">
@@ -14,6 +13,7 @@
                     {% icon "hardware-chip-outline" css_class="text-3xl text-success" %}
                 </div>
                 <div class="flex-1 min-w-0">
+                    {% if metrics.memory_limit_mb %}
                     <div class="flex items-center justify-between mb-1">
                         <p class="font-semibold text-sm m-0">{{ metrics.memory_used_mb }} / {{ metrics.memory_limit_mb }} MB</p>
                         <span class="text-xs text-base-content/50">{{ metrics.memory_percent }}%</span>
@@ -21,13 +21,14 @@
                     <div class="w-full bg-base-200 rounded-full h-1.5">
                         <div class="h-1.5 rounded-full {% if metrics.memory_percent >= 90 %}bg-error{% elif metrics.memory_percent >= 70 %}bg-warning{% else %}bg-success{% endif %}" style="width: {{ metrics.memory_percent }}%"></div>
                     </div>
+                    {% else %}
+                    <p class="font-semibold text-sm m-0">{{ metrics.memory_used_mb }} MB</p>
+                    {% endif %}
                     <p class="text-xs text-base-content/50 m-0 mt-1">{% trans "RAM" %}</p>
                 </div>
             </div>
         </div>
-        {% endif %}
 
-        {% if metrics.cpu_limit %}
         <!-- CPU Usage -->
         <div class="card glass">
             <div class="card-body p-4 flex flex-row items-center gap-4">
@@ -35,6 +36,7 @@
                     {% icon "speedometer-outline" css_class="text-3xl text-info" %}
                 </div>
                 <div class="flex-1 min-w-0">
+                    {% if metrics.cpu_limit %}
                     <div class="flex items-center justify-between mb-1">
                         <p class="font-semibold text-sm m-0">{{ metrics.cpu_used }} / {{ metrics.cpu_limit }} {% trans "cores" %}</p>
                         <span class="text-xs text-base-content/50">{{ metrics.cpu_percent }}%</span>
@@ -42,11 +44,13 @@
                     <div class="w-full bg-base-200 rounded-full h-1.5">
                         <div class="h-1.5 rounded-full {% if metrics.cpu_percent >= 90 %}bg-error{% elif metrics.cpu_percent >= 70 %}bg-warning{% else %}bg-info{% endif %}" style="width: {{ metrics.cpu_percent }}%"></div>
                     </div>
+                    {% else %}
+                    <p class="font-semibold text-sm m-0">{{ metrics.cpu_used }} {% trans "cores" %}</p>
+                    {% endif %}
                     <p class="text-xs text-base-content/50 m-0 mt-1">{% trans "CPU" %}</p>
                 </div>
             </div>
         </div>
-        {% endif %}
 
     </div>
     {% endif %}
