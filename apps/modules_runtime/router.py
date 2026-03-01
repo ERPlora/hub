@@ -4,6 +4,7 @@ from importlib import import_module
 from django.urls import path, include
 
 module_urlpatterns = []
+module_api_urlpatterns = []
 
 
 def _normalize_prefix(prefix: str) -> str:
@@ -32,3 +33,18 @@ def register_module_urls(module_id: str, module_name: str, main_url: Optional[st
     module_urlpatterns.append(pattern)
 
     print(f"[MODULES][URLS] Registradas URLs de '{module_id}' en '/{prefix}'")
+
+    # Also register API URLs if the module has api.py with api_urlpatterns
+    try:
+        api_module = import_module(f"{module_name}.api")
+        api_urls = getattr(api_module, 'api_urlpatterns', None)
+        if api_urls:
+            api_prefix = f"api/v1/m/{module_id}/"
+            api_namespace = f"api_{module_id}"
+            api_pattern = path(api_prefix, include((api_urls, api_namespace)))
+            module_api_urlpatterns.append(api_pattern)
+            print(f"[MODULES][API] Registradas API URLs de '{module_id}' en '/{api_prefix}'")
+    except ModuleNotFoundError:
+        pass  # Module doesn't have api.py — normal, skip
+    except Exception as e:
+        print(f"[MODULES][API] Error loading API from '{module_id}': {e}")

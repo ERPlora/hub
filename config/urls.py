@@ -10,7 +10,8 @@ URL Structure
 ├── /config/                Hub configuration
 ├── /modules/               Module management
 ├── /system/                System utilities (updates, notifications)
-└── /sync/                  Cloud sync & backups
+├── /sync/                  Cloud sync & backups
+└── /m/<module_id>/         Dynamic module APIs (auto-discovered from api.py)
 
 /                           Web UI (HTML + HTMX)
 ├── /                       Root redirect (→ /home/ or /login/)
@@ -41,7 +42,7 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
-from apps.modules_runtime.router import module_urlpatterns
+from apps.modules_runtime.router import module_urlpatterns, module_api_urlpatterns
 from apps.core.views import set_language, health_check, csp_report
 from apps.configuration.views import pwa_manifest, pwa_serviceworker, pwa_offline
 
@@ -117,8 +118,9 @@ urlpatterns = [
 ]
 
 
-# Añadir las URLs dinámicas de modules
+# Añadir las URLs dinámicas de modules (Web UI + API)
 urlpatterns += module_urlpatterns
+urlpatterns += module_api_urlpatterns
 
 # Serve static and media files in development
 if settings.DEBUG:

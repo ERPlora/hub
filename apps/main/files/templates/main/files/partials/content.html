@@ -56,7 +56,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-semibold text-sm m-0">{{ db_size }} / {{ db_limit }}</p>
-                        <p class="text-xs text-base-content/50 m-0">{% trans "Database" %}</p>
+                        <p class="text-xs text-base-content/50 m-0">{% trans "Database" %}{% if plan_name %} · {{ plan_name }}{% endif %}</p>
                     </div>
                     <a href="{{ download_url }}" title="{% trans 'Download backup' %}">
                         {% icon "cloud-download-outline" css_class="text-base-content/30 hover:text-primary transition-colors" %}
@@ -88,7 +88,7 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="font-semibold text-sm m-0">{% trans "Browse" %}</p>
-                    <p class="text-xs text-base-content/50 m-0">{% trans "5 directories" %}</p>
+                    <p class="text-xs text-base-content/50 m-0">{% trans "4 directories" %}</p>
                 </div>
             </div>
         </div>
