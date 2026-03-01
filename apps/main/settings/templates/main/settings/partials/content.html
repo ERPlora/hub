@@ -791,7 +791,11 @@
             <div class="mt-6 flex flex-col items-center gap-4" x-data="{
                 hubUrl: window.location.origin,
                 generate() {
-                    if (typeof qrcode === 'undefined') return;
+                    var self = this;
+                    if (typeof qrcode === 'undefined') {
+                        setTimeout(function() { self.generate(); }, 50);
+                        return;
+                    }
                     var qr = qrcode(0, 'M');
                     qr.addData(this.hubUrl);
                     qr.make();
