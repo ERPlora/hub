@@ -97,7 +97,11 @@ async function checkoutCart(btn) {
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
         });
         var data = await response.json();
-        if (data.checkout_url) {
+        if (data.client_secret && data.stripe_publishable_key) {
+            // Embedded checkout — open in modal
+            openCheckoutModal(data.client_secret, data.stripe_publishable_key);
+        } else if (data.checkout_url) {
+            // Fallback: hosted checkout
             window.open(data.checkout_url, '_blank');
             if (typeof Toast !== 'undefined') Toast.info('{% trans "Complete payment in the opened window" %}');
         } else if (data.message) {
