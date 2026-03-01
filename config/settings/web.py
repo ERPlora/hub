@@ -200,7 +200,9 @@ MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 # WhiteNoise right after SecurityMiddleware for static files
 MIDDLEWARE.insert(2, 'whitenoise.middleware.WhiteNoiseMiddleware')
 # Cloud SSO middleware after session middleware
-MIDDLEWARE.insert(4, 'apps.core.middleware.CloudSSOMiddleware')
+# After insert(0, CORS) and insert(2, WhiteNoise), SessionMiddleware is at index 4
+# So we insert at 5 to place CloudSSO right after Session
+MIDDLEWARE.insert(5, 'apps.core.middleware.CloudSSOMiddleware')
 
 # =============================================================================
 # STATIC & MEDIA STORAGE BACKENDS
