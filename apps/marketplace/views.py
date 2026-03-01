@@ -581,6 +581,7 @@ def cart_checkout(request, store_type='modules'):
                 ],
                 'success_url': request.build_absolute_uri('/marketplace/?checkout=success'),
                 'cancel_url': request.build_absolute_uri('/marketplace/?checkout=cancel'),
+                'ui_mode': 'embedded',
             },
             headers={
                 'X-Hub-Token': auth_token,
@@ -591,7 +592,19 @@ def cart_checkout(request, store_type='modules'):
 
         if response.status_code == 200:
             data = response.json()
-            if data.get('checkout_url'):
+            if data.get('client_secret'):
+                # Embedded checkout — return client_secret for modal
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'client_secret': data['client_secret'],
+                        'session_id': data.get('session_id'),
+                        'stripe_publishable_key': data.get('stripe_publishable_key', ''),
+                    }),
+                    content_type='application/json',
+                )
+            elif data.get('checkout_url'):
+                # Fallback: hosted checkout (redirect)
                 return HttpResponse(
                     json.dumps({
                         'success': True,
