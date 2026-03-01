@@ -11,7 +11,13 @@
         this.$watch('view', v => localStorage.setItem('mp_view', v));
         this.$watch('perPage', v => localStorage.setItem('mp_per_page', v));
         this.$nextTick(() => {
-            htmx.trigger(document.getElementById('datatable-body'), 'mpReady');
+            var body = document.getElementById('datatable-body');
+            if (body) {
+                // Ensure HTMX has processed hx-* attributes on the new DOM
+                // before triggering the event (fixes first-load via HTMX navigation)
+                htmx.process(body);
+                htmx.trigger(body, 'mpReady');
+            }
         });
     },
     toggleCol(col) {
