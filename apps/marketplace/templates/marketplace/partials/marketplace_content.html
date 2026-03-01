@@ -10,15 +10,13 @@
     init() {
         this.$watch('view', v => localStorage.setItem('mp_view', v));
         this.$watch('perPage', v => localStorage.setItem('mp_per_page', v));
-        this.$nextTick(() => {
-            var body = document.getElementById('datatable-body');
-            if (body) {
-                // Ensure HTMX has processed hx-* attributes on the new DOM
-                // before triggering the event (fixes first-load via HTMX navigation)
-                htmx.process(body);
-                htmx.trigger(body, 'mpReady');
-            }
-        });
+        // Use setTimeout to ensure inline scripts have executed after HTMX swap
+        var self = this;
+        setTimeout(function() {
+            var qs = typeof gatherDatatableParams === 'function' ? gatherDatatableParams() : '';
+            var url = '{% url "marketplace:products_list" %}' + (qs ? '?' + qs : '');
+            htmx.ajax('GET', url, {target: '#datatable-body', swap: 'innerHTML'});
+        }, 0);
     },
     toggleCol(col) {
         this.cols[col] = !this.cols[col];
@@ -225,11 +223,7 @@
         <input type="hidden" name="type" id="filter-type" value="">
 
         <!-- Datatable Body (HTMX swap target) -->
-        <div id="datatable-body"
-             hx-get="{% url 'marketplace:products_list' %}"
-             hx-trigger="mpReady"
-             hx-include="#marketplace-datatable"
-             hx-swap="innerHTML">
+        <div id="datatable-body">
             <div class="flex justify-center py-8">
                 <div class="loading"></div>
             </div>
