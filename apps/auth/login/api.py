@@ -80,48 +80,6 @@ class LocalUserListSerializer(serializers.ModelSerializer):
 
 
 # =============================================================================
-# Helper Functions
-# =============================================================================
-
-def verify_user_access_with_cloud(user):
-    """Verify if user has active access to Hub by querying Cloud."""
-    hub_config = HubConfig.get_config()
-
-    if not hub_config.is_configured:
-        return True, "hub_not_configured"
-
-    try:
-        response = requests.get(
-            f"{django_settings.CLOUD_API_URL}/api/hubs/{hub_config.hub_id}/users/check/{user.email}/",
-            headers={'X-Hub-Token': hub_config.cloud_api_token},
-            timeout=5
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            has_access = data.get('has_access', False)
-
-            if not has_access and user.is_active:
-                user.is_active = False
-                user.save(update_fields=['is_active'])
-                return False, "removed_from_cloud"
-            elif has_access and not user.is_active:
-                user.is_active = True
-                user.save(update_fields=['is_active'])
-                return True, "reactivated_from_cloud"
-
-            return has_access, "synced_with_cloud"
-        else:
-            return user.is_active, "cloud_error_use_local"
-
-    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        return user.is_active, "offline_use_local"
-    except Exception as e:
-        print(f"Error verifying access in Cloud: {str(e)}")
-        return user.is_active, "error_use_local"
-
-
-# =============================================================================
 # API Views
 # =============================================================================
 
@@ -173,17 +131,8 @@ class PinLoginView(APIView):
             )
 
         if user.check_pin(pin):
-            has_access, reason = verify_user_access_with_cloud(user)
-
-            if not has_access:
-                return Response({
-                    'success': False,
-                    'error': 'Access denied. You have been removed from this Hub.',
-                    'reason': reason
-                }, status=status.HTTP_401_UNAUTHORIZED)
-
             user.last_login = timezone.now()
-            user.save()
+            user.save(update_fields=['last_login'])
 
             # Store session (convert UUID to string for JSON serialization)
             request.session['local_user_id'] = str(user.id)
@@ -200,7 +149,6 @@ class PinLoginView(APIView):
                     'email': user.email,
                     'role': user.role,
                 },
-                'sync_reason': reason
             })
         else:
             return Response(
