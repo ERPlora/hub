@@ -90,7 +90,7 @@ class HubManager(models.Manager):
         Returns None if HubConfig is not available (during migrations/tests).
         """
         try:
-            from hub.apps.configuration.models import HubConfig
+            from apps.configuration.models import HubConfig
             config = HubConfig.get_solo()
             return config.hub_id
         except Exception:
@@ -133,7 +133,7 @@ class HubManagerWithDeleted(models.Manager):
         Get current hub_id from HubConfig singleton.
         """
         try:
-            from hub.apps.configuration.models import HubConfig
+            from apps.configuration.models import HubConfig
             config = HubConfig.get_solo()
             return config.hub_id
         except Exception:

@@ -39,7 +39,11 @@ class JWTMiddleware:
         '/api/',  # API endpoints handle their own auth
         '/manifest.json',  # PWA manifest
         '/serviceworker.js',  # Service worker
-        '/ht/',  # Health check
+        '/health/',  # Health check endpoint
+        '/ht/',  # django-health-check endpoint
+        '/favicon.ico',
+        '/set-language/',
+        '/logout/',
     ]
 
     def __init__(self, get_response):
