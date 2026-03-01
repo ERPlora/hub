@@ -68,11 +68,13 @@ class CloudSSOMiddleware:
         self.hub_id = getattr(settings, 'HUB_ID', '')
         self.demo_mode = getattr(settings, 'DEMO_MODE', False)
 
-        # Cloud base URL for API calls and login redirects
-        # Use CLOUD_API_URL (set in web.py from CLOUD_BASE_URL env var)
-        # NOT PARENT_DOMAIN (which is the Hub's domain, e.g. a.erplora.com)
+        # Internal URL for server-to-server API calls (session verification, access checks)
         cloud_api_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
-        self.cloud_base_url = cloud_api_url.rstrip('/')
+        self.cloud_api_url = cloud_api_url.rstrip('/')
+
+        # Public URL for browser redirects (login page, dashboard links)
+        cloud_public_url = getattr(settings, 'CLOUD_PUBLIC_URL', cloud_api_url)
+        self.cloud_base_url = cloud_public_url.rstrip('/')
 
     def __call__(self, request):
         # Solo aplicar middleware en Cloud Hubs
@@ -228,7 +230,7 @@ class CloudSSOMiddleware:
         """
         try:
             response = requests.get(
-                f"{self.cloud_base_url}/api/auth/verify-session/",
+                f"{self.cloud_api_url}/api/auth/verify-session/",
                 cookies={'sessionid': session_id},
                 timeout=5
             )
@@ -267,7 +269,7 @@ class CloudSSOMiddleware:
 
         try:
             response = requests.get(
-                f"{self.cloud_base_url}/api/hubs/{self.hub_id}/check-access/",
+                f"{self.cloud_api_url}/api/hubs/{self.hub_id}/check-access/",
                 cookies={'sessionid': session_id},
                 timeout=5
             )
