@@ -176,7 +176,7 @@ class CloudSSOMiddleware:
                     cloud_user_id=cloud_user_id,  # Link to Cloud user (nullable)
                     email=user_email,
                     name=name,
-                    role='admin' if is_first_user else 'cashier',
+                    role='admin' if is_first_user else 'employee',
                     pin_hash='',  # Sin PIN todavía
                     language=hub_config.os_language,
                 )
@@ -216,9 +216,9 @@ class CloudSSOMiddleware:
             return None
 
         except Exception as e:
-            logger.error(f"[SSO] Error ensuring local user: {str(e)}")
-            # En caso de error, permitir que continúe (fallback)
-            return None
+            logger.error(f"[SSO] Error ensuring local user for {user_email}: {e}", exc_info=True)
+            # On error, redirect to login instead of continuing unauthenticated
+            return self._redirect_to_login(request)
 
     def _verify_session_with_cloud(self, session_id):
         """
