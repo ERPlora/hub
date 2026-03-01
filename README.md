@@ -1,6 +1,6 @@
 # ERPlora Hub
 
-Modular POS (Point of Sale) system built with Django 5.2 + HTMX + Alpine.js.
+Modular POS (Point of Sale) system built with Django 6.0 + HTMX + Alpine.js.
 
 ---
 
@@ -8,7 +8,7 @@ Modular POS (Point of Sale) system built with Django 5.2 + HTMX + Alpine.js.
 
 | Component | Technology |
 |-----------|------------|
-| Backend | Django 5.2 |
+| Backend | Django 6.0 |
 | Frontend | UX CSS + Alpine.js + HTMX |
 | Database | PostgreSQL 17 |
 | Icons | djicons (template tags) |
