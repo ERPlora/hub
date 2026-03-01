@@ -13,8 +13,10 @@ from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 from apps.configuration.views_files import format_file_size
 
-# Database size limit: 2 GB
-DB_LIMIT = 2 * 1024 * 1024 * 1024
+def _get_db_limit():
+    """Get database size limit from plan env var (default 2 GB)."""
+    max_db_gb = float(os.environ.get('MAX_DATABASE_GB', '2'))
+    return int(max_db_gb * 1024 * 1024 * 1024)
 
 
 def _get_database_size():
@@ -77,15 +79,20 @@ def _get_resource_metrics():
 def index(request):
     """System page - resources, storage, and file browser."""
     db_size = _get_database_size()
+    db_limit = _get_db_limit()
 
     # Database size indicator
-    db_percent = min(100, int((db_size / DB_LIMIT) * 100)) if DB_LIMIT else 0
-    if db_size < 1 * 1024 * 1024 * 1024:
+    db_percent = min(100, int((db_size / db_limit) * 100)) if db_limit else 0
+    # Color thresholds at 50% and 85% of limit
+    if db_percent < 50:
         db_color = 'success'
-    elif db_size < 1.7 * 1024 * 1024 * 1024:
+    elif db_percent < 85:
         db_color = 'warning'
     else:
         db_color = 'error'
+
+    # Plan name from env (set by Cloud deployment)
+    plan_name = os.environ.get('PLAN_NAME', '')
 
     # Resource metrics (only available inside Docker containers)
     resource_metrics = _get_resource_metrics()
@@ -96,8 +103,9 @@ def index(request):
         'base_path': str(settings.DATA_DIR),
         'download_url': reverse('configuration:download_database'),
         'db_size': format_file_size(db_size),
-        'db_limit': format_file_size(DB_LIMIT),
+        'db_limit': format_file_size(db_limit),
         'db_percent': db_percent,
         'db_color': db_color,
+        'plan_name': plan_name,
         'metrics': resource_metrics,
     }

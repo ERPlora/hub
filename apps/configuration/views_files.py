@@ -1,7 +1,7 @@
 """
 Local Files Views - File Browser and Database Download.
 
-Provides file browser for local Hub data (media, modules, reports, backups)
+Provides file browser for local Hub data (media, reports, backups, logs)
 and database download functionality.
 """
 import os
@@ -65,7 +65,6 @@ def get_allowed_directories() -> dict:
     """Get list of browsable directories with their display names."""
     return {
         'media': {'path': Path(django_settings.MEDIA_ROOT), 'name': 'Media Files', 'icon': 'images'},
-        'modules': {'path': Path(django_settings.MODULES_DIR), 'name': 'Modules', 'icon': 'extension-puzzle'},
         'reports': {'path': Path(django_settings.REPORTS_DIR), 'name': 'Reports', 'icon': 'document-text'},
         'backups': {'path': Path(django_settings.BACKUPS_DIR), 'name': 'Backups', 'icon': 'cloud-download'},
         'logs': {'path': Path(django_settings.LOGS_DIR), 'name': 'Logs', 'icon': 'list'},
@@ -389,17 +388,18 @@ def get_storage_info(request):
                     count += 1
         return count
 
-    # Get database size (recommended limit: 2 GB)
+    # Get database size
     from django.db import connection as db_connection
     with db_connection.cursor() as cursor:
         cursor.execute("SELECT pg_database_size(current_database())")
         db_size = cursor.fetchone()[0]
-    db_limit = 2 * 1024 * 1024 * 1024  # 2 GB
+    max_db_gb = float(os.environ.get('MAX_DATABASE_GB', '2'))
+    db_limit = int(max_db_gb * 1024 * 1024 * 1024)
     db_percent = min(100, int((db_size / db_limit) * 100)) if db_limit else 0
-    # Color: green < 1 GB, yellow 1-1.7 GB, red > 1.7 GB
-    if db_size < 1 * 1024 * 1024 * 1024:
+    # Color thresholds at 50% and 85% of limit
+    if db_percent < 50:
         db_color = 'success'
-    elif db_size < 1.7 * 1024 * 1024 * 1024:
+    elif db_percent < 85:
         db_color = 'warning'
     else:
         db_color = 'error'
@@ -422,13 +422,6 @@ def get_storage_info(request):
             'size': format_file_size(get_dir_size(Path(django_settings.MEDIA_ROOT))),
             'size_bytes': get_dir_size(Path(django_settings.MEDIA_ROOT)),
             'files': count_files(Path(django_settings.MEDIA_ROOT)),
-        },
-        'modules': {
-            'name': 'Modules',
-            'icon': 'extension-puzzle',
-            'size': format_file_size(get_dir_size(Path(django_settings.MODULES_DIR))),
-            'size_bytes': get_dir_size(Path(django_settings.MODULES_DIR)),
-            'files': count_files(Path(django_settings.MODULES_DIR)),
         },
         'reports': {
             'name': 'Reports',
