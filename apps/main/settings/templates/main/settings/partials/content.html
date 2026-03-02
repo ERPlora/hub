@@ -137,6 +137,14 @@
                     </div>
                 </div>
             </form>
+
+            <div class="callout callout-info mt-4" x-data x-show="!$store.bridge.connected" x-cloak>
+                <span class="callout-icon">{% icon "hardware-chip-outline" %}</span>
+                <div class="callout-content">
+                    <div class="callout-title">{% trans "Hardware printing requires ERPlora Bridge" %}</div>
+                    <div class="callout-text">{% trans "To print receipts, open the cash drawer, or use a barcode scanner, install the ERPlora Bridge app on this device. You can configure it in the Native Bridge section below." %}</div>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -347,7 +355,29 @@
                 <span class="callout-icon">{% icon "information-circle-outline" %}</span>
                 <div class="callout-content">
                     <div class="callout-title">{% trans "ERPlora Bridge not detected" %}</div>
-                    <div class="callout-text">{% trans "Install and run the ERPlora Bridge app on this device to enable hardware printing, cash drawer, and barcode scanning." %}</div>
+                    <div class="callout-text mb-3">{% trans "Install and run the ERPlora Bridge app on this device to enable hardware printing, cash drawer, and barcode scanning." %}</div>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="https://github.com/ERPlora/bridge-native/releases/latest/download/erplora-bridge.exe"
+                           target="_blank" class="btn btn-sm btn-outline">
+                            {% icon "desktop-outline" %}
+                            Windows
+                        </a>
+                        <a href="https://github.com/ERPlora/bridge-native/releases/latest/download/ERPlora.Bridge.dmg"
+                           target="_blank" class="btn btn-sm btn-outline">
+                            {% icon "laptop-outline" %}
+                            macOS
+                        </a>
+                        <a href="https://github.com/ERPlora/bridge-native/releases/latest/download/erplora-bridge"
+                           target="_blank" class="btn btn-sm btn-outline">
+                            {% icon "terminal-outline" %}
+                            Linux
+                        </a>
+                        <a href="https://github.com/ERPlora/bridge-native/releases/latest/download/erplora-bridge.apk"
+                           target="_blank" class="btn btn-sm btn-outline">
+                            {% icon "phone-portrait-outline" %}
+                            Android
+                        </a>
+                    </div>
                 </div>
             </div>
 
