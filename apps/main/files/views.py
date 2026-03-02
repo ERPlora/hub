@@ -22,7 +22,7 @@ def _get_database_size():
 
 
 def _get_resource_metrics():
-    """Get container resource usage (cgroups v2 in Docker, fallback for local dev)."""
+    """Get container resource metrics from cgroups v2 (Docker) or env vars."""
     metrics = {
         'memory_used_mb': 0,
         'memory_limit_mb': 0,
@@ -30,6 +30,7 @@ def _get_resource_metrics():
         'cpu_limit': 0,
         'cpu_used': 0,
         'cpu_percent': 0,
+        'is_cloud': bool(os.environ.get('HUB_ID')),
     }
 
     # Memory used: cgroup v2
@@ -40,7 +41,7 @@ def _get_resource_metrics():
     except (FileNotFoundError, ValueError):
         pass
 
-    # Memory limit: env var (Dokploy) or cgroup
+    # Memory limit: env var (Dokploy), cgroup, or Docker inspect
     mem_limit_env = os.environ.get('MEMORY_LIMIT', '')
     if mem_limit_env.endswith('m'):
         metrics['memory_limit_mb'] = int(mem_limit_env[:-1])
@@ -72,7 +73,6 @@ def _get_resource_metrics():
             with open('/sys/fs/cgroup/cpu.max', 'r') as f:
                 parts = f.read().strip().split()
                 if parts[0] != 'max':
-                    # quota / period = CPU cores limit
                     metrics['cpu_limit'] = round(int(parts[0]) / int(parts[1]), 2)
         except (FileNotFoundError, ValueError, IndexError):
             pass
@@ -91,7 +91,6 @@ def _get_resource_metrics():
             uptime_sec = float(f.read().split()[0])
 
         if uptime_sec > 0 and cpu_usage_usec > 0:
-            # usage_usec / uptime_in_usec = average CPU cores used
             cpu_used = cpu_usage_usec / (uptime_sec * 1_000_000)
             metrics['cpu_used'] = round(cpu_used, 2)
 
