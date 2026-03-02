@@ -134,6 +134,12 @@
                         </button>
                     </div>
                     <div class="sidebar-menu-item">
+                        <button @click="$dispatch('open-bug-report')" class="sidebar-menu-button">
+                            <span class="sidebar-menu-icon">{% icon "bug-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Report a Problem" %}</span>
+                        </button>
+                    </div>
+                    <div class="sidebar-menu-item">
                         <a href="{% url 'auth:logout' %}" class="sidebar-menu-button">
                             <span class="sidebar-menu-icon">{% icon "log-out-outline" %}</span>
                             <span class="sidebar-label">{% trans "Log Out" %}</span>
@@ -146,6 +152,8 @@
         <!-- Main content area (direct child of .page → grid column 2, row 2) -->
         {% block main %}{% endblock %}
     </div>
+
+    {% include "partials/bug_report_modal.html" %}
 </div>
 {% endblock %}
 
