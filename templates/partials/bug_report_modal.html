@@ -1,0 +1,103 @@
+{% load i18n djicons %}
+
+<div x-data="bugReport()" @open-bug-report.window="open = true" x-cloak>
+    <div class="modal-backdrop" :data-state="open ? 'open' : 'closed'" @click.self="open = false">
+        <div class="modal" style="max-width: 420px;">
+            <div class="modal-header">
+                <h2 class="modal-title">{% trans "Report a Problem" %}</h2>
+                <button @click="open = false" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm text-base-content/60 mb-3">
+                    {% trans "Describe the problem you encountered. A screenshot of the current page will be captured automatically." %}
+                </p>
+                <div class="form-group">
+                    <label class="form-group-label">{% trans "Description" %}</label>
+                    <textarea x-model="description" class="textarea" rows="3"
+                              placeholder="{% trans 'What went wrong?' %}"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button @click="open = false" class="btn btn-ghost" :disabled="sending">
+                    {% trans "Cancel" %}
+                </button>
+                <button @click="send()" class="btn color-primary" :disabled="sending">
+                    <template x-if="sending">
+                        <span class="loading loading-sm mr-2"></span>
+                    </template>
+                    <template x-if="!sending">
+                        <span class="mr-2">{% icon "send-outline" %}</span>
+                    </template>
+                    {% trans "Send Report" %}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+function bugReport() {
+    return {
+        open: false,
+        sending: false,
+        description: '',
+
+        async send() {
+            this.sending = true;
+            try {
+                // Lazy-load html2canvas
+                if (!window.html2canvas) {
+                    await new Promise(function(resolve, reject) {
+                        var s = document.createElement('script');
+                        s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+                        s.onload = resolve;
+                        s.onerror = reject;
+                        document.head.appendChild(s);
+                    });
+                }
+
+                // Capture screenshot of main content
+                var target = document.querySelector('#main-content-area') || document.body;
+                var canvas = await html2canvas(target, { useCORS: true, scale: 1 });
+                var blob = await new Promise(function(r) { canvas.toBlob(r, 'image/png'); });
+
+                // Build form data
+                var fd = new FormData();
+                fd.append('screenshot', blob, 'screenshot.png');
+                fd.append('url', window.location.href);
+                fd.append('description', this.description);
+                fd.append('user_agent', navigator.userAgent);
+
+                // Get CSRF token
+                var csrfToken = document.cookie.match(/csrftoken=([^;]+)/);
+                csrfToken = csrfToken ? csrfToken[1] : '';
+
+                var response = await fetch('/api/v1/sync/bug-report/', {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+
+                if (response.ok) {
+                    this.open = false;
+                    this.description = '';
+                    if (window.Alpine && Alpine.store('toast')) {
+                        Alpine.store('toast').show('success', '{% trans "Report sent successfully" %}');
+                    }
+                } else {
+                    if (window.Alpine && Alpine.store('toast')) {
+                        Alpine.store('toast').show('error', '{% trans "Failed to send report" %}');
+                    }
+                }
+            } catch (e) {
+                console.error('[BUG REPORT]', e);
+                if (window.Alpine && Alpine.store('toast')) {
+                    Alpine.store('toast').show('error', '{% trans "Failed to capture screenshot" %}');
+                }
+            } finally {
+                this.sending = false;
+            }
+        }
+    }
+}
+</script>
