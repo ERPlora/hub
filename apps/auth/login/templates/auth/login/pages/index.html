@@ -147,6 +147,12 @@
                                     </template>
                                 </div>
 
+                                <!-- Verifying indicator -->
+                                <div x-show="pinVerifying" x-cloak class="flex items-center justify-center gap-2 mt-2">
+                                    <span class="loading loading-sm"></span>
+                                    <span class="text-sm text-base-content/60">{% trans "Verifying..." %}</span>
+                                </div>
+
                                 <!-- Error -->
                                 <p x-show="pinError" x-cloak class="pinpad-error">
                                     {% trans "Incorrect PIN" %}
@@ -301,6 +307,7 @@
             selectedEmployee: null,
             pinInput: '',
             pinError: false,
+            pinVerifying: false,
             employees: {{ local_users_json|safe }},
 
             // Cloud Login
@@ -326,20 +333,21 @@
             },
 
             addPinDigit(digit) {
-                if (this.pinInput.length < 4) {
-                    this.pinInput += digit;
-                    if (this.pinInput.length === 4) {
-                        this.$nextTick(() => setTimeout(() => this.verifyPin(), 200));
-                    }
+                if (this.pinVerifying || this.pinInput.length >= 4) return;
+                this.pinInput += digit;
+                if (this.pinInput.length === 4) {
+                    this.$nextTick(() => setTimeout(() => this.verifyPin(), 200));
                 }
             },
 
             clearPinDigit() {
+                if (this.pinVerifying) return;
                 this.pinInput = this.pinInput.slice(0, -1);
                 this.pinError = false;
             },
 
             async verifyPin() {
+                this.pinVerifying = true;
                 try {
                     const response = await fetch('{% url "auth:verify_pin" %}', {
                         method: 'POST',
@@ -363,6 +371,8 @@
                 } catch (error) {
                     this.pinError = true;
                     this.pinInput = '';
+                } finally {
+                    this.pinVerifying = false;
                 }
             },
 
