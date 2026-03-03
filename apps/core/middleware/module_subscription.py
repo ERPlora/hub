@@ -222,8 +222,8 @@ class ModuleSubscriptionMiddleware:
         # Check subscription status
         status = get_subscription_status(namespace, hub_id, auth_token)
 
-        if status in ('active', 'trialing'):
-            return None  # Paid — pass through
+        if status in ('active', 'trialing', 'unknown'):
+            return None  # Paid or can't verify — pass through (fail-open)
 
         # Not paid — redirect to pricing page
         pricing_url = reverse('marketplace:module_pricing', kwargs={'module_id': namespace})
