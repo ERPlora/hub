@@ -35,12 +35,21 @@
         <!-- Role -->
         <div>
             <label class="text-sm font-medium mb-1 block" for="add-role">{% trans "Role" %}</label>
+            {% if role_options %}
             <select id="add-role" name="role_id" class="select select-sm w-full">
                 <option value="">{% trans "Select a role" %}</option>
                 {% for option in role_options %}
                 <option value="{{ option.value }}">{{ option.label }}</option>
                 {% endfor %}
             </select>
+            {% else %}
+            <select id="add-role" name="role_id" class="select select-sm w-full" disabled>
+                <option value="">{% trans "No roles available" %}</option>
+            </select>
+            <span class="text-xs text-base-content/50 mt-1 block">
+                {% trans "Create roles in the Roles section first." %}
+            </span>
+            {% endif %}
         </div>
 
         <!-- PIN -->

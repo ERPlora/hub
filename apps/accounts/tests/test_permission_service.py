@@ -203,10 +203,10 @@ class TestCreateDefaultRoles:
     """Tests for creating default roles."""
 
     def test_creates_default_roles(self, db, hub_id):
-        """Test that default roles are created."""
+        """Test that default roles are created (admin, manager, viewer — no employee)."""
         roles = PermissionService.create_default_roles(str(hub_id))
 
-        assert len(roles) == 4  # admin, manager, employee, viewer
+        assert len(roles) == 3  # admin, manager, viewer
 
         # Verify admin role
         admin = Role.objects.get(hub_id=hub_id, name='admin')
@@ -217,13 +217,12 @@ class TestCreateDefaultRoles:
         manager = Role.objects.get(hub_id=hub_id, name='manager')
         assert manager.is_system is True
 
-        # Verify employee role
-        employee = Role.objects.get(hub_id=hub_id, name='employee')
-        assert employee.is_system is True
-
         # Verify viewer role
         viewer = Role.objects.get(hub_id=hub_id, name='viewer')
         assert viewer.is_system is True
+
+        # Employee should NOT be created by default — modules create it
+        assert not Role.objects.filter(hub_id=hub_id, name='employee').exists()
 
     def test_admin_has_all_wildcard(self, db, hub_id):
         """Test that admin role gets '*' wildcard."""
@@ -250,11 +249,54 @@ class TestCreateDefaultRoles:
 
         roles = PermissionService.create_default_roles(str(hub_id))
 
-        # Should still return 4 roles (including existing)
-        assert len(roles) == 4
+        # Should still return 3 roles (including existing)
+        assert len(roles) == 3
 
         # Only one admin should exist
         assert Role.objects.filter(hub_id=hub_id, name='admin').count() == 1
+
+
+class TestApplyModuleRoleDefaults:
+    """Tests for applying module ROLE_PERMISSIONS."""
+
+    def test_auto_creates_employee_role(self, db, hub_id):
+        """Test that employee role is auto-created when a module defines it."""
+        # Create basic roles first (no employee)
+        PermissionService.create_default_roles(str(hub_id))
+        assert not Role.objects.filter(hub_id=hub_id, name='employee').exists()
+
+        # Create a permission for the module
+        Permission.objects.create(
+            hub_id=hub_id, codename='inventory.view_product',
+            name='View product', module_id='inventory'
+        )
+
+        # Apply module defaults with employee role
+        role_perms = {
+            "admin": ["*"],
+            "employee": ["view_product"],
+        }
+        count = PermissionService.apply_module_role_defaults(
+            str(hub_id), 'inventory', role_perms
+        )
+
+        # Employee role should now exist
+        employee = Role.objects.get(hub_id=hub_id, name='employee')
+        assert employee.is_system is True
+        assert employee.source == 'basic'
+        assert count >= 1
+
+    def test_unknown_role_skipped(self, db, hub_id):
+        """Test that unknown role names are skipped (not auto-created)."""
+        PermissionService.create_default_roles(str(hub_id))
+
+        role_perms = {"cashier": ["view_product"]}
+        count = PermissionService.apply_module_role_defaults(
+            str(hub_id), 'inventory', role_perms
+        )
+
+        assert count == 0
+        assert not Role.objects.filter(hub_id=hub_id, name='cashier').exists()
 
 
 class TestAssignRoleToUser:
