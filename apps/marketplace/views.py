@@ -1,5 +1,5 @@
 """
-Marketplace Views - Multi-store marketplace with sidebar filters and cart
+Marketplace Views - Multi-store marketplace with sidebar filters
 
 Tabs:
 - Modules: Software modules from Cloud marketplace
@@ -133,7 +133,7 @@ def get_store_config(store_type):
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/marketplace_content.html')
 def store_index(request, store_type='modules'):
     """
-    Main marketplace view with sidebar filters and cart.
+    Main marketplace view with sidebar filters.
     """
     from apps.configuration.models import HubConfig
 
@@ -148,9 +148,6 @@ def store_index(request, store_type='modules'):
     # Get filters based on store type
     filters_data = _get_filters_for_store(store_type, language, request)
 
-    # Get cart for this store type
-    cart = get_cart(request, store_type)
-
     return {
         'current_section': 'marketplace',
         'page_title': 'Marketplace',
@@ -158,8 +155,6 @@ def store_index(request, store_type='modules'):
         'store_config': config,
         'store_types': STORE_TYPES,
         'filters': filters_data,
-        'cart': cart,
-        'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('modules'),
     }
 
@@ -363,194 +358,27 @@ def _get_filters_for_store(store_type, language, request):
     return filters
 
 
-# Cart Management
-
-def get_cart_key(store_type):
-    """Get session key for cart by store type"""
-    return f'marketplace_cart_{store_type}'
-
-
-def get_cart(request, store_type):
-    """Get cart from session for specific store type"""
-    key = get_cart_key(store_type)
-    return request.session.get(key, {'items': [], 'total': 0})
-
-
-def save_cart(request, store_type, cart):
-    """Save cart to session"""
-    key = get_cart_key(store_type)
-    request.session[key] = cart
-    request.session.modified = True
-
+# Module Purchase (direct, no cart)
 
 @login_required
-def cart_add(request, store_type):
-    """Add item to cart — returns JSON for JS fetch calls."""
+def module_purchase(request):
+    """Create Stripe Checkout session for a single module via Cloud API."""
     if request.method != 'POST':
         return HttpResponse(status=405)
 
     try:
         data = json.loads(request.body)
-        item_id = data.get('item_id')
         module_id = data.get('module_id', '')
-        item_name = data.get('item_name', '')
-        item_price = float(data.get('item_price', 0))
-        item_icon = data.get('item_icon', 'cube-outline')
-        item_type = data.get('item_type', 'one_time')
-        quantity = int(data.get('quantity', 1))
-        tier_slug = data.get('tier_slug', '')
+        module_slug = data.get('module_slug', '')
     except (json.JSONDecodeError, ValueError):
         return HttpResponse(
             json.dumps({'success': False, 'error': 'Invalid data'}),
             content_type='application/json', status=400,
         )
 
-    if not item_id:
+    if not module_id:
         return HttpResponse(
-            json.dumps({'success': False, 'error': 'Missing item_id'}),
-            content_type='application/json', status=400,
-        )
-
-    cart = get_cart(request, store_type)
-
-    # Check if item already in cart (for tiered modules, different tiers = different items)
-    for item in cart['items']:
-        if item['id'] == item_id and item.get('tier_slug', '') == tier_slug:
-            item['quantity'] += quantity
-            break
-    else:
-        cart_item = {
-            'id': item_id,
-            'module_id': module_id,
-            'name': item_name,
-            'price': item_price,
-            'icon': item_icon,
-            'module_type': item_type,
-            'quantity': quantity,
-        }
-        if tier_slug:
-            cart_item['tier_slug'] = tier_slug
-        cart['items'].append(cart_item)
-
-    # Recalculate total
-    cart['total'] = sum(item['price'] * item['quantity'] for item in cart['items'])
-    save_cart(request, store_type, cart)
-
-    return HttpResponse(
-        json.dumps({
-            'success': True,
-            'cart_count': len(cart['items']),
-            'cart_total': cart['total'],
-        }),
-        content_type='application/json',
-    )
-
-
-@login_required
-def cart_remove(request, store_type, item_id):
-    """Remove item from cart (HTMX endpoint)"""
-    if request.method != 'DELETE':
-        return HttpResponse(status=405)
-
-    cart = get_cart(request, store_type)
-    cart['items'] = [item for item in cart['items'] if item['id'] != item_id]
-    cart['total'] = sum(item['price'] * item['quantity'] for item in cart['items'])
-    save_cart(request, store_type, cart)
-
-    html = render_to_string('marketplace/partials/cart_content.html', {
-        'cart': cart,
-        'store_type': store_type,
-    }, request=request)
-
-    badge_count = len(cart['items'])
-    hidden_attr = ' style="display:none"' if badge_count == 0 else ''
-    badge_html = (
-        f'<span id="cart-badge" class="badge badge-sm color-error" hx-swap-oob="true"'
-        f'{hidden_attr}>{badge_count}</span>'
-    )
-
-    return HttpResponse(html + badge_html)
-
-
-@login_required
-def cart_clear(request, store_type):
-    """Clear entire cart (HTMX endpoint)"""
-    if request.method != 'DELETE':
-        return HttpResponse(status=405)
-
-    save_cart(request, store_type, {'items': [], 'total': 0})
-
-    html = render_to_string('marketplace/partials/cart_content.html', {
-        'cart': {'items': [], 'total': 0},
-        'store_type': store_type,
-    }, request=request)
-
-    badge_html = '<span id="cart-badge" class="badge badge-sm color-error" hx-swap-oob="true" style="display:none">0</span>'
-
-    return HttpResponse(html + badge_html)
-
-
-@login_required
-def cart_view(request, store_type):
-    """Get cart content (HTMX endpoint)"""
-    cart = get_cart(request, store_type)
-
-    html = render_to_string('marketplace/partials/cart_content.html', {
-        'cart': cart,
-        'store_type': store_type,
-    }, request=request)
-
-    return HttpResponse(html)
-
-
-@login_required
-@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/cart_page_content.html')
-def cart_page(request, store_type='modules'):
-    """
-    Full cart page view.
-    Uses same layout as store, but shows cart page content.
-    """
-    config = get_store_config(store_type)
-    cart = get_cart(request, store_type)
-
-    # Calculate cart summary
-    subtotal = sum(item['price'] * item.get('quantity', 1) for item in cart.get('items', []))
-    tax_rate = 21  # Default VAT rate
-    tax = subtotal * (tax_rate / 100)
-    total = subtotal + tax
-
-    cart_summary = {
-        'items': cart.get('items', []),
-        'count': len(cart.get('items', [])),
-        'subtotal': subtotal,
-        'tax_rate': tax_rate,
-        'tax': tax if subtotal > 0 else 0,
-        'total': total if subtotal > 0 else 0,
-    }
-
-    return {
-        'current_section': 'marketplace',
-        'page_title': 'Cart',
-        'store_type': store_type,
-        'store_config': config,
-        'cart': cart_summary,
-        'cart_count': cart_summary['count'],
-        'navigation': _marketplace_navigation('modules'),
-    }
-
-
-# Cart Checkout
-
-@login_required
-def cart_checkout(request, store_type='modules'):
-    """Create Stripe Checkout session for cart items via Cloud API."""
-    if request.method != 'POST':
-        return HttpResponse(status=405)
-
-    cart = get_cart(request, store_type)
-    if not cart['items']:
-        return HttpResponse(
-            json.dumps({'success': False, 'error': str(_('Cart is empty'))}),
+            json.dumps({'success': False, 'error': 'Missing module_id'}),
             content_type='application/json', status=400,
         )
 
@@ -568,19 +396,10 @@ def cart_checkout(request, store_type='modules'):
 
     try:
         response = requests.post(
-            f"{cloud_api_url}/api/marketplace/cart/checkout/",
+            f"{cloud_api_url}/api/marketplace/modules/{module_id}/purchase/",
             json={
-                'items': [
-                    {
-                        'module_id': item.get('module_id', item['id']),
-                        'module_slug': item['id'],
-                        'quantity': item.get('quantity', 1),
-                        **(({'tier_slug': item['tier_slug']} if item.get('tier_slug') else {})),
-                    }
-                    for item in cart['items']
-                ],
-                'success_url': request.build_absolute_uri('/marketplace/?checkout=success'),
-                'cancel_url': request.build_absolute_uri('/marketplace/?checkout=cancel'),
+                'success_url': request.build_absolute_uri(f'/marketplace/{module_slug}/?purchase=success'),
+                'cancel_url': request.build_absolute_uri(f'/marketplace/{module_slug}/?purchase=cancel'),
                 'ui_mode': 'embedded',
             },
             headers={
@@ -590,38 +409,56 @@ def cart_checkout(request, store_type='modules'):
             timeout=30,
         )
 
-        if response.status_code == 200:
+        if response.status_code in (200, 201):
             data = response.json()
-            if data.get('client_secret'):
-                # Embedded checkout — return client_secret for modal
+            if data.get('is_free'):
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'is_free': True,
+                        'message': data.get('message', str(_('Module added to your account.'))),
+                    }),
+                    content_type='application/json',
+                )
+            elif data.get('client_secret'):
+                # Embedded checkout — return client_secret for Stripe modal
                 return HttpResponse(
                     json.dumps({
                         'success': True,
                         'client_secret': data['client_secret'],
-                        'session_id': data.get('session_id'),
+                        'session_id': data.get('session_id', ''),
                         'stripe_publishable_key': data.get('stripe_publishable_key', ''),
                     }),
                     content_type='application/json',
                 )
             elif data.get('checkout_url'):
-                # Fallback: hosted checkout (redirect)
+                # Hosted checkout fallback
                 return HttpResponse(
                     json.dumps({
                         'success': True,
                         'checkout_url': data['checkout_url'],
-                        'session_id': data.get('session_id'),
+                        'session_id': data.get('session_id', ''),
                     }),
                     content_type='application/json',
                 )
             else:
-                # All free or already owned
                 return HttpResponse(
                     json.dumps({
                         'success': True,
-                        'message': data.get('message', str(_('No paid items to checkout.'))),
+                        'message': data.get('message', str(_('Purchase processed.'))),
                     }),
                     content_type='application/json',
                 )
+        elif response.status_code == 409:
+            # Already owned
+            data = response.json()
+            return HttpResponse(
+                json.dumps({
+                    'success': False,
+                    'error': data.get('error', str(_('You already own this module.'))),
+                }),
+                content_type='application/json', status=409,
+            )
         else:
             error_data = {}
             try:
@@ -943,7 +780,6 @@ def module_detail(request, slug):
         return {
             'current_section': 'marketplace',
             'error': 'Hub not connected to Cloud. Please connect in Settings.',
-            'cart_count': 0,
         }
 
     installed_module_ids = _get_installed_module_ids()
@@ -966,14 +802,12 @@ def module_detail(request, slug):
                 return {
                     'current_section': 'marketplace',
                     'error': f'Module "{slug}" not found.',
-                    'cart_count': 0,
                 }
 
             if response.status_code != 200:
                 return {
                     'current_section': 'marketplace',
                     'error': f'Cloud API returned {response.status_code}',
-                    'cart_count': 0,
                 }
 
             module = response.json()
@@ -1000,9 +834,6 @@ def module_detail(request, slug):
         # Determine if free
         is_free = module.get('module_type') == 'free' or module.get('price', 0) == 0
 
-        # Get cart count
-        cart = get_cart(request, 'modules')
-
         # Related modules (same category) — use cached modules list
         related_modules = []
         all_modules = _fetch_all_modules()
@@ -1022,7 +853,6 @@ def module_detail(request, slug):
             'is_free': is_free,
             'related_modules': related_modules,
             'back_url': reverse('marketplace:index'),
-            'cart_count': len(cart.get('items', [])),
             'navigation': _marketplace_navigation('modules'),
         }
 
@@ -1030,7 +860,6 @@ def module_detail(request, slug):
         return {
             'current_section': 'marketplace',
             'error': f'Failed to connect to Cloud: {str(e)}',
-            'cart_count': 0,
         }
 
 
@@ -1049,12 +878,10 @@ SOLUTIONS_BLOCK_TYPES = [
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/solutions_content.html')
 def solutions_index(request):
     """Functional blocks DataTable wrapper — content loads via HTMX from solutions_list."""
-    cart = get_cart(request, 'modules')
     return {
         'current_section': 'marketplace',
         'page_title': _('Solutions'),
         'block_types': SOLUTIONS_BLOCK_TYPES,
-        'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('modules'),
     }
 
@@ -1282,7 +1109,7 @@ def modules_bulk_install(request):
 
     Separates free/owned modules (installable) from paid modules that
     require purchase first. Paid modules are returned in ``requires_purchase``
-    so the frontend can add them to the cart.
+    so the frontend can prompt individual purchases.
     """
     if request.method != 'POST':
         return HttpResponse(status=405)
@@ -1474,8 +1301,6 @@ def solution_detail(request, slug):
             else:
                 optional_modules.append(mod)
 
-        cart = get_cart(request, 'modules')
-
         return {
             'current_section': 'marketplace',
             'page_title': solution.get('name', 'Block'),
@@ -1485,7 +1310,6 @@ def solution_detail(request, slug):
             'all_installed': all_installed,
             'is_block_active': is_block_active,
             'back_url': reverse('marketplace:index'),
-            'cart_count': len(cart.get('items', [])),
             'navigation': _marketplace_navigation('modules'),
         }
 
@@ -1674,13 +1498,10 @@ def business_types_index(request):
     """Business types list — browse by type to see recommended modules and roles."""
     industries = _fetch_industries_for_filters()
 
-    cart = get_cart(request, 'modules')
-
     return {
         'current_section': 'marketplace',
         'page_title': _('Business Types'),
         'industries': industries,
-        'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('business_types'),
     }
 
@@ -1739,14 +1560,11 @@ def business_type_detail(request, slug):
                 or mod.get('module_id', '') in installed_ids
             )
 
-        cart = get_cart(request, 'modules')
-
         return {
             'current_section': 'marketplace',
             'page_title': industry.get('name', _('Business Type')),
             'industry': industry,
             'back_url': reverse('marketplace:business_types'),
-            'cart_count': len(cart.get('items', [])),
             'navigation': _marketplace_navigation('business_types'),
         }
 
@@ -2020,8 +1838,6 @@ def compliance_index(request):
         country['supported_count'] = supported
         country['requirement_count'] = len(country['requirements'])
 
-    cart = get_cart(request, 'modules')
-
     from apps.configuration.models import HubConfig
     hub_config = HubConfig.get_config()
 
@@ -2030,7 +1846,6 @@ def compliance_index(request):
         'page_title': _('Compliance'),
         'countries': countries,
         'hub_country': hub_config.country_code,
-        'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('compliance'),
     }
 
