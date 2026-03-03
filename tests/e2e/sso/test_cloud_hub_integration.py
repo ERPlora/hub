@@ -279,8 +279,8 @@ class TestMultiUserSSOFlow(TestCase):
         self.factory = RequestFactory()
 
     @patch('apps.core.middleware.cloud_sso_middleware.requests.get')
-    def test_first_user_admin_subsequent_cashiers(self, mock_get):
-        """Test that first user is admin, subsequent users are cashiers."""
+    def test_first_user_admin_subsequent_employees(self, mock_get):
+        """Test that first user is admin, subsequent users are employees."""
         middleware = CloudSSOMiddleware(Mock(return_value=HttpResponse()))
         middleware.deployment_mode = 'web'
 
@@ -318,7 +318,7 @@ class TestMultiUserSSOFlow(TestCase):
         )
 
         second_user = LocalUser.objects.get(email='second@example.com')
-        assert second_user.role == 'cashier'
+        assert second_user.role == 'employee'
 
         # Third user
         request3 = self.factory.get('/home/')
@@ -331,7 +331,7 @@ class TestMultiUserSSOFlow(TestCase):
         )
 
         third_user = LocalUser.objects.get(email='third@example.com')
-        assert third_user.role == 'cashier'
+        assert third_user.role == 'employee'
 
 
 @pytest.mark.e2e

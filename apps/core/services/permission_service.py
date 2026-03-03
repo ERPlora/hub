@@ -3,7 +3,8 @@ Permission Service for Hub.
 
 Handles:
 - Syncing permissions from module PERMISSIONS lists to database
-- Creating default roles (admin, manager, employee)
+- Creating default roles (admin, manager, viewer)
+- Auto-creating module-driven roles (employee) when modules need them
 - Expanding wildcard patterns in role permissions
 """
 
@@ -33,7 +34,9 @@ class PermissionService:
         'inventory.view_product', 'inventory.add_product', etc.
     """
 
-    # Basic roles — always created, always active, not tied to any solution
+    # Basic roles — always created, always active, not tied to any solution.
+    # Employee role is NOT here — it is created automatically when modules
+    # that define "employee" in ROLE_PERMISSIONS are installed.
     DEFAULT_ROLES = [
         {
             'name': 'admin',
@@ -47,27 +50,7 @@ class PermissionService:
             'display_name': 'Manager',
             'description': 'Management access. CRUD on main modules, reports, and team oversight.',
             'is_system': True,
-            'wildcards': [
-                'inventory.*',
-                'sales.*',
-                'customers.*',
-                'cash_register.*',
-                'invoicing.*',
-                'reports.*',
-            ],
-        },
-        {
-            'name': 'employee',
-            'display_name': 'Employee',
-            'description': 'Basic access. Day-to-day operations like sales and viewing products.',
-            'is_system': True,
-            'wildcards': [
-                'inventory.view_*',
-                'sales.view_*',
-                'sales.add_sale',
-                'sales.process_payment',
-                'customers.view_*',
-            ],
+            'wildcards': [],  # Permissions come from each module's ROLE_PERMISSIONS
         },
         {
             'name': 'viewer',
@@ -202,6 +185,17 @@ class PermissionService:
 
         return total
 
+    # Roles that modules can auto-create via ROLE_PERMISSIONS.
+    # Basic roles (admin, manager, viewer) are seeded by create_default_roles.
+    # Any other role name referenced in a module's ROLE_PERMISSIONS will be
+    # created on-demand when that module is installed/synced.
+    MODULE_CREATABLE_ROLES = {
+        'employee': {
+            'display_name': 'Employee',
+            'description': 'Basic access. Day-to-day operations defined by installed modules.',
+        },
+    }
+
     @classmethod
     @transaction.atomic
     def apply_module_role_defaults(cls, hub_id: str, module_id: str, role_permissions: dict) -> int:
@@ -209,7 +203,9 @@ class PermissionService:
         Apply ROLE_PERMISSIONS defaults from a module's module.py.
 
         This creates RolePermission entries for each role/permission pair defined.
-        Only applies if the role exists and permission entry doesn't already exist.
+        If a role doesn't exist yet but is in MODULE_CREATABLE_ROLES, it will be
+        created automatically (e.g., 'employee' is created when the first module
+        that needs it is installed).
 
         Args:
             hub_id: Hub UUID
@@ -225,7 +221,7 @@ class PermissionService:
         count = 0
 
         for role_name, perm_suffixes in role_permissions.items():
-            # Get the role (skip if doesn't exist)
+            # Get or auto-create the role
             try:
                 role = Role.objects.get(
                     hub_id=hub_id,
@@ -233,8 +229,21 @@ class PermissionService:
                     is_deleted=False
                 )
             except Role.DoesNotExist:
-                logger.debug(f"Role {role_name} not found, skipping module defaults")
-                continue
+                # Auto-create if it's a known module-creatable role
+                role_meta = cls.MODULE_CREATABLE_ROLES.get(role_name)
+                if role_meta:
+                    role = Role.objects.create(
+                        hub_id=hub_id,
+                        name=role_name,
+                        display_name=role_meta['display_name'],
+                        description=role_meta['description'],
+                        is_system=True,
+                        source='basic',
+                    )
+                    logger.info(f"Auto-created role '{role_name}' (triggered by module {module_id})")
+                else:
+                    logger.debug(f"Role {role_name} not found, skipping module defaults")
+                    continue
 
             for suffix in perm_suffixes:
                 if suffix == "*":
@@ -281,8 +290,9 @@ class PermissionService:
         """
         Create default system roles for a Hub.
 
-        Creates admin, manager, and employee roles with their default
-        wildcard permissions.
+        Creates admin, manager, and viewer roles. Employee role is NOT
+        created here — it is auto-created when modules that define it
+        in ROLE_PERMISSIONS are installed.
 
         Args:
             hub_id: Hub UUID

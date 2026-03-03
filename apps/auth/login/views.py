@@ -134,6 +134,14 @@ def cloud_login(request):
                     hub_config.is_configured = True
                     hub_config.save()
 
+                    # Ensure roles and permissions exist with correct hub_id
+                    try:
+                        from apps.core.services.permission_service import PermissionService
+                        PermissionService.create_default_roles(str(hub_id))
+                        PermissionService.sync_all_module_permissions(str(hub_id))
+                    except Exception as e:
+                        logger.warning(f"Failed to sync roles/permissions: {e}")
+
                     # Start WebSocket client for heartbeat now that we have hub_jwt
                     try:
                         from apps.sync.services.websocket_client import start_websocket_client

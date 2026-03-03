@@ -25,10 +25,11 @@
                     </div>
                     <div class="employee-card-actions">
                         <a class="employee-card-action"
-                           href="{% url 'main:employee_edit' employee_id=request.user.pk %}"
-                           hx-get="{% url 'main:employee_edit' employee_id=request.user.pk %}"
+                           href="{% url 'main:employees' %}"
+                           hx-get="{% url 'main:employees' %}"
                            hx-target="#main-content-area"
-                           hx-push-url="true">
+                           hx-push-url="true"
+                           aria-label="{% trans 'Manage employees' %}">
                             {% icon "create-outline" %}
                         </a>
                     </div>
@@ -47,7 +48,7 @@
                            hx-target="#main-content-area"
                            hx-push-url="true">
                             <span class="sidebar-menu-icon">{% icon "home-outline" %}</span>
-                            <span class="sidebar-label">{% trans "Home" %}</span>
+                            <span class="sidebar-label">{% trans "Dashboard" %}</span>
                         </a>
                     </div>
                     <div class="sidebar-menu-item">
@@ -124,12 +125,15 @@
             <!-- Drawer Footer: Install + Logout -->
             <div class="footer">
                 <div class="sidebar-menu"
-                     x-data="{ canInstall: canInstallPWA() }"
+                     x-data="{ canInstall: canInstallPWA(), installing: false }"
                      @pwa-installable.document="canInstall = true"
-                     @pwa-installed.document="canInstall = false">
+                     @pwa-installed.document="canInstall = false; installing = false">
                     <div class="sidebar-menu-item" x-show="canInstall" x-cloak>
-                        <button @click="installPWA().then(() => canInstall = canInstallPWA())" class="sidebar-menu-button">
-                            <span class="sidebar-menu-icon">{% icon "download-outline" %}</span>
+                        <button @click="installing = true; installPWA().then(() => { canInstall = canInstallPWA(); installing = false; }).catch(() => installing = false)" class="sidebar-menu-button" :disabled="installing">
+                            <span class="sidebar-menu-icon">
+                                <template x-if="installing"><span class="loading loading-sm"></span></template>
+                                <template x-if="!installing">{% icon "download-outline" %}</template>
+                            </span>
                             <span class="sidebar-label">{% trans "Install App" %}</span>
                         </button>
                     </div>
