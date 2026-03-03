@@ -5,6 +5,7 @@ Handles local PIN login and Cloud login authentication.
 """
 import json
 import logging
+import requests
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt

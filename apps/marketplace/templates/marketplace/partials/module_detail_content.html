@@ -59,6 +59,12 @@
 
                         <!-- Status Badges -->
                         <div class="d-flex flex-wrap gap-sm align-center">
+                            {% if not module.module_type == 'free' and not is_free and module.price != 0 %}
+                            <span class="badge color-warning">
+                                {% icon "star-outline" %}
+                                {% trans "Premium" %}
+                            </span>
+                            {% endif %}
                             {% if module.is_featured %}
                             <span class="badge color-warning">
                                 {% icon "star" %}
@@ -70,37 +76,21 @@
                                 {% icon "checkmark-circle-outline" %}
                                 {% trans "Installed" %}
                             </span>
-                            {% elif is_owned %}
-                            <span class="chip color-secondary">
-                                {% icon "bag-check-outline" %}
-                                {% trans "Owned" %}
-                            </span>
                             {% endif %}
                         </div>
                     </div>
 
                     <!-- Price & Actions -->
                     <div class="module-detail-actions">
-                        {% if not is_installed and not is_owned %}
+                        {% if not is_installed %}
                         <div class="mb-md text-right">
-                            {% if module.assistant_tiers %}
-                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);" id="assistant-tier-price-display">&euro;{{ module.assistant_tiers.0.price_monthly }}/{% trans "mo" %}</div>
-                            <div class="fs-sm text-secondary mb-sm">{% trans "monthly subscription" %}</div>
-                            <select class="select w-full"
-                                    id="assistant-tier-select"
-                                    onchange="document.getElementById('assistant-tier-price-display').innerHTML = '&euro;' + this.selectedOptions[0].dataset.price + '/{% trans "mo" %}'">
-                                {% for tier in module.assistant_tiers %}
-                                <option value="{{ tier.slug }}" data-price="{{ tier.price_monthly }}">{{ tier.name }} — &euro;{{ tier.price_monthly }}/{% trans "mo" %}</option>
-                                {% endfor %}
-                            </select>
-                            {% elif module.module_type == 'free' or is_free %}
+                            {% if module.module_type == 'free' or is_free %}
                             <div class="fs-2xl fw-bold" style="color: var(--color-success);">{% trans "Free" %}</div>
-                            {% elif module.module_type == 'one_time' %}
-                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.price }}</div>
-                            <div class="fs-sm text-secondary">{% trans "one-time payment" %}</div>
                             {% elif module.module_type == 'subscription' %}
                             <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}</div>
-                            <div class="fs-sm text-secondary">{% trans "monthly subscription" %}</div>
+                            <div class="fs-sm text-secondary">{% trans "subscription after install" %}</div>
+                            {% elif module.price %}
+                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.price }}</div>
                             {% endif %}
                         </div>
                         {% endif %}
@@ -111,16 +101,6 @@
                             <button type="button" class="btn btn-lg" disabled>
                                 {% icon "checkmark-circle-outline" %}
                                 <span>{% trans "Installed" %}</span>
-                            </button>
-                            {% elif is_owned %}
-                            <button type="button"
-                                    class="btn btn-lg color-success"
-                                    data-action="download"
-                                    data-module-slug="{{ module.slug }}"
-                                    data-module-dir="{{ module.module_id }}"
-                                    data-download-url="{{ module.download_url }}">
-                                {% icon "download-outline" %}
-                                <span>{% trans "Download & Install" %}</span>
                             </button>
                             {% elif module.module_type == 'free' or is_free %}
                             <button type="button"
@@ -136,12 +116,12 @@
                             {% else %}
                             <button type="button"
                                     class="btn btn-lg color-primary"
-                                    data-action="buy-now"
-                                    data-module-id="{{ module.id }}"
+                                    data-action="install-module"
                                     data-module-slug="{{ module.slug }}"
-                                    data-module-name="{{ module.name }}">
-                                {% icon "card-outline" %}
-                                <span>{% if module.module_type == 'subscription' %}{% trans "Subscribe" %}{% else %}{% trans "Buy Now" %}{% endif %}</span>
+                                    data-module-dir="{{ module.module_id }}"
+                                    data-download-url="{{ module.download_url }}">
+                                {% icon "download-outline" %}
+                                <span>{% trans "Install" %}</span>
                             </button>
                             {% endif %}
                         </div>
@@ -305,12 +285,10 @@ document.addEventListener('click', function(e) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (action === 'download') {
+    if (action === 'download' || action === 'install-module') {
         downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
     } else if (action === 'install-free') {
         installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
-    } else if (action === 'buy-now') {
-        buyModule(button);
     }
 });
 
@@ -338,62 +316,6 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, modu
         }
     } catch (error) {
         Toast.error('{% trans "Error acquiring module" %}');
-    } finally {
-        setButtonLoading(button, false);
-    }
-}
-
-// Buy module (direct purchase, no cart)
-async function buyModule(button) {
-    setButtonLoading(button, true);
-    try {
-        const payload = {
-            module_id: button.dataset.moduleId,
-            module_slug: button.dataset.moduleSlug,
-            module_name: button.dataset.moduleName,
-        };
-        // Include selected tier for assistant/subscription modules
-        const tierSelect = document.getElementById('assistant-tier-select');
-        if (tierSelect) {
-            payload.tier_slug = tierSelect.value;
-        }
-        const response = await fetch('{% url "marketplace:module_purchase" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-
-        if (data.client_secret && data.stripe_publishable_key) {
-            // Embedded checkout via Stripe modal
-            if (typeof openCheckoutModal === 'function') {
-                openCheckoutModal(data.client_secret, data.stripe_publishable_key);
-            } else {
-                Toast.error('{% trans "Checkout modal not available. Please reload." %}');
-            }
-        } else if (data.checkout_url) {
-            // Hosted checkout fallback (redirect)
-            window.open(data.checkout_url, '_blank');
-            Toast.info('{% trans "Complete payment in the opened window" %}');
-        } else if (data.is_free) {
-            Toast.success(data.message || '{% trans "Module added to your account." %}');
-            if (typeof htmx !== 'undefined') {
-                htmx.ajax('GET', window.location.pathname, { target: '#main-content-area', swap: 'innerHTML' });
-            } else {
-                window.location.reload();
-            }
-        } else if (data.error) {
-            Toast.error(data.error);
-        } else {
-            Toast.success(data.message || '{% trans "Purchase processed." %}');
-            if (typeof htmx !== 'undefined') {
-                htmx.ajax('GET', window.location.pathname, { target: '#main-content-area', swap: 'innerHTML' });
-            } else {
-                window.location.reload();
-            }
-        }
-    } catch (error) {
-        Toast.error('{% trans "Error processing purchase" %}');
     } finally {
         setButtonLoading(button, false);
     }
