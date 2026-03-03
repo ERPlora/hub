@@ -8,6 +8,7 @@ URL patterns (app_name='marketplace'):
 - marketplace:products_list -> /marketplace/products/ (HTMX)
 - marketplace:module_purchase -> /marketplace/purchase/ (POST)
 - marketplace:store_hubs -> /marketplace/hubs/
+- marketplace:my_purchases -> /marketplace/purchases/
 """
 import json
 import pytest
@@ -274,6 +275,46 @@ class TestMarketplaceAuth:
             data=json.dumps({'module_id': 'mod-1', 'module_slug': 'test'}),
             content_type='application/json',
         )
+
+        assert response.status_code == 302
+        assert '/login/' in response.url
+
+
+class TestMyPurchases:
+    """Tests for the My Purchases page."""
+
+    @patch('apps.marketplace.views.requests.get')
+    def test_my_purchases_page_loads(self, mock_get, authenticated_client, hub_config):
+        """My Purchases page should load with 200."""
+        hub_config.hub_jwt = 'test.jwt.token'
+        hub_config.save()
+
+        mock_get.return_value = _mock_cloud_modules_response()
+
+        url = reverse('marketplace:my_purchases')
+        response = authenticated_client.get(url)
+
+        assert response.status_code == 200
+
+    @patch('apps.marketplace.views.requests.get')
+    def test_my_purchases_htmx_returns_partial(self, mock_get, authenticated_client, hub_config):
+        """HTMX requests should return a partial."""
+        hub_config.hub_jwt = 'test.jwt.token'
+        hub_config.save()
+
+        mock_get.return_value = _mock_cloud_modules_response()
+
+        url = reverse('marketplace:my_purchases')
+        response = authenticated_client.get(url, HTTP_HX_REQUEST='true')
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert '<!DOCTYPE' not in content
+
+    def test_my_purchases_requires_auth(self, client, db, store_config):
+        """My Purchases should require authentication."""
+        url = reverse('marketplace:my_purchases')
+        response = client.get(url)
 
         assert response.status_code == 302
         assert '/login/' in response.url

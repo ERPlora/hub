@@ -5,6 +5,7 @@ Mounted at /marketplace/ in config/urls.py
 
 URL Structure:
 /marketplace/                            -> marketplace:index (modules store)
+/marketplace/purchases/                  -> marketplace:my_purchases (owned modules)
 /marketplace/business-types/             -> marketplace:business_types (informational)
 /marketplace/business-types/<slug>/      -> marketplace:business_type_detail
 /marketplace/compliance/                 -> marketplace:compliance (country requirements)
@@ -48,6 +49,9 @@ urlpatterns = [
     # Compliance
     path('compliance/', views.compliance_index, name='compliance'),
     path('compliance/<str:country_code>/', views.compliance_detail, name='compliance_detail'),
+
+    # My Purchases
+    path('purchases/', views.my_purchases, name='my_purchases'),
 
     # HTMX endpoints for modules (default store)
     path('modules/bulk-install/', views.modules_bulk_install, name='modules_bulk_install'),
