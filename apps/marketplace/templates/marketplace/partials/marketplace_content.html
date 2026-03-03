@@ -80,10 +80,9 @@
                 if (data.errors && data.errors.length > 0) {
                     data.errors.forEach(function(err) { Toast.error(err); });
                 }
-                // Notify about paid modules that need individual purchase
+                // Show modal for paid modules that need individual purchase
                 if (data.requires_purchase && data.requires_purchase.length > 0) {
-                    var names = data.requires_purchase.map(function(m) { return m.name; }).join(', ');
-                    Toast.warning(data.requires_purchase.length + ' {% trans "modules require purchase" %}: ' + names);
+                    showPurchaseRequiredModal(data.requires_purchase);
                 }
                 if (data.installed === 0 && (!data.requires_purchase || data.requires_purchase.length === 0)) {
                     Toast.info('{% trans "All modules already installed" %}');
@@ -607,5 +606,62 @@
     };
 
     updateActiveFilters();
+
+    // --- Purchase Required Modal ---
+    window.showPurchaseRequiredModal = function(modules) {
+        var existing = document.getElementById('purchase-required-modal');
+        if (existing) existing.remove();
+
+        var listHtml = modules.map(function(m) {
+            var priceLabel = m.module_type === 'subscription'
+                ? '€' + m.price + '/{% trans "mo" %}'
+                : '€' + m.price;
+            return '<div class="list-item" id="pr-item-' + m.module_id + '">' +
+                '<div class="list-item-content">' +
+                    '<span class="list-item-label">' + m.name + '</span>' +
+                    '<span class="list-item-note">' + priceLabel + '</span>' +
+                '</div>' +
+                '<div class="list-item-end">' +
+                    '<button class="btn btn-sm color-primary" ' +
+                        'data-action="buy-now" ' +
+                        'data-module-id="' + m.module_id + '" ' +
+                        'data-module-slug="' + m.slug + '" ' +
+                        'data-module-name="' + m.name + '">' +
+                        '{% trans "Buy" %}' +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+
+        var backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        backdrop.id = 'purchase-required-modal';
+        backdrop.setAttribute('data-state', 'open');
+        backdrop.innerHTML =
+            '<div class="modal modal-sm">' +
+                '<div class="modal-header">' +
+                    '<h3 class="modal-title">{% trans "Purchase Required" %}</h3>' +
+                    '<button class="modal-close" onclick="closePurchaseModal()">&times;</button>' +
+                '</div>' +
+                '<div class="modal-body p-0">' +
+                    '<p class="px-4 pt-3 pb-2 text-sm opacity-70">{% trans "These modules require purchase before they can be installed:" %}</p>' +
+                    '<div class="list">' + listHtml + '</div>' +
+                '</div>' +
+                '<div class="modal-footer">' +
+                    '<button class="btn btn-outline" onclick="closePurchaseModal()">{% trans "Close" %}</button>' +
+                '</div>' +
+            '</div>';
+
+        backdrop.addEventListener('click', function(e) { if (e.target === backdrop) closePurchaseModal(); });
+        document.body.appendChild(backdrop);
+    };
+
+    window.closePurchaseModal = function() {
+        var modal = document.getElementById('purchase-required-modal');
+        if (modal) {
+            modal.setAttribute('data-state', 'closed');
+            setTimeout(function() { modal.remove(); }, 300);
+        }
+    };
 })();
 </script>
