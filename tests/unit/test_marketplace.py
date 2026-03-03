@@ -6,7 +6,6 @@ URL patterns (app_name='marketplace'):
 - marketplace:index -> /marketplace/
 - marketplace:module_detail -> /marketplace/<slug>/
 - marketplace:products_list -> /marketplace/products/ (HTMX)
-- marketplace:module_purchase -> /marketplace/purchase/ (POST)
 - marketplace:store_hubs -> /marketplace/hubs/
 - marketplace:my_purchases -> /marketplace/purchases/
 """
@@ -173,89 +172,6 @@ class TestProductsList:
         assert response.status_code == 200
 
 
-class TestModulePurchase:
-    """Tests for the module purchase endpoint."""
-
-    @patch('apps.marketplace.views.requests.post')
-    def test_purchase_requires_post(self, mock_post, authenticated_client, hub_config):
-        """Purchase endpoint should reject GET requests."""
-        url = reverse('marketplace:module_purchase')
-        response = authenticated_client.get(url)
-
-        assert response.status_code == 405
-
-    @patch('apps.marketplace.views.requests.post')
-    def test_purchase_requires_module_id(self, mock_post, authenticated_client, hub_config):
-        """Purchase endpoint should require module_id."""
-        hub_config.hub_jwt = 'test.jwt.token'
-        hub_config.save()
-
-        url = reverse('marketplace:module_purchase')
-        response = authenticated_client.post(
-            url,
-            data=json.dumps({'module_slug': 'sales'}),
-            content_type='application/json',
-        )
-
-        assert response.status_code == 400
-
-    @patch('apps.marketplace.views.requests.post')
-    def test_purchase_calls_cloud_api(self, mock_post, authenticated_client, hub_config):
-        """Purchase endpoint should call Cloud API and return checkout data."""
-        hub_config.hub_jwt = 'test.jwt.token'
-        hub_config.save()
-
-        mock_post.return_value = MagicMock(
-            status_code=200,
-            json=MagicMock(return_value={
-                'client_secret': 'cs_test_secret',
-                'session_id': 'cs_test_123',
-                'stripe_publishable_key': 'pk_test_123',
-            })
-        )
-
-        url = reverse('marketplace:module_purchase')
-        response = authenticated_client.post(
-            url,
-            data=json.dumps({
-                'module_id': 'mod-2',
-                'module_slug': 'sales',
-                'module_name': 'Sales',
-            }),
-            content_type='application/json',
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
-        assert data['client_secret'] == 'cs_test_secret'
-
-    @patch('apps.marketplace.views.requests.post')
-    def test_purchase_handles_already_owned(self, mock_post, authenticated_client, hub_config):
-        """Purchase endpoint should handle 409 (already owned)."""
-        hub_config.hub_jwt = 'test.jwt.token'
-        hub_config.save()
-
-        mock_post.return_value = MagicMock(
-            status_code=409,
-            json=MagicMock(return_value={
-                'error': 'You already own Sales',
-            })
-        )
-
-        url = reverse('marketplace:module_purchase')
-        response = authenticated_client.post(
-            url,
-            data=json.dumps({
-                'module_id': 'mod-2',
-                'module_slug': 'sales',
-            }),
-            content_type='application/json',
-        )
-
-        assert response.status_code == 409
-
-
 class TestMarketplaceAuth:
     """Tests for marketplace authentication requirements."""
 
@@ -266,19 +182,6 @@ class TestMarketplaceAuth:
 
         assert response.status_code == 302
         assert '/login/' in response.url
-
-    def test_purchase_requires_auth(self, client, db, store_config):
-        """Module purchase should require authentication."""
-        url = reverse('marketplace:module_purchase')
-        response = client.post(
-            url,
-            data=json.dumps({'module_id': 'mod-1', 'module_slug': 'test'}),
-            content_type='application/json',
-        )
-
-        assert response.status_code == 302
-        assert '/login/' in response.url
-
 
 class TestMyPurchases:
     """Tests for the My Purchases page."""

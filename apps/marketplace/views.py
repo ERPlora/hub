@@ -364,133 +364,6 @@ def _get_filters_for_store(store_type, language, request):
     return filters
 
 
-# Module Purchase (direct, no cart)
-
-@login_required
-def module_purchase(request):
-    """Create Stripe Checkout session for a single module via Cloud API."""
-    if request.method != 'POST':
-        return HttpResponse(status=405)
-
-    try:
-        data = json.loads(request.body)
-        module_id = data.get('module_id', '')
-        module_slug = data.get('module_slug', '')
-        tier_slug = data.get('tier_slug', '')
-    except (json.JSONDecodeError, ValueError):
-        return HttpResponse(
-            json.dumps({'success': False, 'error': 'Invalid data'}),
-            content_type='application/json', status=400,
-        )
-
-    if not module_id:
-        return HttpResponse(
-            json.dumps({'success': False, 'error': 'Missing module_id'}),
-            content_type='application/json', status=400,
-        )
-
-    from apps.configuration.models import HubConfig
-    hub_config = HubConfig.get_solo()
-    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
-
-    if not auth_token:
-        return HttpResponse(
-            json.dumps({'success': False, 'error': str(_('Hub not connected to Cloud.'))}),
-            content_type='application/json', status=400,
-        )
-
-    cloud_api_url = _get_cloud_api_url()
-
-    try:
-        purchase_payload = {
-            'success_url': request.build_absolute_uri(f'/marketplace/{module_slug}/?purchase=success'),
-            'cancel_url': request.build_absolute_uri(f'/marketplace/{module_slug}/?purchase=cancel'),
-            'ui_mode': 'embedded',
-        }
-        if tier_slug:
-            purchase_payload['tier_slug'] = tier_slug
-
-        response = requests.post(
-            f"{cloud_api_url}/api/marketplace/modules/{module_id}/purchase/",
-            json=purchase_payload,
-            headers={
-                'X-Hub-Token': auth_token,
-                'Content-Type': 'application/json',
-            },
-            timeout=30,
-        )
-
-        if response.status_code in (200, 201):
-            data = response.json()
-            if data.get('is_free'):
-                return HttpResponse(
-                    json.dumps({
-                        'success': True,
-                        'is_free': True,
-                        'message': data.get('message', str(_('Module added to your account.'))),
-                    }),
-                    content_type='application/json',
-                )
-            elif data.get('client_secret'):
-                # Embedded checkout — return client_secret for Stripe modal
-                return HttpResponse(
-                    json.dumps({
-                        'success': True,
-                        'client_secret': data['client_secret'],
-                        'session_id': data.get('session_id', ''),
-                        'stripe_publishable_key': data.get('stripe_publishable_key', ''),
-                    }),
-                    content_type='application/json',
-                )
-            elif data.get('checkout_url'):
-                # Hosted checkout fallback
-                return HttpResponse(
-                    json.dumps({
-                        'success': True,
-                        'checkout_url': data['checkout_url'],
-                        'session_id': data.get('session_id', ''),
-                    }),
-                    content_type='application/json',
-                )
-            else:
-                return HttpResponse(
-                    json.dumps({
-                        'success': True,
-                        'message': data.get('message', str(_('Purchase processed.'))),
-                    }),
-                    content_type='application/json',
-                )
-        elif response.status_code == 409:
-            # Already owned
-            data = response.json()
-            return HttpResponse(
-                json.dumps({
-                    'success': False,
-                    'error': data.get('error', str(_('You already own this module.'))),
-                }),
-                content_type='application/json', status=409,
-            )
-        else:
-            error_data = {}
-            try:
-                error_data = response.json()
-            except Exception:
-                pass
-            return HttpResponse(
-                json.dumps({
-                    'success': False,
-                    'error': error_data.get('error', f'Cloud API returned {response.status_code}'),
-                }),
-                content_type='application/json', status=500,
-            )
-
-    except requests.exceptions.RequestException as e:
-        return HttpResponse(
-            json.dumps({'success': False, 'error': str(e)}),
-            content_type='application/json', status=500,
-        )
-
-
 # Cancel subscription
 
 @login_required
@@ -612,6 +485,16 @@ def my_purchases(request):
             'marketplace:module_detail',
             kwargs={'slug': p.get('module_slug', '')},
         )
+        # Compute annual cost for subscriptions
+        price = p.get('price') or p.get('subscription_price_monthly') or 0
+        try:
+            p['annual_cost'] = f"{float(price) * 12:.2f}"
+        except (TypeError, ValueError):
+            p['annual_cost'] = ''
+
+    # Sort: active/trialing first, then canceled, then expired/other
+    status_order = {'active': 0, 'trialing': 1, 'past_due': 2, 'canceled': 3, 'expired': 4}
+    purchases.sort(key=lambda p: status_order.get(p.get('subscription_status', ''), 5))
 
     return {
         'current_section': 'marketplace',
@@ -1248,9 +1131,9 @@ def solutions_bulk_install(request):
 def modules_bulk_install(request):
     """POST: Install multiple modules at once.
 
-    Separates free/owned modules (installable) from paid modules that
-    require purchase first. Paid modules are returned in ``requires_purchase``
-    so the frontend can prompt individual purchases.
+    All modules (free and premium) install the same way.
+    Premium modules are gated by ModuleSubscriptionMiddleware when the
+    user opens them — no purchase check at install time.
     """
     if request.method != 'POST':
         return HttpResponse(status=405)
@@ -1274,14 +1157,11 @@ def modules_bulk_install(request):
     hub_token = ModuleInstallService.get_hub_token()
     cloud_api_url = _get_cloud_api_url()
 
-    # Fresh ownership data — avoid stale cache after recent purchases
     cache.delete(_CK_MODULES_LIST)
     all_cloud_modules = _fetch_all_modules() or []
     catalog = {m.get('slug') or m.get('module_id'): m for m in all_cloud_modules}
 
-    # Classify requested modules into installable vs requires purchase
     modules_to_install = []
-    requires_purchase = []
 
     for m in modules:
         slug = m.get('slug')
@@ -1289,41 +1169,14 @@ def modules_bulk_install(request):
             continue
 
         cloud_mod = catalog.get(slug)
-        if not cloud_mod:
-            # Not in catalog — attempt install anyway (backward compat)
-            modules_to_install.append({
-                'slug': slug,
-                'name': m.get('name', slug),
-                'download_url': f"{cloud_api_url}/api/marketplace/modules/{slug}/download/",
-            })
-            continue
+        modules_to_install.append({
+            'slug': slug,
+            'name': (cloud_mod or {}).get('name', m.get('name', slug)),
+            'download_url': (cloud_mod or {}).get('download_url')
+                or f"{cloud_api_url}/api/marketplace/modules/{slug}/download/",
+        })
 
-        if cloud_mod.get('is_free') or cloud_mod.get('is_owned'):
-            modules_to_install.append({
-                'slug': slug,
-                'name': cloud_mod.get('name', slug),
-                'download_url': cloud_mod.get('download_url')
-                    or f"{cloud_api_url}/api/marketplace/modules/{slug}/download/",
-            })
-        else:
-            # Paid and not owned — needs purchase
-            price = cloud_mod.get('subscription_price_monthly') or cloud_mod.get('price') or 0
-            requires_purchase.append({
-                'slug': slug,
-                'name': cloud_mod.get('name', slug),
-                'price': float(price),
-                'module_type': cloud_mod.get('module_type', 'one_time'),
-                'icon': cloud_mod.get('display_icon', 'cube-outline'),
-                'module_id': cloud_mod.get('id', ''),
-            })
-
-    if requires_purchase:
-        logger.info(
-            "[BULK INSTALL] %d modules require purchase: %s",
-            len(requires_purchase), [m['slug'] for m in requires_purchase],
-        )
-
-    # Resolve transitive dependencies (only for installable modules)
+    # Resolve transitive dependencies
     if modules_to_install:
         installed_ids = set(_get_installed_module_ids())
         all_slugs = {m['slug'] for m in modules_to_install}
@@ -1331,30 +1184,14 @@ def modules_bulk_install(request):
             all_slugs, installed_ids, cloud_api_url, hub_token
         )
         if dep_modules:
-            # Check deps against catalog too — paid deps go to requires_purchase
             for dep in dep_modules:
-                dep_slug = dep['slug']
-                dep_cloud = catalog.get(dep_slug)
-                if dep_cloud and not dep_cloud.get('is_free') and not dep_cloud.get('is_owned'):
-                    price = dep_cloud.get('subscription_price_monthly') or dep_cloud.get('price') or 0
-                    requires_purchase.append({
-                        'slug': dep_slug,
-                        'name': dep_cloud.get('name', dep_slug),
-                        'price': float(price),
-                        'module_type': dep_cloud.get('module_type', 'one_time'),
-                        'icon': dep_cloud.get('display_icon', 'cube-outline'),
-                        'module_id': dep_cloud.get('id', ''),
-                    })
-                else:
-                    modules_to_install.append(dep)
+                modules_to_install.append(dep)
 
             logger.info(
                 "[BULK INSTALL] Adding %d dependency modules: %s",
-                len([d for d in dep_modules if d['slug'] in {m['slug'] for m in modules_to_install}]),
-                [d['slug'] for d in dep_modules if d['slug'] in {m['slug'] for m in modules_to_install}],
+                len(dep_modules), [d['slug'] for d in dep_modules],
             )
 
-    # Install free/owned modules
     installed_count = 0
     errors = []
 
@@ -1386,7 +1223,6 @@ def modules_bulk_install(request):
         'success': True,
         'installed': installed_count,
         'errors': errors,
-        'requires_purchase': requires_purchase,
         'requires_restart': installed_count > 0,
     }), content_type='application/json')
 
