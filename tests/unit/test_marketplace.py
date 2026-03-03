@@ -289,7 +289,31 @@ class TestMyPurchases:
         hub_config.hub_jwt = 'test.jwt.token'
         hub_config.save()
 
-        mock_get.return_value = _mock_cloud_modules_response()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {
+                'purchase_id': 1,
+                'module_id': 'mod-2',
+                'module_slug': 'sales',
+                'name': 'Sales',
+                'description': 'POS module',
+                'icon': None,
+                'display_icon': 'storefront-outline',
+                'author': 'ERPlora',
+                'version': '1.0.0',
+                'module_type': 'one_time',
+                'price': 49.99,
+                'purchased_at': '2026-03-01T10:00:00Z',
+                'download_url': 'https://example.com/download/sales/',
+                'subscription_status': '',
+                'subscription_end_date': None,
+                'trial_end_date': None,
+                'stripe_subscription_id': '',
+                'invoice_url': '',
+            },
+        ]
+        mock_get.return_value = mock_response
 
         url = reverse('marketplace:my_purchases')
         response = authenticated_client.get(url)
@@ -302,7 +326,10 @@ class TestMyPurchases:
         hub_config.hub_jwt = 'test.jwt.token'
         hub_config.save()
 
-        mock_get.return_value = _mock_cloud_modules_response()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []
+        mock_get.return_value = mock_response
 
         url = reverse('marketplace:my_purchases')
         response = authenticated_client.get(url, HTTP_HX_REQUEST='true')

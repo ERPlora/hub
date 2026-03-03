@@ -9,51 +9,77 @@
     </div>
 </div>
 
-{% elif modules %}
+{% elif purchases %}
 <div class="p-md">
     <h2 class="fs-xl fw-semibold mb-md">{% trans "My Purchases" %}</h2>
     <p class="text-sm opacity-60 mb-lg">{% trans "Modules you have purchased or subscribed to." %}</p>
 
     <div class="list list-inset glass">
-        {% for module in modules %}
-        <div class="list-item list-item-multiline">
+        {% for purchase in purchases %}
+        <div class="list-item list-item-multiline" id="purchase-{{ purchase.purchase_id }}">
             <div class="list-item-start">
                 <div class="flex items-center justify-center size-10 rounded-lg bg-base-200 shrink-0">
-                    {% if module.icon %}
-                    <img src="{{ module.icon }}" alt="{{ module.name }}" class="size-6">
+                    {% if purchase.icon %}
+                    <img src="{{ purchase.icon }}" alt="{{ purchase.name }}" class="size-6">
                     {% else %}
-                    {% icon module.display_icon|default:"cube-outline" %}
+                    {% icon purchase.display_icon|default:"cube-outline" %}
                     {% endif %}
                 </div>
             </div>
             <div class="list-item-content">
-                <a href="{{ module.detail_url }}"
-                   hx-get="{{ module.detail_url }}"
+                <a href="{{ purchase.detail_url }}"
+                   hx-get="{{ purchase.detail_url }}"
                    hx-target="#main-content-area"
                    hx-push-url="true"
                    class="list-item-label hover:text-primary transition-colors">
-                    {{ module.name }}
+                    {{ purchase.name }}
+                    {% if purchase.tier_name %}
+                    <span class="badge badge-sm ml-1">{{ purchase.tier_name }}</span>
+                    {% endif %}
                 </a>
                 <span class="list-item-note">
-                    {{ module.author|default:"ERPlora" }} &middot; v{{ module.version }}
-                    {% if module.module_type == 'subscription' %}
-                    &middot; &euro;{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}
-                    {% elif module.price %}
-                    &middot; &euro;{{ module.price }}
+                    {{ purchase.author|default:"ERPlora" }} &middot; v{{ purchase.version }}
+                    {% if purchase.price %}
+                    &middot; &euro;{{ purchase.price }}{% if purchase.module_type == 'subscription' %}/{% trans "mo" %}{% endif %}
                     {% endif %}
                 </span>
+                {% if purchase.subscription_status %}
+                <span class="list-item-note">
+                    {% if purchase.subscription_status == 'trialing' %}
+                    <span class="badge badge-sm color-info">{% trans "Trial" %}</span>
+                    {% elif purchase.subscription_status == 'active' %}
+                    <span class="badge badge-sm color-success">{% trans "Active" %}</span>
+                    {% elif purchase.subscription_status == 'canceled' %}
+                    <span class="badge badge-sm color-warning">{% trans "Canceling" %}</span>
+                    {% elif purchase.subscription_status == 'past_due' %}
+                    <span class="badge badge-sm color-error">{% trans "Past Due" %}</span>
+                    {% endif %}
+                    {% if purchase.subscription_end_date %}
+                    &middot; {% trans "until" %} {{ purchase.subscription_end_date|truncatechars:10 }}
+                    {% endif %}
+                </span>
+                {% endif %}
             </div>
-            <div class="list-item-end">
-                {% if module.is_installed %}
+            <div class="list-item-end flex gap-2">
+                {% if purchase.is_installed %}
                 <span class="badge badge-sm color-success">{% icon "checkmark-circle-outline" %} {% trans "Installed" %}</span>
-                {% else %}
+                {% elif purchase.download_url %}
                 <button class="btn btn-sm color-success"
                         data-action="download"
-                        data-module-slug="{{ module.slug }}"
-                        data-module-dir="{{ module.module_id }}"
-                        data-download-url="{{ module.download_url }}">
+                        data-module-slug="{{ purchase.module_slug }}"
+                        data-module-dir="{{ purchase.module_id }}"
+                        data-download-url="{{ purchase.download_url }}">
                     {% icon "download-outline" %}
                     {% trans "Install" %}
+                </button>
+                {% endif %}
+                {% if purchase.stripe_subscription_id and purchase.subscription_status != 'canceled' %}
+                <button class="btn btn-sm btn-ghost color-error"
+                        data-action="cancel-subscription"
+                        data-module-id="{{ purchase.module_id }}"
+                        data-module-name="{{ purchase.name }}"
+                        title="{% trans 'Cancel subscription' %}">
+                    {% icon "close-circle-outline" %}
                 </button>
                 {% endif %}
             </div>
@@ -62,16 +88,26 @@
     </div>
 </div>
 
-<!-- Download handler -->
 <script>
 if (!window._purchasesInit) {
 window._purchasesInit = true;
 document.addEventListener('click', function(e) {
-    var button = e.target.closest('button[data-action="download"]');
-    if (!button) return;
-    e.preventDefault();
-    e.stopPropagation();
-    downloadAndInstallPurchase(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
+    var dlBtn = e.target.closest('button[data-action="download"]');
+    if (dlBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        downloadAndInstallPurchase(dlBtn.dataset.moduleSlug, dlBtn.dataset.downloadUrl, dlBtn, dlBtn.dataset.moduleDir);
+        return;
+    }
+    var cancelBtn = e.target.closest('button[data-action="cancel-subscription"]');
+    if (cancelBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        var name = cancelBtn.dataset.moduleName;
+        if (confirm('{% trans "Cancel subscription to" %} ' + name + '?\n{% trans "It will remain active until the end of the billing period." %}')) {
+            cancelSubscription(cancelBtn.dataset.moduleId, cancelBtn);
+        }
+    }
 });
 
 async function downloadAndInstallPurchase(moduleSlug, downloadUrl, button, moduleDir) {
@@ -101,6 +137,38 @@ async function downloadAndInstallPurchase(moduleSlug, downloadUrl, button, modul
         }
     } catch (error) {
         Toast.error('{% trans "Error downloading module" %}');
+        if (button && button.dataset.originalContent) {
+            button.innerHTML = button.dataset.originalContent;
+            button.disabled = false;
+        }
+    }
+}
+
+async function cancelSubscription(moduleId, button) {
+    if (button) {
+        button.disabled = true;
+        button.dataset.originalContent = button.innerHTML;
+        button.innerHTML = '<div class="loading loading-sm"></div>';
+    }
+    try {
+        var response = await fetch('{% url "marketplace:cancel_subscription" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ module_id: moduleId })
+        });
+        var data = await response.json();
+        if (data.success) {
+            Toast.success(data.message || '{% trans "Subscription canceled." %}');
+            htmx.ajax('GET', window.location.pathname, { target: '#main-content-area', swap: 'innerHTML' });
+        } else {
+            Toast.error(data.error || '{% trans "Error canceling subscription" %}');
+            if (button && button.dataset.originalContent) {
+                button.innerHTML = button.dataset.originalContent;
+                button.disabled = false;
+            }
+        }
+    } catch (error) {
+        Toast.error('{% trans "Error canceling subscription" %}');
         if (button && button.dataset.originalContent) {
             button.innerHTML = button.dataset.originalContent;
             button.disabled = false;

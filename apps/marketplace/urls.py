@@ -58,6 +58,7 @@ urlpatterns = [
     path('products/', views.products_list, {'store_type': 'modules'}, name='products_list'),
     path('filters/', views.filters_view, {'store_type': 'modules'}, name='filters_view'),
     path('purchase/', views.module_purchase, name='module_purchase'),
+    path('cancel-subscription/', views.cancel_subscription, name='cancel_subscription'),
 
     # Hubs store (legacy, still accessible)
     path('hubs/', views.store_index, {'store_type': 'hubs'}, name='store_hubs'),

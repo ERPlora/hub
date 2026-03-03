@@ -491,12 +491,76 @@ def module_purchase(request):
         )
 
 
+# Cancel subscription
+
+@login_required
+def cancel_subscription(request):
+    """Cancel a module subscription via Cloud API."""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    try:
+        data = json.loads(request.body)
+        module_id = data.get('module_id', '')
+    except (json.JSONDecodeError, ValueError):
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Invalid data'}),
+            content_type='application/json', status=400,
+        )
+
+    if not module_id:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Missing module_id'}),
+            content_type='application/json', status=400,
+        )
+
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(_('Hub not connected to Cloud.'))}),
+            content_type='application/json', status=400,
+        )
+
+    cloud_api_url = _get_cloud_api_url()
+
+    try:
+        response = requests.post(
+            f"{cloud_api_url}/api/marketplace/modules/{module_id}/cancel-subscription/",
+            json={},
+            headers={
+                'X-Hub-Token': auth_token,
+                'Content-Type': 'application/json',
+            },
+            timeout=30,
+        )
+
+        resp_data = response.json()
+        if response.status_code == 200:
+            return HttpResponse(
+                json.dumps({'success': True, 'message': resp_data.get('message', '')}),
+                content_type='application/json',
+            )
+        else:
+            return HttpResponse(
+                json.dumps({'success': False, 'error': resp_data.get('error', 'Failed to cancel')}),
+                content_type='application/json', status=response.status_code,
+            )
+    except requests.exceptions.RequestException as e:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(e)}),
+            content_type='application/json', status=500,
+        )
+
+
 # My Purchases
 
 @login_required
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/my_purchases_content.html')
 def my_purchases(request):
-    """My Purchases — show owned modules from Cloud with install status."""
+    """My Purchases — show paid purchases from Cloud with subscription status."""
     from apps.configuration.models import HubConfig
 
     hub_config = HubConfig.get_solo()
@@ -510,38 +574,49 @@ def my_purchases(request):
             'navigation': _marketplace_navigation('purchases'),
         }
 
-    # Fetch all modules (cached) and filter to owned
-    all_modules = _fetch_all_modules()
-    if all_modules is None:
+    cloud_api_url = _get_cloud_api_url()
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/modules/my_purchases/",
+            headers={
+                'X-Hub-Token': auth_token,
+                'Content-Type': 'application/json',
+            },
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return {
+                'current_section': 'marketplace',
+                'page_title': _('My Purchases'),
+                'error': str(_('Could not fetch purchases from Cloud.')),
+                'navigation': _marketplace_navigation('purchases'),
+            }
+        purchases = response.json()
+    except requests.exceptions.RequestException:
         return {
             'current_section': 'marketplace',
             'page_title': _('My Purchases'),
-            'error': str(_('Could not fetch modules from Cloud.')),
+            'error': str(_('Could not connect to Cloud.')),
             'navigation': _marketplace_navigation('purchases'),
         }
 
     installed_module_ids = _get_installed_module_ids()
-    cloud_api_url = _get_cloud_api_url()
 
-    # Filter to owned (paid) modules only — exclude free modules
-    owned_modules = []
-    for m in all_modules:
-        if not m.get('is_owned'):
-            continue
-        module = dict(m)
-        module['is_installed'] = (
-            module.get('slug', '') in installed_module_ids
-            or module.get('module_id', '') in installed_module_ids
+    for p in purchases:
+        p['is_installed'] = (
+            p.get('module_slug', '') in installed_module_ids
+            or p.get('module_id', '') in installed_module_ids
         )
-        module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
-        if not module.get('download_url'):
-            module['download_url'] = f"{cloud_api_url}/api/marketplace/modules/{module.get('slug', '')}/download/"
-        owned_modules.append(module)
+        p['detail_url'] = reverse(
+            'marketplace:module_detail',
+            kwargs={'slug': p.get('module_slug', '')},
+        )
 
     return {
         'current_section': 'marketplace',
         'page_title': _('My Purchases'),
-        'modules': owned_modules,
+        'purchases': purchases,
         'navigation': _marketplace_navigation('purchases'),
     }
 
