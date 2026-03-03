@@ -149,6 +149,24 @@
 if (!window._moduleActionsInitialized) {
     window._moduleActionsInitialized = true;
 
+    function _moduleActionPost(url) {
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'HX-Request': 'true',
+                'HX-Target': 'main-content-area'
+            }
+        }).then(function(r) { return r.text(); })
+          .then(function(html) {
+            var target = document.getElementById('main-content-area');
+            if (target) {
+                target.innerHTML = html;
+                htmx.process(target);
+                if (window.Alpine) Alpine.initTree(target);
+            }
+        });
+    }
+
     function _moduleModalConfirm(btn, action) {
         var url = btn.dataset.url;
         var moduleName = btn.dataset.moduleName || '{% trans "this module" %}';
@@ -182,7 +200,7 @@ if (!window._moduleActionsInitialized) {
         backdrop.addEventListener('click', function(e) { if (e.target === backdrop) close(); });
         backdrop.querySelector('[data-role="confirm"]').addEventListener('click', function() {
             close();
-            htmx.ajax('POST', url, {target: '#main-content-area', swap: 'innerHTML'});
+            _moduleActionPost(url);
         });
         document.body.appendChild(backdrop);
     }

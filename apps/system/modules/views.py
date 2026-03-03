@@ -53,7 +53,7 @@ def modules_index(request):
 
     if modules_dir.exists():
         for module_dir in modules_dir.iterdir():
-            if not module_dir.is_dir() or module_dir.name.startswith('.'):
+            if not module_dir.is_dir() or module_dir.name.startswith('.') or module_dir.name == '__pycache__':
                 continue
 
             module_id = module_dir.name
@@ -491,7 +491,7 @@ def _render_modules_page(request, error=None):
 
     if modules_dir.exists():
         for module_dir in modules_dir.iterdir():
-            if not module_dir.is_dir() or module_dir.name.startswith('.'):
+            if not module_dir.is_dir() or module_dir.name.startswith('.') or module_dir.name == '__pycache__':
                 continue
 
             module_id = module_dir.name
@@ -871,7 +871,10 @@ def module_delete(request, module_id):
         return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
 
     try:
-        shutil.rmtree(folder_to_delete)
+        if folder_to_delete.is_symlink():
+            folder_to_delete.unlink()
+        else:
+            shutil.rmtree(folder_to_delete)
 
         if request.htmx:
             return _render_modules_page(request)
