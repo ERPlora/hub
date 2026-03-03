@@ -288,7 +288,7 @@ def setup_pin(request):
 
         user.set_pin(pin)
         user.last_login = timezone.now()
-        user.save()
+        user.save(update_fields=['last_login'])
 
         if 'pending_user_id' in request.session:
             del request.session['pending_user_id']
