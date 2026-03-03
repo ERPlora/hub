@@ -52,7 +52,10 @@
                         </div>
                     </td>
                     <td class="datatable-td" data-label="{% trans 'Cost' %}">
-                        {% if purchase.price %}
+                        {% if purchase.subscription_price_monthly %}
+                        <div class="text-sm font-medium">&euro;{{ purchase.subscription_price_monthly }}/{% trans "mo" %}</div>
+                        <div class="text-xs text-base-content/50">&euro;{{ purchase.annual_cost|default:"—" }}/{% trans "yr" %}</div>
+                        {% elif purchase.price %}
                             {% if purchase.module_type == 'subscription' %}
                             <div class="text-sm font-medium">&euro;{{ purchase.price }}/{% trans "mo" %}</div>
                             <div class="text-xs text-base-content/50">&euro;{{ purchase.annual_cost|default:"—" }}/{% trans "yr" %}</div>
@@ -81,11 +84,11 @@
                     </td>
                     <td class="datatable-td" data-label="{% trans 'Period' %}">
                         {% if purchase.subscription_end_date %}
-                        <span class="text-sm">{% trans "until" %} {{ purchase.subscription_end_date|truncatechars:10 }}</span>
+                        <span class="text-sm">{% trans "until" %} {{ purchase.subscription_end_date|slice:":10" }}</span>
                         {% elif purchase.trial_end_date %}
-                        <span class="text-sm">{% trans "trial until" %} {{ purchase.trial_end_date|truncatechars:10 }}</span>
+                        <span class="text-sm">{% trans "trial until" %} {{ purchase.trial_end_date|slice:":10" }}</span>
                         {% elif purchase.purchased_at %}
-                        <span class="text-sm text-base-content/50">{{ purchase.purchased_at|truncatechars:10 }}</span>
+                        <span class="text-sm text-base-content/50">{{ purchase.purchased_at|slice:":10" }}</span>
                         {% else %}
                         <span class="text-base-content/40">—</span>
                         {% endif %}
