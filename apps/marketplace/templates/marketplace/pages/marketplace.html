@@ -4,8 +4,7 @@
 {% block page_title %}{{ page_title }}{% endblock %}
 
 {% block page_actions %}
-{# Cart button — visible only on Modules tab #}
-{% if active_tab == 'modules' or store_type == 'modules' %}
+{# Cart button — always visible in marketplace #}
 <button type="button"
         class="btn btn-sm btn-ghost"
         onclick="document.dispatchEvent(new CustomEvent('cart:open'))"
@@ -16,7 +15,6 @@
         {{ cart_count|default:0 }}
     </span>
 </button>
-{% endif %}
 {% endblock %}
 
 {% block page_content %}
