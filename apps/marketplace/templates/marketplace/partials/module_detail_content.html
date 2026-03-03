@@ -347,14 +347,20 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, modu
 async function buyModule(button) {
     setButtonLoading(button, true);
     try {
+        const payload = {
+            module_id: button.dataset.moduleId,
+            module_slug: button.dataset.moduleSlug,
+            module_name: button.dataset.moduleName,
+        };
+        // Include selected tier for assistant/subscription modules
+        const tierSelect = document.getElementById('assistant-tier-select');
+        if (tierSelect) {
+            payload.tier_slug = tierSelect.value;
+        }
         const response = await fetch('{% url "marketplace:module_purchase" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({
-                module_id: button.dataset.moduleId,
-                module_slug: button.dataset.moduleSlug,
-                module_name: button.dataset.moduleName,
-            })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
 

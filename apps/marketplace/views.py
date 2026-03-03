@@ -376,6 +376,7 @@ def module_purchase(request):
         data = json.loads(request.body)
         module_id = data.get('module_id', '')
         module_slug = data.get('module_slug', '')
+        tier_slug = data.get('tier_slug', '')
     except (json.JSONDecodeError, ValueError):
         return HttpResponse(
             json.dumps({'success': False, 'error': 'Invalid data'}),
@@ -401,13 +402,17 @@ def module_purchase(request):
     cloud_api_url = _get_cloud_api_url()
 
     try:
+        purchase_payload = {
+            'success_url': request.build_absolute_uri(f'/marketplace/{module_slug}/?purchase=success'),
+            'cancel_url': request.build_absolute_uri(f'/marketplace/{module_slug}/?purchase=cancel'),
+            'ui_mode': 'embedded',
+        }
+        if tier_slug:
+            purchase_payload['tier_slug'] = tier_slug
+
         response = requests.post(
             f"{cloud_api_url}/api/marketplace/modules/{module_id}/purchase/",
-            json={
-                'success_url': request.build_absolute_uri(f'/marketplace/{module_slug}/?purchase=success'),
-                'cancel_url': request.build_absolute_uri(f'/marketplace/{module_slug}/?purchase=cancel'),
-                'ui_mode': 'embedded',
-            },
+            json=purchase_payload,
             headers={
                 'X-Hub-Token': auth_token,
                 'Content-Type': 'application/json',
