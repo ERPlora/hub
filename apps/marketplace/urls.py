@@ -15,8 +15,6 @@ URL Structure:
 HTMX Endpoints:
 /marketplace/products/              -> marketplace:products_list
 /marketplace/filters/               -> marketplace:filters_view
-/marketplace/purchase/              -> marketplace:module_purchase (POST)
-
 Internal API (used by install flows):
 /marketplace/solutions/bulk-install/     -> marketplace:solutions_bulk_install (POST)
 /marketplace/solutions/<slug>/install/   -> marketplace:solution_install (POST)
@@ -57,7 +55,6 @@ urlpatterns = [
     path('modules/bulk-install/', views.modules_bulk_install, name='modules_bulk_install'),
     path('products/', views.products_list, {'store_type': 'modules'}, name='products_list'),
     path('filters/', views.filters_view, {'store_type': 'modules'}, name='filters_view'),
-    path('purchase/', views.module_purchase, name='module_purchase'),
     path('cancel-subscription/', views.cancel_subscription, name='cancel_subscription'),
 
     # Hubs store (legacy, still accessible)
