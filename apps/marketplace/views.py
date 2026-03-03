@@ -48,6 +48,12 @@ def _marketplace_navigation(active_tab):
             'active': active_tab == 'modules',
         },
         {
+            'url': reverse('marketplace:my_purchases'),
+            'icon': 'bag-check-outline',
+            'label': str(_('My Purchases')),
+            'active': active_tab == 'purchases',
+        },
+        {
             'url': reverse('marketplace:business_types'),
             'icon': 'business-outline',
             'label': str(_('Business Types')),
@@ -478,6 +484,61 @@ def module_purchase(request):
             json.dumps({'success': False, 'error': str(e)}),
             content_type='application/json', status=500,
         )
+
+
+# My Purchases
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/my_purchases_content.html')
+def my_purchases(request):
+    """My Purchases — show owned modules from Cloud with install status."""
+    from apps.configuration.models import HubConfig
+
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return {
+            'current_section': 'marketplace',
+            'page_title': _('My Purchases'),
+            'error': str(_('Hub not connected to Cloud. Please connect in Settings.')),
+            'navigation': _marketplace_navigation('purchases'),
+        }
+
+    # Fetch all modules (cached) and filter to owned
+    all_modules = _fetch_all_modules()
+    if all_modules is None:
+        return {
+            'current_section': 'marketplace',
+            'page_title': _('My Purchases'),
+            'error': str(_('Could not fetch modules from Cloud.')),
+            'navigation': _marketplace_navigation('purchases'),
+        }
+
+    installed_module_ids = _get_installed_module_ids()
+    cloud_api_url = _get_cloud_api_url()
+
+    # Filter to owned (paid) modules only — exclude free modules
+    owned_modules = []
+    for m in all_modules:
+        if not m.get('is_owned'):
+            continue
+        module = dict(m)
+        module['is_installed'] = (
+            module.get('slug', '') in installed_module_ids
+            or module.get('module_id', '') in installed_module_ids
+        )
+        module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
+        if not module.get('download_url'):
+            module['download_url'] = f"{cloud_api_url}/api/marketplace/modules/{module.get('slug', '')}/download/"
+        owned_modules.append(module)
+
+    return {
+        'current_section': 'marketplace',
+        'page_title': _('My Purchases'),
+        'modules': owned_modules,
+        'navigation': _marketplace_navigation('purchases'),
+    }
 
 
 # Filters endpoint

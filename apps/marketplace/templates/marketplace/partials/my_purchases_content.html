@@ -1,0 +1,130 @@
+{% load i18n djicons %}
+
+{% if error %}
+<div class="callout callout-error mx-4 my-4">
+    <span class="callout-icon">{% icon "alert-circle-outline" %}</span>
+    <div class="callout-content">
+        <div class="callout-title">{% trans "Error" %}</div>
+        <div class="callout-text">{{ error }}</div>
+    </div>
+</div>
+
+{% elif modules %}
+<div class="p-md">
+    <h2 class="fs-xl fw-semibold mb-md">{% trans "My Purchases" %}</h2>
+    <p class="text-sm opacity-60 mb-lg">{% trans "Modules you have purchased or subscribed to." %}</p>
+
+    <div class="list list-inset glass">
+        {% for module in modules %}
+        <div class="list-item list-item-multiline">
+            <div class="list-item-start">
+                <div class="flex items-center justify-center size-10 rounded-lg bg-base-200 shrink-0">
+                    {% if module.icon %}
+                    <img src="{{ module.icon }}" alt="{{ module.name }}" class="size-6">
+                    {% else %}
+                    {% icon module.display_icon|default:"cube-outline" %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="list-item-content">
+                <a href="{{ module.detail_url }}"
+                   hx-get="{{ module.detail_url }}"
+                   hx-target="#main-content-area"
+                   hx-push-url="true"
+                   class="list-item-label hover:text-primary transition-colors">
+                    {{ module.name }}
+                </a>
+                <span class="list-item-note">
+                    {{ module.author|default:"ERPlora" }} &middot; v{{ module.version }}
+                    {% if module.module_type == 'subscription' %}
+                    &middot; &euro;{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}
+                    {% elif module.price %}
+                    &middot; &euro;{{ module.price }}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="list-item-end">
+                {% if module.is_installed %}
+                <span class="badge badge-sm color-success">{% icon "checkmark-circle-outline" %} {% trans "Installed" %}</span>
+                {% else %}
+                <button class="btn btn-sm color-success"
+                        data-action="download"
+                        data-module-slug="{{ module.slug }}"
+                        data-module-dir="{{ module.module_id }}"
+                        data-download-url="{{ module.download_url }}">
+                    {% icon "download-outline" %}
+                    {% trans "Install" %}
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Download handler -->
+<script>
+if (!window._purchasesInit) {
+window._purchasesInit = true;
+document.addEventListener('click', function(e) {
+    var button = e.target.closest('button[data-action="download"]');
+    if (!button) return;
+    e.preventDefault();
+    e.stopPropagation();
+    downloadAndInstallPurchase(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
+});
+
+async function downloadAndInstallPurchase(moduleSlug, downloadUrl, button, moduleDir) {
+    if (button) {
+        button.disabled = true;
+        button.dataset.originalContent = button.innerHTML;
+        button.innerHTML = '<div class="loading loading-sm"></div>';
+    }
+    try {
+        var payload = { module_slug: moduleSlug, download_url: downloadUrl };
+        if (moduleDir) payload.module_id = moduleDir;
+        var response = await fetch('{% url "mymodules:api_install" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify(payload)
+        });
+        var data = await response.json();
+        if (data.success) {
+            Toast.success('{% trans "Module installed! Reloading..." %}');
+            setTimeout(function() { window.location.reload(); }, 5000);
+        } else {
+            Toast.error(data.error || '{% trans "Error installing module" %}');
+            if (button && button.dataset.originalContent) {
+                button.innerHTML = button.dataset.originalContent;
+                button.disabled = false;
+            }
+        }
+    } catch (error) {
+        Toast.error('{% trans "Error downloading module" %}');
+        if (button && button.dataset.originalContent) {
+            button.innerHTML = button.dataset.originalContent;
+            button.disabled = false;
+        }
+    }
+}
+} // end guard
+</script>
+
+{% else %}
+<!-- Empty State -->
+<div class="flex flex-col items-center text-center py-16">
+    <div class="text-5xl mb-4 opacity-30">
+        {% icon "bag-outline" %}
+    </div>
+    <h3 class="text-lg font-semibold mb-2">{% trans "No purchases yet" %}</h3>
+    <p class="text-sm opacity-60 mb-6">{% trans "Modules you purchase or subscribe to will appear here." %}</p>
+    <a href="{% url 'marketplace:index' %}"
+       hx-get="{% url 'marketplace:index' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true"
+       class="btn color-primary">
+        {% icon "storefront-outline" %}
+        {% trans "Browse Modules" %}
+    </a>
+</div>
+{% endif %}
