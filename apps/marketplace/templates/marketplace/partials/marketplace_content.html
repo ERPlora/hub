@@ -80,9 +80,10 @@
                 if (data.errors && data.errors.length > 0) {
                     data.errors.forEach(function(err) { Toast.error(err); });
                 }
-                // Add paid modules to cart
+                // Notify about paid modules that need individual purchase
                 if (data.requires_purchase && data.requires_purchase.length > 0) {
-                    await self._addPaidToCart(data.requires_purchase, csrfToken);
+                    var names = data.requires_purchase.map(function(m) { return m.name; }).join(', ');
+                    Toast.warning(data.requires_purchase.length + ' {% trans "modules require purchase" %}: ' + names);
                 }
                 if (data.installed === 0 && (!data.requires_purchase || data.requires_purchase.length === 0)) {
                     Toast.info('{% trans "All modules already installed" %}');
@@ -103,28 +104,6 @@
             Toast.info('{% trans "Server restarting..." %}');
             self._waitForRestart();
         }
-    },
-    async _addPaidToCart(paidModules, csrfToken) {
-        for (var mod of paidModules) {
-            try {
-                await fetch('{% url "marketplace:cart_add" store_type="modules" %}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                    body: JSON.stringify({
-                        item_id: mod.slug,
-                        module_id: mod.module_id,
-                        item_name: mod.name,
-                        item_price: mod.price,
-                        item_icon: mod.icon,
-                        item_type: mod.module_type,
-                        quantity: 1
-                    })
-                });
-            } catch (e) { /* ignore individual cart errors */ }
-        }
-        Toast.info(paidModules.length + ' {% trans "paid modules added to cart" %}');
-        htmx.trigger(document.body, 'cart:refresh');
-        document.dispatchEvent(new CustomEvent('cart:open'));
     },
     _waitForRestart() {
         var self = this;

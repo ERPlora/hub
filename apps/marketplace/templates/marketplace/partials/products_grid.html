@@ -145,15 +145,12 @@
                         </button>
                         {% else %}
                         <button class="btn btn-sm btn-ghost color-primary"
-                                data-action="add-to-cart"
+                                data-action="buy-now"
                                 data-module-id="{{ product.id }}"
-                                data-module-name="{{ product.name }}"
                                 data-module-slug="{{ product.slug }}"
-                                data-module-price="{{ product.price }}"
-                                data-module-icon="{{ product.display_icon|default:'cube-outline' }}"
-                                data-module-type="{{ product.module_type }}"
-                                title="{% trans 'Add to Cart' %}">
-                            {% icon "cart-outline" %}
+                                data-module-name="{{ product.name }}"
+                                title="{% if product.module_type == 'subscription' %}{% trans 'Subscribe' %}{% else %}{% trans 'Buy' %}{% endif %}">
+                            {% icon "card-outline" %}
                         </button>
                         {% endif %}
                     </div>
@@ -268,8 +265,8 @@ document.addEventListener('click', function(e) {
         downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
     } else if (action === 'install-free') {
         installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
-    } else if (action === 'add-to-cart') {
-        addToCart(button);
+    } else if (action === 'buy-now') {
+        buyModule(button);
     }
 });
 
@@ -301,49 +298,40 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, modu
     }
 }
 
-async function addToCart(button) {
+async function buyModule(button) {
     setButtonLoading(button, true);
     try {
-        // Check if parent card/row has a tier selection (e.g. assistant module)
-        var container = button.closest('.module-card') || button.closest('tr');
-        var tierSlug = container ? container.dataset.tierSlug : null;
-        var dynamicPrice = container ? container.dataset.modulePrice : null;
-        var itemPrice = dynamicPrice ? parseFloat(dynamicPrice) : (parseFloat(button.dataset.modulePrice) || 0);
-
-        var payload = {
-            item_id: button.dataset.moduleSlug,
-            module_id: button.dataset.moduleId,
-            item_name: button.dataset.moduleName,
-            item_price: itemPrice,
-            item_icon: button.dataset.moduleIcon || 'cube-outline',
-            item_type: button.dataset.moduleType || 'one_time',
-            quantity: 1
-        };
-        if (tierSlug) payload.tier_slug = tierSlug;
-
-        const response = await fetch('{% url "marketplace:cart_add" %}', {
+        const response = await fetch('{% url "marketplace:module_purchase" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                module_id: button.dataset.moduleId,
+                module_slug: button.dataset.moduleSlug,
+                module_name: button.dataset.moduleName,
+            })
         });
         const data = await response.json();
-        if (data.success) {
-            Toast.success(button.dataset.moduleName + ' {% trans "added to cart" %}');
-            // Update cart badge
-            var badge = document.getElementById('cart-badge');
-            if (badge) {
-                badge.textContent = data.cart_count;
-                badge.style.display = '';
+
+        if (data.client_secret && data.stripe_publishable_key) {
+            if (typeof openCheckoutModal === 'function') {
+                openCheckoutModal(data.client_secret, data.stripe_publishable_key);
+            } else {
+                Toast.error('{% trans "Checkout modal not available. Please reload." %}');
             }
-            // Open cart side-sheet
-            document.dispatchEvent(new CustomEvent('cart:open'));
-            // Refresh cart content
-            htmx.trigger(document.body, 'cart:refresh');
+        } else if (data.checkout_url) {
+            window.open(data.checkout_url, '_blank');
+            Toast.info('{% trans "Complete payment in the opened window" %}');
+        } else if (data.is_free) {
+            Toast.success(data.message || '{% trans "Module added to your account." %}');
+            htmx.ajax('GET', window.location.pathname, { target: '#main-content-area', swap: 'innerHTML' });
+        } else if (data.error) {
+            Toast.error(data.error);
         } else {
-            Toast.error(data.error || '{% trans "Error adding to cart" %}');
+            Toast.success(data.message || '{% trans "Purchase processed." %}');
+            htmx.ajax('GET', window.location.pathname, { target: '#main-content-area', swap: 'innerHTML' });
         }
     } catch (error) {
-        Toast.error('{% trans "Error adding to cart" %}');
+        Toast.error('{% trans "Error processing purchase" %}');
     } finally {
         setButtonLoading(button, false);
     }

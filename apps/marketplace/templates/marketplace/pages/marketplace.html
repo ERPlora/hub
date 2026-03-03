@@ -3,46 +3,9 @@
 
 {% block page_title %}{{ page_title }}{% endblock %}
 
-{% block page_actions %}
-{# Cart button — always visible in marketplace #}
-<button type="button"
-        class="btn btn-sm btn-ghost"
-        onclick="document.dispatchEvent(new CustomEvent('cart:open'))"
-        style="position: relative;">
-    {% icon "cart-outline" %}
-    <span id="cart-badge" class="badge badge-sm color-error"
-          style="position: absolute; top: -4px; right: -4px;{% if not cart_count %} display: none;{% endif %}">
-        {{ cart_count|default:0 }}
-    </span>
-</button>
-{% endblock %}
-
 {% block page_content %}
 {% include content_template|default:"marketplace/partials/marketplace_content.html" %}
 
-{# Cart Side-Sheet (right sliding panel) #}
-<div x-data="{ cartOpen: false }"
-     @cart:open.document="cartOpen = true"
-     @cart:close.document="cartOpen = false">
-    <div class="sheet-backdrop" :data-state="cartOpen ? 'open' : 'closed'" @click.self="cartOpen = false">
-        <div class="side-sheet side-sheet-right glass">
-            <div class="side-sheet-header">
-                <h2 class="sheet-title">{% trans "Cart" %}</h2>
-                <button class="sheet-close" @click="cartOpen = false">
-                    {% icon "close-outline" %}
-                </button>
-            </div>
-            <div class="side-sheet-content" id="cart-sheet-content"
-                 hx-get="{% url 'marketplace:cart_view' %}"
-                 hx-trigger="load, cart:refresh from:document"
-                 hx-swap="innerHTML">
-                <div class="flex justify-center py-8">
-                    <div class="loading"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {# ── Checkout Modal (Stripe Embedded Checkout) ── #}
 <div class="modal-backdrop" id="checkout-modal" data-state="closed">
     <div class="modal" style="max-width: 600px; max-height: 90vh;">
@@ -88,7 +51,7 @@
                 }
                 modal.setAttribute('data-state', 'closed');
                 if (typeof Toast !== 'undefined') Toast.success('{% trans "Payment successful!" %}');
-                // Reload marketplace to refresh purchase status
+                // Reload page to refresh purchase status
                 if (typeof htmx !== 'undefined') {
                     htmx.ajax('GET', window.location.pathname, { target: '#main-content-area', swap: 'innerHTML' });
                 } else {
