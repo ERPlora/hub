@@ -49,22 +49,27 @@
                         </span>
                         {% endif %}
 
-                        {% if module.is_featured %}
+                        {% if not module.is_free and module.module_type != 'free' and module.price != 0 and not module.is_installed %}
+                        <span class="badge badge-sm color-warning">{% trans "Premium" %}</span>
+                        {% elif module.is_featured %}
                         <span class="badge badge-sm color-warning">{% trans "Featured" %}</span>
                         {% endif %}
                     {% endif %}
                 </div>
             </div>
 
-            {% if card_context == 'marketplace' %}
-            <label class="checkbox shrink-0 ml-auto" @click.stop>
-                <input type="checkbox" class="checkbox-input"
-                       @change="toggle('{{ module.slug }}')"
-                       :checked="selected.has('{{ module.slug }}')">
-                <span class="checkbox-box">
-                    <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                </span>
-            </label>
+            {# Checkbox only for free + not-installed modules (eligible for bulk install) #}
+            {% if card_context == 'marketplace' and not module.is_installed %}
+                {% if module.is_free or module.module_type == 'free' or module.price == 0 %}
+                <label class="checkbox shrink-0 ml-auto" @click.stop>
+                    <input type="checkbox" class="checkbox-input"
+                           @change="toggle('{{ module.slug }}')"
+                           :checked="selected.has('{{ module.slug }}')">
+                    <span class="checkbox-box">
+                        <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </span>
+                </label>
+                {% endif %}
             {% endif %}
         </div>
 
@@ -122,28 +127,21 @@
             <div class="module-card-actions">
                 {% if module.is_installed %}
                 <span class="badge badge-sm color-success">{% icon "checkmark-circle-outline" %} {% trans "Installed" %}</span>
-                {% elif module.is_owned %}
-                <button class="btn btn-sm color-success"
-                        data-action="download"
-                        data-module-slug="{{ module.slug }}"
-                        data-module-dir="{{ module.module_id }}"
-                        data-download-url="{{ module.download_url }}">
-                    {% icon "download-outline" %}
-                    {% trans "Install" %}
-                </button>
                 {% elif module.is_free or module.module_type == 'free' or module.price == 0 %}
+                {# Free module: Select for bulk install #}
                 <button class="btn btn-sm btn-outline" @click.stop="toggle('{{ module.slug }}')">
                     {% icon "add-outline" %}
                     {% trans "Select" %}
                 </button>
                 {% else %}
+                {# Premium module: individual Install (with deps) #}
                 <button class="btn btn-sm color-primary"
-                        data-action="buy-now"
-                        data-module-id="{{ module.id }}"
+                        data-action="install-module"
                         data-module-slug="{{ module.slug }}"
-                        data-module-name="{{ module.name }}">
-                    {% icon "card-outline" %}
-                    {% trans "Buy" %}
+                        data-module-dir="{{ module.module_id }}"
+                        data-download-url="{{ module.download_url }}">
+                    {% icon "download-outline" %}
+                    {% trans "Install" %}
                 </button>
                 {% endif %}
             </div>

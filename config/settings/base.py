@@ -147,6 +147,7 @@ MIDDLEWARE = [
     'django_htmx.middleware.HtmxMiddleware',
     'apps.accounts.middleware.jwt_middleware.JWTMiddleware',
     'apps.configuration.middleware.StoreConfigCheckMiddleware',
+    'apps.core.middleware.module_subscription.ModuleSubscriptionMiddleware',
     'apps.core.middleware.module_middleware_manager.ModuleMiddlewareManager',
 ]
 

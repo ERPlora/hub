@@ -491,12 +491,76 @@ def module_purchase(request):
         )
 
 
+# Cancel subscription
+
+@login_required
+def cancel_subscription(request):
+    """Cancel a module subscription via Cloud API."""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    try:
+        data = json.loads(request.body)
+        module_id = data.get('module_id', '')
+    except (json.JSONDecodeError, ValueError):
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Invalid data'}),
+            content_type='application/json', status=400,
+        )
+
+    if not module_id:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Missing module_id'}),
+            content_type='application/json', status=400,
+        )
+
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(_('Hub not connected to Cloud.'))}),
+            content_type='application/json', status=400,
+        )
+
+    cloud_api_url = _get_cloud_api_url()
+
+    try:
+        response = requests.post(
+            f"{cloud_api_url}/api/marketplace/modules/{module_id}/cancel-subscription/",
+            json={},
+            headers={
+                'X-Hub-Token': auth_token,
+                'Content-Type': 'application/json',
+            },
+            timeout=30,
+        )
+
+        resp_data = response.json()
+        if response.status_code == 200:
+            return HttpResponse(
+                json.dumps({'success': True, 'message': resp_data.get('message', '')}),
+                content_type='application/json',
+            )
+        else:
+            return HttpResponse(
+                json.dumps({'success': False, 'error': resp_data.get('error', 'Failed to cancel')}),
+                content_type='application/json', status=response.status_code,
+            )
+    except requests.exceptions.RequestException as e:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(e)}),
+            content_type='application/json', status=500,
+        )
+
+
 # My Purchases
 
 @login_required
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/my_purchases_content.html')
 def my_purchases(request):
-    """My Purchases — show owned modules from Cloud with install status."""
+    """My Purchases — show paid purchases from Cloud with subscription status."""
     from apps.configuration.models import HubConfig
 
     hub_config = HubConfig.get_solo()
@@ -510,38 +574,49 @@ def my_purchases(request):
             'navigation': _marketplace_navigation('purchases'),
         }
 
-    # Fetch all modules (cached) and filter to owned
-    all_modules = _fetch_all_modules()
-    if all_modules is None:
+    cloud_api_url = _get_cloud_api_url()
+
+    try:
+        response = requests.get(
+            f"{cloud_api_url}/api/marketplace/modules/my_purchases/",
+            headers={
+                'X-Hub-Token': auth_token,
+                'Content-Type': 'application/json',
+            },
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return {
+                'current_section': 'marketplace',
+                'page_title': _('My Purchases'),
+                'error': str(_('Could not fetch purchases from Cloud.')),
+                'navigation': _marketplace_navigation('purchases'),
+            }
+        purchases = response.json()
+    except requests.exceptions.RequestException:
         return {
             'current_section': 'marketplace',
             'page_title': _('My Purchases'),
-            'error': str(_('Could not fetch modules from Cloud.')),
+            'error': str(_('Could not connect to Cloud.')),
             'navigation': _marketplace_navigation('purchases'),
         }
 
     installed_module_ids = _get_installed_module_ids()
-    cloud_api_url = _get_cloud_api_url()
 
-    # Filter to owned (paid) modules only — exclude free modules
-    owned_modules = []
-    for m in all_modules:
-        if not m.get('is_owned'):
-            continue
-        module = dict(m)
-        module['is_installed'] = (
-            module.get('slug', '') in installed_module_ids
-            or module.get('module_id', '') in installed_module_ids
+    for p in purchases:
+        p['is_installed'] = (
+            p.get('module_slug', '') in installed_module_ids
+            or p.get('module_id', '') in installed_module_ids
         )
-        module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
-        if not module.get('download_url'):
-            module['download_url'] = f"{cloud_api_url}/api/marketplace/modules/{module.get('slug', '')}/download/"
-        owned_modules.append(module)
+        p['detail_url'] = reverse(
+            'marketplace:module_detail',
+            kwargs={'slug': p.get('module_slug', '')},
+        )
 
     return {
         'current_section': 'marketplace',
         'page_title': _('My Purchases'),
-        'modules': owned_modules,
+        'purchases': purchases,
         'navigation': _marketplace_navigation('purchases'),
     }
 
@@ -1921,3 +1996,237 @@ def compliance_detail(request, country_code):
     """Redirect to the main compliance page (accordion view)."""
     from django.shortcuts import redirect
     return redirect('marketplace:compliance')
+
+
+# =============================================================================
+# Module Pricing Page (Bouncer redirect target)
+# =============================================================================
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/module_pricing_content.html')
+def module_pricing(request, module_id):
+    """
+    Pricing page for a premium module.
+
+    Users land here when the ModuleSubscriptionMiddleware redirects them
+    because they haven't paid for a premium module.
+    """
+    from apps.core.middleware.module_subscription import (
+        _get_module_pricing, get_subscription_status,
+    )
+
+    # Read module metadata from module.py
+    modules_dir = Path(django_settings.MODULES_DIR)
+    module_name = module_id
+    module_icon = 'cube-outline'
+    module_description = ''
+    tiers = []
+    price_monthly = 0
+    default_tier_slug = ''
+
+    module_py = modules_dir / module_id / 'module.py'
+    if module_py.exists():
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                f'{module_id}.module', module_py,
+            )
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+
+            module_name = str(getattr(mod, 'MODULE_NAME', module_id))
+            module_icon = getattr(mod, 'MODULE_ICON', 'cube-outline')
+            menu = getattr(mod, 'MENU', {})
+            if menu and isinstance(menu, dict):
+                module_icon = menu.get('icon', module_icon)
+
+            pricing = getattr(mod, 'PRICING', {})
+            if pricing:
+                price_monthly = pricing.get('subscription_price_monthly', 0)
+
+            module_description = str(getattr(mod, 'MODULE_DESCRIPTION', ''))
+        except Exception:
+            pass
+
+    # Also try Cloud API for richer data (tiers, description, etc.)
+    cloud_api_url = _get_cloud_api_url()
+    try:
+        cache_key = f'{_CK_MODULE_DETAIL}{module_id}'
+        cloud_module = cache.get(cache_key)
+        if cloud_module is None:
+            from apps.configuration.models import HubConfig
+            hub_config = HubConfig.get_solo()
+            auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+            if auth_token:
+                resp = requests.get(
+                    f'{cloud_api_url}/api/marketplace/modules/{module_id}/',
+                    headers={'X-Hub-Token': auth_token, 'Accept': 'application/json'},
+                    timeout=10,
+                )
+                if resp.status_code == 200:
+                    cloud_module = resp.json()
+                    cache.set(cache_key, cloud_module, _CACHE_TTL)
+
+        if cloud_module:
+            module_name = cloud_module.get('name', module_name)
+            module_description = cloud_module.get('description', module_description)
+            if cloud_module.get('assistant_tiers'):
+                tiers = cloud_module['assistant_tiers']
+                default_tier_slug = tiers[0].get('slug', '') if tiers else ''
+            elif cloud_module.get('subscription_price_monthly'):
+                price_monthly = cloud_module['subscription_price_monthly']
+            elif cloud_module.get('price'):
+                price_monthly = cloud_module['price']
+    except Exception:
+        pass
+
+    # Get current subscription status
+    subscription_status = get_subscription_status(module_id)
+    show_trial = subscription_status not in ('expired',)  # No trial for returning users
+
+    # Calculate yearly savings if applicable
+    price_yearly = None
+    yearly_savings = 0
+    if price_monthly and not tiers:
+        price_yearly = round(float(price_monthly) * 10, 2)  # 2 months free
+        yearly_savings = round((1 - (price_yearly / (float(price_monthly) * 12))) * 100)
+
+    return {
+        'current_section': 'marketplace',
+        'page_title': f'{module_name} — {_("Pricing")}',
+        'content_template': 'marketplace/partials/module_pricing_content.html',
+        'module_id': module_id,
+        'module_name': module_name,
+        'module_icon': module_icon,
+        'module_description': module_description,
+        'tiers': tiers,
+        'default_tier_slug': default_tier_slug,
+        'price_monthly': price_monthly,
+        'price_yearly': price_yearly,
+        'yearly_savings': yearly_savings,
+        'subscription_status': subscription_status,
+        'show_trial': show_trial,
+    }
+
+
+@login_required
+def module_subscribe(request):
+    """
+    Create a Stripe Checkout session for a module subscription.
+
+    POST payload:
+    - module_id: the module directory name (e.g., 'tobacco')
+    - tier_slug: optional tier for tiered pricing (e.g., 'basic', 'pro')
+    """
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    try:
+        data = json.loads(request.body)
+        module_id = data.get('module_id', '')
+        tier_slug = data.get('tier_slug', '')
+    except (json.JSONDecodeError, ValueError):
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Invalid data'}),
+            content_type='application/json', status=400,
+        )
+
+    if not module_id:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Missing module_id'}),
+            content_type='application/json', status=400,
+        )
+
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(_('Hub not connected to Cloud.'))}),
+            content_type='application/json', status=400,
+        )
+
+    cloud_api_url = _get_cloud_api_url()
+
+    try:
+        purchase_payload = {
+            'success_url': request.build_absolute_uri(f'/m/{module_id}/'),
+            'cancel_url': request.build_absolute_uri(f'/marketplace/pricing/{module_id}/'),
+            'ui_mode': 'embedded',
+        }
+        if tier_slug:
+            purchase_payload['tier_slug'] = tier_slug
+
+        response = requests.post(
+            f'{cloud_api_url}/api/marketplace/modules/{module_id}/purchase/',
+            json=purchase_payload,
+            headers={
+                'X-Hub-Token': auth_token,
+                'Content-Type': 'application/json',
+            },
+            timeout=30,
+        )
+
+        if response.status_code in (200, 201):
+            resp_data = response.json()
+
+            # Invalidate subscription cache on successful purchase
+            from apps.core.middleware.module_subscription import invalidate_subscription_cache
+            invalidate_subscription_cache(module_id)
+
+            if resp_data.get('client_secret'):
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'client_secret': resp_data['client_secret'],
+                        'session_id': resp_data.get('session_id', ''),
+                        'stripe_publishable_key': resp_data.get('stripe_publishable_key', ''),
+                    }),
+                    content_type='application/json',
+                )
+            elif resp_data.get('checkout_url'):
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'checkout_url': resp_data['checkout_url'],
+                    }),
+                    content_type='application/json',
+                )
+            else:
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'message': resp_data.get('message', str(_('Subscription processed.'))),
+                    }),
+                    content_type='application/json',
+                )
+
+        elif response.status_code == 409:
+            resp_data = response.json()
+            return HttpResponse(
+                json.dumps({
+                    'success': False,
+                    'error': resp_data.get('error', str(_('You already have a subscription.'))),
+                }),
+                content_type='application/json', status=409,
+            )
+        else:
+            error_data = {}
+            try:
+                error_data = response.json()
+            except Exception:
+                pass
+            return HttpResponse(
+                json.dumps({
+                    'success': False,
+                    'error': error_data.get('error', f'Cloud API returned {response.status_code}'),
+                }),
+                content_type='application/json', status=500,
+            )
+
+    except requests.exceptions.RequestException as e:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(e)}),
+            content_type='application/json', status=500,
+        )

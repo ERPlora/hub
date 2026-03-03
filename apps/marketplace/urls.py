@@ -58,10 +58,17 @@ urlpatterns = [
     path('products/', views.products_list, {'store_type': 'modules'}, name='products_list'),
     path('filters/', views.filters_view, {'store_type': 'modules'}, name='filters_view'),
     path('purchase/', views.module_purchase, name='module_purchase'),
+    path('cancel-subscription/', views.cancel_subscription, name='cancel_subscription'),
 
     # Hubs store (legacy, still accessible)
     path('hubs/', views.store_index, {'store_type': 'hubs'}, name='store_hubs'),
     path('hubs/products/', views.products_list, {'store_type': 'hubs'}, name='hubs_products_list'),
+
+    # Module pricing page (Bouncer redirect target)
+    path('pricing/<str:module_id>/', views.module_pricing, name='module_pricing'),
+
+    # Subscribe to a premium module (POST — Stripe checkout)
+    path('subscribe/', views.module_subscribe, name='module_subscribe'),
 
     # Module detail page (MUST be last - catches slugs)
     path('<slug:slug>/', views.module_detail, name='module_detail'),
