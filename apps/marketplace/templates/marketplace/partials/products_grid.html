@@ -35,7 +35,7 @@
                     {% trans "Rating" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>
-                <th class="datatable-th datatable-th-center" data-col="status" style="white-space: nowrap;">{% trans "Status" %}</th>
+                <th class="datatable-th datatable-th-center" data-col="status" style="white-space: nowrap; min-width: 90px;">{% trans "Status" %}</th>
                 <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
                 <th class="datatable-th datatable-th-center" style="width: 70px;">{% trans "Select" %}</th>
             </tr>
@@ -114,7 +114,7 @@
                         {% endif %}
                     </div>
                 </td>
-                <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}" style="white-space: nowrap;">
+                <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}" style="white-space: nowrap; min-width: 90px;">
                     {% if product.is_installed %}
                     <span class="badge badge-sm color-success">{% trans "Installed" %}</span>
                     {% elif product.is_owned %}

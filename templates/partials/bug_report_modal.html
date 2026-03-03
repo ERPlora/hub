@@ -1,6 +1,6 @@
 {% load i18n djicons %}
 
-<div x-data="bugReport()" @open-bug-report.window="open = true" x-cloak>
+<div x-data="bugReport()" @open-bug-report.window="open = true; showError = false" x-cloak>
     <div class="modal-backdrop" :data-state="open ? 'open' : 'closed'" @click.self="open = false">
         <div class="modal" style="max-width: 420px;">
             <div class="modal-header">
@@ -12,9 +12,15 @@
                     {% trans "Describe the problem you encountered. A screenshot of the current page will be captured automatically." %}
                 </p>
                 <div class="form-group">
-                    <label class="form-group-label" for="bug-report-description">{% trans "Description" %}</label>
-                    <textarea x-model="description" id="bug-report-description" class="textarea" rows="3"
-                              placeholder="{% trans 'What went wrong?' %}"></textarea>
+                    <label class="form-group-label" for="bug-report-description">{% trans "Description" %} <span class="form-group-label-required"></span></label>
+                    <textarea x-model="description" id="bug-report-description"
+                              class="textarea" :class="{ 'textarea-error': showError && !description.trim() }"
+                              rows="3"
+                              placeholder="{% trans 'What went wrong?' %}"
+                              @input="showError = false"></textarea>
+                    <p class="form-group-hint color-error" x-show="showError && !description.trim()" x-cloak>
+                        {% trans "Please describe the problem before sending." %}
+                    </p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -41,9 +47,13 @@ function bugReport() {
         open: false,
         sending: false,
         description: '',
+        showError: false,
 
         async send() {
-            if (!this.description.trim()) return;
+            if (!this.description.trim()) {
+                this.showError = true;
+                return;
+            }
             this.sending = true;
             try {
                 // Lazy-load html2canvas-pro (supports oklch colors)
