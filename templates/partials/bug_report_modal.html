@@ -45,11 +45,11 @@ function bugReport() {
         async send() {
             this.sending = true;
             try {
-                // Lazy-load html2canvas
+                // Lazy-load html2canvas-pro (supports oklch colors)
                 if (!window.html2canvas) {
                     await new Promise(function(resolve, reject) {
                         var s = document.createElement('script');
-                        s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+                        s.src = 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js';
                         s.onload = resolve;
                         s.onerror = reject;
                         document.head.appendChild(s);
