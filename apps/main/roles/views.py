@@ -412,13 +412,16 @@ def sync_permissions(request):
 
 @admin_required
 def create_default_roles(request):
-    """Create default system roles."""
+    """Create default system roles and sync module permissions."""
     hub_id = request.session.get('hub_id')
 
     roles = PermissionService.create_default_roles(hub_id)
+    perm_count = PermissionService.sync_all_module_permissions(hub_id)
 
     messages.success(
         request,
-        _('Created %(count)d default roles.') % {'count': len(roles)}
+        _('Synced %(roles)d roles and %(perms)d permissions.') % {
+            'roles': len(roles), 'perms': perm_count,
+        }
     )
     return redirect('main:roles:list')

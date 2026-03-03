@@ -60,13 +60,22 @@ DEFAULT_ROLES = [
 
 
 def get_hub_id():
-    """Resolve hub_id from settings or generate a deterministic fallback."""
+    """Resolve hub_id from settings, HubConfig, or generate a deterministic fallback."""
     # 1. Docker env var
     hub_id = getattr(settings, 'HUB_ID', None)
     if hub_id:
         return str(hub_id)
 
-    # 2. Deterministic fallback for local dev
+    # 2. HubConfig (Cloud-provisioned hub_id)
+    try:
+        from apps.configuration.models import HubConfig
+        config = HubConfig.get_config()
+        if config.hub_id:
+            return str(config.hub_id)
+    except Exception:
+        pass
+
+    # 3. Deterministic fallback for local dev
     return str(uuid_lib.uuid5(uuid_lib.NAMESPACE_DNS, 'erplora.local'))
 
 

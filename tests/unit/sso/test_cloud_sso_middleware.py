@@ -342,8 +342,8 @@ class TestCloudSSOMiddlewareLocalUserCreation(TestCase):
         user = LocalUser.objects.get(email='first@example.com')
         assert user.role == 'admin'
 
-    def test_subsequent_users_get_cashier_role(self):
-        """Subsequent users should be assigned cashier role."""
+    def test_subsequent_users_get_employee_role(self):
+        """Subsequent users should be assigned employee role."""
         from apps.accounts.models import LocalUser
 
         # Create first user
@@ -360,7 +360,7 @@ class TestCloudSSOMiddlewareLocalUserCreation(TestCase):
         result = self.middleware._ensure_local_user_and_session(request, user_data)
 
         user = LocalUser.objects.get(email='second@example.com')
-        assert user.role == 'cashier'
+        assert user.role == 'employee'
 
     def test_user_without_pin_redirects_to_setup(self):
         """User without PIN should be redirected to setup-pin."""

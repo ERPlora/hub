@@ -410,8 +410,8 @@ class TestHubCloudSSOIntegrationFlow(TestCase):
         assert user.role == 'admin'
 
     @patch('apps.core.middleware.cloud_sso_middleware.requests.get')
-    def test_subsequent_users_become_cashiers(self, mock_get):
-        """Test that subsequent users become cashiers."""
+    def test_subsequent_users_become_employees(self, mock_get):
+        """Test that subsequent users become employees."""
         # Create first admin user
         LocalUser.objects.create(
             email='admin@example.com',
@@ -447,9 +447,9 @@ class TestHubCloudSSOIntegrationFlow(TestCase):
         user_data = {'email': 'second@example.com', 'user_id': 2, 'name': 'Second User'}
         middleware._ensure_local_user_and_session(request, user_data)
 
-        # Second user should be cashier
+        # Second user should be employee
         user = LocalUser.objects.get(email='second@example.com')
-        assert user.role == 'cashier'
+        assert user.role == 'employee'
 
 
 @pytest.mark.e2e
