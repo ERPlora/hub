@@ -124,15 +124,6 @@
                         <button class="btn btn-sm btn-ghost" disabled title="{% trans 'Installed' %}">
                             {% icon "checkmark-circle-outline" %}
                         </button>
-                        {% elif product.is_owned %}
-                        <button class="btn btn-sm btn-ghost color-success"
-                                data-action="download"
-                                data-module-slug="{{ product.slug }}"
-                                data-module-dir="{{ product.module_id }}"
-                                data-download-url="{{ product.download_url }}"
-                                title="{% trans 'Install' %}">
-                            {% icon "download-outline" %}
-                        </button>
                         {% elif product.is_free or product.module_type == 'free' or product.price == 0 %}
                         <button class="btn btn-sm btn-ghost color-primary"
                                 data-action="install-free"
@@ -145,25 +136,30 @@
                         </button>
                         {% else %}
                         <button class="btn btn-sm btn-ghost color-primary"
-                                data-action="buy-now"
-                                data-module-id="{{ product.id }}"
+                                data-action="install-module"
                                 data-module-slug="{{ product.slug }}"
-                                data-module-name="{{ product.name }}"
-                                title="{% if product.module_type == 'subscription' %}{% trans 'Subscribe' %}{% else %}{% trans 'Buy' %}{% endif %}">
-                            {% icon "card-outline" %}
+                                data-module-dir="{{ product.module_id }}"
+                                data-download-url="{{ product.download_url }}"
+                                title="{% trans 'Install' %}">
+                            {% icon "download-outline" %}
                         </button>
                         {% endif %}
                     </div>
                 </td>
                 <td class="datatable-td datatable-td-center" style="width: 70px;">
-                    <label class="checkbox" @click.stop>
-                        <input type="checkbox" class="checkbox-input"
-                               @change="toggle('{{ product.slug }}')"
-                               :checked="selected.has('{{ product.slug }}')">
-                        <span class="checkbox-box">
-                            <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        </span>
-                    </label>
+                    {# Checkbox only for free + not-installed modules #}
+                    {% if not product.is_installed %}
+                        {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
+                        <label class="checkbox" @click.stop>
+                            <input type="checkbox" class="checkbox-input"
+                                   @change="toggle('{{ product.slug }}')"
+                                   :checked="selected.has('{{ product.slug }}')">
+                            <span class="checkbox-box">
+                                <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </span>
+                        </label>
+                        {% endif %}
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
@@ -261,12 +257,10 @@ document.addEventListener('click', function(e) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (action === 'download') {
+    if (action === 'download' || action === 'install-module') {
         downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
     } else if (action === 'install-free') {
         installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
-    } else if (action === 'buy-now') {
-        buyModule(button);
     }
 });
 
@@ -293,54 +287,6 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, modu
         }
     } catch (error) {
         Toast.error('{% trans "Error acquiring module" %}');
-    } finally {
-        setButtonLoading(button, false);
-    }
-}
-
-async function buyModule(button) {
-    setButtonLoading(button, true);
-    try {
-        const payload = {
-            module_id: button.dataset.moduleId,
-            module_slug: button.dataset.moduleSlug,
-            module_name: button.dataset.moduleName,
-        };
-        // Include selected tier from table row or card (for assistant/subscription modules)
-        const row = button.closest('tr');
-        const card = button.closest('.module-card');
-        if (row && row.dataset.tierSlug) {
-            payload.tier_slug = row.dataset.tierSlug;
-        } else if (card && card.dataset.tierSlug) {
-            payload.tier_slug = card.dataset.tierSlug;
-        }
-        const response = await fetch('{% url "marketplace:module_purchase" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-
-        if (data.client_secret && data.stripe_publishable_key) {
-            if (typeof openCheckoutModal === 'function') {
-                openCheckoutModal(data.client_secret, data.stripe_publishable_key);
-            } else {
-                Toast.error('{% trans "Checkout modal not available. Please reload." %}');
-            }
-        } else if (data.checkout_url) {
-            window.open(data.checkout_url, '_blank');
-            Toast.info('{% trans "Complete payment in the opened window" %}');
-        } else if (data.is_free) {
-            Toast.success(data.message || '{% trans "Module added to your account." %}');
-            htmx.ajax('GET', window.location.pathname, { target: '#main-content-area', swap: 'innerHTML' });
-        } else if (data.error) {
-            Toast.error(data.error);
-        } else {
-            Toast.success(data.message || '{% trans "Purchase processed." %}');
-            htmx.ajax('GET', window.location.pathname, { target: '#main-content-area', swap: 'innerHTML' });
-        }
-    } catch (error) {
-        Toast.error('{% trans "Error processing purchase" %}');
     } finally {
         setButtonLoading(button, false);
     }
@@ -475,4 +421,3 @@ window.openReviewModal = function(trigger) {
 };
 } // end guard
 </script>
-{% include "marketplace/partials/_checkout_modal.html" %}

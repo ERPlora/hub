@@ -1,0 +1,147 @@
+{% load i18n djicons %}
+
+<div hidden data-back-url="/marketplace/"></div>
+
+<div class="flex flex-col items-center justify-center min-h-[60vh] p-md">
+    <div class="card glass" style="max-width: 480px; width: 100%;">
+        <div class="card-body text-center">
+            {# Module icon + name #}
+            <div class="flex justify-center mb-md">
+                <div class="flex items-center justify-center size-16 rounded-xl bg-base-200">
+                    {% icon module_icon|default:"cube-outline" css_class="text-3xl" %}
+                </div>
+            </div>
+
+            <h1 class="fs-2xl fw-bold mb-xs">{{ module_name }}</h1>
+
+            <span class="badge color-warning mb-md">
+                {% icon "star-outline" %}
+                {% trans "Premium Module" %}
+            </span>
+
+            {% if module_description %}
+            <p class="text-secondary mb-lg">{{ module_description }}</p>
+            {% endif %}
+
+            {# Subscription status message #}
+            {% if subscription_status == 'expired' %}
+            <div class="callout callout-warning mb-lg">
+                <span class="callout-icon">{% icon "alert-circle-outline" %}</span>
+                <div class="callout-content">
+                    <div class="callout-title">{% trans "Subscription Expired" %}</div>
+                    <div class="callout-text">{% trans "Your subscription has expired. Renew to continue using this module." %}</div>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-secondary mb-lg">
+                {% trans "This module requires a subscription to use." %}
+            </p>
+            {% endif %}
+
+            {# Pricing #}
+            <div class="mb-lg">
+                {% if tiers %}
+                {# Multiple tiers (e.g., AI Assistant) #}
+                <div class="flex flex-col gap-sm">
+                    {% for tier in tiers %}
+                    <label class="card cursor-pointer border-2 transition-colors hover:border-primary"
+                           :class="{ 'border-primary': selectedTier === '{{ tier.slug }}' }"
+                           x-data
+                           @click="$dispatch('tier-selected', { slug: '{{ tier.slug }}', price: '{{ tier.price_monthly }}' })">
+                        <div class="card-body p-md flex items-center justify-between">
+                            <div>
+                                <span class="fw-semibold">{{ tier.name }}</span>
+                                {% if tier.description %}
+                                <p class="text-xs text-secondary m-0">{{ tier.description }}</p>
+                                {% endif %}
+                            </div>
+                            <span class="fw-bold text-primary">&euro;{{ tier.price_monthly }}<span class="text-xs text-secondary">/{% trans "mo" %}</span></span>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% else %}
+                {# Single price #}
+                <div class="fs-3xl fw-bold" style="color: var(--color-primary);">
+                    &euro;{{ price_monthly }}<span class="fs-lg text-secondary">/{% trans "mo" %}</span>
+                </div>
+                {% if price_yearly %}
+                <p class="text-sm text-secondary mt-xs">
+                    {% trans "or" %} &euro;{{ price_yearly }}/{% trans "year" %}
+                    <span class="badge badge-sm color-success ml-1">{% trans "Save" %} {{ yearly_savings }}%</span>
+                </p>
+                {% endif %}
+                {% endif %}
+            </div>
+
+            {# Trial info #}
+            {% if show_trial %}
+            <div class="callout callout-info mb-lg">
+                <span class="callout-icon">{% icon "time-outline" %}</span>
+                <div class="callout-content">
+                    <div class="callout-text">{% trans "Includes a 15-day free trial. Cancel anytime." %}</div>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Subscribe button #}
+            <div x-data="{ loading: false, selectedTier: '{{ default_tier_slug }}' }"
+                 @tier-selected.window="selectedTier = $event.detail.slug">
+                <button class="btn btn-lg btn-block color-primary mb-sm"
+                        :disabled="loading"
+                        @click="
+                            loading = true;
+                            fetch('{% url 'marketplace:module_subscribe' %}', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                                body: JSON.stringify({
+                                    module_id: '{{ module_id }}',
+                                    tier_slug: selectedTier,
+                                })
+                            })
+                            .then(r => r.json())
+                            .then(data => {
+                                loading = false;
+                                if (data.client_secret && data.stripe_publishable_key) {
+                                    openCheckoutModal(data.client_secret, data.stripe_publishable_key);
+                                } else if (data.checkout_url) {
+                                    window.open(data.checkout_url, '_blank');
+                                    Toast.info('{% trans "Complete payment in the opened window" %}');
+                                } else if (data.error) {
+                                    Toast.error(data.error);
+                                }
+                            })
+                            .catch(() => {
+                                loading = false;
+                                Toast.error('{% trans "Error processing subscription" %}');
+                            });
+                        ">
+                    <template x-if="loading">
+                        <span class="loading loading-sm"></span>
+                    </template>
+                    <template x-if="!loading">
+                        <span>
+                            {% icon "card-outline" %}
+                            {% if show_trial %}
+                            {% trans "Start Free Trial" %}
+                            {% else %}
+                            {% trans "Subscribe" %}
+                            {% endif %}
+                        </span>
+                    </template>
+                </button>
+
+                <a href="{% url 'marketplace:index' %}"
+                   hx-get="{% url 'marketplace:index' %}"
+                   hx-target="#main-content-area"
+                   hx-push-url="true"
+                   class="btn btn-outline btn-lg btn-block">
+                    {% icon "arrow-back-outline" %}
+                    {% trans "Back to Marketplace" %}
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include "marketplace/partials/_checkout_modal.html" %}

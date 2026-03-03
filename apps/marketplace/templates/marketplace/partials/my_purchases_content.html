@@ -11,8 +11,8 @@
 
 {% elif purchases %}
 <div class="p-md">
-    <h2 class="fs-xl fw-semibold mb-md">{% trans "My Purchases" %}</h2>
-    <p class="text-sm opacity-60 mb-lg">{% trans "Modules you have purchased or subscribed to." %}</p>
+    <h2 class="fs-xl fw-semibold mb-md">{% trans "My Subscriptions" %}</h2>
+    <p class="text-sm opacity-60 mb-lg">{% trans "Active and past module subscriptions." %}</p>
 
     <div class="list list-inset glass">
         {% for purchase in purchases %}
@@ -61,18 +61,6 @@
                 {% endif %}
             </div>
             <div class="list-item-end flex gap-2">
-                {% if purchase.is_installed %}
-                <span class="badge badge-sm color-success">{% icon "checkmark-circle-outline" %} {% trans "Installed" %}</span>
-                {% elif purchase.download_url %}
-                <button class="btn btn-sm color-success"
-                        data-action="download"
-                        data-module-slug="{{ purchase.module_slug }}"
-                        data-module-dir="{{ purchase.module_id }}"
-                        data-download-url="{{ purchase.download_url }}">
-                    {% icon "download-outline" %}
-                    {% trans "Install" %}
-                </button>
-                {% endif %}
                 {% if purchase.stripe_subscription_id and purchase.subscription_status != 'canceled' %}
                 <button class="btn btn-sm btn-ghost color-error"
                         data-action="cancel-subscription"
@@ -80,7 +68,17 @@
                         data-module-name="{{ purchase.name }}"
                         title="{% trans 'Cancel subscription' %}">
                     {% icon "close-circle-outline" %}
+                    {% trans "Cancel" %}
                 </button>
+                {% elif purchase.subscription_status == 'canceled' or purchase.subscription_status == 'expired' %}
+                <a href="{% url 'marketplace:module_pricing' module_id=purchase.module_id %}"
+                   hx-get="{% url 'marketplace:module_pricing' module_id=purchase.module_id %}"
+                   hx-target="#main-content-area"
+                   hx-push-url="true"
+                   class="btn btn-sm color-primary">
+                    {% icon "refresh-outline" %}
+                    {% trans "Renew" %}
+                </a>
                 {% endif %}
             </div>
         </div>
@@ -92,13 +90,6 @@
 if (!window._purchasesInit) {
 window._purchasesInit = true;
 document.addEventListener('click', function(e) {
-    var dlBtn = e.target.closest('button[data-action="download"]');
-    if (dlBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        downloadAndInstallPurchase(dlBtn.dataset.moduleSlug, dlBtn.dataset.downloadUrl, dlBtn, dlBtn.dataset.moduleDir);
-        return;
-    }
     var cancelBtn = e.target.closest('button[data-action="cancel-subscription"]');
     if (cancelBtn) {
         e.preventDefault();
@@ -109,40 +100,6 @@ document.addEventListener('click', function(e) {
         }
     }
 });
-
-async function downloadAndInstallPurchase(moduleSlug, downloadUrl, button, moduleDir) {
-    if (button) {
-        button.disabled = true;
-        button.dataset.originalContent = button.innerHTML;
-        button.innerHTML = '<div class="loading loading-sm"></div>';
-    }
-    try {
-        var payload = { module_slug: moduleSlug, download_url: downloadUrl };
-        if (moduleDir) payload.module_id = moduleDir;
-        var response = await fetch('{% url "mymodules:api_install" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify(payload)
-        });
-        var data = await response.json();
-        if (data.success) {
-            Toast.success('{% trans "Module installed! Reloading..." %}');
-            setTimeout(function() { window.location.reload(); }, 5000);
-        } else {
-            Toast.error(data.error || '{% trans "Error installing module" %}');
-            if (button && button.dataset.originalContent) {
-                button.innerHTML = button.dataset.originalContent;
-                button.disabled = false;
-            }
-        }
-    } catch (error) {
-        Toast.error('{% trans "Error downloading module" %}');
-        if (button && button.dataset.originalContent) {
-            button.innerHTML = button.dataset.originalContent;
-            button.disabled = false;
-        }
-    }
-}
 
 async function cancelSubscription(moduleId, button) {
     if (button) {
@@ -184,8 +141,8 @@ async function cancelSubscription(moduleId, button) {
     <div class="text-5xl mb-4 opacity-30">
         {% icon "bag-outline" %}
     </div>
-    <h3 class="text-lg font-semibold mb-2">{% trans "No purchases yet" %}</h3>
-    <p class="text-sm opacity-60 mb-6">{% trans "Modules you purchase or subscribe to will appear here." %}</p>
+    <h3 class="text-lg font-semibold mb-2">{% trans "No subscriptions yet" %}</h3>
+    <p class="text-sm opacity-60 mb-6">{% trans "When you subscribe to premium modules, they will appear here." %}</p>
     <a href="{% url 'marketplace:index' %}"
        hx-get="{% url 'marketplace:index' %}"
        hx-target="#main-content-area"
