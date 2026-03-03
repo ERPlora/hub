@@ -10,7 +10,9 @@ Models:
 from django.utils.translation import gettext_lazy as _
 
 from django.db import models
-from django.contrib.auth.hashers import make_password, check_password
+import hashlib
+import hmac
+import secrets
 
 from apps.core.models import HubBaseModel, HubManager, HubManagerWithDeleted
 
@@ -354,13 +356,26 @@ class LocalUser(HubBaseModel):
         return f"{self.name} ({self.email})"
 
     def set_pin(self, pin):
-        """Hash and save PIN."""
-        self.pin_hash = make_password(pin)
+        """Hash and save PIN using HMAC-SHA256 (fast, sufficient for 4-digit PINs)."""
+        salt = secrets.token_hex(16)
+        digest = hmac.new(salt.encode(), pin.encode(), hashlib.sha256).hexdigest()
+        self.pin_hash = f"sha256${salt}${digest}"
         self.save(update_fields=['pin_hash', 'updated_at'])
 
     def check_pin(self, pin):
-        """Verify PIN."""
-        return check_password(pin, self.pin_hash)
+        """Verify PIN against stored hash. Supports both new (sha256$) and legacy (pbkdf2) formats."""
+        if not self.pin_hash:
+            return False
+        if self.pin_hash.startswith('sha256$'):
+            _, salt, stored_digest = self.pin_hash.split('$', 2)
+            digest = hmac.new(salt.encode(), pin.encode(), hashlib.sha256).hexdigest()
+            return hmac.compare_digest(digest, stored_digest)
+        # Legacy PBKDF2 hash — verify and upgrade
+        from django.contrib.auth.hashers import check_password
+        if check_password(pin, self.pin_hash):
+            self.set_pin(pin)  # Upgrade to fast hash
+            return True
+        return False
 
     def get_initials(self):
         """Return user initials for avatar."""
