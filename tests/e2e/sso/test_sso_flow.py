@@ -491,7 +491,7 @@ class TestHubProtectedRoutesFlow(TestCase):
         )
 
         # Access dashboard - may redirect to settings if not configured
-        response = self.client.get('/home/')
+        response = self.client.get('/')
         # 200 or redirect to settings/setup is valid
         assert response.status_code in [200, 302]
 

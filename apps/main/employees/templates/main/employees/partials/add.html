@@ -58,6 +58,7 @@
                         <!-- Role Select -->
                         <div class="form-group mb-4">
                             <label class="form-group-label" for="employee-role">{% trans "Role" %}</label>
+                            {% if role_options %}
                             <select id="employee-role"
                                     name="role_id"
                                     class="select">
@@ -66,6 +67,12 @@
                                 <option value="{{ option.value }}">{{ option.label }}</option>
                                 {% endfor %}
                             </select>
+                            {% else %}
+                            <select id="employee-role" name="role_id" class="select" disabled>
+                                <option value="">{% trans "No roles available" %}</option>
+                            </select>
+                            <span class="form-group-helper">{% trans "Create roles in the Roles section first." %}</span>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

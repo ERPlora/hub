@@ -12,8 +12,8 @@
                     {% trans "Describe the problem you encountered. A screenshot of the current page will be captured automatically." %}
                 </p>
                 <div class="form-group">
-                    <label class="form-group-label">{% trans "Description" %}</label>
-                    <textarea x-model="description" class="textarea" rows="3"
+                    <label class="form-group-label" for="bug-report-description">{% trans "Description" %}</label>
+                    <textarea x-model="description" id="bug-report-description" class="textarea" rows="3"
                               placeholder="{% trans 'What went wrong?' %}"></textarea>
                 </div>
             </div>
@@ -21,7 +21,7 @@
                 <button @click="open = false" class="btn btn-ghost" :disabled="sending">
                     {% trans "Cancel" %}
                 </button>
-                <button @click="send()" class="btn color-primary" :disabled="sending">
+                <button @click="send()" class="btn color-primary" :disabled="sending || !description.trim()">
                     <template x-if="sending">
                         <span class="loading loading-sm mr-2"></span>
                     </template>
@@ -43,6 +43,7 @@ function bugReport() {
         description: '',
 
         async send() {
+            if (!this.description.trim()) return;
             this.sending = true;
             try {
                 // Lazy-load html2canvas-pro (supports oklch colors)
