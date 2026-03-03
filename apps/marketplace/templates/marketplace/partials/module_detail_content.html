@@ -102,24 +102,13 @@
                                 {% icon "checkmark-circle-outline" %}
                                 <span>{% trans "Installed" %}</span>
                             </button>
-                            {% elif module.module_type == 'free' or is_free %}
-                            <button type="button"
-                                    class="btn btn-lg color-primary"
-                                    data-action="install-free"
-                                    data-module-id="{{ module.id }}"
-                                    data-module-slug="{{ module.slug }}"
-                                    data-module-dir="{{ module.module_id }}"
-                                    data-download-url="{{ module.download_url|default:'' }}">
-                                {% icon "download-outline" %}
-                                <span>{% trans "Get Free Module" %}</span>
-                            </button>
                             {% else %}
                             <button type="button"
                                     class="btn btn-lg color-primary"
                                     data-action="install-module"
                                     data-module-slug="{{ module.slug }}"
                                     data-module-dir="{{ module.module_id }}"
-                                    data-download-url="{{ module.download_url }}">
+                                    data-download-url="{{ module.download_url|default:'' }}">
                                 {% icon "download-outline" %}
                                 <span>{% trans "Install" %}</span>
                             </button>
@@ -285,41 +274,10 @@ document.addEventListener('click', function(e) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (action === 'download' || action === 'install-module') {
+    if (action === 'install-module') {
         downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
-    } else if (action === 'install-free') {
-        installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
     }
 });
-
-// Install free module
-async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, moduleDir) {
-    setButtonLoading(button, true);
-    try {
-        const purchaseResponse = await fetch('{% url "mymodules:api_purchase" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ module_id: moduleId })
-        });
-        const purchaseData = await purchaseResponse.json();
-
-        if (!purchaseData.success && !purchaseData.is_free && !purchaseData.already_owned) {
-            Toast.error(purchaseData.error || '{% trans "Error acquiring module" %}');
-            return;
-        }
-
-        if (downloadUrl) {
-            await downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir);
-        } else {
-            Toast.warning('{% trans "Module acquired. Download not available yet." %}');
-            setTimeout(() => window.location.reload(), 1500);
-        }
-    } catch (error) {
-        Toast.error('{% trans "Error acquiring module" %}');
-    } finally {
-        setButtonLoading(button, false);
-    }
-}
 
 // Download and install module
 async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir) {

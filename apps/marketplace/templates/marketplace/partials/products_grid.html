@@ -124,41 +124,25 @@
                         <button class="btn btn-sm btn-ghost" disabled title="{% trans 'Installed' %}">
                             {% icon "checkmark-circle-outline" %}
                         </button>
-                        {% elif product.is_free or product.module_type == 'free' or product.price == 0 %}
-                        <button class="btn btn-sm btn-ghost color-primary"
-                                data-action="install-free"
-                                data-module-id="{{ product.id }}"
-                                data-module-slug="{{ product.slug }}"
-                                data-module-dir="{{ product.module_id }}"
-                                data-download-url="{{ product.download_url|default:'' }}"
-                                title="{% trans 'Get Free' %}">
-                            {% icon "download-outline" %}
-                        </button>
                         {% else %}
                         <button class="btn btn-sm btn-ghost color-primary"
-                                data-action="install-module"
-                                data-module-slug="{{ product.slug }}"
-                                data-module-dir="{{ product.module_id }}"
-                                data-download-url="{{ product.download_url }}"
-                                title="{% trans 'Install' %}">
-                            {% icon "download-outline" %}
+                                @click.stop="toggle('{{ product.slug }}')"
+                                title="{% trans 'Select' %}">
+                            {% icon "add-outline" %}
                         </button>
                         {% endif %}
                     </div>
                 </td>
                 <td class="datatable-td datatable-td-center" style="width: 70px;">
-                    {# Checkbox only for free + not-installed modules #}
                     {% if not product.is_installed %}
-                        {% if product.is_free or product.module_type == 'free' or product.price == 0 %}
-                        <label class="checkbox" @click.stop>
-                            <input type="checkbox" class="checkbox-input"
-                                   @change="toggle('{{ product.slug }}')"
-                                   :checked="selected.has('{{ product.slug }}')">
-                            <span class="checkbox-box">
-                                <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            </span>
-                        </label>
-                        {% endif %}
+                    <label class="checkbox" @click.stop>
+                        <input type="checkbox" class="checkbox-input"
+                               @change="toggle('{{ product.slug }}')"
+                               :checked="selected.has('{{ product.slug }}')">
+                        <span class="checkbox-box">
+                            <svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </span>
+                    </label>
                     {% endif %}
                 </td>
             </tr>
@@ -249,48 +233,6 @@
 <script>
 if (!window._marketplaceGridInit) {
 window._marketplaceGridInit = true;
-document.addEventListener('click', function(e) {
-    var button = e.target.closest('button[data-action]');
-    if (!button) return;
-
-    var action = button.dataset.action;
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (action === 'download' || action === 'install-module') {
-        downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
-    } else if (action === 'install-free') {
-        installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
-    }
-});
-
-async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, moduleDir) {
-    setButtonLoading(button, true);
-    try {
-        const purchaseResponse = await fetch('{% url "mymodules:api_purchase" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ module_id: moduleId })
-        });
-        const purchaseData = await purchaseResponse.json();
-
-        if (!purchaseData.success && !purchaseData.is_free && !purchaseData.already_owned) {
-            Toast.error(purchaseData.error || '{% trans "Error acquiring module" %}');
-            return;
-        }
-
-        if (downloadUrl) {
-            await downloadAndInstall(moduleSlug, downloadUrl, null, moduleDir);
-        } else {
-            Toast.warning('{% trans "Module acquired. Download not available yet." %}');
-            setTimeout(() => window.location.reload(), 1500);
-        }
-    } catch (error) {
-        Toast.error('{% trans "Error acquiring module" %}');
-    } finally {
-        setButtonLoading(button, false);
-    }
-}
 
 async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir) {
     if (button) setButtonLoading(button, true);
