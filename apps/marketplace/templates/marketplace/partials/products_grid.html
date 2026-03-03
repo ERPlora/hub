@@ -97,17 +97,22 @@
                     {% endif %}
                 </td>
                 <td class="datatable-td datatable-td-center" data-col="rating" data-label="{% trans 'Rating' %}">
-                    {% if product.rating %}
-                    <div class="flex items-center justify-center gap-1">
+                    <div class="flex items-center justify-center gap-1 cursor-pointer"
+                         data-module-id="{{ product.id }}"
+                         data-module-name="{{ product.name }}"
+                         onclick="event.stopPropagation(); if (typeof openReviewModal === 'function') openReviewModal(this);"
+                         title="{% trans 'Rate this module' %}">
+                        {% if product.rating %}
                         {% icon "star" css_class="text-warning" %}
                         <span class="text-sm">{{ product.rating|floatformat:1 }}</span>
                         {% if product.review_count %}
                         <span class="text-xs text-base-content/40">({{ product.review_count }})</span>
                         {% endif %}
+                        {% else %}
+                        {% icon "star-outline" css_class="text-base-content/30" %}
+                        <span class="text-xs text-base-content/40">{% trans "Rate" %}</span>
+                        {% endif %}
                     </div>
-                    {% else %}
-                    <span class="text-base-content/40">-</span>
-                    {% endif %}
                 </td>
                 <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}">
                     {% if product.is_installed %}
