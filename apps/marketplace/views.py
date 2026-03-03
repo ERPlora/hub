@@ -485,10 +485,14 @@ def my_purchases(request):
             'marketplace:module_detail',
             kwargs={'slug': p.get('module_slug', '')},
         )
-        # Compute annual cost for subscriptions
-        price = p.get('price') or p.get('subscription_price_monthly') or 0
+        # Use subscription_price_monthly (real module price) over amount paid
+        monthly = p.get('subscription_price_monthly') or p.get('price') or 0
         try:
-            p['annual_cost'] = f"{float(price) * 12:.2f}"
+            monthly = float(monthly)
+            p['annual_cost'] = f"{monthly * 12:.2f}" if monthly else ''
+            # Ensure price reflects the real subscription price, not trial $0
+            if p.get('subscription_price_monthly') and not p.get('price'):
+                p['price'] = monthly
         except (TypeError, ValueError):
             p['annual_cost'] = ''
 
