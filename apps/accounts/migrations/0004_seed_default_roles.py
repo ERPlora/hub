@@ -12,6 +12,7 @@ from django.db import migrations
 
 
 # Role definitions — must match PermissionService.DEFAULT_ROLES
+# Employee role is NOT seeded here — it is created by modules via ROLE_PERMISSIONS.
 DEFAULT_ROLES = [
     {
         'name': 'admin',
@@ -25,27 +26,7 @@ DEFAULT_ROLES = [
         'display_name': 'Manager',
         'description': 'Management access. CRUD on main modules, reports, and team oversight.',
         'is_system': True,
-        'wildcards': [
-            'inventory.*',
-            'sales.*',
-            'customers.*',
-            'cash_register.*',
-            'invoicing.*',
-            'reports.*',
-        ],
-    },
-    {
-        'name': 'employee',
-        'display_name': 'Employee',
-        'description': 'Basic access. Day-to-day operations like sales and viewing products.',
-        'is_system': True,
-        'wildcards': [
-            'inventory.view_*',
-            'sales.view_*',
-            'sales.add_sale',
-            'sales.process_payment',
-            'customers.view_*',
-        ],
+        'wildcards': [],  # Permissions come from each module's ROLE_PERMISSIONS
     },
     {
         'name': 'viewer',
