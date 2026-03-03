@@ -301,14 +301,23 @@ async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, modu
 async function buyModule(button) {
     setButtonLoading(button, true);
     try {
+        const payload = {
+            module_id: button.dataset.moduleId,
+            module_slug: button.dataset.moduleSlug,
+            module_name: button.dataset.moduleName,
+        };
+        // Include selected tier from table row or card (for assistant/subscription modules)
+        const row = button.closest('tr');
+        const card = button.closest('.module-card');
+        if (row && row.dataset.tierSlug) {
+            payload.tier_slug = row.dataset.tierSlug;
+        } else if (card && card.dataset.tierSlug) {
+            payload.tier_slug = card.dataset.tierSlug;
+        }
         const response = await fetch('{% url "marketplace:module_purchase" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({
-                module_id: button.dataset.moduleId,
-                module_slug: button.dataset.moduleSlug,
-                module_name: button.dataset.moduleName,
-            })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
 
