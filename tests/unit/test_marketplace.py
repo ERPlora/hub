@@ -1,15 +1,12 @@
 """
 Unit tests for the marketplace views.
 
-Tests the multi-store marketplace with modules, hubs, cart, and filters.
+Tests the multi-store marketplace with modules, hubs, and filters.
 URL patterns (app_name='marketplace'):
 - marketplace:index -> /marketplace/
 - marketplace:module_detail -> /marketplace/<slug>/
 - marketplace:products_list -> /marketplace/products/ (HTMX)
-- marketplace:cart_page -> /marketplace/cart/
-- marketplace:cart_add -> /marketplace/cart/add/
-- marketplace:cart_remove -> /marketplace/cart/remove/<item_id>/
-- marketplace:cart_clear -> /marketplace/cart/clear/
+- marketplace:module_purchase -> /marketplace/purchase/ (POST)
 - marketplace:store_hubs -> /marketplace/hubs/
 """
 import json
@@ -175,78 +172,87 @@ class TestProductsList:
         assert response.status_code == 200
 
 
-class TestCartPage:
-    """Tests for the cart page."""
+class TestModulePurchase:
+    """Tests for the module purchase endpoint."""
 
-    def test_cart_page_loads(self, authenticated_client, hub_config):
-        """Cart page should load for authenticated users."""
-        url = reverse('marketplace:cart_page')
+    @patch('apps.marketplace.views.requests.post')
+    def test_purchase_requires_post(self, mock_post, authenticated_client, hub_config):
+        """Purchase endpoint should reject GET requests."""
+        url = reverse('marketplace:module_purchase')
         response = authenticated_client.get(url)
 
-        assert response.status_code == 200
+        assert response.status_code == 405
 
+    @patch('apps.marketplace.views.requests.post')
+    def test_purchase_requires_module_id(self, mock_post, authenticated_client, hub_config):
+        """Purchase endpoint should require module_id."""
+        hub_config.hub_jwt = 'test.jwt.token'
+        hub_config.save()
 
-class TestCartOperations:
-    """Tests for cart add, remove, and clear operations."""
+        url = reverse('marketplace:module_purchase')
+        response = authenticated_client.post(
+            url,
+            data=json.dumps({'module_slug': 'sales'}),
+            content_type='application/json',
+        )
 
-    def test_cart_add(self, authenticated_client, hub_config):
-        """Adding an item to the cart should succeed."""
-        url = reverse('marketplace:cart_add')
+        assert response.status_code == 400
+
+    @patch('apps.marketplace.views.requests.post')
+    def test_purchase_calls_cloud_api(self, mock_post, authenticated_client, hub_config):
+        """Purchase endpoint should call Cloud API and return checkout data."""
+        hub_config.hub_jwt = 'test.jwt.token'
+        hub_config.save()
+
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=MagicMock(return_value={
+                'client_secret': 'cs_test_secret',
+                'session_id': 'cs_test_123',
+                'stripe_publishable_key': 'pk_test_123',
+            })
+        )
+
+        url = reverse('marketplace:module_purchase')
         response = authenticated_client.post(
             url,
             data=json.dumps({
-                'item_id': 'mod-1',
-                'item_name': 'Inventory Module',
-                'item_price': 49.99,
-                'item_icon': 'cube-outline',
-                'quantity': 1,
+                'module_id': 'mod-2',
+                'module_slug': 'sales',
+                'module_name': 'Sales',
             }),
             content_type='application/json',
         )
 
         assert response.status_code == 200
+        data = response.json()
+        assert data['success'] is True
+        assert data['client_secret'] == 'cs_test_secret'
 
-    def test_cart_remove(self, authenticated_client, hub_config):
-        """Removing an item from the cart should succeed."""
-        # First add an item
-        add_url = reverse('marketplace:cart_add')
-        authenticated_client.post(
-            add_url,
+    @patch('apps.marketplace.views.requests.post')
+    def test_purchase_handles_already_owned(self, mock_post, authenticated_client, hub_config):
+        """Purchase endpoint should handle 409 (already owned)."""
+        hub_config.hub_jwt = 'test.jwt.token'
+        hub_config.save()
+
+        mock_post.return_value = MagicMock(
+            status_code=409,
+            json=MagicMock(return_value={
+                'error': 'You already own Sales',
+            })
+        )
+
+        url = reverse('marketplace:module_purchase')
+        response = authenticated_client.post(
+            url,
             data=json.dumps({
-                'item_id': 'mod-1',
-                'item_name': 'Inventory Module',
-                'item_price': 49.99,
-                'quantity': 1,
+                'module_id': 'mod-2',
+                'module_slug': 'sales',
             }),
             content_type='application/json',
         )
 
-        # Then remove it
-        remove_url = reverse('marketplace:cart_remove', kwargs={'item_id': 'mod-1'})
-        response = authenticated_client.delete(remove_url)
-
-        assert response.status_code == 200
-
-    def test_cart_clear(self, authenticated_client, hub_config):
-        """Clearing the cart should succeed."""
-        # First add an item
-        add_url = reverse('marketplace:cart_add')
-        authenticated_client.post(
-            add_url,
-            data=json.dumps({
-                'item_id': 'mod-1',
-                'item_name': 'Inventory Module',
-                'item_price': 49.99,
-                'quantity': 1,
-            }),
-            content_type='application/json',
-        )
-
-        # Clear the cart (store_type is passed via URL kwargs, not reverse args)
-        clear_url = reverse('marketplace:cart_clear')
-        response = authenticated_client.delete(clear_url)
-
-        assert response.status_code == 200
+        assert response.status_code == 409
 
 
 class TestMarketplaceAuth:
@@ -260,20 +266,12 @@ class TestMarketplaceAuth:
         assert response.status_code == 302
         assert '/login/' in response.url
 
-    def test_cart_page_requires_auth(self, client, db, store_config):
-        """Cart page should require authentication."""
-        url = reverse('marketplace:cart_page')
-        response = client.get(url)
-
-        assert response.status_code == 302
-        assert '/login/' in response.url
-
-    def test_cart_add_requires_auth(self, client, db, store_config):
-        """Cart add should require authentication."""
-        url = reverse('marketplace:cart_add')
+    def test_purchase_requires_auth(self, client, db, store_config):
+        """Module purchase should require authentication."""
+        url = reverse('marketplace:module_purchase')
         response = client.post(
             url,
-            data=json.dumps({'item_id': 'mod-1', 'item_name': 'Test', 'item_price': 10}),
+            data=json.dumps({'module_id': 'mod-1', 'module_slug': 'test'}),
             content_type='application/json',
         )
 
