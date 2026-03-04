@@ -640,17 +640,21 @@ def products_list(request, store_type):
 
 
 def _fetch_all_modules():
-    """Fetch all modules from Cloud API (cached). Returns list or None on auth error."""
+    """Fetch all modules from Cloud API (cached).
+
+    Returns:
+        tuple: (modules_list or None, error_message or None)
+    """
     cached = cache.get(_CK_MODULES_LIST)
     if cached is not None:
-        return cached
+        return cached, None
 
     from apps.configuration.models import HubConfig
     hub_config = HubConfig.get_solo()
     auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
     if not auth_token:
-        return None
+        return None, str(_('Hub not connected to Cloud. Please connect in Settings.'))
 
     cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
     headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
@@ -662,16 +666,24 @@ def _fetch_all_modules():
             timeout=30,
         )
         if response.status_code != 200:
-            return None
+            logger.warning(f"[MARKETPLACE] Cloud API returned {response.status_code}")
+            return None, str(_('Could not load modules from Cloud (error %(code)s). Please try again.') % {'code': response.status_code})
 
         data = response.json()
         modules = data.get('results', data) if isinstance(data, dict) else data
         if not isinstance(modules, list):
             modules = []
         cache.set(_CK_MODULES_LIST, modules, _CACHE_TTL)
-        return modules
-    except requests.exceptions.RequestException:
-        return None
+        return modules, None
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"[MARKETPLACE] Connection error fetching modules: {e}")
+        return None, str(_('Connection error. Please check your internet connection and try again.'))
+    except requests.exceptions.Timeout as e:
+        logger.error(f"[MARKETPLACE] Timeout fetching modules: {e}")
+        return None, str(_('Cloud is taking too long to respond. Please try again.'))
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[MARKETPLACE] Error fetching modules: {e}")
+        return None, str(_('Could not connect to Cloud. Please try again.'))
 
 
 def _fetch_modules_list(request, search_query, solution_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
@@ -680,10 +692,10 @@ def _fetch_modules_list(request, search_query, solution_filter, industry_filter,
 
     installed_module_ids = _get_installed_module_ids()
 
-    modules = _fetch_all_modules()
+    modules, error = _fetch_all_modules()
     if modules is None:
         html = render_to_string('marketplace/partials/error.html', {
-            'error': 'Hub not connected to Cloud. Please connect in Settings.'
+            'error': error or 'Unknown error'
         }, request=request)
         return HttpResponse(html)
 
@@ -881,7 +893,7 @@ def module_detail(request, slug):
 
         # Related modules (same category) — use cached modules list
         related_modules = []
-        all_modules = _fetch_all_modules()
+        all_modules, _ = _fetch_all_modules()
         if all_modules:
             category = module.get('category', '')
             related_modules = [
@@ -1179,7 +1191,8 @@ def modules_bulk_install(request):
     cloud_api_url = _get_cloud_api_url()
 
     cache.delete(_CK_MODULES_LIST)
-    all_cloud_modules = _fetch_all_modules() or []
+    all_cloud_modules, _ = _fetch_all_modules()
+    all_cloud_modules = all_cloud_modules or []
     catalog = {m.get('slug') or m.get('module_id'): m for m in all_cloud_modules}
 
     modules_to_install = []
