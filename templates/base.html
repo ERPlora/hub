@@ -595,7 +595,7 @@
 
     {% block scripts %}{% endblock %}
 
-    <!-- AI Assistant chat logic (loaded once in base, survives HTMX swaps) -->
+    <!-- AI Assistant: chatBeforeRequest / chatAfterRequest called via hx-on in chat_panel.html -->
     <script nonce="{{ csp_nonce }}">
     (function() {
         if (window._chatListenersAttached) return;
