@@ -92,7 +92,7 @@ def _fetch_subscription_status(hub_id, module_id, auth_token):
             f'{cloud_api_url}/api/hubs/me/module-subscription/',
             params={'module': module_id},
             headers={
-                'X-Hub-Token': auth_token,
+                'Authorization': f'Bearer {auth_token}',
                 'Accept': 'application/json',
             },
             timeout=10,
