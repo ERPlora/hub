@@ -107,31 +107,26 @@
         </div>
 
         <!-- Tabs -->
-        <div x-data="{ activeTab: 'overview' }">
-            <div class="tabs tabs-border mb-lg">
-                <button type="button"
-                        class="tab"
-                        :class="{ 'tab-active': activeTab === 'overview' }"
-                        @click="activeTab = 'overview'">
-                    {% trans "Overview" %}
-                </button>
-                <button type="button"
-                        class="tab"
-                        :class="{ 'tab-active': activeTab === 'reviews' }"
-                        @click="activeTab = 'reviews'">
-                    {% trans "Reviews" %} ({{ module.review_count|default:0 }})
-                </button>
-                <button type="button"
-                        class="tab"
-                        :class="{ 'tab-active': activeTab === 'changelog' }"
-                        @click="activeTab = 'changelog'">
-                    {% trans "Changelog" %}
-                </button>
-            </div>
+        <div class="tabs tabs-border" x-data="{ activeTab: 'overview' }">
+            <button type="button" class="tab"
+                    :class="{ 'tab-active': activeTab === 'overview' }"
+                    @click="activeTab = 'overview'">
+                {% trans "Overview" %}
+            </button>
+            <button type="button" class="tab"
+                    :class="{ 'tab-active': activeTab === 'reviews' }"
+                    @click="activeTab = 'reviews'">
+                {% trans "Reviews" %} ({{ module.review_count|default:0 }})
+            </button>
+            <button type="button" class="tab"
+                    :class="{ 'tab-active': activeTab === 'changelog' }"
+                    @click="activeTab = 'changelog'">
+                {% trans "Changelog" %}
+            </button>
 
-            <!-- Overview Tab -->
-            <div x-show="activeTab === 'overview'" x-cloak>
-                <div class="card mb-lg">
+            <!-- Overview -->
+            <div class="tab-content pt-6" :class="activeTab === 'overview' ? 'tab-content-active' : 'tab-content'">
+                <div class="card mb-4">
                     <div class="card-header">
                         <h3 class="card-title">{% trans "About this module" %}</h3>
                     </div>
@@ -173,8 +168,8 @@
                 </div>
             </div>
 
-            <!-- Reviews Tab -->
-            <div x-show="activeTab === 'reviews'" x-cloak>
+            <!-- Reviews -->
+            <div class="tab-content pt-6" :class="activeTab === 'reviews' ? 'tab-content-active' : 'tab-content'">
                 {% if module.recent_reviews %}
                 {% for review in module.recent_reviews %}
                 <div class="card mb-4">
@@ -212,8 +207,8 @@
                 {% endif %}
             </div>
 
-            <!-- Changelog Tab -->
-            <div x-show="activeTab === 'changelog'" x-cloak>
+            <!-- Changelog -->
+            <div class="tab-content pt-6" :class="activeTab === 'changelog' ? 'tab-content-active' : 'tab-content'">
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">{% trans "Changelog" %}</h3>
