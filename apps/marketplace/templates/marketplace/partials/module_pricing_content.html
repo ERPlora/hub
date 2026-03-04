@@ -41,7 +41,7 @@
             {# Pricing #}
             {% if tiers %}
             {# Multiple tiers #}
-            <div class="flex flex-col gap-sm mb-lg"
+            <div class="flex flex-col gap-3 mb-lg"
                  x-data="{ selectedTier: '{{ default_tier_slug }}' }"
                  @tier-selected.window="selectedTier = $event.detail.slug">
                 {% for tier in tiers %}
