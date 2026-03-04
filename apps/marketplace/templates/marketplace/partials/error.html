@@ -1,7 +1,7 @@
 {% load i18n djicons %}
 
-<div class="p-4 error-state" style="text-align: center;">
-    {% icon "cloud-offline-outline" style="font-size: 64px; color: var(--color-error);" %}
+<div class="py-16 px-4 text-center">
+    {% icon "cloud-offline-outline" css_class="text-6xl text-error" %}
     <h3>{% trans "Connection Error" %}</h3>
     <p class="text-medium">{{ error }}</p>
     <button class="btn" onclick="location.reload()">
@@ -9,9 +9,3 @@
         {% trans "Retry" %}
     </button>
 </div>
-
-<style>
-.error-state {
-    padding: 60px 20px;
-}
-</style>

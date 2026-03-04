@@ -3,12 +3,12 @@
 <div hidden data-back-url="/marketplace/"></div>
 
 <div class="flex flex-col items-center justify-center min-h-[60vh] p-md">
-    <div class="card glass" style="max-width: 440px; width: 100%;">
-        <div class="card-body" style="padding: 2rem;">
+    <div class="card glass max-w-md w-full">
+        <div class="card-body p-8">
 
             {# Module icon + name + badge #}
             <div class="flex flex-col items-center text-center mb-lg">
-                <div class="flex items-center justify-center size-14 rounded-2xl mb-md" style="background: var(--color-primary); color: white;">
+                <div class="flex items-center justify-center size-14 rounded-2xl mb-md bg-primary text-white">
                     {% icon module_icon|default:"cube-outline" css_class="text-2xl" %}
                 </div>
 
@@ -21,7 +21,7 @@
             </div>
 
             {% if module_description %}
-            <p class="text-sm text-center opacity-60 mb-lg m-0" style="line-height: 1.5;">{{ module_description }}</p>
+            <p class="text-sm text-center opacity-60 mb-lg m-0 leading-relaxed">{{ module_description }}</p>
             {% endif %}
 
             {# Subscription status message #}
@@ -41,22 +41,21 @@
             {# Pricing #}
             {% if tiers %}
             {# Multiple tiers #}
-            <div class="flex flex-col gap-sm mb-lg"
+            <div class="flex flex-col gap-3 mb-lg"
                  x-data="{ selectedTier: '{{ default_tier_slug }}' }"
                  @tier-selected.window="selectedTier = $event.detail.slug">
                 {% for tier in tiers %}
-                <label class="card cursor-pointer transition-all"
+                <label class="card cursor-pointer transition-all m-0"
                        :class="selectedTier === '{{ tier.slug }}' ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-base-300'"
-                       @click="$dispatch('tier-selected', { slug: '{{ tier.slug }}', price: '{{ tier.price_monthly }}' })"
-                       style="margin: 0;">
-                    <div class="card-body flex items-center justify-between" style="padding: 0.75rem 1rem;">
+                       @click="$dispatch('tier-selected', { slug: '{{ tier.slug }}', price: '{{ tier.price_monthly }}' })">
+                    <div class="card-body flex items-center justify-between py-3 px-4">
                         <div>
                             <span class="fw-semibold text-sm">{{ tier.name }}</span>
                             {% if tier.description %}
                             <p class="text-xs opacity-50 m-0">{{ tier.description }}</p>
                             {% endif %}
                         </div>
-                        <span class="fw-bold" style="color: var(--color-primary);">&euro;{{ tier.price_monthly }}<span class="text-xs opacity-50">/{% trans "mo" %}</span></span>
+                        <span class="fw-bold text-primary">&euro;{{ tier.price_monthly }}<span class="text-xs opacity-50">/{% trans "mo" %}</span></span>
                     </div>
                 </label>
                 {% endfor %}
@@ -64,7 +63,7 @@
             {% else %}
             {# Single price — prominent #}
             <div class="text-center mb-lg">
-                <div class="fw-bold mb-xs" style="font-size: 2.5rem; color: var(--color-primary); line-height: 1;">
+                <div class="fw-bold mb-xs text-4xl text-primary leading-none">
                     &euro;{{ price_monthly }}<span class="fs-lg opacity-50">/{% trans "mo" %}</span>
                 </div>
                 {% if price_yearly %}
