@@ -9,6 +9,8 @@ Tabs:
 import json
 import logging
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from pathlib import Path
 
 from django.core.cache import cache
@@ -22,6 +24,21 @@ from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 
 logger = logging.getLogger(__name__)
+
+
+def _get_session():
+    """Get a requests session with automatic retry on connection errors.
+
+    Retries on connection resets/timeouts (common after long idle periods
+    when the underlying TCP connection goes stale in the pool).
+    """
+    session = requests.Session()
+    retry = Retry(total=2, backoff_factor=0.3, status_forcelist=[502, 503, 504])
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
+
 
 # Cache TTL (seconds)
 _CACHE_TTL = getattr(django_settings, 'MARKETPLACE_CACHE_TTL', 300)
@@ -211,7 +228,7 @@ def _fetch_industries_for_filters():
         return []
 
     try:
-        response = requests.get(
+        response = _get_session().get(
             f"{cloud_api_url}/api/marketplace/industries/",
             headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
             timeout=10,
@@ -242,7 +259,7 @@ def _fetch_industry_modules(slug):
         return {}
 
     try:
-        response = requests.get(
+        response = _get_session().get(
             f"{cloud_api_url}/api/marketplace/industries/{slug}/",
             headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
             timeout=10,
@@ -273,7 +290,7 @@ def _fetch_solutions_for_filters():
         cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
         solutions = []
         try:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/solutions/",
                 headers={'Accept': 'application/json'},
                 timeout=10,
@@ -400,7 +417,7 @@ def cancel_subscription(request):
     cloud_api_url = _get_cloud_api_url()
 
     try:
-        response = requests.post(
+        response = _get_session().post(
             f"{cloud_api_url}/api/marketplace/modules/{module_id}/cancel-subscription/",
             json={},
             headers={
@@ -450,7 +467,7 @@ def my_purchases(request):
     cloud_api_url = _get_cloud_api_url()
 
     try:
-        response = requests.get(
+        response = _get_session().get(
             f"{cloud_api_url}/api/marketplace/modules/my_purchases/",
             headers={
                 'X-Hub-Token': auth_token,
@@ -547,7 +564,7 @@ def _create_roles_for_installed_modules(module_slugs):
     solution_slugs_to_fetch = set()
     for slug in module_slugs:
         try:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/modules/{slug}/",
                 headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
                 timeout=10,
@@ -566,7 +583,7 @@ def _create_roles_for_installed_modules(module_slugs):
     from apps.core.services.permission_service import PermissionService
     for sol_slug in solution_slugs_to_fetch:
         try:
-            resp = requests.get(
+            resp = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/solutions/{sol_slug}/",
                 headers={'Accept': 'application/json'},
                 timeout=15,
@@ -639,7 +656,7 @@ def _fetch_all_modules():
     headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
 
     try:
-        response = requests.get(
+        response = _get_session().get(
             f"{cloud_api_url}/api/marketplace/modules/",
             headers=headers,
             timeout=30,
@@ -820,7 +837,7 @@ def module_detail(request, slug):
         cache_key = f"{_CK_MODULE_DETAIL}{slug}"
         module = cache.get(cache_key)
         if module is None:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/modules/{slug}/",
                 headers=headers,
                 timeout=30
@@ -848,7 +865,7 @@ def module_detail(request, slug):
         is_owned = module.get('is_owned', False)
         if not is_owned:
             try:
-                ownership_response = requests.get(
+                ownership_response = _get_session().get(
                     f"{cloud_api_url}/api/marketplace/modules/{module.get('id', '')}/check_ownership/",
                     headers=headers,
                     timeout=10
@@ -922,7 +939,7 @@ def _fetch_solution_modules(slug, cloud_api_url):
         return slug, cached
 
     try:
-        r = requests.get(
+        r = _get_session().get(
             f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
             headers={'Accept': 'application/json'}, timeout=15,
         )
@@ -961,7 +978,7 @@ def solutions_list(request):
     solutions = cache.get(_CK_SOLUTIONS_LIST)
     if solutions is None:
         try:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/solutions/",
                 headers={'Accept': 'application/json'}, timeout=15,
             )
@@ -1111,7 +1128,7 @@ def solutions_bulk_install(request):
         cloud_api_url = _get_cloud_api_url()
         for slug in block_slugs:
             try:
-                resp = requests.get(
+                resp = _get_session().get(
                     f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
                     headers={'Accept': 'application/json'}, timeout=15,
                 )
@@ -1243,7 +1260,7 @@ def solution_detail(request, slug):
         sol_cache_key = f"{_CK_SOLUTION_DETAIL}{slug}:full"
         solution = cache.get(sol_cache_key)
         if solution is None:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
                 headers={'Accept': 'application/json'},
                 timeout=15,
@@ -1313,7 +1330,7 @@ def solution_install(request, slug):
 
     try:
         # Fetch solution detail to get modules
-        response = requests.get(
+        response = _get_session().get(
             f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
             headers={'Accept': 'application/json'},
             timeout=15,
@@ -1443,7 +1460,7 @@ def block_toggle(request, slug):
         if hub_config.hub_id:
             cloud_api_url = _get_cloud_api_url()
             try:
-                response = requests.get(
+                response = _get_session().get(
                     f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
                     headers={'Accept': 'application/json'},
                     timeout=15,
@@ -1509,7 +1526,7 @@ def business_type_detail(request, slug):
         ind_cache_key = f"{_CK_INDUSTRY_DETAIL}{slug}:full"
         industry = cache.get(ind_cache_key)
         if industry is None:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/industries/{slug}/",
                 headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
                 timeout=15,
@@ -1898,7 +1915,7 @@ def module_pricing(request, module_id):
             hub_config = HubConfig.get_solo()
             auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
             if auth_token:
-                resp = requests.get(
+                resp = _get_session().get(
                     f'{cloud_api_url}/api/marketplace/modules/{module_id}/',
                     headers={'X-Hub-Token': auth_token, 'Accept': 'application/json'},
                     timeout=10,
@@ -1998,7 +2015,7 @@ def module_subscribe(request):
         if tier_slug:
             purchase_payload['tier_slug'] = tier_slug
 
-        response = requests.post(
+        response = _get_session().post(
             f'{cloud_api_url}/api/marketplace/modules/{module_id}/purchase/',
             json=purchase_payload,
             headers={
