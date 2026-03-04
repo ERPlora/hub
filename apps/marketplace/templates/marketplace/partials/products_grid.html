@@ -16,7 +16,7 @@
                     {% trans "Module" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>
-                <th class="datatable-th" data-col="author">{% trans "Author" %}</th>
+                <th class="datatable-th hidden 2xl:table-cell" data-col="author">{% trans "Author" %}</th>
                 <th class="datatable-th datatable-th-sortable{% if sort_field == 'price' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
                     data-col="price"
                     hx-get="{% url 'marketplace:products_list' %}?sort=price&dir={% if sort_field == 'price' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
@@ -26,7 +26,7 @@
                     {% trans "Price" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>
-                <th class="datatable-th datatable-th-sortable datatable-th-center{% if sort_field == 'rating' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                <th class="datatable-th datatable-th-sortable datatable-th-center hidden 2xl:table-cell{% if sort_field == 'rating' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
                     data-col="rating"
                     hx-get="{% url 'marketplace:products_list' %}?sort=rating&dir={% if sort_field == 'rating' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
                     hx-target="#datatable-body"
@@ -35,7 +35,7 @@
                     {% trans "Rating" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>
-                <th class="datatable-th datatable-th-center" data-col="status" style="white-space: nowrap; min-width: 90px;">{% trans "Status" %}</th>
+                <th class="datatable-th datatable-th-center" data-col="status" style="white-space: nowrap; min-width: 80px;">{% trans "Status" %}</th>
                 <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
                 <th class="datatable-th datatable-th-center" style="width: 70px;">{% trans "Select" %}</th>
             </tr>
@@ -75,7 +75,7 @@
                         </div>
                     </div>
                 </td>
-                <td class="datatable-td" data-col="author" data-label="{% trans 'Author' %}">
+                <td class="datatable-td hidden 2xl:table-cell" data-col="author" data-label="{% trans 'Author' %}">
                     <span class="text-base-content/60">{{ product.author|default:"-" }}</span>
                 </td>
                 <td class="datatable-td" data-col="price" data-label="{% trans 'Price' %}">
@@ -96,7 +96,7 @@
                     <span class="text-base-content/40">-</span>
                     {% endif %}
                 </td>
-                <td class="datatable-td datatable-td-center" data-col="rating" data-label="{% trans 'Rating' %}">
+                <td class="datatable-td datatable-td-center hidden 2xl:table-cell" data-col="rating" data-label="{% trans 'Rating' %}">
                     <div class="flex items-center justify-center gap-1 cursor-pointer"
                          data-module-id="{{ product.id }}"
                          data-module-name="{{ product.name }}"
@@ -114,7 +114,7 @@
                         {% endif %}
                     </div>
                 </td>
-                <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}" style="white-space: nowrap; min-width: 90px;">
+                <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}" style="white-space: nowrap; min-width: 80px;">
                     {% if product.is_installed %}
                     <span class="badge badge-sm color-success">{% trans "Installed" %}</span>
                     {% elif product.is_owned %}
