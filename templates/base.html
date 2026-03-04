@@ -594,5 +594,50 @@
     </script>
 
     {% block scripts %}{% endblock %}
+
+    <!-- Server reconnect overlay -->
+    <div id="reconnect-overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+        <div class="loading" style="width:48px; height:48px;"></div>
+        <p style="color:#fff; font-size:1rem; font-weight:500; margin:0;">{% trans "Reconnecting to server..." %}</p>
+        <p style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin:0;">{% trans "Please wait a moment" %}</p>
+    </div>
+    <script nonce="{{ csp_nonce }}">
+    (function() {
+        var overlay = document.getElementById('reconnect-overlay');
+        var pollInterval = null;
+        var shown = false;
+
+        function showOverlay() {
+            if (shown) return;
+            shown = true;
+            overlay.style.display = 'flex';
+            pollInterval = setInterval(function() {
+                fetch('/health/', {cache: 'no-store'})
+                    .then(function(r) {
+                        if (r.ok) hideOverlay();
+                    })
+                    .catch(function() {});
+            }, 2000);
+        }
+
+        function hideOverlay() {
+            shown = false;
+            overlay.style.display = 'none';
+            if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+            window.location.reload();
+        }
+
+        // HTMX connection error (server down / restart)
+        document.body.addEventListener('htmx:sendError', showOverlay);
+        // Fetch errors from non-HTMX requests (e.g. chat fetch)
+        var origFetch = window.fetch;
+        window.fetch = function() {
+            return origFetch.apply(this, arguments).catch(function(err) {
+                showOverlay();
+                return Promise.reject(err);
+            });
+        };
+    })();
+    </script>
 </body>
 </html>
