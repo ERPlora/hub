@@ -15,12 +15,12 @@
         backdrop.id = 'checkout-modal';
         backdrop.setAttribute('data-state', 'closed');
         backdrop.innerHTML =
-            '<div class="modal" style="max-width:600px;max-height:90vh;">' +
+            '<div class="modal max-w-xl max-h-[90vh]">' +
                 '<div class="modal-header">' +
                     '<h2 class="modal-title">{% trans "Complete Purchase" %}</h2>' +
                     '<button class="modal-close" onclick="closeCheckoutModal()">&times;</button>' +
                 '</div>' +
-                '<div class="modal-body" style="padding:0;min-height:400px;overflow-y:auto;">' +
+                '<div class="modal-body p-0 min-h-[400px] overflow-y-auto">' +
                     '<div id="checkout-loading" class="flex items-center justify-center p-8">' +
                         '<span class="loading"></span>' +
                         '<span class="ml-3 opacity-60">{% trans "Loading payment form..." %}</span>' +

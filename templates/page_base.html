@@ -4,7 +4,7 @@
 {% block main %}
 <main class="content padding">
     {% block page_header %}
-    <div class="header glass sticky top-0 z-200" style="position: relative;">
+    <div class="header glass sticky top-0 z-200">
         <div class="header-start">
             <a id="back-button"
                class="btn btn-ghost btn-sm hidden"
@@ -24,8 +24,8 @@
         <div class="header-end">
             {% block page_actions %}{% endblock %}
         </div>
-        <div class="htmx-indicator" style="position: absolute; bottom: 0; left: 0; right: 0; height: 2px; overflow: hidden;">
-            <div style="width: 40%; height: 100%; background: var(--color-primary); border-radius: 1px; animation: htmx-progress 1.2s ease-in-out infinite;"></div>
+        <div class="htmx-indicator absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden">
+            <div class="w-2/5 h-full bg-primary rounded-sm" style="animation: htmx-progress 1.2s ease-in-out infinite;"></div>
         </div>
     </div>
     {% endblock %}

@@ -8,36 +8,33 @@
     <table class="datatable-table">
         <thead class="datatable-thead">
             <tr>
-                <th class="datatable-th datatable-th-sortable{% if sort_field == 'name' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                <th class="datatable-th datatable-th-sortable cursor-pointer{% if sort_field == 'name' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
                     hx-get="{% url 'marketplace:products_list' %}?sort=name&dir={% if sort_field == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
                     hx-target="#datatable-body"
-                    hx-include="#marketplace-datatable"
-                    style="cursor: pointer;">
+                    hx-include="#marketplace-datatable">
                     {% trans "Module" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>
                 <th class="datatable-th hidden 2xl:table-cell" data-col="author">{% trans "Author" %}</th>
-                <th class="datatable-th datatable-th-sortable{% if sort_field == 'price' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                <th class="datatable-th datatable-th-sortable cursor-pointer{% if sort_field == 'price' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
                     data-col="price"
                     hx-get="{% url 'marketplace:products_list' %}?sort=price&dir={% if sort_field == 'price' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
                     hx-target="#datatable-body"
-                    hx-include="#marketplace-datatable"
-                    style="cursor: pointer;">
+                    hx-include="#marketplace-datatable">
                     {% trans "Price" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>
-                <th class="datatable-th datatable-th-sortable datatable-th-center hidden 2xl:table-cell{% if sort_field == 'rating' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                <th class="datatable-th datatable-th-sortable datatable-th-center cursor-pointer hidden 2xl:table-cell{% if sort_field == 'rating' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
                     data-col="rating"
                     hx-get="{% url 'marketplace:products_list' %}?sort=rating&dir={% if sort_field == 'rating' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
                     hx-target="#datatable-body"
-                    hx-include="#marketplace-datatable"
-                    style="cursor: pointer;">
+                    hx-include="#marketplace-datatable">
                     {% trans "Rating" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>
-                <th class="datatable-th datatable-th-center" data-col="status" style="white-space: nowrap; min-width: 80px;">{% trans "Status" %}</th>
+                <th class="datatable-th datatable-th-center whitespace-nowrap min-w-[80px]" data-col="status">{% trans "Status" %}</th>
                 <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
-                <th class="datatable-th datatable-th-center" style="width: 70px;">{% trans "Select" %}</th>
+                <th class="datatable-th datatable-th-center w-[70px]">{% trans "Select" %}</th>
             </tr>
         </thead>
         <tbody class="datatable-tbody">
@@ -80,7 +77,7 @@
                 </td>
                 <td class="datatable-td" data-col="price" data-label="{% trans 'Price' %}">
                     {% if product.assistant_tiers %}
-                    <select class="select select-sm" style="font-size: 0.75rem; min-width: 140px;"
+                    <select class="select select-sm text-xs min-w-[140px]"
                             onchange="var row = this.closest('tr'); if(row) { row.dataset.tierSlug = this.value; row.dataset.modulePrice = this.selectedOptions[0].dataset.price; }">
                         {% for tier in product.assistant_tiers %}
                         <option value="{{ tier.slug }}" data-price="{{ tier.price_monthly }}">{{ tier.name }} — &euro;{{ tier.price_monthly }}/{% trans "mo" %}</option>
@@ -114,7 +111,7 @@
                         {% endif %}
                     </div>
                 </td>
-                <td class="datatable-td datatable-td-center" data-col="status" data-label="{% trans 'Status' %}" style="white-space: nowrap; min-width: 80px;">
+                <td class="datatable-td datatable-td-center whitespace-nowrap min-w-[80px]" data-col="status" data-label="{% trans 'Status' %}">
                     {% if product.is_installed %}
                     <span class="badge badge-sm color-success">{% trans "Installed" %}</span>
                     {% elif product.is_owned %}
@@ -138,7 +135,7 @@
                         {% endif %}
                     </div>
                 </td>
-                <td class="datatable-td datatable-td-center" style="width: 70px;">
+                <td class="datatable-td datatable-td-center w-[70px]">
                     {% if not product.is_installed %}
                     <label class="checkbox" @click.stop>
                         <input type="checkbox" class="checkbox-input"
