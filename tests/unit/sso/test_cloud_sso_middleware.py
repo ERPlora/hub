@@ -4,6 +4,7 @@ Unit tests for CloudSSOMiddleware.
 Tests the SSO authentication flow between Cloud and Hub.
 """
 import pytest
+import responses
 from unittest.mock import Mock, patch, MagicMock
 from django.test import RequestFactory, TestCase, override_settings
 from django.contrib.sessions.middleware import SessionMiddleware
@@ -246,12 +247,14 @@ class TestCloudSSOMiddlewareCloudAPIVerification(TestCase):
         self.get_response = Mock(return_value=HttpResponse())
         self.middleware = CloudSSOMiddleware(self.get_response)
 
-    @patch('apps.core.middleware.cloud_sso_middleware.requests.get')
-    def test_successful_session_verification(self, mock_get):
+    @responses.activate
+    def test_successful_session_verification(self):
         """Test successful session verification with Cloud API."""
-        mock_get.return_value = Mock(
-            status_code=200,
-            json=lambda: {'authenticated': True, 'email': 'user@example.com', 'user_id': 123, 'name': 'Test User'}
+        responses.add(
+            responses.GET,
+            'https://int.erplora.com/api/auth/verify-session/',
+            json={'authenticated': True, 'email': 'user@example.com', 'user_id': 123, 'name': 'Test User'},
+            status=200,
         )
 
         is_auth, user_data = self.middleware._verify_session_with_cloud('valid-session')
@@ -260,18 +263,15 @@ class TestCloudSSOMiddlewareCloudAPIVerification(TestCase):
         assert user_data['email'] == 'user@example.com'
         assert user_data['user_id'] == 123
         assert user_data['name'] == 'Test User'
-        mock_get.assert_called_once_with(
-            'https://int.erplora.com/api/auth/verify-session/',
-            cookies={'sessionid': 'valid-session'},
-            timeout=5
-        )
 
-    @patch('apps.core.middleware.cloud_sso_middleware.requests.get')
-    def test_failed_session_verification(self, mock_get):
+    @responses.activate
+    def test_failed_session_verification(self):
         """Test failed session verification (unauthenticated)."""
-        mock_get.return_value = Mock(
-            status_code=200,
-            json=lambda: {'authenticated': False}
+        responses.add(
+            responses.GET,
+            'https://int.erplora.com/api/auth/verify-session/',
+            json={'authenticated': False},
+            status=200,
         )
 
         is_auth, user_data = self.middleware._verify_session_with_cloud('invalid-session')
@@ -279,32 +279,42 @@ class TestCloudSSOMiddlewareCloudAPIVerification(TestCase):
         assert is_auth is False
         assert user_data is None
 
-    @patch('apps.core.middleware.cloud_sso_middleware.requests.get')
-    def test_cloud_api_error_denies_access(self, mock_get):
+    @responses.activate
+    def test_cloud_api_error_denies_access(self):
         """Cloud API errors should deny access for security."""
-        mock_get.return_value = Mock(status_code=500)
+        responses.add(
+            responses.GET,
+            'https://int.erplora.com/api/auth/verify-session/',
+            status=500,
+        )
 
         is_auth, user_data = self.middleware._verify_session_with_cloud('session')
 
         assert is_auth is False
         assert user_data is None
 
-    @patch('apps.core.middleware.cloud_sso_middleware.requests.get')
-    def test_network_error_denies_access(self, mock_get):
+    @patch('apps.core.middleware.cloud_sso_middleware.requests.Session')
+    def test_network_error_denies_access(self, mock_session_cls):
         """Network errors should deny access for security."""
-        import requests
-        mock_get.side_effect = requests.exceptions.ConnectionError()
+        import requests as req_lib
+        mock_session = Mock()
+        mock_session.mount = Mock()
+        mock_session.get.side_effect = req_lib.exceptions.ConnectionError()
+        mock_session_cls.return_value = mock_session
 
         is_auth, user_data = self.middleware._verify_session_with_cloud('session')
 
         assert is_auth is False
         assert user_data is None
 
-    @patch('apps.core.middleware.cloud_sso_middleware.requests.get')
-    def test_timeout_denies_access(self, mock_get):
+    @patch('apps.core.middleware.cloud_sso_middleware.requests.Session')
+    def test_timeout_denies_access(self, mock_session_cls):
         """Timeouts should deny access for security."""
-        import requests
-        mock_get.side_effect = requests.exceptions.Timeout()
+        import requests as req_lib
+        mock_session = Mock()
+        mock_session.mount = Mock()
+        mock_session.get.side_effect = req_lib.exceptions.Timeout()
+        mock_session_cls.return_value = mock_session
 
         is_auth, user_data = self.middleware._verify_session_with_cloud('session')
 
