@@ -27,7 +27,7 @@
                 <button @click="open = false" class="btn btn-ghost" :disabled="sending">
                     {% trans "Cancel" %}
                 </button>
-                <button @click="send()" class="btn color-primary" :disabled="sending || !description.trim()">
+                <button @click="send()" class="btn color-primary" :disabled="sending">
                     <template x-if="sending">
                         <span class="loading loading-sm mr-2"></span>
                     </template>
