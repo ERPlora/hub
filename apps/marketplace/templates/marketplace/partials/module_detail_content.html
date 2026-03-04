@@ -19,58 +19,48 @@
         <!-- Hero Card -->
         <div class="card mb-lg">
             <div class="card-body">
-                <div class="module-detail-header">
+                <div class="flex flex-wrap gap-6">
                     <!-- Icon -->
-                    <div class="module-detail-icon">
+                    <div class="shrink-0 flex items-center justify-center w-18 h-18 rounded-xl bg-base-200 text-3xl">
                         {% icon module.icon|default:"cube-outline" %}
                     </div>
 
                     <!-- Info -->
-                    <div class="module-detail-info">
-                        <div class="d-flex align-center gap-sm mb-xs flex-wrap">
-                            <h1 class="fs-2xl fw-bold m-0">{{ module.name }}</h1>
-                            <!-- Status Badges -->
+                    <div class="flex-1 min-w-[200px]" data-role="module-info">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap" data-role="module-badges">
+                            <h1 class="text-2xl font-bold m-0">{{ module.name }}</h1>
                             {% if not module.module_type == 'free' and not is_free and module.price != 0 %}
-                            <span class="badge color-warning">
-                                {% icon "star-outline" %}
-                                {% trans "Premium" %}
-                            </span>
+                            <span class="badge color-warning">{% icon "star-outline" %} {% trans "Premium" %}</span>
                             {% endif %}
                             {% if module.is_featured %}
-                            <span class="badge color-warning">
-                                {% icon "star" %}
-                                {% trans "Featured" %}
-                            </span>
+                            <span class="badge color-warning">{% icon "star" %} {% trans "Featured" %}</span>
                             {% endif %}
                             {% if is_installed %}
-                            <span class="chip color-success">
-                                {% icon "checkmark-circle-outline" %}
-                                {% trans "Installed" %}
-                            </span>
+                            <span class="chip color-success">{% icon "checkmark-circle-outline" %} {% trans "Installed" %}</span>
                             {% endif %}
                         </div>
-                        <p class="text-secondary fs-sm m-0 mb-sm">
+                        <p class="text-sm text-base-content/60 m-0 mb-2">
                             {% trans "by" %} <strong>{{ module.author|default:"ERPlora" }}</strong>
-                            {% if module.version %}<span class="mx-xs">&middot;</span> v{{ module.version }}{% endif %}
+                            {% if module.version %}<span class="mx-1">&middot;</span> v{{ module.version }}{% endif %}
                         </p>
-                        <p class="text-secondary m-0 mb-md" style="max-width: 600px;">{{ module.description|truncatewords:30 }}</p>
+                        <p class="text-base-content/60 m-0 mb-4 max-w-xl">{{ module.description|truncatewords:30 }}</p>
 
                         <!-- Stats -->
-                        <div class="d-flex flex-wrap gap-md align-center">
+                        <div class="flex flex-wrap gap-4 items-center">
                             {% if module.downloads %}
-                            <span class="d-inline-flex align-center gap-xs text-secondary fs-sm">
+                            <span class="inline-flex items-center gap-1 text-sm text-base-content/60">
                                 {% icon "download-outline" %}
                                 {{ module.downloads }} {% trans "downloads" %}
                             </span>
                             {% endif %}
                             {% if module.rating %}
-                            <span class="d-inline-flex align-center gap-xs text-secondary fs-sm">
+                            <span class="inline-flex items-center gap-1 text-sm text-base-content/60">
                                 {% icon "star" css_class="text-warning" %}
                                 {{ module.rating|floatformat:1 }}
                             </span>
                             {% endif %}
                             {% if module.category_name %}
-                            <span class="d-inline-flex align-center gap-xs text-secondary fs-sm">
+                            <span class="inline-flex items-center gap-1 text-sm text-base-content/60">
                                 {% icon "pricetag-outline" %}
                                 {{ module.category_name }}
                             </span>
@@ -79,22 +69,21 @@
                     </div>
 
                     <!-- Price & Actions -->
-                    <div class="module-detail-actions">
+                    <div class="shrink-0 min-w-[200px]" data-role="module-actions">
                         {% if not is_installed %}
-                        <div class="mb-sm text-right">
+                        <div class="mb-2 text-right">
                             {% if module.module_type == 'free' or is_free %}
-                            <div class="fs-2xl fw-bold" style="color: var(--color-success);">{% trans "Free" %}</div>
+                            <div class="text-2xl font-bold text-success">{% trans "Free" %}</div>
                             {% elif module.module_type == 'subscription' %}
-                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}</div>
-                            <div class="fs-xs text-secondary">{% trans "subscription after install" %}</div>
+                            <div class="text-2xl font-bold text-primary">&euro;{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}</div>
+                            <div class="text-xs text-base-content/60">{% trans "subscription after install" %}</div>
                             {% elif module.price %}
-                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.price }}</div>
+                            <div class="text-2xl font-bold text-primary">&euro;{{ module.price }}</div>
                             {% endif %}
                         </div>
                         {% endif %}
 
-                        <!-- Action Buttons -->
-                        <div class="d-flex flex-column gap-sm">
+                        <div class="flex flex-col gap-2">
                             {% if is_installed %}
                             <button type="button" class="btn btn-lg" disabled>
                                 {% icon "checkmark-circle-outline" %}
@@ -214,11 +203,11 @@
                 {% endfor %}
                 {% else %}
                 <div class="flex flex-col items-center text-center py-12 mt-4">
-                    <div class="text-4xl mb-4 opacity-40">
+                    <div class="text-4xl mb-4 text-base-content/40">
                         {% icon "chatbubbles-outline" %}
                     </div>
                     <h3 class="text-lg font-semibold mb-2">{% trans "No reviews yet" %}</h3>
-                    <p class="text-sm opacity-60">{% trans "Be the first to review this module" %}</p>
+                    <p class="text-sm text-base-content/60">{% trans "Be the first to review this module" %}</p>
                 </div>
                 {% endif %}
             </div>
@@ -336,7 +325,7 @@ function markAsInstalled(button) {
     }
 
     // If on detail page, update the hero actions section
-    const detailActions = document.querySelector('.module-detail-actions');
+    const detailActions = document.querySelector('[data-role="module-actions"]');
     if (detailActions) {
         const actionBtn = detailActions.querySelector('button[data-action]');
         if (actionBtn) {
@@ -346,7 +335,7 @@ function markAsInstalled(button) {
             actionBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="20" height="20" fill="currentColor"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg> <span>{% trans "Installed" %}</span>';
         }
         // Add installed badge
-        const badges = document.querySelector('.module-detail-info .d-flex.flex-wrap.gap-sm');
+        const badges = document.querySelector('[data-role="module-badges"]');
         if (badges && !badges.querySelector('.color-success')) {
             const chip = document.createElement('span');
             chip.className = 'chip color-success';
@@ -479,60 +468,8 @@ if (typeof window.openReviewModal !== 'function') {
 </script>
 
 <style>
-.module-detail-header {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-}
-
-.module-detail-icon {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 72px;
-    height: 72px;
-    border-radius: var(--radius-lg);
-    background: var(--color-base-200);
-    font-size: 2rem;
-}
-
-.module-detail-info {
-    flex: 1;
-    min-width: 200px;
-}
-
-.module-detail-actions {
-    flex-shrink: 0;
-    min-width: 200px;
-}
-
-@media (max-width: 768px) {
-    .module-detail-header {
-        flex-direction: column;
-    }
-
-    .module-detail-actions {
-        width: 100%;
-    }
-}
-
-.markdown-content {
-    line-height: 1.6;
-}
-
-.markdown-content p {
-    margin-bottom: 1rem;
-}
-
-.markdown-content ul,
-.markdown-content ol {
-    margin-bottom: 1rem;
-    padding-left: 2rem;
-}
-
-.markdown-content li {
-    margin-bottom: 0.5rem;
-}
-
+.markdown-content { line-height: 1.6; }
+.markdown-content p { margin-bottom: 1rem; }
+.markdown-content ul, .markdown-content ol { margin-bottom: 1rem; padding-left: 2rem; }
+.markdown-content li { margin-bottom: 0.5rem; }
 </style>
