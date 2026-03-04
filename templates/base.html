@@ -269,6 +269,7 @@
     <script nonce="{{ csp_nonce }}">
         // Enable HTMX to process inline scripts
         htmx.config.allowScriptTags = true;
+        htmx.config.inlineScriptNonce = '{{ csp_nonce }}';
 
         document.addEventListener('DOMContentLoaded', function() {
             // Include CSRF token and module ID in all HTMX requests
