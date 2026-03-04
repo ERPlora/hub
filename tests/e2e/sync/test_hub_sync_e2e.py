@@ -23,6 +23,7 @@ def hub_config():
         config = MagicMock()
         config.hub_id = 'e2e-test-hub-id'
         config.hub_jwt = 'e2e.test.jwt.token'
+        config.hub_refresh_token = ''
         config.cloud_public_key = ''
         config.is_configured = True
         mock_class.get_solo.return_value = config

@@ -20,6 +20,7 @@ def mock_hub_config():
         config = MagicMock()
         config.hub_jwt = 'test.jwt.token'
         config.hub_id = 'test-hub-id'
+        config.hub_refresh_token = ''
         config.cloud_public_key = ''
         mock.get_solo.return_value = config
         mock.set_value = MagicMock()
