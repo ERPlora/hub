@@ -23,6 +23,8 @@ Requisitos:
 """
 import logging
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from django.shortcuts import redirect
 from django.conf import settings
 from django.urls import reverse
@@ -85,24 +87,28 @@ class CloudSSOMiddleware:
         if self._is_exempt_url(request.path):
             return self.get_response(request)
 
-        # Obtener cookie de sesión
+        # Fast path: if user already has a local session, skip Cloud verification
+        local_user_id = request.session.get('local_user_id')
+        if local_user_id:
+            return self.get_response(request)
+
+        # No local session — verify with Cloud
         session_id = request.COOKIES.get('sessionid')
 
         if not session_id:
-            logger.info(f"[SSO] No sessionid cookie found. Redirecting to login.")
+            logger.info("[SSO] No sessionid cookie found. Redirecting to login.")
             return self._redirect_to_login(request)
 
         # Verificar sesión con Cloud API
         is_authenticated, user_data = self._verify_session_with_cloud(session_id)
 
         if not is_authenticated:
-            logger.info(f"[SSO] Invalid session. Redirecting to login.")
+            logger.info("[SSO] Invalid session. Redirecting to login.")
             return self._redirect_to_login(request)
 
         user_email = user_data.get('email')
 
         # En modo DEMO, cualquier usuario autenticado tiene acceso
-        # No verificamos permisos de Hub específico
         if self.demo_mode:
             logger.info(f"[SSO] DEMO MODE: User {user_email} authenticated - access granted")
         else:
@@ -119,13 +125,7 @@ class CloudSSOMiddleware:
         request.cloud_user_email = user_email
         request.cloud_user_data = user_data
 
-        # Verificar si el usuario ya tiene sesión local válida
-        local_user_id = request.session.get('local_user_id')
-        if local_user_id:
-            # Ya tiene sesión local, permitir acceso
-            return self.get_response(request)
-
-        # No tiene sesión local → crear/obtener LocalUser y verificar PIN
+        # Crear/obtener LocalUser y verificar PIN
         redirect_response = self._ensure_local_user_and_session(request, user_data)
         if redirect_response:
             return redirect_response
@@ -229,7 +229,10 @@ class CloudSSOMiddleware:
                    user_data contains: email, user_id, name
         """
         try:
-            response = requests.get(
+            session = requests.Session()
+            retry = Retry(total=1, backoff_factor=0.2, status_forcelist=[502, 503, 504])
+            session.mount('https://', HTTPAdapter(max_retries=retry))
+            response = session.get(
                 f"{self.cloud_api_url}/api/auth/verify-session/",
                 cookies={'sessionid': session_id},
                 timeout=5
@@ -268,7 +271,10 @@ class CloudSSOMiddleware:
             return True
 
         try:
-            response = requests.get(
+            session = requests.Session()
+            retry = Retry(total=1, backoff_factor=0.2, status_forcelist=[502, 503, 504])
+            session.mount('https://', HTTPAdapter(max_retries=retry))
+            response = session.get(
                 f"{self.cloud_api_url}/api/hubs/{self.hub_id}/check-access/",
                 cookies={'sessionid': session_id},
                 timeout=5
