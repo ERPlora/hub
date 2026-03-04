@@ -107,31 +107,26 @@
         </div>
 
         <!-- Tabs -->
-        <div class="tabs" x-data="{ activeTab: 'overview' }">
-            <div>
-                <button type="button"
-                        class="tab"
-                        :class="{ 'tab-active': activeTab === 'overview' }"
-                        @click="activeTab = 'overview'">
-                    {% trans "Overview" %}
-                </button>
-                <button type="button"
-                        class="tab"
-                        :class="{ 'tab-active': activeTab === 'reviews' }"
-                        @click="activeTab = 'reviews'">
-                    {% trans "Reviews" %} ({{ module.review_count|default:0 }})
-                </button>
-                <button type="button"
-                        class="tab"
-                        :class="{ 'tab-active': activeTab === 'changelog' }"
-                        @click="activeTab = 'changelog'">
-                    {% trans "Changelog" %}
-                </button>
-            </div>
+        <div class="tabs tabs-border" x-data="{ activeTab: 'overview' }">
+            <button type="button" class="tab"
+                    :class="{ 'tab-active': activeTab === 'overview' }"
+                    @click="activeTab = 'overview'">
+                {% trans "Overview" %}
+            </button>
+            <button type="button" class="tab"
+                    :class="{ 'tab-active': activeTab === 'reviews' }"
+                    @click="activeTab = 'reviews'">
+                {% trans "Reviews" %} ({{ module.review_count|default:0 }})
+            </button>
+            <button type="button" class="tab"
+                    :class="{ 'tab-active': activeTab === 'changelog' }"
+                    @click="activeTab = 'changelog'">
+                {% trans "Changelog" %}
+            </button>
 
-            <!-- Overview Tab -->
-            <div class="tab-panel" :class="{ 'tab-panel--active': activeTab === 'overview' }" x-show="activeTab === 'overview'">
-                <div class="card mt-lg mb-lg">
+            <!-- Overview -->
+            <div class="tab-content pt-6" :class="activeTab === 'overview' ? 'tab-content-active' : 'tab-content'">
+                <div class="card mb-4">
                     <div class="card-header">
                         <h3 class="card-title">{% trans "About this module" %}</h3>
                     </div>
@@ -173,36 +168,36 @@
                 </div>
             </div>
 
-            <!-- Reviews Tab -->
-            <div class="tab-panel" :class="{ 'tab-panel--active': activeTab === 'reviews' }" x-show="activeTab === 'reviews'">
+            <!-- Reviews -->
+            <div class="tab-content pt-6" :class="activeTab === 'reviews' ? 'tab-content-active' : 'tab-content'">
                 {% if module.recent_reviews %}
                 {% for review in module.recent_reviews %}
-                <div class="card mt-lg mb-md">
+                <div class="card mb-4">
                     <div class="card-body">
-                        <div class="d-flex justify-between align-start mb-sm">
+                        <div class="flex justify-between items-start mb-2">
                             <div>
-                                <p class="fw-semibold m-0">{{ review.user_name|default:"Anonymous" }}</p>
-                                <div class="d-flex gap-xxs mt-xs text-warning">
+                                <p class="font-semibold m-0">{{ review.user_name|default:"Anonymous" }}</p>
+                                <div class="flex gap-0.5 mt-1 text-warning">
                                     {% for i in "12345" %}
                                         {% if forloop.counter <= review.rating %}
                                         {% icon "star" %}
                                         {% else %}
-                                        {% icon "star-outline" css_class="text-medium" %}
+                                        {% icon "star-outline" css_class="text-base-content/30" %}
                                         {% endif %}
                                     {% endfor %}
                                 </div>
                             </div>
-                            <span class="fs-xs text-secondary">{{ review.created_at }}</span>
+                            <span class="text-xs text-base-content/60">{{ review.created_at }}</span>
                         </div>
                         {% if review.title %}
-                        <h4 class="fw-semibold mb-xs m-0">{{ review.title }}</h4>
+                        <h4 class="font-semibold mb-1 m-0">{{ review.title }}</h4>
                         {% endif %}
-                        <p class="text-secondary m-0">{{ review.comment }}</p>
+                        <p class="text-base-content/60 m-0">{{ review.comment }}</p>
                     </div>
                 </div>
                 {% endfor %}
                 {% else %}
-                <div class="flex flex-col items-center text-center py-12 mt-4">
+                <div class="flex flex-col items-center text-center py-12">
                     <div class="text-4xl mb-4 text-base-content/40">
                         {% icon "chatbubbles-outline" %}
                     </div>
@@ -212,9 +207,9 @@
                 {% endif %}
             </div>
 
-            <!-- Changelog Tab -->
-            <div class="tab-panel" :class="{ 'tab-panel--active': activeTab === 'changelog' }" x-show="activeTab === 'changelog'">
-                <div class="card mt-lg">
+            <!-- Changelog -->
+            <div class="tab-content pt-6" :class="activeTab === 'changelog' ? 'tab-content-active' : 'tab-content'">
+                <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">{% trans "Changelog" %}</h3>
                     </div>
@@ -224,9 +219,9 @@
                             {{ module.changelog|linebreaks }}
                         </div>
                         {% else %}
-                        <div class="text-center py-xl">
-                            {% icon "document-text-outline" css_class="fs-4xl text-medium" %}
-                            <p class="text-secondary mt-md m-0">{% trans "No changelog available" %}</p>
+                        <div class="text-center py-12">
+                            {% icon "document-text-outline" css_class="text-4xl text-base-content/30" %}
+                            <p class="text-base-content/60 mt-4 m-0">{% trans "No changelog available" %}</p>
                         </div>
                         {% endif %}
                     </div>
@@ -237,7 +232,7 @@
         <!-- Related Modules -->
         {% if related_modules %}
         <div class="mt-xl">
-            <h2 class="fs-xl fw-semibold mb-md">{% trans "Related Modules" %}</h2>
+            <h2 class="text-xl font-semibold mb-4">{% trans "Related Modules" %}</h2>
             <div class="module-grid module-grid-3">
                 {% for related in related_modules %}
                 {% include "system/modules/partials/module_card.html" with module=related card_context='marketplace' %}
