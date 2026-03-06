@@ -145,8 +145,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
+    'apps.core.middleware.htmx_messages.HtmxMessagesMiddleware',
     'apps.accounts.middleware.jwt_middleware.JWTMiddleware',
     'apps.configuration.middleware.StoreConfigCheckMiddleware',
+    'apps.core.middleware.module_subscription.ModuleSubscriptionMiddleware',
     'apps.core.middleware.module_middleware_manager.ModuleMiddlewareManager',
 ]
 

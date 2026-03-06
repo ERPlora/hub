@@ -1,0 +1,242 @@
+{% load i18n djicons %}
+
+{% if error %}
+<div class="callout callout-error mx-4 my-4">
+    <span class="callout-icon">{% icon "alert-circle-outline" %}</span>
+    <div class="callout-content">
+        <div class="callout-title">{% trans "Error" %}</div>
+        <div class="callout-text">{{ error }}</div>
+    </div>
+</div>
+
+{% elif purchases %}
+<div class="datatable glass mt-5">
+    <div class="datatable-body">
+        <table class="datatable-table">
+            <thead class="datatable-thead">
+                <tr>
+                    <th class="datatable-th">{% trans "Module" %}</th>
+                    <th class="datatable-th">{% trans "Cost" %}</th>
+                    <th class="datatable-th datatable-th-center">{% trans "Status" %}</th>
+                    <th class="datatable-th">{% trans "Period" %}</th>
+                    <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
+                </tr>
+            </thead>
+            <tbody class="datatable-tbody">
+                {% for purchase in purchases %}
+                <tr class="datatable-tr" id="purchase-{{ purchase.purchase_id }}">
+                    <td class="datatable-td" data-label="{% trans 'Module' %}">
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center justify-center size-9 rounded-lg bg-base-200 shrink-0">
+                                {% if purchase.icon %}
+                                <img src="{{ purchase.icon }}" alt="{{ purchase.name }}" class="size-6">
+                                {% else %}
+                                {% icon purchase.display_icon|default:"cube-outline" %}
+                                {% endif %}
+                            </div>
+                            <div class="min-w-0">
+                                <a href="{{ purchase.detail_url }}"
+                                   hx-get="{{ purchase.detail_url }}"
+                                   hx-target="#main-content-area"
+                                   hx-push-url="true"
+                                   class="font-medium block hover:text-primary transition-colors">
+                                    {{ purchase.name }}
+                                    {% if purchase.tier_name %}
+                                    <span class="badge badge-sm ml-1">{{ purchase.tier_name }}</span>
+                                    {% endif %}
+                                </a>
+                                <span class="text-xs text-base-content/50">
+                                    {{ purchase.author|default:"ERPlora" }} &middot; v{{ purchase.version }}
+                                </span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="datatable-td" data-label="{% trans 'Cost' %}">
+                        {% if purchase.subscription_price_monthly %}
+                        <div class="text-sm font-medium">&euro;{{ purchase.subscription_price_monthly }}/{% trans "mo" %}</div>
+                        <div class="text-xs text-base-content/50">&euro;{{ purchase.annual_cost|default:"—" }}/{% trans "yr" %}</div>
+                        {% elif purchase.price %}
+                            {% if purchase.module_type == 'subscription' %}
+                            <div class="text-sm font-medium">&euro;{{ purchase.price }}/{% trans "mo" %}</div>
+                            <div class="text-xs text-base-content/50">&euro;{{ purchase.annual_cost|default:"—" }}/{% trans "yr" %}</div>
+                            {% else %}
+                            <div class="text-sm font-medium">&euro;{{ purchase.price }}</div>
+                            <div class="text-xs text-base-content/50">{% trans "one-time" %}</div>
+                            {% endif %}
+                        {% else %}
+                        <span class="badge badge-sm color-success">{% trans "Free" %}</span>
+                        {% endif %}
+                    </td>
+                    <td class="datatable-td datatable-td-center" data-label="{% trans 'Status' %}">
+                        {% if purchase.subscription_status == 'trialing' %}
+                        <span class="badge badge-sm color-info">{% trans "Trial" %}</span>
+                        {% elif purchase.subscription_status == 'active' %}
+                        <span class="badge badge-sm color-success">{% trans "Active" %}</span>
+                        {% elif purchase.subscription_status == 'canceled' %}
+                        <span class="badge badge-sm color-warning">{% trans "Canceling" %}</span>
+                        {% elif purchase.subscription_status == 'past_due' %}
+                        <span class="badge badge-sm color-error">{% trans "Past Due" %}</span>
+                        {% elif purchase.subscription_status == 'expired' %}
+                        <span class="badge badge-sm">{% trans "Expired" %}</span>
+                        {% else %}
+                        <span class="badge badge-sm color-success">{% trans "Owned" %}</span>
+                        {% endif %}
+                    </td>
+                    <td class="datatable-td" data-label="{% trans 'Period' %}">
+                        {% if purchase.subscription_end_date %}
+                        <span class="text-sm">{% trans "until" %} {{ purchase.subscription_end_date|slice:":10" }}</span>
+                        {% elif purchase.trial_end_date %}
+                        <span class="text-sm">{% trans "trial until" %} {{ purchase.trial_end_date|slice:":10" }}</span>
+                        {% elif purchase.purchased_at %}
+                        <span class="text-sm text-base-content/50">{{ purchase.purchased_at|slice:":10" }}</span>
+                        {% else %}
+                        <span class="text-base-content/40">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="datatable-td datatable-td-actions">
+                        <div class="datatable-row-actions">
+                            {% if purchase.stripe_subscription_id and purchase.subscription_status != 'canceled' and purchase.subscription_status != 'expired' %}
+                            <button class="datatable-row-action datatable-row-action-danger"
+                                    data-action="cancel-subscription"
+                                    data-module-id="{{ purchase.module_id }}"
+                                    data-module-name="{{ purchase.name }}"
+                                    data-module-price="{% if purchase.price %}&euro;{{ purchase.price }}{% if purchase.module_type == 'subscription' %}/{% trans 'mo' %}{% endif %}{% endif %}"
+                                    title="{% trans 'Cancel subscription' %}">
+                                {% icon "close-circle-outline" %}
+                            </button>
+                            {% elif purchase.subscription_status == 'canceled' or purchase.subscription_status == 'expired' %}
+                            <a class="datatable-row-action"
+                               href="{% url 'marketplace:module_pricing' module_id=purchase.module_id %}"
+                               hx-get="{% url 'marketplace:module_pricing' module_id=purchase.module_id %}"
+                               hx-target="#main-content-area"
+                               hx-push-url="true"
+                               title="{% trans 'Renew' %}">
+                                {% icon "refresh-outline" %}
+                            </a>
+                            {% endif %}
+                            {% if purchase.invoice_url %}
+                            <a class="datatable-row-action"
+                               href="{{ purchase.invoice_url }}"
+                               target="_blank"
+                               title="{% trans 'Invoice' %}">
+                                {% icon "document-text-outline" %}
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+if (!window._purchasesInit) {
+window._purchasesInit = true;
+
+document.addEventListener('click', function(e) {
+    var cancelBtn = e.target.closest('button[data-action="cancel-subscription"]');
+    if (!cancelBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    var name = cancelBtn.dataset.moduleName;
+    var price = cancelBtn.dataset.modulePrice;
+
+    var backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.setAttribute('data-state', 'open');
+    backdrop.innerHTML =
+        '<div class="modal modal-sm">' +
+            '<div class="modal-header">' +
+                '<h3 class="modal-title">{% trans "Cancel Subscription" %}</h3>' +
+                '<button class="modal-close" data-role="close">' +
+                    '{% icon "close-outline" %}' +
+                '</button>' +
+            '</div>' +
+            '<div class="modal-body">' +
+                '<p>{% trans "Are you sure you want to cancel" %} <strong>' + name + '</strong>?</p>' +
+                (price ? '<p class="text-sm opacity-60 mt-2">{% trans "Current cost:" %} ' + price + '</p>' : '') +
+                '<p class="text-sm opacity-60 mt-2">{% trans "It will remain active until the end of the billing period." %}</p>' +
+            '</div>' +
+            '<div class="modal-footer">' +
+                '<button class="btn btn-outline" data-role="close">{% trans "Keep Subscription" %}</button>' +
+                '<button class="btn color-error" data-role="confirm">{% trans "Cancel Subscription" %}</button>' +
+            '</div>' +
+        '</div>';
+
+    function close() {
+        backdrop.setAttribute('data-state', 'closed');
+        setTimeout(function() { backdrop.remove(); }, 300);
+    }
+
+    backdrop.querySelectorAll('[data-role="close"]').forEach(function(el) { el.addEventListener('click', close); });
+    backdrop.addEventListener('click', function(ev) { if (ev.target === backdrop) close(); });
+
+    backdrop.querySelector('[data-role="confirm"]').addEventListener('click', function() {
+        close();
+        cancelSubscription(cancelBtn.dataset.moduleId, cancelBtn);
+    });
+
+    document.body.appendChild(backdrop);
+});
+
+async function cancelSubscription(moduleId, button) {
+    if (button) {
+        button.disabled = true;
+        button.dataset.originalContent = button.innerHTML;
+        button.innerHTML = '<div class="loading loading-sm"></div>';
+    }
+    try {
+        var response = await fetch('{% url "marketplace:cancel_subscription" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ module_id: moduleId })
+        });
+        var data = await response.json();
+        if (data.success) {
+            Toast.success(data.message || '{% trans "Subscription canceled." %}');
+            htmx.ajax('GET', window.location.pathname, { target: '#main-content-area', swap: 'innerHTML' });
+        } else {
+            Toast.error(data.error || '{% trans "Error canceling subscription" %}');
+            if (button && button.dataset.originalContent) {
+                button.innerHTML = button.dataset.originalContent;
+                button.disabled = false;
+            }
+        }
+    } catch (error) {
+        Toast.error('{% trans "Error canceling subscription" %}');
+        if (button && button.dataset.originalContent) {
+            button.innerHTML = button.dataset.originalContent;
+            button.disabled = false;
+        }
+    }
+}
+} // end guard
+</script>
+
+{% else %}
+<!-- Empty State -->
+<div class="datatable glass mt-5">
+    <div class="datatable-empty">
+        <div class="datatable-empty-icon">
+            {% icon "bag-outline" %}
+        </div>
+        <div class="datatable-empty-title">
+            {% trans "No subscriptions yet" %}
+        </div>
+        <div class="datatable-empty-text">
+            {% trans "When you subscribe to premium modules, they will appear here." %}
+        </div>
+        <a href="{% url 'marketplace:index' %}"
+           hx-get="{% url 'marketplace:index' %}"
+           hx-target="#main-content-area"
+           hx-push-url="true"
+           class="btn color-primary mt-4">
+            {% icon "storefront-outline" %}
+            {% trans "Browse Modules" %}
+        </a>
+    </div>
+</div>
+{% endif %}

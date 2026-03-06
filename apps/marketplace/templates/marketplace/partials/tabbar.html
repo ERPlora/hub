@@ -35,18 +35,4 @@
         <span class="badge">{% trans "Soon" %}</span>
     </span>
 
-    {# Cart Tab #}
-    <a href="{% url 'marketplace:cart_page' %}"
-       class="tab tab-icon-top {% if current_view == 'cart' %}tab-active{% endif %}"
-       hx-get="{% url 'marketplace:cart_page' %}"
-       hx-target="#main-content-area"
-       hx-push-url="true">
-        <span class="tab-icon">
-            {% icon "cart-outline" %}
-        </span>
-        <span class="tab-label">{% trans "Cart" %}</span>
-        {% if cart_count %}
-        <span class="badge">{{ cart_count }}</span>
-        {% endif %}
-    </a>
 </nav>

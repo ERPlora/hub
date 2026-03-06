@@ -393,17 +393,6 @@ def get_storage_info(request):
     with db_connection.cursor() as cursor:
         cursor.execute("SELECT pg_database_size(current_database())")
         db_size = cursor.fetchone()[0]
-    max_db_gb = float(os.environ.get('MAX_DATABASE_GB', '2'))
-    db_limit = int(max_db_gb * 1024 * 1024 * 1024)
-    db_percent = min(100, int((db_size / db_limit) * 100)) if db_limit else 0
-    # Color thresholds at 50% and 85% of limit
-    if db_percent < 50:
-        db_color = 'success'
-    elif db_percent < 85:
-        db_color = 'warning'
-    else:
-        db_color = 'error'
-
     # Get directory sizes
     storage_info = {
         'database': {
@@ -412,9 +401,6 @@ def get_storage_info(request):
             'size': format_file_size(db_size),
             'size_bytes': db_size,
             'files': 1,
-            'limit': format_file_size(db_limit),
-            'percent': db_percent,
-            'color': db_color,
         },
         'media': {
             'name': 'Media Files',

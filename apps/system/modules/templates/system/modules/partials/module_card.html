@@ -1,6 +1,6 @@
 {% load i18n djicons module_icons %}
 
-<div class="module-card{% if card_context == 'installed' and module.is_active %} module-card-installed{% endif %}{% if card_context == 'marketplace' and module.is_installed %} module-card-installed{% elif card_context == 'marketplace' and module.is_owned %} module-card-owned{% endif %} glass"{% if module.assistant_tiers %} data-tier-slug="{{ module.assistant_tiers.0.slug }}" data-module-price="{{ module.assistant_tiers.0.price_monthly }}"{% endif %}{% if card_context == 'marketplace' %} data-module-slug="{{ module.slug }}" data-dependencies="{{ module.dependency_ids|join:',' }}"{% endif %}>
+<div class="module-card{% if card_context == 'installed' and module.is_active %} module-card-installed{% endif %}{% if card_context == 'marketplace' and module.is_installed %} module-card-installed{% elif card_context == 'marketplace' and module.is_owned %} module-card-owned{% endif %} glass{% if card_context == 'marketplace' and module.detail_url %} cursor-pointer hover:shadow-md transition-shadow{% endif %}"{% if module.assistant_tiers %} data-tier-slug="{{ module.assistant_tiers.0.slug }}" data-module-price="{{ module.assistant_tiers.0.price_monthly }}"{% endif %}{% if card_context == 'marketplace' %} data-module-slug="{{ module.slug }}" data-dependencies="{{ module.dependency_ids|join:',' }}"{% endif %}{% if card_context == 'marketplace' and module.detail_url %} hx-get="{{ module.detail_url }}" hx-target="#main-content-area" hx-push-url="true"{% endif %}>
     <div class="module-card-body">
         {# Header: Icon + Name/Meta + Badges #}
         <div class="module-card-header">
@@ -49,14 +49,17 @@
                         </span>
                         {% endif %}
 
-                        {% if module.is_featured %}
+                        {% if not module.is_free and module.module_type != 'free' and module.price != 0 and not module.is_installed %}
+                        <span class="badge badge-sm color-warning">{% trans "Premium" %}</span>
+                        {% elif module.is_featured %}
                         <span class="badge badge-sm color-warning">{% trans "Featured" %}</span>
                         {% endif %}
                     {% endif %}
                 </div>
             </div>
 
-            {% if card_context == 'marketplace' %}
+            {# Checkbox for all not-installed modules (bulk install) #}
+            {% if card_context == 'marketplace' and not module.is_installed %}
             <label class="checkbox shrink-0 ml-auto" @click.stop>
                 <input type="checkbox" class="checkbox-input"
                        @change="toggle('{{ module.slug }}')"

@@ -1,16 +1,13 @@
 """
 Unit tests for the marketplace views.
 
-Tests the multi-store marketplace with modules, hubs, cart, and filters.
+Tests the multi-store marketplace with modules, hubs, and filters.
 URL patterns (app_name='marketplace'):
 - marketplace:index -> /marketplace/
 - marketplace:module_detail -> /marketplace/<slug>/
 - marketplace:products_list -> /marketplace/products/ (HTMX)
-- marketplace:cart_page -> /marketplace/cart/
-- marketplace:cart_add -> /marketplace/cart/add/
-- marketplace:cart_remove -> /marketplace/cart/remove/<item_id>/
-- marketplace:cart_clear -> /marketplace/cart/clear/
 - marketplace:store_hubs -> /marketplace/hubs/
+- marketplace:my_purchases -> /marketplace/purchases/
 """
 import json
 import pytest
@@ -175,80 +172,6 @@ class TestProductsList:
         assert response.status_code == 200
 
 
-class TestCartPage:
-    """Tests for the cart page."""
-
-    def test_cart_page_loads(self, authenticated_client, hub_config):
-        """Cart page should load for authenticated users."""
-        url = reverse('marketplace:cart_page')
-        response = authenticated_client.get(url)
-
-        assert response.status_code == 200
-
-
-class TestCartOperations:
-    """Tests for cart add, remove, and clear operations."""
-
-    def test_cart_add(self, authenticated_client, hub_config):
-        """Adding an item to the cart should succeed."""
-        url = reverse('marketplace:cart_add')
-        response = authenticated_client.post(
-            url,
-            data=json.dumps({
-                'item_id': 'mod-1',
-                'item_name': 'Inventory Module',
-                'item_price': 49.99,
-                'item_icon': 'cube-outline',
-                'quantity': 1,
-            }),
-            content_type='application/json',
-        )
-
-        assert response.status_code == 200
-
-    def test_cart_remove(self, authenticated_client, hub_config):
-        """Removing an item from the cart should succeed."""
-        # First add an item
-        add_url = reverse('marketplace:cart_add')
-        authenticated_client.post(
-            add_url,
-            data=json.dumps({
-                'item_id': 'mod-1',
-                'item_name': 'Inventory Module',
-                'item_price': 49.99,
-                'quantity': 1,
-            }),
-            content_type='application/json',
-        )
-
-        # Then remove it
-        remove_url = reverse('marketplace:cart_remove', kwargs={'item_id': 'mod-1'})
-        response = authenticated_client.delete(remove_url)
-
-        assert response.status_code == 200
-
-    def test_cart_clear(self, authenticated_client, hub_config):
-        """Clearing the cart should succeed."""
-        # First add an item
-        add_url = reverse('marketplace:cart_add')
-        authenticated_client.post(
-            add_url,
-            data=json.dumps({
-                'item_id': 'mod-1',
-                'item_name': 'Inventory Module',
-                'item_price': 49.99,
-                'quantity': 1,
-            }),
-            content_type='application/json',
-        )
-
-        # Clear the cart (store_type is passed via URL kwargs, not reverse args)
-        clear_url = reverse('marketplace:cart_clear')
-        response = authenticated_client.delete(clear_url)
-
-        assert response.status_code == 200
-
-
 class TestMarketplaceAuth:
     """Tests for marketplace authentication requirements."""
 
@@ -260,22 +183,68 @@ class TestMarketplaceAuth:
         assert response.status_code == 302
         assert '/login/' in response.url
 
-    def test_cart_page_requires_auth(self, client, db, store_config):
-        """Cart page should require authentication."""
-        url = reverse('marketplace:cart_page')
+class TestMyPurchases:
+    """Tests for the My Purchases page."""
+
+    @patch('apps.marketplace.views.requests.get')
+    def test_my_purchases_page_loads(self, mock_get, authenticated_client, hub_config):
+        """My Purchases page should load with 200."""
+        hub_config.hub_jwt = 'test.jwt.token'
+        hub_config.save()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {
+                'purchase_id': 1,
+                'module_id': 'mod-2',
+                'module_slug': 'sales',
+                'name': 'Sales',
+                'description': 'POS module',
+                'icon': None,
+                'display_icon': 'storefront-outline',
+                'author': 'ERPlora',
+                'version': '1.0.0',
+                'module_type': 'one_time',
+                'price': 49.99,
+                'purchased_at': '2026-03-01T10:00:00Z',
+                'download_url': 'https://example.com/download/sales/',
+                'subscription_status': '',
+                'subscription_end_date': None,
+                'trial_end_date': None,
+                'stripe_subscription_id': '',
+                'invoice_url': '',
+            },
+        ]
+        mock_get.return_value = mock_response
+
+        url = reverse('marketplace:my_purchases')
+        response = authenticated_client.get(url)
+
+        assert response.status_code == 200
+
+    @patch('apps.marketplace.views.requests.get')
+    def test_my_purchases_htmx_returns_partial(self, mock_get, authenticated_client, hub_config):
+        """HTMX requests should return a partial."""
+        hub_config.hub_jwt = 'test.jwt.token'
+        hub_config.save()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []
+        mock_get.return_value = mock_response
+
+        url = reverse('marketplace:my_purchases')
+        response = authenticated_client.get(url, HTTP_HX_REQUEST='true')
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert '<!DOCTYPE' not in content
+
+    def test_my_purchases_requires_auth(self, client, db, store_config):
+        """My Purchases should require authentication."""
+        url = reverse('marketplace:my_purchases')
         response = client.get(url)
-
-        assert response.status_code == 302
-        assert '/login/' in response.url
-
-    def test_cart_add_requires_auth(self, client, db, store_config):
-        """Cart add should require authentication."""
-        url = reverse('marketplace:cart_add')
-        response = client.post(
-            url,
-            data=json.dumps({'item_id': 'mod-1', 'item_name': 'Test', 'item_price': 10}),
-            content_type='application/json',
-        )
 
         assert response.status_code == 302
         assert '/login/' in response.url

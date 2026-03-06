@@ -19,132 +19,85 @@
         <!-- Hero Card -->
         <div class="card mb-lg">
             <div class="card-body">
-                <div class="module-detail-header">
+                <div class="flex flex-wrap gap-6">
                     <!-- Icon -->
-                    <div class="module-detail-icon">
-                        <div class="flex items-center justify-center" style="width: 80px; height: 80px; border-radius: var(--radius-lg);">
-                            {% icon module.icon|default:"cube-outline" %}
-                        </div>
+                    <div class="shrink-0 flex items-center justify-center w-18 h-18 rounded-xl bg-base-200 text-3xl">
+                        {% icon module.icon|default:"cube-outline" %}
                     </div>
 
                     <!-- Info -->
-                    <div class="module-detail-info">
-                        <h1 class="fs-2xl fw-bold mb-sm m-0">{{ module.name }}</h1>
-                        <p class="text-secondary mb-sm m-0">
+                    <div class="flex-1 min-w-[200px]" data-role="module-info">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap" data-role="module-badges">
+                            <h1 class="text-2xl font-bold m-0">{{ module.name }}</h1>
+                            {% if not module.module_type == 'free' and not is_free and module.price != 0 %}
+                            <span class="badge color-warning">{% icon "star-outline" %} {% trans "Premium" %}</span>
+                            {% endif %}
+                            {% if module.is_featured %}
+                            <span class="badge color-warning">{% icon "star" %} {% trans "Featured" %}</span>
+                            {% endif %}
+                            {% if is_installed %}
+                            <span class="chip color-success">{% icon "checkmark-circle-outline" %} {% trans "Installed" %}</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-sm text-base-content/60 m-0 mb-2">
                             {% trans "by" %} <strong>{{ module.author|default:"ERPlora" }}</strong>
+                            {% if module.version %}<span class="mx-1">&middot;</span> v{{ module.version }}{% endif %}
                         </p>
-                        <p class="text-secondary mb-md m-0">{{ module.description }}</p>
+                        <p class="text-base-content/60 m-0 mb-4 max-w-xl">{{ module.description|truncatewords:30 }}</p>
 
                         <!-- Stats -->
-                        <div class="d-flex flex-wrap gap-md align-center mb-md">
+                        <div class="flex flex-wrap gap-4 items-center">
                             {% if module.downloads %}
-                            <span class="d-inline-flex align-center gap-xs text-secondary fs-sm">
+                            <span class="inline-flex items-center gap-1 text-sm text-base-content/60">
                                 {% icon "download-outline" %}
                                 {{ module.downloads }} {% trans "downloads" %}
                             </span>
                             {% endif %}
                             {% if module.rating %}
-                            <span class="d-inline-flex align-center gap-xs text-secondary fs-sm">
+                            <span class="inline-flex items-center gap-1 text-sm text-base-content/60">
                                 {% icon "star" css_class="text-warning" %}
                                 {{ module.rating|floatformat:1 }}
                             </span>
                             {% endif %}
                             {% if module.category_name %}
-                            <span class="d-inline-flex align-center gap-xs text-secondary fs-sm">
+                            <span class="inline-flex items-center gap-1 text-sm text-base-content/60">
                                 {% icon "pricetag-outline" %}
                                 {{ module.category_name }}
-                            </span>
-                            {% endif %}
-                        </div>
-
-                        <!-- Status Badges -->
-                        <div class="d-flex flex-wrap gap-sm align-center">
-                            {% if module.is_featured %}
-                            <span class="badge color-warning">
-                                {% icon "star" %}
-                                {% trans "Featured" %}
-                            </span>
-                            {% endif %}
-                            {% if is_installed %}
-                            <span class="chip color-success">
-                                {% icon "checkmark-circle-outline" %}
-                                {% trans "Installed" %}
-                            </span>
-                            {% elif is_owned %}
-                            <span class="chip color-secondary">
-                                {% icon "bag-check-outline" %}
-                                {% trans "Owned" %}
                             </span>
                             {% endif %}
                         </div>
                     </div>
 
                     <!-- Price & Actions -->
-                    <div class="module-detail-actions">
-                        {% if not is_installed and not is_owned %}
-                        <div class="mb-md text-right">
-                            {% if module.assistant_tiers %}
-                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);" id="assistant-tier-price-display">&euro;{{ module.assistant_tiers.0.price_monthly }}/{% trans "mo" %}</div>
-                            <div class="fs-sm text-secondary mb-sm">{% trans "monthly subscription" %}</div>
-                            <select class="select w-full"
-                                    id="assistant-tier-select"
-                                    onchange="document.getElementById('assistant-tier-price-display').innerHTML = '&euro;' + this.selectedOptions[0].dataset.price + '/{% trans "mo" %}'">
-                                {% for tier in module.assistant_tiers %}
-                                <option value="{{ tier.slug }}" data-price="{{ tier.price_monthly }}">{{ tier.name }} — &euro;{{ tier.price_monthly }}/{% trans "mo" %}</option>
-                                {% endfor %}
-                            </select>
-                            {% elif module.module_type == 'free' or is_free %}
-                            <div class="fs-2xl fw-bold" style="color: var(--color-success);">{% trans "Free" %}</div>
-                            {% elif module.module_type == 'one_time' %}
-                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.price }}</div>
-                            <div class="fs-sm text-secondary">{% trans "one-time payment" %}</div>
+                    <div class="shrink-0 min-w-[200px]" data-role="module-actions">
+                        {% if not is_installed %}
+                        <div class="mb-2 text-right">
+                            {% if module.module_type == 'free' or is_free %}
+                            <div class="text-2xl font-bold text-success">{% trans "Free" %}</div>
                             {% elif module.module_type == 'subscription' %}
-                            <div class="fs-2xl fw-bold" style="color: var(--color-primary);">&euro;{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}</div>
-                            <div class="fs-sm text-secondary">{% trans "monthly subscription" %}</div>
+                            <div class="text-2xl font-bold text-primary">&euro;{{ module.subscription_price_monthly|default:module.price }}/{% trans "mo" %}</div>
+                            <div class="text-xs text-base-content/60">{% trans "subscription after install" %}</div>
+                            {% elif module.price %}
+                            <div class="text-2xl font-bold text-primary">&euro;{{ module.price }}</div>
                             {% endif %}
                         </div>
                         {% endif %}
 
-                        <!-- Action Buttons -->
-                        <div class="d-flex flex-column gap-sm">
+                        <div class="flex flex-col gap-2">
                             {% if is_installed %}
                             <button type="button" class="btn btn-lg" disabled>
                                 {% icon "checkmark-circle-outline" %}
                                 <span>{% trans "Installed" %}</span>
                             </button>
-                            {% elif is_owned %}
-                            <button type="button"
-                                    class="btn btn-lg color-success"
-                                    data-action="download"
-                                    data-module-slug="{{ module.slug }}"
-                                    data-module-dir="{{ module.module_id }}"
-                                    data-download-url="{{ module.download_url }}">
-                                {% icon "download-outline" %}
-                                <span>{% trans "Download & Install" %}</span>
-                            </button>
-                            {% elif module.module_type == 'free' or is_free %}
+                            {% else %}
                             <button type="button"
                                     class="btn btn-lg color-primary"
-                                    data-action="install-free"
-                                    data-module-id="{{ module.id }}"
+                                    data-action="install-module"
                                     data-module-slug="{{ module.slug }}"
                                     data-module-dir="{{ module.module_id }}"
                                     data-download-url="{{ module.download_url|default:'' }}">
                                 {% icon "download-outline" %}
-                                <span>{% trans "Get Free Module" %}</span>
-                            </button>
-                            {% else %}
-                            <button type="button"
-                                    class="btn btn-lg color-primary"
-                                    data-action="add-to-cart"
-                                    data-module-id="{{ module.id }}"
-                                    data-module-name="{{ module.name }}"
-                                    data-module-slug="{{ module.slug }}"
-                                    data-module-price="{{ module.price }}"
-                                    data-module-icon="{{ module.display_icon|default:'cube-outline' }}"
-                                    data-module-type="{{ module.module_type }}">
-                                {% icon "cart-outline" %}
-                                <span>{% trans "Add to Cart" %}</span>
+                                <span>{% trans "Install" %}</span>
                             </button>
                             {% endif %}
                         </div>
@@ -154,31 +107,26 @@
         </div>
 
         <!-- Tabs -->
-        <div class="tabs" x-data="{ activeTab: 'overview' }">
-            <div>
-                <button type="button"
-                        class="tab"
-                        :class="{ 'tab-active': activeTab === 'overview' }"
-                        @click="activeTab = 'overview'">
-                    {% trans "Overview" %}
-                </button>
-                <button type="button"
-                        class="tab"
-                        :class="{ 'tab-active': activeTab === 'reviews' }"
-                        @click="activeTab = 'reviews'">
-                    {% trans "Reviews" %} ({{ module.review_count|default:0 }})
-                </button>
-                <button type="button"
-                        class="tab"
-                        :class="{ 'tab-active': activeTab === 'changelog' }"
-                        @click="activeTab = 'changelog'">
-                    {% trans "Changelog" %}
-                </button>
-            </div>
+        <div class="tabs tabs-border" x-data="{ activeTab: 'overview' }">
+            <button type="button" class="tab"
+                    :class="{ 'tab-active': activeTab === 'overview' }"
+                    @click="activeTab = 'overview'">
+                {% trans "Overview" %}
+            </button>
+            <button type="button" class="tab"
+                    :class="{ 'tab-active': activeTab === 'reviews' }"
+                    @click="activeTab = 'reviews'">
+                {% trans "Reviews" %} ({{ module.review_count|default:0 }})
+            </button>
+            <button type="button" class="tab"
+                    :class="{ 'tab-active': activeTab === 'changelog' }"
+                    @click="activeTab = 'changelog'">
+                {% trans "Changelog" %}
+            </button>
 
-            <!-- Overview Tab -->
-            <div class="tab-panel" :class="{ 'tab-panel--active': activeTab === 'overview' }" x-show="activeTab === 'overview'">
-                <div class="card mt-lg mb-lg">
+            <!-- Overview -->
+            <div class="tab-content pt-6" :class="activeTab === 'overview' ? 'tab-content-active' : 'tab-content'">
+                <div class="card mb-4">
                     <div class="card-header">
                         <h3 class="card-title">{% trans "About this module" %}</h3>
                     </div>
@@ -220,48 +168,48 @@
                 </div>
             </div>
 
-            <!-- Reviews Tab -->
-            <div class="tab-panel" :class="{ 'tab-panel--active': activeTab === 'reviews' }" x-show="activeTab === 'reviews'">
+            <!-- Reviews -->
+            <div class="tab-content pt-6" :class="activeTab === 'reviews' ? 'tab-content-active' : 'tab-content'">
                 {% if module.recent_reviews %}
                 {% for review in module.recent_reviews %}
-                <div class="card mt-lg mb-md">
+                <div class="card mb-4">
                     <div class="card-body">
-                        <div class="d-flex justify-between align-start mb-sm">
+                        <div class="flex justify-between items-start mb-2">
                             <div>
-                                <p class="fw-semibold m-0">{{ review.user_name|default:"Anonymous" }}</p>
-                                <div class="d-flex gap-xxs mt-xs text-warning">
+                                <p class="font-semibold m-0">{{ review.user_name|default:"Anonymous" }}</p>
+                                <div class="flex gap-0.5 mt-1 text-warning">
                                     {% for i in "12345" %}
                                         {% if forloop.counter <= review.rating %}
                                         {% icon "star" %}
                                         {% else %}
-                                        {% icon "star-outline" css_class="text-medium" %}
+                                        {% icon "star-outline" css_class="text-base-content/30" %}
                                         {% endif %}
                                     {% endfor %}
                                 </div>
                             </div>
-                            <span class="fs-xs text-secondary">{{ review.created_at }}</span>
+                            <span class="text-xs text-base-content/60">{{ review.created_at }}</span>
                         </div>
                         {% if review.title %}
-                        <h4 class="fw-semibold mb-xs m-0">{{ review.title }}</h4>
+                        <h4 class="font-semibold mb-1 m-0">{{ review.title }}</h4>
                         {% endif %}
-                        <p class="text-secondary m-0">{{ review.comment }}</p>
+                        <p class="text-base-content/60 m-0">{{ review.comment }}</p>
                     </div>
                 </div>
                 {% endfor %}
                 {% else %}
-                <div class="flex flex-col items-center text-center py-12 mt-4">
-                    <div class="text-4xl mb-4 opacity-40">
+                <div class="flex flex-col items-center text-center py-12">
+                    <div class="text-4xl mb-4 text-base-content/40">
                         {% icon "chatbubbles-outline" %}
                     </div>
                     <h3 class="text-lg font-semibold mb-2">{% trans "No reviews yet" %}</h3>
-                    <p class="text-sm opacity-60">{% trans "Be the first to review this module" %}</p>
+                    <p class="text-sm text-base-content/60">{% trans "Be the first to review this module" %}</p>
                 </div>
                 {% endif %}
             </div>
 
-            <!-- Changelog Tab -->
-            <div class="tab-panel" :class="{ 'tab-panel--active': activeTab === 'changelog' }" x-show="activeTab === 'changelog'">
-                <div class="card mt-lg">
+            <!-- Changelog -->
+            <div class="tab-content pt-6" :class="activeTab === 'changelog' ? 'tab-content-active' : 'tab-content'">
+                <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">{% trans "Changelog" %}</h3>
                     </div>
@@ -271,9 +219,9 @@
                             {{ module.changelog|linebreaks }}
                         </div>
                         {% else %}
-                        <div class="text-center py-xl">
-                            {% icon "document-text-outline" css_class="fs-4xl text-medium" %}
-                            <p class="text-secondary mt-md m-0">{% trans "No changelog available" %}</p>
+                        <div class="text-center py-12">
+                            {% icon "document-text-outline" css_class="text-4xl text-base-content/30" %}
+                            <p class="text-base-content/60 mt-4 m-0">{% trans "No changelog available" %}</p>
                         </div>
                         {% endif %}
                     </div>
@@ -284,7 +232,7 @@
         <!-- Related Modules -->
         {% if related_modules %}
         <div class="mt-xl">
-            <h2 class="fs-xl fw-semibold mb-md">{% trans "Related Modules" %}</h2>
+            <h2 class="text-xl font-semibold mb-4">{% trans "Related Modules" %}</h2>
             <div class="module-grid module-grid-3">
                 {% for related in related_modules %}
                 {% include "system/modules/partials/module_card.html" with module=related card_context='marketplace' %}
@@ -308,72 +256,10 @@ document.addEventListener('click', function(e) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (action === 'download') {
+    if (action === 'install-module') {
         downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
-    } else if (action === 'install-free') {
-        installFreeModule(button.dataset.moduleId, button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
-    } else if (action === 'purchase') {
-        purchaseModule(button.dataset.moduleId, button);
-    } else if (action === 'add-to-cart') {
-        addToCartDetail(button);
     }
 });
-
-// Install free module
-async function installFreeModule(moduleId, moduleSlug, downloadUrl, button, moduleDir) {
-    setButtonLoading(button, true);
-    try {
-        const purchaseResponse = await fetch('{% url "mymodules:api_purchase" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ module_id: moduleId })
-        });
-        const purchaseData = await purchaseResponse.json();
-
-        if (!purchaseData.success && !purchaseData.is_free && !purchaseData.already_owned) {
-            Toast.error(purchaseData.error || '{% trans "Error acquiring module" %}');
-            return;
-        }
-
-        if (downloadUrl) {
-            await downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir);
-        } else {
-            Toast.warning('{% trans "Module acquired. Download not available yet." %}');
-            setTimeout(() => window.location.reload(), 1500);
-        }
-    } catch (error) {
-        Toast.error('{% trans "Error acquiring module" %}');
-    } finally {
-        setButtonLoading(button, false);
-    }
-}
-
-// Purchase paid module
-async function purchaseModule(moduleId, button) {
-    setButtonLoading(button, true);
-    try {
-        const response = await fetch('{% url "mymodules:api_purchase" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ module_id: moduleId })
-        });
-        const data = await response.json();
-
-        if (data.success && data.checkout_url) {
-            window.open(data.checkout_url, '_blank');
-            Toast.info('{% trans "Complete payment in the opened window" %}');
-        } else if (data.already_owned) {
-            Toast.warning('{% trans "You already own this module" %}');
-            setTimeout(() => window.location.reload(), 1500);
-        } else {
-            Toast.error(data.error || '{% trans "Error starting purchase" %}');
-        }
-    } catch (error) {
-        Toast.error('{% trans "Error processing purchase" %}');
-    } finally {
-        setButtonLoading(button, false);
-    }
-}
 
 // Download and install module
 async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir) {
@@ -434,7 +320,7 @@ function markAsInstalled(button) {
     }
 
     // If on detail page, update the hero actions section
-    const detailActions = document.querySelector('.module-detail-actions');
+    const detailActions = document.querySelector('[data-role="module-actions"]');
     if (detailActions) {
         const actionBtn = detailActions.querySelector('button[data-action]');
         if (actionBtn) {
@@ -444,7 +330,7 @@ function markAsInstalled(button) {
             actionBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="20" height="20" fill="currentColor"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg> <span>{% trans "Installed" %}</span>';
         }
         // Add installed badge
-        const badges = document.querySelector('.module-detail-info .d-flex.flex-wrap.gap-sm');
+        const badges = document.querySelector('[data-role="module-badges"]');
         if (badges && !badges.querySelector('.color-success')) {
             const chip = document.createElement('span');
             chip.className = 'chip color-success';
@@ -464,51 +350,6 @@ function setButtonLoading(button, loading) {
         button.innerHTML = '<div class="loading loading-sm"></div>';
     } else if (button.dataset.originalContent) {
         button.innerHTML = button.dataset.originalContent;
-    }
-}
-
-// Add to cart (detail page)
-async function addToCartDetail(button) {
-    setButtonLoading(button, true);
-    try {
-        var tierSelect = document.getElementById('assistant-tier-select');
-        var tierSlug = tierSelect ? tierSelect.value : '';
-        var dynamicPrice = tierSelect ? parseFloat(tierSelect.selectedOptions[0].dataset.price) : null;
-        var itemPrice = dynamicPrice || (parseFloat(button.dataset.modulePrice) || 0);
-
-        var payload = {
-            item_id: button.dataset.moduleSlug,
-            module_id: button.dataset.moduleId,
-            item_name: button.dataset.moduleName,
-            item_price: itemPrice,
-            item_icon: button.dataset.moduleIcon || 'cube-outline',
-            item_type: button.dataset.moduleType || 'one_time',
-            quantity: 1
-        };
-        if (tierSlug) payload.tier_slug = tierSlug;
-
-        const response = await fetch('{% url "marketplace:cart_add" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        if (data.success) {
-            Toast.success(button.dataset.moduleName + ' {% trans "added to cart" %}');
-            var badge = document.getElementById('cart-badge');
-            if (badge) {
-                badge.textContent = data.cart_count;
-                badge.style.display = '';
-            }
-            document.dispatchEvent(new CustomEvent('cart:open'));
-            htmx.trigger(document.body, 'cart:refresh');
-        } else {
-            Toast.error(data.error || '{% trans "Error adding to cart" %}');
-        }
-    } catch (error) {
-        Toast.error('{% trans "Error adding to cart" %}');
-    } finally {
-        setButtonLoading(button, false);
     }
 }
 
@@ -622,52 +463,8 @@ if (typeof window.openReviewModal !== 'function') {
 </script>
 
 <style>
-.module-detail-header {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-}
-
-.module-detail-icon {
-    flex-shrink: 0;
-}
-
-.module-detail-info {
-    flex: 1;
-    min-width: 200px;
-}
-
-.module-detail-actions {
-    flex-shrink: 0;
-    min-width: 200px;
-}
-
-@media (max-width: 768px) {
-    .module-detail-header {
-        flex-direction: column;
-    }
-
-    .module-detail-actions {
-        width: 100%;
-    }
-}
-
-.markdown-content {
-    line-height: 1.6;
-}
-
-.markdown-content p {
-    margin-bottom: 1rem;
-}
-
-.markdown-content ul,
-.markdown-content ol {
-    margin-bottom: 1rem;
-    padding-left: 2rem;
-}
-
-.markdown-content li {
-    margin-bottom: 0.5rem;
-}
-
+.markdown-content { line-height: 1.6; }
+.markdown-content p { margin-bottom: 1rem; }
+.markdown-content ul, .markdown-content ol { margin-bottom: 1rem; padding-left: 2rem; }
+.markdown-content li { margin-bottom: 0.5rem; }
 </style>

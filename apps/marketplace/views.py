@@ -1,5 +1,5 @@
 """
-Marketplace Views - Multi-store marketplace with sidebar filters and cart
+Marketplace Views - Multi-store marketplace with sidebar filters
 
 Tabs:
 - Modules: Software modules from Cloud marketplace
@@ -9,6 +9,8 @@ Tabs:
 import json
 import logging
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from pathlib import Path
 
 from django.core.cache import cache
@@ -22,6 +24,21 @@ from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 
 logger = logging.getLogger(__name__)
+
+
+def _get_session():
+    """Get a requests session with automatic retry on connection errors.
+
+    Retries on connection resets/timeouts (common after long idle periods
+    when the underlying TCP connection goes stale in the pool).
+    """
+    session = requests.Session()
+    retry = Retry(total=2, backoff_factor=0.3, status_forcelist=[502, 503, 504])
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
+
 
 # Cache TTL (seconds)
 _CACHE_TTL = getattr(django_settings, 'MARKETPLACE_CACHE_TTL', 300)
@@ -46,6 +63,12 @@ def _marketplace_navigation(active_tab):
             'icon': 'cube-outline',
             'label': str(_('Modules')),
             'active': active_tab == 'modules',
+        },
+        {
+            'url': reverse('marketplace:my_purchases'),
+            'icon': 'bag-check-outline',
+            'label': str(_('My Purchases')),
+            'active': active_tab == 'purchases',
         },
         {
             'url': reverse('marketplace:business_types'),
@@ -133,7 +156,7 @@ def get_store_config(store_type):
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/marketplace_content.html')
 def store_index(request, store_type='modules'):
     """
-    Main marketplace view with sidebar filters and cart.
+    Main marketplace view with sidebar filters.
     """
     from apps.configuration.models import HubConfig
 
@@ -148,9 +171,6 @@ def store_index(request, store_type='modules'):
     # Get filters based on store type
     filters_data = _get_filters_for_store(store_type, language, request)
 
-    # Get cart for this store type
-    cart = get_cart(request, store_type)
-
     return {
         'current_section': 'marketplace',
         'page_title': 'Marketplace',
@@ -158,8 +178,6 @@ def store_index(request, store_type='modules'):
         'store_config': config,
         'store_types': STORE_TYPES,
         'filters': filters_data,
-        'cart': cart,
-        'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('modules'),
     }
 
@@ -210,7 +228,7 @@ def _fetch_industries_for_filters():
         return []
 
     try:
-        response = requests.get(
+        response = _get_session().get(
             f"{cloud_api_url}/api/marketplace/industries/",
             headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
             timeout=10,
@@ -241,7 +259,7 @@ def _fetch_industry_modules(slug):
         return {}
 
     try:
-        response = requests.get(
+        response = _get_session().get(
             f"{cloud_api_url}/api/marketplace/industries/{slug}/",
             headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
             timeout=10,
@@ -272,7 +290,7 @@ def _fetch_solutions_for_filters():
         cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
         solutions = []
         try:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/solutions/",
                 headers={'Accept': 'application/json'},
                 timeout=10,
@@ -363,194 +381,26 @@ def _get_filters_for_store(store_type, language, request):
     return filters
 
 
-# Cart Management
-
-def get_cart_key(store_type):
-    """Get session key for cart by store type"""
-    return f'marketplace_cart_{store_type}'
-
-
-def get_cart(request, store_type):
-    """Get cart from session for specific store type"""
-    key = get_cart_key(store_type)
-    return request.session.get(key, {'items': [], 'total': 0})
-
-
-def save_cart(request, store_type, cart):
-    """Save cart to session"""
-    key = get_cart_key(store_type)
-    request.session[key] = cart
-    request.session.modified = True
-
+# Cancel subscription
 
 @login_required
-def cart_add(request, store_type):
-    """Add item to cart — returns JSON for JS fetch calls."""
+def cancel_subscription(request):
+    """Cancel a module subscription via Cloud API."""
     if request.method != 'POST':
         return HttpResponse(status=405)
 
     try:
         data = json.loads(request.body)
-        item_id = data.get('item_id')
         module_id = data.get('module_id', '')
-        item_name = data.get('item_name', '')
-        item_price = float(data.get('item_price', 0))
-        item_icon = data.get('item_icon', 'cube-outline')
-        item_type = data.get('item_type', 'one_time')
-        quantity = int(data.get('quantity', 1))
-        tier_slug = data.get('tier_slug', '')
     except (json.JSONDecodeError, ValueError):
         return HttpResponse(
             json.dumps({'success': False, 'error': 'Invalid data'}),
             content_type='application/json', status=400,
         )
 
-    if not item_id:
+    if not module_id:
         return HttpResponse(
-            json.dumps({'success': False, 'error': 'Missing item_id'}),
-            content_type='application/json', status=400,
-        )
-
-    cart = get_cart(request, store_type)
-
-    # Check if item already in cart (for tiered modules, different tiers = different items)
-    for item in cart['items']:
-        if item['id'] == item_id and item.get('tier_slug', '') == tier_slug:
-            item['quantity'] += quantity
-            break
-    else:
-        cart_item = {
-            'id': item_id,
-            'module_id': module_id,
-            'name': item_name,
-            'price': item_price,
-            'icon': item_icon,
-            'module_type': item_type,
-            'quantity': quantity,
-        }
-        if tier_slug:
-            cart_item['tier_slug'] = tier_slug
-        cart['items'].append(cart_item)
-
-    # Recalculate total
-    cart['total'] = sum(item['price'] * item['quantity'] for item in cart['items'])
-    save_cart(request, store_type, cart)
-
-    return HttpResponse(
-        json.dumps({
-            'success': True,
-            'cart_count': len(cart['items']),
-            'cart_total': cart['total'],
-        }),
-        content_type='application/json',
-    )
-
-
-@login_required
-def cart_remove(request, store_type, item_id):
-    """Remove item from cart (HTMX endpoint)"""
-    if request.method != 'DELETE':
-        return HttpResponse(status=405)
-
-    cart = get_cart(request, store_type)
-    cart['items'] = [item for item in cart['items'] if item['id'] != item_id]
-    cart['total'] = sum(item['price'] * item['quantity'] for item in cart['items'])
-    save_cart(request, store_type, cart)
-
-    html = render_to_string('marketplace/partials/cart_content.html', {
-        'cart': cart,
-        'store_type': store_type,
-    }, request=request)
-
-    badge_count = len(cart['items'])
-    hidden_attr = ' style="display:none"' if badge_count == 0 else ''
-    badge_html = (
-        f'<span id="cart-badge" class="badge badge-sm color-error" hx-swap-oob="true"'
-        f'{hidden_attr}>{badge_count}</span>'
-    )
-
-    return HttpResponse(html + badge_html)
-
-
-@login_required
-def cart_clear(request, store_type):
-    """Clear entire cart (HTMX endpoint)"""
-    if request.method != 'DELETE':
-        return HttpResponse(status=405)
-
-    save_cart(request, store_type, {'items': [], 'total': 0})
-
-    html = render_to_string('marketplace/partials/cart_content.html', {
-        'cart': {'items': [], 'total': 0},
-        'store_type': store_type,
-    }, request=request)
-
-    badge_html = '<span id="cart-badge" class="badge badge-sm color-error" hx-swap-oob="true" style="display:none">0</span>'
-
-    return HttpResponse(html + badge_html)
-
-
-@login_required
-def cart_view(request, store_type):
-    """Get cart content (HTMX endpoint)"""
-    cart = get_cart(request, store_type)
-
-    html = render_to_string('marketplace/partials/cart_content.html', {
-        'cart': cart,
-        'store_type': store_type,
-    }, request=request)
-
-    return HttpResponse(html)
-
-
-@login_required
-@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/cart_page_content.html')
-def cart_page(request, store_type='modules'):
-    """
-    Full cart page view.
-    Uses same layout as store, but shows cart page content.
-    """
-    config = get_store_config(store_type)
-    cart = get_cart(request, store_type)
-
-    # Calculate cart summary
-    subtotal = sum(item['price'] * item.get('quantity', 1) for item in cart.get('items', []))
-    tax_rate = 21  # Default VAT rate
-    tax = subtotal * (tax_rate / 100)
-    total = subtotal + tax
-
-    cart_summary = {
-        'items': cart.get('items', []),
-        'count': len(cart.get('items', [])),
-        'subtotal': subtotal,
-        'tax_rate': tax_rate,
-        'tax': tax if subtotal > 0 else 0,
-        'total': total if subtotal > 0 else 0,
-    }
-
-    return {
-        'current_section': 'marketplace',
-        'page_title': 'Cart',
-        'store_type': store_type,
-        'store_config': config,
-        'cart': cart_summary,
-        'cart_count': cart_summary['count'],
-        'navigation': _marketplace_navigation('modules'),
-    }
-
-
-# Cart Checkout
-
-@login_required
-def cart_checkout(request, store_type='modules'):
-    """Create Stripe Checkout session for cart items via Cloud API."""
-    if request.method != 'POST':
-        return HttpResponse(status=405)
-
-    cart = get_cart(request, store_type)
-    if not cart['items']:
-        return HttpResponse(
-            json.dumps({'success': False, 'error': str(_('Cart is empty'))}),
+            json.dumps({'success': False, 'error': 'Missing module_id'}),
             content_type='application/json', status=400,
         )
 
@@ -567,22 +417,9 @@ def cart_checkout(request, store_type='modules'):
     cloud_api_url = _get_cloud_api_url()
 
     try:
-        response = requests.post(
-            f"{cloud_api_url}/api/marketplace/cart/checkout/",
-            json={
-                'items': [
-                    {
-                        'module_id': item.get('module_id', item['id']),
-                        'module_slug': item['id'],
-                        'quantity': item.get('quantity', 1),
-                        **(({'tier_slug': item['tier_slug']} if item.get('tier_slug') else {})),
-                    }
-                    for item in cart['items']
-                ],
-                'success_url': request.build_absolute_uri('/marketplace/?checkout=success'),
-                'cancel_url': request.build_absolute_uri('/marketplace/?checkout=cancel'),
-                'ui_mode': 'embedded',
-            },
+        response = _get_session().post(
+            f"{cloud_api_url}/api/marketplace/modules/{module_id}/cancel-subscription/",
+            json={},
             headers={
                 'X-Hub-Token': auth_token,
                 'Content-Type': 'application/json',
@@ -590,57 +427,102 @@ def cart_checkout(request, store_type='modules'):
             timeout=30,
         )
 
+        resp_data = response.json()
         if response.status_code == 200:
-            data = response.json()
-            if data.get('client_secret'):
-                # Embedded checkout — return client_secret for modal
-                return HttpResponse(
-                    json.dumps({
-                        'success': True,
-                        'client_secret': data['client_secret'],
-                        'session_id': data.get('session_id'),
-                        'stripe_publishable_key': data.get('stripe_publishable_key', ''),
-                    }),
-                    content_type='application/json',
-                )
-            elif data.get('checkout_url'):
-                # Fallback: hosted checkout (redirect)
-                return HttpResponse(
-                    json.dumps({
-                        'success': True,
-                        'checkout_url': data['checkout_url'],
-                        'session_id': data.get('session_id'),
-                    }),
-                    content_type='application/json',
-                )
-            else:
-                # All free or already owned
-                return HttpResponse(
-                    json.dumps({
-                        'success': True,
-                        'message': data.get('message', str(_('No paid items to checkout.'))),
-                    }),
-                    content_type='application/json',
-                )
-        else:
-            error_data = {}
-            try:
-                error_data = response.json()
-            except Exception:
-                pass
             return HttpResponse(
-                json.dumps({
-                    'success': False,
-                    'error': error_data.get('error', f'Cloud API returned {response.status_code}'),
-                }),
-                content_type='application/json', status=500,
+                json.dumps({'success': True, 'message': resp_data.get('message', '')}),
+                content_type='application/json',
             )
-
+        else:
+            return HttpResponse(
+                json.dumps({'success': False, 'error': resp_data.get('error', 'Failed to cancel')}),
+                content_type='application/json', status=response.status_code,
+            )
     except requests.exceptions.RequestException as e:
         return HttpResponse(
             json.dumps({'success': False, 'error': str(e)}),
             content_type='application/json', status=500,
         )
+
+
+# My Purchases
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/my_purchases_content.html')
+def my_purchases(request):
+    """My Purchases — show paid purchases from Cloud with subscription status."""
+    from apps.configuration.models import HubConfig
+
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return {
+            'current_section': 'marketplace',
+            'page_title': _('My Purchases'),
+            'error': str(_('Hub not connected to Cloud. Please connect in Settings.')),
+            'navigation': _marketplace_navigation('purchases'),
+        }
+
+    cloud_api_url = _get_cloud_api_url()
+
+    try:
+        response = _get_session().get(
+            f"{cloud_api_url}/api/marketplace/modules/my_purchases/",
+            headers={
+                'X-Hub-Token': auth_token,
+                'Content-Type': 'application/json',
+            },
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return {
+                'current_section': 'marketplace',
+                'page_title': _('My Purchases'),
+                'error': str(_('Could not fetch purchases from Cloud.')),
+                'navigation': _marketplace_navigation('purchases'),
+            }
+        purchases = response.json()
+    except requests.exceptions.RequestException:
+        return {
+            'current_section': 'marketplace',
+            'page_title': _('My Purchases'),
+            'error': str(_('Could not connect to Cloud.')),
+            'navigation': _marketplace_navigation('purchases'),
+        }
+
+    installed_module_ids = _get_installed_module_ids()
+
+    for p in purchases:
+        p['is_installed'] = (
+            p.get('module_slug', '') in installed_module_ids
+            or p.get('module_id', '') in installed_module_ids
+        )
+        p['detail_url'] = reverse(
+            'marketplace:module_detail',
+            kwargs={'slug': p.get('module_slug', '')},
+        )
+        # Use subscription_price_monthly (real module price) over amount paid
+        monthly = p.get('subscription_price_monthly') or p.get('price') or 0
+        try:
+            monthly = float(monthly)
+            p['annual_cost'] = f"{monthly * 12:.2f}" if monthly else ''
+            # Ensure price reflects the real subscription price, not trial $0
+            if p.get('subscription_price_monthly') and not p.get('price'):
+                p['price'] = monthly
+        except (TypeError, ValueError):
+            p['annual_cost'] = ''
+
+    # Sort: active/trialing first, then canceled, then expired/other
+    status_order = {'active': 0, 'trialing': 1, 'past_due': 2, 'canceled': 3, 'expired': 4}
+    purchases.sort(key=lambda p: status_order.get(p.get('subscription_status', ''), 5))
+
+    return {
+        'current_section': 'marketplace',
+        'page_title': _('My Purchases'),
+        'purchases': purchases,
+        'navigation': _marketplace_navigation('purchases'),
+    }
 
 
 # Filters endpoint
@@ -682,7 +564,7 @@ def _create_roles_for_installed_modules(module_slugs):
     solution_slugs_to_fetch = set()
     for slug in module_slugs:
         try:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/modules/{slug}/",
                 headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
                 timeout=10,
@@ -701,7 +583,7 @@ def _create_roles_for_installed_modules(module_slugs):
     from apps.core.services.permission_service import PermissionService
     for sol_slug in solution_slugs_to_fetch:
         try:
-            resp = requests.get(
+            resp = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/solutions/{sol_slug}/",
                 headers={'Accept': 'application/json'},
                 timeout=15,
@@ -758,38 +640,50 @@ def products_list(request, store_type):
 
 
 def _fetch_all_modules():
-    """Fetch all modules from Cloud API (cached). Returns list or None on auth error."""
+    """Fetch all modules from Cloud API (cached).
+
+    Returns:
+        tuple: (modules_list or None, error_message or None)
+    """
     cached = cache.get(_CK_MODULES_LIST)
     if cached is not None:
-        return cached
+        return cached, None
 
     from apps.configuration.models import HubConfig
     hub_config = HubConfig.get_solo()
     auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
     if not auth_token:
-        return None
+        return None, str(_('Hub not connected to Cloud. Please connect in Settings.'))
 
     cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
     headers = {'Accept': 'application/json', 'X-Hub-Token': auth_token}
 
     try:
-        response = requests.get(
+        response = _get_session().get(
             f"{cloud_api_url}/api/marketplace/modules/",
             headers=headers,
             timeout=30,
         )
         if response.status_code != 200:
-            return None
+            logger.warning(f"[MARKETPLACE] Cloud API returned {response.status_code}")
+            return None, str(_('Could not load modules from Cloud (error %(code)s). Please try again.') % {'code': response.status_code})
 
         data = response.json()
         modules = data.get('results', data) if isinstance(data, dict) else data
         if not isinstance(modules, list):
             modules = []
         cache.set(_CK_MODULES_LIST, modules, _CACHE_TTL)
-        return modules
-    except requests.exceptions.RequestException:
-        return None
+        return modules, None
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"[MARKETPLACE] Connection error fetching modules: {e}")
+        return None, str(_('Connection error. Please check your internet connection and try again.'))
+    except requests.exceptions.Timeout as e:
+        logger.error(f"[MARKETPLACE] Timeout fetching modules: {e}")
+        return None, str(_('Cloud is taking too long to respond. Please try again.'))
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[MARKETPLACE] Error fetching modules: {e}")
+        return None, str(_('Could not connect to Cloud. Please try again.'))
 
 
 def _fetch_modules_list(request, search_query, solution_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
@@ -798,10 +692,10 @@ def _fetch_modules_list(request, search_query, solution_filter, industry_filter,
 
     installed_module_ids = _get_installed_module_ids()
 
-    modules = _fetch_all_modules()
+    modules, error = _fetch_all_modules()
     if modules is None:
         html = render_to_string('marketplace/partials/error.html', {
-            'error': 'Hub not connected to Cloud. Please connect in Settings.'
+            'error': error or 'Unknown error'
         }, request=request)
         return HttpResponse(html)
 
@@ -943,7 +837,6 @@ def module_detail(request, slug):
         return {
             'current_section': 'marketplace',
             'error': 'Hub not connected to Cloud. Please connect in Settings.',
-            'cart_count': 0,
         }
 
     installed_module_ids = _get_installed_module_ids()
@@ -956,7 +849,7 @@ def module_detail(request, slug):
         cache_key = f"{_CK_MODULE_DETAIL}{slug}"
         module = cache.get(cache_key)
         if module is None:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/modules/{slug}/",
                 headers=headers,
                 timeout=30
@@ -966,14 +859,12 @@ def module_detail(request, slug):
                 return {
                     'current_section': 'marketplace',
                     'error': f'Module "{slug}" not found.',
-                    'cart_count': 0,
                 }
 
             if response.status_code != 200:
                 return {
                     'current_section': 'marketplace',
                     'error': f'Cloud API returned {response.status_code}',
-                    'cart_count': 0,
                 }
 
             module = response.json()
@@ -986,7 +877,7 @@ def module_detail(request, slug):
         is_owned = module.get('is_owned', False)
         if not is_owned:
             try:
-                ownership_response = requests.get(
+                ownership_response = _get_session().get(
                     f"{cloud_api_url}/api/marketplace/modules/{module.get('id', '')}/check_ownership/",
                     headers=headers,
                     timeout=10
@@ -1000,12 +891,9 @@ def module_detail(request, slug):
         # Determine if free
         is_free = module.get('module_type') == 'free' or module.get('price', 0) == 0
 
-        # Get cart count
-        cart = get_cart(request, 'modules')
-
         # Related modules (same category) — use cached modules list
         related_modules = []
-        all_modules = _fetch_all_modules()
+        all_modules, _ = _fetch_all_modules()
         if all_modules:
             category = module.get('category', '')
             related_modules = [
@@ -1022,7 +910,6 @@ def module_detail(request, slug):
             'is_free': is_free,
             'related_modules': related_modules,
             'back_url': reverse('marketplace:index'),
-            'cart_count': len(cart.get('items', [])),
             'navigation': _marketplace_navigation('modules'),
         }
 
@@ -1030,7 +917,6 @@ def module_detail(request, slug):
         return {
             'current_section': 'marketplace',
             'error': f'Failed to connect to Cloud: {str(e)}',
-            'cart_count': 0,
         }
 
 
@@ -1049,12 +935,10 @@ SOLUTIONS_BLOCK_TYPES = [
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/solutions_content.html')
 def solutions_index(request):
     """Functional blocks DataTable wrapper — content loads via HTMX from solutions_list."""
-    cart = get_cart(request, 'modules')
     return {
         'current_section': 'marketplace',
         'page_title': _('Solutions'),
         'block_types': SOLUTIONS_BLOCK_TYPES,
-        'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('modules'),
     }
 
@@ -1067,7 +951,7 @@ def _fetch_solution_modules(slug, cloud_api_url):
         return slug, cached
 
     try:
-        r = requests.get(
+        r = _get_session().get(
             f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
             headers={'Accept': 'application/json'}, timeout=15,
         )
@@ -1106,7 +990,7 @@ def solutions_list(request):
     solutions = cache.get(_CK_SOLUTIONS_LIST)
     if solutions is None:
         try:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/solutions/",
                 headers={'Accept': 'application/json'}, timeout=15,
             )
@@ -1256,7 +1140,7 @@ def solutions_bulk_install(request):
         cloud_api_url = _get_cloud_api_url()
         for slug in block_slugs:
             try:
-                resp = requests.get(
+                resp = _get_session().get(
                     f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
                     headers={'Accept': 'application/json'}, timeout=15,
                 )
@@ -1278,7 +1162,12 @@ def solutions_bulk_install(request):
 
 @login_required
 def modules_bulk_install(request):
-    """POST: Install multiple modules at once."""
+    """POST: Install multiple modules at once.
+
+    All modules (free and premium) install the same way.
+    Premium modules are gated by ModuleSubscriptionMiddleware when the
+    user opens them — no purchase check at install time.
+    """
     if request.method != 'POST':
         return HttpResponse(status=405)
 
@@ -1301,59 +1190,74 @@ def modules_bulk_install(request):
     hub_token = ModuleInstallService.get_hub_token()
     cloud_api_url = _get_cloud_api_url()
 
-    modules_to_install = [
-        {
-            'slug': m['slug'],
-            'name': m.get('name', m['slug']),
-            'download_url': m.get('download_url', f"{cloud_api_url}/api/marketplace/modules/{m['slug']}/download/"),
-        }
-        for m in modules if m.get('slug')
-    ]
+    cache.delete(_CK_MODULES_LIST)
+    all_cloud_modules, _ = _fetch_all_modules()
+    all_cloud_modules = all_cloud_modules or []
+    catalog = {m.get('slug') or m.get('module_id'): m for m in all_cloud_modules}
+
+    modules_to_install = []
+
+    for m in modules:
+        slug = m.get('slug')
+        if not slug:
+            continue
+
+        cloud_mod = catalog.get(slug)
+        modules_to_install.append({
+            'slug': slug,
+            'name': (cloud_mod or {}).get('name', m.get('name', slug)),
+            'download_url': (cloud_mod or {}).get('download_url')
+                or f"{cloud_api_url}/api/marketplace/modules/{slug}/download/",
+        })
 
     # Resolve transitive dependencies
-    installed_ids = set(_get_installed_module_ids())
+    if modules_to_install:
+        installed_ids = set(_get_installed_module_ids())
+        all_slugs = {m['slug'] for m in modules_to_install}
+        dep_modules = ModuleInstallService._resolve_dependencies(
+            all_slugs, installed_ids, cloud_api_url, hub_token
+        )
+        if dep_modules:
+            for dep in dep_modules:
+                modules_to_install.append(dep)
 
-    all_slugs = {m['slug'] for m in modules_to_install}
-    dep_modules = ModuleInstallService._resolve_dependencies(
-        all_slugs, installed_ids, cloud_api_url, hub_token
-    )
-    if dep_modules:
+            logger.info(
+                "[BULK INSTALL] Adding %d dependency modules: %s",
+                len(dep_modules), [d['slug'] for d in dep_modules],
+            )
+
+    installed_count = 0
+    errors = []
+
+    if modules_to_install:
         logger.info(
-            "[BULK INSTALL] Adding %d dependency modules: %s",
-            len(dep_modules), [m['slug'] for m in dep_modules],
-        )
-        modules_to_install.extend(dep_modules)
-
-    logger.info(
-        "[BULK INSTALL] Installing %d modules: %s",
-        len(modules_to_install),
-        [m['slug'] for m in modules_to_install],
-    )
-
-    result = ModuleInstallService.bulk_download_and_install(modules_to_install, hub_token)
-
-    logger.info(
-        "[BULK INSTALL] Result: installed=%d, errors=%s, results=%s",
-        result.installed,
-        result.errors,
-        [(r.module_id, r.success, r.message) for r in (result.results or [])],
-    )
-
-    if result.installed > 0:
-        _invalidate_installed_cache()
-        ModuleInstallService.run_post_install(
-            load_all=True, run_migrations=True, schedule_restart=True,
+            "[BULK INSTALL] Installing %d modules: %s",
+            len(modules_to_install),
+            [m['slug'] for m in modules_to_install],
         )
 
-        # Auto-create roles for newly installed modules
-        installed_slugs = [m['slug'] for m in modules_to_install]
-        _create_roles_for_installed_modules(installed_slugs)
+        result = ModuleInstallService.bulk_download_and_install(modules_to_install, hub_token)
+        installed_count = result.installed
+        errors = result.errors
+
+        logger.info(
+            "[BULK INSTALL] Result: installed=%d, errors=%s",
+            result.installed, result.errors,
+        )
+
+        if result.installed > 0:
+            _invalidate_installed_cache()
+            ModuleInstallService.run_post_install(
+                load_all=True, run_migrations=True, schedule_restart=True,
+            )
+            installed_slugs = [m['slug'] for m in modules_to_install]
+            _create_roles_for_installed_modules(installed_slugs)
 
     return HttpResponse(json.dumps({
         'success': True,
-        'installed': result.installed,
-        'errors': result.errors,
-        'requires_restart': result.installed > 0,
+        'installed': installed_count,
+        'errors': errors,
+        'requires_restart': installed_count > 0,
     }), content_type='application/json')
 
 
@@ -1369,7 +1273,7 @@ def solution_detail(request, slug):
         sol_cache_key = f"{_CK_SOLUTION_DETAIL}{slug}:full"
         solution = cache.get(sol_cache_key)
         if solution is None:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
                 headers={'Accept': 'application/json'},
                 timeout=15,
@@ -1408,8 +1312,6 @@ def solution_detail(request, slug):
             else:
                 optional_modules.append(mod)
 
-        cart = get_cart(request, 'modules')
-
         return {
             'current_section': 'marketplace',
             'page_title': solution.get('name', 'Block'),
@@ -1419,7 +1321,6 @@ def solution_detail(request, slug):
             'all_installed': all_installed,
             'is_block_active': is_block_active,
             'back_url': reverse('marketplace:index'),
-            'cart_count': len(cart.get('items', [])),
             'navigation': _marketplace_navigation('modules'),
         }
 
@@ -1442,7 +1343,7 @@ def solution_install(request, slug):
 
     try:
         # Fetch solution detail to get modules
-        response = requests.get(
+        response = _get_session().get(
             f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
             headers={'Accept': 'application/json'},
             timeout=15,
@@ -1572,7 +1473,7 @@ def block_toggle(request, slug):
         if hub_config.hub_id:
             cloud_api_url = _get_cloud_api_url()
             try:
-                response = requests.get(
+                response = _get_session().get(
                     f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
                     headers={'Accept': 'application/json'},
                     timeout=15,
@@ -1608,13 +1509,10 @@ def business_types_index(request):
     """Business types list — browse by type to see recommended modules and roles."""
     industries = _fetch_industries_for_filters()
 
-    cart = get_cart(request, 'modules')
-
     return {
         'current_section': 'marketplace',
         'page_title': _('Business Types'),
         'industries': industries,
-        'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('business_types'),
     }
 
@@ -1641,7 +1539,7 @@ def business_type_detail(request, slug):
         ind_cache_key = f"{_CK_INDUSTRY_DETAIL}{slug}:full"
         industry = cache.get(ind_cache_key)
         if industry is None:
-            response = requests.get(
+            response = _get_session().get(
                 f"{cloud_api_url}/api/marketplace/industries/{slug}/",
                 headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
                 timeout=15,
@@ -1673,14 +1571,11 @@ def business_type_detail(request, slug):
                 or mod.get('module_id', '') in installed_ids
             )
 
-        cart = get_cart(request, 'modules')
-
         return {
             'current_section': 'marketplace',
             'page_title': industry.get('name', _('Business Type')),
             'industry': industry,
             'back_url': reverse('marketplace:business_types'),
-            'cart_count': len(cart.get('items', [])),
             'navigation': _marketplace_navigation('business_types'),
         }
 
@@ -1954,8 +1849,6 @@ def compliance_index(request):
         country['supported_count'] = supported
         country['requirement_count'] = len(country['requirements'])
 
-    cart = get_cart(request, 'modules')
-
     from apps.configuration.models import HubConfig
     hub_config = HubConfig.get_config()
 
@@ -1964,7 +1857,6 @@ def compliance_index(request):
         'page_title': _('Compliance'),
         'countries': countries,
         'hub_country': hub_config.country_code,
-        'cart_count': len(cart.get('items', [])),
         'navigation': _marketplace_navigation('compliance'),
     }
 
@@ -1974,3 +1866,237 @@ def compliance_detail(request, country_code):
     """Redirect to the main compliance page (accordion view)."""
     from django.shortcuts import redirect
     return redirect('marketplace:compliance')
+
+
+# =============================================================================
+# Module Pricing Page (Bouncer redirect target)
+# =============================================================================
+
+@login_required
+@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/module_pricing_content.html')
+def module_pricing(request, module_id):
+    """
+    Pricing page for a premium module.
+
+    Users land here when the ModuleSubscriptionMiddleware redirects them
+    because they haven't paid for a premium module.
+    """
+    from apps.core.middleware.module_subscription import (
+        _get_module_pricing, get_subscription_status,
+    )
+
+    # Read module metadata from module.py
+    modules_dir = Path(django_settings.MODULES_DIR)
+    module_name = module_id
+    module_icon = 'cube-outline'
+    module_description = ''
+    tiers = []
+    price_monthly = 0
+    default_tier_slug = ''
+
+    module_py = modules_dir / module_id / 'module.py'
+    if module_py.exists():
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                f'{module_id}.module', module_py,
+            )
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+
+            module_name = str(getattr(mod, 'MODULE_NAME', module_id))
+            module_icon = getattr(mod, 'MODULE_ICON', 'cube-outline')
+            menu = getattr(mod, 'MENU', {})
+            if menu and isinstance(menu, dict):
+                module_icon = menu.get('icon', module_icon)
+
+            pricing = getattr(mod, 'PRICING', {})
+            if pricing:
+                price_monthly = pricing.get('subscription_price_monthly', 0)
+
+            module_description = str(getattr(mod, 'MODULE_DESCRIPTION', ''))
+        except Exception:
+            pass
+
+    # Also try Cloud API for richer data (tiers, description, etc.)
+    cloud_api_url = _get_cloud_api_url()
+    try:
+        cache_key = f'{_CK_MODULE_DETAIL}{module_id}'
+        cloud_module = cache.get(cache_key)
+        if cloud_module is None:
+            from apps.configuration.models import HubConfig
+            hub_config = HubConfig.get_solo()
+            auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+            if auth_token:
+                resp = _get_session().get(
+                    f'{cloud_api_url}/api/marketplace/modules/{module_id}/',
+                    headers={'X-Hub-Token': auth_token, 'Accept': 'application/json'},
+                    timeout=10,
+                )
+                if resp.status_code == 200:
+                    cloud_module = resp.json()
+                    cache.set(cache_key, cloud_module, _CACHE_TTL)
+
+        if cloud_module:
+            module_name = cloud_module.get('name', module_name)
+            module_description = cloud_module.get('description', module_description)
+            if cloud_module.get('assistant_tiers'):
+                tiers = cloud_module['assistant_tiers']
+                default_tier_slug = tiers[0].get('slug', '') if tiers else ''
+            elif cloud_module.get('subscription_price_monthly'):
+                price_monthly = cloud_module['subscription_price_monthly']
+            elif cloud_module.get('price'):
+                price_monthly = cloud_module['price']
+    except Exception:
+        pass
+
+    # Get current subscription status
+    subscription_status = get_subscription_status(module_id)
+    show_trial = subscription_status not in ('expired',)  # No trial for returning users
+
+    # Calculate yearly savings if applicable
+    price_yearly = None
+    yearly_savings = 0
+    if price_monthly and not tiers:
+        price_yearly = round(float(price_monthly) * 10, 2)  # 2 months free
+        yearly_savings = round((1 - (price_yearly / (float(price_monthly) * 12))) * 100)
+
+    return {
+        'current_section': 'marketplace',
+        'page_title': f'{module_name} — {_("Pricing")}',
+        'content_template': 'marketplace/partials/module_pricing_content.html',
+        'module_id': module_id,
+        'module_name': module_name,
+        'module_icon': module_icon,
+        'module_description': module_description,
+        'tiers': tiers,
+        'default_tier_slug': default_tier_slug,
+        'price_monthly': price_monthly,
+        'price_yearly': price_yearly,
+        'yearly_savings': yearly_savings,
+        'subscription_status': subscription_status,
+        'show_trial': show_trial,
+    }
+
+
+@login_required
+def module_subscribe(request):
+    """
+    Create a Stripe Checkout session for a module subscription.
+
+    POST payload:
+    - module_id: the module directory name (e.g., 'tobacco')
+    - tier_slug: optional tier for tiered pricing (e.g., 'basic', 'pro')
+    """
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    try:
+        data = json.loads(request.body)
+        module_id = data.get('module_id', '')
+        tier_slug = data.get('tier_slug', '')
+    except (json.JSONDecodeError, ValueError):
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Invalid data'}),
+            content_type='application/json', status=400,
+        )
+
+    if not module_id:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Missing module_id'}),
+            content_type='application/json', status=400,
+        )
+
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_solo()
+    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
+
+    if not auth_token:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(_('Hub not connected to Cloud.'))}),
+            content_type='application/json', status=400,
+        )
+
+    cloud_api_url = _get_cloud_api_url()
+
+    try:
+        purchase_payload = {
+            'success_url': request.build_absolute_uri(f'/m/{module_id}/'),
+            'cancel_url': request.build_absolute_uri(f'/marketplace/pricing/{module_id}/'),
+            'ui_mode': 'embedded',
+        }
+        if tier_slug:
+            purchase_payload['tier_slug'] = tier_slug
+
+        response = _get_session().post(
+            f'{cloud_api_url}/api/marketplace/modules/{module_id}/purchase/',
+            json=purchase_payload,
+            headers={
+                'X-Hub-Token': auth_token,
+                'Content-Type': 'application/json',
+            },
+            timeout=30,
+        )
+
+        if response.status_code in (200, 201):
+            resp_data = response.json()
+
+            # Invalidate subscription cache on successful purchase
+            from apps.core.middleware.module_subscription import invalidate_subscription_cache
+            invalidate_subscription_cache(module_id)
+
+            if resp_data.get('client_secret'):
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'client_secret': resp_data['client_secret'],
+                        'session_id': resp_data.get('session_id', ''),
+                        'stripe_publishable_key': resp_data.get('stripe_publishable_key', ''),
+                    }),
+                    content_type='application/json',
+                )
+            elif resp_data.get('checkout_url'):
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'checkout_url': resp_data['checkout_url'],
+                    }),
+                    content_type='application/json',
+                )
+            else:
+                return HttpResponse(
+                    json.dumps({
+                        'success': True,
+                        'message': resp_data.get('message', str(_('Subscription processed.'))),
+                    }),
+                    content_type='application/json',
+                )
+
+        elif response.status_code == 409:
+            resp_data = response.json()
+            return HttpResponse(
+                json.dumps({
+                    'success': False,
+                    'error': resp_data.get('error', str(_('You already have a subscription.'))),
+                }),
+                content_type='application/json', status=409,
+            )
+        else:
+            error_data = {}
+            try:
+                error_data = response.json()
+            except Exception:
+                pass
+            return HttpResponse(
+                json.dumps({
+                    'success': False,
+                    'error': error_data.get('error', f'Cloud API returned {response.status_code}'),
+                }),
+                content_type='application/json', status=500,
+            )
+
+    except requests.exceptions.RequestException as e:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': str(e)}),
+            content_type='application/json', status=500,
+        )

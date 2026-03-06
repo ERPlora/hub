@@ -34,8 +34,9 @@ LABEL org.opencontainers.image.source="https://github.com/ERPlora/hub"
 
 WORKDIR /app
 
-# No apt-get needed: all Python deps have precompiled wheels for linux/amd64
-# Healthcheck uses Python instead of curl (see HEALTHCHECK below)
+# Install postgresql-client for pg_dump (database backups)
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install uv (fast Python package manager)
 RUN pip install --no-cache-dir uv

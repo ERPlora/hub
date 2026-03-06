@@ -1,13 +1,13 @@
 // ERPlora Hub Service Worker
-const CACHE_NAME = 'erplora-hub-v1';
+const CACHE_NAME = 'erplora-hub-v2';
 
-// Files to cache for offline use
+// Static assets to cache for offline use (never cache HTML pages)
 const STATIC_CACHE_URLS = [
-    '/',
     '/static/js/alpine.min.js',
     '/static/js/htmx.min.js',
     '/static/fonts/plus-jakarta-sans/plus-jakarta-sans.css',
     '/static/img/logo.png',
+    '/offline/',
 ];
 
 // Install event - cache static assets
@@ -46,7 +46,7 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event
 self.addEventListener('fetch', (event) => {
     // Skip non-GET requests
     if (event.request.method !== 'GET') {
@@ -66,45 +66,47 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    event.respondWith(
-        caches.match(event.request)
-            .then((cachedResponse) => {
-                if (cachedResponse) {
-                    // Return cached response and update cache in background
-                    event.waitUntil(
-                        fetch(event.request)
-                            .then((networkResponse) => {
-                                if (networkResponse && networkResponse.status === 200) {
-                                    caches.open(CACHE_NAME)
-                                        .then((cache) => cache.put(event.request, networkResponse));
-                                }
-                            })
-                            .catch(() => {/* Network failed, that's ok */})
-                    );
-                    return cachedResponse;
-                }
+    // Static assets: cache-first with background revalidation
+    if (url.pathname.startsWith('/static/')) {
+        event.respondWith(
+            caches.match(event.request)
+                .then((cachedResponse) => {
+                    if (cachedResponse) {
+                        // Serve from cache, update in background
+                        event.waitUntil(
+                            fetch(event.request)
+                                .then((networkResponse) => {
+                                    if (networkResponse && networkResponse.status === 200) {
+                                        caches.open(CACHE_NAME)
+                                            .then((cache) => cache.put(event.request, networkResponse));
+                                    }
+                                })
+                                .catch(() => {/* Network failed, that's ok */})
+                        );
+                        return cachedResponse;
+                    }
 
-                // Not in cache, fetch from network
-                return fetch(event.request)
-                    .then((networkResponse) => {
-                        // Cache successful responses for static assets
-                        if (networkResponse && networkResponse.status === 200) {
-                            const responseToCache = networkResponse.clone();
-
-                            // Only cache static assets
-                            if (url.pathname.startsWith('/static/')) {
+                    // Not in cache, fetch from network and cache it
+                    return fetch(event.request)
+                        .then((networkResponse) => {
+                            if (networkResponse && networkResponse.status === 200) {
+                                const responseToCache = networkResponse.clone();
                                 caches.open(CACHE_NAME)
                                     .then((cache) => cache.put(event.request, responseToCache));
                             }
-                        }
-                        return networkResponse;
-                    })
-                    .catch(() => {
-                        // Network failed and not in cache
-                        // Return offline page if available
-                        return caches.match('/offline/');
-                    });
-            })
+                            return networkResponse;
+                        })
+                        .catch(() => caches.match('/offline/'));
+                })
+        );
+        return;
+    }
+
+    // HTML/navigation requests: network-first, fallback to offline page
+    event.respondWith(
+        fetch(event.request)
+            .then((networkResponse) => networkResponse)
+            .catch(() => caches.match('/offline/'))
     );
 });
 

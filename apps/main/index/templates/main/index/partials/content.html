@@ -62,14 +62,13 @@
         {% endfor %}
 
         <!-- Get More -->
-        <a class="card card-body items-center text-center gap-2 no-underline text-base-content opacity-50 hover:opacity-80 border-2 border-dashed cursor-pointer"
+        <a class="card card-body items-center text-center gap-2 no-underline text-base-content opacity-50 hover:opacity-80 border-2 border-dashed cursor-pointer bg-transparent"
            href="/marketplace/"
            hx-get="/marketplace/"
            hx-target="#main-content-area"
            hx-push-url="true"
-           x-show="!searchQuery"
-           style="background: transparent;">
-            <div class="app-icon" style="background: transparent;">
+           x-show="!searchQuery">
+            <div class="app-icon bg-transparent">
                 {% icon "add" css_class="text-3xl" %}
             </div>
             <span class="text-sm font-medium">{% trans "Get More" %}</span>
@@ -79,7 +78,7 @@
     <!-- Empty state -->
     <div class="flex flex-col items-center text-center py-12">
         {% icon "extension-puzzle-outline" css_class="w-16 h-16 opacity-30 mb-4" %}
-        <h3 class="text-lg font-semibold mb-2">{% trans "No modules installed" %}</h3>
+        <h2 class="text-lg font-semibold mb-2">{% trans "No modules installed" %}</h2>
         <p class="opacity-60 mb-6">{% trans "Visit the Marketplace to add functionality to your Hub." %}</p>
         <a class="btn color-primary"
            href="/marketplace/"

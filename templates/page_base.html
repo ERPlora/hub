@@ -8,9 +8,10 @@
         <div class="header-start">
             <a id="back-button"
                class="btn btn-ghost btn-sm hidden"
-               href="#"
+               href="/"
                hx-target="#main-content-area"
-               hx-push-url="true">
+               hx-push-url="true"
+               aria-label="{% trans 'Go back' %}">
                 {% icon "arrow-back-outline" %}
             </a>
             <button class="btn btn-ghost btn-sm"
@@ -19,10 +20,12 @@
                 {% icon "menu-outline" %}
             </button>
         </div>
-        <span class="header-title" id="page-title">{% block page_title %}{% endblock %}</span>
+        <h1 class="header-title" id="page-title">{% block page_title %}{% endblock %}</h1>
         <div class="header-end">
-            <span class="loading loading-sm htmx-indicator"></span>
             {% block page_actions %}{% endblock %}
+        </div>
+        <div class="htmx-indicator absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden">
+            <div class="w-2/5 h-full bg-primary rounded-sm" style="animation: htmx-progress 1.2s ease-in-out infinite;"></div>
         </div>
     </div>
     {% endblock %}
@@ -35,4 +38,12 @@
     <footer id="global-tabbar-footer"></footer>
     {% endblock %}
 </main>
+
+<style>
+@keyframes htmx-progress {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(150%); }
+    100% { transform: translateX(300%); }
+}
+</style>
 {% endblock %}

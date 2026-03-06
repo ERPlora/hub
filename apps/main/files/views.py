@@ -1,7 +1,7 @@
 """
 Main System Views
 
-System page with resource monitoring, storage info, and file browser.
+System page with storage info, resource usage and file browser.
 """
 import os
 
@@ -13,11 +13,6 @@ from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required
 from apps.configuration.views_files import format_file_size
 
-def _get_db_limit():
-    """Get database size limit from plan env var (default 2 GB)."""
-    max_db_gb = float(os.environ.get('MAX_DATABASE_GB', '2'))
-    return int(max_db_gb * 1024 * 1024 * 1024)
-
 
 def _get_database_size():
     """Get PostgreSQL database size in bytes."""
@@ -27,49 +22,84 @@ def _get_database_size():
 
 
 def _get_resource_metrics():
-    """
-    Get container resource metrics from cgroups v2.
+    """Get container resource metrics from cgroups v2 (Docker) or env vars."""
+    metrics = {
+        'memory_used_mb': 0,
+        'memory_limit_mb': 0,
+        'memory_percent': 0,
+        'cpu_limit': 0,
+        'cpu_used': 0,
+        'cpu_percent': 0,
+        'is_cloud': bool(os.environ.get('HUB_ID')),
+    }
 
-    Returns dict with memory/cpu info or None if not in a container.
-    """
-    metrics = {}
-
-    # Memory
+    # Memory used: cgroup v2
     try:
         with open('/sys/fs/cgroup/memory.current', 'r') as f:
             memory_used = int(f.read().strip())
-        with open('/sys/fs/cgroup/memory.max', 'r') as f:
-            val = f.read().strip()
-            memory_limit = int(val) if val != 'max' else 0
         metrics['memory_used_mb'] = round(memory_used / (1024 * 1024))
-        metrics['memory_limit_mb'] = round(memory_limit / (1024 * 1024)) if memory_limit else 0
-        if metrics['memory_limit_mb'] > 0:
-            metrics['memory_percent'] = min(100, int(metrics['memory_used_mb'] / metrics['memory_limit_mb'] * 100))
-        else:
-            metrics['memory_percent'] = 0
-    except (FileNotFoundError, ValueError, PermissionError):
-        return None
+    except (FileNotFoundError, ValueError):
+        pass
 
-    # CPU limit from env var
-    cpu_limit = os.environ.get('CPU_LIMIT', '')
-    if cpu_limit:
-        try:
-            metrics['cpu_limit'] = float(cpu_limit)
-        except ValueError:
-            metrics['cpu_limit'] = 0
+    # Memory limit: env var (Dokploy), cgroup, or Docker inspect
+    mem_limit_env = os.environ.get('MEMORY_LIMIT', '')
+    if mem_limit_env.endswith('m'):
+        metrics['memory_limit_mb'] = int(mem_limit_env[:-1])
+    elif mem_limit_env.endswith('g'):
+        metrics['memory_limit_mb'] = int(mem_limit_env[:-1]) * 1024
     else:
-        metrics['cpu_limit'] = 0
+        try:
+            with open('/sys/fs/cgroup/memory.max', 'r') as f:
+                val = f.read().strip()
+                if val != 'max':
+                    metrics['memory_limit_mb'] = round(int(val) / (1024 * 1024))
+        except (FileNotFoundError, ValueError):
+            pass
 
-    # CPU usage from cgroup
+    if metrics['memory_limit_mb'] > 0 and metrics['memory_used_mb'] > 0:
+        metrics['memory_percent'] = round(
+            metrics['memory_used_mb'] / metrics['memory_limit_mb'] * 100
+        )
+
+    # CPU limit: env var (Dokploy) or cgroup
+    cpu_limit_env = os.environ.get('CPU_LIMIT', '')
+    if cpu_limit_env:
+        try:
+            metrics['cpu_limit'] = float(cpu_limit_env)
+        except ValueError:
+            pass
+    else:
+        try:
+            with open('/sys/fs/cgroup/cpu.max', 'r') as f:
+                parts = f.read().strip().split()
+                if parts[0] != 'max':
+                    metrics['cpu_limit'] = round(int(parts[0]) / int(parts[1]), 2)
+        except (FileNotFoundError, ValueError, IndexError):
+            pass
+
+    # CPU usage: cgroup v2 usage_usec / uptime = average CPU cores used
     try:
         with open('/sys/fs/cgroup/cpu.stat', 'r') as f:
             for line in f:
-                parts = line.strip().split()
-                if len(parts) == 2 and parts[0] == 'usage_usec':
-                    metrics['cpu_usage_usec'] = int(parts[1])
+                if line.startswith('usage_usec'):
+                    cpu_usage_usec = int(line.split()[1])
                     break
-    except (FileNotFoundError, ValueError, PermissionError):
-        metrics['cpu_usage_usec'] = 0
+            else:
+                cpu_usage_usec = 0
+
+        with open('/proc/uptime', 'r') as f:
+            uptime_sec = float(f.read().split()[0])
+
+        if uptime_sec > 0 and cpu_usage_usec > 0:
+            cpu_used = cpu_usage_usec / (uptime_sec * 1_000_000)
+            metrics['cpu_used'] = round(cpu_used, 2)
+
+            if metrics['cpu_limit'] > 0:
+                metrics['cpu_percent'] = min(100, round(
+                    cpu_used / metrics['cpu_limit'] * 100
+                ))
+    except (FileNotFoundError, ValueError, IndexError):
+        pass
 
     return metrics
 
@@ -77,25 +107,9 @@ def _get_resource_metrics():
 @login_required
 @htmx_view('main/files/pages/index.html', 'main/files/partials/content.html')
 def index(request):
-    """System page - resources, storage, and file browser."""
+    """System page - storage, resources and file browser."""
     db_size = _get_database_size()
-    db_limit = _get_db_limit()
-
-    # Database size indicator
-    db_percent = min(100, int((db_size / db_limit) * 100)) if db_limit else 0
-    # Color thresholds at 50% and 85% of limit
-    if db_percent < 50:
-        db_color = 'success'
-    elif db_percent < 85:
-        db_color = 'warning'
-    else:
-        db_color = 'error'
-
-    # Plan name from env (set by Cloud deployment)
-    plan_name = os.environ.get('PLAN_NAME', '')
-
-    # Resource metrics (only available inside Docker containers)
-    resource_metrics = _get_resource_metrics()
+    metrics = _get_resource_metrics()
 
     return {
         'current_section': 'files',
@@ -103,9 +117,5 @@ def index(request):
         'base_path': str(settings.DATA_DIR),
         'download_url': reverse('configuration:download_database'),
         'db_size': format_file_size(db_size),
-        'db_limit': format_file_size(db_limit),
-        'db_percent': db_percent,
-        'db_color': db_color,
-        'plan_name': plan_name,
-        'metrics': resource_metrics,
+        'metrics': metrics,
     }

@@ -10,9 +10,13 @@
     init() {
         this.$watch('view', v => localStorage.setItem('mp_view', v));
         this.$watch('perPage', v => localStorage.setItem('mp_per_page', v));
-        this.$nextTick(() => {
-            htmx.trigger(document.getElementById('datatable-body'), 'mpReady');
-        });
+        // Use setTimeout to ensure inline scripts have executed after HTMX swap
+        var self = this;
+        setTimeout(function() {
+            var qs = typeof gatherDatatableParams === 'function' ? gatherDatatableParams() : '';
+            var url = '{% url "marketplace:products_list" %}' + (qs ? '?' + qs : '');
+            htmx.ajax('GET', url, {target: '#datatable-body', swap: 'innerHTML'});
+        }, 0);
     },
     toggleCol(col) {
         this.cols[col] = !this.cols[col];
@@ -72,11 +76,12 @@
             if (data.success) {
                 if (data.installed > 0) {
                     Toast.success(data.installed + ' {% trans "modules installed" %}');
-                } else {
-                    Toast.info('{% trans "All modules already installed" %}');
                 }
                 if (data.errors && data.errors.length > 0) {
                     data.errors.forEach(function(err) { Toast.error(err); });
+                }
+                if (data.installed === 0) {
+                    Toast.info('{% trans "All modules already installed" %}');
                 }
                 self.clearSelection();
                 if (data.requires_restart) {
@@ -219,13 +224,9 @@
         <input type="hidden" name="type" id="filter-type" value="">
 
         <!-- Datatable Body (HTMX swap target) -->
-        <div id="datatable-body"
-             hx-get="{% url 'marketplace:products_list' %}"
-             hx-trigger="mpReady"
-             hx-include="#marketplace-datatable"
-             hx-swap="innerHTML">
-            <div class="flex justify-center py-8">
-                <div class="loading"></div>
+        <div id="datatable-body">
+            <div class="flex items-center justify-center py-16">
+                <span class="loading"></span>
             </div>
         </div>
     </div>
@@ -601,5 +602,6 @@
     };
 
     updateActiveFilters();
+
 })();
 </script>

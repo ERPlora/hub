@@ -53,7 +53,7 @@ def modules_index(request):
 
     if modules_dir.exists():
         for module_dir in modules_dir.iterdir():
-            if not module_dir.is_dir() or module_dir.name.startswith('.'):
+            if not module_dir.is_dir() or module_dir.name.startswith('.') or module_dir.name == '__pycache__':
                 continue
 
             module_id = module_dir.name
@@ -491,7 +491,7 @@ def _render_modules_page(request, error=None):
 
     if modules_dir.exists():
         for module_dir in modules_dir.iterdir():
-            if not module_dir.is_dir() or module_dir.name.startswith('.'):
+            if not module_dir.is_dir() or module_dir.name.startswith('.') or module_dir.name == '__pycache__':
                 continue
 
             module_id = module_dir.name
@@ -871,7 +871,10 @@ def module_delete(request, module_id):
         return JsonResponse({'success': False, 'error': _('Module not found')}, status=404)
 
     try:
-        shutil.rmtree(folder_to_delete)
+        if folder_to_delete.is_symlink():
+            folder_to_delete.unlink()
+        else:
+            shutil.rmtree(folder_to_delete)
 
         if request.htmx:
             return _render_modules_page(request)
@@ -1147,11 +1150,17 @@ def install_from_marketplace(request):
         module_slug = data.get('module_slug')
         download_url = data.get('download_url')
 
-        if not module_slug or not download_url:
+        if not module_slug:
             return JsonResponse({
                 'success': False,
-                'error': 'Missing module_slug or download_url'
+                'error': 'Missing module_slug'
             }, status=400)
+
+        # Auto-construct download URL if not provided
+        if not download_url:
+            from django.conf import settings as django_settings
+            cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com').rstrip('/')
+            download_url = f"{cloud_api_url}/api/marketplace/modules/{module_slug}/download/"
 
         hub_token = ModuleInstallService.get_hub_token()
         if not hub_token:

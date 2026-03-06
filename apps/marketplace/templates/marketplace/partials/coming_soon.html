@@ -1,6 +1,6 @@
 {% load i18n djicons %}
 
-<div class="p-4 coming-soon-state" style="text-align: center;">
+<div class="py-20 px-4 text-center">
     {% icon store_config.icon style="font-size: 80px; opacity: 0.6;" %}
     <h2>{{ store_config.name }}</h2>
     <span class="chip color-warning">
@@ -15,9 +15,3 @@
         {% trans "Browse Modules" %}
     </button>
 </div>
-
-<style>
-.coming-soon-state {
-    padding: 80px 20px;
-}
-</style>

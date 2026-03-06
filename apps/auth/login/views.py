@@ -20,49 +20,6 @@ from apps.configuration.models import HubConfig
 from apps.sync.models import TokenCache
 
 
-def verify_user_access_with_cloud(user):
-    """
-    Verify if user has active access to Hub by querying Cloud.
-
-    Runs during login to sync user state.
-    If Hub is offline, trust local state.
-    """
-    hub_config = HubConfig.get_config()
-
-    if not hub_config.is_configured:
-        return True, "hub_not_configured"
-
-    try:
-        response = requests.get(
-            f"{django_settings.CLOUD_API_URL}/api/hubs/{hub_config.hub_id}/users/check/{user.email}/",
-            headers={'X-Hub-Token': hub_config.cloud_api_token},
-            timeout=5
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            has_access = data.get('has_access', False)
-
-            if not has_access and user.is_active:
-                user.is_active = False
-                user.save(update_fields=['is_active'])
-                return False, "removed_from_cloud"
-            elif has_access and not user.is_active:
-                user.is_active = True
-                user.save(update_fields=['is_active'])
-                return True, "reactivated_from_cloud"
-
-            return has_access, "synced_with_cloud"
-        else:
-            return user.is_active, "cloud_error_use_local"
-
-    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        return user.is_active, "offline_use_local"
-    except Exception as e:
-        print(f"Error verifying access in Cloud: {str(e)}")
-        return user.is_active, "error_use_local"
-
-
 def login(request):
     """
     Login page - supports both local PIN login and Cloud login.
@@ -107,17 +64,8 @@ def verify_pin(request):
             return JsonResponse({'success': False, 'error': 'User not found'})
 
         if user.check_pin(pin):
-            has_access, reason = verify_user_access_with_cloud(user)
-
-            if not has_access:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Access denied. You have been removed from this Hub.',
-                    'reason': reason
-                })
-
             user.last_login = timezone.now()
-            user.save()
+            user.save(update_fields=['last_login'])
 
             request.session['local_user_id'] = str(user.id)
             request.session['hub_id'] = str(user.hub_id)
@@ -133,7 +81,6 @@ def verify_pin(request):
                     'name': user.name,
                     'email': user.email,
                 },
-                'sync_reason': reason
             })
         else:
             return JsonResponse({'success': False, 'error': 'Incorrect PIN'})
@@ -186,6 +133,14 @@ def cloud_login(request):
                         hub_config.cloud_public_key = public_key
                     hub_config.is_configured = True
                     hub_config.save()
+
+                    # Ensure roles and permissions exist with correct hub_id
+                    try:
+                        from apps.core.services.permission_service import PermissionService
+                        PermissionService.create_default_roles(str(hub_id))
+                        PermissionService.sync_all_module_permissions(str(hub_id))
+                    except Exception as e:
+                        logger.warning(f"Failed to sync roles/permissions: {e}")
 
                     # Start WebSocket client for heartbeat now that we have hub_jwt
                     try:
@@ -290,16 +245,19 @@ def cloud_login(request):
 
 @csrf_exempt
 def setup_pin(request):
-    """Setup PIN for first-time Cloud login user"""
+    """Setup PIN for first-time Cloud login user (SSO flow)"""
     if request.method == 'GET':
         pending_user_id = request.session.get('pending_user_id')
+        logger.info(f"[SETUP-PIN] GET request, pending_user_id={pending_user_id}")
 
         if not pending_user_id:
+            logger.info("[SETUP-PIN] No pending_user_id in session, redirecting to login")
             return redirect('auth:login')
 
         try:
             user = LocalUser.objects.get(id=pending_user_id)
         except LocalUser.DoesNotExist:
+            logger.warning(f"[SETUP-PIN] User {pending_user_id} not found, redirecting to login")
             return redirect('auth:login')
 
         pending_user_data = {
@@ -323,6 +281,8 @@ def setup_pin(request):
         if not user_id:
             user_id = request.session.get('pending_user_id')
 
+        logger.info(f"[SETUP-PIN] POST request, user_id={user_id}")
+
         if not user_id or not pin:
             return JsonResponse({'success': False, 'error': 'Missing data'})
 
@@ -332,11 +292,12 @@ def setup_pin(request):
         try:
             user = LocalUser.objects.get(id=user_id)
         except LocalUser.DoesNotExist:
+            logger.warning(f"[SETUP-PIN] User {user_id} not found")
             return JsonResponse({'success': False, 'error': 'User not found'})
 
         user.set_pin(pin)
         user.last_login = timezone.now()
-        user.save()
+        user.save(update_fields=['last_login'])
 
         if 'pending_user_id' in request.session:
             del request.session['pending_user_id']
@@ -344,15 +305,16 @@ def setup_pin(request):
             del request.session['pending_user_email']
 
         request.session['local_user_id'] = str(user.id)
-        request.session['hub_id'] = str(user.hub_id)
         request.session['user_name'] = user.name
         request.session['user_email'] = user.email
         request.session['user_role'] = user.role
         request.session['user_language'] = user.language
 
+        logger.info(f"[SETUP-PIN] PIN configured for {user.email}, session established")
         return JsonResponse({'success': True})
 
     except Exception as e:
+        logger.error(f"[SETUP-PIN] Error: {e}", exc_info=True)
         return JsonResponse({'success': False, 'error': str(e)})
 
 
