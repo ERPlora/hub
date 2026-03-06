@@ -52,7 +52,8 @@ class SubscriptionChecker:
             return cached_status
 
         # Si no hay conexión a Cloud configurada
-        if not self.hub_config.is_configured or not self.hub_config.cloud_api_token:
+        auth_token = self.hub_config.hub_jwt or self.hub_config.cloud_api_token
+        if not auth_token:
             return {
                 'has_active_subscription': False,
                 'subscription_status': 'not_configured',
@@ -61,7 +62,7 @@ class SubscriptionChecker:
 
         # Consultar Cloud API
         api_url = f"{settings.CLOUD_API_URL}/api/modules/{module_id}/subscription-status/"
-        headers = {'X-Hub-Token': self.hub_config.cloud_api_token}
+        headers = {'X-Hub-Token': auth_token}
 
         try:
             response = requests.get(api_url, headers=headers, timeout=10)

@@ -181,8 +181,7 @@ class HubConfig(SingletonConfigMixin, models.Model):
     """
     # Cloud connection credentials
     hub_id = models.UUIDField(unique=True, null=True, blank=True)
-    cloud_api_token = models.CharField(
-        max_length=255,
+    cloud_api_token = models.TextField(
         blank=True,
         help_text='Legacy token (deprecated, use hub_jwt instead)'
     )
