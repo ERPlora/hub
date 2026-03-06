@@ -39,7 +39,7 @@
                     this.toggleResult = { success: true, message: msg };
                     setTimeout(function() {
                         htmx.ajax('GET', '/marketplace/solutions/{{ solution.slug }}/', {target: '#main-content-area', swap: 'innerHTML'});
-                    }, data.requires_restart ? 2000 : 800);
+                    }, 800);
                 } else {
                     this.toggleResult = { success: false, message: data.error || '{% trans 'Action failed.' %}' };
                 }

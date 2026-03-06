@@ -282,9 +282,8 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir) {
         }
 
         if (data.success) {
-            Toast.success('{% trans "Module installed! Reloading..." %}');
+            Toast.success('{% trans "Module installed!" %}');
             markAsInstalled(button);
-            setTimeout(() => window.location.reload(), 5000);
         } else {
             Toast.error(data.error || '{% trans "Error installing module" %}');
         }
