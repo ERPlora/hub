@@ -2021,7 +2021,7 @@ def module_subscribe(request):
 
     try:
         purchase_payload = {
-            'success_url': request.build_absolute_uri(f'/m/{module_id}/'),
+            'success_url': request.build_absolute_uri(f'/m/{module_id}/?subscription=success'),
             'cancel_url': request.build_absolute_uri(f'/marketplace/pricing/{module_id}/'),
             'ui_mode': 'embedded',
         }
