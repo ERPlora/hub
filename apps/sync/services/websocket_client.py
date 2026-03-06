@@ -2,14 +2,16 @@
 WebSocket Client for Hub-to-Cloud real-time communication.
 
 Maintains persistent WebSocket connection to Cloud for:
-- Heartbeat (online/offline status)
 - Receiving commands from Cloud (install module, sync config)
 - Sending events to Cloud (module installed, user sync)
+
+Note: Online/offline status is determined on-demand via HTTP ping from Cloud.
+The WebSocket library's built-in ping/pong (ping_interval=60) keeps the connection alive.
 """
 import json
 import logging
-import threading
 import time
+import threading
 from typing import Optional, Callable, Dict, Any
 
 from django.conf import settings
@@ -23,9 +25,9 @@ class WebSocketClient:
 
     Features:
     - Auto-reconnect on disconnect
-    - Heartbeat every 30 seconds
     - Command handlers registry
     - Thread-safe message sending
+    - Connection keepalive via WebSocket ping/pong (60s)
 
     Usage:
         client = WebSocketClient()
@@ -33,7 +35,6 @@ class WebSocketClient:
         client.start()
     """
 
-    HEARTBEAT_INTERVAL = 30  # seconds
     RECONNECT_DELAY = 5  # seconds
     MAX_RECONNECT_DELAY = 60  # seconds
 
@@ -41,7 +42,6 @@ class WebSocketClient:
         self.ws = None
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._heartbeat_thread: Optional[threading.Thread] = None
         self._reconnect_delay = self.RECONNECT_DELAY
 
         # Command handlers
@@ -170,7 +170,7 @@ class WebSocketClient:
 
                 # Run WebSocket (blocking)
                 self.ws.run_forever(
-                    ping_interval=30,
+                    ping_interval=60,
                     ping_timeout=10
                 )
 
@@ -190,9 +190,6 @@ class WebSocketClient:
         """Handle WebSocket connection opened."""
         logger.info("[WS] Connected to Cloud")
         self._reconnect_delay = self.RECONNECT_DELAY
-
-        # Start heartbeat thread
-        self._start_heartbeat()
 
     def _on_message(self, ws, message):
         """Handle message received from Cloud."""
@@ -224,39 +221,6 @@ class WebSocketClient:
     def _on_close(self, ws, close_status_code, close_msg):
         """Handle WebSocket connection closed."""
         logger.info(f"[WS] Disconnected (code={close_status_code})")
-        self._stop_heartbeat()
-
-    def _start_heartbeat(self):
-        """Start heartbeat thread."""
-        self._heartbeat_thread = threading.Thread(
-            target=self._heartbeat_loop,
-            daemon=True,
-            name="WebSocketHeartbeat"
-        )
-        self._heartbeat_thread.start()
-
-    def _stop_heartbeat(self):
-        """Stop heartbeat thread."""
-        # Thread will stop on next iteration when ws is None
-        pass
-
-    def _heartbeat_loop(self):
-        """Send periodic heartbeats."""
-        while self._running and self.ws:
-            try:
-                self.send('heartbeat', {
-                    'version': getattr(settings, 'HUB_VERSION', '1.0.0'),
-                    'status': 'healthy'
-                })
-            except Exception as e:
-                logger.error(f"[WS] Heartbeat error: {e}")
-                break
-
-            # Sleep in small intervals for quick shutdown
-            for _ in range(self.HEARTBEAT_INTERVAL):
-                if not self._running or not self.ws:
-                    break
-                time.sleep(1)
 
     # ==========================================================================
     # Default Command Handlers

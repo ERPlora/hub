@@ -35,7 +35,7 @@ class HeartbeatService:
         service.stop()
     """
 
-    DEFAULT_HEARTBEAT_INTERVAL = 60  # seconds
+    DEFAULT_HEARTBEAT_INTERVAL = 120  # seconds
     DEFAULT_COMMAND_POLL_INTERVAL = 300  # 5 minutes
 
     def __init__(
