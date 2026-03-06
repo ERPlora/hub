@@ -158,6 +158,9 @@
     </div>
 
     {% include "partials/bug_report_modal.html" %}
+    {% for item in MODULE_MENU_ITEMS %}{% if item.module_id == 'assistant' %}
+    {% include "assistant/partials/chat_modal.html" %}
+    {% endif %}{% endfor %}
 </div>
 {% endblock %}
 
