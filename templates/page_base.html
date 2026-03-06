@@ -22,13 +22,6 @@
         </div>
         <h1 class="header-title" id="page-title">{% block page_title %}{% endblock %}</h1>
         <div class="header-end">
-            {% for item in MODULE_MENU_ITEMS %}{% if item.module_id == 'assistant' %}
-            <button class="btn btn-ghost btn-sm"
-                    @click="$dispatch('open-assistant-chat')"
-                    title="{% trans 'AI Assistant' %}">
-                {% icon "sparkles-outline" %}
-            </button>
-            {% endif %}{% endfor %}
             {% block page_actions %}{% endblock %}
         </div>
         <div class="htmx-indicator absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden">
