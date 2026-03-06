@@ -23,7 +23,7 @@ class WebSocketClient:
 
     Features:
     - Auto-reconnect on disconnect
-    - Heartbeat every 30 seconds
+    - Heartbeat every 120 seconds
     - Command handlers registry
     - Thread-safe message sending
 
@@ -33,7 +33,7 @@ class WebSocketClient:
         client.start()
     """
 
-    HEARTBEAT_INTERVAL = 30  # seconds
+    HEARTBEAT_INTERVAL = 120  # seconds
     RECONNECT_DELAY = 5  # seconds
     MAX_RECONNECT_DELAY = 60  # seconds
 
@@ -170,7 +170,7 @@ class WebSocketClient:
 
                 # Run WebSocket (blocking)
                 self.ws.run_forever(
-                    ping_interval=30,
+                    ping_interval=60,
                     ping_timeout=10
                 )
 
