@@ -777,8 +777,20 @@
         var subtitleEl = document.getElementById('reconnect-overlay-subtitle');
         var pollInterval = null;
         var shown = false;
+        var SK = '_erplora_reloading';
         var defaultTitle = '{% trans "Reconnecting to server..." %}';
         var defaultSubtitle = '{% trans "Please wait a moment" %}';
+
+        // If we're coming back from a reload, show overlay until page is fully ready
+        if (sessionStorage.getItem(SK)) {
+            overlay.style.display = 'flex';
+            shown = true;
+            window.addEventListener('load', function() {
+                sessionStorage.removeItem(SK);
+                overlay.style.display = 'none';
+                shown = false;
+            });
+        }
 
         function showOverlay(title, subtitle) {
             if (shown) return;
@@ -789,17 +801,14 @@
             pollInterval = setInterval(function() {
                 fetch('/health/', {cache: 'no-store'})
                     .then(function(r) {
-                        if (r.ok) hideOverlay();
+                        if (r.ok) {
+                            if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+                            sessionStorage.setItem(SK, '1');
+                            window.location.reload();
+                        }
                     })
                     .catch(function() {});
             }, 2000);
-        }
-
-        function hideOverlay() {
-            shown = false;
-            overlay.style.display = 'none';
-            if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-            window.location.reload();
         }
 
         // HTMX connection error (server down / restart)
