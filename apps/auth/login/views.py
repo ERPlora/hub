@@ -67,8 +67,9 @@ def verify_pin(request):
             user.last_login = timezone.now()
             user.save(update_fields=['last_login'])
 
+            hub_config = HubConfig.get_config()
             request.session['local_user_id'] = str(user.id)
-            request.session['hub_id'] = str(user.hub_id)
+            request.session['hub_id'] = str(hub_config.hub_id)
             request.session['user_name'] = user.name
             request.session['user_email'] = user.email
             request.session['user_role'] = user.role
@@ -211,15 +212,17 @@ def cloud_login(request):
 
                     first_time = not local_user.pin_hash
 
+                    # Store Cloud session (JWT) — persists across browser sessions
                     request.session['jwt_token'] = access_token
                     request.session['jwt_refresh'] = refresh_token
-                    request.session['local_user_id'] = str(local_user.id)
-                    request.session['hub_id'] = str(local_user.hub_id)
-                    request.session['user_name'] = local_user.name
-                    request.session['user_email'] = local_user.email
-                    request.session['user_role'] = local_user.role
-                    request.session['user_language'] = local_user.language
 
+                    # If first time (no PIN), redirect to PIN setup
+                    if first_time:
+                        request.session['pending_user_id'] = str(local_user.id)
+                        request.session['pending_user_email'] = local_user.email
+
+                    # Don't set local_user_id here — user must select
+                    # profile + enter PIN on the login screen
                     return JsonResponse({
                         'success': True,
                         'first_time': first_time,
@@ -304,7 +307,9 @@ def setup_pin(request):
         if 'pending_user_email' in request.session:
             del request.session['pending_user_email']
 
+        hub_config = HubConfig.get_config()
         request.session['local_user_id'] = str(user.id)
+        request.session['hub_id'] = str(hub_config.hub_id)
         request.session['user_name'] = user.name
         request.session['user_email'] = user.email
         request.session['user_role'] = user.role
@@ -336,5 +341,8 @@ def logout(request):
         except Exception:
             pass
 
-    request.session.flush()
+    # Clear PIN session but preserve Cloud session (JWT tokens)
+    # so user doesn't have to re-enter Cloud credentials
+    for key in ['local_user_id', 'hub_id', 'user_name', 'user_email', 'user_role', 'user_language']:
+        request.session.pop(key, None)
     return redirect('auth:login')

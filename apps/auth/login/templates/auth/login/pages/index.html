@@ -398,8 +398,9 @@
                             this.newUser = data.user;
                             this.showPinSetup = true;
                         } else {
-                            await this.showToast(`{% trans "Welcome" %}, ${data.user.name}!`, 'success');
-                            setTimeout(() => window.location.href = '{% url "main:index" %}', 1000);
+                            // Cloud session saved — now select profile + enter PIN
+                            await this.showToast('{% trans "Now select your profile and enter PIN" %}', 'success');
+                            this.loginMode = 'local';
                         }
                     } else {
                         await this.showToast(data.error || '{% trans "Login failed" %}', 'danger');
