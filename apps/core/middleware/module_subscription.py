@@ -219,6 +219,10 @@ class ModuleSubscriptionMiddleware:
             # Hub not connected — let module load (can't check status)
             return None
 
+        # After Stripe checkout, force cache refresh (LocMemCache is per-worker)
+        if request.GET.get('subscription') == 'success':
+            invalidate_subscription_cache(namespace)
+
         # Check subscription status
         status = get_subscription_status(namespace, hub_id, auth_token)
 
