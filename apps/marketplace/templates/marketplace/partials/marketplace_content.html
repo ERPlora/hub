@@ -84,42 +84,15 @@
                     Toast.info('{% trans "All modules already installed" %}');
                 }
                 self.clearSelection();
-                if (data.requires_restart) {
-                    Toast.info('{% trans "Server restarting..." %}');
-                    self._waitForRestart();
-                } else {
-                    self.installing = false;
-                    htmx.ajax('GET', '{% url "marketplace:products_list" %}', {target: '#datatable-body', swap: 'innerHTML'});
-                }
+                self.installing = false;
+                htmx.ajax('GET', '{% url "marketplace:products_list" %}', {target: '#datatable-body', swap: 'innerHTML'});
             } else {
                 Toast.error(data.error || '{% trans "Install failed" %}');
                 self.installing = false;
             }
         } catch (e) {
-            Toast.info('{% trans "Server restarting..." %}');
-            self._waitForRestart();
+            self.installing = false;
         }
-    },
-    _waitForRestart() {
-        var self = this;
-        var attempts = 0;
-        var interval = setInterval(async function() {
-            attempts++;
-            try {
-                var r = await fetch('{% url "marketplace:products_list" %}', {method: 'HEAD'});
-                if (r.ok || r.status === 302) {
-                    clearInterval(interval);
-                    self.installing = false;
-                    self.clearSelection();
-                    window.location.reload();
-                }
-            } catch(e) { /* server still down */ }
-            if (attempts > 30) {
-                clearInterval(interval);
-                self.installing = false;
-                Toast.error('{% trans "Server did not restart. Please reload manually." %}');
-            }
-        }, 2000);
     }
 }">
 

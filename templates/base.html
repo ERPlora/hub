@@ -767,18 +767,24 @@
     <!-- Server reconnect overlay -->
     <div id="reconnect-overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); flex-direction:column; align-items:center; justify-content:center; gap:16px;">
         <div class="loading" style="width:48px; height:48px;"></div>
-        <p style="color:#fff; font-size:1rem; font-weight:500; margin:0;">{% trans "Reconnecting to server..." %}</p>
-        <p style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin:0;">{% trans "Please wait a moment" %}</p>
+        <p id="reconnect-overlay-title" style="color:#fff; font-size:1rem; font-weight:500; margin:0;">{% trans "Reconnecting to server..." %}</p>
+        <p id="reconnect-overlay-subtitle" style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin:0;">{% trans "Please wait a moment" %}</p>
     </div>
     <script nonce="{{ csp_nonce }}">
     (function() {
         var overlay = document.getElementById('reconnect-overlay');
+        var titleEl = document.getElementById('reconnect-overlay-title');
+        var subtitleEl = document.getElementById('reconnect-overlay-subtitle');
         var pollInterval = null;
         var shown = false;
+        var defaultTitle = '{% trans "Reconnecting to server..." %}';
+        var defaultSubtitle = '{% trans "Please wait a moment" %}';
 
-        function showOverlay() {
+        function showOverlay(title, subtitle) {
             if (shown) return;
             shown = true;
+            titleEl.textContent = title || defaultTitle;
+            subtitleEl.textContent = subtitle || defaultSubtitle;
             overlay.style.display = 'flex';
             pollInterval = setInterval(function() {
                 fetch('/health/', {cache: 'no-store'})
@@ -797,11 +803,24 @@
         }
 
         // HTMX connection error (server down / restart)
-        document.body.addEventListener('htmx:sendError', showOverlay);
-        // Fetch errors from non-HTMX requests (e.g. chat fetch)
+        document.body.addEventListener('htmx:sendError', function() { showOverlay(); });
+        // Intercept all fetch calls: detect connection errors and requires_restart
         var origFetch = window.fetch;
         window.fetch = function() {
-            return origFetch.apply(this, arguments).catch(function(err) {
+            return origFetch.apply(this, arguments).then(function(response) {
+                if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
+                    var cloned = response.clone();
+                    cloned.json().then(function(data) {
+                        if (data && data.requires_restart) {
+                            showOverlay(
+                                '{% trans "Applying changes..." %}',
+                                '{% trans "The server is restarting. This page will reload automatically." %}'
+                            );
+                        }
+                    }).catch(function() {});
+                }
+                return response;
+            }).catch(function(err) {
                 showOverlay();
                 return Promise.reject(err);
             });
