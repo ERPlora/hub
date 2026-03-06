@@ -8,37 +8,26 @@ logger = logging.getLogger(__name__)
 
 
 def schedule_server_restart(delay=2):
-    """Schedule a graceful server reload after sending the current response.
+    """Schedule a full server restart after sending the current response.
 
-    In Docker/gunicorn: sends SIGHUP to the gunicorn master process for
-    graceful worker reload (zero downtime). Reads PID from /run/gunicorn.pid.
+    In Docker: exits the process so Docker restarts the container. This
+    ensures the full entrypoint runs again, re-registering module template
+    dirs, URLs, and running migrations. A SIGHUP only reloads workers and
+    does NOT re-execute startup initialization (module loader, template dirs).
 
     In local dev: touches wsgi.py to trigger runserver's autoreload.
 
     Args:
         delay: Seconds to wait before restarting (lets the response be sent).
     """
-    import signal
 
     def _restart():
         import time
         time.sleep(delay)
 
-        # Try gunicorn graceful reload via SIGHUP
-        pidfile = Path('/run/gunicorn.pid')
-        if pidfile.exists():
-            try:
-                master_pid = int(pidfile.read_text().strip())
-                os.kill(master_pid, signal.SIGHUP)
-                logger.info("Sent SIGHUP to gunicorn master (pid=%d)", master_pid)
-                return
-            except (ValueError, ProcessLookupError, PermissionError) as e:
-                logger.warning("SIGHUP failed: %s, falling back", e)
-
-        # Fallback: Docker without pidfile → os._exit
         from config.paths import is_docker_environment
         if is_docker_environment():
-            logger.info("No gunicorn pidfile, exiting for Docker restart")
+            logger.info("Exiting process for Docker container restart")
             os._exit(0)
         else:
             # Local dev: touch wsgi.py for runserver autoreload
