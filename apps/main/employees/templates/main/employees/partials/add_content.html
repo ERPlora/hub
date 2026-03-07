@@ -1,0 +1,81 @@
+{% load djicons i18n %}
+<div data-back-url="{% url 'main:employees' %}" hidden></div>
+
+<div class="p-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">{% trans "Add Employee" %}</h1>
+        <div class="flex gap-2">
+            <a class="btn btn-ghost btn-sm"
+               hx-get="{% url 'main:employees' %}"
+               hx-target="#main-content-area"
+               hx-push-url="true">
+                {% trans "Cancel" %}
+            </a>
+            <button type="submit" form="add-employee-form" class="btn btn-sm color-primary">
+                {% icon "checkmark-outline" %}
+                {% trans "Save" %}
+            </button>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <form id="add-employee-form"
+          hx-post="{% url 'main:employee_add' %}"
+          class="max-w-2xl">
+        {% csrf_token %}
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">{% icon "person-outline" css_class="text-primary" %} {% trans "Employee Information" %}</h3>
+            </div>
+            <div class="card-body flex flex-col gap-4">
+                <div class="form-group">
+                    <label class="form-group-label" for="add-name">{% trans "Name" %} *</label>
+                    <input type="text" id="add-name" name="name" class="input w-full"
+                           placeholder="{% trans 'Full name' %}" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-group-label" for="add-email">{% trans "Email" %} *</label>
+                    <input type="email" id="add-email" name="email" class="input w-full"
+                           placeholder="{% trans 'email@example.com' %}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-group-label" for="add-role">{% trans "Role" %}</label>
+                    {% if role_options %}
+                    <select id="add-role" name="role_id" class="select w-full">
+                        <option value="">{% trans "Select a role" %}</option>
+                        {% for option in role_options %}
+                        <option value="{{ option.value }}">{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <select id="add-role" name="role_id" class="select w-full" disabled>
+                        <option value="">{% trans "No roles available" %}</option>
+                    </select>
+                    <span class="text-xs text-base-content/50 mt-1 block">
+                        {% trans "Create roles in the Roles section first." %}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">{% icon "key-outline" css_class="text-primary" %} {% trans "Security" %}</h3>
+            </div>
+            <div class="card-body flex flex-col gap-4">
+                <div class="form-group">
+                    <label class="form-group-label" for="add-pin">{% trans "PIN (4 digits)" %} *</label>
+                    <input type="password" id="add-pin" name="pin" class="input w-full"
+                           maxlength="4" pattern="[0-9]{4}" inputmode="numeric"
+                           placeholder="****" required>
+                    <span class="text-xs text-base-content/50 mt-1 block">{% trans "4-digit PIN for quick access" %}</span>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>

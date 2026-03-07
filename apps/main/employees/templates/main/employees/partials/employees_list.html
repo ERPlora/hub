@@ -8,7 +8,7 @@
     <div class="employee-grid p-4">
         {% for user in local_users %}
         <div class="employee-card glass employee-card-clickable"
-             @click="openPanel('{% url 'main:employee_edit' user.id %}')">
+             hx-get="{% url 'main:employee_edit' user.id %}" hx-target="#main-content-area" hx-push-url="true">
             <div class="employee-card-avatar employee-card-avatar-{{ user.get_role_color|default:'primary' }}">
                 {% if user.avatar %}
                 <img src="{{ user.avatar.url }}" alt="{{ user.name }}">
@@ -90,7 +90,7 @@
                 </td>
                 <td class="datatable-td" data-label="{% trans 'Employee' %}">
                     <div class="flex items-center gap-3 cursor-pointer"
-                         @click="openPanel('{% url 'main:employee_edit' user.id %}')">
+                         hx-get="{% url 'main:employee_edit' user.id %}" hx-target="#main-content-area" hx-push-url="true">
                         {% if user.avatar %}
                         <div class="avatar" style="background-image: url('{{ user.avatar.url }}');"></div>
                         {% else %}
@@ -126,7 +126,7 @@
                 <td class="datatable-td datatable-td-actions" onclick="event.stopPropagation();">
                     <div class="datatable-row-actions">
                         <button class="datatable-row-action"
-                                @click="openPanel('{% url 'main:employee_edit' user.id %}')"
+                                hx-get="{% url 'main:employee_edit' user.id %}" hx-target="#main-content-area" hx-push-url="true"
                                 title="{% trans 'Edit' %}">
                             {% icon "create-outline" %}
                         </button>
@@ -222,11 +222,13 @@
         {% endif %}
     </div>
     {% if not search_query and not role_filter and not status_filter %}
-    <button class="btn color-primary mt-4"
-            @click="openPanel('{% url 'main:employee_add' %}')">
+    <a class="btn color-primary mt-4"
+       hx-get="{% url 'main:employee_add' %}"
+       hx-target="#main-content-area"
+       hx-push-url="true">
         {% icon "add-outline" %}
         {% trans "Add First Employee" %}
-    </button>
+    </a>
     {% endif %}
 </div>
 {% endif %}
