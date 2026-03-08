@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ERPlora Hub 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-02-24 22:58+0000\n"
+"POT-Creation-Date: 2026-03-06 23:25+0000\n"
 "PO-Revision-Date: 2025-12-29 11:30+0000\n"
 "Last-Translator: ERPlora Team <info@erplora.com>\n"
 "Language-Team: Spanish <es@erplora.com>\n"
@@ -77,6 +77,9 @@ msgstr "Selecciona tu perfil"
 msgid "Enter your PIN"
 msgstr "Ingresa tu PIN"
 
+msgid "Verifying..."
+msgstr "Verificando..."
+
 msgid "Incorrect PIN"
 msgstr "PIN incorrecto"
 
@@ -106,6 +109,11 @@ msgstr "Los PINs no coinciden"
 
 msgid "Please complete all fields"
 msgstr "Por favor completa todos los campos"
+
+#, fuzzy
+#| msgid "Select your profile"
+msgid "Now select your profile and enter PIN"
+msgstr "Selecciona tu perfil"
 
 msgid "Login failed"
 msgstr "Error al iniciar sesión"
@@ -170,9 +178,6 @@ msgstr "archivos"
 msgid "Disk usage"
 msgstr "Uso de disco por categoría"
 
-msgid "Database not found"
-msgstr "Base de datos no encontrada"
-
 msgid "Invalid directory"
 msgstr "Directorio no válido"
 
@@ -188,54 +193,6 @@ msgstr "Parámetros faltantes"
 msgid "File not found"
 msgstr "Archivo no encontrado"
 
-msgid "Not authenticated"
-msgstr "No autenticado"
-
-msgid "Module not found"
-msgstr "Módulo no encontrado"
-
-msgid "Module already active"
-msgstr "El módulo ya está activo"
-
-msgid "Module activated and migrations applied. Restart required for URLs."
-msgstr ""
-"Módulo activado y migraciones aplicadas. Se requiere reinicio para las URLs."
-
-msgid "Module already disabled"
-msgstr "El módulo ya está desactivado"
-
-msgid "Module deactivated. Restart required."
-msgstr "Módulo desactivado. Se requiere reinicio."
-
-msgid "Module deleted successfully."
-msgstr "Módulo eliminado correctamente."
-
-msgid "Server restarting... Migrations applied."
-msgstr "Reiniciando servidor... Migraciones aplicadas."
-
-msgid ""
-"Hub not connected to Cloud. Please connect your Hub in Settings to access "
-"the marketplace."
-msgstr ""
-
-msgid "Missing module_id"
-msgstr "Falta module_id"
-
-msgid "Hub not connected to Cloud. Please configure your Hub first."
-msgstr "Hub no conectado a la nube. Configure su Hub primero."
-
-msgid "Hub not connected to Cloud"
-msgstr "Hub no conectado a Cloud"
-
-msgid "Missing module_slug or download_url"
-msgstr "Falta module_slug o download_url"
-
-msgid "Module already installed"
-msgstr "El módulo ya está instalado"
-
-msgid "Invalid module package (not a valid zip file)"
-msgstr "Paquete de módulo no válido (no es un archivo zip válido)"
-
 msgid "Core"
 msgstr "Núcleo"
 
@@ -243,7 +200,7 @@ msgid "Unsupported file format. Please upload a CSV or Excel file."
 msgstr "Formato de archivo no soportado. Suba un archivo CSV o Excel."
 
 msgid "Could not decode file. Please ensure it is UTF-8 encoded."
-msgstr ""
+msgstr "No se pudo decodificar el archivo. Asegúrese de que esté codificado en UTF-8."
 "No se pudo decodificar el archivo. Asegúrese de que esté en formato UTF-8."
 
 msgid "PIN must be a string"
@@ -281,6 +238,14 @@ msgstr "correo@ejemplo.com"
 
 msgid "Select a role"
 msgstr "Selecciona un rol"
+
+#, fuzzy
+#| msgid "No Blocks Available"
+msgid "No roles available"
+msgstr "No hay bloques disponibles"
+
+msgid "Create roles in the Roles section first."
+msgstr "Cree roles en la sección Roles primero."
 
 msgid "Security"
 msgstr "Seguridad"
@@ -441,7 +406,7 @@ msgid "Employee is inactive"
 msgstr "El empleado está inactivo"
 
 msgid "Deleting an employee will deactivate their account."
-msgstr ""
+msgstr "Eliminar un empleado desactivará su cuenta."
 "Eliminar un empleado desactivará su cuenta. Esta acción puede ser revertida "
 "por un administrador."
 
@@ -527,23 +492,23 @@ msgstr "%(count)d omitidos (duplicados)"
 msgid "%(count)d errors"
 msgstr "%(count)d errores"
 
-msgid "Files"
-msgstr "Archivos"
+msgid "System"
+msgstr "Sistema"
+
+msgid "RAM"
+msgstr "RAM"
+
+msgid "cores"
+msgstr "núcleos"
+
+msgid "CPU"
+msgstr "CPU"
 
 msgid "Database"
 msgstr "Base de Datos"
 
 msgid "Download backup"
 msgstr "Descargar"
-
-msgid "Browse"
-msgstr "Explorador de Archivos"
-
-msgid "5 directories"
-msgstr "5 directorios"
-
-msgid "Location"
-msgstr "Ubicación"
 
 msgid "Preview"
 msgstr "Vista previa"
@@ -574,6 +539,59 @@ msgstr "Visita la Tienda de Módulos para añadir funcionalidad"
 # =============================================================================
 msgid "Browse Marketplace"
 msgstr "Tienda"
+
+#, fuzzy
+#| msgid "Tell us about your business"
+msgid "Configure your business"
+msgstr "Cuéntenos sobre su negocio"
+
+msgid "Set your business name, address, tax info, language, and timezone."
+msgstr "Configure el nombre del negocio, dirección, información fiscal, idioma y zona horaria."
+
+#, fuzzy
+#| msgid "Save Store Settings"
+msgid "Go to Settings"
+msgstr "Guardar Configuración de Tienda"
+
+#, fuzzy
+#| msgid "Error installing module"
+msgid "Install modules"
+msgstr "Error al instalar el módulo"
+
+#, fuzzy
+#| msgid "Browse the marketplace to find modules and services for your Hub."
+msgid "Visit the Marketplace to find modules for your business type."
+msgstr "Explore la tienda para encontrar módulos y servicios para su Hub."
+
+#, fuzzy
+#| msgid "Select a role"
+msgid "Set up roles"
+msgstr "Selecciona un rol"
+
+msgid ""
+"Create custom roles for your employees or install modules to auto-generate "
+"roles."
+msgstr ""
+
+#, fuzzy
+#| msgid "Manager"
+msgid "Manage Roles"
+msgstr "Gerente"
+
+#, fuzzy, python-format
+#| msgid "%(count)d roles skipped (have assigned users)."
+msgid "%(count)d modules skipped due to missing dependencies"
+msgstr "%(count)d roles omitidos (tienen usuarios asignados)."
+
+msgid ""
+"Some modules could not load because their dependencies are not active. Check "
+"My Modules for details."
+msgstr ""
+
+#, fuzzy
+#| msgid "View details"
+msgid "View Details"
+msgstr "Ver detalles"
 
 msgid "Delete Role"
 msgstr "Eliminar"
@@ -612,9 +630,6 @@ msgstr "Añadir Rol"
 
 msgid "No description"
 msgstr "Sin descripción"
-
-msgid "System"
-msgstr "Sistema"
 
 msgid "Full Access"
 msgstr "Acceso completo"
@@ -676,12 +691,6 @@ msgstr "Descripción"
 msgid "Optional description for this role"
 msgstr "Descripción opcional para este rol"
 
-msgid "No roles yet"
-msgstr "Aún no hay roles"
-
-msgid "Create your first custom role to get started."
-msgstr "Crea tu primer rol personalizado para comenzar."
-
 msgid "permissions"
 msgstr "permisos"
 
@@ -706,6 +715,9 @@ msgstr "Mostrando %(start)s-%(end)s de %(total)s roles"
 
 msgid "No roles found"
 msgstr "No se encontraron roles"
+
+msgid "No roles yet"
+msgstr "Aún no hay roles"
 
 msgid "Create your first custom role to get started"
 msgstr "Crea tu primer rol personalizado para comenzar"
@@ -765,8 +777,8 @@ msgid "Synced %(count)d permissions from modules."
 msgstr "%(count)d permisos sincronizados de los módulos."
 
 #, python-format
-msgid "Created %(count)d default roles."
-msgstr "%(count)d roles predeterminados creados."
+msgid "Synced %(roles)d roles and %(perms)d permissions."
+msgstr "Sincronizados %(roles)d roles y %(perms)d permisos."
 
 msgid "Settings"
 msgstr "Configuración"
@@ -781,7 +793,7 @@ msgid "Business details for receipts and invoices"
 msgstr "Datos del negocio para facturas y recibos"
 
 msgid "Store configuration required. Please fill in the required fields below."
-msgstr ""
+msgstr "Configuración de tienda requerida. Complete los campos obligatorios a continuación."
 "Configuración de la tienda requerida. Complete los campos obligatorios a "
 "continuación."
 
@@ -828,6 +840,15 @@ msgstr "Logo del negocio para facturas y recibos"
 msgid "Choose image"
 msgstr "Elegir imagen"
 
+msgid "Hardware printing requires ERPlora Bridge"
+msgstr "La impresión por hardware requiere ERPlora Bridge"
+
+msgid ""
+"To print receipts, open the cash drawer, or use a barcode scanner, install "
+"the ERPlora Bridge app on this device. You can configure it in the Native "
+"Bridge section below."
+msgstr ""
+
 msgid "Configure tax rates according to your country's legislation"
 msgstr "Configura las tasas de impuestos según la legislación de tu país"
 
@@ -871,6 +892,27 @@ msgstr "Moneda"
 
 msgid "Default currency for prices"
 msgstr "Moneda predeterminada para precios"
+
+msgid "Theme"
+msgstr "Tema"
+
+#, fuzzy
+#| msgid "Default language for the Hub interface"
+msgid "Appearance mode for the interface"
+msgstr "Idioma predeterminado para la interfaz del Hub"
+
+#, fuzzy
+#| msgid "System Language"
+msgid "System (auto)"
+msgstr "Idioma"
+
+msgid "Light"
+msgstr "Claro"
+
+#, fuzzy
+#| msgid "Dark Mode"
+msgid "Dark"
+msgstr "Modo Oscuro"
 
 msgid "Native Bridge"
 msgstr "Bridge Nativo"
@@ -923,7 +965,7 @@ msgid "Auto-print"
 msgstr "Impresión automática"
 
 msgid "Automatically print via bridge (skip browser preview)"
-msgstr ""
+msgstr "Imprimir automáticamente vía bridge (sin vista previa)"
 "Imprimir automáticamente via bridge (omitir vista previa del navegador)"
 
 msgid "Satellite printing"
@@ -1026,7 +1068,7 @@ msgid "Version"
 msgstr "Versión"
 
 msgid "Scan this QR code from another device to connect to this Hub."
-msgstr ""
+msgstr "Escanee este código QR desde otro dispositivo para conectarse a este Hub."
 "Escanee este código QR desde otro dispositivo para conectarse a este Hub."
 
 msgid "Open Cloud Portal"
@@ -1036,8 +1078,7 @@ msgid "Database Maintenance"
 msgstr "Mantenimiento de Base de Datos"
 
 msgid "Scan for and remove orphaned data left behind by deleted modules"
-msgstr ""
-"Buscar y eliminar datos huérfanos dejados por módulos eliminados"
+msgstr "Buscar y eliminar datos huérfanos dejados por módulos eliminados"
 
 msgid "Scan for Orphaned Data"
 msgstr "Buscar Datos Huérfanos"
@@ -1075,70 +1116,70 @@ msgstr ""
 msgid "Marketplace"
 msgstr "Tienda"
 
-msgid "Cart"
-msgstr "Carrito"
+#, fuzzy
+#| msgid "Complete Setup"
+msgid "Complete Purchase"
+msgstr "Completar Configuración"
 
-msgid "item"
-msgstr "artículo"
+msgid "Loading payment form..."
+msgstr "Cargando formulario de pago..."
 
-msgid "Clear cart?"
-msgstr "Limpiar todo"
+#, fuzzy
+#| msgid "PIN reset successfully"
+msgid "Payment successful!"
+msgstr "PIN restablecido correctamente"
 
-msgid "Clear"
-msgstr "Limpiar todo"
+#, fuzzy
+#| msgid "Error adding to cart"
+msgid "Error loading payment form."
+msgstr "Error al añadir al carrito"
 
-msgid "mo"
-msgstr "mes"
+#, fuzzy
+#| msgid "Recommended"
+msgid "Recommended Modules"
+msgstr "Recomendado"
+
+msgid "Essential"
+msgstr "Esencial"
+
+msgid "Recommended"
+msgstr "Recomendado"
+
+msgid "Installed"
+msgstr "Instalado"
 
 msgid "Free"
 msgstr "Gratis"
 
-msgid "Total"
-msgstr "Total"
+msgid "mo"
+msgstr "mes"
 
-msgid "Tax will be calculated at checkout."
-msgstr "Los impuestos se calcularán al finalizar la compra."
-
-msgid "Checkout"
-msgstr "Finalizar compra"
-
-msgid "Your cart is empty"
-msgstr "El carrito está vacío"
-
-msgid "Add paid modules to get started."
-msgstr "Añade módulos de pago para comenzar."
-
-msgid "Processing..."
-msgstr "Procesando..."
-
-msgid "Complete payment in the opened window"
-msgstr "Completa el pago en la ventana abierta"
-
-msgid "Checkout failed"
-msgstr "Error en la compra"
-
-msgid "Error starting checkout"
-msgstr "Error al iniciar la compra"
-
-msgid "Subtotal"
-msgstr "Subtotal"
-
-msgid "Tax"
-msgstr "Impuesto"
-
-msgid "Proceed to Checkout"
-msgstr "Proceder al pago"
-
-msgid "Clear Cart"
-msgstr "Limpiar todo"
-
-msgid "Browse the marketplace to find modules and services for your Hub."
-msgstr "Explore la tienda para encontrar módulos y servicios para su Hub."
+#, fuzzy
+#| msgid "No compliance modules defined for this country yet."
+msgid "No modules or roles configured for this business type yet."
+msgstr "Aún no se han definido módulos de cumplimiento para este país."
 
 msgid ""
-"All modules include a 15-day free trial. You won't be charged until the "
-"trial period ends."
+"Browse business types to see the recommended modules and roles for your type "
+"of business."
 msgstr ""
+
+msgid "modules"
+msgstr "Módulos"
+
+#, fuzzy
+#| msgid "No Blocks Available"
+msgid "No Business Types Available"
+msgstr "No hay bloques disponibles"
+
+#, fuzzy
+#| msgid ""
+#| "Could not load modules. Please check your internet connection and try "
+#| "again."
+msgid ""
+"Could not load business type data. Please check your internet connection and "
+"try again."
+msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
 
 msgid "Coming Soon"
 msgstr "Próximamente"
@@ -1149,46 +1190,96 @@ msgstr "Esta tienda está en desarrollo. ¡Estén atentos a las novedades!"
 msgid "Browse Modules"
 msgstr "Explorar Tienda de Módulos"
 
-msgid "Select your country to see the required modules for legal compliance."
+msgid ""
+"Regulatory modules required to use ERPlora for sales in each country. "
+"Modules marked as not available mean the POS cannot be used in that region."
 msgstr ""
-"Seleccione su país para ver los módulos requeridos para cumplimiento legal."
 
 msgid "Your country"
 msgstr "Su país"
 
-msgid "modules"
-msgstr "Módulos"
+msgid "OK"
+msgstr "OK"
 
-msgid "No Compliance Data Available"
-msgstr "No hay datos de cumplimiento disponibles"
+msgid "No"
+msgstr "No"
+
+msgid "POS partially compliant"
+msgstr "TPV parcialmente compatible"
 
 msgid ""
-"Could not load compliance requirements. Please check your internet "
-"connection and try again."
-msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
+"ERPlora does not yet have all the required modules for this country. The POS "
+"cannot be used for sales in regions where required modules are not available."
+msgstr ""
 
-msgid "Compliance"
-msgstr "Cumplimiento"
+msgid "POS not compliant"
+msgstr "TPV no compatible"
 
-msgid "All Installed"
-msgstr "Instalado"
+msgid ""
+"ERPlora does not yet have any of the required modules for this country. The "
+"POS cannot be used for sales."
+msgstr ""
 
-msgid "Required Modules"
-msgstr "Módulos Requeridos"
+#, fuzzy
+#| msgid "No Compliance Data Available"
+msgid "No compliance data available"
+msgstr "No hay datos de cumplimiento disponibles"
+
+msgid "Compliance information is being prepared."
+msgstr "La información de cumplimiento se está preparando."
+
+#, fuzzy
+#| msgid "Get Support"
+msgid "Fully Supported"
+msgstr "Obtener Soporte"
+
+#, fuzzy
+#| msgid "Get Support"
+msgid "supported"
+msgstr "Obtener Soporte"
+
+#, fuzzy
+#| msgid "Total Storage"
+msgid "Partial Coverage"
+msgstr "Almacenamiento Total"
+
+#, python-format
+msgid ""
+"ERPlora currently covers %(supported)s of %(total)s requirements in this "
+"country. Some features may not be usable for full legal compliance."
+msgstr ""
+
+#, fuzzy
+#| msgid "Full name"
+msgid "Full Coverage"
+msgstr "Nombre completo"
+
+msgid "ERPlora covers all known requirements for this country."
+msgstr "ERPlora cubre todos los requisitos conocidos para este país."
 
 msgid "Mandatory"
 msgstr "Obligatorio"
 
-msgid "Recommended"
-msgstr "Recomendado"
+msgid "Enforced"
+msgstr "Vigente"
 
-msgid "Installed"
-msgstr "Instalado"
+msgid "Upcoming"
+msgstr "Próximamente"
+
+msgid "Planned"
+msgstr "Planificado"
 
 msgid "Install"
 msgstr "Instalar"
 
-msgid "No compliance modules defined for this country yet."
+#, fuzzy
+#| msgid "Available"
+msgid "Not available"
+msgstr "Disponible"
+
+#, fuzzy
+#| msgid "No compliance modules defined for this country yet."
+msgid "No specific compliance requirements defined for this country yet."
 msgstr "Aún no se han definido módulos de cumplimiento para este país."
 
 msgid "Module installed successfully"
@@ -1236,11 +1327,39 @@ msgstr "Todos los planes"
 msgid "Apply Filters"
 msgstr "Aplicar filtros"
 
+#, fuzzy
+#| msgid "No modules installed"
+msgid "modules installed"
+msgstr "No hay módulos instalados"
+
+#, fuzzy
+#| msgid "All modules are already installed."
+msgid "All modules already installed"
+msgstr "Todos los módulos ya están instalados."
+
+#, fuzzy
+#| msgid "Installation failed"
+msgid "Install failed"
+msgstr "Instalación fallida"
+
 msgid "Filters"
 msgstr "Filtros"
 
+#, fuzzy
+#| msgid "Installed"
+msgid "Install Selected"
+msgstr "Instalado"
+
+#, fuzzy
+#| msgid "Install"
+msgid "Installing..."
+msgstr "Instalar"
+
 msgid "Active:"
 msgstr "Activos:"
+
+msgid "Clear"
+msgstr "Limpiar todo"
 
 msgid "Module"
 msgstr "Módulo"
@@ -1254,8 +1373,10 @@ msgstr "Precio"
 msgid "Rating"
 msgstr "Valoración"
 
-msgid "Function"
-msgstr "Función"
+#, fuzzy
+#| msgid "Business Name"
+msgid "Business Types"
+msgstr "Nombre del Negocio"
 
 msgid "All"
 msgstr "Todos"
@@ -1263,14 +1384,22 @@ msgstr "Todos"
 msgid "Apply"
 msgstr "Aplicar"
 
+#, fuzzy
+#| msgid "Business Name"
+msgid "Business Type"
+msgstr "Nombre del Negocio"
+
 msgid "Type"
 msgstr "Tipo"
 
-msgid "Module Details"
-msgstr "Detalles del Módulo"
-
 msgid "Error"
 msgstr "Error"
+
+msgid "Premium"
+msgstr "Premium"
+
+msgid "Featured"
+msgstr "Destacados"
 
 msgid "by"
 msgstr "por"
@@ -1278,26 +1407,8 @@ msgstr "por"
 msgid "downloads"
 msgstr "descargas"
 
-msgid "Featured"
-msgstr "Destacados"
-
-msgid "Owned"
-msgstr "Adquirido"
-
-msgid "one-time payment"
-msgstr "pago único"
-
-msgid "monthly subscription"
-msgstr "suscripción mensual"
-
-msgid "Download & Install"
-msgstr "Descargar e Instalar"
-
-msgid "Get Free Module"
-msgstr "Obtener Módulo Gratis"
-
-msgid "Add to Cart"
-msgstr "Añadir al carrito"
+msgid "subscription after install"
+msgstr "suscripción tras instalar"
 
 msgid "Overview"
 msgstr "Resumen"
@@ -1332,26 +1443,13 @@ msgstr "No hay registro de cambios disponible"
 msgid "Related Modules"
 msgstr "Módulos Relacionados"
 
-msgid "Error acquiring module"
-msgstr "Error al adquirir el módulo"
-
-msgid "Module acquired. Download not available yet."
-msgstr "Módulo adquirido. La descarga aún no está disponible."
-
-msgid "You already own this module"
-msgstr "Ya tienes este módulo"
-
-msgid "Error starting purchase"
-msgstr "Error al iniciar la compra"
-
-msgid "Error processing purchase"
-msgstr "Error al procesar la compra"
-
 msgid "Server error. Please try again later."
 msgstr "Error del servidor. Inténtelo de nuevo más tarde."
 
-msgid "Module installed! Reloading..."
-msgstr "¡Módulo instalado correctamente!"
+#, fuzzy
+#| msgid "No modules installed"
+msgid "Module installed!"
+msgstr "No hay módulos instalados"
 
 msgid "Error installing module"
 msgstr "Error al instalar el módulo"
@@ -1374,11 +1472,145 @@ msgstr "¡Valoración enviada!"
 msgid "Error submitting review"
 msgstr "Error al enviar la valoración"
 
+#, fuzzy
+#| msgid "Subscription required"
+msgid "Subscription Expired"
+msgstr "Suscripción requerida"
+
+msgid "Renew to continue using this module."
+msgstr "Renueve para seguir usando este módulo."
+
+#, fuzzy
+#| msgid "Core"
+msgid "or"
+msgstr "Núcleo"
+
+msgid "year"
+msgstr "año"
+
+msgid "15-day free trial. Cancel anytime."
+msgstr "Prueba gratuita de 15 días. Cancele cuando quiera."
+
+msgid "Complete payment in the opened window"
+msgstr "Completa el pago en la ventana abierta"
+
+#, fuzzy
+#| msgid "Error processing purchase"
+msgid "Error processing subscription"
+msgstr "Error al procesar la compra"
+
+msgid "Start Free Trial"
+msgstr "Iniciar prueba gratuita"
+
+#, fuzzy
+#| msgid "Subscription"
+msgid "Subscribe"
+msgstr "Suscripción"
+
+msgid "Back to Marketplace"
+msgstr "Volver a la Tienda"
+
+msgid "Cost"
+msgstr "Coste"
+
+msgid "Period"
+msgstr "Período"
+
+msgid "yr"
+msgstr "año"
+
+#, fuzzy
+#| msgid "One-time"
+msgid "one-time"
+msgstr "Pago Único"
+
+msgid "Trial"
+msgstr "Prueba"
+
+#, fuzzy
+#| msgid "Cancel"
+msgid "Canceling"
+msgstr "Cancelar"
+
+msgid "Past Due"
+msgstr "Vencido"
+
+msgid "Expired"
+msgstr "Expirado"
+
+msgid "Owned"
+msgstr "Adquirido"
+
+msgid "until"
+msgstr "hasta"
+
+msgid "trial until"
+msgstr "prueba hasta"
+
+#, fuzzy
+#| msgid "monthly subscription"
+msgid "Cancel subscription"
+msgstr "suscripción mensual"
+
+msgid "Renew"
+msgstr "Renovar"
+
+msgid "Invoice"
+msgstr "Factura"
+
+#, fuzzy
+#| msgid "Subscription"
+msgid "Cancel Subscription"
+msgstr "Suscripción"
+
+#, fuzzy
+#| msgid "Are you sure you want to delete"
+msgid "Are you sure you want to cancel"
+msgstr "¿Estás seguro de que quieres eliminar este empleado?"
+
+#, fuzzy
+#| msgid "Current Guests"
+msgid "Current cost:"
+msgstr "Comensales Actuales"
+
+msgid "It will remain active until the end of the billing period."
+msgstr "Permanecerá activo hasta el final del período de facturación."
+
+#, fuzzy
+#| msgid "Subscription"
+msgid "Keep Subscription"
+msgstr "Suscripción"
+
+#, fuzzy
+#| msgid "Subscription required"
+msgid "Subscription canceled."
+msgstr "Suscripción requerida"
+
+#, fuzzy
+#| msgid "monthly subscription"
+msgid "Error canceling subscription"
+msgstr "suscripción mensual"
+
+#, fuzzy
+#| msgid "No description"
+msgid "No subscriptions yet"
+msgstr "Sin descripción"
+
+msgid "When you subscribe to premium modules, they will appear here."
+msgstr "Cuando se suscriba a módulos premium, aparecerán aquí."
+
+#, fuzzy
+#| msgid "selected"
+msgid "Select"
+msgstr "seleccionado"
+
+#, fuzzy
+#| msgid "this module"
+msgid "Rate this module"
+msgstr "este módulo"
+
 msgid "Available"
 msgstr "Disponible"
-
-msgid "Get Free"
-msgstr "Obtener Gratis"
 
 #, python-format
 msgid "Showing %(start)s-%(end)s of %(total)s modules"
@@ -1387,23 +1619,37 @@ msgstr "Mostrando %(start)s-%(end)s de %(total)s módulos"
 msgid "Try adjusting your search or filters"
 msgstr "Intenta ajustar tu búsqueda o filtros"
 
-msgid "added to cart"
-msgstr "añadido al carrito"
+msgid "Module installed! Reloading..."
+msgstr "¡Módulo instalado correctamente!"
 
-msgid "Error adding to cart"
-msgstr "Error al añadir al carrito"
+#, fuzzy
+#| msgid "Module installed successfully"
+msgid "Solution installed successfully"
+msgstr "¡Módulo instalado correctamente!"
 
-msgid "Activate Block"
-msgstr "Activar Bloque"
+#, fuzzy
+#| msgid "Role activated."
+msgid "Solution activated"
+msgstr "Rol activado."
 
-msgid "Activating..."
-msgstr "Activando..."
+#, fuzzy
+#| msgid "Role deactivated."
+msgid "Solution deactivated"
+msgstr "Rol desactivado."
+
+msgid "Action failed."
+msgstr "Error en la acción."
+
+#, fuzzy
+#| msgid "Install"
+msgid "Uninstall"
+msgstr "Instalar"
+
+msgid "Required Modules"
+msgstr "Módulos Requeridos"
 
 msgid "Coming soon"
 msgstr "Próximamente"
-
-msgid "Planned"
-msgstr "Planificado"
 
 msgid "Optional Modules"
 msgstr "Módulos Opcionales"
@@ -1411,34 +1657,34 @@ msgstr "Módulos Opcionales"
 msgid "Pre-configured Roles"
 msgstr "Roles preconfigurados"
 
-msgid "Block activated successfully"
-msgstr "Bloque activado correctamente"
+msgid "modules require purchase"
+msgstr "módulos requieren compra"
 
-msgid "Block deactivated"
-msgstr "Bloque desactivado"
+#, fuzzy
+#| msgid "Search roles..."
+msgid "Search solutions..."
+msgstr "Buscar roles..."
 
-msgid "Action failed."
-msgstr "Error en la acción."
-
-msgid "blocks active"
-msgstr "bloques activos"
-
-msgid "required"
-msgstr "Requerido"
-
-msgid "Block activated"
-msgstr "Bloque activado"
-
-msgid "No Blocks Available"
-msgstr "No hay bloques disponibles"
-
-msgid ""
-"Could not load functional blocks. Please check your internet connection and "
-"try again."
-msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
+#, fuzzy
+#| msgid "selected"
+msgid "modules selected"
+msgstr "seleccionado"
 
 msgid "Modules"
 msgstr "Módulos"
+
+msgid "Partial"
+msgstr "Parcial"
+
+#, fuzzy, python-format
+#| msgid "Showing %(start)s-%(end)s of %(total)s roles"
+msgid "Showing %(start)s-%(end)s of %(total)s solutions"
+msgstr "Mostrando %(start)s-%(end)s de %(total)s roles"
+
+#, fuzzy
+#| msgid "No roles found"
+msgid "No solutions found"
+msgstr "No se encontraron roles"
 
 msgid "Hubs"
 msgstr "Hubs"
@@ -1449,8 +1695,13 @@ msgstr "Componentes"
 msgid "Soon"
 msgstr "Pronto"
 
-msgid "Blocks"
-msgstr "Bloques"
+#, fuzzy
+#| msgid "Purchase"
+msgid "My Purchases"
+msgstr "Comprar"
+
+msgid "Compliance"
+msgstr "Cumplimiento"
 
 msgid "Commerce"
 msgstr "Comercio"
@@ -1482,17 +1733,46 @@ msgstr "Utilidad"
 msgid "Specialized"
 msgstr "Especializado"
 
-msgid "Cart is empty"
-msgstr "El carrito está vacío"
-
 msgid "Hub not connected to Cloud."
 msgstr "Hub no conectado a Cloud."
 
-msgid "No paid items to checkout."
-msgstr "No hay artículos de pago para finalizar."
+#, fuzzy
+#| msgid "Hub not connected to Cloud. Please configure your Hub first."
+msgid "Hub not connected to Cloud. Please connect in Settings."
+msgstr "Hub no conectado a la nube. Configure su Hub primero."
 
-msgid "Functional Blocks"
-msgstr "Bloques funcionales"
+msgid "Could not fetch purchases from Cloud."
+msgstr "No se pudieron obtener las compras del Cloud."
+
+#, fuzzy
+#| msgid "Hub not connected to Cloud."
+msgid "Could not connect to Cloud."
+msgstr "Hub no conectado a Cloud."
+
+#, fuzzy, python-format
+#| msgid ""
+#| "Could not load modules. Please check your internet connection and try "
+#| "again."
+msgid "Could not load modules from Cloud (error %(code)s). Please try again."
+msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
+
+#, fuzzy
+#| msgid "Please check your internet connection and try again."
+msgid "Connection error. Please check your internet connection and try again."
+msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
+
+msgid "Cloud is taking too long to respond. Please try again."
+msgstr "El Cloud está tardando demasiado en responder. Inténtelo de nuevo."
+
+#, fuzzy
+#| msgid "Hub not connected to Cloud. Please configure your Hub first."
+msgid "Could not connect to Cloud. Please try again."
+msgstr "Hub no conectado a la nube. Configure su Hub primero."
+
+#, fuzzy
+#| msgid "Solution"
+msgid "Solutions"
+msgstr "Solución"
 
 msgid "Block not found."
 msgstr "Bloque no encontrado."
@@ -1500,8 +1780,44 @@ msgstr "Bloque no encontrado."
 msgid "All modules are already installed."
 msgstr "Todos los módulos ya están instalados."
 
-msgid "Country not found."
+#, fuzzy
+#| msgid "Country not found."
+msgid "Business type not found."
 msgstr "País no encontrado."
+
+msgid "Electronic Invoicing"
+msgstr "Facturación electrónica"
+
+#, fuzzy
+#| msgid "Tax Configuration"
+msgid "Tax Reporting"
+msgstr "Configuración de Impuestos"
+
+msgid "POS / Cash Register"
+msgstr "TPV / Caja registradora"
+
+#, fuzzy
+#| msgid "Data location"
+msgid "Data Protection"
+msgstr "Ubicación de datos"
+
+#, fuzzy
+#| msgid "Consulting"
+msgid "Accounting"
+msgstr "Consultoría"
+
+msgid "Other"
+msgstr "Otros"
+
+#, fuzzy
+#| msgid "Subscription required"
+msgid "Subscription processed."
+msgstr "Suscripción requerida"
+
+#, fuzzy
+#| msgid "monthly subscription"
+msgid "You already have a subscription."
+msgstr "suscripción mensual"
 
 msgid "Invalid module context"
 msgstr "Contexto de módulo no válido"
@@ -1526,117 +1842,6 @@ msgstr "Compra requerida"
 msgid "This feature requires purchasing the module."
 msgstr "Esta función requiere la compra del módulo."
 
-# =============================================================================
-# SETUP WIZARD
-# =============================================================================
-msgid "Setup"
-msgstr "Configuración"
-
-msgid "Configure your store to get started"
-msgstr "Configura tu tienda para comenzar"
-
-msgid "Regional Settings"
-msgstr "Configuración Regional"
-
-msgid "Set your language, country, and timezone"
-msgstr "Configure su idioma, país y zona horaria"
-
-msgid "Country"
-msgstr "País"
-
-# =============================================================================
-# POS / SALES
-# =============================================================================
-msgid "Search country..."
-msgstr "Buscar país..."
-
-msgid "Search timezone..."
-msgstr "Buscar zona horaria..."
-
-msgid "Continue"
-msgstr "Continuar"
-
-msgid "Choose Your Modules"
-msgstr "Elija sus módulos"
-
-msgid ""
-"Select the functional blocks your business needs. You can always add more "
-"later."
-msgstr ""
-
-msgid "Quick Start"
-msgstr "Inicio rápido"
-
-msgid "Retail"
-msgstr "Comercio minorista"
-
-msgid "Restaurant"
-msgstr "Restaurante"
-
-msgid "Consulting"
-msgstr "Consultoría"
-
-msgid "Field Service"
-msgstr "Servicio de campo"
-
-msgid ""
-"Could not load modules. Please check your internet connection and try again."
-msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
-
-# =============================================================================
-# NAVIGATION / COMMON
-# =============================================================================
-msgid "Back"
-msgstr "Volver"
-
-msgid "Business Information"
-msgstr "Información del Negocio"
-
-msgid "Tell us about your business"
-msgstr "Cuéntenos sobre su negocio"
-
-msgid "Tax Configuration"
-msgstr "Configuración de Impuestos"
-
-msgid "Set up your default tax settings"
-msgstr "Configure sus impuestos predeterminados"
-
-msgid "Prices shown already include tax"
-msgstr "Los precios mostrados ya incluyen impuestos"
-
-msgid "Complete Setup"
-msgstr "Completar Configuración"
-
-msgid "Business"
-msgstr "Negocio"
-
-msgid "Invalid language selection."
-msgstr "Selección de idioma no válida."
-
-msgid "Invalid timezone."
-msgstr "Zona horaria no válida."
-
-msgid "Please select at least one block"
-msgstr "Por favor selecciona al menos un bloque"
-
-msgid "Invalid selection"
-msgstr "Selección no válida"
-
-msgid "Business name is required"
-msgstr "El nombre del negocio es obligatorio"
-
-msgid "Address is required"
-msgstr "La dirección es obligatoria"
-
-msgid "VAT/Tax ID is required"
-msgstr "El NIF/CIF es obligatorio"
-
-msgid "Tax rate must be between 0 and 100."
-msgstr "La tasa de impuesto debe estar entre 0 y 100."
-
-msgid "Invalid tax rate."
-msgstr "Tasa de impuesto no válida."
-
 msgid "Cloud Synchronization"
 msgstr "Conexión Cloud"
 
@@ -1648,6 +1853,14 @@ msgstr "Elemento de cola de sincronización"
 
 msgid "Sync Queue"
 msgstr "Cola de sincronización"
+
+msgid "Modules with missing dependencies"
+msgstr "Módulos con dependencias faltantes"
+
+#, fuzzy
+#| msgid "required"
+msgid "requires"
+msgstr "Requerido"
 
 msgid "this module"
 msgstr "este módulo"
@@ -1685,6 +1898,21 @@ msgstr "Suscripción"
 msgid "Clear all"
 msgstr "Limpiar todo"
 
+msgid "Error acquiring module"
+msgstr "Error al adquirir el módulo"
+
+msgid "Module acquired. Download not available yet."
+msgstr "Módulo adquirido. La descarga aún no está disponible."
+
+msgid "You already own this module"
+msgstr "Ya tienes este módulo"
+
+msgid "Error starting purchase"
+msgstr "Error al iniciar la compra"
+
+msgid "Error processing purchase"
+msgstr "Error al procesar la compra"
+
 msgid "Module installed successfully!"
 msgstr "¡Módulo instalado correctamente!"
 
@@ -1692,7 +1920,7 @@ msgid "Restart Required"
 msgstr "Reinicio Requerido"
 
 msgid "The server needs to restart to complete module setup. Restart now?"
-msgstr ""
+msgstr "El servidor necesita reiniciarse para completar la configuración del módulo. ¿Reiniciar ahora?"
 "El servidor necesita reiniciarse para completar la configuración del módulo. "
 "¿Reiniciar ahora?"
 
@@ -1717,9 +1945,6 @@ msgstr "de"
 msgid "Last"
 msgstr "Último"
 
-msgid "Back to Marketplace"
-msgstr "Volver a la Tienda"
-
 msgid "No Connection"
 msgstr "Sin Conexión"
 
@@ -1730,6 +1955,18 @@ msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
 
 msgid "Back to Modules"
 msgstr "Volver a Módulos"
+
+msgid "one-time payment"
+msgstr "pago único"
+
+msgid "monthly subscription"
+msgstr "suscripción mensual"
+
+msgid "Download & Install"
+msgstr "Descargar e Instalar"
+
+msgid "Get Free Module"
+msgstr "Obtener Módulo Gratis"
 
 msgid "Purchase"
 msgstr "Comprar"
@@ -1755,29 +1992,78 @@ msgstr "¡Aún no hay valoraciones — sea el primero!"
 msgid "Explore the Marketplace to extend your Hub"
 msgstr "Explora la Tienda de Módulos para ampliar tu Hub"
 
-msgid "My Modules"
-msgstr "Mis Módulos"
+msgid "Module already active"
+msgstr "El módulo ya está activo"
 
-# =============================================================================
-# DASHBOARD
-# =============================================================================
-msgid "Products"
-msgstr "Productos"
+msgid "Module not found"
+msgstr "Módulo no encontrado"
+
+#, python-format
+msgid "Cannot activate: dependency '%(dep)s' is not installed."
+msgstr "No se puede activar: la dependencia '%(dep)s' no está instalada."
 
 msgid "Module activated. Server restarting."
 msgstr "Módulo activado. Reiniciando servidor."
 
+msgid "Module already disabled"
+msgstr "El módulo ya está desactivado"
+
+#, python-format
+msgid ""
+"Cannot deactivate: %(names)s depend on this module. Deactivate them first."
+msgstr ""
+
 msgid "Module deactivated. Server restarting."
 msgstr "Módulo desactivado. Reiniciando servidor."
+
+msgid "Module deleted successfully."
+msgstr "Módulo eliminado correctamente."
 
 msgid "Free module acquired"
 msgstr "Módulo gratuito adquirido"
 
-msgid "Home"
-msgstr "Inicio"
+#, fuzzy
+#| msgid "File not found"
+msgid "Page Not Found"
+msgstr "Archivo no encontrado"
+
+msgid "The page you're looking for doesn't exist or has been moved."
+msgstr "La página que busca no existe o ha sido movida."
+
+#, fuzzy
+#| msgid "Dashboard"
+msgid "Go to Dashboard"
+msgstr "Panel"
+
+msgid "Server Error"
+msgstr "Error del servidor"
+
+msgid "Internal Server Error"
+msgstr "Error interno del servidor"
+
+#, fuzzy
+#| msgid "Server error. Please try again later."
+msgid "Something went wrong. Please try again in a few moments."
+msgstr "Error del servidor. Inténtelo de nuevo más tarde."
+
+msgid "Go to Home"
+msgstr "Ir al inicio"
+
+#, fuzzy
+#| msgid "Employees"
+msgid "Manage employees"
+msgstr "Empleados"
+
+msgid "My Modules"
+msgstr "Mis Módulos"
 
 msgid "Install App"
 msgstr "Instalar"
+
+#, fuzzy
+#| msgid "Select a role"
+msgid "Report a Problem"
+msgstr "Selecciona un rol"
 
 msgid "Log Out"
 msgstr "Cerrar Sesión"
@@ -1794,6 +2080,22 @@ msgstr "Error al eliminar"
 msgid "Confirm"
 msgstr "Confirmar"
 
+#, fuzzy
+#| msgid "Connecting..."
+msgid "Reconnecting to server..."
+msgstr "Conectando..."
+
+#, fuzzy
+#| msgid "Please select a file"
+msgid "Please wait a moment"
+msgstr "Por favor selecciona un archivo"
+
+msgid "Applying changes..."
+msgstr "Aplicando cambios..."
+
+msgid "The server is restarting. This page will reload automatically."
+msgstr "El servidor se está reiniciando. Esta página se recargará automáticamente."
+
 # =============================================================================
 # OFFLINE
 # =============================================================================
@@ -1806,8 +2108,295 @@ msgstr "Estás Sin Conexión"
 msgid "Please check your internet connection and try again."
 msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
 
+msgid "Go back"
+msgstr "Volver"
+
 msgid "Toggle navigation menu"
 msgstr "Alternar menú de navegación"
+
+msgid ""
+"Describe the problem you encountered. A screenshot of the current page will "
+"be captured automatically."
+msgstr ""
+
+msgid "What went wrong?"
+msgstr "¿Qué salió mal?"
+
+msgid "Please describe the problem before sending."
+msgstr "Describa el problema antes de enviar."
+
+msgid "Send Report"
+msgstr "Enviar reporte"
+
+#, fuzzy
+#| msgid "PIN reset successfully"
+msgid "Report sent successfully"
+msgstr "PIN restablecido correctamente"
+
+msgid "Failed to send report"
+msgstr "Error al enviar el reporte"
+
+msgid "Failed to capture screenshot"
+msgstr "Error al capturar la pantalla"
+
+#~ msgid "Database not found"
+#~ msgstr "Base de datos no encontrada"
+
+#~ msgid "Not authenticated"
+#~ msgstr "No autenticado"
+
+#~ msgid "Module activated and migrations applied. Restart required for URLs."
+#~ msgstr ""
+#~ "Módulo activado y migraciones aplicadas. Se requiere reinicio para las "
+#~ "URLs."
+
+#~ msgid "Module deactivated. Restart required."
+#~ msgstr "Módulo desactivado. Se requiere reinicio."
+
+#~ msgid "Server restarting... Migrations applied."
+#~ msgstr "Reiniciando servidor... Migraciones aplicadas."
+
+#~ msgid "Missing module_id"
+#~ msgstr "Falta module_id"
+
+#~ msgid "Hub not connected to Cloud"
+#~ msgstr "Hub no conectado a Cloud"
+
+#~ msgid "Missing module_slug or download_url"
+#~ msgstr "Falta module_slug o download_url"
+
+#~ msgid "Module already installed"
+#~ msgstr "El módulo ya está instalado"
+
+#~ msgid "Invalid module package (not a valid zip file)"
+#~ msgstr "Paquete de módulo no válido (no es un archivo zip válido)"
+
+#~ msgid "Files"
+#~ msgstr "Archivos"
+
+#~ msgid "Browse"
+#~ msgstr "Explorador de Archivos"
+
+#~ msgid "5 directories"
+#~ msgstr "5 directorios"
+
+#~ msgid "Location"
+#~ msgstr "Ubicación"
+
+#~ msgid "Create your first custom role to get started."
+#~ msgstr "Crea tu primer rol personalizado para comenzar."
+
+#, python-format
+#~ msgid "Created %(count)d default roles."
+#~ msgstr "%(count)d roles predeterminados creados."
+
+#~ msgid "Cart"
+#~ msgstr "Carrito"
+
+#~ msgid "item"
+#~ msgstr "artículo"
+
+#~ msgid "Clear cart?"
+#~ msgstr "Limpiar todo"
+
+#~ msgid "Total"
+#~ msgstr "Total"
+
+#~ msgid "Tax will be calculated at checkout."
+#~ msgstr "Los impuestos se calcularán al finalizar la compra."
+
+#~ msgid "Checkout"
+#~ msgstr "Finalizar compra"
+
+#~ msgid "Your cart is empty"
+#~ msgstr "El carrito está vacío"
+
+#~ msgid "Add paid modules to get started."
+#~ msgstr "Añade módulos de pago para comenzar."
+
+#~ msgid "Processing..."
+#~ msgstr "Procesando..."
+
+#~ msgid "Checkout failed"
+#~ msgstr "Error en la compra"
+
+#~ msgid "Error starting checkout"
+#~ msgstr "Error al iniciar la compra"
+
+#~ msgid "Subtotal"
+#~ msgstr "Subtotal"
+
+#~ msgid "Tax"
+#~ msgstr "Impuesto"
+
+#~ msgid "Proceed to Checkout"
+#~ msgstr "Proceder al pago"
+
+#~ msgid "Clear Cart"
+#~ msgstr "Limpiar todo"
+
+#~ msgid ""
+#~ "Select your country to see the required modules for legal compliance."
+#~ msgstr ""
+#~ "Seleccione su país para ver los módulos requeridos para cumplimiento "
+#~ "legal."
+
+#~ msgid ""
+#~ "Could not load compliance requirements. Please check your internet "
+#~ "connection and try again."
+#~ msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
+
+#~ msgid "All Installed"
+#~ msgstr "Instalado"
+
+#~ msgid "Function"
+#~ msgstr "Función"
+
+#~ msgid "Module Details"
+#~ msgstr "Detalles del Módulo"
+
+#~ msgid "Add to Cart"
+#~ msgstr "Añadir al carrito"
+
+#~ msgid "Get Free"
+#~ msgstr "Obtener Gratis"
+
+#~ msgid "added to cart"
+#~ msgstr "añadido al carrito"
+
+#~ msgid "Activate Block"
+#~ msgstr "Activar Bloque"
+
+#~ msgid "Activating..."
+#~ msgstr "Activando..."
+
+#~ msgid "Block activated successfully"
+#~ msgstr "Bloque activado correctamente"
+
+#~ msgid "Block deactivated"
+#~ msgstr "Bloque desactivado"
+
+#~ msgid "blocks active"
+#~ msgstr "bloques activos"
+
+#~ msgid "Block activated"
+#~ msgstr "Bloque activado"
+
+#~ msgid ""
+#~ "Could not load functional blocks. Please check your internet connection "
+#~ "and try again."
+#~ msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
+
+#~ msgid "Blocks"
+#~ msgstr "Bloques"
+
+#~ msgid "Cart is empty"
+#~ msgstr "El carrito está vacío"
+
+#~ msgid "No paid items to checkout."
+#~ msgstr "No hay artículos de pago para finalizar."
+
+#~ msgid "Functional Blocks"
+#~ msgstr "Bloques funcionales"
+
+# =============================================================================
+# SETUP WIZARD
+# =============================================================================
+#~ msgid "Setup"
+#~ msgstr "Configuración"
+
+#~ msgid "Configure your store to get started"
+#~ msgstr "Configura tu tienda para comenzar"
+
+#~ msgid "Regional Settings"
+#~ msgstr "Configuración Regional"
+
+#~ msgid "Set your language, country, and timezone"
+#~ msgstr "Configure su idioma, país y zona horaria"
+
+#~ msgid "Country"
+#~ msgstr "País"
+
+# =============================================================================
+# POS / SALES
+# =============================================================================
+#~ msgid "Search country..."
+#~ msgstr "Buscar país..."
+
+#~ msgid "Search timezone..."
+#~ msgstr "Buscar zona horaria..."
+
+#~ msgid "Continue"
+#~ msgstr "Continuar"
+
+#~ msgid "Choose Your Modules"
+#~ msgstr "Elija sus módulos"
+
+#~ msgid "Quick Start"
+#~ msgstr "Inicio rápido"
+
+#~ msgid "Retail"
+#~ msgstr "Comercio minorista"
+
+#~ msgid "Restaurant"
+#~ msgstr "Restaurante"
+
+#~ msgid "Field Service"
+#~ msgstr "Servicio de campo"
+
+# =============================================================================
+# NAVIGATION / COMMON
+# =============================================================================
+#~ msgid "Back"
+#~ msgstr "Volver"
+
+#~ msgid "Business Information"
+#~ msgstr "Información del Negocio"
+
+#~ msgid "Set up your default tax settings"
+#~ msgstr "Configure sus impuestos predeterminados"
+
+#~ msgid "Prices shown already include tax"
+#~ msgstr "Los precios mostrados ya incluyen impuestos"
+
+#~ msgid "Business"
+#~ msgstr "Negocio"
+
+#~ msgid "Invalid language selection."
+#~ msgstr "Selección de idioma no válida."
+
+#~ msgid "Invalid timezone."
+#~ msgstr "Zona horaria no válida."
+
+#~ msgid "Please select at least one block"
+#~ msgstr "Por favor selecciona al menos un bloque"
+
+#~ msgid "Invalid selection"
+#~ msgstr "Selección no válida"
+
+#~ msgid "Business name is required"
+#~ msgstr "El nombre del negocio es obligatorio"
+
+#~ msgid "Address is required"
+#~ msgstr "La dirección es obligatoria"
+
+#~ msgid "VAT/Tax ID is required"
+#~ msgstr "El NIF/CIF es obligatorio"
+
+#~ msgid "Tax rate must be between 0 and 100."
+#~ msgstr "La tasa de impuesto debe estar entre 0 y 100."
+
+#~ msgid "Invalid tax rate."
+#~ msgstr "Tasa de impuesto no válida."
+
+# =============================================================================
+# DASHBOARD
+# =============================================================================
+#~ msgid "Products"
+#~ msgstr "Productos"
+
+#~ msgid "Home"
+#~ msgstr "Inicio"
 
 #~ msgid "Local Login"
 #~ msgstr "Acceso Local"
@@ -1826,12 +2415,6 @@ msgstr "Alternar menú de navegación"
 
 #~ msgid "By"
 #~ msgstr "Por"
-
-#~ msgid "Total Storage"
-#~ msgstr "Almacenamiento Total"
-
-#~ msgid "Data location"
-#~ msgstr "Ubicación de datos"
 
 #~ msgid "Download your Hub database"
 #~ msgstr "Descarga tu base de datos del Hub"
@@ -1852,9 +2435,6 @@ msgstr "Alternar menú de navegación"
 
 #~ msgid "Admin"
 #~ msgstr "Administrador"
-
-#~ msgid "Manager"
-#~ msgstr "Gerente"
 
 #~ msgid "Sales Today"
 #~ msgstr "Ventas Hoy"
@@ -1877,9 +2457,6 @@ msgstr "Alternar menú de navegación"
 #~ msgid "Tax Rate (%%)"
 #~ msgstr "Tasa de Impuesto (%%)"
 
-#~ msgid "Save Store Settings"
-#~ msgstr "Guardar Configuración de Tienda"
-
 #~ msgid "Examples by country:"
 #~ msgstr "Ejemplos por país:"
 
@@ -1888,9 +2465,6 @@ msgstr "Alternar menú de navegación"
 
 #~ msgid "Hub Settings"
 #~ msgstr "Configuración del Hub"
-
-#~ msgid "Dark Mode"
-#~ msgstr "Modo Oscuro"
 
 #~ msgid "Save Hub Settings"
 #~ msgstr "Guardar Configuración del Hub"
@@ -1942,9 +2516,6 @@ msgstr "Alternar menú de navegación"
 #~ msgid "Documentation"
 #~ msgstr "Documentación"
 
-#~ msgid "Get Support"
-#~ msgstr "Obtener Soporte"
-
 #~ msgid "Contact Us"
 #~ msgstr "Contáctanos"
 
@@ -1956,9 +2527,6 @@ msgstr "Alternar menú de navegación"
 
 #~ msgid "New"
 #~ msgstr "Nuevo"
-
-#~ msgid "View details"
-#~ msgstr "Ver detalles"
 
 # =============================================================================
 # SECTIONS MODULE (Tables & Areas)
@@ -2028,9 +2596,6 @@ msgstr "Alternar menú de navegación"
 
 #~ msgid "Shape"
 #~ msgstr "Forma"
-
-#~ msgid "Current Guests"
-#~ msgstr "Comensales Actuales"
 
 #~ msgid "Occupied At"
 #~ msgstr "Ocupada Desde"

@@ -167,8 +167,9 @@ def index(request):
 
 
 @admin_required
+@htmx_view('main/employees/pages/add.html', 'main/employees/partials/add_content.html')
 def add(request):
-    """Add employee — renders in side panel via HTMX."""
+    """Add employee — full page form."""
     hub_id = request.session.get('hub_id')
     role_options = get_role_options(hub_id)
 
@@ -180,21 +181,15 @@ def add(request):
 
         if not name or not email or not pin:
             messages.error(request, _('Please fill all required fields'))
-            return django_render(request, 'main/employees/partials/panel_add.html', {
-                'role_options': role_options,
-            })
+            return {'role_options': role_options}
 
         if len(pin) != 4 or not pin.isdigit():
             messages.error(request, _('PIN must be 4 digits'))
-            return django_render(request, 'main/employees/partials/panel_add.html', {
-                'role_options': role_options,
-            })
+            return {'role_options': role_options}
 
         if LocalUser.objects.filter(hub_id=hub_id, email=email).exists():
             messages.error(request, _('Email already exists'))
-            return django_render(request, 'main/employees/partials/panel_add.html', {
-                'role_options': role_options,
-            })
+            return {'role_options': role_options}
 
         # Get role object (default to employee if not found)
         role_obj = None
@@ -216,17 +211,17 @@ def add(request):
         user.save()
 
         messages.success(request, _('Employee added successfully'))
-        return _render_list(request, hub_id)
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse('main:employees')
+        return response
 
-    # GET: render panel form
-    return django_render(request, 'main/employees/partials/panel_add.html', {
-        'role_options': role_options,
-    })
+    return {'role_options': role_options}
 
 
 @admin_required
+@htmx_view('main/employees/pages/edit.html', 'main/employees/partials/edit_content.html')
 def edit(request, employee_id):
-    """Edit employee — renders in side panel via HTMX."""
+    """Edit employee — full page form."""
     hub_id = request.session.get('hub_id')
     employee = get_object_or_404(LocalUser, id=employee_id, hub_id=hub_id)
     role_options = get_role_options(hub_id)
@@ -238,18 +233,12 @@ def edit(request, employee_id):
 
         if not name or not email:
             messages.error(request, _('Please fill all required fields'))
-            return django_render(request, 'main/employees/partials/panel_edit.html', {
-                'employee': employee,
-                'role_options': role_options,
-            })
+            return {'employee': employee, 'role_options': role_options}
 
         # Check if email changed and is already in use
         if employee.email != email and LocalUser.objects.filter(hub_id=hub_id, email=email).exists():
             messages.error(request, _('Email already exists'))
-            return django_render(request, 'main/employees/partials/panel_edit.html', {
-                'employee': employee,
-                'role_options': role_options,
-            })
+            return {'employee': employee, 'role_options': role_options}
 
         # Get role object
         role_obj = None
@@ -264,13 +253,11 @@ def edit(request, employee_id):
         employee.save()
 
         messages.success(request, _('Employee updated successfully'))
-        return _render_list(request, hub_id)
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse('main:employees')
+        return response
 
-    # GET: render panel form
-    return django_render(request, 'main/employees/partials/panel_edit.html', {
-        'employee': employee,
-        'role_options': role_options,
-    })
+    return {'employee': employee, 'role_options': role_options}
 
 
 @admin_required

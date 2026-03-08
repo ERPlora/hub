@@ -256,18 +256,22 @@ class HubConfig(SingletonConfigMixin, models.Model):
         help_text='ISO 3166-1 alpha-2 country code (e.g., ES, FR, US)'
     )
 
-    # Solution (selected during setup wizard)
-    solution_slug = models.CharField(
-        max_length=100, blank=True, default='',
-        help_text='Selected solution slug from Cloud (e.g., salon-pos)'
+    # Blueprint configuration (selected during setup wizard)
+    business_sector = models.CharField(
+        max_length=50, blank=True, default='',
+        help_text='Selected sector code (e.g., "hosteleria", "retail")'
     )
-    solution_name = models.CharField(
-        max_length=200, blank=True, default='',
-        help_text='Selected solution display name (e.g., Salon & Spa)'
-    )
-    selected_blocks = models.JSONField(
+    selected_business_types = models.JSONField(
         default=list, blank=True,
-        help_text='List of selected block slugs (e.g., ["crm", "pos", "invoicing"])'
+        help_text='List of selected business type codes (e.g., ["bar", "restaurante"])'
+    )
+    selected_transversals = models.JSONField(
+        default=list, blank=True,
+        help_text='List of selected transversal model codes (e.g., ["multi_store", "franchise"])'
+    )
+    blueprint_version = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text='Version of the blueprint data used during setup'
     )
 
     # Hardware Bridge
