@@ -183,8 +183,10 @@ Two singleton models with automatic 1-hour cache and auto-invalidation on save.
 | `hub_id` | UUIDField | null | Cloud ID |
 | `cloud_api_token` | CharField | '' | HTTP auth token for Cloud API |
 | `is_configured` | BooleanField | False | Setup wizard completed |
-| `selected_blocks` | JSONField | [] | Functional block slugs |
-| `solution_slug` | CharField | '' | Legacy, kept for retrocompat |
+| `business_sector` | CharField | '' | Selected sector code |
+| `selected_business_types` | JSONField | [] | Business type codes |
+| `selected_transversals` | JSONField | [] | Transversal model codes |
+| `blueprint_version` | CharField | '' | Blueprint data version |
 | `os_language` | CharField | 'en' | System language |
 | `currency` | CharField | 'EUR' | Transaction currency |
 | `color_theme` | CharField | 'default' | Color theme |
@@ -532,9 +534,9 @@ Font: Plus Jakarta Sans (loaded locally from `static/fonts/`).
 
 4 steps: **Region → Modules → Business → Tax**
 
-- Step 2 (Modules): Fetches functional blocks from Cloud API, user multi-selects
-- `HubConfig.selected_blocks` stores list of block slugs
-- Roles created from all selected blocks via `PermissionService.create_solution_roles()`
+- Step 2 (Modules): Fetches business types from Cloud Blueprint API, user multi-selects
+- `HubConfig.selected_business_types` stores list of business type codes
+- Roles created from selected types via `PermissionService.create_blueprint_roles()`
 
 ---
 
