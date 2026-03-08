@@ -3,7 +3,7 @@ Marketplace Views - Multi-store marketplace with sidebar filters
 
 Tabs:
 - Modules: Software modules from Cloud marketplace
-- Solutions: Pre-configured module bundles
+- Business Types: Browse by business type (from blueprints)
 - Compliance: Country-specific required modules
 """
 import json
@@ -45,10 +45,10 @@ _CACHE_TTL = getattr(django_settings, 'MARKETPLACE_CACHE_TTL', 300)
 
 # Cache key prefixes
 _CK_MODULES_LIST = 'mp:modules_list'
-_CK_SOLUTIONS_LIST = 'mp:solutions_list'
-_CK_INDUSTRIES_LIST = 'mp:industries_list'
-_CK_INDUSTRY_DETAIL = 'mp:industry:'       # + slug
-_CK_SOLUTION_DETAIL = 'mp:solution:'       # + slug
+_CK_SECTORS_LIST = 'mp:sectors_list'
+_CK_TYPES_LIST = 'mp:types_list'
+_CK_FU_DETAIL = 'mp:fu:'                  # + slug (functional unit)
+_CK_TYPE_DETAIL = 'mp:type:'              # + slug (business type)
 _CK_MODULE_DETAIL = 'mp:module:'           # + slug
 _CK_INSTALLED_IDS = 'mp:installed_ids'
 
@@ -118,7 +118,7 @@ STORE_TYPES = {
         'icon': 'cube-outline',
         'api_endpoint': '/api/marketplace/modules/',
         'enabled': True,
-        'filters': ['function', 'industry', 'type'],
+        'filters': ['sector', 'type'],
     },
     'hubs': {
         'name': 'Hubs',
@@ -182,183 +182,96 @@ def store_index(request, store_type='modules'):
     }
 
 
-def _build_grouped_categories(language):
-    """Build grouped categories from local config (fallback when Cloud unavailable)."""
-    from config.module_categories import get_all_categories, get_categories_grouped
-    groups = get_categories_grouped(language)
-    all_cats = {c['id']: c for c in get_all_categories(language)}
-    result = []
-    for group_key, group_data in groups.items():
-        result.append({
-            'key': group_key,
-            'name': group_data['name'],
-            'categories': [all_cats[cid] for cid in group_data['categories'] if cid in all_cats],
-        })
-    return result
-
-
-def _build_grouped_industries(language):
-    """Build grouped industries from local config (fallback when Cloud unavailable)."""
-    from config.module_categories import get_all_industries, get_industries_grouped
-    groups = get_industries_grouped(language)
-    all_inds = {i['id']: i for i in get_all_industries(language)}
-    result = []
-    for group_key, group_data in groups.items():
-        result.append({
-            'key': group_key,
-            'name': group_data['name'],
-            'industries': [all_inds[iid] for iid in group_data['industries'] if iid in all_inds],
-        })
-    return result
-
-
-def _fetch_industries_for_filters():
-    """Fetch active industries from Cloud API for the marketplace filter (cached)."""
-    cached = cache.get(_CK_INDUSTRIES_LIST)
+def _fetch_sectors_for_filters():
+    """Fetch sectors from Cloud blueprints API for the marketplace filter (cached)."""
+    cached = cache.get(_CK_SECTORS_LIST)
     if cached is not None:
         return cached
 
-    from apps.configuration.models import HubConfig
-
-    hub_config = HubConfig.get_solo()
     cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
-    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
-
-    if not auth_token:
-        return []
 
     try:
         response = _get_session().get(
-            f"{cloud_api_url}/api/marketplace/industries/",
-            headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
+            f"{cloud_api_url}/api/blueprints/sectors/",
+            headers={'Accept': 'application/json'},
             timeout=10,
         )
         if response.status_code == 200:
             data = response.json()
-            cache.set(_CK_INDUSTRIES_LIST, data, _CACHE_TTL)
-            return data
+            sectors = data.get('results', data) if isinstance(data, dict) else data
+            if not isinstance(sectors, list):
+                sectors = []
+            cache.set(_CK_SECTORS_LIST, sectors, _CACHE_TTL)
+            return sectors
     except requests.exceptions.RequestException:
         pass
     return []
 
 
-def _fetch_industry_modules(slug):
-    """Fetch recommended modules for an industry from Cloud API (cached)."""
-    cache_key = f"{_CK_INDUSTRY_DETAIL}{slug}:modules"
-    cached = cache.get(cache_key)
+def _fetch_business_types_for_filters():
+    """Fetch business types from Cloud blueprints API for the marketplace filter (cached)."""
+    cached = cache.get(_CK_TYPES_LIST)
     if cached is not None:
         return cached
 
-    from apps.configuration.models import HubConfig
-
-    hub_config = HubConfig.get_solo()
     cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
-    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
-
-    if not auth_token:
-        return {}
 
     try:
         response = _get_session().get(
-            f"{cloud_api_url}/api/marketplace/industries/{slug}/",
-            headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
+            f"{cloud_api_url}/api/blueprints/types/",
+            headers={'Accept': 'application/json'},
             timeout=10,
         )
         if response.status_code == 200:
             data = response.json()
-            # Build a dict: module_id → is_essential
-            result = {}
-            for m in data.get('modules', []):
-                result[m.get('module_id', '')] = m.get('is_essential', False)
-            cache.set(cache_key, result, _CACHE_TTL)
-            return result
+            types = data.get('results', data) if isinstance(data, dict) else data
+            if not isinstance(types, list):
+                types = []
+            cache.set(_CK_TYPES_LIST, types, _CACHE_TTL)
+            return types
     except requests.exceptions.RequestException:
         pass
-    return {}
+    return []
 
 
-def _fetch_solutions_for_filters():
-    """Fetch solutions from Cloud API and group by block_type for the filter modal (cached)."""
-    from apps.configuration.models import HubConfig
+def _fetch_functional_units():
+    """Fetch functional units from Cloud blueprints API (cached, replaces solutions)."""
+    cache_key = 'mp:functional_units_list'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
 
-    hub_config = HubConfig.get_config()
-    active_blocks = set(hub_config.selected_blocks or [])
+    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
 
-    # Cache the raw solutions list from Cloud API
-    solutions = cache.get(_CK_SOLUTIONS_LIST)
-    if solutions is None:
-        cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
-        solutions = []
-        try:
-            response = _get_session().get(
-                f"{cloud_api_url}/api/marketplace/solutions/",
-                headers={'Accept': 'application/json'},
-                timeout=10,
-            )
-            if response.status_code == 200:
-                solutions = response.json()
-                cache.set(_CK_SOLUTIONS_LIST, solutions, _CACHE_TTL)
-        except requests.exceptions.RequestException:
-            pass
-
-    if not solutions:
-        return []
-
-    category_order = [
-        'core', 'commerce', 'services', 'hospitality', 'hr',
-        'finance', 'operations', 'marketing', 'utility', 'compliance', 'specialized',
-    ]
-    category_labels = {
-        'core': str(_('Core')), 'commerce': str(_('Commerce')), 'services': str(_('Services')),
-        'hospitality': str(_('Hospitality')), 'hr': str(_('HR')), 'finance': str(_('Finance')),
-        'operations': str(_('Operations')), 'marketing': str(_('Marketing')),
-        'utility': str(_('Utility')), 'compliance': str(_('Compliance')),
-        'specialized': str(_('Specialized')),
-    }
-
-    # Group blocks by category for the filter UI
-    blocks_by_category = {}
-    for s in solutions:
-        cat = s.get('block_type', '') or 'other'
-        blocks_by_category.setdefault(cat, []).append({
-            'id': s.get('slug', ''),
-            'name': s.get('name', ''),
-            'is_active': s.get('slug', '') in active_blocks,
-        })
-
-    grouped = []
-    for cat in category_order:
-        if cat in blocks_by_category:
-            grouped.append({
-                'key': cat,
-                'name': category_labels.get(cat, cat.title()),
-                'blocks': blocks_by_category[cat],
-            })
-    for cat, blocks in blocks_by_category.items():
-        if cat not in category_order:
-            grouped.append({'key': cat, 'name': cat.title(), 'blocks': blocks})
-
-    return grouped
+    try:
+        response = _get_session().get(
+            f"{cloud_api_url}/api/blueprints/functional-units/",
+            headers={'Accept': 'application/json'},
+            timeout=15,
+        )
+        if response.status_code == 200:
+            data = response.json()
+            units = data.get('results', data) if isinstance(data, dict) else data
+            if not isinstance(units, list):
+                units = []
+            cache.set(cache_key, units, _CACHE_TTL)
+            return units
+    except requests.exceptions.RequestException:
+        pass
+    return []
 
 
 def _get_filters_for_store(store_type, language, request):
     """Get filter options based on store type"""
-    from apps.configuration.models import HubConfig
-
     filters = {}
-    hub_config = HubConfig.get_solo()
-    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
 
     if store_type == 'modules':
-        # Fetch solutions grouped by block_type
-        solutions_grouped = _fetch_solutions_for_filters()
+        # Fetch sectors and business types from blueprints API
+        sectors = _fetch_sectors_for_filters()
+        business_types = _fetch_business_types_for_filters()
 
-        # Fetch industries for the search select
-        industries = _fetch_industries_for_filters()
-
-        filters['solutions_grouped'] = solutions_grouped
-        filters['industries'] = industries
-        filters['industries_list'] = industries if isinstance(industries, list) else []
+        filters['sectors'] = sectors
+        filters['business_types'] = business_types
         filters['types'] = [
             {'id': 'free', 'name': 'Free', 'name_es': 'Gratis', 'icon': 'gift-outline'},
             {'id': 'one_time', 'name': 'One-time', 'name_es': 'Pago único', 'icon': 'card-outline'},
@@ -546,7 +459,7 @@ MARKETPLACE_PER_PAGE_CHOICES = [12, 24, 48, 96]
 
 def _create_roles_for_installed_modules(module_slugs):
     """
-    After installing modules, look up which solutions they belong to
+    After installing modules, look up which functional units they belong to
     and auto-create the corresponding roles.
     """
     from apps.configuration.models import HubConfig
@@ -560,8 +473,8 @@ def _create_roles_for_installed_modules(module_slugs):
     if not auth_token:
         return
 
-    # Fetch module details to find solution_slugs
-    solution_slugs_to_fetch = set()
+    # Fetch module details to find functional_unit_slugs
+    fu_slugs_to_fetch = set()
     for slug in module_slugs:
         try:
             response = _get_session().get(
@@ -571,30 +484,30 @@ def _create_roles_for_installed_modules(module_slugs):
             )
             if response.status_code == 200:
                 data = response.json()
-                for sol_slug in data.get('solution_slugs', []):
-                    solution_slugs_to_fetch.add(sol_slug)
+                for fu_slug in data.get('functional_unit_slugs', []):
+                    fu_slugs_to_fetch.add(fu_slug)
         except Exception:
             pass
 
-    if not solution_slugs_to_fetch:
+    if not fu_slugs_to_fetch:
         return
 
-    # Fetch roles for each solution and create them
+    # Fetch roles for each functional unit and create them
     from apps.core.services.permission_service import PermissionService
-    for sol_slug in solution_slugs_to_fetch:
+    for fu_slug in fu_slugs_to_fetch:
         try:
             resp = _get_session().get(
-                f"{cloud_api_url}/api/marketplace/solutions/{sol_slug}/",
+                f"{cloud_api_url}/api/blueprints/functional-units/{fu_slug}/",
                 headers={'Accept': 'application/json'},
                 timeout=15,
             )
             if resp.status_code == 200:
                 roles_data = resp.json().get('roles', [])
                 if roles_data:
-                    PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
-                    logger.info("[AUTO ROLES] Created roles for solution %s", sol_slug)
+                    PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles_data)
+                    logger.info("[AUTO ROLES] Created roles for functional unit %s", fu_slug)
         except Exception as e:
-            logger.warning("[AUTO ROLES] Failed for solution %s: %s", sol_slug, e)
+            logger.warning("[AUTO ROLES] Failed for functional unit %s: %s", fu_slug, e)
 
 
 # Products list with DataTable pagination
@@ -604,14 +517,13 @@ def products_list(request, store_type):
     """
     HTMX endpoint: Fetch and render products with DataTable pagination.
     Returns HTML partial with product cards or table rows.
-    Supports filters: q (search), category, industry, type, page, sort, dir, view
+    Supports filters: q (search), sector, type, page, sort, dir, view
     """
     from apps.configuration.models import HubConfig
 
     # Get filters from query params
     search_query = request.GET.get('q', '').strip()
-    solution_filter = request.GET.get('solution', '').strip()
-    industry_filter = request.GET.get('industry', '').strip()
+    sector_filter = request.GET.get('sector', '').strip()
     type_filter = request.GET.get('type', '').strip()
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
@@ -627,7 +539,7 @@ def products_list(request, store_type):
     config = get_store_config(store_type)
 
     if store_type == 'modules':
-        return _fetch_modules_list(request, search_query, solution_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number)
+        return _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number)
     elif store_type == 'hubs':
         return _fetch_hubs_list(request, search_query, '', 12)
     else:
@@ -686,7 +598,7 @@ def _fetch_all_modules():
         return None, str(_('Could not connect to Cloud. Please try again.'))
 
 
-def _fetch_modules_list(request, search_query, solution_filter, industry_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
+def _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
     """Fetch modules from Cloud API with DataTable pagination"""
     from django.core.paginator import Paginator
 
@@ -711,31 +623,14 @@ def _fetch_modules_list(request, search_query, solution_filter, industry_filter,
             any(query_lower in str(tag).lower() for tag in m.get('tags', []))
         )]
 
-    if solution_filter:
-        solution_slugs = [s.strip() for s in solution_filter.split(',') if s.strip()]
-        if solution_slugs:
-            # Filter modules by solution_slugs field (solution membership)
+    if sector_filter:
+        sector_slugs = [s.strip() for s in sector_filter.split(',') if s.strip()]
+        if sector_slugs:
+            # Filter modules by sector membership
             modules = [m for m in modules if any(
-                ss in m.get('solution_slugs', []) for ss in solution_slugs
+                ss in m.get('sectors', []) or ss in m.get('sector_slugs', [])
+                for ss in sector_slugs
             )]
-
-    # Industry filter: fetch recommended modules for selected industries
-    industry_module_map = {}
-    if industry_filter:
-        industry_slugs = [s.strip() for s in industry_filter.split(',') if s.strip()]
-        for ind_slug in industry_slugs:
-            ind_map = _fetch_industry_modules(ind_slug)
-            for mid, is_essential in ind_map.items():
-                # Keep essential=True if any industry marks it essential
-                if mid not in industry_module_map:
-                    industry_module_map[mid] = is_essential
-                elif is_essential:
-                    industry_module_map[mid] = True
-        if industry_module_map:
-            industry_module_ids = set(industry_module_map.keys())
-            modules = [m for m in modules if m.get('module_id', '') in industry_module_ids]
-            for m in modules:
-                m['is_essential'] = industry_module_map.get(m.get('module_id', ''), False)
 
     if type_filter:
         modules = [m for m in modules if m.get('module_type') == type_filter]
@@ -765,8 +660,7 @@ def _fetch_modules_list(request, search_query, solution_filter, industry_filter,
         'page_obj': page_obj,
         'store_type': 'modules',
         'search_query': search_query,
-        'solution_filter': solution_filter,
-        'industry_filter': industry_filter,
+        'sector_filter': sector_filter,
         'type_filter': type_filter,
         'sort_field': sort_field,
         'sort_dir': sort_dir,
@@ -920,39 +814,19 @@ def module_detail(request, slug):
         }
 
 
-# --- Solutions views ---
-
-SOLUTIONS_BLOCK_TYPES = [
-    ('core', _('Core')), ('commerce', _('Commerce')), ('services', _('Services')),
-    ('hospitality', _('Hospitality')), ('hr', _('HR')), ('finance', _('Finance')),
-    ('operations', _('Operations')), ('marketing', _('Marketing')),
-    ('utility', _('Utility')), ('compliance', _('Compliance')),
-    ('specialized', _('Specialized')),
-]
+# --- Functional Units views (replaces Solutions) ---
 
 
-@login_required
-@htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/solutions_content.html')
-def solutions_index(request):
-    """Functional blocks DataTable wrapper — content loads via HTMX from solutions_list."""
-    return {
-        'current_section': 'marketplace',
-        'page_title': _('Solutions'),
-        'block_types': SOLUTIONS_BLOCK_TYPES,
-        'navigation': _marketplace_navigation('modules'),
-    }
-
-
-def _fetch_solution_modules(slug, cloud_api_url):
-    """Fetch module list for a single solution from Cloud API (cached)."""
-    cache_key = f"{_CK_SOLUTION_DETAIL}{slug}"
+def _fetch_functional_unit_modules(slug, cloud_api_url):
+    """Fetch module list for a single functional unit from Cloud API (cached)."""
+    cache_key = f"{_CK_FU_DETAIL}{slug}"
     cached = cache.get(cache_key)
     if cached is not None:
         return slug, cached
 
     try:
         r = _get_session().get(
-            f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+            f"{cloud_api_url}/api/blueprints/functional-units/{slug}/",
             headers={'Accept': 'application/json'}, timeout=15,
         )
         if r.status_code == 200:
@@ -965,139 +839,8 @@ def _fetch_solution_modules(slug, cloud_api_url):
 
 
 @login_required
-def solutions_list(request):
-    """HTMX endpoint: Fetch and render solutions with DataTable features."""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    from django.core.paginator import Paginator
-
-    search_query = request.GET.get('q', '').strip()
-    block_type_filter = request.GET.get('block_type', '').strip()
-    status_filter = request.GET.get('status', '').strip()
-    sort_field = request.GET.get('sort', 'name')
-    sort_dir = request.GET.get('dir', 'asc')
-    current_view = request.GET.get('view', 'cards')
-    try:
-        per_page = int(request.GET.get('per_page', 12))
-    except (ValueError, TypeError):
-        per_page = 12
-    if per_page not in MARKETPLACE_PER_PAGE_CHOICES:
-        per_page = 12
-    page_number = request.GET.get('page', 1)
-
-    cloud_api_url = _get_cloud_api_url()
-
-    # Use the same cached solutions list
-    solutions = cache.get(_CK_SOLUTIONS_LIST)
-    if solutions is None:
-        try:
-            response = _get_session().get(
-                f"{cloud_api_url}/api/marketplace/solutions/",
-                headers={'Accept': 'application/json'}, timeout=15,
-            )
-            if response.status_code == 200:
-                solutions = response.json()
-                cache.set(_CK_SOLUTIONS_LIST, solutions, _CACHE_TTL)
-            else:
-                solutions = []
-        except requests.exceptions.RequestException:
-            solutions = []
-
-    # Work on copies
-    solutions = [dict(s) for s in solutions]
-
-    installed_ids = set(_get_installed_module_ids())
-
-    # Fetch module details for each solution (individually cached)
-    if solutions:
-        slugs_to_fetch = [s['slug'] for s in solutions if s.get('slug')]
-        modules_by_slug = {}
-        # Only fetch uncached ones in parallel
-        uncached_slugs = []
-        for slug in slugs_to_fetch:
-            cached_mods = cache.get(f"{_CK_SOLUTION_DETAIL}{slug}")
-            if cached_mods is not None:
-                modules_by_slug[slug] = cached_mods
-            else:
-                uncached_slugs.append(slug)
-
-        if uncached_slugs:
-            with ThreadPoolExecutor(max_workers=6) as executor:
-                futures = {
-                    executor.submit(_fetch_solution_modules, slug, cloud_api_url): slug
-                    for slug in uncached_slugs
-                }
-                for future in as_completed(futures):
-                    slug, modules = future.result()
-                    modules_by_slug[slug] = modules
-
-    for s in solutions:
-        # Attach modules list and mark install status
-        sol_modules = modules_by_slug.get(s.get('slug', ''), [])
-        for m in sol_modules:
-            m['is_installed'] = (
-                m.get('module_id', '') in installed_ids
-                or m.get('slug', '') in installed_ids
-            )
-        s['modules'] = sol_modules
-        # Compact JSON for Alpine.js (only fields needed by toggleSolution/isSolutionFullySelected)
-        s['modules_json'] = json.dumps([
-            {'slug': m.get('slug', ''), 'is_installed': m.get('is_installed', False)}
-            for m in sol_modules if not m.get('is_coming_soon')
-        ])
-
-        required_ids = s.get('required_module_ids', [])
-        required_count = s.get('required_module_count', 0) or len(required_ids)
-        installed_count = sum(1 for mid in required_ids if mid in installed_ids)
-        s['installed_count'] = installed_count
-        s['required_count'] = required_count
-        s['all_installed'] = required_count > 0 and installed_count >= required_count
-        s['partially_installed'] = installed_count > 0 and installed_count < required_count
-        s.setdefault('all_modules_count', 0)
-        s['detail_url'] = reverse('marketplace:solution_detail', kwargs={'slug': s.get('slug', '')})
-
-    # Filters
-    if search_query:
-        q = search_query.lower()
-        solutions = [s for s in solutions if q in s.get('name', '').lower() or q in s.get('tagline', '').lower()]
-    if block_type_filter:
-        types = [t.strip() for t in block_type_filter.split(',') if t.strip()]
-        solutions = [s for s in solutions if s.get('block_type', '') in types]
-    if status_filter:
-        if status_filter == 'installed':
-            solutions = [s for s in solutions if s['all_installed']]
-        elif status_filter == 'partial':
-            solutions = [s for s in solutions if s['partially_installed']]
-        elif status_filter == 'available':
-            solutions = [s for s in solutions if not s['all_installed'] and not s['partially_installed']]
-
-    # Sort
-    sort_map = {
-        'name': lambda x: x.get('name', '').lower(),
-        'modules': lambda x: x.get('all_modules_count', 0) or 0,
-        'type': lambda x: x.get('block_type', ''),
-    }
-    solutions.sort(key=sort_map.get(sort_field, sort_map['name']), reverse=(sort_dir == 'desc'))
-
-    paginator = Paginator(solutions, per_page)
-    page_obj = paginator.get_page(page_number)
-
-    html = render_to_string('marketplace/partials/solutions_grid.html', {
-        'solutions': page_obj,
-        'page_obj': page_obj,
-        'current_view': current_view,
-        'search_query': search_query,
-        'block_type_filter': block_type_filter,
-        'status_filter': status_filter,
-        'sort_field': sort_field,
-        'sort_dir': sort_dir,
-        'per_page': per_page,
-    }, request=request)
-    return HttpResponse(html)
-
-
-@login_required
 def solutions_bulk_install(request):
-    """POST: Install multiple blocks at once."""
+    """POST: Install multiple functional unit blocks at once."""
     if request.method != 'POST':
         return HttpResponse(status=405)
 
@@ -1118,12 +861,11 @@ def solutions_bulk_install(request):
 
     from apps.configuration.models import HubConfig
     hub_config = HubConfig.get_config()
-    active_blocks = list(hub_config.selected_blocks or [])
+    active_types = list(hub_config.selected_business_types or [])
     for slug in block_slugs:
-        if slug not in active_blocks:
-            active_blocks.append(slug)
-    hub_config.selected_blocks = active_blocks
-    hub_config.solution_slug = active_blocks[0] if active_blocks else ''
+        if slug not in active_types:
+            active_types.append(slug)
+    hub_config.selected_business_types = active_types
     hub_config.save()
 
     from apps.core.services.module_install_service import ModuleInstallService
@@ -1135,22 +877,22 @@ def solutions_bulk_install(request):
             load_all=True, run_migrations=True, schedule_restart=True,
         )
 
-    # Create roles for all installed blocks
+    # Create roles for all installed functional units
     if hub_config.hub_id:
         cloud_api_url = _get_cloud_api_url()
         for slug in block_slugs:
             try:
                 resp = _get_session().get(
-                    f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+                    f"{cloud_api_url}/api/blueprints/functional-units/{slug}/",
                     headers={'Accept': 'application/json'}, timeout=15,
                 )
                 if resp.status_code == 200:
                     roles_data = resp.json().get('roles', [])
                     if roles_data:
                         from apps.core.services.permission_service import PermissionService
-                        PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
+                        PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles_data)
             except Exception as e:
-                logger.warning("Failed to create roles for block %s: %s", slug, e)
+                logger.warning("Failed to create roles for functional unit %s: %s", slug, e)
 
     return HttpResponse(json.dumps({
         'success': True,
@@ -1264,24 +1006,24 @@ def modules_bulk_install(request):
 @login_required
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/solution_detail_content.html')
 def solution_detail(request, slug):
-    """Block detail — shows modules, roles, and activate/deactivate button."""
+    """Functional unit detail — shows modules, roles, and activate/deactivate button."""
     cloud_api_url = _get_cloud_api_url()
     installed_ids = _get_installed_module_ids()
 
     try:
-        # Cached solution detail
-        sol_cache_key = f"{_CK_SOLUTION_DETAIL}{slug}:full"
-        solution = cache.get(sol_cache_key)
+        # Cached functional unit detail
+        fu_cache_key = f"{_CK_FU_DETAIL}{slug}:full"
+        solution = cache.get(fu_cache_key)
         if solution is None:
             response = _get_session().get(
-                f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+                f"{cloud_api_url}/api/blueprints/functional-units/{slug}/",
                 headers={'Accept': 'application/json'},
                 timeout=15,
             )
             if response.status_code == 404:
                 return {
                     'current_section': 'marketplace',
-                    'error': _('Block not found.'),
+                    'error': _('Functional unit not found.'),
                     'navigation': _marketplace_navigation('modules'),
                 }
             if response.status_code != 200:
@@ -1291,13 +1033,13 @@ def solution_detail(request, slug):
                     'navigation': _marketplace_navigation('modules'),
                 }
             solution = response.json()
-            cache.set(sol_cache_key, solution, _CACHE_TTL)
+            cache.set(fu_cache_key, solution, _CACHE_TTL)
 
-        # Check if this block is active
+        # Check if this functional unit is active
         from apps.configuration.models import HubConfig
         hub_config = HubConfig.get_config()
-        active_blocks = set(hub_config.selected_blocks or [])
-        is_block_active = slug in active_blocks
+        active_types = set(hub_config.selected_business_types or [])
+        is_block_active = slug in active_types
 
         # Split modules into required/optional and mark installed
         required_modules = []
@@ -1305,7 +1047,7 @@ def solution_detail(request, slug):
         all_installed = True
         for mod in solution.get('modules', []):
             mod['is_installed'] = mod.get('slug', '') in installed_ids or mod.get('module_id', '') in installed_ids
-            if mod['role'] == 'required':
+            if mod.get('role') == 'required':
                 required_modules.append(mod)
                 if not mod['is_installed']:
                     all_installed = False
@@ -1314,7 +1056,7 @@ def solution_detail(request, slug):
 
         return {
             'current_section': 'marketplace',
-            'page_title': solution.get('name', 'Block'),
+            'page_title': solution.get('name', 'Functional Unit'),
             'solution': solution,
             'required_modules': required_modules,
             'optional_modules': optional_modules,
@@ -1334,7 +1076,7 @@ def solution_detail(request, slug):
 
 @login_required
 def solution_install(request, slug):
-    """POST: Install all required modules from a solution."""
+    """POST: Install all required modules from a functional unit."""
     if request.method != 'POST':
         return HttpResponse(status=405)
 
@@ -1342,22 +1084,22 @@ def solution_install(request, slug):
     installed_ids = _get_installed_module_ids()
 
     try:
-        # Fetch solution detail to get modules
+        # Fetch functional unit detail to get modules
         response = _get_session().get(
-            f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+            f"{cloud_api_url}/api/blueprints/functional-units/{slug}/",
             headers={'Accept': 'application/json'},
             timeout=15,
         )
         if response.status_code != 200:
             return HttpResponse(
-                json.dumps({'success': False, 'error': 'Solution not found'}),
+                json.dumps({'success': False, 'error': 'Functional unit not found'}),
                 content_type='application/json', status=404,
             )
 
         solution = response.json()
         required_modules = [
             m for m in solution.get('modules', [])
-            if m['role'] == 'required' and m.get('slug', '') not in installed_ids and m.get('module_id', '') not in installed_ids
+            if m.get('role') == 'required' and m.get('slug', '') not in installed_ids and m.get('module_id', '') not in installed_ids
         ]
 
         if not required_modules:
@@ -1404,14 +1146,14 @@ def solution_install(request, slug):
                 schedule_restart=True,
             )
 
-            # Create solution roles
+            # Create roles from functional unit definition
             roles_data = solution.get('roles', [])
             if roles_data and hub_config.hub_id:
                 try:
                     from apps.core.services.permission_service import PermissionService
-                    PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
+                    PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles_data)
                 except Exception as e:
-                    logger.warning(f"Failed to create solution roles for {slug}: {e}")
+                    logger.warning(f"Failed to create roles for functional unit {slug}: {e}")
 
         result = {
             'success': True,
@@ -1431,32 +1173,30 @@ def solution_install(request, slug):
 
 @login_required
 def block_toggle(request, slug):
-    """POST: Activate or deactivate a functional block."""
+    """POST: Activate or deactivate a functional unit."""
     if request.method != 'POST':
         return HttpResponse(status=405)
 
     from apps.configuration.models import HubConfig
     hub_config = HubConfig.get_config()
-    active_blocks = list(hub_config.selected_blocks or [])
+    active_types = list(hub_config.selected_business_types or [])
 
-    if slug in active_blocks:
-        # Uninstall: remove from list
-        active_blocks.remove(slug)
-        hub_config.selected_blocks = active_blocks
-        hub_config.solution_slug = active_blocks[0] if active_blocks else ''
+    if slug in active_types:
+        # Deactivate: remove from list
+        active_types.remove(slug)
+        hub_config.selected_business_types = active_types
         hub_config.save()
         return HttpResponse(
-            json.dumps({'success': True, 'action': 'uninstalled', 'slug': slug, 'active_count': len(active_blocks)}),
+            json.dumps({'success': True, 'action': 'uninstalled', 'slug': slug, 'active_count': len(active_types)}),
             content_type='application/json',
         )
     else:
-        # Install: add to list + install modules + create roles
-        active_blocks.append(slug)
-        hub_config.selected_blocks = active_blocks
-        hub_config.solution_slug = active_blocks[0] if active_blocks else ''
+        # Activate: add to list + install modules + create roles
+        active_types.append(slug)
+        hub_config.selected_business_types = active_types
         hub_config.save()
 
-        # Install required modules for this block
+        # Install required modules for this functional unit
         from apps.core.services.module_install_service import ModuleInstallService
         result = ModuleInstallService.install_block_modules([slug], hub_config)
 
@@ -1469,30 +1209,30 @@ def block_toggle(request, slug):
                 schedule_restart=True,
             )
 
-        # Create roles for this block
+        # Create roles for this functional unit
         if hub_config.hub_id:
             cloud_api_url = _get_cloud_api_url()
             try:
                 response = _get_session().get(
-                    f"{cloud_api_url}/api/marketplace/solutions/{slug}/",
+                    f"{cloud_api_url}/api/blueprints/functional-units/{slug}/",
                     headers={'Accept': 'application/json'},
                     timeout=15,
                 )
                 if response.status_code == 200:
-                    solution = response.json()
-                    roles_data = solution.get('roles', [])
+                    fu_data = response.json()
+                    roles_data = fu_data.get('roles', [])
                     if roles_data:
                         from apps.core.services.permission_service import PermissionService
-                        PermissionService.create_solution_roles(str(hub_config.hub_id), roles_data)
+                        PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles_data)
             except Exception as e:
-                logger.warning(f"Failed to create roles for block {slug}: {e}")
+                logger.warning(f"Failed to create roles for functional unit {slug}: {e}")
 
         return HttpResponse(
             json.dumps({
                 'success': True,
                 'action': 'installed',
                 'slug': slug,
-                'active_count': len(active_blocks),
+                'active_count': len(active_types),
                 'modules_installed': result.installed,
                 'install_errors': result.errors,
                 'requires_restart': result.installed > 0,
@@ -1501,18 +1241,18 @@ def block_toggle(request, slug):
         )
 
 
-# --- Business Types views (informational) ---
+# --- Business Types views (informational, from blueprints API) ---
 
 @login_required
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/business_types_content.html')
 def business_types_index(request):
     """Business types list — browse by type to see recommended modules and roles."""
-    industries = _fetch_industries_for_filters()
+    business_types = _fetch_business_types_for_filters()
 
     return {
         'current_section': 'marketplace',
         'page_title': _('Business Types'),
-        'industries': industries,
+        'industries': business_types,
         'navigation': _marketplace_navigation('business_types'),
     }
 
@@ -1521,27 +1261,16 @@ def business_types_index(request):
 @htmx_view('marketplace/pages/marketplace.html', 'marketplace/partials/business_type_detail_content.html')
 def business_type_detail(request, slug):
     """Business type detail — shows recommended modules and roles (informational only)."""
-    from apps.configuration.models import HubConfig
-
-    hub_config = HubConfig.get_solo()
     cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com')
-    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
-
-    if not auth_token:
-        return {
-            'current_section': 'marketplace',
-            'error': _('Hub not connected to Cloud. Please connect in Settings.'),
-            'navigation': _marketplace_navigation('business_types'),
-        }
 
     try:
-        # Cached industry detail
-        ind_cache_key = f"{_CK_INDUSTRY_DETAIL}{slug}:full"
-        industry = cache.get(ind_cache_key)
+        # Cached business type detail
+        type_cache_key = f"{_CK_TYPE_DETAIL}{slug}:full"
+        industry = cache.get(type_cache_key)
         if industry is None:
             response = _get_session().get(
-                f"{cloud_api_url}/api/marketplace/industries/{slug}/",
-                headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
+                f"{cloud_api_url}/api/blueprints/types/{slug}/",
+                headers={'Accept': 'application/json'},
                 timeout=15,
             )
             if response.status_code == 404:
@@ -1557,7 +1286,7 @@ def business_type_detail(request, slug):
                     'navigation': _marketplace_navigation('business_types'),
                 }
             industry = response.json()
-            cache.set(ind_cache_key, industry, _CACHE_TTL)
+            cache.set(type_cache_key, industry, _CACHE_TTL)
 
         # Work on a copy so cache stays clean
         industry = dict(industry)

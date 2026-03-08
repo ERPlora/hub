@@ -1,0 +1,175 @@
+{% load djicons i18n %}
+<div data-back-url="{% url 'main:employees' %}" hidden></div>
+
+<div class="p-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">{% trans "Edit Employee" %}</h1>
+        <div class="flex gap-2">
+            <a class="btn btn-ghost btn-sm"
+               hx-get="{% url 'main:employees' %}"
+               hx-target="#main-content-area"
+               hx-push-url="true">
+                {% trans "Cancel" %}
+            </a>
+            <button type="submit" form="edit-employee-form" class="btn btn-sm color-primary">
+                {% icon "checkmark-outline" %}
+                {% trans "Save" %}
+            </button>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <form id="edit-employee-form"
+          hx-post="{% url 'main:employee_edit' employee.id %}"
+          class="max-w-2xl">
+        {% csrf_token %}
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">{% icon "person-outline" css_class="text-primary" %} {% trans "Employee Information" %}</h3>
+            </div>
+            <div class="card-body flex flex-col gap-4">
+                <!-- Avatar Preview -->
+                <div class="flex items-center gap-4 mb-2">
+                    {% if employee.avatar %}
+                    <div class="avatar avatar-xl" style="background-image: url('{{ employee.avatar.url }}');"></div>
+                    {% else %}
+                    <div class="avatar avatar-xl avatar-{{ employee.get_role_color|default:'primary' }}">
+                        <span>{{ employee.get_initials }}</span>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <h3 class="font-semibold">{{ employee.name }}</h3>
+                        <p class="text-sm text-base-content/60">{{ employee.email }}</p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-group-label" for="edit-name">{% trans "Name" %} *</label>
+                    <input type="text" id="edit-name" name="name" class="input w-full"
+                           value="{{ employee.name }}" placeholder="{% trans 'Full name' %}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-group-label" for="edit-email">{% trans "Email" %} *</label>
+                    <input type="email" id="edit-email" name="email" class="input w-full"
+                           value="{{ employee.email }}" placeholder="{% trans 'email@example.com' %}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-group-label" for="edit-role">{% trans "Role" %}</label>
+                    <select id="edit-role" name="role_id" class="select w-full">
+                        <option value="">{% trans "Select a role" %}</option>
+                        {% for option in role_options %}
+                        <option value="{{ option.value }}" {% if employee.role_obj.id|slugify == option.value %}selected{% endif %}>
+                            {{ option.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">{% icon "shield-outline" css_class="text-primary" %} {% trans "Status" %}</h3>
+            </div>
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-medium">{% trans "Account Status" %}</p>
+                        <p class="text-sm text-base-content/60">
+                            {% if employee.is_active %}{% trans "Employee is active" %}{% else %}{% trans "Employee is inactive" %}{% endif %}
+                        </p>
+                    </div>
+                    <button type="button" class="btn btn-sm {% if employee.is_active %}color-success{% else %}btn-outline{% endif %}"
+                            hx-post="{% url 'main:employee_toggle_status' employee.id %}"
+                            hx-target="#main-content-area"
+                            hx-push-url="false">
+                        {% if employee.is_active %}
+                        {% icon "checkmark-circle-outline" %}
+                        {% trans "Active" %}
+                        {% else %}
+                        {% icon "close-circle-outline" %}
+                        {% trans "Inactive" %}
+                        {% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Security (outside form) -->
+    <div class="max-w-2xl">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">{% icon "key-outline" css_class="text-primary" %} {% trans "Security" %}</h3>
+            </div>
+            <div class="card-body">
+                <div id="pin-form-container">
+                    <form hx-post="{% url 'main:employee_reset_pin' employee.id %}"
+                          hx-target="#pin-form-container"
+                          hx-swap="innerHTML"
+                          class="flex flex-col gap-3">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label class="form-group-label" for="edit-pin">{% trans "New PIN (4 digits)" %}</label>
+                            <input type="password" id="edit-pin" name="pin" class="input w-full"
+                                   maxlength="4" pattern="[0-9]{4}" inputmode="numeric"
+                                   placeholder="****" required>
+                            <span class="text-xs text-base-content/50 mt-1 block">{% trans "4-digit PIN for quick access" %}</span>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline color-warning">
+                            {% icon "key-outline" %}
+                            {% trans "Reset PIN" %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        {% if employee.get_role_name != 'admin' %}
+        <div class="card mb-4" x-data="{ confirmDelete: false }">
+            <div class="card-header">
+                <h3 class="card-title text-error">{% icon "warning-outline" css_class="text-error" %} {% trans "Danger Zone" %}</h3>
+            </div>
+            <div class="card-body">
+                <p class="text-base-content/60 text-sm mb-3">
+                    {% trans "Deleting an employee will deactivate their account." %}
+                </p>
+
+                <template x-if="!confirmDelete">
+                    <button type="button" class="btn btn-sm btn-outline color-error"
+                            @click="confirmDelete = true">
+                        {% icon "trash-outline" %}
+                        {% trans "Delete Employee" %}
+                    </button>
+                </template>
+
+                <template x-if="confirmDelete">
+                    <div>
+                        <p class="text-error text-sm font-semibold mb-3">
+                            {% trans "Are you sure?" %}
+                        </p>
+                        <div class="flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline"
+                                    @click="confirmDelete = false">
+                                {% trans "Cancel" %}
+                            </button>
+                            <button type="button" class="btn btn-sm color-error"
+                                    hx-post="{% url 'main:employee_delete' employee.id %}"
+                                    hx-target="#main-content-area">
+                                {% icon "trash-outline" %}
+                                {% trans "Delete" %}
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>

@@ -335,18 +335,18 @@ class PermissionService:
 
     @classmethod
     @transaction.atomic
-    def create_solution_roles(cls, hub_id: str, roles_data: list) -> List:
+    def create_blueprint_roles(cls, hub_id: str, roles_data: list) -> List:
         """
-        Create/activate roles from a solution's role definitions.
+        Create/activate roles from blueprint role definitions.
 
-        Called when user selects a solution during setup. Creates the
-        solution-specific roles (e.g., cashier, waiter, kitchen) with
+        Called when user selects business types during setup. Creates
+        blueprint-specific roles (e.g., cashier, waiter, kitchen) with
         their permission wildcards.
 
         Args:
             hub_id: Hub UUID
-            roles_data: List of dicts from Cloud API with keys:
-                role_name, role_display_name, role_description, wildcards
+            roles_data: List of dicts from Blueprint API with keys:
+                id, name, permissions (wildcards)
 
         Returns:
             List of created/updated Role instances
@@ -355,23 +355,28 @@ class PermissionService:
 
         created_roles = []
         for role_data in roles_data:
+            role_name = role_data.get('id') or role_data.get('role_name', '')
+            display_name = role_data.get('name') or role_data.get('role_display_name', role_name)
+            description = role_data.get('description') or role_data.get('role_description', '')
+            wildcards = role_data.get('permissions') or role_data.get('wildcards', [])
+
             role, created = Role.objects.update_or_create(
                 hub_id=hub_id,
-                name=role_data['role_name'],
+                name=role_name,
                 defaults={
-                    'display_name': role_data['role_display_name'],
-                    'description': role_data.get('role_description', ''),
+                    'display_name': display_name,
+                    'description': description,
                     'is_system': True,
                     'is_active': True,
-                    'source': 'solution',
+                    'source': 'blueprint',
                 }
             )
 
             if created:
-                logger.info(f"Created solution role: {role.name}")
+                logger.info(f"Created blueprint role: {role.name}")
 
             # Add wildcard permissions
-            for wildcard in role_data.get('wildcards', []):
+            for wildcard in wildcards:
                 RolePermission.objects.get_or_create(
                     hub_id=hub_id,
                     role=role,
