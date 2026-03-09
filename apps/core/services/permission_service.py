@@ -368,7 +368,7 @@ class PermissionService:
                     'description': description,
                     'is_system': True,
                     'is_active': True,
-                    'source': 'blueprint',
+                    'source': 'solution',
                 }
             )
 
