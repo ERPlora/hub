@@ -47,10 +47,10 @@
             <tr>
                 <th class="datatable-th datatable-th-checkbox">
                     <label class="checkbox checkbox-sm">
-                        <input type="checkbox"
+                        <input type="checkbox" class="checkbox-input"
                                :checked="selectAll"
                                @click="toggleAll([{% for user in local_users %}'{{ user.id }}'{% if not forloop.last %},{% endif %}{% endfor %}])">
-                        <span class="checkbox-mark"></span>
+                        <span class="checkbox-box"><svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
                     </label>
                 </th>
                 <th class="datatable-th datatable-th-sortable{% if sort_field == 'name' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
@@ -82,10 +82,10 @@
                 :class="{ 'datatable-tr-selected': selectedIds.includes('{{ user.id }}') }">
                 <td class="datatable-td datatable-td-checkbox" onclick="event.stopPropagation();">
                     <label class="checkbox checkbox-sm">
-                        <input type="checkbox"
+                        <input type="checkbox" class="checkbox-input"
                                :checked="selectedIds.includes('{{ user.id }}')"
                                @click="toggleSelect('{{ user.id }}')">
-                        <span class="checkbox-mark"></span>
+                        <span class="checkbox-box"><svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
                     </label>
                 </td>
                 <td class="datatable-td" data-label="{% trans 'Employee' %}">
