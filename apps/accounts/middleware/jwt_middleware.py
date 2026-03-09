@@ -44,6 +44,7 @@ class JWTMiddleware:
         '/favicon.ico',
         '/set-language/',
         '/logout/',
+        '/public/',  # Public pages (catalog, etc.)
     ]
 
     def __init__(self, get_response):

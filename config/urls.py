@@ -115,6 +115,11 @@ urlpatterns = [
 
     # Configuration (maintenance utilities) - internal use
     path('config/', include('apps.configuration.urls')),
+
+    # ==========================================================================
+    # Public pages (no authentication required)
+    # ==========================================================================
+    path('public/catalog/', include('catalog.public_urls')),
 ]
 
 
