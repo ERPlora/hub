@@ -125,11 +125,11 @@
                 </div>
             </div>
             <div class="list-item-content">
-                <span class="list-item-label">{{ role.name|default:role.role_display_name }}</span>
+                <span class="list-item-label">{{ role.name|default:role.id }}</span>
                 {% if role.description %}
                 <span class="list-item-note">{{ role.description }}</span>
-                {% elif role.role_description %}
-                <span class="list-item-note">{{ role.role_description }}</span>
+                {% elif role.id %}
+                <span class="list-item-note">{{ role.id }}</span>
                 {% endif %}
             </div>
             <div class="list-item-end">
