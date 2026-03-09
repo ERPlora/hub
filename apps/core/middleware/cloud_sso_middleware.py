@@ -91,6 +91,12 @@ class CloudSSOMiddleware:
         # Fast path: if user already has a local session, skip Cloud verification
         local_user_id = request.session.get('local_user_id')
         if local_user_id:
+            # Ensure hub_id is in session (may be missing from pre-fix sessions)
+            if not request.session.get('hub_id'):
+                from apps.configuration.models import HubConfig
+                hub_config = HubConfig.get_config()
+                request.session['hub_id'] = str(hub_config.hub_id)
+                request.session.save()
             return self.get_response(request)
 
         # No local session — verify with Cloud
