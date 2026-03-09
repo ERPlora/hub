@@ -119,6 +119,7 @@ urlpatterns = [
     # ==========================================================================
     # Public pages (no authentication required)
     # ==========================================================================
+    path('public/', include('apps.public.urls')),
     path('public/catalog/', include('catalog.public_urls')),
 ]
 

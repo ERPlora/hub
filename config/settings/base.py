@@ -130,6 +130,8 @@ INSTALLED_APPS = [
     'apps.system.modules.apps.SystemModulesConfig',
     # Hub apps - Marketplace
     'apps.marketplace.apps.MarketplaceConfig',
+    # Hub apps - Public pages
+    'apps.public',
 ]
 
 MIDDLEWARE = [
