@@ -204,9 +204,9 @@ class BlueprintService:
 
         # Create roles from blueprint
         roles = result.get('roles', [])
-        if roles:
+        if roles and hub_config.hub_id:
             from apps.core.services.permission_service import PermissionService
-            PermissionService.create_blueprint_roles(roles)
+            PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles)
 
         return {
             'success': True,

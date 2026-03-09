@@ -459,55 +459,53 @@ MARKETPLACE_PER_PAGE_CHOICES = [12, 24, 48, 96]
 
 def _create_roles_for_installed_modules(module_slugs):
     """
-    After installing modules, look up which functional units they belong to
-    and auto-create the corresponding roles.
+    After installing modules, create all required roles:
+    1. Default system roles (admin, manager, viewer)
+    2. Blueprint roles from selected business types (chef, waiter, etc.)
+    3. Module-driven roles (employee) via permission sync
     """
     from apps.configuration.models import HubConfig
+    from apps.core.services.permission_service import PermissionService
 
     hub_config = HubConfig.get_solo()
     if not hub_config.hub_id:
         return
 
-    cloud_api_url = _get_cloud_api_url()
-    auth_token = hub_config.hub_jwt or hub_config.cloud_api_token
-    if not auth_token:
-        return
+    hub_id = str(hub_config.hub_id)
 
-    # Fetch module details to find functional_unit_slugs
-    fu_slugs_to_fetch = set()
-    for slug in module_slugs:
-        try:
-            response = _get_session().get(
-                f"{cloud_api_url}/api/marketplace/modules/{slug}/",
-                headers={'Accept': 'application/json', 'X-Hub-Token': auth_token},
-                timeout=10,
-            )
-            if response.status_code == 200:
-                data = response.json()
-                for fu_slug in data.get('functional_unit_slugs', []):
-                    fu_slugs_to_fetch.add(fu_slug)
-        except Exception:
-            pass
+    # 1. Always ensure default roles exist (admin, manager, viewer)
+    try:
+        PermissionService.create_default_roles(hub_id)
+        logger.info("[AUTO ROLES] Default roles ensured (admin, manager, viewer)")
+    except Exception as e:
+        logger.warning("[AUTO ROLES] Failed to create default roles: %s", e)
 
-    if not fu_slugs_to_fetch:
-        return
+    # 2. Sync all module permissions (creates employee role if modules need it)
+    try:
+        PermissionService.sync_all_module_permissions(hub_id)
+        logger.info("[AUTO ROLES] Module permissions synced")
+    except Exception as e:
+        logger.warning("[AUTO ROLES] Failed to sync module permissions: %s", e)
 
-    # Fetch roles for each functional unit and create them
-    from apps.core.services.permission_service import PermissionService
-    for fu_slug in fu_slugs_to_fetch:
-        try:
-            resp = _get_session().get(
-                f"{cloud_api_url}/api/blueprints/functional-units/{fu_slug}/",
-                headers={'Accept': 'application/json'},
-                timeout=15,
-            )
-            if resp.status_code == 200:
-                roles_data = resp.json().get('roles', [])
-                if roles_data:
-                    PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles_data)
-                    logger.info("[AUTO ROLES] Created roles for functional unit %s", fu_slug)
-        except Exception as e:
-            logger.warning("[AUTO ROLES] Failed for functional unit %s: %s", fu_slug, e)
+    # 3. Create blueprint roles from selected business types
+    selected_types = hub_config.selected_business_types or []
+    if selected_types:
+        cloud_api_url = _get_cloud_api_url()
+        for type_code in selected_types:
+            try:
+                resp = _get_session().get(
+                    f"{cloud_api_url}/api/blueprints/types/{type_code}/",
+                    headers={'Accept': 'application/json'},
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    roles_data = resp.json().get('roles', [])
+                    if roles_data:
+                        PermissionService.create_blueprint_roles(hub_id, roles_data)
+                        logger.info("[AUTO ROLES] Created roles for business type %s: %s",
+                                    type_code, [r.get('id') for r in roles_data])
+            except Exception as e:
+                logger.warning("[AUTO ROLES] Failed for business type %s: %s", type_code, e)
 
 
 # Products list with DataTable pagination
@@ -877,22 +875,28 @@ def solutions_bulk_install(request):
             load_all=True, run_migrations=True, schedule_restart=True,
         )
 
-    # Create roles for all installed functional units
+    # Create default roles + blueprint roles from selected business types
     if hub_config.hub_id:
+        from apps.core.services.permission_service import PermissionService
+        hub_id = str(hub_config.hub_id)
+        PermissionService.create_default_roles(hub_id)
+        PermissionService.sync_all_module_permissions(hub_id)
+        # Create roles from all selected business types
+        all_types = list(hub_config.selected_business_types or [])
         cloud_api_url = _get_cloud_api_url()
-        for slug in block_slugs:
+        for type_code in all_types:
             try:
                 resp = _get_session().get(
-                    f"{cloud_api_url}/api/blueprints/functional-units/{slug}/",
+                    f"{cloud_api_url}/api/blueprints/types/{type_code}/",
                     headers={'Accept': 'application/json'}, timeout=15,
                 )
                 if resp.status_code == 200:
                     roles_data = resp.json().get('roles', [])
                     if roles_data:
-                        from apps.core.services.permission_service import PermissionService
-                        PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles_data)
+                        PermissionService.create_blueprint_roles(hub_id, roles_data)
+                        logger.info("Created roles for business type %s", type_code)
             except Exception as e:
-                logger.warning("Failed to create roles for functional unit %s: %s", slug, e)
+                logger.warning("Failed to create roles for business type %s: %s", type_code, e)
 
     return HttpResponse(json.dumps({
         'success': True,
@@ -1209,23 +1213,25 @@ def block_toggle(request, slug):
                 schedule_restart=True,
             )
 
-        # Create roles for this functional unit
+        # Create roles for this business type
         if hub_config.hub_id:
             cloud_api_url = _get_cloud_api_url()
             try:
                 response = _get_session().get(
-                    f"{cloud_api_url}/api/blueprints/functional-units/{slug}/",
+                    f"{cloud_api_url}/api/blueprints/types/{slug}/",
                     headers={'Accept': 'application/json'},
                     timeout=15,
                 )
                 if response.status_code == 200:
-                    fu_data = response.json()
-                    roles_data = fu_data.get('roles', [])
+                    type_data = response.json()
+                    roles_data = type_data.get('roles', [])
                     if roles_data:
                         from apps.core.services.permission_service import PermissionService
                         PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles_data)
+                        logger.info("Created roles for business type %s: %s",
+                                    slug, [r.get('id') for r in roles_data])
             except Exception as e:
-                logger.warning(f"Failed to create roles for functional unit {slug}: {e}")
+                logger.warning(f"Failed to create roles for business type {slug}: {e}")
 
         return HttpResponse(
             json.dumps({
@@ -1300,10 +1306,17 @@ def business_type_detail(request, slug):
                 or mod.get('module_id', '') in installed_ids
             )
 
+        # Check if this business type is active
+        from apps.configuration.models import HubConfig
+        hub_config = HubConfig.get_config()
+        active_types = hub_config.selected_business_types or []
+        is_active = slug in active_types
+
         return {
             'current_section': 'marketplace',
             'page_title': industry.get('name', _('Business Type')),
             'industry': industry,
+            'is_active': is_active,
             'back_url': reverse('marketplace:business_types'),
             'navigation': _marketplace_navigation('business_types'),
         }
@@ -1314,6 +1327,60 @@ def business_type_detail(request, slug):
             'error': f'Failed to connect to Cloud: {str(e)}',
             'navigation': _marketplace_navigation('business_types'),
         }
+
+
+@login_required
+def business_type_activate(request, slug):
+    """POST: Activate a business type — saves to HubConfig and creates its roles."""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    from apps.configuration.models import HubConfig
+    hub_config = HubConfig.get_config()
+    if not hub_config.hub_id:
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'Hub not configured'}),
+            content_type='application/json', status=400,
+        )
+
+    hub_id = str(hub_config.hub_id)
+    active_types = list(hub_config.selected_business_types or [])
+    already_active = slug in active_types
+
+    if not already_active:
+        active_types.append(slug)
+        hub_config.selected_business_types = active_types
+        hub_config.save()
+
+    # Create default roles (admin, manager, viewer) if not exist
+    from apps.core.services.permission_service import PermissionService
+    PermissionService.create_default_roles(hub_id)
+    PermissionService.sync_all_module_permissions(hub_id)
+
+    # Create blueprint roles from this business type
+    cloud_api_url = _get_cloud_api_url()
+    roles_created = []
+    try:
+        resp = _get_session().get(
+            f"{cloud_api_url}/api/blueprints/types/{slug}/",
+            headers={'Accept': 'application/json'},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            roles_data = resp.json().get('roles', [])
+            if roles_data:
+                PermissionService.create_blueprint_roles(hub_id, roles_data)
+                roles_created = [r.get('id') for r in roles_data]
+                logger.info("Created roles for business type %s: %s", slug, roles_created)
+    except Exception as e:
+        logger.warning("Failed to create roles for business type %s: %s", slug, e)
+
+    return HttpResponse(json.dumps({
+        'success': True,
+        'slug': slug,
+        'already_active': already_active,
+        'roles_created': roles_created,
+    }), content_type='application/json')
 
 
 # --- Compliance views ---
