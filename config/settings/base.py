@@ -323,7 +323,7 @@ CLOUD_API_URL = config('CLOUD_URL', default=config('CLOUD_BASE_URL', default=con
 DEPLOYMENT_MODE = 'desktop'  # desktop, web, demo
 OFFLINE_ENABLED = True
 CLOUD_SYNC_REQUIRED = False
-DEMO_MODE = False
+DEMO_MODE = config('DEMO_MODE', default=False, cast=bool)
 
 # =============================================================================
 # HUB CONFIGURATION
