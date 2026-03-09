@@ -279,11 +279,17 @@ class BlueprintService:
                 return False
             if Product.objects.filter(code=code).exists():
                 return False
+            # Map blueprint unit/is_weighable to model fields
+            unit = prod_data.get('unit', 'unit')
+            is_weighable = prod_data.get('is_weighable', False)
+
             Product.objects.create(
                 code=code,
                 name=prod_data.get('name', code),
                 description=prod_data.get('description', ''),
                 price=prod_data.get('price', 0),
+                unit_of_measure=unit if unit else 'unit',
+                sold_by_weight=bool(is_weighable),
                 source='blueprint',
             )
             return True

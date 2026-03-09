@@ -405,6 +405,18 @@ class StoreConfig(SingletonConfigMixin, models.Model):
     # Logo/Image
     logo = models.ImageField(upload_to='store/', blank=True, null=True)
 
+    # Social Media Links
+    instagram = models.URLField(blank=True, help_text='Instagram profile URL')
+    facebook = models.URLField(blank=True, help_text='Facebook page URL')
+    tiktok = models.URLField(blank=True, help_text='TikTok profile URL')
+    google_maps = models.URLField(blank=True, help_text='Google Maps link')
+
+    # Public Site
+    public_site_enabled = models.BooleanField(
+        default=False,
+        help_text='Enable public landing page at /public/'
+    )
+
     # Tax Configuration
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text='Tax rate in percentage (e.g., 21.00 for 21%)')
     tax_included = models.BooleanField(default=True, help_text='Tax included in prices')
