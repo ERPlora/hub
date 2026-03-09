@@ -9,6 +9,7 @@ API endpoints are in apps/core/api.py (mounted at /api/v1/system/)
 """
 from django.urls import path
 from . import views
+from . import chooser_views
 
 app_name = 'htmx'
 
@@ -25,4 +26,8 @@ urlpatterns = [
 
     # Health check (for internal use and Docker healthcheck)
     path('health/', views.health_check, name='health_check'),
+
+    # Generic Chooser (model selection modals)
+    path('chooser/<str:model_key>/search/', chooser_views.chooser_search, name='chooser_search'),
+    path('chooser/<str:model_key>/filters/', chooser_views.chooser_filters, name='chooser_filters'),
 ]

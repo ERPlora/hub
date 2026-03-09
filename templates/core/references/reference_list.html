@@ -1,0 +1,85 @@
+{% load i18n djicons %}
+{# Renders a list of reference groups for an object about to be deleted.
+   Expects: references (dict from get_references()) #}
+
+{% if references.total_count > 0 %}
+<div class="space-y-3">
+    {% if references.has_protected %}
+    <div class="alert color-error">
+        <span class="alert-icon">{% icon "shield-outline" %}</span>
+        <div>
+            <p class="font-semibold">{% trans "Cannot delete" %}</p>
+            <p class="text-sm">{% trans "This item is protected by other records that depend on it." %}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <p class="text-sm text-base-content/70">
+        {% blocktrans count count=references.total_count %}
+            This item is referenced in {{ count }} place.
+        {% plural %}
+            This item is referenced in {{ count }} places.
+        {% endblocktrans %}
+    </p>
+
+    {% for group in references.groups %}
+    <div class="card card-compact">
+        <div class="card-body p-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    {% if group.on_delete == 'PROTECT' %}
+                        <span class="badge badge-sm color-error">{% icon "lock-closed-outline" class="text-xs" %}</span>
+                    {% elif group.on_delete == 'CASCADE' %}
+                        <span class="badge badge-sm color-warning">{% icon "trash-outline" class="text-xs" %}</span>
+                    {% else %}
+                        <span class="badge badge-sm color-info">{% icon "link-outline" class="text-xs" %}</span>
+                    {% endif %}
+                    <span class="font-medium text-sm">{{ group.label }}</span>
+                </div>
+                <span class="badge badge-sm">{{ group.count }}</span>
+            </div>
+
+            {% if group.items %}
+            <ul class="mt-2 space-y-1">
+                {% for item in group.items %}
+                <li class="text-xs text-base-content/60 truncate pl-6">{{ item }}</li>
+                {% endfor %}
+                {% if group.has_more %}
+                <li class="text-xs text-base-content/40 pl-6">
+                    {% blocktrans with remaining=group.count|add:"-5" %}
+                        ...and {{ remaining }} more
+                    {% endblocktrans %}
+                </li>
+                {% endif %}
+            </ul>
+            {% endif %}
+
+            <div class="mt-1 pl-6">
+                {% if group.on_delete == 'PROTECT' %}
+                    <span class="text-xs color-error">{% trans "Blocks deletion" %}</span>
+                {% elif group.on_delete == 'CASCADE' %}
+                    <span class="text-xs color-warning">{% trans "Will be deleted too" %}</span>
+                {% elif group.on_delete == 'SET_NULL' %}
+                    <span class="text-xs text-base-content/50">{% trans "Reference will be cleared" %}</span>
+                {% elif group.on_delete == 'CLEAR' %}
+                    <span class="text-xs text-base-content/50">{% trans "Association will be removed" %}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if references.cascade_count > 0 %}
+    <div class="alert color-warning">
+        <span class="alert-icon">{% icon "warning-outline" %}</span>
+        <p class="text-sm">
+            {% blocktrans count count=references.cascade_count %}
+                {{ count }} related record will also be deleted.
+            {% plural %}
+                {{ count }} related records will also be deleted.
+            {% endblocktrans %}
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
