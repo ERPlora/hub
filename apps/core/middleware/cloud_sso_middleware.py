@@ -215,7 +215,11 @@ class CloudSSOMiddleware:
             request.session['user_role'] = local_user.role
             request.session['user_language'] = local_user.language
 
-            logger.info(f"[SSO] Session established for {user_email}")
+            # Force session save — Django's SessionMiddleware may not detect
+            # the modification if the session was just created in this request
+            request.session.modified = True
+            request.session.save()
+            logger.info(f"[SSO] Session established for {user_email} (hub_id={hub_config.hub_id})")
             return None
 
         except Exception as e:
