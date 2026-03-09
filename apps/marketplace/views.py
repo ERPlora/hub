@@ -1377,11 +1377,26 @@ def business_type_activate(request, slug):
     except Exception as e:
         logger.warning("Failed to create roles for business type %s: %s", slug, e)
 
+    # Import seed products for this business type
+    seed_result = {'imported': 0, 'skipped': 0, 'categories': 0}
+    try:
+        from apps.core.services.blueprint_service import BlueprintService
+        seed_result = BlueprintService.import_seeds(
+            type_codes=[slug],
+            language=getattr(hub_config, 'language', 'en') or 'en',
+            country=getattr(hub_config, 'country_code', 'es') or 'es',
+        )
+        logger.info("Imported seeds for business type %s: %s", slug, seed_result)
+    except Exception as e:
+        logger.warning("Failed to import seeds for business type %s: %s", slug, e)
+
     return HttpResponse(json.dumps({
         'success': True,
         'slug': slug,
         'already_active': already_active,
         'roles_created': roles_created,
+        'seeds_imported': seed_result.get('imported', 0),
+        'seeds_skipped': seed_result.get('skipped', 0),
     }), content_type='application/json')
 
 
