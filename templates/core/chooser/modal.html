@@ -1,0 +1,155 @@
+{% load i18n djicons %}
+{# Chooser modal component.
+   Rendered by the {% chooser %} template tag.
+
+   Required context:
+     - model_key: e.g. "inventory.product"
+     - name: form field name
+     - chooser_id: unique ID for this chooser instance
+     - config: ChooserConfig instance
+     - multiple: bool
+     - value: current value (pk string or list of pk strings)
+     - selected_items: list of {pk, label} dicts for pre-selected items
+#}
+
+<div x-data="chooserComponent_{{ chooser_id }}()" x-cloak>
+    {# Trigger button #}
+    <div class="select-modal" @click="openModal()">
+        <template x-if="selectedItems.length === 0">
+            <span class="select-modal-placeholder text-base-content/40">
+                {{ config.label }}...
+            </span>
+        </template>
+        <template x-if="selectedItems.length > 0">
+            <span class="select-modal-tags">
+                <template x-for="item in selectedItems" :key="item.pk">
+                    <span class="select-modal-tag">
+                        <span x-text="item.label"></span>
+                        <span class="select-modal-tag-remove" @click.stop="removeItem(item.pk)">&times;</span>
+                    </span>
+                </template>
+            </span>
+        </template>
+        <span class="ml-auto text-base-content/30">{% icon "chevron-down-outline" class="text-sm" %}</span>
+    </div>
+
+    {# Hidden inputs for form submission #}
+    <template x-for="item in selectedItems" :key="item.pk">
+        <input type="hidden" name="{{ name }}" :value="item.pk">
+    </template>
+
+    {# Modal #}
+    <div class="modal-backdrop" :data-state="open ? 'open' : 'closed'" @click.self="open = false">
+        <div class="modal" style="max-width: 520px; max-height: 80vh;">
+            <div class="modal-header">
+                <h2 class="modal-title flex items-center gap-2">
+                    {% icon config.icon class="text-lg" %}
+                    {{ config.label }}
+                </h2>
+                <button @click="open = false" class="modal-close">&times;</button>
+            </div>
+
+            <div class="px-4 py-2 border-b border-base-200">
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40">
+                        {% icon "search-outline" class="text-sm" %}
+                    </span>
+                    <input type="search"
+                           class="input input-sm w-full pl-9"
+                           placeholder="{% trans 'Search' %}..."
+                           x-model="query"
+                           @input.debounce.300ms="search()"
+                           @keydown.escape="open = false"
+                           x-ref="searchInput">
+                </div>
+            </div>
+
+            {# Results container - loaded via HTMX #}
+            <div class="modal-body overflow-y-auto" style="max-height: 400px;"
+                 id="chooser-results-{{ chooser_id }}"
+                 x-ref="results">
+                <div class="flex items-center justify-center py-8 text-base-content/40">
+                    <span class="loading loading-sm mr-2"></span>
+                    {% trans "Loading" %}...
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <span class="text-xs text-base-content/50" x-show="selectedItems.length > 0">
+                    <span x-text="selectedItems.length"></span> {% trans "selected" %}
+                </span>
+                <div class="ml-auto flex gap-2">
+                    <button @click="open = false" class="btn btn-ghost btn-sm">{% trans "Cancel" %}</button>
+                    <button @click="confirm()" class="btn btn-sm color-primary">{% trans "Confirm" %}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+function chooserComponent_{{ chooser_id }}() {
+    return {
+        open: false,
+        query: '',
+        modelKey: '{{ model_key }}',
+        multiple: {{ multiple|yesno:"true,false" }},
+        selectedItems: {{ selected_items_json|safe }},
+        pendingItems: [],
+
+        openModal() {
+            this.pendingItems = JSON.parse(JSON.stringify(this.selectedItems));
+            this.open = true;
+            this.$nextTick(() => {
+                this.$refs.searchInput.focus();
+                this.search();
+            });
+        },
+
+        async search(page) {
+            page = page || 1;
+            const params = new URLSearchParams({q: this.query, page: page});
+            const url = `/htmx/chooser/${this.modelKey}/search/?${params}`;
+            try {
+                const resp = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                this.$refs.results.innerHTML = await resp.text();
+            } catch (e) {
+                console.error('Chooser search error:', e);
+            }
+        },
+
+        toggleItem(pk, label) {
+            if (this.multiple) {
+                const idx = this.pendingItems.findIndex(i => i.pk === pk);
+                if (idx >= 0) {
+                    this.pendingItems.splice(idx, 1);
+                } else {
+                    this.pendingItems.push({pk, label});
+                }
+            } else {
+                this.pendingItems = [{pk, label}];
+                this.confirm();
+            }
+        },
+
+        isSelected(pk) {
+            return this.pendingItems.some(i => i.pk === pk);
+        },
+
+        confirm() {
+            this.selectedItems = JSON.parse(JSON.stringify(this.pendingItems));
+            this.open = false;
+            this.$dispatch('chooser-change', {name: '{{ name }}', items: this.selectedItems});
+        },
+
+        removeItem(pk) {
+            this.selectedItems = this.selectedItems.filter(i => i.pk !== pk);
+            this.$dispatch('chooser-change', {name: '{{ name }}', items: this.selectedItems});
+        },
+
+        goToPage(page) {
+            this.search(page);
+        }
+    }
+}
+</script>

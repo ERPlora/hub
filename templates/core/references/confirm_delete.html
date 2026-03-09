@@ -1,0 +1,59 @@
+{% load i18n djicons references %}
+{# Reusable delete confirmation modal with reference checking.
+
+   Usage (inline in a template):
+       {% include "core/references/confirm_delete.html" with object=product delete_url=delete_url %}
+
+   Usage (as HTMX partial - load via hx-get):
+       Return this template from a view with context: object, references, delete_url
+
+   Required context:
+       - object: The object to delete
+       - delete_url: URL to POST to for actual deletion
+       - references: (optional) Pre-computed references dict. If not provided, computed automatically.
+#}
+
+{% if not references %}
+    {% get_references_for object as references %}
+{% endif %}
+
+<div class="modal" style="max-width: 480px;">
+    <div class="modal-header">
+        <h2 class="modal-title">
+            {% if references.has_protected %}
+                {% trans "Cannot Delete" %}
+            {% else %}
+                {% trans "Confirm Deletion" %}
+            {% endif %}
+        </h2>
+        <button @click="open = false" class="modal-close">&times;</button>
+    </div>
+
+    <div class="modal-body">
+        <p class="mb-3">
+            {% blocktrans with name=object %}
+                Are you sure you want to delete <strong>{{ name }}</strong>?
+            {% endblocktrans %}
+        </p>
+
+        {% include "core/references/reference_list.html" with references=references %}
+    </div>
+
+    <div class="modal-footer">
+        <button @click="open = false" class="btn btn-ghost">{% trans "Cancel" %}</button>
+
+        {% if not references.has_protected %}
+        <form method="post" action="{{ delete_url }}">
+            {% csrf_token %}
+            <button type="submit" class="btn color-error">
+                {% icon "trash-outline" class="mr-1" %}
+                {% if references.total_count > 0 %}
+                    {% trans "Delete Anyway" %}
+                {% else %}
+                    {% trans "Delete" %}
+                {% endif %}
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>

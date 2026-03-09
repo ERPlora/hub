@@ -1,0 +1,18 @@
+{% load i18n %}
+{# HTMX partial: filter dropdowns for chooser.
+   Context: filters (list of {key, label, choices}), model_key
+#}
+
+{% for filter in filters %}
+<div class="form-group">
+    <label class="form-group-label text-xs">{{ filter.label }}</label>
+    <select class="select select-sm"
+            name="filter_{{ filter.key }}"
+            @change="search()">
+        <option value="">{% trans "All" %}</option>
+        {% for choice in filter.choices %}
+        <option value="{{ choice.value }}">{{ choice.label }}</option>
+        {% endfor %}
+    </select>
+</div>
+{% endfor %}
