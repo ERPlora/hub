@@ -227,6 +227,8 @@ def _fetch_business_types_for_filters():
             types = data.get('results', data) if isinstance(data, dict) else data
             if not isinstance(types, list):
                 types = []
+            # Filter out types without a code (required for URL generation)
+            types = [t for t in types if t.get('code')]
             cache.set(_CK_TYPES_LIST, types, _CACHE_TTL)
             return types
     except requests.exceptions.RequestException:
