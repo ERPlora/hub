@@ -120,8 +120,17 @@ urlpatterns = [
     # Public pages (no authentication required)
     # ==========================================================================
     path('public/', include('apps.public.urls')),
-    path('public/catalog/', include('catalog.public_urls')),
 ]
+
+# Catalog public page (only if catalog module is installed)
+try:
+    from importlib import import_module
+    import_module('catalog.public_urls')
+    urlpatterns += [
+        path('public/catalog/', include('catalog.public_urls')),
+    ]
+except ModuleNotFoundError:
+    pass
 
 
 # Añadir las URLs dinámicas de modules (Web UI + API)
