@@ -7,12 +7,14 @@ Flat URL structure for clear navigation states:
 /settings/      Settings
 /employees/     Employee management
 /roles/         Roles and permissions management
+/help/          Help & documentation
 """
 from django.urls import path, include
 
 from apps.main.index import views as index_views
 from apps.main.settings import views as settings_views
 from apps.main.files import views as files_views
+from apps.main.help import views as help_views
 
 app_name = 'main'
 
@@ -31,4 +33,7 @@ urlpatterns = [
 
     # Roles and permissions
     path('roles/', include('apps.main.roles.urls')),
+
+    # Help & documentation
+    path('help/', help_views.index, name='help'),
 ]

@@ -61,6 +61,7 @@ class CloudSSOMiddleware:
         '/set-language/',  # Language switcher (can be called during setup)
         '/logout/',  # Logout endpoint
         '/api/',     # All API endpoints (authenticated via JWT, not cookies)
+        '/public/',  # Public pages (catalog, etc.)
     ]
 
     def __init__(self, get_response):
