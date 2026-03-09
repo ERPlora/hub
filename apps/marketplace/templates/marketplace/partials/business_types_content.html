@@ -9,7 +9,7 @@
     <div class="list list-inset glass">
         {% for industry in industries %}
         <button class="list-item list-item-clickable list-item-multiline"
-                hx-get="{% url 'marketplace:business_type_detail' slug=industry.id %}"
+                hx-get="{% url 'marketplace:business_type_detail' slug=industry.code %}"
                 hx-target="#main-content-area"
                 hx-push-url="true">
             <div class="list-item-start">
