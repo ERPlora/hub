@@ -207,7 +207,9 @@ class CloudSSOMiddleware:
             local_user.save(update_fields=['last_login'])
 
             # IMPORTANT: Convert UUID to string for JSON serialization
+            hub_config = HubConfig.get_config()
             request.session['local_user_id'] = str(local_user.id)
+            request.session['hub_id'] = str(hub_config.hub_id)
             request.session['user_name'] = local_user.name
             request.session['user_email'] = local_user.email
             request.session['user_role'] = local_user.role
