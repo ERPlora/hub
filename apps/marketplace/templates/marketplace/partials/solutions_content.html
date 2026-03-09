@@ -189,21 +189,25 @@
                 <button class="modal-close" @click="columnsModal = false">{% icon "close-outline" %}</button>
             </div>
             <div class="modal-body">
-                <label class="flex items-center gap-3 py-2 cursor-not-allowed opacity-50">
-                    <input type="checkbox" class="checkbox checkbox-sm" checked disabled>
-                    <span class="text-sm">{% trans "Solution" %}</span>
+                <label class="checkbox checkbox-sm opacity-50 cursor-not-allowed">
+                    <input type="checkbox" class="checkbox-input" checked disabled>
+                    <span class="checkbox-box"><svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                    <span class="checkbox-label text-sm">{% trans "Solution" %}</span>
                 </label>
-                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('type')">
-                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.type" readonly>
-                    <span class="text-sm">{% trans "Type" %}</span>
+                <label class="checkbox checkbox-sm cursor-pointer" @click="toggleCol('type')">
+                    <input type="checkbox" class="checkbox-input" :checked="cols.type" readonly>
+                    <span class="checkbox-box"><svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                    <span class="checkbox-label text-sm">{% trans "Type" %}</span>
                 </label>
-                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('modules')">
-                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.modules" readonly>
-                    <span class="text-sm">{% trans "Modules" %}</span>
+                <label class="checkbox checkbox-sm cursor-pointer" @click="toggleCol('modules')">
+                    <input type="checkbox" class="checkbox-input" :checked="cols.modules" readonly>
+                    <span class="checkbox-box"><svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                    <span class="checkbox-label text-sm">{% trans "Modules" %}</span>
                 </label>
-                <label class="flex items-center gap-3 py-2 cursor-pointer" @click="toggleCol('status')">
-                    <input type="checkbox" class="checkbox checkbox-sm" :checked="cols.status" readonly>
-                    <span class="text-sm">{% trans "Status" %}</span>
+                <label class="checkbox checkbox-sm cursor-pointer" @click="toggleCol('status')">
+                    <input type="checkbox" class="checkbox-input" :checked="cols.status" readonly>
+                    <span class="checkbox-box"><svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                    <span class="checkbox-label text-sm">{% trans "Status" %}</span>
                 </label>
             </div>
             <div class="modal-footer">

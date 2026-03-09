@@ -201,3 +201,35 @@ class HubBaseModel(models.Model):
             obj.hard_delete()  # Same as obj.delete(hard_delete=True)
         """
         self.delete(hard_delete=True)
+
+    def get_references(self, include_deleted=False, max_items=5):
+        """
+        Get all objects that reference this instance.
+
+        Returns a dict with reference groups, counts, and deletion safety info.
+
+        Usage:
+            refs = product.get_references()
+            if refs['total_count'] > 0:
+                print(f"Used in {refs['total_count']} places")
+
+            for group in refs['groups']:
+                print(f"  {group['label']}: {group['count']}")
+        """
+        from apps.core.references import get_references
+        return get_references(self, include_deleted=include_deleted, max_items=max_items)
+
+    def can_delete(self):
+        """
+        Check if this object can be safely deleted (no PROTECT references).
+
+        Returns:
+            (bool, dict): (can_delete, references_info)
+
+        Usage:
+            ok, refs = product.can_delete()
+            if not ok:
+                messages.error(request, "Cannot delete: object is in use")
+        """
+        from apps.core.references import can_delete
+        return can_delete(self)
