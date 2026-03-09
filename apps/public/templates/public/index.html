@@ -1,0 +1,248 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ store.business_name|default:"Business" }}</title>
+
+    <!-- Favicon -->
+    {% if store.logo %}
+    <link rel="icon" type="image/png" href="{{ store.logo.url }}">
+    <link rel="apple-touch-icon" href="{{ store.logo.url }}">
+    {% else %}
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+    {% endif %}
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="{{ store.business_name }}">
+    <meta property="og:description" content="{{ store.tagline }}">
+    <meta property="og:type" content="website">
+    {% if store.logo %}
+    <meta property="og:image" content="{{ store.logo.url }}">
+    {% endif %}
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+            background: #fafafa;
+            color: #1a1a1a;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+
+        .logo {
+            width: 96px;
+            height: 96px;
+            object-fit: contain;
+            border-radius: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .name {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+
+        .tagline {
+            font-size: 0.9375rem;
+            color: #666;
+            margin-top: 0.375rem;
+        }
+
+        .address {
+            font-size: 0.8125rem;
+            color: #888;
+            margin-top: 0.75rem;
+            line-height: 1.5;
+        }
+
+        /* Links section */
+        .links {
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.625rem;
+        }
+
+        .link-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.5rem;
+            border-radius: 0.75rem;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.1s, box-shadow 0.15s;
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .link-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .link-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Social links */
+        .socials {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .social-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            text-decoration: none;
+            background: #f0f0f0;
+            color: #333;
+            transition: background 0.15s;
+        }
+
+        .social-btn:hover {
+            background: #e0e0e0;
+        }
+
+        /* Contact */
+        .contact {
+            margin-top: 2rem;
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .contact-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: #fff;
+            transition: opacity 0.15s;
+        }
+
+        .contact-btn:hover { opacity: 0.85; }
+
+        .contact-phone { background: #2563eb; }
+        .contact-email { background: #7c3aed; }
+        .contact-whatsapp { background: #25D366; }
+
+        .powered {
+            margin-top: 3rem;
+            font-size: 0.6875rem;
+            color: #ccc;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body { background: #111; color: #eee; }
+            .tagline { color: #999; }
+            .address { color: #777; }
+            .link-btn { background: #fff; color: #111; }
+            .social-btn { background: #222; color: #ccc; }
+            .social-btn:hover { background: #333; }
+            .powered { color: #444; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="page">
+        <!-- Logo -->
+        {% if store.logo %}
+        <img src="{{ store.logo.url }}" alt="{{ store.business_name }}" class="logo">
+        {% endif %}
+
+        <!-- Business Name -->
+        <h1 class="name">{{ store.business_name }}</h1>
+
+        {% if store.tagline %}
+        <p class="tagline">{{ store.tagline }}</p>
+        {% endif %}
+
+        {% if store.business_address %}
+        <p class="address">{{ store.business_address }}</p>
+        {% endif %}
+
+        <!-- Public Module Links -->
+        {% if public_links %}
+        <div class="links">
+            {% for link in public_links %}
+            <a href="{{ link.url }}" class="link-btn">
+                <span>{{ link.icon }}</span>
+                {{ link.label }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Social Media -->
+        {% if social_links %}
+        <div class="socials">
+            {% for link in social_links %}
+            <a href="{{ link.url }}" target="_blank" rel="noopener" class="social-btn">
+                <span>{{ link.icon }}</span>
+                {{ link.label }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Contact -->
+        {% if store.phone or store.email or whatsapp_url %}
+        <div class="contact">
+            {% if store.phone %}
+            <a href="tel:{{ store.phone }}" class="contact-btn contact-phone">
+                📞 {{ store.phone }}
+            </a>
+            {% endif %}
+
+            {% if store.email %}
+            <a href="mailto:{{ store.email }}" class="contact-btn contact-email">
+                ✉️ Email
+            </a>
+            {% endif %}
+
+            {% if whatsapp_url %}
+            <a href="{{ whatsapp_url }}" target="_blank" rel="noopener" class="contact-btn contact-whatsapp">
+                💬 WhatsApp
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <p class="powered">Powered by ERPlora</p>
+    </div>
+
+</body>
+</html>
