@@ -32,8 +32,11 @@ def get_or_create_secret_key():
     if secret_key:
         return secret_key
 
-    # For Docker: generate and persist to file
-    secret_file = Path('/app/.secret_key')
+    # For Docker: generate and persist to data volume (survives rebuilds)
+    secret_file = Path('/app/data/.secret_key')
+    if not secret_file.parent.exists():
+        # Fallback to /app/.secret_key (old location)
+        secret_file = Path('/app/.secret_key')
     if not secret_file.parent.exists():
         # Desktop: use local file
         secret_file = BASE_DIR / '.secret_key'
