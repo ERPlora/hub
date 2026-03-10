@@ -261,23 +261,47 @@ class BlueprintService:
             from apps.core.services.permission_service import PermissionService
             PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles)
 
-        # Import seed products
-        seed_result = {'imported': 0, 'skipped': 0, 'categories': 0}
-        try:
-            seed_result = cls.import_seeds(
-                type_codes=type_codes,
-                language=getattr(hub_config, 'language', 'en') or 'en',
-                country=getattr(hub_config, 'country_code', 'es') or 'es',
-            )
-        except Exception as e:
-            logger.warning('Seed import failed during install_blueprint: %s', e)
+        # Schedule seed import for after restart (inventory module not loaded yet)
+        seeds_imported = 0
+        if install_result.installed > 0:
+            # Modules were just installed — inventory won't be available until restart.
+            # Store a flag in cache so the next boot runs import_seeds().
+            cache.set('bp:pending_seed_import', {
+                'type_codes': type_codes,
+                'language': getattr(hub_config, 'language', 'en') or 'en',
+                'country': getattr(hub_config, 'country_code', 'es') or 'es',
+            }, timeout=3600)
+            logger.info('Seed import deferred until after restart')
+        else:
+            # No new modules installed — inventory should already be loaded.
+            try:
+                seed_result = cls.import_seeds(
+                    type_codes=type_codes,
+                    language=getattr(hub_config, 'language', 'en') or 'en',
+                    country=getattr(hub_config, 'country_code', 'es') or 'es',
+                )
+                seeds_imported = seed_result.get('imported', 0)
+            except Exception as e:
+                logger.warning('Seed import failed during install_blueprint: %s', e)
+
+        logger.info(
+            'install_blueprint for %s: %s',
+            ', '.join(type_codes),
+            {
+                'success': True,
+                'modules_installed': install_result.installed,
+                'module_errors': install_result.errors,
+                'roles_created': len(roles),
+                'seeds_imported': seeds_imported,
+            },
+        )
 
         return {
             'success': True,
             'modules_installed': install_result.installed,
             'module_errors': install_result.errors,
             'roles_created': len(roles),
-            'seeds_imported': seed_result.get('imported', 0),
+            'seeds_imported': seeds_imported,
         }
 
     @classmethod
