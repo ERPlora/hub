@@ -12,7 +12,6 @@ urlpatterns = [
     path('info/', views.step_info, name='step_info'),
     path('tax/', views.step_tax, name='step_tax'),
     path('tax/load/', views.load_tax_preset, name='load_tax_preset'),
-    path('modules/', views.step_modules, name='step_modules'),
     path('finalize/', views.finalize, name='finalize'),
     path('complete/', views.complete, name='complete'),
 ]

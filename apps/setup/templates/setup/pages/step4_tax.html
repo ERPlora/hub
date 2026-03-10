@@ -92,12 +92,32 @@
             {% trans "Back" %}
         </a>
         <button type="button" class="btn color-primary"
-                :disabled="taxClasses.length === 0"
-                @click="document.getElementById('tax-form').submit()">
-            {% trans "Next" %}
-            {% icon "arrow-forward-outline" %}
+                :disabled="taxClasses.length === 0 || finalizing"
+                @click="completeSetup()">
+            <template x-if="!finalizing">
+                <span class="flex items-center gap-2">
+                    {% trans "Complete Setup" %}
+                    {% icon "checkmark-circle-outline" %}
+                </span>
+            </template>
+            <template x-if="finalizing">
+                <span class="flex items-center gap-2">
+                    <span class="spinner spinner-sm"></span>
+                    {% trans "Setting up..." %}
+                </span>
+            </template>
         </button>
     </div>
+
+    <!-- Error message -->
+    <template x-if="errorMsg">
+        <div class="callout callout-error mt-4">
+            <div class="callout-body">
+                {% icon "alert-circle-outline" class="callout-icon" %}
+                <p class="text-sm" x-text="errorMsg"></p>
+            </div>
+        </div>
+    </template>
 </div>
 {% endblock %}
 
@@ -106,6 +126,8 @@
 function taxStep() {
     return {
         taxClasses: {{ tax_classes|safe }},
+        finalizing: false,
+        errorMsg: '',
 
         setDefault(index) {
             this.taxClasses.forEach((tc, i) => {
@@ -126,6 +148,35 @@ function taxStep() {
 
         removeTaxClass(index) {
             this.taxClasses.splice(index, 1);
+        },
+
+        async completeSetup() {
+            this.finalizing = true;
+            this.errorMsg = '';
+
+            // First save tax classes to session
+            const taxForm = new FormData(document.getElementById('tax-form'));
+            taxForm.set('tax_classes', JSON.stringify(this.taxClasses));
+            try {
+                await fetch('{% url "setup:step_tax" %}', { method: 'POST', body: taxForm });
+            } catch (e) {}
+
+            // Then finalize
+            try {
+                const fd = new FormData();
+                fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+                const resp = await fetch('{% url "setup:finalize" %}', { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.success) {
+                    window.location.href = data.redirect || '/';
+                } else {
+                    this.errorMsg = data.error || 'Setup failed';
+                    this.finalizing = false;
+                }
+            } catch (e) {
+                this.errorMsg = 'Connection error: ' + e.message;
+                this.finalizing = false;
+            }
         },
     };
 }

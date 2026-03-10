@@ -86,26 +86,7 @@ def _build_setup_alerts(menu_items):
             'color': 'info',
         })
 
-    # Alert 4: Modules needing initial configuration
-    try:
-        from apps.modules_runtime.setup_discovery import get_pending_module_setups
-        pending_setups = get_pending_module_setups()
-        if pending_setups:
-            module_names = ', '.join(s['title'] for s in pending_setups[:3])
-            first_url = pending_setups[0]['url']
-            alerts.append({
-                'id': 'module_setup',
-                'icon': 'construct-outline',
-                'title': _('%(count)d module(s) need configuration') % {'count': len(pending_setups)},
-                'description': module_names,
-                'link': first_url,
-                'link_text': _('Configure'),
-                'color': 'info',
-            })
-    except Exception:
-        pass
-
-    # Alert 5: Modules skipped due to missing dependencies
+    # Alert 4: Modules skipped due to missing dependencies
     from django.conf import settings as django_settings
     skipped = getattr(django_settings, 'MODULES_SKIPPED_DEPENDENCIES', {})
     if skipped:

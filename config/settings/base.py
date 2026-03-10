@@ -172,7 +172,6 @@ MIDDLEWARE = [
     'apps.accounts.middleware.jwt_middleware.JWTMiddleware',
     'apps.configuration.middleware.StoreConfigCheckMiddleware',
     'apps.core.middleware.module_subscription.ModuleSubscriptionMiddleware',
-    'apps.modules_runtime.middleware.ModuleSetupRedirectMiddleware',
     'apps.core.middleware.module_middleware_manager.ModuleMiddlewareManager',
 ]
 

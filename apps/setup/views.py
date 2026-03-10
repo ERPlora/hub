@@ -1,11 +1,10 @@
 """
-Setup Wizard Views — 5-step setup for new Hub instances.
+Setup Wizard Views — 4-step setup for new Hub instances.
 
 Step 1: Region (country, language, timezone, currency)
 Step 2: Business (sector + business types)
 Step 3: Info (business name, NIF, address, logo)
 Step 4: Tax (tax classes from preset, editable)
-Step 5: Modules (review and toggle modules to install)
 """
 import json
 import logging
@@ -76,9 +75,7 @@ def index(request):
         return redirect('setup:step_business')
     if not data.get('business_name'):
         return redirect('setup:step_info')
-    if not data.get('tax_classes_saved'):
-        return redirect('setup:step_tax')
-    return redirect('setup:step_modules')
+    return redirect('setup:step_tax')
 
 
 @login_required
@@ -201,7 +198,8 @@ def step_tax(request):
         data['tax_classes_data'] = json.loads(tax_classes_json)
         data['tax_classes_saved'] = True
         _set_setup_data(request, data)
-        return redirect('setup:step_modules')
+        # Tax is the last step — finalize is triggered via JS fetch
+        return redirect('setup:step_tax')
 
     # Load tax preset
     country_code = data.get('country_code', 'ES').lower()
@@ -237,50 +235,6 @@ def step_tax(request):
         'sector_notes': data.get('sector_tax_notes', ''),
     }
     return render(request, 'setup/pages/step4_tax.html', context)
-
-
-@login_required
-def step_modules(request):
-    """Step 5: Modules — review and toggle modules to install."""
-    data = _get_setup_data(request)
-    if not data.get('tax_classes_saved'):
-        return redirect('setup:step_tax')
-
-    type_codes = data.get('business_types', [])
-    compute_result = BlueprintService.compute_modules(type_codes)
-    modules_detail = compute_result.get('modules_detail', []) if compute_result else []
-
-    if request.method == 'POST':
-        selected = request.POST.getlist('modules')
-        # Always include essential modules
-        essential_ids = [m['module_id'] for m in modules_detail if m.get('source') == 'essential']
-        selected_set = set(selected) | set(essential_ids)
-        data['selected_modules'] = sorted(selected_set)
-        _set_setup_data(request, data)
-        # POST handled — redirect back (PRG pattern), finalize via JS on the page
-        return redirect('setup:step_modules')
-
-    # Classify modules
-    essential = [m for m in modules_detail if m.get('source') == 'essential']
-    recommended = [m for m in modules_detail if m.get('source') in ('recommended', 'extra')]
-
-    # Pre-select: all by default, or use previously saved selection
-    previously_selected = data.get('selected_modules')
-    if previously_selected is None:
-        selected_ids = [m['module_id'] for m in modules_detail]
-    else:
-        selected_ids = previously_selected
-
-    context = {
-        'current_step': 5,
-        'setup_data': data,
-        'essential_modules': essential,
-        'recommended_modules': recommended,
-        'selected_modules_json': json.dumps(selected_ids),
-        'essential_ids_json': json.dumps([m['module_id'] for m in essential]),
-        'total_modules': len(modules_detail),
-    }
-    return render(request, 'setup/pages/step5_modules.html', context)
 
 
 @login_required
@@ -345,20 +299,13 @@ def finalize(request):
         sector = data.get('sector', '')
         SetupService.finalize_setup(hub_config, store_config, tax_classes_data, sector)
 
-        # Install modules — use selected_modules from POST (step 5) or session
+        # Install modules from blueprint
         type_codes = data.get('business_types', [])
-        selected_modules = request.POST.getlist('modules') or data.get('selected_modules')
-
-        if selected_modules:
-            install_result = BlueprintService.install_selected_modules(
-                hub_config, type_codes, selected_modules,
-            )
-        elif type_codes:
+        install_result = {}
+        if type_codes:
             install_result = BlueprintService.install_blueprint(
                 hub_config, type_codes, include_recommended=True,
             )
-        else:
-            install_result = {}
 
         if install_result:
             logger.info('Blueprint install result: %s', install_result)
