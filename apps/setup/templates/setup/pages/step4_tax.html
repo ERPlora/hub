@@ -1,0 +1,133 @@
+{% extends "setup/wizard_base.html" %}
+{% load i18n djicons %}
+
+{% block wizard_content %}
+<div x-data="taxStep()">
+    <div class="setup-step-header">
+        <div class="setup-step-number">4</div>
+        <h2 class="setup-step-title">{% trans "Tax Configuration" %}</h2>
+        <p class="setup-step-subtitle">
+            {% if preset_name %}{{ preset_name }}{% else %}{% trans "Configure your tax classes" %}{% endif %}
+        </p>
+    </div>
+
+    {% if sector_notes %}
+    <div class="callout callout-info mb-4">
+        <div class="callout-body">
+            {% icon "information-circle-outline" class="callout-icon" %}
+            <p class="text-sm">{{ sector_notes }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not has_tax_data %}
+    <div class="callout callout-warning mb-4">
+        <div class="callout-body">
+            {% icon "warning-outline" class="callout-icon" %}
+            <p class="text-sm">{% trans "No preset tax data available. Add your tax classes manually below." %}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tax Classes Table -->
+    <div class="overflow-x-auto mb-4">
+        <table class="data-table data-table-sm">
+            <thead>
+                <tr>
+                    <th>{% trans "Code" %}</th>
+                    <th>{% trans "Name" %}</th>
+                    <th>{% trans "Rate" %} (%)</th>
+                    <th>{% trans "Default" %}</th>
+                    <th class="w-10"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(tc, index) in taxClasses" :key="index">
+                    <tr>
+                        <td>
+                            <input type="text" class="input input-sm glass" style="width: 120px;"
+                                   x-model="tc.code" placeholder="general">
+                        </td>
+                        <td>
+                            <input type="text" class="input input-sm glass" style="width: 160px;"
+                                   x-model="tc.name" placeholder="{% trans 'Tax Name' %}">
+                        </td>
+                        <td>
+                            <input type="number" class="input input-sm glass" style="width: 90px;"
+                                   x-model="tc.rate" step="0.01" min="0" max="100" placeholder="0.00">
+                        </td>
+                        <td class="text-center">
+                            <input type="radio" name="default_tax" class="radio"
+                                   :checked="tc.is_default"
+                                   @change="setDefault(index)">
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-ghost btn-sm color-error"
+                                    @click="removeTaxClass(index)">
+                                {% icon "trash-outline" %}
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add Tax Class -->
+    <button type="button" class="btn btn-sm btn-outline mb-6" @click="addTaxClass()">
+        {% icon "add-outline" %}
+        {% trans "Add Tax Class" %}
+    </button>
+
+    <!-- Hidden form for POST -->
+    <form id="tax-form" method="post" action="{% url 'setup:step_tax' %}">
+        {% csrf_token %}
+        <input type="hidden" name="tax_classes" :value="JSON.stringify(taxClasses)">
+    </form>
+
+    <!-- Navigation -->
+    <div class="setup-nav">
+        <a href="{% url 'setup:step_info' %}" class="btn btn-outline">
+            {% icon "arrow-back-outline" %}
+            {% trans "Back" %}
+        </a>
+        <button type="button" class="btn color-primary"
+                :disabled="taxClasses.length === 0"
+                @click="document.getElementById('tax-form').submit()">
+            {% trans "Next" %}
+            {% icon "arrow-forward-outline" %}
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+function taxStep() {
+    return {
+        taxClasses: {{ tax_classes|safe }},
+
+        setDefault(index) {
+            this.taxClasses.forEach((tc, i) => {
+                tc.is_default = (i === index);
+            });
+        },
+
+        addTaxClass() {
+            this.taxClasses.push({
+                code: '',
+                name: '',
+                rate: 0,
+                is_default: false,
+                order: this.taxClasses.length + 1,
+                description: ''
+            });
+        },
+
+        removeTaxClass(index) {
+            this.taxClasses.splice(index, 1);
+        },
+    };
+}
+</script>
+{% endblock %}

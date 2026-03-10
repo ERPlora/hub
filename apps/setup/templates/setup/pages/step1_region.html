@@ -1,0 +1,152 @@
+{% extends "setup/wizard_base.html" %}
+{% load i18n djicons %}
+
+{% block wizard_content %}
+<div x-data="regionStep()">
+    <div class="setup-step-header">
+        <div class="setup-step-number">1</div>
+        <h2 class="setup-step-title">{% trans "Region" %}</h2>
+        <p class="setup-step-subtitle">{% trans "Select your country and regional settings" %}</p>
+    </div>
+
+    <form method="post" action="{% url 'setup:step_region' %}">
+        {% csrf_token %}
+
+        <!-- Country -->
+        <div class="form-group mb-4">
+            <label class="form-group-label" for="country_code">{% trans "Country" %}</label>
+            <select id="country_code" name="country_code" class="select glass"
+                    x-model="country" @change="onCountryChange()">
+                <option value="">{% trans "Select country..." %}</option>
+                <option value="ES" {% if setup_data.country_code == 'ES' %}selected{% endif %}>&#127466;&#127480; {% trans "Spain" %}</option>
+                <option value="FR" {% if setup_data.country_code == 'FR' %}selected{% endif %}>&#127467;&#127479; {% trans "France" %}</option>
+                <option value="DE" {% if setup_data.country_code == 'DE' %}selected{% endif %}>&#127465;&#127466; {% trans "Germany" %}</option>
+                <option value="IT" {% if setup_data.country_code == 'IT' %}selected{% endif %}>&#127470;&#127481; {% trans "Italy" %}</option>
+                <option value="PT" {% if setup_data.country_code == 'PT' %}selected{% endif %}>&#127477;&#127481; {% trans "Portugal" %}</option>
+                <option value="GB" {% if setup_data.country_code == 'GB' %}selected{% endif %}>&#127468;&#127463; {% trans "United Kingdom" %}</option>
+                <option value="US" {% if setup_data.country_code == 'US' %}selected{% endif %}>&#127482;&#127480; {% trans "United States" %}</option>
+                <option value="MX" {% if setup_data.country_code == 'MX' %}selected{% endif %}>&#127474;&#127485; {% trans "Mexico" %}</option>
+            </select>
+        </div>
+
+        <!-- Spain sub-option: Canarias -->
+        <div x-show="country === 'ES'" x-cloak class="form-group mb-4">
+            <label class="form-group-label">{% trans "Tax Region" %}</label>
+            <div class="flex gap-3">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="tax_preset" value="es_standard"
+                           x-model="taxPreset" class="radio">
+                    <span>{% trans "Peninsula y Baleares" %} (IVA)</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="tax_preset" value="es_canarias"
+                           x-model="taxPreset" class="radio">
+                    <span>{% trans "Canarias" %} (IGIC)</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- No tax data warning -->
+        <div x-show="country && !hasTaxData" x-cloak class="callout callout-warning mb-4">
+            <div class="callout-body">
+                {% icon "warning-outline" class="callout-icon" %}
+                <div>
+                    <p class="font-medium">{% trans "Tax data not available for this country" %}</p>
+                    <p class="text-sm mt-1">{% trans "You will need to configure tax classes manually. Please verify that ERPlora complies with your country's legal requirements." %}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language -->
+        <div class="form-group mb-4">
+            <label class="form-group-label" for="language">{% trans "Language" %}</label>
+            <select id="language" name="language" class="select glass" x-model="language">
+                <option value="en">English</option>
+                <option value="es">Espanol</option>
+                <option value="fr">Francais</option>
+                <option value="de">Deutsch</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Portugues</option>
+            </select>
+        </div>
+
+        <!-- Timezone -->
+        <div class="form-group mb-4">
+            <label class="form-group-label" for="timezone">{% trans "Timezone" %}</label>
+            <select id="timezone" name="timezone" class="select glass" x-model="timezone">
+                <option value="Europe/Madrid">Europe/Madrid</option>
+                <option value="Europe/London">Europe/London</option>
+                <option value="Europe/Paris">Europe/Paris</option>
+                <option value="Europe/Berlin">Europe/Berlin</option>
+                <option value="Europe/Rome">Europe/Rome</option>
+                <option value="Europe/Lisbon">Europe/Lisbon</option>
+                <option value="America/New_York">America/New_York</option>
+                <option value="America/Chicago">America/Chicago</option>
+                <option value="America/Denver">America/Denver</option>
+                <option value="America/Los_Angeles">America/Los_Angeles</option>
+                <option value="America/Mexico_City">America/Mexico_City</option>
+                <option value="Atlantic/Canary">Atlantic/Canary</option>
+                <option value="UTC">UTC</option>
+            </select>
+        </div>
+
+        <!-- Currency -->
+        <div class="form-group mb-4">
+            <label class="form-group-label" for="currency">{% trans "Currency" %}</label>
+            <select id="currency" name="currency" class="select glass" x-model="currency">
+                <option value="EUR">EUR - Euro</option>
+                <option value="GBP">GBP - British Pound</option>
+                <option value="USD">USD - US Dollar</option>
+                <option value="MXN">MXN - Mexican Peso</option>
+            </select>
+        </div>
+
+        <!-- Navigation -->
+        <div class="setup-nav">
+            <div></div>
+            <button type="submit" class="btn color-primary" :disabled="!country">
+                {% trans "Next" %}
+                {% icon "arrow-forward-outline" %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+function regionStep() {
+    const countryDefaults = {{ country_defaults|safe }};
+    return {
+        country: '{{ setup_data.country_code|default:"" }}',
+        taxPreset: '{{ setup_data.tax_preset|default:"es_standard" }}',
+        language: '{{ setup_data.language|default:"en" }}',
+        timezone: '{{ setup_data.timezone|default:"UTC" }}',
+        currency: '{{ setup_data.currency|default:"EUR" }}',
+        hasTaxData: {% if tax_data %}true{% else %}{{ setup_data.country_code|yesno:"false,true" }}{% endif %},
+
+        onCountryChange() {
+            const defaults = countryDefaults[this.country];
+            if (defaults) {
+                this.language = defaults.language;
+                this.timezone = defaults.timezone;
+                this.currency = defaults.currency;
+            }
+            // Check if tax data exists for this country
+            if (this.country) {
+                fetch(`{% url 'setup:load_tax_preset' %}?country=${this.country.toLowerCase()}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        this.hasTaxData = data.tax_classes && data.tax_classes.length > 0;
+                    })
+                    .catch(() => { this.hasTaxData = false; });
+            }
+            // Default tax preset for Spain
+            if (this.country === 'ES') {
+                this.taxPreset = 'es_standard';
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

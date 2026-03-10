@@ -147,6 +147,8 @@ INSTALLED_APPS = [
     'apps.main.roles.apps.RolesConfig',
     # Hub apps - System
     'apps.system.modules.apps.SystemModulesConfig',
+    # Hub apps - Setup Wizard
+    'apps.setup.apps.SetupConfig',
     # Hub apps - Marketplace
     'apps.marketplace.apps.MarketplaceConfig',
     # Hub apps - Public pages
@@ -170,6 +172,7 @@ MIDDLEWARE = [
     'apps.accounts.middleware.jwt_middleware.JWTMiddleware',
     'apps.configuration.middleware.StoreConfigCheckMiddleware',
     'apps.core.middleware.module_subscription.ModuleSubscriptionMiddleware',
+    'apps.modules_runtime.middleware.ModuleSetupRedirectMiddleware',
     'apps.core.middleware.module_middleware_manager.ModuleMiddlewareManager',
 ]
 

@@ -177,6 +177,26 @@ class BlueprintService:
             return None
 
     @classmethod
+    def get_tax_data(cls, country_code):
+        """GET /api/blueprints/tax/<country_code>/ — returns tax presets for a country."""
+        cache_key = f'bp:tax:{country_code}'
+        data = cache.get(cache_key)
+        if data is not None:
+            return data
+        try:
+            resp = _get_session().get(
+                _cloud_url(f'tax/{country_code}/'),
+                timeout=10
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            cache.set(cache_key, data, CACHE_TTL)
+            return data
+        except Exception as e:
+            logger.error(f'BlueprintService.get_tax_data failed: {e}')
+            return None
+
+    @classmethod
     def resolve_modules_for_types(cls, type_codes, include_recommended=True):
         """
         Resolve which module slugs to install for given business types.
@@ -218,6 +238,69 @@ class BlueprintService:
             extra_modules,
         )
         return sorted(module_slugs), result
+
+    @classmethod
+    def install_selected_modules(cls, hub_config, type_codes, module_slugs):
+        """
+        Install a specific list of module slugs (from Step 5 selection).
+        Also creates roles from compute result and schedules seed import.
+        """
+        from apps.core.services.module_install_service import ModuleInstallService
+
+        # Get compute result for roles
+        result = cls.compute_modules(type_codes)
+
+        cloud_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
+        hub_token = ModuleInstallService.get_hub_token()
+
+        modules_to_install = [
+            {
+                'slug': slug,
+                'name': slug,
+                'download_url': f'{cloud_url}/api/marketplace/modules/{slug}/download/',
+            }
+            for slug in module_slugs
+        ]
+
+        install_result = ModuleInstallService.bulk_download_and_install(
+            modules_to_install, hub_token,
+        )
+
+        if install_result.installed > 0:
+            ModuleInstallService.run_post_install(
+                load_all=True, run_migrations=True, schedule_restart=True,
+            )
+
+        # Create roles from blueprint
+        roles = result.get('roles', []) if result else []
+        if roles and hub_config.hub_id:
+            from apps.core.services.permission_service import PermissionService
+            PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles)
+
+        # Schedule seed import for after restart
+        if install_result.installed > 0:
+            cls._write_pending_seed_flag({
+                'type_codes': type_codes,
+                'language': getattr(hub_config, 'language', 'en') or 'en',
+                'country': getattr(hub_config, 'country_code', 'es') or 'es',
+            })
+            logger.info('Seed import deferred until after restart')
+        else:
+            try:
+                seed_result = cls.import_seeds(
+                    type_codes=type_codes,
+                    language=getattr(hub_config, 'language', 'en') or 'en',
+                    country=getattr(hub_config, 'country_code', 'es') or 'es',
+                )
+            except Exception as e:
+                logger.warning('Seed import failed: %s', e)
+
+        return {
+            'success': True,
+            'modules_installed': install_result.installed,
+            'module_errors': install_result.errors,
+            'roles_created': len(roles),
+        }
 
     @classmethod
     def install_blueprint(cls, hub_config, type_codes, include_recommended=True):
@@ -360,7 +443,8 @@ class BlueprintService:
 
     @classmethod
     def _build_tax_class_mapping(cls):
-        """Map blueprint tax_class_hint strings to TaxClass records."""
+        """Map blueprint tax_class_hint strings to TaxClass records.
+        Priority: 1) code field (deterministic), 2) name heuristic, 3) rate fallback."""
         from apps.configuration.models import TaxClass
 
         tax_classes = list(TaxClass.objects.filter(is_active=True).order_by('rate'))
@@ -369,11 +453,23 @@ class BlueprintService:
 
         mapping = {}
 
-        # Name-based matching (works for Spanish: "General 21%", "Reducido 10%")
+        # 1. Code-based matching (deterministic, preferred)
+        for tc in tax_classes:
+            if tc.code:
+                mapping.setdefault(tc.code, tc)
+
+        # If code-based mapping found all expected keys, return early
+        if all(k in mapping for k in ['general', 'reduced', 'exempt']):
+            # Map 'standard' as alias for 'general' for backward compatibility
+            mapping.setdefault('standard', mapping.get('general'))
+            return mapping
+
+        # 2. Name-based matching fallback
         for tc in tax_classes:
             name_lower = tc.name.lower()
             if any(k in name_lower for k in ['general', 'standard', 'normal']):
                 mapping.setdefault('standard', tc)
+                mapping.setdefault('general', tc)
             elif any(k in name_lower for k in ['super', 'superreducido', 'super-reducido']):
                 mapping.setdefault('super_reduced', tc)
             elif any(k in name_lower for k in ['reducido', 'reduced', 'ermäßigt']):
@@ -381,9 +477,11 @@ class BlueprintService:
             elif any(k in name_lower for k in ['exento', 'exempt', 'zero', 'cero']):
                 mapping.setdefault('exempt', tc)
 
-        # Fallback: rate-based heuristic
-        if 'standard' not in mapping:
-            mapping['standard'] = max(tax_classes, key=lambda t: t.rate)
+        # 3. Rate-based heuristic fallback
+        if 'standard' not in mapping and 'general' not in mapping:
+            tc = max(tax_classes, key=lambda t: t.rate)
+            mapping['standard'] = tc
+            mapping['general'] = tc
         if 'exempt' not in mapping:
             zero_rate = [t for t in tax_classes if float(t.rate) == 0]
             if zero_rate:

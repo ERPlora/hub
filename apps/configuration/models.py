@@ -316,6 +316,13 @@ class TaxClass(models.Model):
     - France: Normal 20%, Intermediate 10%, Reduced 5.5%
     - UK: Standard 20%, Reduced 5%, Zero 0%
     """
+    code = models.CharField(
+        max_length=50,
+        blank=True,
+        default='',
+        verbose_name='Code',
+        help_text='Machine-readable code for blueprint mapping (e.g., general, reduced, super_reduced, exempt)'
+    )
     name = models.CharField(
         max_length=100,
         verbose_name='Name',

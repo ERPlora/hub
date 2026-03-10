@@ -1,0 +1,109 @@
+{% extends "setup/wizard_base.html" %}
+{% load i18n djicons %}
+
+{% block wizard_content %}
+<div x-data="businessStep()">
+    <div class="setup-step-header">
+        <div class="setup-step-number">2</div>
+        <h2 class="setup-step-title">{% trans "Business Type" %}</h2>
+        <p class="setup-step-subtitle">{% trans "Select your sector and business types" %}</p>
+    </div>
+
+    <form method="post" action="{% url 'setup:step_business' %}">
+        {% csrf_token %}
+        <input type="hidden" name="sector" x-model="selectedSector">
+        <template x-for="bt in selectedTypes" :key="bt">
+            <input type="hidden" name="business_types" :value="bt">
+        </template>
+
+        <!-- Sectors -->
+        <div class="form-group mb-4">
+            <label class="form-group-label">{% trans "Sector" %}</label>
+            <div class="setup-grid">
+                {% for sector in sectors %}
+                <div class="setup-grid-item"
+                     :class="{ 'selected': selectedSector === '{{ sector.code }}' }"
+                     @click="selectSector('{{ sector.code }}')">
+                    {% if sector.icon %}
+                    {% icon sector.icon %}
+                    {% endif %}
+                    <span class="label">{{ sector.name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Business Types (loaded via HTMX) -->
+        <div x-show="selectedSector" x-cloak class="form-group mb-4">
+            <label class="form-group-label">{% trans "Business Types" %} <span class="text-sm text-base-content/50">({% trans "select one or more" %})</span></label>
+            <div id="business-types-container">
+                {% if setup_data.sector %}
+                <div class="text-center py-4">
+                    <span class="loading loading-sm"></span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Selected summary -->
+        <div x-show="selectedTypes.length > 0" x-cloak class="callout callout-info mb-4">
+            <div class="callout-body">
+                {% icon "checkmark-circle-outline" class="callout-icon" %}
+                <div>
+                    <p class="font-medium">
+                        <span x-text="selectedTypes.length"></span> {% trans "type(s) selected" %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="setup-nav">
+            <a href="{% url 'setup:step_region' %}" class="btn btn-outline">
+                {% icon "arrow-back-outline" %}
+                {% trans "Back" %}
+            </a>
+            <button type="submit" class="btn color-primary" :disabled="selectedTypes.length === 0">
+                {% trans "Next" %}
+                {% icon "arrow-forward-outline" %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+function businessStep() {
+    return {
+        selectedSector: '{{ setup_data.sector|default:"" }}',
+        selectedTypes: {{ selected_types_json|safe }},
+
+        selectSector(code) {
+            this.selectedSector = code;
+            this.selectedTypes = [];
+            // Load types via HTMX
+            htmx.ajax('GET', `{% url 'setup:load_business_types' %}?sector=${code}`, {
+                target: '#business-types-container',
+                swap: 'innerHTML'
+            });
+        },
+
+        toggleType(code) {
+            const idx = this.selectedTypes.indexOf(code);
+            if (idx === -1) {
+                this.selectedTypes.push(code);
+            } else {
+                this.selectedTypes.splice(idx, 1);
+            }
+        },
+
+        init() {
+            if (this.selectedSector) {
+                this.selectSector(this.selectedSector);
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

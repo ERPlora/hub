@@ -132,7 +132,6 @@ def cloud_login(request):
                         hub_config.hub_refresh_token = hub_refresh_token
                     if public_key:
                         hub_config.cloud_public_key = public_key
-                    hub_config.is_configured = True
                     hub_config.save()
 
                     # Ensure roles and permissions exist with correct hub_id
