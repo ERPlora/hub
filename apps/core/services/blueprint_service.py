@@ -370,16 +370,11 @@ class BlueprintService:
             if hint and tax_class_mapping:
                 tax_class = tax_class_mapping.get(hint)
 
-            unit = prod_data.get('unit', 'unit')
-            is_weighable = prod_data.get('is_weighable', False)
-
             product = Product.objects.create(
                 sku=code,
                 name=prod_data.get('name', code),
                 description=prod_data.get('description', ''),
                 price=prod_data.get('price', 0),
-                unit_of_measure=unit if unit else 'unit',
-                sold_by_weight=bool(is_weighable),
                 tax_class=tax_class,
                 source='blueprint',
             )
