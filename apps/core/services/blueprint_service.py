@@ -405,7 +405,7 @@ class BlueprintService:
             return
 
         try:
-            url = _cloud_url(f'assets/{image_path}')
+            url = _cloud_url(f'assets/products/{image_path}')
             resp = _get_session().get(url, timeout=15)
             resp.raise_for_status()
 
