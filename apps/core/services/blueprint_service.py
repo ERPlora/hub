@@ -177,6 +177,49 @@ class BlueprintService:
             return None
 
     @classmethod
+    def resolve_modules_for_types(cls, type_codes, include_recommended=True):
+        """
+        Resolve which module slugs to install for given business types.
+        Uses compute_modules() for UFO matrix + get_functional_units() for UFO→module mapping.
+        Returns (module_slugs, compute_result) or (None, None) on failure.
+        """
+        result = cls.compute_modules(type_codes)
+        if not result:
+            return None, None
+
+        ufo_matrix = result.get('ufo_matrix', {})
+        extra_modules = result.get('extra_modules', [])
+
+        # Build UFO → module slugs mapping from functional units
+        ufo_data = cls.get_functional_units()
+        ufo_to_modules = {}
+        if isinstance(ufo_data, dict):
+            for unit in ufo_data.get('units', []):
+                ufo_to_modules[unit['code']] = unit.get('modules', [])
+
+        # Collect module slugs from active UFOs
+        module_slugs = set()
+        accepted_levels = {'essential'}
+        if include_recommended:
+            accepted_levels.add('recommended')
+
+        for ufo_code, level in ufo_matrix.items():
+            if level in accepted_levels:
+                for slug in ufo_to_modules.get(ufo_code, []):
+                    module_slugs.add(slug)
+
+        # Add extra modules (type-specific like kitchen, tables, etc.)
+        module_slugs.update(extra_modules)
+
+        logger.info(
+            'Resolved %d modules for types %s (UFOs: %s, extras: %s)',
+            len(module_slugs), type_codes,
+            {k: v for k, v in ufo_matrix.items() if v in accepted_levels},
+            extra_modules,
+        )
+        return sorted(module_slugs), result
+
+    @classmethod
     def install_blueprint(cls, hub_config, type_codes, include_recommended=True):
         """
         Compute modules for given types, then install them.
@@ -184,23 +227,33 @@ class BlueprintService:
         """
         from apps.core.services.module_install_service import ModuleInstallService
 
-        result = cls.compute_modules(type_codes)
+        module_slugs, result = cls.resolve_modules_for_types(
+            type_codes, include_recommended,
+        )
         if not result:
             return {'success': False, 'error': 'Failed to compute modules'}
 
-        # Collect module IDs to install
-        module_ids = []
-        ufo_matrix = result.get('ufo_matrix', {})
-        for ufo_code, level in ufo_matrix.items():
-            if level in ('essential', 'recommended' if include_recommended else 'essential'):
-                pass  # UFO matrix doesn't directly map to module_ids
+        # Build install list with download URLs
+        cloud_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
+        hub_token = ModuleInstallService.get_hub_token()
 
-        # Use extra_modules from the result
-        extra_modules = result.get('extra_modules', [])
-        module_ids.extend(extra_modules)
+        modules_to_install = []
+        for slug in module_slugs:
+            modules_to_install.append({
+                'slug': slug,
+                'name': slug,
+                'download_url': f'{cloud_url}/api/marketplace/modules/{slug}/download/',
+            })
 
         # Install modules
-        install_result = ModuleInstallService.bulk_download_and_install(module_ids)
+        install_result = ModuleInstallService.bulk_download_and_install(
+            modules_to_install, hub_token,
+        )
+
+        if install_result.installed > 0:
+            ModuleInstallService.run_post_install(
+                load_all=True, run_migrations=True, schedule_restart=True,
+            )
 
         # Create roles from blueprint
         roles = result.get('roles', [])
@@ -221,7 +274,8 @@ class BlueprintService:
 
         return {
             'success': True,
-            'modules_installed': install_result,
+            'modules_installed': install_result.installed,
+            'module_errors': install_result.errors,
             'roles_created': len(roles),
             'seeds_imported': seed_result.get('imported', 0),
         }

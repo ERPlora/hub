@@ -1333,7 +1333,7 @@ def business_type_detail(request, slug):
 
 @login_required
 def business_type_activate(request, slug):
-    """POST: Activate a business type — saves to HubConfig and creates its roles."""
+    """POST: Activate a business type — installs modules, creates roles, imports seeds."""
     if request.method != 'POST':
         return HttpResponse(status=405)
 
@@ -1345,7 +1345,6 @@ def business_type_activate(request, slug):
             content_type='application/json', status=400,
         )
 
-    hub_id = str(hub_config.hub_id)
     active_types = list(hub_config.selected_business_types or [])
     already_active = slug in active_types
 
@@ -1356,47 +1355,24 @@ def business_type_activate(request, slug):
 
     # Create default roles (admin, manager, viewer) if not exist
     from apps.core.services.permission_service import PermissionService
-    PermissionService.create_default_roles(hub_id)
-    PermissionService.sync_all_module_permissions(hub_id)
+    PermissionService.create_default_roles(str(hub_config.hub_id))
 
-    # Create blueprint roles from this business type
-    cloud_api_url = _get_cloud_api_url()
-    roles_created = []
-    try:
-        resp = _get_session().get(
-            f"{cloud_api_url}/api/blueprints/types/{slug}/",
-            headers={'Accept': 'application/json'},
-            timeout=15,
-        )
-        if resp.status_code == 200:
-            roles_data = resp.json().get('roles', [])
-            if roles_data:
-                PermissionService.create_blueprint_roles(hub_id, roles_data)
-                roles_created = [r.get('id') for r in roles_data]
-                logger.info("Created roles for business type %s: %s", slug, roles_created)
-    except Exception as e:
-        logger.warning("Failed to create roles for business type %s: %s", slug, e)
+    # Install blueprint: modules + roles + seed products
+    from apps.core.services.blueprint_service import BlueprintService
+    result = BlueprintService.install_blueprint(hub_config, active_types)
+    logger.info("install_blueprint for %s: %s", slug, result)
 
-    # Import seed products for this business type
-    seed_result = {'imported': 0, 'skipped': 0, 'categories': 0}
-    try:
-        from apps.core.services.blueprint_service import BlueprintService
-        seed_result = BlueprintService.import_seeds(
-            type_codes=[slug],
-            language=getattr(hub_config, 'language', 'en') or 'en',
-            country=getattr(hub_config, 'country_code', 'es') or 'es',
-        )
-        logger.info("Imported seeds for business type %s: %s", slug, seed_result)
-    except Exception as e:
-        logger.warning("Failed to import seeds for business type %s: %s", slug, e)
+    # Sync permissions after modules are installed
+    PermissionService.sync_all_module_permissions(str(hub_config.hub_id))
 
     return HttpResponse(json.dumps({
         'success': True,
         'slug': slug,
         'already_active': already_active,
-        'roles_created': roles_created,
-        'seeds_imported': seed_result.get('imported', 0),
-        'seeds_skipped': seed_result.get('skipped', 0),
+        'modules_installed': result.get('modules_installed', 0),
+        'roles_created': result.get('roles_created', 0),
+        'seeds_imported': result.get('seeds_imported', 0),
+        'requires_restart': result.get('modules_installed', 0) > 0,
     }), content_type='application/json')
 
 
