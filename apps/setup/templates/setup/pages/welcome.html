@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load static i18n djicons %}
+
+{% block title %}ERPlora Hub - {% trans "Setup" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .setup-bg {
+        background: var(--color-base-200);
+        color: var(--color-base-content);
+    }
+
+    .setup-bg::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background:
+            radial-gradient(ellipse 80% 60% at 70% 10%, color-mix(in oklch, var(--color-primary) 15%, transparent) 0%, transparent 60%),
+            radial-gradient(ellipse 70% 50% at 20% 90%, color-mix(in oklch, var(--color-secondary) 12%, transparent) 0%, transparent 60%);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .setup-welcome {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        position: relative;
+        z-index: 1;
+        min-height: 100dvh;
+    }
+
+    .setup-options {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        width: 100%;
+        max-width: 700px;
+    }
+
+    @media (max-width: 640px) {
+        .setup-options {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .setup-option {
+        padding: 2rem;
+        border-radius: 1rem;
+        border: 2px solid var(--color-base-300);
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: color-mix(in oklch, var(--color-base-100) 80%, transparent);
+        backdrop-filter: blur(12px);
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .setup-option:hover {
+        border-color: var(--color-primary);
+        background: color-mix(in oklch, var(--color-primary) 5%, var(--color-base-100));
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px -4px color-mix(in oklch, var(--color-base-content) 10%, transparent);
+    }
+
+    .setup-option .option-icon {
+        font-size: 2.5rem;
+        color: var(--color-primary);
+    }
+
+    .setup-option .option-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+
+    .setup-option .option-desc {
+        font-size: 0.8125rem;
+        opacity: 0.7;
+        line-height: 1.4;
+    }
+
+    .setup-option .option-badge {
+        font-size: 0.6875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page setup-bg" style="height: 100dvh;">
+    <div class="setup-welcome">
+        <!-- Logo -->
+        <div class="flex items-center gap-2 mb-4">
+            <img src="{% static 'img/logo.png' %}" alt="ERPlora" style="width: 40px; height: 40px;">
+            <span class="font-semibold text-xl">ERPlora</span>
+        </div>
+
+        <h1 class="text-2xl font-bold mb-2">{% trans "Welcome to ERPlora" %}</h1>
+        <p class="text-sm opacity-70 mb-8 text-center" style="max-width: 500px;">
+            {% trans "Let's set up your hub. Choose how you'd like to get started:" %}
+        </p>
+
+        <div class="setup-options">
+            <!-- AI Setup -->
+            <a href="{% if has_assistant %}/m/assistant/?context=setup{% else %}{% url 'setup:step_region' %}{% endif %}"
+               class="setup-option">
+                <div class="option-icon">
+                    {% icon "chatbubbles-outline" %}
+                </div>
+                <div class="option-title">{% trans "AI Assistant" %}</div>
+                <div class="option-desc">
+                    {% trans "Tell me about your business and I'll configure everything for you. Fast and conversational." %}
+                </div>
+                <span class="badge badge-sm color-primary option-badge">{% trans "Recommended" %}</span>
+            </a>
+
+            <!-- Manual Setup -->
+            <a href="{% url 'setup:step_region' %}" class="setup-option">
+                <div class="option-icon">
+                    {% icon "settings-outline" %}
+                </div>
+                <div class="option-title">{% trans "Manual Setup" %}</div>
+                <div class="option-desc">
+                    {% trans "Step-by-step wizard: region, business type, details, and taxes. 4 quick steps." %}
+                </div>
+                <span class="badge badge-sm badge-outline option-badge">{% trans "4 steps" %}</span>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

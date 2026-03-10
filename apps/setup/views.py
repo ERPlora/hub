@@ -8,7 +8,9 @@ Step 4: Tax (tax classes from preset, editable)
 """
 import json
 import logging
+from pathlib import Path
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
@@ -61,21 +63,20 @@ def _set_setup_data(request, data):
 
 @login_required
 def index(request):
-    """Detect current step and redirect."""
+    """Welcome page: choose AI assistant or manual setup."""
     hub_config = HubConfig.get_config()
     if hub_config.is_configured:
         return redirect('main:index')
 
-    data = _get_setup_data(request)
+    # Check if assistant module is available
+    modules_dir = getattr(settings, 'MODULES_DIR', None)
+    has_assistant = bool(
+        modules_dir and Path(modules_dir).joinpath('assistant').exists()
+    )
 
-    # Determine which step to go to
-    if not data.get('country_code'):
-        return redirect('setup:step_region')
-    if not data.get('business_types'):
-        return redirect('setup:step_business')
-    if not data.get('business_name'):
-        return redirect('setup:step_info')
-    return redirect('setup:step_tax')
+    return render(request, 'setup/pages/welcome.html', {
+        'has_assistant': has_assistant,
+    })
 
 
 @login_required
