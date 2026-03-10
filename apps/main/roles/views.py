@@ -22,7 +22,7 @@ SORT_FIELDS = {
     'status': 'is_active',
 }
 
-PER_PAGE_CHOICES = [10, 25, 50, 100]
+PER_PAGE_CHOICES = [12, 24, 48, 96, 0]
 
 
 def _build_list_context(hub_id, per_page=10):
@@ -31,7 +31,7 @@ def _build_list_context(hub_id, per_page=10):
         hub_id=hub_id, is_deleted=False
     ).annotate(user_count=Count('users')).order_by('-is_system', 'display_name')
 
-    paginator = Paginator(roles, per_page)
+    paginator = Paginator(roles, per_page if per_page > 0 else max(roles.count(), 1))
     page_obj = paginator.get_page(1)
 
     return {
@@ -65,11 +65,11 @@ def role_list(request):
     page_number = request.GET.get('page', 1)
     current_view = request.GET.get('view', 'table')
     try:
-        per_page = int(request.GET.get('per_page', 10))
+        per_page = int(request.GET.get('per_page', 12))
     except (ValueError, TypeError):
-        per_page = 10
+        per_page = 12
     if per_page not in PER_PAGE_CHOICES:
-        per_page = 10
+        per_page = 12
 
     roles = Role.objects.filter(
         hub_id=hub_id, is_deleted=False
@@ -122,7 +122,7 @@ def role_list(request):
             sheet_name=str(_('Roles')),
         )
 
-    paginator = Paginator(roles, per_page)
+    paginator = Paginator(roles, per_page if per_page > 0 else max(roles.count(), 1))
     page_obj = paginator.get_page(page_number)
 
     context = {

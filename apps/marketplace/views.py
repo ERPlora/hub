@@ -456,7 +456,7 @@ def filters_view(request, store_type):
     return HttpResponse(html)
 
 
-MARKETPLACE_PER_PAGE_CHOICES = [12, 24, 48, 96]
+MARKETPLACE_PER_PAGE_CHOICES = [12, 24, 48, 96, 0]
 
 
 def _create_roles_for_installed_modules(module_slugs):
@@ -652,7 +652,7 @@ def _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_
     modules.sort(key=sort_fn, reverse=(sort_dir == 'desc'))
 
     # Page-based pagination
-    paginator = Paginator(modules, per_page)
+    paginator = Paginator(modules, per_page if per_page > 0 else max(len(modules), 1))
     page_obj = paginator.get_page(page_number)
 
     html = render_to_string('marketplace/partials/products_grid.html', {
