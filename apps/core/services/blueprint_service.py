@@ -265,12 +265,12 @@ class BlueprintService:
         seeds_imported = 0
         if install_result.installed > 0:
             # Modules were just installed — inventory won't be available until restart.
-            # Store a flag in cache so the next boot runs import_seeds().
-            cache.set('bp:pending_seed_import', {
+            # Write a flag file so the next boot runs import_seeds().
+            cls._write_pending_seed_flag({
                 'type_codes': type_codes,
                 'language': getattr(hub_config, 'language', 'en') or 'en',
                 'country': getattr(hub_config, 'country_code', 'es') or 'es',
-            }, timeout=3600)
+            })
             logger.info('Seed import deferred until after restart')
         else:
             # No new modules installed — inventory should already be loaded.
@@ -491,3 +491,41 @@ class BlueprintService:
             product.image.save(filename, ContentFile(resp.content), save=True)
         except Exception as e:
             logger.warning('Failed to download image %s for product %s: %s', image_path, product.sku, e)
+
+    @staticmethod
+    def _pending_seed_flag_path():
+        """Path to the pending seed import flag file (survives process restart)."""
+        from pathlib import Path
+        data_dir = getattr(settings, 'DATA_DIR', None)
+        if data_dir:
+            return Path(data_dir) / '.pending_seed_import.json'
+        return Path('/tmp/.pending_seed_import.json')
+
+    @classmethod
+    def _write_pending_seed_flag(cls, data):
+        """Write pending seed import data to a flag file."""
+        import json
+        path = cls._pending_seed_flag_path()
+        try:
+            path.write_text(json.dumps(data))
+        except Exception as e:
+            logger.warning('Failed to write pending seed flag: %s', e)
+
+    @classmethod
+    def read_and_clear_pending_seed_flag(cls):
+        """Read and delete the pending seed import flag file. Returns dict or None."""
+        import json
+        path = cls._pending_seed_flag_path()
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text())
+            path.unlink()
+            return data
+        except Exception as e:
+            logger.warning('Failed to read pending seed flag: %s', e)
+            try:
+                path.unlink()
+            except OSError:
+                pass
+            return None

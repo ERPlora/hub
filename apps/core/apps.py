@@ -29,16 +29,17 @@ class CoreConfig(AppConfig):
     def _run_pending_seed_import(self):
         """Run deferred seed import if flagged by install_blueprint()."""
         import logging
-        from django.core.cache import cache
 
         logger = logging.getLogger(__name__)
 
-        pending = cache.get('bp:pending_seed_import')
-        if not pending:
+        try:
+            from apps.core.services.blueprint_service import BlueprintService
+            pending = BlueprintService.read_and_clear_pending_seed_flag()
+        except Exception:
             return
 
-        # Clear flag immediately to avoid re-running on next restart
-        cache.delete('bp:pending_seed_import')
+        if not pending:
+            return
 
         type_codes = pending.get('type_codes', [])
         language = pending.get('language', 'en')
@@ -48,15 +49,11 @@ class CoreConfig(AppConfig):
             return
 
         try:
-            from apps.core.services.blueprint_service import BlueprintService
             result = BlueprintService.import_seeds(
                 type_codes=type_codes,
                 language=language,
                 country=country,
             )
-            logger.info(
-                'Deferred seed import complete: %s',
-                result,
-            )
+            logger.info('Deferred seed import complete: %s', result)
         except Exception as e:
             logger.warning('Deferred seed import failed: %s', e)
