@@ -127,7 +127,7 @@ class Role(HubBaseModel):
         max_length=20,
         choices=SOURCE_CHOICES,
         default='custom',
-        help_text="Origin: basic (always active), solution (from selected solution), custom (user-created)"
+        help_text="Origin: basic (always active), solution (from blueprint business type), custom (user-created)"
     )
 
     # Permissions via through model (supports wildcards)
