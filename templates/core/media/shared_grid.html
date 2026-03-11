@@ -1,0 +1,17 @@
+{% comment %}
+Shared assets grid — shows blueprint images from Cloud S3.
+{% endcomment %}
+{% if assets %}
+{% for asset in assets %}
+<div class="media-grid-item" data-url="{{ cloud_url }}/api/blueprints/assets/{{ asset.path }}"
+     @click="selectPending('{{ cloud_url }}/api/blueprints/assets/{{ asset.path }}')"
+     :class="pendingUrl === '{{ cloud_url }}/api/blueprints/assets/{{ asset.path }}' ? 'ring-2 ring-primary' : ''">
+    <img src="{{ cloud_url }}/api/blueprints/assets/{{ asset.path }}" alt="{{ asset.name }}" loading="lazy">
+    <span class="media-grid-name">{{ asset.name }}</span>
+</div>
+{% endfor %}
+{% else %}
+<div class="col-span-full text-center py-8 opacity-50">
+    <p class="text-sm">No shared images found.</p>
+</div>
+{% endif %}
