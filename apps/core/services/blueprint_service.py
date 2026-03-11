@@ -15,6 +15,15 @@ logger = logging.getLogger(__name__)
 
 CACHE_TTL = 300  # 5 min
 
+# Compliance modules required per country (installed automatically during blueprint setup)
+COMPLIANCE_MODULES = {
+    'ES': ['verifactu', 'tax', 'gdpr'],
+    'PT': ['tax', 'gdpr'],
+    'FR': ['tax', 'gdpr'],
+    'DE': ['tax', 'gdpr'],
+    'IT': ['tax', 'gdpr'],
+}
+
 
 def _get_session():
     """Get a requests session with retry."""
@@ -333,10 +342,32 @@ class BlueprintService:
             modules_to_install, hub_token,
         )
 
-        if install_result.installed > 0:
-            ModuleInstallService.run_post_install(
-                load_all=True, run_migrations=True, schedule_restart=True,
-            )
+        # Install compliance modules for the hub's country
+        compliance_installed = 0
+        country_code = (getattr(hub_config, 'country_code', '') or '').upper()
+        compliance_slugs = COMPLIANCE_MODULES.get(country_code, [])
+        if compliance_slugs:
+            # Only install compliance modules not already in the blueprint list
+            existing_slugs = set(module_slugs)
+            extra_compliance = [s for s in compliance_slugs if s not in existing_slugs]
+            if extra_compliance:
+                compliance_to_install = [
+                    {
+                        'slug': slug,
+                        'name': slug,
+                        'download_url': f'{cloud_url}/api/marketplace/modules/{slug}/download/',
+                    }
+                    for slug in extra_compliance
+                ]
+                compliance_result = ModuleInstallService.bulk_download_and_install(
+                    compliance_to_install, hub_token,
+                )
+                compliance_installed = compliance_result.installed
+                if compliance_installed > 0:
+                    logger.info(
+                        'Installed %d compliance modules for %s: %s',
+                        compliance_installed, country_code, extra_compliance,
+                    )
 
         # Create roles from blueprint
         roles = result.get('roles', [])
@@ -346,7 +377,8 @@ class BlueprintService:
 
         # Schedule seed import for after restart (inventory module not loaded yet)
         seeds_imported = 0
-        if install_result.installed > 0:
+        total_installed = install_result.installed + compliance_installed
+        if total_installed > 0:
             # Modules were just installed — inventory won't be available until restart.
             # Write a flag file so the next boot runs import_seeds().
             cls._write_pending_seed_flag({
@@ -355,6 +387,9 @@ class BlueprintService:
                 'country': getattr(hub_config, 'country_code', 'es') or 'es',
             })
             logger.info('Seed import deferred until after restart')
+            ModuleInstallService.run_post_install(
+                load_all=True, run_migrations=True, schedule_restart=True,
+            )
         else:
             # No new modules installed — inventory should already be loaded.
             try:
@@ -373,6 +408,7 @@ class BlueprintService:
             {
                 'success': True,
                 'modules_installed': install_result.installed,
+                'compliance_installed': compliance_installed,
                 'module_errors': install_result.errors,
                 'roles_created': len(roles),
                 'seeds_imported': seeds_imported,
@@ -382,6 +418,7 @@ class BlueprintService:
         return {
             'success': True,
             'modules_installed': install_result.installed,
+            'compliance_installed': compliance_installed,
             'module_errors': install_result.errors,
             'roles_created': len(roles),
             'seeds_imported': seeds_imported,
@@ -437,6 +474,74 @@ class BlueprintService:
 
         logger.info(
             'Seed import complete: %d products imported, %d skipped, %d categories',
+            imported, skipped, categories_created,
+        )
+        return {'imported': imported, 'skipped': skipped, 'categories': categories_created}
+
+    @classmethod
+    def import_selected_products(cls, type_codes, product_codes, language='en', country='es'):
+        """
+        Import specific products for business types.
+        If product_codes is ['*'], imports all products (same as import_seeds).
+        Otherwise, only imports products whose code is in product_codes.
+        Images are downloaded with per-image error handling (failures don't block import).
+        """
+        import_all = product_codes == ['*']
+
+        try:
+            from django.apps import apps
+            apps.get_model('inventory', 'Product')
+        except LookupError:
+            logger.warning('Inventory module not installed, skipping selective product import')
+            return {'imported': 0, 'skipped': 0, 'categories': 0}
+
+        tax_class_mapping = cls._build_tax_class_mapping()
+
+        imported = 0
+        skipped = 0
+        categories_created = 0
+
+        for type_code in type_codes:
+            products_data = cls.get_products(type_code, country=country, language=language)
+            if not products_data:
+                continue
+
+            categories = products_data.get('categories', [])
+            products = products_data.get('products', [])
+
+            # Filter products by code unless importing all
+            if not import_all:
+                product_code_set = set(product_codes)
+                products = [p for p in products if p.get('code') in product_code_set]
+
+            if not products:
+                continue
+
+            # Import categories referenced by the selected products
+            needed_category_codes = {p.get('category', '') for p in products} - {''}
+            category_map = {}
+            for cat_data in categories:
+                if import_all or cat_data.get('code', '') in needed_category_codes:
+                    cat, created = cls._import_category(cat_data, tax_class_mapping)
+                    if cat:
+                        category_map[cat.code] = cat
+                        if created:
+                            categories_created += 1
+
+            # Import products
+            for prod_data in products:
+                was_imported = cls._import_product(
+                    prod_data,
+                    tax_class_mapping=tax_class_mapping,
+                    category_map=category_map,
+                )
+                if was_imported:
+                    imported += 1
+                else:
+                    skipped += 1
+
+        logger.info(
+            'Selective product import complete: %d products imported, %d skipped, %d categories',
             imported, skipped, categories_created,
         )
         return {'imported': imported, 'skipped': skipped, 'categories': categories_created}
@@ -581,7 +686,7 @@ class BlueprintService:
             return
 
         try:
-            url = _cloud_url(f'assets/products/{image_path}')
+            url = _cloud_url(f'assets/{image_path}')
             resp = _get_session().get(url, timeout=15)
             resp.raise_for_status()
 

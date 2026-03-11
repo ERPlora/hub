@@ -138,15 +138,13 @@
                         </button>
                     </div>
                     <div class="sidebar-menu-item">
-                        <a class="sidebar-menu-button"
-                           :class="{ 'is-active': $store.nav.isActive('/help') }"
-                           href="{% url 'main:help' %}"
-                           hx-get="{% url 'main:help' %}"
-                           hx-target="#main-content-area"
-                           hx-push-url="true">
+                        <button class="sidebar-menu-button"
+                                hx-get="{% url 'main:help_modal' %}"
+                                hx-target="#help-modal-container"
+                                hx-swap="innerHTML">
                             <span class="sidebar-menu-icon">{% icon "help-circle-outline" %}</span>
                             <span class="sidebar-label">{% trans "Help" %}</span>
-                        </a>
+                        </button>
                     </div>
                     <div class="sidebar-menu-item">
                         <button @click="$dispatch('open-bug-report')" class="sidebar-menu-button">

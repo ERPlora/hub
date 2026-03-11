@@ -38,6 +38,7 @@
     <script src="{% static 'js/bridge.js' %}" defer nonce="{{ csp_nonce }}"></script>
 
     <!-- Alpine.js (local) -->
+    <script src="{% static 'js/media-picker.js' %}" defer nonce="{{ csp_nonce }}"></script>
     <script defer src="{% static 'js/alpine.min.js' %}" nonce="{{ csp_nonce }}"></script>
 
     <!-- Alpine.js Global Stores -->
@@ -491,6 +492,9 @@
     </script>
 
     {% block content %}{% endblock %}
+
+    <!-- Help modal container (loaded via HTMX) -->
+    <div id="help-modal-container"></div>
 
     <!-- Toast container -->
     <div id="toast-container" class="toast toast-bottom toast-center"></div>

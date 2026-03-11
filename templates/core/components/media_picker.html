@@ -1,0 +1,142 @@
+{% comment %}
+Media Picker Component — WordPress-style image selector.
+
+Usage in any form:
+    {% include "core/components/media_picker.html" with field_name="image" current_url=product.image.url accept="image/*" folder="products" %}
+
+Parameters:
+    field_name  — name attribute for the hidden input (required)
+    current_url — URL of the currently selected image (optional)
+    accept      — MIME types to accept (default: "image/*")
+    folder      — default folder for uploads (optional, e.g., "products")
+    label       — label text (optional)
+{% endcomment %}
+{% load i18n djicons %}
+
+<div x-data="mediaPicker('{{ field_name }}', '{{ current_url|default:"" }}', '{{ folder|default:"" }}')"
+     class="media-picker">
+
+    {# Hidden input that holds the selected image URL — this is what the form submits #}
+    <input type="hidden" name="{{ field_name }}_url" :value="selectedUrl">
+
+    {# Also support traditional file upload as fallback #}
+    <input type="file" name="{{ field_name }}" accept="{{ accept|default:'image/*' }}"
+           class="hidden" x-ref="fileInput"
+           @change="handleDirectUpload($event)">
+
+    {# Preview + Button #}
+    <div class="flex items-center gap-3">
+        <div class="media-picker-preview" @click="open()">
+            <template x-if="selectedUrl">
+                <img :src="selectedUrl" alt="" class="w-full h-full object-cover">
+            </template>
+            <template x-if="!selectedUrl">
+                <span class="text-2xl opacity-30">{% icon "image-outline" %}</span>
+            </template>
+        </div>
+        <div class="flex flex-col gap-1">
+            <button type="button" @click="open()" class="btn btn-sm btn-outline">
+                {% icon "image-outline" %}
+                <span x-text="selectedUrl ? '{% trans "Change" %}' : '{% trans "Select image" %}'"></span>
+            </button>
+            <button type="button" x-show="selectedUrl" @click="clear()" class="btn btn-sm btn-ghost text-error">
+                {% icon "trash-outline" %}
+                {% trans "Remove" %}
+            </button>
+        </div>
+    </div>
+
+    {# Modal #}
+    <div class="modal-backdrop" :data-state="isOpen ? 'open' : 'closed'" @click.self="close()">
+        <div class="modal modal-lg" @click.stop style="max-height: 85vh;">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Media Library" %}</h3>
+                <button type="button" @click="close()" class="modal-close">&times;</button>
+            </div>
+
+            {# Tabs #}
+            <div class="flex gap-1 px-4 pt-2 border-b border-base-200">
+                <button type="button" @click="tab = 'upload'"
+                        :class="tab === 'upload' ? 'tab tab-active' : 'tab'" class="tab-bordered">
+                    {% icon "cloud-upload-outline" %} {% trans "Upload" %}
+                </button>
+                <button type="button" @click="tab = 'library'; loadLibrary()"
+                        :class="tab === 'library' ? 'tab tab-active' : 'tab'" class="tab-bordered">
+                    {% icon "images-outline" %} {% trans "My images" %}
+                </button>
+                <button type="button" @click="tab = 'shared'; loadShared()"
+                        :class="tab === 'shared' ? 'tab tab-active' : 'tab'" class="tab-bordered">
+                    {% icon "globe-outline" %} {% trans "Shared" %}
+                </button>
+            </div>
+
+            <div class="modal-body" style="min-height: 320px; max-height: 55vh; overflow-y: auto;">
+
+                {# Tab: Upload #}
+                <div x-show="tab === 'upload'" x-cloak>
+                    <div class="upload-dropzone"
+                         @dragover.prevent="dragover = true"
+                         @dragleave.prevent="dragover = false"
+                         @drop.prevent="handleDrop($event)"
+                         :class="dragover ? 'upload-dropzone-dragover' : ''">
+                        <div class="flex flex-col items-center gap-2 py-8">
+                            <span class="text-4xl opacity-40">{% icon "cloud-upload-outline" %}</span>
+                            <p class="text-sm opacity-60">{% trans "Drag an image here or" %}</p>
+                            <label class="btn btn-sm color-primary">
+                                {% trans "Browse files" %}
+                                <input type="file" accept="{{ accept|default:'image/*' }}" class="hidden"
+                                       @change="handleUpload($event)">
+                            </label>
+                        </div>
+                    </div>
+                    <div x-show="uploading" class="mt-3">
+                        <div class="upload-progress">
+                            <div class="upload-progress-bar" style="width: 100%; animation: pulse 1s infinite;"></div>
+                        </div>
+                        <p class="text-xs opacity-60 mt-1">{% trans "Uploading..." %}</p>
+                    </div>
+                </div>
+
+                {# Tab: Library (my uploads) #}
+                <div x-show="tab === 'library'" x-cloak>
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" class="input input-sm flex-1" placeholder="{% trans 'Search...' %}"
+                               x-model="librarySearch" @input.debounce.300ms="loadLibrary()">
+                        <select class="select select-sm" x-model="libraryFolder" @change="loadLibrary()">
+                            <option value="">{% trans "All folders" %}</option>
+                            <template x-for="f in libraryFolders" :key="f">
+                                <option :value="f" x-text="f"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div id="media-library-grid" class="media-grid" x-html="libraryHtml">
+                    </div>
+                </div>
+
+                {# Tab: Shared (blueprint assets) #}
+                <div x-show="tab === 'shared'" x-cloak>
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" class="input input-sm flex-1" placeholder="{% trans 'Search...' %}"
+                               x-model="sharedSearch" @input.debounce.300ms="loadShared()">
+                        <select class="select select-sm" x-model="sharedFolder" @change="loadShared()">
+                            <option value="">{% trans "All categories" %}</option>
+                            <template x-for="f in sharedFolders" :key="f">
+                                <option :value="f" x-text="f"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div id="media-shared-grid" class="media-grid" x-html="sharedHtml">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" @click="close()" class="btn btn-sm">{% trans "Cancel" %}</button>
+                <button type="button" @click="confirm()" class="btn btn-sm color-primary"
+                        :disabled="!pendingUrl">
+                    {% trans "Select" %}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -10,6 +10,7 @@ API endpoints are in apps/core/api.py (mounted at /api/v1/system/)
 from django.urls import path
 from . import views
 from . import chooser_views
+from . import media_views
 
 app_name = 'htmx'
 
@@ -30,4 +31,10 @@ urlpatterns = [
     # Generic Chooser (model selection modals)
     path('chooser/<str:model_key>/search/', chooser_views.chooser_search, name='chooser_search'),
     path('chooser/<str:model_key>/filters/', chooser_views.chooser_filters, name='chooser_filters'),
+
+    # Media Library
+    path('media/list/', media_views.media_list, name='media_list'),
+    path('media/upload/', media_views.media_upload, name='media_upload'),
+    path('media/shared/', media_views.shared_assets, name='media_shared'),
+    path('media/shared/folders/', media_views.shared_folders, name='media_shared_folders'),
 ]

@@ -22,6 +22,7 @@ Usage in modules:
 
 from .base import TimeStampedModel, ActiveModel, HubBaseModel
 from .managers import HubManager, HubManagerWithDeleted
+from .media import MediaFile
 
 __all__ = [
     # Simple base models for modules
@@ -32,4 +33,6 @@ __all__ = [
     # Managers
     'HubManager',
     'HubManagerWithDeleted',
+    # Media
+    'MediaFile',
 ]
