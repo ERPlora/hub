@@ -10,9 +10,9 @@ Variables de entorno (configuradas por Cloud durante deploy):
   - DATABASE_URL: PostgreSQL connection string
   - AWS_* : Credenciales S3
 
-Storage structure (automatic via HUB_ID):
+Storage structure (shared per organization via AWS_LOCATION env var):
 
-  S3 hubs/{HUB_ID}/:
+  S3 orgs/{org_prefix}/:
     - backups/     - Database backups
     - module_data/ - Module data
     - reports/     - Generated reports
@@ -43,7 +43,7 @@ HUB_NAME = config('HUB_NAME', default='hub')
 # =============================================================================
 # DATA PATHS — Fixed container path, bind-mounted from host NVMe
 # =============================================================================
-# docker-compose mounts: ${VOLUME_PATH}/hubs/${HUB_ID} → /app/data
+# docker-compose mounts a volume → /app/data
 # Inside the container we always use /app/data (deterministic, no env dependency)
 
 DATA_DIR = Path('/app/data')
@@ -61,7 +61,7 @@ DATABASES = {'default': dj_database_url.parse(DATABASE_URL)}
 # In Docker: /app/modules/ by default, can be overridden via MODULES_DIR env var
 
 # =============================================================================
-# S3 STORAGE - Hetzner Object Storage (hubs/{HUB_ID}/)
+# S3 STORAGE - Hetzner Object Storage (shared per organization)
 # =============================================================================
 
 AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
@@ -69,7 +69,7 @@ AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='erplora')
 AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default='https://fsn1.your-objectstorage.com')
 AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='eu-central')
-AWS_LOCATION = f'hubs/{HUB_ID}'  # Each Hub has its own S3 folder
+AWS_LOCATION = config('AWS_LOCATION', default=f'hubs/{HUB_ID}')  # Shared per org (orgs/{org_prefix})
 AWS_DEFAULT_ACL = 'public-read'
 AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
 AWS_S3_SIGNATURE_VERSION = 's3v4'
@@ -86,7 +86,7 @@ MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/'
 MEDIA_ROOT = Path('/tmp/hub_media')
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
-# S3 paths for Hub data (all under hubs/{HUB_ID}/)
+# S3 paths for Hub data (all under orgs/{org_prefix}/)
 # Note: logs go to Docker stdout/stderr, not S3
 S3_BACKUPS_PREFIX = 'backups'
 S3_TEMP_PREFIX = 'temp'
