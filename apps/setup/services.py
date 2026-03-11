@@ -72,12 +72,12 @@ class SetupService:
 
             created = 0
             defaults = [
-                {'name': 'Efectivo', 'method_type': 'cash', 'is_active': True, 'is_default': True, 'order': 1},
-                {'name': 'Tarjeta', 'method_type': 'card', 'is_active': True, 'is_default': False, 'order': 2},
+                {'name': 'Efectivo', 'type': 'cash', 'is_active': True, 'sort_order': 1, 'opens_cash_drawer': True, 'requires_change': True},
+                {'name': 'Tarjeta', 'type': 'card', 'is_active': True, 'sort_order': 2, 'opens_cash_drawer': False, 'requires_change': False},
             ]
             for pm_data in defaults:
                 _, was_created = PaymentMethod.objects.get_or_create(
-                    method_type=pm_data['method_type'],
+                    type=pm_data['type'],
                     defaults=pm_data,
                 )
                 if was_created:
