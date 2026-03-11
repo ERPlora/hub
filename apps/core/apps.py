@@ -12,7 +12,6 @@ class CoreConfig(AppConfig):
         self._setup_module_icons()
         self._register_choosers()
         self._run_pending_seed_import()
-        self._run_deferred_setup()
 
     def _setup_module_icons(self):
         """Register custom icons from installed modules."""
@@ -82,31 +81,3 @@ class CoreConfig(AppConfig):
         except Exception as e:
             logger.warning('Deferred seed import failed: %s', e)
 
-    def _run_deferred_setup(self):
-        """Run deferred setup tasks (payment methods, invoice series) after restart."""
-        import json
-        import logging
-        from pathlib import Path
-
-        logger = logging.getLogger(__name__)
-
-        try:
-            from django.conf import settings
-            data_dir = getattr(settings, 'DATA_DIR', None)
-            flag_path = Path(data_dir) / '.pending_setup.json' if data_dir else Path('/tmp/.pending_setup.json')
-
-            if not flag_path.exists():
-                return
-
-            data = json.loads(flag_path.read_text())
-            flag_path.unlink()
-        except Exception:
-            return
-
-        try:
-            from apps.setup.services import SetupService
-            pm = SetupService.create_payment_methods()
-            inv = SetupService.create_invoice_series()
-            logger.info('Deferred setup complete: %d payment methods, %d invoice series', pm, inv)
-        except Exception as e:
-            logger.warning('Deferred setup failed: %s', e)

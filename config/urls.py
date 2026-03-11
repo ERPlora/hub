@@ -101,9 +101,6 @@ urlpatterns = [
     # Main UI routes (flat structure for clear active states)
     path('', include('apps.main.urls')),  # Home at /
 
-    # Setup wizard
-    path('setup/', include('apps.setup.urls')),
-
     # Module store (installed modules management)
     path('modules/', include('apps.system.modules.urls')),
 

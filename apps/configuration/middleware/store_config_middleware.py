@@ -1,6 +1,3 @@
-from pathlib import Path
-
-from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -11,7 +8,6 @@ class StoreConfigCheckMiddleware:
     """
     Middleware to check if hub is configured after login.
     If not configured, redirects to the AI assistant for conversational setup.
-    Falls back to the manual setup wizard if the assistant module is not available.
     """
 
     def __init__(self, get_response):
@@ -23,7 +19,6 @@ class StoreConfigCheckMiddleware:
             reverse('auth:cloud_login'),
             reverse('auth:verify_pin'),
             reverse('auth:setup_pin'),
-            '/setup/',  # Setup wizard (fallback)
             '/m/assistant/',  # AI assistant (for setup mode)
             '/api/',  # API endpoints
             '/static/',  # Static files
@@ -43,11 +38,7 @@ class StoreConfigCheckMiddleware:
                     hub_config = HubConfig.get_config()
 
                     if not hub_config.is_configured:
-                        # Prefer AI assistant, fall back to manual wizard
-                        modules_dir = getattr(settings, 'MODULES_DIR', None)
-                        if modules_dir and Path(modules_dir).joinpath('assistant').exists():
-                            return redirect('/m/assistant/?context=setup')
-                        return redirect('setup:index')
+                        return redirect('/m/assistant/?context=setup')
 
                     # Mark as checked for this session
                     request.session['store_config_checked'] = True
