@@ -176,7 +176,7 @@ class BlueprintService:
         try:
             resp = _get_session().get(
                 _cloud_url(f'products/{type_code}/'),
-                params={'country': country, 'language': language},
+                params={'country': country.lower(), 'language': language},
                 timeout=15
             )
             resp.raise_for_status()

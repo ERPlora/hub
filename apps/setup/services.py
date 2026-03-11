@@ -98,12 +98,12 @@ class SetupService:
 
             created = 0
             defaults = [
-                {'code': 'F', 'name': 'Facturas', 'prefix': 'F', 'is_default': True, 'next_number': 1},
-                {'code': 'R', 'name': 'Facturas Rectificativas', 'prefix': 'R', 'is_default': False, 'next_number': 1},
+                {'prefix': 'F', 'name': 'Facturas', 'is_default': True, 'next_number': 1},
+                {'prefix': 'R', 'name': 'Facturas Rectificativas', 'is_default': False, 'next_number': 1},
             ]
             for series_data in defaults:
                 _, was_created = InvoiceSeries.objects.get_or_create(
-                    code=series_data['code'],
+                    prefix=series_data['prefix'],
                     defaults=series_data,
                 )
                 if was_created:
