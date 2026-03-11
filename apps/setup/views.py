@@ -63,20 +63,12 @@ def _set_setup_data(request, data):
 
 @login_required
 def index(request):
-    """Welcome page: choose AI assistant or manual setup."""
+    """Welcome page — redirects to setup wizard."""
     hub_config = HubConfig.get_config()
     if hub_config.is_configured:
         return redirect('main:index')
 
-    # Check if assistant module is available
-    modules_dir = getattr(settings, 'MODULES_DIR', None)
-    has_assistant = bool(
-        modules_dir and Path(modules_dir).joinpath('assistant').exists()
-    )
-
-    return render(request, 'setup/pages/welcome.html', {
-        'has_assistant': has_assistant,
-    })
+    return render(request, 'setup/pages/welcome.html')
 
 
 @login_required
