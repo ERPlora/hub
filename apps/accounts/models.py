@@ -6,13 +6,17 @@ Models:
 - Role: Named collection of permissions
 - RolePermission: Through model for Role-Permission M2M
 - LocalUser: Hub users with role-based permissions
+- TrustedDevice: Trusted browser/device for PIN-only access
 """
 from django.utils.translation import gettext_lazy as _
 
 from django.db import models
+from datetime import timedelta
 import hashlib
 import hmac
 import secrets
+
+from django.utils import timezone
 
 from apps.core.models import HubBaseModel, HubManager, HubManagerWithDeleted
 
@@ -127,7 +131,7 @@ class Role(HubBaseModel):
         max_length=20,
         choices=SOURCE_CHOICES,
         default='custom',
-        help_text="Origin: basic (always active), solution (from selected solution), custom (user-created)"
+        help_text="Origin: basic (always active), solution (from blueprint business type), custom (user-created)"
     )
 
     # Permissions via through model (supports wildcards)
@@ -539,3 +543,148 @@ class LocalUser(HubBaseModel):
 
         prefix = f"{module_id}."
         return any(p.startswith(prefix) for p in self.get_permissions())
+
+
+# =============================================================================
+# TrustedDevice Model
+# =============================================================================
+
+class TrustedDevice(HubBaseModel):
+    """
+    Represents a trusted browser/device for a specific user.
+
+    A device token is stored in the browser's localStorage. When the user
+    visits the login page, the token is sent to the server to verify trust.
+    If valid, the user can log in with PIN only. If not, Cloud SSO is required.
+
+    This model is used on AWS deployments where Hub auth is independent
+    (no shared cookies with Cloud). On Hetzner, CloudSSOMiddleware handles auth.
+    """
+
+    user = models.ForeignKey(
+        'LocalUser',
+        on_delete=models.CASCADE,
+        related_name='trusted_devices',
+    )
+
+    # Device identification
+    device_token = models.CharField(
+        max_length=128,
+        unique=True,
+        help_text="Opaque token stored in browser localStorage"
+    )
+    device_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="User-friendly name (e.g., 'Chrome on MacBook Pro')"
+    )
+    user_agent = models.TextField(
+        blank=True,
+        help_text="Browser User-Agent at time of registration"
+    )
+
+    # Trust lifecycle
+    last_used = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(
+        help_text="Device trust expires after this date"
+    )
+    is_revoked = models.BooleanField(
+        default=False,
+        help_text="Admin or user manually revoked trust"
+    )
+
+    objects = HubManager()
+    all_objects = HubManagerWithDeleted()
+
+    # Configuration
+    DEFAULT_TRUST_DAYS = 90
+    MAX_DEVICES_PER_USER = 5
+
+    class Meta:
+        verbose_name = _('Trusted Device')
+        verbose_name_plural = _('Trusted Devices')
+        db_table = 'accounts_trusted_devices'
+        ordering = ['-last_used']
+        indexes = [
+            models.Index(fields=['hub_id', 'user'], name='idx_trusted_device_hub_user'),
+        ]
+
+    def __str__(self):
+        return f"{self.device_name or 'Unknown device'} ({self.user.name})"
+
+    @classmethod
+    def generate_token(cls):
+        """Generate a cryptographically secure device token."""
+        return secrets.token_urlsafe(64)
+
+    @classmethod
+    def create_for_user(cls, user, request, hub_id):
+        """
+        Create a new trusted device for a user.
+        Enforces MAX_DEVICES_PER_USER -- oldest device is removed if limit exceeded.
+        """
+        # Enforce device limit
+        existing = cls.objects.filter(
+            hub_id=hub_id, user=user, is_revoked=False
+        ).order_by('last_used')
+        if existing.count() >= cls.MAX_DEVICES_PER_USER:
+            existing.first().revoke()
+
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        device_name = cls._parse_device_name(user_agent)
+
+        return cls.objects.create(
+            hub_id=hub_id,
+            user=user,
+            device_token=cls.generate_token(),
+            device_name=device_name,
+            user_agent=user_agent,
+            expires_at=timezone.now() + timedelta(days=cls.DEFAULT_TRUST_DAYS),
+        )
+
+    @staticmethod
+    def _parse_device_name(user_agent):
+        """Extract a human-readable device name from User-Agent."""
+        ua = user_agent.lower()
+        browser = 'Browser'
+        if 'chrome' in ua and 'edg' not in ua:
+            browser = 'Chrome'
+        elif 'firefox' in ua:
+            browser = 'Firefox'
+        elif 'safari' in ua and 'chrome' not in ua:
+            browser = 'Safari'
+        elif 'edg' in ua:
+            browser = 'Edge'
+
+        os_name = 'Unknown'
+        if 'macintosh' in ua or 'mac os' in ua:
+            os_name = 'macOS'
+        elif 'windows' in ua:
+            os_name = 'Windows'
+        elif 'linux' in ua:
+            os_name = 'Linux'
+        elif 'android' in ua:
+            os_name = 'Android'
+        elif 'iphone' in ua or 'ipad' in ua:
+            os_name = 'iOS'
+
+        return f"{browser} on {os_name}"
+
+    def is_valid(self):
+        """Check if device trust is still valid."""
+        if self.is_revoked:
+            return False
+        if self.expires_at < timezone.now():
+            return False
+        return True
+
+    def revoke(self):
+        """Revoke trust for this device."""
+        self.is_revoked = True
+        self.save(update_fields=['is_revoked', 'updated_at'])
+
+    def refresh(self):
+        """Extend trust expiry (called on each successful PIN login)."""
+        self.expires_at = timezone.now() + timedelta(days=self.DEFAULT_TRUST_DAYS)
+        self.last_used = timezone.now()
+        self.save(update_fields=['expires_at', 'last_used', 'updated_at'])

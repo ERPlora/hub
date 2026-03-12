@@ -1,0 +1,74 @@
+{% load i18n djicons %}
+
+<style nonce="{{ csp_nonce }}">
+    .help-content h2 { font-size: 1.25rem; font-weight: 600; margin: 1.5rem 0 0.75rem; }
+    .help-content h3 { font-size: 1.1rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+    .help-content p { margin: 0.5rem 0; line-height: 1.7; }
+    .help-content ul, .help-content ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    .help-content li { margin: 0.25rem 0; line-height: 1.6; }
+    .help-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+    .help-content th, .help-content td { padding: 0.5rem 0.75rem; border: 1px solid var(--color-base-300, #e5e7eb); text-align: left; }
+    .help-content th { background: var(--color-base-200, #f3f4f6); font-weight: 600; }
+    .help-content code { background: var(--color-base-200, #f3f4f6); padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.875em; user-select: all; cursor: pointer; }
+    .help-content pre { background: var(--color-base-200, #f3f4f6); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 1rem 0; }
+    .help-content pre code { background: none; padding: 0; }
+    .help-content blockquote { border-left: 3px solid var(--color-primary, #3b82f6); padding: 0.5rem 1rem; margin: 1rem 0; background: var(--color-base-100, #f9fafb); border-radius: 0 0.5rem 0.5rem 0; }
+    #help-modal-backdrop { z-index: 9999; }
+</style>
+
+<div id="help-modal-backdrop"
+     class="modal-backdrop glass"
+     data-state="open"
+     @click.self="document.getElementById('help-modal-container').remove()"
+     @keydown.escape.window="document.getElementById('help-modal-container').remove()">
+    <div class="modal modal-lg" style="max-width: 800px; max-height: 85vh;">
+        <div class="modal-header">
+            <h2 class="modal-title flex items-center gap-2">
+                {% icon "help-circle-outline" %}
+                {% trans "Help & Documentation" %}
+            </h2>
+            <button class="modal-close"
+                    @click="document.getElementById('help-modal-container').remove()">&times;</button>
+        </div>
+        <div class="modal-body" style="overflow-y: auto; max-height: calc(85vh - 120px);">
+
+            <!-- Search -->
+            <div class="form-group mb-4" x-data="{ query: '' }">
+                <div class="input-group">
+                    <span class="input-group-text opacity-50">{% icon "search-outline" %}</span>
+                    <input type="text"
+                           class="input"
+                           placeholder="{% trans 'Search in help...' %}"
+                           x-model="query"
+                           @input="
+                               document.querySelectorAll('#help-modal-accordion [data-help-section]').forEach(el => {
+                                   const text = el.textContent.toLowerCase();
+                                   const match = !query || text.includes(query.toLowerCase());
+                                   el.style.display = match ? '' : 'none';
+                               });
+                           ">
+                </div>
+            </div>
+
+            <!-- Accordion sections -->
+            <div id="help-modal-accordion" class="accordion accordion-outline">
+                {% for section in sections %}
+                <details class="accordion-item" data-help-section>
+                    <summary class="accordion-header">
+                        <span class="accordion-title">{{ section.title }}</span>
+                        <span class="accordion-chevron">&#9660;</span>
+                    </summary>
+                    <div class="accordion-body help-content">
+                        {{ section.html|safe }}
+                    </div>
+                </details>
+                {% empty %}
+                <div class="callout callout-warning">
+                    <p>{% trans "No help documentation found." %}</p>
+                </div>
+                {% endfor %}
+            </div>
+
+        </div>
+    </div>
+</div>

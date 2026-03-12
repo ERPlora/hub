@@ -14,12 +14,17 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="ERPlora Hub">
+    <meta name="apple-mobile-web-app-title" content="{{ STORE_CONFIG.business_name|default:'ERPlora Hub' }}">
     <link rel="manifest" href="/manifest.json">
 
-    <!-- Favicon -->
+    <!-- Favicon & Apple Touch Icon (dynamic: custom logo or ERPlora default) -->
+    {% if STORE_CONFIG.pwa_favicon_url %}
+    <link rel="icon" type="image/png" href="{{ STORE_CONFIG.pwa_favicon_url }}">
+    <link rel="apple-touch-icon" href="{{ STORE_CONFIG.pwa_apple_touch_icon_url }}">
+    {% else %}
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
     <link rel="apple-touch-icon" href="{% static 'img/icons/icon-152x152.png' %}">
+    {% endif %}
 
     <!-- @erplora/ux CSS (components + Tailwind utilities) — CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ERPlora/ux@main/dist/ux-full.min.css">
@@ -38,6 +43,7 @@
     <script src="{% static 'js/bridge.js' %}" defer nonce="{{ csp_nonce }}"></script>
 
     <!-- Alpine.js (local) -->
+    <script src="{% static 'js/media-picker.js' %}" defer nonce="{{ csp_nonce }}"></script>
     <script defer src="{% static 'js/alpine.min.js' %}" nonce="{{ csp_nonce }}"></script>
 
     <!-- Alpine.js Global Stores -->
@@ -492,6 +498,9 @@
 
     {% block content %}{% endblock %}
 
+    <!-- Help modal container (loaded via HTMX) -->
+    <div id="help-modal-container"></div>
+
     <!-- Toast container -->
     <div id="toast-container" class="toast toast-bottom toast-center"></div>
 
@@ -666,6 +675,15 @@
             });
         };
     })();
+    </script>
+
+    <!-- Service Worker Registration -->
+    <script nonce="{{ csp_nonce }}">
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/serviceworker.js', { scope: '/' })
+            .then(function(reg) { console.log('[SW] Registered, scope:', reg.scope); })
+            .catch(function(err) { console.log('[SW] Registration failed:', err); });
+    }
     </script>
 </body>
 </html>

@@ -222,7 +222,6 @@ class CloudLoginView(APIView):
                             hub_data = hub_response.json()
                             hub_config.hub_id = hub_data.get('hub_id')
                             hub_config.cloud_api_token = hub_data.get('cloud_api_token')
-                            hub_config.is_configured = True
                             hub_config.save()
 
                     hub_config = HubConfig.get_config()

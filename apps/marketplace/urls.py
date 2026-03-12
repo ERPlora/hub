@@ -37,6 +37,7 @@ urlpatterns = [
     # Business Types (informational — modules & roles per business type)
     path('business-types/', views.business_types_index, name='business_types'),
     path('business-types/<slug:slug>/', views.business_type_detail, name='business_type_detail'),
+    path('business-types/<slug:slug>/activate/', views.business_type_activate, name='business_type_activate'),
 
     # Solutions
     path('solutions/bulk-install/', views.solutions_bulk_install, name='solutions_bulk_install'),

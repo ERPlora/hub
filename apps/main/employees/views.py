@@ -24,7 +24,7 @@ SORT_FIELDS = {
     'role': 'role_obj__display_name',
 }
 
-PER_PAGE_CHOICES = [10, 25, 50, 100]
+PER_PAGE_CHOICES = [12, 24, 48, 96, 0]
 
 
 def get_role_options(hub_id):
@@ -37,7 +37,7 @@ def _build_list_context(hub_id, per_page=10):
     """Build context dict for the employees list (used after mutations)."""
     local_users = LocalUser.objects.filter(hub_id=hub_id).order_by('name')
     active_count = local_users.filter(is_active=True).count()
-    paginator = Paginator(local_users, per_page)
+    paginator = Paginator(local_users, per_page if per_page > 0 else max(local_users.count(), 1))
     page_obj = paginator.get_page(1)
     roles_list = Role.objects.filter(
         hub_id=hub_id, is_active=True, is_deleted=False
@@ -76,11 +76,11 @@ def index(request):
     page_number = request.GET.get('page', 1)
     current_view = request.GET.get('view', 'table')
     try:
-        per_page = int(request.GET.get('per_page', 10))
+        per_page = int(request.GET.get('per_page', 12))
     except (ValueError, TypeError):
-        per_page = 10
+        per_page = 12
     if per_page not in PER_PAGE_CHOICES:
-        per_page = 10
+        per_page = 12
 
     # Base queryset — show all employees (active + inactive) unless filtered
     local_users = LocalUser.objects.filter(hub_id=hub_id)
@@ -132,7 +132,7 @@ def index(request):
             sheet_name=str(_('Employees')),
         )
 
-    paginator = Paginator(local_users, per_page)
+    paginator = Paginator(local_users, per_page if per_page > 0 else max(local_users.count(), 1))
     page_obj = paginator.get_page(page_number)
 
     roles_list = Role.objects.filter(

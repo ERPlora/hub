@@ -25,24 +25,43 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 def get_or_create_secret_key():
     """
     Get SECRET_KEY from environment or generate one automatically.
-    For Docker deployments, generates and persists to .secret_key file.
+
+    Priority:
+      1. SECRET_KEY env var (most reliable for Docker)
+      2. /app/data/.secret_key (data volume, survives rebuilds)
+      3. /app/.secret_key (build-time fallback)
+      4. BASE_DIR/.secret_key (desktop)
+      5. Generate new key
     """
-    # First, try environment variable
+    # 1. Environment variable
     secret_key = config('SECRET_KEY', default='')
     if secret_key:
         return secret_key
 
-    # For Docker: generate and persist to file
-    secret_file = Path('/app/.secret_key')
-    if not secret_file.parent.exists():
-        # Desktop: use local file
-        secret_file = BASE_DIR / '.secret_key'
+    # 2. Data volume key (Docker runtime — survives rebuilds)
+    data_key = Path('/app/data/.secret_key')
+    if data_key.exists():
+        return data_key.read_text().strip()
 
-    if secret_file.exists():
-        return secret_file.read_text().strip()
+    # 3. Build-time key (Docker image — regenerated on each build)
+    app_key = Path('/app/.secret_key')
+    if app_key.exists():
+        return app_key.read_text().strip()
 
-    # Generate new key
+    # 4. Desktop key
+    desktop_key = BASE_DIR / '.secret_key'
+    if desktop_key.exists():
+        return desktop_key.read_text().strip()
+
+    # 5. Generate new key and persist
     new_key = secrets.token_urlsafe(50)
+    # Pick best location to persist
+    if data_key.parent.exists():
+        secret_file = data_key
+    elif app_key.parent.exists():
+        secret_file = app_key
+    else:
+        secret_file = desktop_key
     try:
         secret_file.write_text(new_key)
         print(f"[SECURITY] Generated new SECRET_KEY: {secret_file}")
@@ -203,17 +222,24 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # =============================================================================
 # DATABASE (default PostgreSQL - overridden per environment)
 # =============================================================================
+# Supports DATABASE_URL env var (used by App Runner / Aurora Serverless v2)
+# Falls back to individual settings for local development
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'erplora_hub',
-        'USER': 'erplora',
-        'PASSWORD': 'erplora',
-        'HOST': 'localhost',
-        'PORT': '5432',
+_database_url = config('DATABASE_URL', default='')
+if _database_url:
+    import dj_database_url
+    DATABASES = {'default': dj_database_url.parse(_database_url)}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='erplora_hub'),
+            'USER': config('DB_USER', default='erplora'),
+            'PASSWORD': config('DB_PASSWORD', default='erplora'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
     }
-}
 
 # =============================================================================
 # PASSWORD VALIDATION
@@ -280,8 +306,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'erplora-hub',
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': Path('/app/data/cache') if Path('/app/data').exists() else BASE_DIR / '.cache',
         'TIMEOUT': 300,  # 5 minutes default
     }
 }
@@ -304,7 +330,7 @@ CLOUD_API_URL = config('CLOUD_URL', default=config('CLOUD_BASE_URL', default=con
 DEPLOYMENT_MODE = 'desktop'  # desktop, web, demo
 OFFLINE_ENABLED = True
 CLOUD_SYNC_REQUIRED = False
-DEMO_MODE = False
+DEMO_MODE = config('DEMO_MODE', default=False, cast=bool)
 
 # =============================================================================
 # HUB CONFIGURATION

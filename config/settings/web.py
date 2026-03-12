@@ -1,18 +1,17 @@
 """
 ERPlora Hub - Web/Docker Settings
 
-Configuración para despliegue en Docker/Cloud.
-Desplegado automáticamente via Dokploy API cuando el cliente compra un Hub.
+Configuración para despliegue en Docker (App Runner on AWS, or Dokploy on Hetzner).
 
-Variables de entorno (configuradas por Cloud durante deploy):
+Variables de entorno (configuradas durante deploy):
   - HUB_ID: UUID del Hub
   - HUB_NAME: Nombre del Hub (subdomain)
-  - DATABASE_URL: PostgreSQL connection string
-  - AWS_* : Credenciales S3
+  - DATABASE_URL: PostgreSQL connection string (Aurora Serverless v2 or direct)
+  - AWS_* : S3 credentials (optional on AWS — IAM role provides them)
 
-Storage structure (automatic via HUB_ID):
+Storage structure (shared per organization via AWS_LOCATION env var):
 
-  S3 hubs/{HUB_ID}/:
+  S3 orgs/{org_prefix}/:
     - backups/     - Database backups
     - module_data/ - Module data
     - reports/     - Generated reports
@@ -43,7 +42,7 @@ HUB_NAME = config('HUB_NAME', default='hub')
 # =============================================================================
 # DATA PATHS — Fixed container path, bind-mounted from host NVMe
 # =============================================================================
-# docker-compose mounts: ${VOLUME_PATH}/hubs/${HUB_ID} → /app/data
+# docker-compose mounts a volume → /app/data
 # Inside the container we always use /app/data (deterministic, no env dependency)
 
 DATA_DIR = Path('/app/data')
@@ -61,32 +60,42 @@ DATABASES = {'default': dj_database_url.parse(DATABASE_URL)}
 # In Docker: /app/modules/ by default, can be overridden via MODULES_DIR env var
 
 # =============================================================================
-# S3 STORAGE - Hetzner Object Storage (hubs/{HUB_ID}/)
+# S3 STORAGE - AWS S3 (or Hetzner Object Storage for legacy)
 # =============================================================================
 
-AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
+# On AWS: IAM role provides credentials automatically (no keys needed)
+# On Hetzner: explicit keys required
+AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='')
+AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
 AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='erplora')
-AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default='https://fsn1.your-objectstorage.com')
-AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='eu-central')
-AWS_LOCATION = f'hubs/{HUB_ID}'  # Each Hub has its own S3 folder
+AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='eu-west-1')
+AWS_LOCATION = config('AWS_LOCATION', default=f'hubs/{HUB_ID}')  # Shared per org (orgs/{org_prefix})
 AWS_DEFAULT_ACL = 'public-read'
 AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
-AWS_S3_SIGNATURE_VERSION = 's3v4'
 AWS_S3_FILE_OVERWRITE = False
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_USE_SSL = True
 AWS_S3_VERIFY = True
 
+# Hetzner Object Storage requires custom endpoint + signature version
+# On AWS S3, these are not needed (boto3 uses standard endpoints)
+_s3_endpoint = config('AWS_S3_ENDPOINT_URL', default='')
+if _s3_endpoint:
+    AWS_S3_ENDPOINT_URL = _s3_endpoint
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+
 # Django storages configuration
 INSTALLED_APPS += ['storages']
-MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/'
+if _s3_endpoint:
+    MEDIA_URL = f'{_s3_endpoint}/{AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/'
+else:
+    MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/{AWS_LOCATION}/'
 
 # Local temp directory for processing (ephemeral, inside container)
 MEDIA_ROOT = Path('/tmp/hub_media')
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
-# S3 paths for Hub data (all under hubs/{HUB_ID}/)
+# S3 paths for Hub data (all under orgs/{org_prefix}/)
 # Note: logs go to Docker stdout/stderr, not S3
 S3_BACKUPS_PREFIX = 'backups'
 S3_TEMP_PREFIX = 'temp'
@@ -192,17 +201,22 @@ CORS_ALLOW_CREDENTIALS = True  # Allow cookies in CORS requests
 INSTALLED_APPS += ['corsheaders']
 
 # =============================================================================
-# MIDDLEWARE - Add CORS, WhiteNoise and Cloud SSO for web deployment
+# MIDDLEWARE - Add CORS, WhiteNoise for web deployment
 # =============================================================================
 
 # CORS middleware must be before CommonMiddleware
 MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 # WhiteNoise right after SecurityMiddleware for static files
 MIDDLEWARE.insert(2, 'whitenoise.middleware.WhiteNoiseMiddleware')
-# Cloud SSO middleware after session middleware
-# After insert(0, CORS) and insert(2, WhiteNoise), SessionMiddleware is at index 4
-# So we insert at 5 to place CloudSSO right after Session
-MIDDLEWARE.insert(5, 'apps.core.middleware.CloudSSOMiddleware')
+
+# Cloud SSO middleware: only for Hetzner (cookie-based SSO across subdomains).
+# On AWS (App Runner), Hubs have independent auth (trusted device + PIN or Cloud API login).
+# AWS_S3_ENDPOINT_URL is only set on Hetzner, so use it as a proxy for "legacy Hetzner mode".
+if _s3_endpoint:
+    # Hetzner: Cloud SSO via shared cookies across *.erplora.com
+    # After insert(0, CORS) and insert(2, WhiteNoise), SessionMiddleware is at index 4
+    # So we insert at 5 to place CloudSSO right after Session
+    MIDDLEWARE.insert(5, 'apps.core.middleware.CloudSSOMiddleware')
 
 # =============================================================================
 # STATIC & MEDIA STORAGE BACKENDS
@@ -273,8 +287,9 @@ load_module_templates(MODULES_DIR)
 # STARTUP INFO
 # =============================================================================
 
-_db_name = DATABASES['default'].get('NAME', DATABASE_URL.split('/')[-1])
-print(f"[HUB] {HUB_NAME} ({HUB_ID})")
+_db_name = DATABASES['default'].get('NAME', DATABASE_URL.split('/')[-1] if '/' in DATABASE_URL else 'unknown')
+_infra = 'AWS' if not _s3_endpoint else 'Hetzner'
+print(f"[HUB] {HUB_NAME} ({HUB_ID}) [{_infra}]")
 print(f"[HUB] Database: PostgreSQL - {_db_name}")
 print(f"[HUB] Data: {DATA_DIR}")
 print(f"[HUB] S3: {AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/")

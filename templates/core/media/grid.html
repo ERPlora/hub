@@ -1,0 +1,19 @@
+{% comment %}
+Media library grid — HTMX partial loaded inside the media picker modal.
+Shows uploaded images as clickable thumbnails.
+{% endcomment %}
+{% if folders %}<span data-folders='[{% for f in folders %}"{{ f }}"{% if not forloop.last %},{% endif %}{% endfor %}]' class="hidden"></span>{% endif %}
+{% if files %}
+{% for file in files %}
+<div class="media-grid-item" data-url="{{ file.url }}"
+     @click="selectPending('{{ file.url }}')"
+     :class="pendingUrl === '{{ file.url }}' ? 'ring-2 ring-primary' : ''">
+    <img src="{{ file.url }}" alt="{{ file.name }}" loading="lazy">
+    <span class="media-grid-name">{{ file.name }}</span>
+</div>
+{% endfor %}
+{% else %}
+<div class="col-span-full text-center py-8 opacity-50">
+    <p class="text-sm">No images found. Upload one!</p>
+</div>
+{% endif %}

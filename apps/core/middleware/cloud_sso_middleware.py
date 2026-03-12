@@ -58,6 +58,9 @@ class CloudSSOMiddleware:
         '/cloud-login/',  # Cloud login endpoint
         '/setup-pin/',  # PIN setup endpoint
         '/verify-pin/',  # PIN verification endpoint
+        '/verify-device-trust/',  # Device trust verification
+        '/trust-device/',  # Trust device registration
+        '/revoke-device/',  # Device trust revocation
         '/set-language/',  # Language switcher (can be called during setup)
         '/logout/',  # Logout endpoint
         '/api/',     # All API endpoints (authenticated via JWT, not cookies)
@@ -91,6 +94,12 @@ class CloudSSOMiddleware:
         # Fast path: if user already has a local session, skip Cloud verification
         local_user_id = request.session.get('local_user_id')
         if local_user_id:
+            # Ensure hub_id is in session (may be missing from pre-fix sessions)
+            if not request.session.get('hub_id'):
+                from apps.configuration.models import HubConfig
+                hub_config = HubConfig.get_config()
+                request.session['hub_id'] = str(hub_config.hub_id)
+                request.session.save()
             return self.get_response(request)
 
         # No local session — verify with Cloud
@@ -207,13 +216,19 @@ class CloudSSOMiddleware:
             local_user.save(update_fields=['last_login'])
 
             # IMPORTANT: Convert UUID to string for JSON serialization
+            hub_config = HubConfig.get_config()
             request.session['local_user_id'] = str(local_user.id)
+            request.session['hub_id'] = str(hub_config.hub_id)
             request.session['user_name'] = local_user.name
             request.session['user_email'] = local_user.email
             request.session['user_role'] = local_user.role
             request.session['user_language'] = local_user.language
 
-            logger.info(f"[SSO] Session established for {user_email}")
+            # Force session save — Django's SessionMiddleware may not detect
+            # the modification if the session was just created in this request
+            request.session.modified = True
+            request.session.save()
+            logger.info(f"[SSO] Session established for {user_email} (hub_id={hub_config.hub_id})")
             return None
 
         except Exception as e:

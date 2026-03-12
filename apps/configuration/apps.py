@@ -12,6 +12,9 @@ class ConfigurationConfig(AppConfig):
         Initialize configuration app.
         Import signals and perform app-level initialization.
         """
+        # Connect signals (PWA icon regeneration on logo change)
+        from . import signals  # noqa: F401
+
         # Initialize the background scheduler for automated backups
         # This runs once when Django starts up
         from .scheduler import init_scheduler

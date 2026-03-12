@@ -86,23 +86,33 @@
             <!-- Login Card -->
             <div class="card glass">
                 <div class="card-body">
-                    <!-- Login Tabs -->
-                    <div class="segment segment-block mb-6">
-                        <button type="button"
-                                class="segment-btn"
-                                :class="{ 'segment-btn-selected': loginMode === 'local' }"
-                                @click="loginMode = 'local'">
-                            {% icon "key-outline" class="segment-btn-icon" %}
-                            <span class="segment-btn-label">{% trans "PIN" %}</span>
-                        </button>
-                        <button type="button"
-                                class="segment-btn"
-                                :class="{ 'segment-btn-selected': loginMode === 'cloud' }"
-                                @click="loginMode = 'cloud'">
-                            {% icon "mail-outline" class="segment-btn-icon" %}
-                            <span class="segment-btn-label">{% trans "Email" %}</span>
-                        </button>
+
+                    <!-- Loading state (checking device trust) -->
+                    <div x-show="loginMode === 'loading'" class="flex items-center justify-center py-12">
+                        <span class="loading loading-lg"></span>
                     </div>
+
+                    <!-- Login Tabs (only shown when NOT in loading state) -->
+                    <template x-if="loginMode !== 'loading'">
+                        <div>
+                            <div class="segment segment-block mb-6">
+                                <button type="button"
+                                        class="segment-btn"
+                                        :class="{ 'segment-btn-selected': loginMode === 'local' }"
+                                        @click="loginMode = 'local'">
+                                    {% icon "key-outline" class="segment-btn-icon" %}
+                                    <span class="segment-btn-label">{% trans "PIN" %}</span>
+                                </button>
+                                <button type="button"
+                                        class="segment-btn"
+                                        :class="{ 'segment-btn-selected': loginMode === 'cloud' }"
+                                        @click="loginMode = 'cloud'">
+                                    {% icon "mail-outline" class="segment-btn-icon" %}
+                                    <span class="segment-btn-label">{% trans "Email" %}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
 
                     <!-- Local Login (Employee Selection + PIN) -->
                     <div x-show="loginMode === 'local'" x-cloak>
@@ -123,6 +133,13 @@
                                         <span class="chip chip-sm glass" x-text="employee.role"></span>
                                     </div>
                                 </template>
+                            </div>
+
+                            <!-- Link to switch to Cloud login -->
+                            <div x-show="deviceTrusted" class="text-center mt-4">
+                                <button @click="loginMode = 'cloud'" class="text-sm text-base-content/50 hover:text-base-content/80 bg-transparent border-none cursor-pointer">
+                                    {% trans "Use a different account" %}
+                                </button>
                             </div>
                         </div>
 
@@ -292,16 +309,47 @@
             </div>
         </div>
     </div>
+
+    <!-- Trust Device Modal (shown after Cloud SSO login) -->
+    <div class="modal-backdrop"
+         :data-state="showTrustPrompt ? 'open' : 'closed'"
+         @click.self="trustThisDevice(false)">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Trust this device?" %}</h3>
+            </div>
+            <div class="modal-body">
+                <p class="text-base-content/70 mb-4">
+                    {% trans "If you trust this device, you can use your PIN for quick access next time. Otherwise, you'll need to enter your email and password every time." %}
+                </p>
+                <p class="text-sm text-base-content/50">
+                    {% trans "Only trust devices you control. Don't trust shared or public computers." %}
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button @click="trustThisDevice(false)" class="btn">
+                    {% trans "No, don't trust" %}
+                </button>
+                <button @click="trustThisDevice(true)" class="btn color-primary">
+                    {% trans "Yes, trust this device" %}
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
     function loginApp() {
         return {
             isDark: window.ERPlora?.isDark || false,
             darkModeAuto: window.ERPlora?.darkModeAuto ?? true,
-            loginMode: 'local',
+            loginMode: 'loading',
+
+            // Device trust
+            deviceTrusted: false,
+            deviceToken: localStorage.getItem('erplora_device_token') || null,
 
             // Local Login
             selectedEmployee: null,
@@ -322,8 +370,49 @@
             setupPinFirst: '',
             setupPinError: false,
 
-            init() {
+            // Trust Device prompt
+            showTrustPrompt: false,
+            pendingTrustUser: null,
+
+            async init() {
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
+
+                if (this.deviceToken) {
+                    await this.checkDeviceTrust();
+                } else {
+                    // No device token -- show Cloud login
+                    this.loginMode = 'cloud';
+                }
+            },
+
+            async checkDeviceTrust() {
+                try {
+                    const response = await fetch('{% url "auth:verify_device_trust" %}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ device_token: this.deviceToken })
+                    });
+                    const data = await response.json();
+
+                    if (data.trusted) {
+                        this.deviceTrusted = true;
+                        // Mark trusted Cloud users and keep all local-only employees
+                        const trustedIds = new Set(data.trusted_user_ids || []);
+                        this.employees = this.employees.map(emp => ({
+                            ...emp,
+                            isTrusted: trustedIds.has(emp.id),
+                        }));
+                        this.loginMode = 'local';
+                    } else {
+                        // Token invalid or expired -- clear it
+                        localStorage.removeItem('erplora_device_token');
+                        this.deviceToken = null;
+                        this.loginMode = 'cloud';
+                    }
+                } catch (error) {
+                    // Network error -- fall back to Cloud login
+                    this.loginMode = 'cloud';
+                }
             },
 
             selectEmployee(employee) {
@@ -354,7 +443,8 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             user_id: this.selectedEmployee.id,
-                            pin: this.pinInput
+                            pin: this.pinInput,
+                            device_token: this.deviceToken,
                         })
                     });
 
@@ -363,6 +453,16 @@
                     if (data.success) {
                         await this.showToast(`{% trans "Welcome" %}, ${this.selectedEmployee.name}!`, 'success');
                         setTimeout(() => window.location.href = '{% url "main:index" %}', 1000);
+                    } else if (data.device_untrusted) {
+                        // Device not trusted for this user -- switch to Cloud login
+                        this.loginMode = 'cloud';
+                        this.selectedEmployee = null;
+                        this.pinInput = '';
+                        await this.showToast(data.error, 'warning');
+                    } else if (data.locked) {
+                        this.pinError = true;
+                        this.pinInput = '';
+                        await this.showToast(data.error, 'danger');
                     } else {
                         this.pinError = true;
                         this.pinInput = '';
@@ -397,8 +497,12 @@
                         if (data.first_time) {
                             this.newUser = data.user;
                             this.showPinSetup = true;
+                        } else if (data.can_trust_device) {
+                            // Show "Trust this device?" dialog
+                            this.pendingTrustUser = data.user;
+                            this.showTrustPrompt = true;
                         } else {
-                            // Cloud session saved — now select profile + enter PIN
+                            // Cloud session saved -- now select profile + enter PIN
                             await this.showToast('{% trans "Now select your profile and enter PIN" %}', 'success');
                             this.loginMode = 'local';
                         }
@@ -410,6 +514,40 @@
                 } finally {
                     this.cloudLoading = false;
                 }
+            },
+
+            async trustThisDevice(trust) {
+                this.showTrustPrompt = false;
+
+                if (trust && this.pendingTrustUser) {
+                    try {
+                        const response = await fetch('{% url "auth:trust_device" %}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user_id: this.pendingTrustUser.id })
+                        });
+                        const data = await response.json();
+
+                        if (data.success) {
+                            localStorage.setItem('erplora_device_token', data.device_token);
+                            this.deviceToken = data.device_token;
+                            this.deviceTrusted = true;
+                            await this.showToast('{% trans "Device trusted. You can use PIN next time." %}', 'success');
+                        }
+                    } catch (error) {
+                        console.error('Failed to trust device:', error);
+                    }
+                }
+
+                // If session is already established (PIN setup just completed), go to dashboard
+                if (this.newUser) {
+                    window.location.href = '{% url "main:index" %}';
+                    return;
+                }
+
+                // Otherwise, proceed to PIN selection
+                await this.showToast('{% trans "Now select your profile and enter PIN" %}', 'success');
+                this.loginMode = 'local';
             },
 
             addSetupPinDigit(digit) {
@@ -452,7 +590,10 @@
 
                         if (data.success) {
                             await this.showToast('{% trans "PIN configured successfully!" %}', 'success');
-                            setTimeout(() => window.location.href = '{% url "main:index" %}', 1000);
+                            this.showPinSetup = false;
+                            // Show trust device prompt before going to dashboard
+                            this.pendingTrustUser = this.newUser;
+                            this.showTrustPrompt = true;
                         }
                     } catch (error) {
                         console.error('Error setting up PIN:', error);

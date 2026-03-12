@@ -20,7 +20,7 @@ from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required, admin_required
 
 
-PER_PAGE_CHOICES = [10, 25, 50, 100]
+PER_PAGE_CHOICES = [12, 24, 48, 96, 0]
 
 # Valid module_id: alphanumeric, underscores, hyphens only (no path separators)
 _MODULE_ID_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
@@ -40,11 +40,11 @@ def modules_index(request):
     sort_dir = request.GET.get('dir', 'asc')
     current_view = request.GET.get('view', 'table')
     try:
-        per_page = int(request.GET.get('per_page', 10))
+        per_page = int(request.GET.get('per_page', 12))
     except (ValueError, TypeError):
-        per_page = 10
+        per_page = 12
     if per_page not in PER_PAGE_CHOICES:
-        per_page = 10
+        per_page = 12
     page_number = request.GET.get('page', 1)
     status_filter = request.GET.get('status', '')
 
@@ -139,7 +139,7 @@ def modules_index(request):
         module['detail_url'] = reverse('mymodules:detail', kwargs={'slug': mid})
 
     # Paginate
-    paginator = Paginator(all_modules, per_page)
+    paginator = Paginator(all_modules, per_page if per_page > 0 else max(all_modules.count(), 1))
     page_obj = paginator.get_page(page_number)
 
     skipped_deps = getattr(django_settings, 'MODULES_SKIPPED_DEPENDENCIES', {})
@@ -555,8 +555,8 @@ def _render_modules_page(request, error=None):
         module['detail_url'] = reverse('mymodules:detail', kwargs={'slug': mid})
 
     # Paginate for DataTable
-    per_page = 10
-    paginator = Paginator(all_modules, per_page)
+    per_page = 12
+    paginator = Paginator(all_modules, per_page if per_page > 0 else max(all_modules.count(), 1))
     page_obj = paginator.get_page(1)
 
     skipped_deps = getattr(django_settings, 'MODULES_SKIPPED_DEPENDENCIES', {})

@@ -36,4 +36,5 @@ urlpatterns = [
 
     # Help & documentation
     path('help/', help_views.index, name='help'),
+    path('help/modal/', help_views.modal, name='help_modal'),
 ]

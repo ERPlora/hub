@@ -50,12 +50,14 @@ def build_module_context(module_id: str, view_id: str) -> dict:
     """
     navigation = get_module_navigation_items(module_id)
 
-    # Mark active tab and find page title
-    page_title = module_id.replace('_', ' ').title()
+    # Use MODULE_NAME as the page title (falls back to formatted module_id)
+    module_py = get_module_py(module_id)
+    module_name = getattr(module_py, 'MODULE_NAME', None)
+    page_title = str(module_name) if module_name else module_id.replace('_', ' ').title()
+
+    # Mark active tab
     for nav in navigation:
         nav['active'] = nav.get('id') == view_id
-        if nav['active']:
-            page_title = nav['label']
 
     return {
         'navigation': navigation,

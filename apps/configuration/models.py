@@ -316,6 +316,13 @@ class TaxClass(models.Model):
     - France: Normal 20%, Intermediate 10%, Reduced 5.5%
     - UK: Standard 20%, Reduced 5%, Zero 0%
     """
+    code = models.CharField(
+        max_length=50,
+        blank=True,
+        default='',
+        verbose_name='Code',
+        help_text='Machine-readable code for blueprint mapping (e.g., general, reduced, super_reduced, exempt)'
+    )
     name = models.CharField(
         max_length=100,
         verbose_name='Name',
@@ -447,6 +454,22 @@ class StoreConfig(SingletonConfigMixin, models.Model):
             self.business_address and
             self.vat_number
         )
+
+    @property
+    def pwa_favicon_url(self):
+        """URL for custom favicon (32px), or empty string if not available."""
+        if not self.logo:
+            return ''
+        from .services.pwa_icons import get_favicon_url
+        return get_favicon_url(size=32) or ''
+
+    @property
+    def pwa_apple_touch_icon_url(self):
+        """URL for custom Apple touch icon (152px), or empty string if not available."""
+        if not self.logo:
+            return ''
+        from .services.pwa_icons import get_apple_touch_icon_url
+        return get_apple_touch_icon_url() or ''
 
 
 class BackupConfig(SingletonConfigMixin, models.Model):

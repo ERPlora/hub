@@ -155,10 +155,11 @@
                 hx-target="#datatable-body"
                 hx-include="#employees-datatable"
                 hx-trigger="change">
-            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
-            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
-            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
-            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+            <option value="12" {% if per_page == 12 %}selected{% endif %}>12</option>
+            <option value="24" {% if per_page == 24 %}selected{% endif %}>24</option>
+            <option value="48" {% if per_page == 48 %}selected{% endif %}>48</option>
+            <option value="96" {% if per_page == 96 %}selected{% endif %}>96</option>
+            <option value="0" {% if per_page == 0 %}selected{% endif %}>All</option>
         </select>
         {% trans "per page" %}
     </div>
