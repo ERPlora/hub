@@ -29,7 +29,7 @@
             </div>
             <div class="employee-card-info">
                 <h3 class="employee-card-name">{{ role.display_name }}</h3>
-                <span class="employee-card-title">{{ role.description|default:"-"|truncatewords:8 }}</span>
+                {% if role.description %}<span class="employee-card-title">{{ role.description|truncatewords:8 }}</span>{% endif %}
             </div>
             <div class="employee-card-actions" @click.stop>
                 {% if role.source == 'basic' %}
@@ -129,7 +129,7 @@
                         </span>
                         <div>
                             <span class="font-medium">{{ role.display_name }}</span>
-                            <span class="text-xs text-base-content/50 block">{{ role.description|default:"-"|truncatewords:8 }}</span>
+                            {% if role.description %}<span class="text-xs text-base-content/50 block">{{ role.description|truncatewords:8 }}</span>{% endif %}
                         </div>
                     </a>
                 </td>
