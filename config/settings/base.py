@@ -299,8 +299,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'erplora-hub',
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': Path('/app/data/cache') if Path('/app/data').exists() else BASE_DIR / '.cache',
         'TIMEOUT': 300,  # 5 minutes default
     }
 }
