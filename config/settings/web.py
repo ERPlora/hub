@@ -1,7 +1,7 @@
 """
 ERPlora Hub - Web/Docker Settings
 
-Configuración para despliegue en Docker (App Runner on AWS, or Dokploy on Hetzner).
+Configuración para despliegue en Docker (App Runner on AWS).
 
 Variables de entorno (configuradas durante deploy):
   - HUB_ID: UUID del Hub
@@ -60,11 +60,10 @@ DATABASES = {'default': dj_database_url.parse(DATABASE_URL)}
 # In Docker: /app/modules/ by default, can be overridden via MODULES_DIR env var
 
 # =============================================================================
-# S3 STORAGE - AWS S3 (or Hetzner Object Storage for legacy)
+# S3 STORAGE - AWS S3
 # =============================================================================
 
 # On AWS: IAM role provides credentials automatically (no keys needed)
-# On Hetzner: explicit keys required
 AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
 AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='erplora')
@@ -77,8 +76,7 @@ AWS_QUERYSTRING_AUTH = False
 AWS_S3_USE_SSL = True
 AWS_S3_VERIFY = True
 
-# Hetzner Object Storage requires custom endpoint + signature version
-# On AWS S3, these are not needed (boto3 uses standard endpoints)
+# Custom S3 endpoint (optional, for S3-compatible services)
 _s3_endpoint = config('AWS_S3_ENDPOINT_URL', default='')
 if _s3_endpoint:
     AWS_S3_ENDPOINT_URL = _s3_endpoint
@@ -209,11 +207,10 @@ MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 # WhiteNoise right after SecurityMiddleware for static files
 MIDDLEWARE.insert(2, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
-# Cloud SSO middleware: only for Hetzner (cookie-based SSO across subdomains).
+# Cloud SSO middleware (cookie-based SSO across subdomains).
 # On AWS (App Runner), Hubs have independent auth (trusted device + PIN or Cloud API login).
-# AWS_S3_ENDPOINT_URL is only set on Hetzner, so use it as a proxy for "legacy Hetzner mode".
+# Only enabled when a custom S3 endpoint is set (non-standard deployment).
 if _s3_endpoint:
-    # Hetzner: Cloud SSO via shared cookies across *.erplora.com
     # After insert(0, CORS) and insert(2, WhiteNoise), SessionMiddleware is at index 4
     # So we insert at 5 to place CloudSSO right after Session
     MIDDLEWARE.insert(5, 'apps.core.middleware.CloudSSOMiddleware')
@@ -288,8 +285,7 @@ load_module_templates(MODULES_DIR)
 # =============================================================================
 
 _db_name = DATABASES['default'].get('NAME', DATABASE_URL.split('/')[-1] if '/' in DATABASE_URL else 'unknown')
-_infra = 'AWS' if not _s3_endpoint else 'Hetzner'
-print(f"[HUB] {HUB_NAME} ({HUB_ID}) [{_infra}]")
+print(f"[HUB] {HUB_NAME} ({HUB_ID}) [AWS]")
 print(f"[HUB] Database: PostgreSQL - {_db_name}")
 print(f"[HUB] Data: {DATA_DIR}")
 print(f"[HUB] S3: {AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/")

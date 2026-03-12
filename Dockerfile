@@ -1,11 +1,11 @@
 # ==============================================================================
 # ERPlora Hub - Production Dockerfile
 # ==============================================================================
-# Used for deployment via App Runner (AWS) or Docker Compose (Dokploy/Hetzner).
+# Used for deployment via AWS App Runner or Docker Compose (local testing).
 #
 # STORAGE (automatic via HUB_ID):
 #   AWS App Runner: ephemeral filesystem, S3 for persistent data
-#   Docker Compose: bind mount from host NVMe → /app/data/
+#   Docker Compose: bind mount from host → /app/data/
 #
 #   S3 hubs/{HUB_ID}/:
 #     - backups/     - Database backups

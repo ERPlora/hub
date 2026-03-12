@@ -83,7 +83,7 @@ dependencies = [
     "django-debug-toolbar>=6.1.0",
     # Background scheduler for automated backups
     "APScheduler>=3.10.0",
-    # S3-compatible storage for media files (Hetzner Object Storage)
+    # S3 storage for media files (AWS S3)
     "boto3>=1.34.0",
     "django-storages>=1.14.0",
     "drf-spectacular[sidecar]>=0.29.0",

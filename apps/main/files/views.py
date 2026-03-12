@@ -41,7 +41,7 @@ def _get_resource_metrics():
     except (FileNotFoundError, ValueError):
         pass
 
-    # Memory limit: env var (Dokploy), cgroup, or Docker inspect
+    # Memory limit: env var, cgroup, or Docker inspect
     mem_limit_env = os.environ.get('MEMORY_LIMIT', '')
     if mem_limit_env.endswith('m'):
         metrics['memory_limit_mb'] = int(mem_limit_env[:-1])
@@ -61,7 +61,7 @@ def _get_resource_metrics():
             metrics['memory_used_mb'] / metrics['memory_limit_mb'] * 100
         )
 
-    # CPU limit: env var (Dokploy) or cgroup
+    # CPU limit: env var or cgroup
     cpu_limit_env = os.environ.get('CPU_LIMIT', '')
     if cpu_limit_env:
         try:
