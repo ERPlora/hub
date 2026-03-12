@@ -58,6 +58,9 @@ class CloudSSOMiddleware:
         '/cloud-login/',  # Cloud login endpoint
         '/setup-pin/',  # PIN setup endpoint
         '/verify-pin/',  # PIN verification endpoint
+        '/verify-device-trust/',  # Device trust verification
+        '/trust-device/',  # Trust device registration
+        '/revoke-device/',  # Device trust revocation
         '/set-language/',  # Language switcher (can be called during setup)
         '/logout/',  # Logout endpoint
         '/api/',     # All API endpoints (authenticated via JWT, not cookies)

@@ -1,11 +1,11 @@
 # ==============================================================================
 # ERPlora Hub - Production Dockerfile
 # ==============================================================================
-# Usado por docker-compose.yaml para deploy via Dokploy.
+# Used for deployment via App Runner (AWS) or Docker Compose (Dokploy/Hetzner).
 #
 # STORAGE (automatic via HUB_ID):
-#   Docker Volume (bind mount isolates by HUB_ID):
-#     Host: ${VOLUME_PATH}/hubs/${HUB_ID}/ -> Container: /app/data/
+#   AWS App Runner: ephemeral filesystem, S3 for persistent data
+#   Docker Compose: bind mount from host NVMe → /app/data/
 #
 #   S3 hubs/{HUB_ID}/:
 #     - backups/     - Database backups
@@ -15,12 +15,13 @@
 #
 #   Container (ephemeral):
 #     - /tmp/hub_media/ - Temporary processing files
-#     - Logs via stdout/stderr (Docker captures)
+#     - Logs via stdout/stderr (Docker/CloudWatch captures)
 #
-# ENVIRONMENT VARIABLES (injected by Dokploy):
+# ENVIRONMENT VARIABLES:
 #   HUB_ID            - UUID del Hub
 #   HUB_NAME          - Subdomain del Hub
-#   AWS_*             - S3 credentials
+#   DATABASE_URL      - PostgreSQL connection string (Aurora or direct)
+#   AWS_*             - S3 credentials (optional on AWS — IAM role provides them)
 #   DJANGO_SETTINGS_MODULE=config.settings.web
 # ==============================================================================
 
@@ -50,16 +51,13 @@ RUN uv pip install --system --no-cache .
 
 # Collect static files during build (don't change between Hubs)
 # Use web settings with dummy values (only needed for settings import, not collectstatic)
-# Real values come from docker-compose.yaml at runtime
+# Real values come from environment at runtime
 ENV DJANGO_SETTINGS_MODULE=config.settings.web \
     HUB_ID=00000000-0000-0000-0000-000000000000 \
     HUB_NAME=build \
     DATABASE_URL=postgres://build:build@localhost:5432/build \
-    AWS_ACCESS_KEY_ID=dummy \
-    AWS_SECRET_ACCESS_KEY=dummy \
     AWS_STORAGE_BUCKET_NAME=dummy \
-    AWS_S3_ENDPOINT_URL=https://dummy.com \
-    AWS_S3_REGION_NAME=eu-central \
+    AWS_S3_REGION_NAME=eu-west-1 \
     AWS_LOCATION=dummy
 RUN python manage.py collectstatic --noinput --clear
 
@@ -67,7 +65,8 @@ RUN python manage.py collectstatic --noinput --clear
 # ENVIRONMENT VARIABLES
 # =============================================================================
 # Fixed variables (don't change between Hubs)
-# Dynamic variables (HUB_ID, HUB_NAME, AWS_*) come from docker-compose.yaml
+# Dynamic variables (HUB_ID, HUB_NAME, DATABASE_URL, AWS_*) come from
+# App Runner env vars or docker-compose.yaml
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DEBUG=false
@@ -83,6 +82,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # =============================================================================
 # DEFAULT COMMAND
 # =============================================================================
-# Command is defined in docker-compose.yml for flexibility
-# This is a fallback for running the container directly
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--pid", "/run/gunicorn.pid"]
+# Runs migrations then starts gunicorn on port 8000 (required by App Runner)
+CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120 --pid /run/gunicorn.pid"]

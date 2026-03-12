@@ -1,14 +1,15 @@
 # ==============================================================================
-# ERPlora Hub - Docker Compose for Dokploy
+# ERPlora Hub - Docker Compose
 # ==============================================================================
-# Dokploy usa este archivo para desplegar el Hub como Docker Compose.
-# Los volúmenes persisten entre deploys usando bind mounts al NVMe local.
+# Used for Dokploy (Hetzner) deployment. On AWS, App Runner uses the Dockerfile
+# directly without docker-compose.
 #
 # Variables de entorno (inyectadas por Dokploy via .env):
 #   - HUB_ID: UUID del Hub
 #   - HUB_NAME: Nombre/subdomain del Hub
 #   - VOLUME_PATH: Ruta base de Hubs en el host (ej: /data/hubs)
-#   - AWS_*: Credenciales S3
+#   - DATABASE_URL: PostgreSQL connection string
+#   - AWS_*: S3 credentials
 #   - Todas las demás env vars configuradas en Dokploy
 #
 # Volumen persistente (NVMe local del servidor):
