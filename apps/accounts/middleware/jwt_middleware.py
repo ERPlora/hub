@@ -34,6 +34,9 @@ class JWTMiddleware:
         '/verify-pin/',
         '/cloud-login/',
         '/setup-pin/',
+        '/verify-device-trust/',
+        '/trust-device/',
+        '/revoke-device/',
         '/static/',
         '/media/',
         '/api/',  # API endpoints handle their own auth

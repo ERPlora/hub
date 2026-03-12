@@ -44,7 +44,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 from apps.modules_runtime.router import module_urlpatterns, module_api_urlpatterns
 from apps.core.views import set_language, health_check, csp_report
-from apps.configuration.views import pwa_manifest, pwa_serviceworker, pwa_offline
+from apps.configuration.views import pwa_manifest, pwa_serviceworker, pwa_offline, pwa_favicon
 
 # Import API URL patterns from each app
 from apps.auth.login.api import api_urlpatterns as auth_api_urls
@@ -83,6 +83,7 @@ urlpatterns = [
     # ==========================================================================
     path('manifest.json', pwa_manifest, name='pwa_manifest'),
     path('serviceworker.js', pwa_serviceworker, name='pwa_serviceworker'),
+    path('favicon.ico', pwa_favicon, name='pwa_favicon'),
     path('offline/', pwa_offline, name='pwa_offline'),
 
     # Language switcher (auto-detected from browser)

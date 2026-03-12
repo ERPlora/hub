@@ -222,17 +222,24 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # =============================================================================
 # DATABASE (default PostgreSQL - overridden per environment)
 # =============================================================================
+# Supports DATABASE_URL env var (used by App Runner / Aurora Serverless v2)
+# Falls back to individual settings for local development
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'erplora_hub',
-        'USER': 'erplora',
-        'PASSWORD': 'erplora',
-        'HOST': 'localhost',
-        'PORT': '5432',
+_database_url = config('DATABASE_URL', default='')
+if _database_url:
+    import dj_database_url
+    DATABASES = {'default': dj_database_url.parse(_database_url)}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='erplora_hub'),
+            'USER': config('DB_USER', default='erplora'),
+            'PASSWORD': config('DB_PASSWORD', default='erplora'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
     }
-}
 
 # =============================================================================
 # PASSWORD VALIDATION
