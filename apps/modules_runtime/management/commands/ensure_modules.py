@@ -110,9 +110,38 @@ class Command(BaseCommand):
                 load_all=True, run_migrations=True, schedule_restart=False,
             )
 
+        # Import seed products (categories, products, images)
+        # On App Runner the flag file is lost on restart, so always try after restore
+        if result.installed > 0:
+            self._import_seeds()
+
         self.stdout.write(self.style.SUCCESS(
             f'Module restore complete: {result.installed} installed, {len(result.errors)} errors'
         ))
+
+    def _import_seeds(self):
+        """Import seed products and images for configured business types."""
+        try:
+            from apps.configuration.models import HubConfig
+            config = HubConfig.get_solo()
+
+            type_codes = config.selected_business_types or []
+            if not type_codes:
+                return
+
+            language = config.language or 'en'
+            country = (config.country_code or 'es').lower()
+
+            from apps.core.services.blueprint_service import BlueprintService
+            result = BlueprintService.import_seeds(
+                type_codes=type_codes,
+                language=language,
+                country=country,
+            )
+            imported = result.get('imported', 0) if result else 0
+            self.stdout.write(f'Seed import: {imported} products imported')
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'Seed import failed: {e}'))
 
     def _get_hub_token(self):
         """Resolve hub JWT token from settings or database."""

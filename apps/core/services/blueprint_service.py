@@ -641,8 +641,12 @@ class BlueprintService:
             if not code:
                 return False
 
-            # Idempotency: skip if SKU already exists
-            if Product.objects.filter(sku=code).exists():
+            # Idempotency: skip if SKU already exists (but retry missing images)
+            existing = Product.objects.filter(sku=code).first()
+            if existing:
+                image_path = prod_data.get('image', '')
+                if image_path and not existing.image:
+                    cls._download_and_save_image(existing, image_path)
                 return False
 
             # Resolve tax_class from hint
