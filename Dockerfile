@@ -49,6 +49,16 @@ COPY . .
 # Note: We use regular install, not editable (-e) since this is production
 RUN uv pip install --system --no-cache .
 
+# Download vendor assets (CSS/JS) from CDN → local static files
+RUN DJANGO_SETTINGS_MODULE=config.settings.web \
+    HUB_ID=00000000-0000-0000-0000-000000000000 \
+    HUB_NAME=build \
+    DATABASE_URL=postgres://build:build@localhost:5432/build \
+    AWS_STORAGE_BUCKET_NAME=dummy \
+    AWS_S3_REGION_NAME=eu-west-1 \
+    AWS_LOCATION=dummy \
+    python manage.py vendor_fetch
+
 # Collect static files during build (don't change between Hubs)
 # Use web settings with dummy values (only needed for settings import, not collectstatic)
 # Real values come from environment at runtime

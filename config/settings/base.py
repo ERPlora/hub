@@ -295,6 +295,30 @@ if _UX_DIST.is_dir():
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Vendor assets downloaded from CDN by `python manage.py vendor_fetch`
+VENDOR_ASSETS = [
+    {
+        'url': 'https://cdn.jsdelivr.net/gh/ERPlora/ux@main/dist/ux-full.min.css',
+        'path': 'css/vendor/ux-full.min.css',
+    },
+    {
+        'url': 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js',
+        'path': 'js/vendor/html2canvas-pro.min.js',
+    },
+    {
+        'url': 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js',
+        'path': 'js/vendor/qrcode-generator.min.js',
+    },
+    {
+        'url': 'https://unpkg.com/swagger-ui-dist@5/swagger-ui.css',
+        'path': 'css/vendor/swagger-ui.css',
+    },
+    {
+        'url': 'https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js',
+        'path': 'js/vendor/swagger-ui-bundle.js',
+    },
+]
+
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
