@@ -92,14 +92,12 @@ CSRF_TRUSTED_ORIGINS = [
 # =============================================================================
 # CONTENT SECURITY POLICY (CSP) — report-only mode
 # =============================================================================
-SECURE_CSP = None  # Not enforcing yet
-
-SECURE_CSP_REPORT_ONLY = {
+SECURE_CSP = {
     "default-src": [CSP.SELF],
-    "script-src": [CSP.SELF, CSP.NONCE, CSP.UNSAFE_EVAL, "unpkg.com"],
-    "style-src": [CSP.SELF, CSP.UNSAFE_INLINE, "cdn.jsdelivr.net", "unpkg.com"],
+    "script-src": [CSP.SELF, CSP.NONCE, CSP.UNSAFE_EVAL],  # UNSAFE_EVAL required by Alpine.js standard build
+    "style-src": [CSP.SELF, CSP.UNSAFE_INLINE],
     "font-src": [CSP.SELF],
-    "img-src": [CSP.SELF, "data:"],
+    "img-src": [CSP.SELF, "data:", "*.amazonaws.com"],
     "connect-src": [CSP.SELF, "ws://localhost:12321"],
     "manifest-src": [CSP.SELF],
     "frame-ancestors": [CSP.NONE],
@@ -107,6 +105,8 @@ SECURE_CSP_REPORT_ONLY = {
     "form-action": [CSP.SELF],
     "report-uri": ["/csp-report/"],
 }
+
+SECURE_CSP_REPORT_ONLY = None
 
 # =============================================================================
 # APPLICATION DEFINITION

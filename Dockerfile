@@ -84,4 +84,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # DEFAULT COMMAND
 # =============================================================================
 # Runs migrations, restores modules, then starts gunicorn on port 8000 (required by App Runner)
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py ensure_modules && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120 --pid /run/gunicorn.pid"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py createcachetable --database default 2>/dev/null; python manage.py ensure_modules && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120 --pid /run/gunicorn.pid"]
