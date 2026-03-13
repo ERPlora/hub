@@ -171,6 +171,21 @@ def store_index(request, store_type='modules'):
     # Get filters based on store type
     filters_data = _get_filters_for_store(store_type, language, request)
 
+    # Default business type filter from HubConfig
+    hub_config = HubConfig.get_config()
+    selected_types = hub_config.selected_business_types or []
+    default_business_types = []
+    if selected_types and store_type == 'modules':
+        all_types = _fetch_business_types_for_filters()
+        types_by_code = {t.get('code', ''): t for t in all_types}
+        for code in selected_types:
+            t = types_by_code.get(code)
+            if t:
+                default_business_types.append({
+                    'code': code,
+                    'name': t.get('name', code),
+                })
+
     return {
         'current_section': 'marketplace',
         'page_title': 'Marketplace',
@@ -178,6 +193,7 @@ def store_index(request, store_type='modules'):
         'store_config': config,
         'store_types': STORE_TYPES,
         'filters': filters_data,
+        'default_business_types': default_business_types,
         'navigation': _marketplace_navigation('modules'),
     }
 
@@ -525,6 +541,8 @@ def products_list(request, store_type):
     search_query = request.GET.get('q', '').strip()
     sector_filter = request.GET.get('sector', '').strip()
     type_filter = request.GET.get('type', '').strip()
+    industry_filter = request.GET.get('industry', '').strip()
+    solution_filter = request.GET.get('solution', '').strip()
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
     current_view = request.GET.get('view', 'cards')
@@ -539,7 +557,7 @@ def products_list(request, store_type):
     config = get_store_config(store_type)
 
     if store_type == 'modules':
-        return _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number)
+        return _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number, industry_filter, solution_filter)
     elif store_type == 'hubs':
         return _fetch_hubs_list(request, search_query, '', 12)
     else:
@@ -598,7 +616,7 @@ def _fetch_all_modules():
         return None, str(_('Could not connect to Cloud. Please try again.'))
 
 
-def _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number):
+def _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number, industry_filter='', solution_filter=''):
     """Fetch modules from Cloud API with DataTable pagination"""
     from django.core.paginator import Paginator
 
@@ -631,6 +649,18 @@ def _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_
                 ss in m.get('sectors', []) or ss in m.get('sector_slugs', [])
                 for ss in sector_slugs
             )]
+
+    if industry_filter:
+        industry_codes = [c.strip() for c in industry_filter.split(',') if c.strip()]
+        if industry_codes:
+            industry_set = set(industry_codes)
+            modules = [m for m in modules if industry_set & set(m.get('business_types', []))]
+
+    if solution_filter:
+        solution_codes = [c.strip() for c in solution_filter.split(',') if c.strip()]
+        if solution_codes:
+            solution_set = set(solution_codes)
+            modules = [m for m in modules if m.get('functional_unit', '') in solution_set]
 
     if type_filter:
         modules = [m for m in modules if m.get('module_type') == type_filter]

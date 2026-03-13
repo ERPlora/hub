@@ -187,12 +187,28 @@
             </button>
         </div>
 
+        {% if default_business_types %}
+        <!-- Default filter callout -->
+        <div id="default-filter-callout" class="callout callout-info mx-4 mt-3 mb-0">
+            <span class="callout-icon">{% icon "funnel-outline" %}</span>
+            <div class="callout-content">
+                <div class="callout-text">
+                    {% trans "Showing modules for:" %}
+                    {% for bt in default_business_types %}{{ bt.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="clearBusinessTypeFilter()">
+                {% trans "Show all" %}
+            </button>
+        </div>
+        {% endif %}
+
         <!-- Hidden state inputs -->
         <input type="hidden" name="sort" value="name">
         <input type="hidden" name="dir" value="asc">
         <input type="hidden" name="view" :value="view">
         <input type="hidden" name="solution" id="filter-solution" value="">
-        <input type="hidden" name="industry" id="filter-industry" value="">
+        <input type="hidden" name="industry" id="filter-industry" value="{% for bt in default_business_types %}{{ bt.code }}{% if not forloop.last %},{% endif %}{% endfor %}">
         <input type="hidden" name="type" id="filter-type" value="">
 
         <!-- Datatable Body (HTMX swap target) -->
@@ -579,6 +595,14 @@
     };
 
     updateActiveFilters();
+
+    window.clearBusinessTypeFilter = function () {
+        setMultiValues('industry', []);
+        var callout = document.getElementById('default-filter-callout');
+        if (callout) callout.remove();
+        fireFilterRequest();
+        updateActiveFilters();
+    };
 
 })();
 </script>

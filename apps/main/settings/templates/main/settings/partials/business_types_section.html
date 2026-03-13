@@ -1,0 +1,97 @@
+{% load i18n djicons %}
+
+<section class="card" id="business-types-section" x-data="{ btModal: false }">
+    <div class="card-header">
+        <div class="flex items-center gap-3">
+            <span class="text-xl opacity-60">{% icon "business-outline" %}</span>
+            <div>
+                <h2 class="card-title">{% trans "Business Types" %}</h2>
+                <p class="text-sm opacity-60 mt-0.5">{% trans "Configure your business types to see relevant modules in the Marketplace" %}</p>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if active_business_types %}
+        <div class="flex flex-wrap gap-2">
+            {% for bt in active_business_types %}
+            <span class="chip chip-active">
+                {% if bt.icon %}{% icon bt.icon %}{% endif %}
+                {{ bt.name }}
+                <form method="post" action="{% url 'main:settings' %}" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="remove_business_type">
+                    <input type="hidden" name="type_code" value="{{ bt.code }}">
+                    <button type="submit"
+                            class="ml-1 opacity-50 hover:opacity-100"
+                            hx-post="{% url 'main:settings' %}"
+                            hx-target="#business-types-section"
+                            hx-swap="outerHTML"
+                            hx-include="closest form"
+                            title="{% trans 'Remove' %}">
+                        {% icon "close-outline" css_class="text-xs" %}
+                    </button>
+                </form>
+            </span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm opacity-50">{% trans "No business types selected. Add one to filter the Marketplace to your needs." %}</p>
+        {% endif %}
+
+        <button type="button" @click="btModal = true" class="btn btn-sm btn-outline mt-4">
+            {% icon "add-outline" %}
+            <span>{% trans "Add Business Type" %}</span>
+        </button>
+    </div>
+
+    <!-- Add Business Type Modal -->
+    <div class="modal-backdrop" :data-state="btModal ? 'open' : 'closed'" @click.self="btModal = false">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Add Business Type" %}</h3>
+                <button class="modal-close" @click="btModal = false">{% icon "close-outline" %}</button>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                {% if available_business_types %}
+                <div class="list list-inset">
+                    {% for bt in available_business_types %}
+                    <form method="post" action="{% url 'main:settings' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_business_type">
+                        <input type="hidden" name="type_code" value="{{ bt.code }}">
+                        <button type="submit"
+                                class="list-item list-item-clickable list-item-multiline"
+                                hx-post="{% url 'main:settings' %}"
+                                hx-target="#business-types-section"
+                                hx-swap="outerHTML"
+                                hx-include="closest form"
+                                @click="btModal = false">
+                            <div class="list-item-start">
+                                <div class="flex items-center justify-center size-10 rounded-lg shrink-0"
+                                     style="background-color: {{ bt.color|default:'var(--color-primary)' }}; color: white;">
+                                    {% icon bt.icon|default:"business-outline" %}
+                                </div>
+                            </div>
+                            <div class="list-item-content">
+                                <span class="list-item-label">{{ bt.name }}</span>
+                                {% if bt.description %}
+                                <span class="list-item-note">{{ bt.description|truncatewords:20 }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="list-item-end">
+                                {% icon "add-circle-outline" css_class="text-xl opacity-40" %}
+                            </div>
+                        </button>
+                    </form>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center py-8 text-sm opacity-50">{% trans "All available business types are already active." %}</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @click="btModal = false">{% trans "Close" %}</button>
+            </div>
+        </div>
+    </div>
+</section>

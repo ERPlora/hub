@@ -2,16 +2,20 @@
 Main Settings Views
 """
 import json
+import logging
 from decimal import Decimal, InvalidOperation
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.conf import settings as django_settings
 from django.utils import translation
+from django.utils.translation import gettext_lazy as _
 from zoneinfo import available_timezones
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required, admin_required
 from apps.accounts.models import LocalUser
 from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass, PrinterConfig
+
+logger = logging.getLogger(__name__)
 
 
 # Common timezones grouped by region (most used first)
@@ -293,6 +297,44 @@ def index(request):
             except PrinterConfig.DoesNotExist:
                 return toast_response('Printer not found', 'error', status=404)
 
+        # Add a business type
+        if action == 'add_business_type':
+            type_code = request.POST.get('type_code', '').strip()
+            if not type_code:
+                return toast_response('Business type code required', 'error', status=400)
+
+            active_types = list(hub_config.selected_business_types or [])
+            if type_code not in active_types:
+                active_types.append(type_code)
+                hub_config.selected_business_types = active_types
+                hub_config.save()
+
+                # Install blueprint: modules + roles + seed products
+                try:
+                    from apps.core.services.permission_service import PermissionService
+                    from apps.core.services.blueprint_service import BlueprintService
+                    PermissionService.create_default_roles(str(hub_config.hub_id))
+                    BlueprintService.install_blueprint(hub_config, active_types)
+                    PermissionService.sync_all_module_permissions(str(hub_config.hub_id))
+                except Exception as e:
+                    logger.warning('[settings] Blueprint install failed for %s: %s', type_code, e)
+
+            return _business_types_partial(request, hub_config)
+
+        # Remove a business type
+        if action == 'remove_business_type':
+            type_code = request.POST.get('type_code', '').strip()
+            if not type_code:
+                return toast_response('Business type code required', 'error', status=400)
+
+            active_types = list(hub_config.selected_business_types or [])
+            if type_code in active_types:
+                active_types.remove(type_code)
+                hub_config.selected_business_types = active_types
+                hub_config.save()
+
+            return _business_types_partial(request, hub_config)
+
         return toast_response('Settings saved')
 
     # Get backup config and scheduler status
@@ -306,6 +348,9 @@ def index(request):
     # Get configured printers
     printers = PrinterConfig.get_active()
 
+    # Business types
+    active_business_types, available_business_types = _get_business_types_context(hub_config)
+
     return {
         'current_section': 'settings',
         'page_title': 'Settings',
@@ -315,6 +360,8 @@ def index(request):
         'backup_config': backup_config,
         'scheduler_status': scheduler_status,
         'tax_classes': tax_classes,
+        'active_business_types': active_business_types,
+        'available_business_types': available_business_types,
         'language_choices': django_settings.LANGUAGES,
         'system_language_choices': django_settings.LANGUAGES,
         'timezone_choices': get_sorted_timezones(),
@@ -330,3 +377,48 @@ def index(request):
             ('cash_session_report', 'Cash Session Report'),
         ],
     }
+
+
+def _fetch_all_business_types():
+    """Fetch all business types from Cloud blueprints API (cached)."""
+    from apps.marketplace.views import _fetch_business_types_for_filters
+    return _fetch_business_types_for_filters()
+
+
+def _get_business_types_context(hub_config):
+    """Build active and available business types for Settings context.
+
+    Returns:
+        tuple: (active_business_types, available_business_types)
+    """
+    selected_codes = hub_config.selected_business_types or []
+    all_types = _fetch_all_business_types()
+    types_by_code = {t.get('code', ''): t for t in all_types}
+
+    active = []
+    for code in selected_codes:
+        t = types_by_code.get(code)
+        if t:
+            active.append({'code': code, 'name': t.get('name', code), 'icon': t.get('icon', ''), 'color': t.get('color', '')})
+
+    selected_set = set(selected_codes)
+    available = [
+        {'code': t.get('code', ''), 'name': t.get('name', ''), 'icon': t.get('icon', ''), 'color': t.get('color', ''), 'description': t.get('description', '')}
+        for t in all_types
+        if t.get('code') and t.get('code') not in selected_set
+    ]
+
+    return active, available
+
+
+def _business_types_partial(request, hub_config):
+    """Render the business types section partial after add/remove."""
+    active, available = _get_business_types_context(hub_config)
+    response = render(request, 'main/settings/partials/business_types_section.html', {
+        'active_business_types': active,
+        'available_business_types': available,
+    })
+    response['HX-Trigger'] = json.dumps({
+        'showMessage': {'message': 'Business types updated', 'type': 'success'}
+    })
+    return response

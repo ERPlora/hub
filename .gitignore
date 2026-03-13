@@ -242,3 +242,5 @@ backups/
 *.old
 *~
 .secret_key
+
+modules
