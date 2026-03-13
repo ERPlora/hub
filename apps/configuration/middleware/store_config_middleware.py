@@ -41,7 +41,7 @@ class StoreConfigCheckMiddleware:
                     hub_config = HubConfig.get_config()
 
                     if not hub_config.is_configured:
-                        return redirect('/m/assistant/')
+                        return redirect('/m/assistant/?context=setup')
 
                     # Mark as checked for this session
                     request.session['store_config_checked'] = True
