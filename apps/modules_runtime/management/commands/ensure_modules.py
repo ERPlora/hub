@@ -54,8 +54,19 @@ class Command(BaseCommand):
             modules_info = self._fallback_from_blueprints(cloud_url, hub_token)
 
         if not modules_info:
-            self.stdout.write('No modules to restore')
-            return
+            # If hub is not configured yet, at minimum install the assistant
+            try:
+                from apps.configuration.models import HubConfig
+                config = HubConfig.get_solo()
+                if not config.is_configured:
+                    self.stdout.write('Hub not configured, ensuring assistant module')
+                    modules_info = [{'slug': 'assistant', 'is_active': True}]
+                else:
+                    self.stdout.write('No modules to restore')
+                    return
+            except Exception:
+                self.stdout.write('No modules to restore')
+                return
 
         all_slugs = [m['slug'] for m in modules_info]
         inactive_slugs = {m['slug'] for m in modules_info if not m['is_active']}

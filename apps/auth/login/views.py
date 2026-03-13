@@ -226,13 +226,16 @@ def cloud_login(request):
 
                 if hub_jwt and hub_id:
                     hub_config = HubConfig.get_config()
+                    update_fields = ['hub_id', 'hub_jwt']
                     hub_config.hub_id = hub_id
                     hub_config.hub_jwt = hub_jwt
                     if hub_refresh_token:
                         hub_config.hub_refresh_token = hub_refresh_token
+                        update_fields.append('hub_refresh_token')
                     if public_key:
                         hub_config.cloud_public_key = public_key
-                    hub_config.save()
+                        update_fields.append('cloud_public_key')
+                    hub_config.save(update_fields=update_fields)
 
                     # Ensure roles and permissions exist with correct hub_id
                     try:
@@ -315,10 +318,9 @@ def cloud_login(request):
                     request.session['jwt_token'] = access_token
                     request.session['jwt_refresh'] = refresh_token
 
-                    # If first time (no PIN), redirect to PIN setup
-                    if first_time:
-                        request.session['pending_user_id'] = str(local_user.id)
-                        request.session['pending_user_email'] = local_user.email
+                    # Store pending user for trust_device validation
+                    request.session['pending_user_id'] = str(local_user.id)
+                    request.session['pending_user_email'] = local_user.email
 
                     # Don't set local_user_id here -- user must select
                     # profile + enter PIN on the login screen

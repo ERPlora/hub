@@ -896,7 +896,7 @@ def solutions_bulk_install(request):
         if slug not in active_types:
             active_types.append(slug)
     hub_config.selected_business_types = active_types
-    hub_config.save()
+    hub_config.save(update_fields=['selected_business_types'])
 
     from apps.core.services.module_install_service import ModuleInstallService
     result = ModuleInstallService.install_block_modules(block_slugs, hub_config)
@@ -1221,7 +1221,7 @@ def block_toggle(request, slug):
         # Deactivate: remove from list
         active_types.remove(slug)
         hub_config.selected_business_types = active_types
-        hub_config.save()
+        hub_config.save(update_fields=['selected_business_types'])
         return HttpResponse(
             json.dumps({'success': True, 'action': 'uninstalled', 'slug': slug, 'active_count': len(active_types)}),
             content_type='application/json',
@@ -1230,7 +1230,7 @@ def block_toggle(request, slug):
         # Activate: add to list + install modules + create roles
         active_types.append(slug)
         hub_config.selected_business_types = active_types
-        hub_config.save()
+        hub_config.save(update_fields=['selected_business_types'])
 
         # Install required modules for this functional unit
         from apps.core.services.module_install_service import ModuleInstallService
@@ -1381,7 +1381,7 @@ def business_type_activate(request, slug):
     if not already_active:
         active_types.append(slug)
         hub_config.selected_business_types = active_types
-        hub_config.save()
+        hub_config.save(update_fields=['selected_business_types'])
 
     # Create default roles (admin, manager, viewer) if not exist
     from apps.core.services.permission_service import PermissionService

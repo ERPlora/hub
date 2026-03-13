@@ -149,6 +149,8 @@ INSTALLED_APPS = [
     'apps.system.modules.apps.SystemModulesConfig',
     # Hub apps - Marketplace
     'apps.marketplace.apps.MarketplaceConfig',
+    # Hub apps - Setup
+    'apps.setup.apps.SetupConfig',
     # Hub apps - Public pages
     'apps.public',
 ]

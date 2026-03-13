@@ -99,6 +99,9 @@ urlpatterns = [
     # Auth routes (login, logout, etc.)
     path('', include('apps.auth.login.urls')),
 
+    # Setup wizard (initial hub configuration)
+    path('setup/', include('apps.setup.urls')),
+
     # Main UI routes (flat structure for clear active states)
     path('', include('apps.main.urls')),  # Home at /
 

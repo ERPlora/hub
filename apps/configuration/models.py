@@ -120,7 +120,7 @@ class SingletonConfigMixin:
         try:
             instance = cls.get_solo()
             setattr(instance, field_name, value)
-            instance.save()
+            instance.save(update_fields=[field_name])
             return True
         except Exception:
             return False
@@ -145,10 +145,12 @@ class SingletonConfigMixin:
         """
         try:
             instance = cls.get_solo()
+            fields = []
             for field_name, value in kwargs.items():
                 if hasattr(instance, field_name):
                     setattr(instance, field_name, value)
-            instance.save()
+                    fields.append(field_name)
+            instance.save(update_fields=fields)
             return True
         except Exception:
             return False
@@ -300,6 +302,38 @@ class HubConfig(SingletonConfigMixin, models.Model):
         verbose_name = _('Hub Configuration')
         verbose_name_plural = _('Hub Configuration')
         db_table = 'core_hubconfig'  # Keep existing table name
+
+    def save(self, *args, **kwargs):
+        """Protect hub_id from being overwritten by stale cached values.
+
+        In web deployment mode, hub_id is set authoritatively from the HUB_ID
+        env var by SyncConfig.ready(). Other code paths that do a full save()
+        (without update_fields) could overwrite hub_id with a stale value from
+        LocMemCache. This override prevents that.
+        """
+        import os
+        update_fields = kwargs.get('update_fields')
+        hub_id_env = os.environ.get('HUB_ID')
+
+        if hub_id_env and update_fields is None:
+            # Full save without update_fields — protect hub_id
+            # Re-read current hub_id from DB to avoid overwriting with stale cache
+            import uuid
+            try:
+                db_hub_id = HubConfig.objects.filter(pk=1).values_list(
+                    'hub_id', flat=True
+                ).first()
+                env_hub_id = uuid.UUID(hub_id_env)
+                if db_hub_id and str(db_hub_id) != hub_id_env:
+                    # DB has a different hub_id than env — use env (authoritative)
+                    self.hub_id = env_hub_id
+                elif db_hub_id:
+                    # DB matches env — keep it (don't use possibly stale self.hub_id)
+                    self.hub_id = db_hub_id
+            except (ValueError, Exception):
+                pass
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Hub Config (Configured: {self.is_configured})"

@@ -151,7 +151,7 @@ def index(request):
             if theme and theme in ('system', 'light', 'dark'):
                 hub_config.theme = theme
 
-            hub_config.save()
+            hub_config.save(update_fields=['language', 'timezone', 'currency', 'theme'])
 
             if theme:
                 response = toast_response('Hub settings saved')
@@ -238,7 +238,7 @@ def index(request):
         # Toggle bridge on/off (master switch)
         if action == 'toggle_bridge':
             hub_config.bridge_enabled = 'bridge_enabled' in request.POST
-            hub_config.save()
+            hub_config.save(update_fields=['bridge_enabled'])
             msg = 'Bridge enabled' if hub_config.bridge_enabled else 'Bridge disabled'
             return toast_response(msg)
 
@@ -250,7 +250,7 @@ def index(request):
                 pass
             hub_config.bridge_auto_print = 'bridge_auto_print' in request.POST
             hub_config.allow_satellite_printing = 'allow_satellite_printing' in request.POST
-            hub_config.save()
+            hub_config.save(update_fields=['bridge_port', 'bridge_auto_print', 'allow_satellite_printing'])
             return toast_response('Hardware settings saved')
 
         # Save a printer configuration (from bridge discovery)
@@ -307,7 +307,7 @@ def index(request):
             if type_code not in active_types:
                 active_types.append(type_code)
                 hub_config.selected_business_types = active_types
-                hub_config.save()
+                hub_config.save(update_fields=['selected_business_types'])
 
                 # Install blueprint: modules + roles + seed products
                 try:
@@ -331,7 +331,7 @@ def index(request):
             if type_code in active_types:
                 active_types.remove(type_code)
                 hub_config.selected_business_types = active_types
-                hub_config.save()
+                hub_config.save(update_fields=['selected_business_types'])
 
             return _business_types_partial(request, hub_config)
 
