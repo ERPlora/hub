@@ -646,6 +646,7 @@ class BlueprintService:
             if existing:
                 image_path = prod_data.get('image', '')
                 if image_path and not existing.image:
+                    print(f'[SEEDS] Retrying image for {code}: {image_path}')
                     cls._download_and_save_image(existing, image_path)
                 return False
 
@@ -696,7 +697,9 @@ class BlueprintService:
 
             filename = image_path.split('/')[-1]
             product.image.save(filename, ContentFile(resp.content), save=True)
+            print(f'[SEEDS] Image saved: {product.sku} → {filename}')
         except Exception as e:
+            print(f'[SEEDS] Image FAILED for {product.sku}: {e}')
             logger.warning('Failed to download image %s for product %s: %s', image_path, product.sku, e)
 
     @staticmethod
