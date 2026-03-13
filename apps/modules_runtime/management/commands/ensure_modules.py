@@ -125,26 +125,32 @@ class Command(BaseCommand):
         ))
 
     def _import_seeds(self):
-        """Import seed products and images for configured business types."""
+        """Import seed products and images via subprocess.
+
+        After dynamic module loading, the current process's Django app registry
+        doesn't include the new modules. Running import_seeds in a subprocess
+        ensures a fresh Django setup that recognises inventory models.
+        """
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        manage_py = str(Path(settings.BASE_DIR) / 'manage.py')
         try:
-            from apps.configuration.models import HubConfig
-            config = HubConfig.get_solo()
-
-            type_codes = config.selected_business_types or []
-            if not type_codes:
-                return
-
-            language = config.language or 'en'
-            country = (config.country_code or 'es').lower()
-
-            from apps.core.services.blueprint_service import BlueprintService
-            result = BlueprintService.import_seeds(
-                type_codes=type_codes,
-                language=language,
-                country=country,
+            result = subprocess.run(
+                [sys.executable, manage_py, 'import_seeds'],
+                cwd=str(settings.BASE_DIR),
+                timeout=300,
+                capture_output=True,
+                text=True,
             )
-            imported = result.get('imported', 0) if result else 0
-            self.stdout.write(f'Seed import: {imported} products imported')
+            if result.stdout:
+                for line in result.stdout.strip().splitlines():
+                    self.stdout.write(line)
+            if result.returncode != 0 and result.stderr:
+                self.stdout.write(self.style.WARNING(
+                    f'Seed import subprocess error: {result.stderr[:500]}'
+                ))
         except Exception as e:
             self.stdout.write(self.style.WARNING(f'Seed import failed: {e}'))
 
