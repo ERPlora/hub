@@ -314,6 +314,10 @@ VENDOR_ASSETS = [
         'path': 'css/vendor/swagger-ui.css',
     },
     {
+        'url': 'https://unpkg.com/swagger-ui-dist@5/swagger-ui.css.map',
+        'path': 'css/vendor/swagger-ui.css.map',
+    },
+    {
         'url': 'https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js',
         'path': 'js/vendor/swagger-ui-bundle.js',
     },
