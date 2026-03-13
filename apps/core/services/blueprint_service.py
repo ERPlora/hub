@@ -44,6 +44,45 @@ def _cloud_url(path):
 class BlueprintService:
     """Service for interacting with Cloud Blueprint API."""
 
+    @staticmethod
+    def _check_inventory_available():
+        """Check if inventory module is available (handles dynamic loading)."""
+        try:
+            from django.apps import apps
+            apps.get_model('inventory', 'Product')
+            return True
+        except LookupError:
+            pass
+        # Fallback: module may be loaded but not in app registry (dynamic install)
+        try:
+            import importlib
+            importlib.import_module('inventory.models')
+            return True
+        except (ImportError, Exception):
+            pass
+        logger.warning('Inventory module not installed, skipping seed import')
+        return False
+
+    @staticmethod
+    def _get_product_model():
+        """Get inventory.Product model, handling dynamic module loading."""
+        try:
+            from django.apps import apps
+            return apps.get_model('inventory', 'Product')
+        except LookupError:
+            from inventory.models import Product
+            return Product
+
+    @staticmethod
+    def _get_category_model():
+        """Get inventory.Category model, handling dynamic module loading."""
+        try:
+            from django.apps import apps
+            return apps.get_model('inventory', 'Category')
+        except LookupError:
+            from inventory.models import Category
+            return Category
+
     @classmethod
     def get_sectors(cls, language='en'):
         """GET /api/blueprints/sectors/ — returns list of business sectors."""
@@ -430,11 +469,7 @@ class BlueprintService:
         Import seed categories and products for business types.
         Idempotent: skips existing categories (by code) and products (by SKU).
         """
-        try:
-            from django.apps import apps
-            apps.get_model('inventory', 'Product')
-        except LookupError:
-            logger.warning('Inventory module not installed, skipping seed import')
+        if not cls._check_inventory_available():
             return {'imported': 0, 'skipped': 0, 'categories': 0}
 
         tax_class_mapping = cls._build_tax_class_mapping()
@@ -488,11 +523,7 @@ class BlueprintService:
         """
         import_all = product_codes == ['*']
 
-        try:
-            from django.apps import apps
-            apps.get_model('inventory', 'Product')
-        except LookupError:
-            logger.warning('Inventory module not installed, skipping selective product import')
+        if not cls._check_inventory_available():
             return {'imported': 0, 'skipped': 0, 'categories': 0}
 
         tax_class_mapping = cls._build_tax_class_mapping()
@@ -602,8 +633,7 @@ class BlueprintService:
     def _import_category(cls, cat_data, tax_class_mapping=None):
         """Import a single category, skip if code already exists. Returns (category, created)."""
         try:
-            from django.apps import apps
-            Category = apps.get_model('inventory', 'Category')
+            Category = cls._get_category_model()
 
             code = cat_data.get('code', '')
             if not code:
@@ -634,8 +664,7 @@ class BlueprintService:
     def _import_product(cls, prod_data, tax_class_mapping=None, category_map=None):
         """Import a single product. Skip if SKU already exists. Returns True if imported."""
         try:
-            from django.apps import apps
-            Product = apps.get_model('inventory', 'Product')
+            Product = cls._get_product_model()
 
             code = prod_data.get('code', '')
             if not code:
@@ -646,7 +675,7 @@ class BlueprintService:
             if existing:
                 image_path = prod_data.get('image', '')
                 if image_path and not existing.image:
-                    print(f'[SEEDS] Retrying image for {code}: {image_path}')
+                    logger.info('[SEEDS] Retrying image for %s: %s', code, image_path)
                     cls._download_and_save_image(existing, image_path)
                 return False
 
@@ -697,10 +726,9 @@ class BlueprintService:
 
             filename = image_path.split('/')[-1]
             product.image.save(filename, ContentFile(resp.content), save=True)
-            print(f'[SEEDS] Image saved: {product.sku} → {filename}')
+            logger.info('[SEEDS] Image saved: %s → %s', product.sku, filename)
         except Exception as e:
-            print(f'[SEEDS] Image FAILED for {product.sku}: {e}')
-            logger.warning('Failed to download image %s for product %s: %s', image_path, product.sku, e)
+            logger.warning('[SEEDS] Image FAILED for %s (%s): %s', product.sku, image_path, e)
 
     @staticmethod
     def _pending_seed_flag_path():
