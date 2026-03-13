@@ -238,12 +238,14 @@
 
                             <!-- Trust Device checkbox -->
                             <div class="flex items-center gap-2 mb-6">
-                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <label class="checkbox">
                                     <input type="checkbox"
                                            class="checkbox-input"
                                            x-model="trustDevice">
-                                    <span class="checkbox-box"></span>
-                                    <span class="text-sm">{% trans "Trust this device" %}</span>
+                                    <span class="checkbox-box">
+                                        {% icon "checkmark-outline" class="checkbox-mark" %}
+                                    </span>
+                                    <span class="checkbox-label">{% trans "Trust this device" %}</span>
                                 </label>
                                 <button type="button"
                                         class="bg-transparent border-none cursor-pointer p-0 opacity-50 hover:opacity-100"
