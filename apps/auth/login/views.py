@@ -330,8 +330,6 @@ def cloud_login(request):
                             'name': local_user.name,
                             'email': local_user.email,
                         },
-                        # Signal that the client should show "Trust this device?" prompt
-                        'can_trust_device': True,
                     })
                 else:
                     return JsonResponse({'success': False, 'error': 'Failed to get user info'})

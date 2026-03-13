@@ -2,7 +2,11 @@
 Main Settings Views
 """
 import json
+import logging
+import os
+import shutil
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.conf import settings as django_settings
@@ -306,6 +310,12 @@ def index(request):
     # Get configured printers
     printers = PrinterConfig.get_active()
 
+    # Business types
+    active_business_types, available_business_types = _get_business_types_context(hub_config)
+
+    # System metrics
+    system_metrics = _get_system_metrics()
+
     return {
         'current_section': 'settings',
         'page_title': 'Settings',
@@ -315,6 +325,9 @@ def index(request):
         'backup_config': backup_config,
         'scheduler_status': scheduler_status,
         'tax_classes': tax_classes,
+        'active_business_types': active_business_types,
+        'available_business_types': available_business_types,
+        'system_metrics': system_metrics,
         'language_choices': django_settings.LANGUAGES,
         'system_language_choices': django_settings.LANGUAGES,
         'timezone_choices': get_sorted_timezones(),
@@ -330,3 +343,115 @@ def index(request):
             ('cash_session_report', 'Cash Session Report'),
         ],
     }
+
+
+def _get_system_metrics():
+    """Collect system resource metrics (RAM, disk) for the Hub Information section."""
+    metrics = {}
+
+    # ── Memory ──
+    # Try cgroups v2 first (container environment: App Runner, Docker)
+    cgroup_current = Path('/sys/fs/cgroup/memory.current')
+    cgroup_max = Path('/sys/fs/cgroup/memory.max')
+    if cgroup_current.exists():
+        try:
+            used = int(cgroup_current.read_text().strip())
+            metrics['memory_used_mb'] = round(used / (1024 * 1024))
+            if cgroup_max.exists():
+                max_val = cgroup_max.read_text().strip()
+                if max_val != 'max':
+                    metrics['memory_limit_mb'] = round(int(max_val) / (1024 * 1024))
+        except (ValueError, OSError):
+            pass
+    else:
+        # Fallback: /proc/meminfo (Linux) or resource module (macOS)
+        meminfo = Path('/proc/meminfo')
+        if meminfo.exists():
+            try:
+                info = {}
+                for line in meminfo.read_text().splitlines():
+                    parts = line.split(':')
+                    if len(parts) == 2:
+                        key = parts[0].strip()
+                        val = parts[1].strip().split()[0]
+                        info[key] = int(val)
+                total_kb = info.get('MemTotal', 0)
+                available_kb = info.get('MemAvailable', 0)
+                if total_kb:
+                    metrics['memory_used_mb'] = round((total_kb - available_kb) / 1024)
+                    metrics['memory_limit_mb'] = round(total_kb / 1024)
+            except (ValueError, OSError):
+                pass
+        else:
+            try:
+                import resource
+                usage = resource.getrusage(resource.RUSAGE_SELF)
+                # ru_maxrss is in bytes on macOS, KB on Linux
+                import platform
+                if platform.system() == 'Darwin':
+                    metrics['memory_used_mb'] = round(usage.ru_maxrss / (1024 * 1024))
+                else:
+                    metrics['memory_used_mb'] = round(usage.ru_maxrss / 1024)
+            except Exception:
+                pass
+
+    # ── Disk ──
+    try:
+        disk = shutil.disk_usage('/')
+        metrics['disk_used_gb'] = round(disk.used / (1024 ** 3), 1)
+        metrics['disk_total_gb'] = round(disk.total / (1024 ** 3), 1)
+    except OSError:
+        pass
+
+    # ── Percentages ──
+    if 'memory_used_mb' in metrics and 'memory_limit_mb' in metrics and metrics['memory_limit_mb'] > 0:
+        metrics['memory_percent'] = round(metrics['memory_used_mb'] / metrics['memory_limit_mb'] * 100)
+    if 'disk_used_gb' in metrics and 'disk_total_gb' in metrics and metrics['disk_total_gb'] > 0:
+        metrics['disk_percent'] = round(metrics['disk_used_gb'] / metrics['disk_total_gb'] * 100)
+
+    return metrics
+
+
+def _fetch_all_business_types():
+    """Fetch all business types from Cloud blueprints API (cached)."""
+    from apps.marketplace.views import _fetch_business_types_for_filters
+    return _fetch_business_types_for_filters()
+
+
+def _get_business_types_context(hub_config):
+    """Build active and available business types for Settings context.
+
+    Returns:
+        tuple: (active_business_types, available_business_types)
+    """
+    selected_codes = hub_config.selected_business_types or []
+    all_types = _fetch_all_business_types()
+    types_by_code = {t.get('code', ''): t for t in all_types}
+
+    active = []
+    for code in selected_codes:
+        t = types_by_code.get(code)
+        if t:
+            active.append({'code': code, 'name': t.get('name', code), 'icon': t.get('icon', ''), 'color': t.get('color', '')})
+
+    selected_set = set(selected_codes)
+    available = [
+        {'code': t.get('code', ''), 'name': t.get('name', ''), 'icon': t.get('icon', ''), 'color': t.get('color', ''), 'description': t.get('description', '')}
+        for t in all_types
+        if t.get('code') and t.get('code') not in selected_set
+    ]
+
+    return active, available
+
+
+def _business_types_partial(request, hub_config):
+    """Render the business types section partial after add/remove."""
+    active, available = _get_business_types_context(hub_config)
+    response = render(request, 'main/settings/partials/business_types_section.html', {
+        'active_business_types': active,
+        'available_business_types': available,
+    })
+    response['HX-Trigger'] = json.dumps({
+        'showMessage': {'message': 'Business types updated', 'type': 'success'}
+    })
+    return response
