@@ -42,7 +42,7 @@ class LanguageMiddleware:
                 os_lang = detect_os_language()
                 if os_lang != hub_config.os_language:
                     hub_config.os_language = os_lang
-                    hub_config.save()
+                    hub_config.save(update_fields=['os_language'])
 
             language = hub_config.os_language
 

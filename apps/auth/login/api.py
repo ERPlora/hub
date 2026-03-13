@@ -222,7 +222,7 @@ class CloudLoginView(APIView):
                             hub_data = hub_response.json()
                             hub_config.hub_id = hub_data.get('hub_id')
                             hub_config.cloud_api_token = hub_data.get('cloud_api_token')
-                            hub_config.save()
+                            hub_config.save(update_fields=['hub_id', 'cloud_api_token'])
 
                     hub_config = HubConfig.get_config()
                     is_first_user = LocalUser.objects.count() == 0

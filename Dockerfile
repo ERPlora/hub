@@ -52,14 +52,14 @@ RUN uv pip install --system --no-cache .
 # Collect static files during build (don't change between Hubs)
 # Use web settings with dummy values (only needed for settings import, not collectstatic)
 # Real values come from environment at runtime
-ENV DJANGO_SETTINGS_MODULE=config.settings.web \
+RUN DJANGO_SETTINGS_MODULE=config.settings.web \
     HUB_ID=00000000-0000-0000-0000-000000000000 \
     HUB_NAME=build \
     DATABASE_URL=postgres://build:build@localhost:5432/build \
     AWS_STORAGE_BUCKET_NAME=dummy \
     AWS_S3_REGION_NAME=eu-west-1 \
-    AWS_LOCATION=dummy
-RUN python manage.py collectstatic --noinput --clear
+    AWS_LOCATION=dummy \
+    python manage.py collectstatic --noinput --clear
 
 # =============================================================================
 # ENVIRONMENT VARIABLES
@@ -69,6 +69,7 @@ RUN python manage.py collectstatic --noinput --clear
 # App Runner env vars or docker-compose.yaml
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    DJANGO_SETTINGS_MODULE=config.settings.web \
     DEBUG=false
 
 # =============================================================================
@@ -82,5 +83,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # =============================================================================
 # DEFAULT COMMAND
 # =============================================================================
-# Runs migrations then starts gunicorn on port 8000 (required by App Runner)
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120 --pid /run/gunicorn.pid"]
+# Runs migrations, restores modules, then starts gunicorn on port 8000 (required by App Runner)
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py createcachetable --database default 2>/dev/null; python manage.py ensure_modules && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120 --pid /run/gunicorn.pid"]

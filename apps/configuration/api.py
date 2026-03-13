@@ -247,7 +247,7 @@ class ThemeToggleView(APIView):
     def post(self, request):
         hub_config = HubConfig.get_config()
         hub_config.dark_mode = not hub_config.dark_mode
-        hub_config.save()
+        hub_config.save(update_fields=['dark_mode'])
 
         return Response({
             'success': True,
@@ -282,7 +282,7 @@ class LanguageChangeView(APIView):
         # Update Hub config
         hub_config = HubConfig.get_config()
         hub_config.os_language = language
-        hub_config.save()
+        hub_config.save(update_fields=['os_language'])
 
         # Update session
         activate(language)

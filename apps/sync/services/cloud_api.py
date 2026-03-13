@@ -85,10 +85,12 @@ class CloudAPIService:
                 if new_access_token:
                     # Update stored tokens
                     config = HubConfig.get_solo()
+                    update_fields = ['hub_jwt']
                     config.hub_jwt = new_access_token
                     if new_refresh_token:
                         config.hub_refresh_token = new_refresh_token
-                    config.save()
+                        update_fields.append('hub_refresh_token')
+                    config.save(update_fields=update_fields)
 
                     # Update instance variables
                     self.hub_jwt = new_access_token

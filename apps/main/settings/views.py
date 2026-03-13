@@ -3,19 +3,19 @@ Main Settings Views
 """
 import json
 import logging
-import os
-import shutil
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.conf import settings as django_settings
 from django.utils import translation
+from django.utils.translation import gettext_lazy as _
 from zoneinfo import available_timezones
 from apps.core.htmx import htmx_view
 from apps.accounts.decorators import login_required, admin_required
 from apps.accounts.models import LocalUser
 from apps.configuration.models import HubConfig, StoreConfig, BackupConfig, TaxClass, PrinterConfig
+
+logger = logging.getLogger(__name__)
 
 
 # Common timezones grouped by region (most used first)
@@ -151,7 +151,7 @@ def index(request):
             if theme and theme in ('system', 'light', 'dark'):
                 hub_config.theme = theme
 
-            hub_config.save()
+            hub_config.save(update_fields=['language', 'timezone', 'currency', 'theme'])
 
             if theme:
                 response = toast_response('Hub settings saved')
@@ -238,7 +238,7 @@ def index(request):
         # Toggle bridge on/off (master switch)
         if action == 'toggle_bridge':
             hub_config.bridge_enabled = 'bridge_enabled' in request.POST
-            hub_config.save()
+            hub_config.save(update_fields=['bridge_enabled'])
             msg = 'Bridge enabled' if hub_config.bridge_enabled else 'Bridge disabled'
             return toast_response(msg)
 
@@ -250,7 +250,7 @@ def index(request):
                 pass
             hub_config.bridge_auto_print = 'bridge_auto_print' in request.POST
             hub_config.allow_satellite_printing = 'allow_satellite_printing' in request.POST
-            hub_config.save()
+            hub_config.save(update_fields=['bridge_port', 'bridge_auto_print', 'allow_satellite_printing'])
             return toast_response('Hardware settings saved')
 
         # Save a printer configuration (from bridge discovery)
@@ -297,6 +297,44 @@ def index(request):
             except PrinterConfig.DoesNotExist:
                 return toast_response('Printer not found', 'error', status=404)
 
+        # Add a business type
+        if action == 'add_business_type':
+            type_code = request.POST.get('type_code', '').strip()
+            if not type_code:
+                return toast_response('Business type code required', 'error', status=400)
+
+            active_types = list(hub_config.selected_business_types or [])
+            if type_code not in active_types:
+                active_types.append(type_code)
+                hub_config.selected_business_types = active_types
+                hub_config.save(update_fields=['selected_business_types'])
+
+                # Install blueprint: modules + roles + seed products
+                try:
+                    from apps.core.services.permission_service import PermissionService
+                    from apps.core.services.blueprint_service import BlueprintService
+                    PermissionService.create_default_roles(str(hub_config.hub_id))
+                    BlueprintService.install_blueprint(hub_config, active_types)
+                    PermissionService.sync_all_module_permissions(str(hub_config.hub_id))
+                except Exception as e:
+                    logger.warning('[settings] Blueprint install failed for %s: %s', type_code, e)
+
+            return _business_types_partial(request, hub_config)
+
+        # Remove a business type
+        if action == 'remove_business_type':
+            type_code = request.POST.get('type_code', '').strip()
+            if not type_code:
+                return toast_response('Business type code required', 'error', status=400)
+
+            active_types = list(hub_config.selected_business_types or [])
+            if type_code in active_types:
+                active_types.remove(type_code)
+                hub_config.selected_business_types = active_types
+                hub_config.save(update_fields=['selected_business_types'])
+
+            return _business_types_partial(request, hub_config)
+
         return toast_response('Settings saved')
 
     # Get backup config and scheduler status
@@ -313,9 +351,6 @@ def index(request):
     # Business types
     active_business_types, available_business_types = _get_business_types_context(hub_config)
 
-    # System metrics
-    system_metrics = _get_system_metrics()
-
     return {
         'current_section': 'settings',
         'page_title': 'Settings',
@@ -327,7 +362,6 @@ def index(request):
         'tax_classes': tax_classes,
         'active_business_types': active_business_types,
         'available_business_types': available_business_types,
-        'system_metrics': system_metrics,
         'language_choices': django_settings.LANGUAGES,
         'system_language_choices': django_settings.LANGUAGES,
         'timezone_choices': get_sorted_timezones(),
@@ -343,73 +377,6 @@ def index(request):
             ('cash_session_report', 'Cash Session Report'),
         ],
     }
-
-
-def _get_system_metrics():
-    """Collect system resource metrics (RAM, disk) for the Hub Information section."""
-    metrics = {}
-
-    # ── Memory ──
-    # Try cgroups v2 first (container environment: App Runner, Docker)
-    cgroup_current = Path('/sys/fs/cgroup/memory.current')
-    cgroup_max = Path('/sys/fs/cgroup/memory.max')
-    if cgroup_current.exists():
-        try:
-            used = int(cgroup_current.read_text().strip())
-            metrics['memory_used_mb'] = round(used / (1024 * 1024))
-            if cgroup_max.exists():
-                max_val = cgroup_max.read_text().strip()
-                if max_val != 'max':
-                    metrics['memory_limit_mb'] = round(int(max_val) / (1024 * 1024))
-        except (ValueError, OSError):
-            pass
-    else:
-        # Fallback: /proc/meminfo (Linux) or resource module (macOS)
-        meminfo = Path('/proc/meminfo')
-        if meminfo.exists():
-            try:
-                info = {}
-                for line in meminfo.read_text().splitlines():
-                    parts = line.split(':')
-                    if len(parts) == 2:
-                        key = parts[0].strip()
-                        val = parts[1].strip().split()[0]
-                        info[key] = int(val)
-                total_kb = info.get('MemTotal', 0)
-                available_kb = info.get('MemAvailable', 0)
-                if total_kb:
-                    metrics['memory_used_mb'] = round((total_kb - available_kb) / 1024)
-                    metrics['memory_limit_mb'] = round(total_kb / 1024)
-            except (ValueError, OSError):
-                pass
-        else:
-            try:
-                import resource
-                usage = resource.getrusage(resource.RUSAGE_SELF)
-                # ru_maxrss is in bytes on macOS, KB on Linux
-                import platform
-                if platform.system() == 'Darwin':
-                    metrics['memory_used_mb'] = round(usage.ru_maxrss / (1024 * 1024))
-                else:
-                    metrics['memory_used_mb'] = round(usage.ru_maxrss / 1024)
-            except Exception:
-                pass
-
-    # ── Disk ──
-    try:
-        disk = shutil.disk_usage('/')
-        metrics['disk_used_gb'] = round(disk.used / (1024 ** 3), 1)
-        metrics['disk_total_gb'] = round(disk.total / (1024 ** 3), 1)
-    except OSError:
-        pass
-
-    # ── Percentages ──
-    if 'memory_used_mb' in metrics and 'memory_limit_mb' in metrics and metrics['memory_limit_mb'] > 0:
-        metrics['memory_percent'] = round(metrics['memory_used_mb'] / metrics['memory_limit_mb'] * 100)
-    if 'disk_used_gb' in metrics and 'disk_total_gb' in metrics and metrics['disk_total_gb'] > 0:
-        metrics['disk_percent'] = round(metrics['disk_used_gb'] / metrics['disk_total_gb'] * 100)
-
-    return metrics
 
 
 def _fetch_all_business_types():
