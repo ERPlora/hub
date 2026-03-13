@@ -7,7 +7,7 @@ from apps.configuration.models import HubConfig
 class StoreConfigCheckMiddleware:
     """
     Middleware to check if hub is configured after login.
-    If not configured, redirects to the setup wizard.
+    If not configured, redirects to the AI assistant for setup.
     """
 
     def __init__(self, get_response):
@@ -22,8 +22,7 @@ class StoreConfigCheckMiddleware:
             reverse('auth:trust_device'),
             reverse('auth:verify_device_trust'),
             reverse('auth:revoke_device'),
-            '/setup/',  # Setup wizard
-            '/m/assistant/',  # AI assistant
+            '/m/assistant/',  # AI assistant (handles setup)
             '/api/',  # API endpoints
             '/static/',  # Static files
             '/media/',  # Media files
@@ -42,7 +41,7 @@ class StoreConfigCheckMiddleware:
                     hub_config = HubConfig.get_config()
 
                     if not hub_config.is_configured:
-                        return redirect('/setup/')
+                        return redirect('/m/assistant/')
 
                     # Mark as checked for this session
                     request.session['store_config_checked'] = True
