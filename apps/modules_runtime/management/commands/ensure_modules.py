@@ -32,13 +32,15 @@ class Command(BaseCommand):
             self.stdout.write('MODULES_DIR does not exist, skipping')
             return
 
-        # Fast path: if modules already present, nothing to do
+        # Fast path: if modules already present, just ensure seeds
         existing = [
             d for d in modules_dir.iterdir()
             if d.is_dir() and not d.name.startswith('.')
         ]
         if len(existing) > 1:
             self.stdout.write(f'{len(existing)} modules already present, skipping restore')
+            # Still import seeds (images lost on ephemeral filesystem)
+            self._import_seeds()
             return
 
         self.stdout.write('Modules directory is empty, restoring...')
