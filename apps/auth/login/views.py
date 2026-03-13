@@ -6,6 +6,7 @@ Supports trusted/untrusted device system for AWS deployment.
 """
 import json
 import logging
+import os
 import requests
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
@@ -206,10 +207,15 @@ def cloud_login(request):
 
         try:
             # Send X-Client-Type header so Cloud registers Hub and returns hub_jwt
+            # In web mode, Hub already has credentials from env — don't re-register
+            deployment_mode = getattr(django_settings, 'DEPLOYMENT_MODE', 'local')
+            headers = {}
+            if deployment_mode != 'web':
+                headers['X-Client-Type'] = f'hub-{deployment_mode or "desktop"}'
             response = requests.post(
                 f"{cloud_api_url}/api/auth/login/",
                 json={'email': email, 'password': password},
-                headers={'X-Client-Type': 'hub-desktop'},
+                headers=headers,
                 timeout=10
             )
 
@@ -226,8 +232,12 @@ def cloud_login(request):
 
                 if hub_jwt and hub_id:
                     hub_config = HubConfig.get_config()
-                    update_fields = ['hub_id', 'hub_jwt']
-                    hub_config.hub_id = hub_id
+                    update_fields = ['hub_jwt']
+                    # Only set hub_id from Cloud if HUB_ID env is not set
+                    # (env var is authoritative in web deployment mode)
+                    if not os.environ.get('HUB_ID'):
+                        hub_config.hub_id = hub_id
+                        update_fields.append('hub_id')
                     hub_config.hub_jwt = hub_jwt
                     if hub_refresh_token:
                         hub_config.hub_refresh_token = hub_refresh_token
