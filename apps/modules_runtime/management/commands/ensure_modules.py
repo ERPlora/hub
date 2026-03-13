@@ -137,20 +137,16 @@ class Command(BaseCommand):
 
         manage_py = str(Path(settings.BASE_DIR) / 'manage.py')
         try:
-            result = subprocess.run(
+            # Don't capture output — let it flow to stdout/stderr for CloudWatch
+            subprocess.check_call(
                 [sys.executable, manage_py, 'import_seeds'],
                 cwd=str(settings.BASE_DIR),
                 timeout=300,
-                capture_output=True,
-                text=True,
             )
-            if result.stdout:
-                for line in result.stdout.strip().splitlines():
-                    self.stdout.write(line)
-            if result.returncode != 0 and result.stderr:
-                self.stdout.write(self.style.WARNING(
-                    f'Seed import subprocess error: {result.stderr[:500]}'
-                ))
+        except subprocess.CalledProcessError as e:
+            self.stdout.write(self.style.WARNING(
+                f'Seed import subprocess exited with code {e.returncode}'
+            ))
         except Exception as e:
             self.stdout.write(self.style.WARNING(f'Seed import failed: {e}'))
 
