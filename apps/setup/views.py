@@ -62,10 +62,6 @@ def _set_setup_data(request, data):
 @login_required
 def index(request):
     """Detect current step and redirect."""
-    hub_config = HubConfig.get_config()
-    if hub_config.is_configured:
-        return redirect('main:index')
-
     data = _get_setup_data(request)
 
     # Determine which step to go to
