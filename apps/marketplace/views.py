@@ -1402,7 +1402,7 @@ def business_type_activate(request, slug):
         'modules_installed': result.get('modules_installed', 0),
         'roles_created': result.get('roles_created', 0),
         'seeds_imported': result.get('seeds_imported', 0),
-        'requires_restart': result.get('modules_installed', 0) > 0,
+        'requires_restart': result.get('restart_scheduled', False),
     }), content_type='application/json')
 
 
