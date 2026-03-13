@@ -177,6 +177,11 @@ CSRF_TRUSTED_ORIGINS = [
     f'https://*.{PARENT_DOMAIN}',
 ]
 
+# Support custom domain (set via App Runner env var when user configures one)
+CUSTOM_DOMAIN = config('CUSTOM_DOMAIN', default='').strip()
+if CUSTOM_DOMAIN:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{CUSTOM_DOMAIN}')
+
 # -----------------------------------------------------------------------------
 # CORS - Allow cross-origin requests within domain family
 # -----------------------------------------------------------------------------
