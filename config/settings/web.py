@@ -69,7 +69,7 @@ AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
 AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='erplora')
 AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='eu-west-1')
 AWS_LOCATION = config('AWS_LOCATION', default=f'hubs/{HUB_ID}')  # Shared per org (orgs/{org_prefix})
-AWS_DEFAULT_ACL = 'public-read'
+AWS_DEFAULT_ACL = None  # Bucket uses ownership-enforced ACLs
 AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
 AWS_S3_FILE_OVERWRITE = False
 AWS_QUERYSTRING_AUTH = False
