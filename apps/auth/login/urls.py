@@ -8,6 +8,7 @@ urlpatterns = [
     path('login/', views.login, name='login'),
     path('logout/', views.logout, name='logout'),
     path('verify-pin/', views.verify_pin, name='verify_pin'),
+    path('get-employees/', views.get_employees, name='get_employees'),
     path('cloud-login/', views.cloud_login, name='cloud_login'),
     path('setup-pin/', views.setup_pin, name='setup_pin'),
     # Device trust (AWS auth)

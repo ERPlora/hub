@@ -32,6 +32,7 @@ class JWTMiddleware:
     # Paths that use prefix matching (any path starting with these)
     EXEMPT_PREFIXES = [
         '/verify-pin/',
+        '/get-employees/',
         '/cloud-login/',
         '/setup-pin/',
         '/verify-device-trust/',

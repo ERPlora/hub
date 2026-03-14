@@ -97,6 +97,17 @@ def index(request):
 
             return toast_response('Store settings saved')
 
+        # Handle business hours form
+        if action == 'update_business_hours':
+            store_config.business_hours_enabled = 'business_hours_enabled' in request.POST
+            hours_json = request.POST.get('business_hours_json', '{}')
+            try:
+                store_config.business_hours = json.loads(hours_json)
+            except (json.JSONDecodeError, TypeError):
+                store_config.business_hours = {}
+            store_config.save(update_fields=['business_hours_enabled', 'business_hours'])
+            return toast_response('Business hours saved')
+
         # Handle user preferences form
         if action == 'update_user':
             language = request.POST.get('language')

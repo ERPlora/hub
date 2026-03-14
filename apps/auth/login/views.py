@@ -38,14 +38,56 @@ def login(request):
     """
     Login page - supports both local PIN login and Cloud login.
     Extends base.html directly (no dashboard layout).
-    """
-    local_users = LocalUser.objects.filter(is_active=True).order_by('name')
 
-    local_users_data = [
+    Employee data is NOT sent on page load — it is fetched via AJAX
+    only after device trust is verified or Cloud SSO completes.
+    """
+    context = {
+        'local_users_json': '[]',
+    }
+
+    return render(request, 'auth/login/pages/index.html', context)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def get_employees(request):
+    """
+    Return employee list as JSON for the login page.
+
+    Only returns data if the device is trusted (valid device_token)
+    or the user has an active Cloud session (jwt_token in session).
+    """
+    try:
+        data = json.loads(request.body)
+        device_token = data.get('device_token')
+    except (json.JSONDecodeError, TypeError):
+        device_token = None
+
+    has_cloud_session = bool(request.session.get('jwt_token'))
+
+    # Verify device trust if token provided
+    device_trusted = False
+    trusted_user_ids = []
+    if device_token:
+        devices = TrustedDevice.objects.filter(
+            device_token=device_token,
+            is_revoked=False,
+        ).select_related('user')
+        valid_devices = [d for d in devices if d.is_valid() and d.user.is_active]
+        if valid_devices:
+            device_trusted = True
+            trusted_user_ids = [str(d.user.id) for d in valid_devices]
+
+    # Only return employees if authorized
+    if not device_trusted and not has_cloud_session:
+        return JsonResponse({'authorized': False, 'employees': []})
+
+    local_users = LocalUser.objects.filter(is_active=True).order_by('name')
+    employees = [
         {
             'id': str(user.id),
             'name': user.name,
-            'email': user.email,
             'initials': user.get_initials(),
             'role': user.role.capitalize(),
             'roleColor': user.get_role_color(),
@@ -53,11 +95,11 @@ def login(request):
         for user in local_users
     ]
 
-    context = {
-        'local_users_json': json.dumps(local_users_data),
-    }
-
-    return render(request, 'auth/login/pages/index.html', context)
+    return JsonResponse({
+        'authorized': True,
+        'employees': employees,
+        'trusted_user_ids': trusted_user_ids,
+    })
 
 
 @csrf_exempt
@@ -129,28 +171,38 @@ def verify_pin(request):
             })
 
         # Verify device trust for Cloud users
+        # Skip trust check if user just completed Cloud SSO (jwt_token in session)
+        has_cloud_session = bool(request.session.get('jwt_token'))
         trusted_device = None
-        if user.is_cloud_user and device_token:
-            trusted_device = TrustedDevice.objects.filter(
-                device_token=device_token,
-                user=user,
-                is_revoked=False,
-            ).first()
 
-            if not trusted_device or not trusted_device.is_valid():
+        if user.is_cloud_user and not has_cloud_session:
+            if device_token:
+                trusted_device = TrustedDevice.objects.filter(
+                    device_token=device_token,
+                    user=user,
+                    is_revoked=False,
+                ).first()
+
+                if not trusted_device or not trusted_device.is_valid():
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Device not trusted. Please log in with email and password.',
+                        'device_untrusted': True,
+                    })
+            else:
+                # Cloud user on untrusted device -- must use Cloud SSO
                 return JsonResponse({
                     'success': False,
                     'error': 'Device not trusted. Please log in with email and password.',
                     'device_untrusted': True,
                 })
-
-        elif user.is_cloud_user and not device_token:
-            # Cloud user on untrusted device -- must use Cloud SSO
-            return JsonResponse({
-                'success': False,
-                'error': 'Device not trusted. Please log in with email and password.',
-                'device_untrusted': True,
-            })
+        elif user.is_cloud_user and has_cloud_session and device_token:
+            # Already authenticated via Cloud SSO, just refresh device trust if exists
+            trusted_device = TrustedDevice.objects.filter(
+                device_token=device_token,
+                user=user,
+                is_revoked=False,
+            ).first()
 
         # Local-only employees (no cloud_user_id) can always use PIN
         # (they have no Cloud account to authenticate with)

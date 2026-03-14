@@ -35,7 +35,8 @@ class HeartbeatService:
         service.stop()
     """
 
-    DEFAULT_HEARTBEAT_INTERVAL = 120  # seconds
+    DEFAULT_HEARTBEAT_INTERVAL = 120  # seconds (outside business hours)
+    BUSINESS_HOURS_HEARTBEAT_INTERVAL = 30  # seconds (during business hours — keeps App Runner warm)
     DEFAULT_COMMAND_POLL_INTERVAL = 300  # 5 minutes
 
     def __init__(
@@ -141,6 +142,20 @@ class HeartbeatService:
 
         logger.info("[HEARTBEAT] Service stopped")
 
+    def _is_business_hours(self):
+        """Check if we're within configured business hours."""
+        try:
+            from apps.configuration.models import StoreConfig
+            return StoreConfig.get_solo().is_within_business_hours()
+        except Exception:
+            return False
+
+    def _get_current_heartbeat_interval(self):
+        """Return shorter interval during business hours to keep App Runner warm."""
+        if self._is_business_hours():
+            return self.BUSINESS_HOURS_HEARTBEAT_INTERVAL
+        return self.heartbeat_interval
+
     def _heartbeat_loop(self):
         """Heartbeat thread main loop."""
         while self._running:
@@ -149,8 +164,9 @@ class HeartbeatService:
             except Exception as e:
                 logger.error(f"[HEARTBEAT] Error in heartbeat loop: {str(e)}")
 
-            # Sleep in small intervals to allow quick shutdown
-            for _ in range(self.heartbeat_interval):
+            # Use shorter interval during business hours
+            interval = self._get_current_heartbeat_interval()
+            for _ in range(interval):
                 if not self._running:
                     break
                 time.sleep(1)
