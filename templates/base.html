@@ -402,26 +402,28 @@
 
         // iOS detection
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const isIOSSafari = isIOS && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|OPiOS|EdgiOS/.test(navigator.userAgent);
+        const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator.standalone === true);
 
         // Check if app is already installed (standalone mode)
-        if (window.matchMedia('(display-mode: standalone)').matches || (isIOS && window.navigator.standalone)) {
+        if (isInStandaloneMode) {
             pwaInstalled = true;
         }
+
+        console.log('[PWA] isIOS:', isIOS, '| standalone:', isInStandaloneMode, '| installed:', pwaInstalled, '| UA:', navigator.userAgent);
 
         // Listen for the beforeinstallprompt event (Android/Chrome only)
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
             document.dispatchEvent(new CustomEvent('pwa-installable'));
-            console.log('[PWA] Install prompt available');
+            console.log('[PWA] Install prompt available (Android/Chrome)');
         });
 
-        // On iOS Safari, show install button after a short delay (no beforeinstallprompt)
-        if (isIOSSafari && !pwaInstalled) {
+        // On iOS (any browser), show install button — it will show Safari instructions
+        if (isIOS && !pwaInstalled) {
             window.addEventListener('load', () => {
                 document.dispatchEvent(new CustomEvent('pwa-installable'));
-                console.log('[PWA] iOS Safari detected — showing install instructions');
+                console.log('[PWA] iOS detected — install button enabled');
             });
         }
 
@@ -456,14 +458,14 @@
         // Check if PWA can be installed
         function canInstallPWA() {
             if (pwaInstalled) return false;
-            // On iOS Safari, always show install button
-            if (isIOSSafari) return true;
+            // On iOS, always show install button (will show instructions)
+            if (isIOS) return true;
             return deferredPrompt !== null;
         }
 
         // Check if PWA is installed
         function isPWAInstalled() {
-            return pwaInstalled || window.matchMedia('(display-mode: standalone)').matches || (isIOS && window.navigator.standalone);
+            return pwaInstalled || isInStandaloneMode;
         }
     </script>
     <!-- Auto dark mode detection (runs before body renders to prevent flash) -->
