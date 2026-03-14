@@ -1184,6 +1184,10 @@ def install_from_marketplace(request):
             load_single=result.module_id, run_migrations=True
         )
 
+        # Invalidate marketplace installed modules cache
+        from django.core.cache import cache
+        cache.delete('mp:installed_ids')
+
         # Track pending restart in session
         request.session.setdefault('modules_pending_restart', [])
         if result.module_id not in request.session['modules_pending_restart']:

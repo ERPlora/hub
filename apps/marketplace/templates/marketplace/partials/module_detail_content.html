@@ -84,7 +84,20 @@
                         {% endif %}
 
                         <div class="flex flex-col gap-2">
-                            {% if is_installed %}
+                            {% if is_installed and has_update %}
+                            <button type="button"
+                                    class="btn btn-lg color-warning"
+                                    data-action="update-module"
+                                    data-module-slug="{{ module.slug }}"
+                                    data-module-dir="{{ module.module_id }}"
+                                    data-download-url="{{ module.download_url|default:'' }}">
+                                {% icon "refresh-outline" %}
+                                <span>{% trans "Update" %}</span>
+                            </button>
+                            <span class="text-xs text-base-content/60 text-center">
+                                v{{ installed_version }} &rarr; v{{ module.version }}
+                            </span>
+                            {% elif is_installed %}
                             <button type="button" class="btn btn-lg" disabled>
                                 {% icon "checkmark-circle-outline" %}
                                 <span>{% trans "Installed" %}</span>
@@ -257,16 +270,19 @@ document.addEventListener('click', function(e) {
     e.stopPropagation();
 
     if (action === 'install-module') {
-        downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir);
+        downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir, false);
+    } else if (action === 'update-module') {
+        downloadAndInstall(button.dataset.moduleSlug, button.dataset.downloadUrl, button, button.dataset.moduleDir, true);
     }
 });
 
-// Download and install module
-async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir) {
+// Download and install module (force=true for updates)
+async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir, force) {
     if (button) setButtonLoading(button, true);
     try {
         const payload = { module_slug: moduleSlug, download_url: downloadUrl };
         if (moduleDir) payload.module_id = moduleDir;
+        if (force) payload.force = true;
         const response = await fetch('{% url "mymodules:api_install" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
@@ -282,7 +298,10 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir) {
         }
 
         if (data.success) {
-            Toast.success('{% trans "Module installed! A server restart is needed to load it." %}');
+            var msg = force
+                ? '{% trans "Module updated! A server restart is needed to load the new version." %}'
+                : '{% trans "Module installed! A server restart is needed to load it." %}';
+            Toast.success(msg);
             markAsInstalled(button);
         } else {
             Toast.error(data.error || '{% trans "Error installing module" %}');

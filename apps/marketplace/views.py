@@ -110,6 +110,25 @@ def _invalidate_installed_cache():
     cache.delete(_CK_INSTALLED_IDS)
 
 
+def _get_installed_module_version(module_id):
+    """Read MODULE_VERSION from an installed module's module.py. Returns None if not found."""
+    modules_dir = Path(django_settings.MODULES_DIR)
+    module_py = modules_dir / module_id / 'module.py'
+    if not module_py.exists():
+        # Check disabled module
+        module_py = modules_dir / f"_{module_id}" / 'module.py'
+    if not module_py.exists():
+        return None
+    try:
+        for line in module_py.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            if line.startswith('MODULE_VERSION'):
+                return line.split('=', 1)[1].strip().strip("'\"")
+    except Exception:
+        pass
+    return None
+
+
 # Store type configurations
 STORE_TYPES = {
     'modules': {
@@ -797,6 +816,16 @@ def module_detail(request, slug):
         # Check if installed (compare both slug and module_id)
         is_installed = slug in installed_module_ids or module.get('module_id', '') in installed_module_ids
 
+        # Check if update available (compare local version vs Cloud version)
+        has_update = False
+        installed_version = None
+        cloud_version = module.get('version', '')
+        if is_installed:
+            mod_id = module.get('module_id', '') or slug
+            installed_version = _get_installed_module_version(mod_id)
+            if installed_version and cloud_version and installed_version != cloud_version:
+                has_update = True
+
         # Check ownership (from API response or via check_ownership endpoint)
         is_owned = module.get('is_owned', False)
         if not is_owned:
@@ -830,6 +859,8 @@ def module_detail(request, slug):
             'page_title': module.get('name', 'Module Details'),
             'module': module,
             'is_installed': is_installed,
+            'has_update': has_update,
+            'installed_version': installed_version,
             'is_owned': is_owned,
             'is_free': is_free,
             'related_modules': related_modules,
