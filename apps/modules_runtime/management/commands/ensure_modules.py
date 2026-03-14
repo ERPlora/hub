@@ -32,13 +32,14 @@ class Command(BaseCommand):
             self.stdout.write('MODULES_DIR does not exist, skipping')
             return
 
-        # Fast path: if modules already present, just ensure seeds
+        # Fast path: if modules already present, check for updates then ensure seeds
         existing = [
             d for d in modules_dir.iterdir()
             if d.is_dir() and not d.name.startswith('.')
         ]
         if len(existing) > 1:
-            self.stdout.write(f'{len(existing)} modules already present, skipping restore')
+            self.stdout.write(f'{len(existing)} modules already present, checking for updates...')
+            self._check_and_update_modules(modules_dir)
             # Still import seeds (images lost on ephemeral filesystem)
             self._import_seeds()
             return
@@ -124,6 +125,55 @@ class Command(BaseCommand):
             f'Module restore complete: {result.installed} installed, {len(result.errors)} errors'
         ))
 
+    def _check_and_update_modules(self, modules_dir):
+        """Compare installed module versions with Cloud and update outdated ones."""
+        hub_token = self._get_hub_token()
+        if not hub_token:
+            return
+
+        cloud_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
+        cloud_modules = self._fetch_from_cloud(cloud_url, hub_token)
+        if not cloud_modules:
+            return
+
+        from apps.core.services.module_install_service import ModuleInstallService
+
+        # Build map of Cloud versions from hub-modules API
+        # The API returns module_version field from HubModuleInstallation
+        # But the real source of truth is the Module.version in Cloud
+        # For now, compare with what Cloud reports
+        updated = 0
+        for mod_info in cloud_modules:
+            slug = mod_info['slug']
+            cloud_version = mod_info.get('version', '')
+            if not cloud_version:
+                continue
+
+            local_version = ModuleInstallService.get_installed_version(slug)
+            if local_version == '0.0.0':
+                continue  # Not installed locally
+
+            if local_version != cloud_version:
+                self.stdout.write(
+                    f'  Updating {slug}: v{local_version} -> v{cloud_version}'
+                )
+                download_url = f'{cloud_url}/api/marketplace/modules/{slug}/download/'
+                result = ModuleInstallService.download_and_install(
+                    slug, download_url, hub_token, force=True
+                )
+                if result.success:
+                    updated += 1
+                else:
+                    self.stdout.write(self.style.WARNING(
+                        f'  Failed to update {slug}: {result.message}'
+                    ))
+
+        if updated > 0:
+            self.stdout.write(f'Updated {updated} modules, running migrations...')
+            ModuleInstallService.run_post_install(
+                load_all=True, run_migrations=True, schedule_restart=False,
+            )
+
     def _import_seeds(self):
         """Import seed products and images via subprocess.
 
@@ -195,6 +245,7 @@ class Command(BaseCommand):
                     modules.append({
                         'slug': slug,
                         'is_active': item.get('is_active', True),
+                        'version': item.get('module_version_latest', ''),
                     })
 
             active = sum(1 for m in modules if m['is_active'])

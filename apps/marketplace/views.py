@@ -112,21 +112,9 @@ def _invalidate_installed_cache():
 
 def _get_installed_module_version(module_id):
     """Read MODULE_VERSION from an installed module's module.py. Returns None if not found."""
-    modules_dir = Path(django_settings.MODULES_DIR)
-    module_py = modules_dir / module_id / 'module.py'
-    if not module_py.exists():
-        # Check disabled module
-        module_py = modules_dir / f"_{module_id}" / 'module.py'
-    if not module_py.exists():
-        return None
-    try:
-        for line in module_py.read_text(encoding='utf-8').splitlines():
-            line = line.strip()
-            if line.startswith('MODULE_VERSION'):
-                return line.split('=', 1)[1].strip().strip("'\"")
-    except Exception:
-        pass
-    return None
+    from apps.core.services.module_install_service import ModuleInstallService
+    version = ModuleInstallService.get_installed_version(module_id)
+    return version if version != '0.0.0' else None
 
 
 # Store type configurations

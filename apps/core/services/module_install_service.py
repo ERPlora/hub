@@ -516,6 +516,25 @@ class ModuleInstallService:
                 from apps.core.utils import schedule_server_restart
                 schedule_server_restart()
 
+    @classmethod
+    def get_installed_version(cls, module_id):
+        """Read MODULE_VERSION from an installed module's module.py.
+
+        Returns version string (e.g. '1.0.8') or '0.0.0' if not found.
+        """
+        modules_dir = Path(settings.MODULES_DIR)
+        for name in (module_id, f"_{module_id}"):
+            module_py = modules_dir / name / 'module.py'
+            if module_py.exists():
+                try:
+                    for line in module_py.read_text(encoding='utf-8').splitlines():
+                        stripped = line.strip()
+                        if stripped.startswith('MODULE_VERSION'):
+                            return stripped.split('=', 1)[1].strip().strip("'\"")
+                except Exception:
+                    pass
+        return '0.0.0'
+
     @staticmethod
     def _get_module_id_from_extracted(extracted_root, fallback):
         """Read MODULE_ID from module.py in the extracted directory.
