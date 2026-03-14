@@ -401,6 +401,30 @@ class CloudAPIService:
 
         return self._request('POST', '/api/modules/download/', data=data)
 
+    # =========================================================================
+    # Invoices
+    # =========================================================================
+
+    def get_invoices(self, invoice_type: str = None, status: str = None) -> List[Dict[str, Any]]:
+        """
+        Get hub invoices from Cloud.
+
+        Args:
+            invoice_type: Filter by type (module, hub_subscription)
+            status: Filter by status (paid, refunded, etc.)
+
+        Returns:
+            List of invoice dicts
+        """
+        params = {}
+        if invoice_type:
+            params['type'] = invoice_type
+        if status:
+            params['status'] = status
+
+        response = self._request('GET', '/api/hubs/me/invoices/', params=params)
+        return response.get('invoices', [])
+
 
 # Singleton instance for convenience
 _cloud_api_instance = None

@@ -15,6 +15,7 @@ from apps.main.index import views as index_views
 from apps.main.settings import views as settings_views
 from apps.main.files import views as files_views
 from apps.main.help import views as help_views
+from apps.main.billing import views as billing_views
 
 app_name = 'main'
 
@@ -33,6 +34,9 @@ urlpatterns = [
 
     # Roles and permissions
     path('roles/', include('apps.main.roles.urls')),
+
+    # Billing (invoices from Cloud)
+    path('billing/', billing_views.index, name='billing'),
 
     # Help & documentation
     path('help/', help_views.index, name='help'),

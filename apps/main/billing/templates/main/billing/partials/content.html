@@ -1,0 +1,78 @@
+{% load i18n djicons %}
+
+<div data-page-title="{% trans 'Billing' %}" class="hidden"></div>
+
+{% if error %}
+<div class="alert color-error mb-4">
+    {% icon "alert-circle-outline" %}
+    <span>{% trans "Could not load invoices. Please try again later." %}</span>
+</div>
+{% endif %}
+
+{% if invoices %}
+<div class="card glass">
+    <div class="card-header">
+        <h3 class="card-title">{% trans "Invoices" %}</h3>
+    </div>
+    <div class="card-body p-0">
+        <div class="datatable">
+            <div class="datatable-body">
+                <table class="datatable-table">
+                    <thead class="datatable-thead">
+                        <tr>
+                            <th class="datatable-th">{% trans "Invoice" %}</th>
+                            <th class="datatable-th">{% trans "Type" %}</th>
+                            <th class="datatable-th">{% trans "Description" %}</th>
+                            <th class="datatable-th">{% trans "Date" %}</th>
+                            <th class="datatable-th">{% trans "Total" %}</th>
+                            <th class="datatable-th datatable-th-center">{% trans "Status" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="datatable-tbody">
+                        {% for invoice in invoices %}
+                        <tr class="datatable-tr">
+                            <td class="datatable-td">
+                                <span class="font-medium">{{ invoice.invoice_number }}</span>
+                            </td>
+                            <td class="datatable-td">
+                                <div class="flex items-center gap-2">
+                                    {% if invoice.invoice_type == 'hub_subscription' %}
+                                    {% icon "globe-outline" css_class="text-primary" %}
+                                    <span class="text-sm">{% trans "Hub" %}</span>
+                                    {% else %}
+                                    {% icon "cube-outline" css_class="text-secondary" %}
+                                    <span class="text-sm">{% trans "Module" %}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="datatable-td">
+                                <span class="text-sm">{{ invoice.description }}</span>
+                            </td>
+                            <td class="datatable-td">
+                                <span class="text-sm">{{ invoice.issue_date }}</span>
+                            </td>
+                            <td class="datatable-td">
+                                <span class="text-sm font-bold">&euro;{{ invoice.total }}</span>
+                            </td>
+                            <td class="datatable-td datatable-td-center">
+                                <span class="badge {% if invoice.status == 'paid' %}color-success{% elif invoice.status == 'refunded' %}color-warning{% elif invoice.status == 'failed' %}color-error{% else %}color-primary{% endif %}">
+                                    {{ invoice.status }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif not error %}
+<div class="card glass">
+    <div class="card-body text-center py-12">
+        <div class="text-4xl opacity-30 mb-4">{% icon "receipt-outline" %}</div>
+        <h3 class="font-semibold m-0 mb-2">{% trans "No invoices yet" %}</h3>
+        <p class="opacity-50 m-0">{% trans "Your invoices will appear here after purchasing a plan or module" %}</p>
+    </div>
+</div>
+{% endif %}
