@@ -23,12 +23,28 @@ def schedule_server_restart(delay=2):
 
     def _restart():
         import time
+        import signal
         time.sleep(delay)
 
         from config.paths import is_docker_environment
         if is_docker_environment():
-            logger.info("Exiting process for Docker container restart")
-            os._exit(0)
+            # Kill the gunicorn master process (PID 1 or parent) to restart
+            # ALL workers. Killing just the worker leaves other workers with
+            # stale INSTALLED_APPS.
+            pid_file = Path('/run/gunicorn.pid')
+            master_pid = None
+            if pid_file.exists():
+                try:
+                    master_pid = int(pid_file.read_text().strip())
+                except (ValueError, OSError):
+                    pass
+
+            if master_pid and master_pid != os.getpid():
+                logger.info("Killing gunicorn master (PID %d) for full restart", master_pid)
+                os.kill(master_pid, signal.SIGTERM)
+            else:
+                logger.info("Exiting process for Docker container restart")
+                os._exit(0)
         else:
             # Local dev: touch wsgi.py for runserver autoreload
             from django.conf import settings
