@@ -86,6 +86,17 @@
                     </div>
                     <div class="sidebar-menu-item">
                         <a class="sidebar-menu-button"
+                           :class="{ 'is-active': $store.nav.isActive('/billing') }"
+                           href="{% url 'main:billing' %}"
+                           hx-get="{% url 'main:billing' %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true">
+                            <span class="sidebar-menu-icon">{% icon "receipt-outline" %}</span>
+                            <span class="sidebar-label">{% trans "Billing" %}</span>
+                        </a>
+                    </div>
+                    <div class="sidebar-menu-item">
+                        <a class="sidebar-menu-button"
                            :class="{ 'is-active': $store.nav.isActive('/settings') }"
                            href="{% url 'main:settings' %}"
                            hx-get="{% url 'main:settings' %}"
