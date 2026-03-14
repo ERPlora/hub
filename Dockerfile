@@ -36,7 +36,7 @@ LABEL org.opencontainers.image.source="https://github.com/ERPlora/hub"
 WORKDIR /app
 
 # Install postgresql-client for pg_dump (database backups)
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client \
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (fast Python package manager)

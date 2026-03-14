@@ -416,6 +416,7 @@ class BlueprintService:
 
         # Schedule seed import for after restart (inventory module not loaded yet)
         seeds_imported = 0
+        restart_scheduled = False
         total_installed = install_result.installed + compliance_installed
         if total_installed > 0:
             # Modules were just installed — inventory won't be available until restart.
@@ -429,17 +430,45 @@ class BlueprintService:
             ModuleInstallService.run_post_install(
                 load_all=True, run_migrations=True, schedule_restart=True,
             )
+            restart_scheduled = True
         else:
-            # No new modules installed — inventory should already be loaded.
-            try:
-                seed_result = cls.import_seeds(
-                    type_codes=type_codes,
-                    language=getattr(hub_config, 'language', 'en') or 'en',
-                    country=getattr(hub_config, 'country_code', 'es') or 'es',
+            # No new modules downloaded — they may already be on disk (e.g. Docker image).
+            # Check if the modules are actually loaded in the running Django process.
+            # If not, schedule a restart so Django picks them up.
+            from django.apps import apps as django_apps
+
+            needs_restart = False
+            for slug in module_slugs:
+                try:
+                    django_apps.get_app_config(slug)
+                except LookupError:
+                    needs_restart = True
+                    break
+
+            if needs_restart:
+                logger.info(
+                    'Modules exist on disk but not loaded in Django — scheduling restart'
                 )
-                seeds_imported = seed_result.get('imported', 0)
-            except Exception as e:
-                logger.warning('Seed import failed during install_blueprint: %s', e)
+                cls._write_pending_seed_flag({
+                    'type_codes': type_codes,
+                    'language': getattr(hub_config, 'language', 'en') or 'en',
+                    'country': getattr(hub_config, 'country_code', 'es') or 'es',
+                })
+                ModuleInstallService.run_post_install(
+                    load_all=True, run_migrations=True, schedule_restart=True,
+                )
+                restart_scheduled = True
+            else:
+                # Modules already loaded — just import seeds directly.
+                try:
+                    seed_result = cls.import_seeds(
+                        type_codes=type_codes,
+                        language=getattr(hub_config, 'language', 'en') or 'en',
+                        country=getattr(hub_config, 'country_code', 'es') or 'es',
+                    )
+                    seeds_imported = seed_result.get('imported', 0)
+                except Exception as e:
+                    logger.warning('Seed import failed during install_blueprint: %s', e)
 
         logger.info(
             'install_blueprint for %s: %s',
@@ -461,6 +490,7 @@ class BlueprintService:
             'module_errors': install_result.errors,
             'roles_created': len(roles),
             'seeds_imported': seeds_imported,
+            'restart_scheduled': restart_scheduled,
         }
 
     @classmethod

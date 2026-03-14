@@ -555,11 +555,12 @@ LOGGING = {
 # =============================================================================
 
 DJICONS = {
+    "MODE": "local",  # Serve all icons from local files (no CDN)
     "DEFAULT_NAMESPACE": "ion",  # Ionicons SVGs as default icon set
     "ICON_DIRS": {
         "ion": BASE_DIR / "static" / "icons" / "ionicons",
     },
-    "PACKS": ["material"],  # Material Symbols via CDN for material:icon_name
+    "PACKS": ["material"],  # Material Symbols (local, collected via djicons_collect)
     "MISSING_ICON_SILENT": False,  # Show error in development
     "CACHE_TIMEOUT": 86400,  # 24 hours
     "DEFAULT_CLASS": "icon",  # Base CSS class for all icons
