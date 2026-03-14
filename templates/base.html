@@ -400,21 +400,30 @@
         let deferredPrompt = null;
         let pwaInstalled = false;
 
-        // Check if app is already installed
-        if (window.matchMedia('(display-mode: standalone)').matches) {
+        // iOS detection
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isIOSSafari = isIOS && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|OPiOS|EdgiOS/.test(navigator.userAgent);
+
+        // Check if app is already installed (standalone mode)
+        if (window.matchMedia('(display-mode: standalone)').matches || (isIOS && window.navigator.standalone)) {
             pwaInstalled = true;
         }
 
-        // Listen for the beforeinstallprompt event
+        // Listen for the beforeinstallprompt event (Android/Chrome only)
         window.addEventListener('beforeinstallprompt', (e) => {
-            // Prevent the mini-infobar from appearing
             e.preventDefault();
-            // Save the event for later
             deferredPrompt = e;
-            // Show install button
             document.dispatchEvent(new CustomEvent('pwa-installable'));
             console.log('[PWA] Install prompt available');
         });
+
+        // On iOS Safari, show install button after a short delay (no beforeinstallprompt)
+        if (isIOSSafari && !pwaInstalled) {
+            window.addEventListener('load', () => {
+                document.dispatchEvent(new CustomEvent('pwa-installable'));
+                console.log('[PWA] iOS Safari detected — showing install instructions');
+            });
+        }
 
         // Listen for successful installation
         window.addEventListener('appinstalled', () => {
@@ -426,32 +435,35 @@
 
         // Function to trigger installation
         async function installPWA() {
+            // iOS: show instructions modal (no native prompt)
+            if (isIOS) {
+                document.dispatchEvent(new CustomEvent('pwa-show-ios-install'));
+                return false;
+            }
+
             if (!deferredPrompt) {
                 console.log('[PWA] No install prompt available');
                 return false;
             }
 
-            // Show the install prompt
             deferredPrompt.prompt();
-
-            // Wait for user response
             const { outcome } = await deferredPrompt.userChoice;
             console.log('[PWA] User response:', outcome);
-
-            // Clear the prompt
             deferredPrompt = null;
-
             return outcome === 'accepted';
         }
 
         // Check if PWA can be installed
         function canInstallPWA() {
-            return deferredPrompt !== null && !pwaInstalled;
+            if (pwaInstalled) return false;
+            // On iOS Safari, always show install button
+            if (isIOSSafari) return true;
+            return deferredPrompt !== null;
         }
 
         // Check if PWA is installed
         function isPWAInstalled() {
-            return pwaInstalled || window.matchMedia('(display-mode: standalone)').matches;
+            return pwaInstalled || window.matchMedia('(display-mode: standalone)').matches || (isIOS && window.navigator.standalone);
         }
     </script>
     <!-- Auto dark mode detection (runs before body renders to prevent flash) -->
