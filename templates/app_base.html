@@ -178,6 +178,32 @@
     </div>
 
     {% include "partials/bug_report_modal.html" %}
+
+    <!-- iOS PWA Install Instructions Modal -->
+    <div x-data="{ show: false }"
+         @pwa-show-ios-install.document="show = true"
+         x-cloak>
+        <div class="modal-backdrop" :data-state="show ? 'open' : 'closed'" @click.self="show = false">
+            <div class="modal modal-sm">
+                <div class="modal-header">
+                    <h2 class="modal-title">{% trans "Install App" %}</h2>
+                    <button @click="show = false" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body text-center space-y-4">
+                    <div class="text-5xl">{% icon "share-outline" %}</div>
+                    <p>{% trans "To install this app on your iPhone:" %}</p>
+                    <ol class="text-left space-y-2 text-sm">
+                        <li>{% trans "1. Tap the Share button in Safari's toolbar" %}</li>
+                        <li>{% trans "2. Scroll down and tap <strong>Add to Home Screen</strong>" %}</li>
+                        <li>{% trans "3. Tap <strong>Add</strong> to confirm" %}</li>
+                    </ol>
+                </div>
+                <div class="modal-footer">
+                    <button @click="show = false" class="btn color-primary w-full">{% trans "Got it" %}</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
