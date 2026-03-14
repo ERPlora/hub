@@ -414,6 +414,30 @@ class BlueprintService:
             from apps.core.services.permission_service import PermissionService
             PermissionService.create_blueprint_roles(str(hub_config.hub_id), roles)
 
+        # Register installed modules with Cloud so ensure_modules can
+        # restore them after container restart.
+        all_installed_slugs = list(module_slugs)
+        if compliance_slugs:
+            all_installed_slugs.extend(
+                s for s in compliance_slugs if s not in module_slugs
+            )
+        try:
+            import requests as http_requests
+            hub_token = ModuleInstallService.get_hub_token()
+            for slug in all_installed_slugs:
+                try:
+                    http_requests.post(
+                        f'{cloud_url}/api/marketplace/modules/{slug}/mark_installed/',
+                        headers={'X-Hub-Token': hub_token},
+                        json={'version': '1.0.0'},
+                        timeout=10,
+                    )
+                except Exception:
+                    pass
+            logger.info('Registered %d modules with Cloud', len(all_installed_slugs))
+        except Exception:
+            logger.warning('Failed to register modules with Cloud')
+
         # Schedule seed import for after restart (inventory module not loaded yet)
         seeds_imported = 0
         restart_scheduled = False
