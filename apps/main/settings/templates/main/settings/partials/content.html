@@ -1,4 +1,4 @@
-{% load i18n djicons %}
+{% load i18n djicons static %}
 
 <div class="flex flex-col gap-6">
 
@@ -308,6 +308,9 @@
             </form>
         </div>
     </section>
+
+    {# ── Business Types ── #}
+    {% include "main/settings/partials/business_types_section.html" %}
 
     {# ── Hardware & Printers ── #}
     <section class="card" x-data="{
@@ -815,6 +818,37 @@
                         <span class="list-item-note">1.0.0</span>
                     </div>
                 </div>
+
+                {% if system_metrics.memory_used_mb %}
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <span class="list-item-label">{% trans "Memory (RAM)" %}</span>
+                        <span class="list-item-note">
+                            {{ system_metrics.memory_used_mb }} MB
+                            {% if system_metrics.memory_limit_mb %}
+                                / {{ system_metrics.memory_limit_mb }} MB
+                                <span class="ml-1 text-xs {% if system_metrics.memory_percent >= 90 %}text-error{% elif system_metrics.memory_percent >= 70 %}text-warning{% else %}opacity-60{% endif %}">
+                                    ({{ system_metrics.memory_percent }}%)
+                                </span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if system_metrics.disk_used_gb %}
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <span class="list-item-label">{% trans "Disk" %}</span>
+                        <span class="list-item-note">
+                            {{ system_metrics.disk_used_gb }} GB / {{ system_metrics.disk_total_gb }} GB
+                            <span class="ml-1 text-xs {% if system_metrics.disk_percent >= 90 %}text-error{% elif system_metrics.disk_percent >= 70 %}text-warning{% else %}opacity-60{% endif %}">
+                                ({{ system_metrics.disk_percent }}%)
+                            </span>
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             {# ── Connect Device QR ── #}
@@ -943,4 +977,4 @@
 }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="{% static 'js/vendor/qrcode-generator.min.js' %}"></script>

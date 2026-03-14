@@ -1,7 +1,7 @@
 """
 ERPlora Hub - Web/Docker Settings
 
-Configuración para despliegue en Docker (App Runner on AWS, or Dokploy on Hetzner).
+Configuración para despliegue en Docker (App Runner on AWS).
 
 Variables de entorno (configuradas durante deploy):
   - HUB_ID: UUID del Hub
@@ -30,7 +30,7 @@ from pathlib import Path
 # =============================================================================
 
 DEPLOYMENT_MODE = 'web'
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = False  # Never enable DEBUG in production
 
 # =============================================================================
 # HUB IDENTITY (from Cloud database, passed via env vars during deploy)
@@ -60,25 +60,23 @@ DATABASES = {'default': dj_database_url.parse(DATABASE_URL)}
 # In Docker: /app/modules/ by default, can be overridden via MODULES_DIR env var
 
 # =============================================================================
-# S3 STORAGE - AWS S3 (or Hetzner Object Storage for legacy)
+# S3 STORAGE - AWS S3
 # =============================================================================
 
 # On AWS: IAM role provides credentials automatically (no keys needed)
-# On Hetzner: explicit keys required
 AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
 AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='erplora')
 AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='eu-west-1')
 AWS_LOCATION = config('AWS_LOCATION', default=f'hubs/{HUB_ID}')  # Shared per org (orgs/{org_prefix})
-AWS_DEFAULT_ACL = 'public-read'
+AWS_DEFAULT_ACL = None  # Bucket uses ownership-enforced ACLs
 AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
 AWS_S3_FILE_OVERWRITE = False
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_USE_SSL = True
 AWS_S3_VERIFY = True
 
-# Hetzner Object Storage requires custom endpoint + signature version
-# On AWS S3, these are not needed (boto3 uses standard endpoints)
+# Custom S3 endpoint (optional, for S3-compatible services)
 _s3_endpoint = config('AWS_S3_ENDPOINT_URL', default='')
 if _s3_endpoint:
     AWS_S3_ENDPOINT_URL = _s3_endpoint
@@ -139,7 +137,7 @@ MODULE_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 #   PROD: PARENT_DOMAIN=erplora.com
 PARENT_DOMAIN = config('PARENT_DOMAIN', default='erplora.com').strip()
 
-# ALLOWED_HOSTS - Traefik handles domain routing/security
+# ALLOWED_HOSTS - App Runner handles domain routing via custom domains
 ALLOWED_HOSTS = ['*']
 
 # -----------------------------------------------------------------------------
@@ -160,6 +158,14 @@ SESSION_COOKIE_SAMESITE = 'Lax'  # Standard security
 SESSION_COOKIE_SECURE = True     # HTTPS only
 SESSION_COOKIE_HTTPONLY = True
 
+# HTTPS security headers
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_SSL_REDIRECT = False  # App Runner handles TLS termination
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+X_FRAME_OPTIONS = 'DENY'
+
 # CSRF cookies also scoped to this subdomain
 CSRF_COOKIE_DOMAIN = None  # Scoped to current subdomain
 CSRF_COOKIE_SAMESITE = 'Lax'
@@ -170,6 +176,11 @@ CSRF_TRUSTED_ORIGINS = [
     f'https://{PARENT_DOMAIN}',
     f'https://*.{PARENT_DOMAIN}',
 ]
+
+# Support custom domain (set via App Runner env var when user configures one)
+CUSTOM_DOMAIN = config('CUSTOM_DOMAIN', default='').strip()
+if CUSTOM_DOMAIN:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{CUSTOM_DOMAIN}')
 
 # -----------------------------------------------------------------------------
 # CORS - Allow cross-origin requests within domain family
@@ -209,11 +220,15 @@ MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 # WhiteNoise right after SecurityMiddleware for static files
 MIDDLEWARE.insert(2, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
-# Cloud SSO middleware: only for Hetzner (cookie-based SSO across subdomains).
+# Enable CSRF protection in production (disabled in base.py for desktop mode)
+# Insert CsrfViewMiddleware after CommonMiddleware
+_common_idx = MIDDLEWARE.index('django.middleware.common.CommonMiddleware')
+MIDDLEWARE.insert(_common_idx + 1, 'django.middleware.csrf.CsrfViewMiddleware')
+
+# Cloud SSO middleware (cookie-based SSO across subdomains).
 # On AWS (App Runner), Hubs have independent auth (trusted device + PIN or Cloud API login).
-# AWS_S3_ENDPOINT_URL is only set on Hetzner, so use it as a proxy for "legacy Hetzner mode".
+# Only enabled when a custom S3 endpoint is set (non-standard deployment).
 if _s3_endpoint:
-    # Hetzner: Cloud SSO via shared cookies across *.erplora.com
     # After insert(0, CORS) and insert(2, WhiteNoise), SessionMiddleware is at index 4
     # So we insert at 5 to place CloudSSO right after Session
     MIDDLEWARE.insert(5, 'apps.core.middleware.CloudSSOMiddleware')
@@ -247,6 +262,21 @@ DEVELOPMENT_MODE = False
 # Cloud API URL for all Hub → Cloud communication (API calls + browser redirects)
 CLOUD_API_URL = config('CLOUD_API_URL', default='https://erplora.com')
 CLOUD_PUBLIC_URL = CLOUD_API_URL
+
+# =============================================================================
+# CACHE — Database-backed (shared across App Runner instances)
+# =============================================================================
+# Override FileBasedCache from base.py — DB cache works across instances
+# and ensures rate limiting (PIN attempts) is consistent.
+# Requires: python manage.py createcachetable (run once during deploy)
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'django_cache',
+        'TIMEOUT': 300,
+    }
+}
 
 # Hub JWT token (generated by Cloud during deployment)
 # This is a long-lived token (1 year) for Hub authentication
@@ -288,8 +318,7 @@ load_module_templates(MODULES_DIR)
 # =============================================================================
 
 _db_name = DATABASES['default'].get('NAME', DATABASE_URL.split('/')[-1] if '/' in DATABASE_URL else 'unknown')
-_infra = 'AWS' if not _s3_endpoint else 'Hetzner'
-print(f"[HUB] {HUB_NAME} ({HUB_ID}) [{_infra}]")
+print(f"[HUB] {HUB_NAME} ({HUB_ID}) [AWS]")
 print(f"[HUB] Database: PostgreSQL - {_db_name}")
 print(f"[HUB] Data: {DATA_DIR}")
 print(f"[HUB] S3: {AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/")

@@ -214,7 +214,7 @@
                                        required>
                             </div>
 
-                            <div class="form-group mb-6" x-data="{ showPassword: false }">
+                            <div class="form-group mb-4" x-data="{ showPassword: false }">
                                 <label class="form-group-label" for="cloud-password">{% trans "Password" %}</label>
                                 <label class="input glass">
                                     <input :type="showPassword ? 'text' : 'password'"
@@ -234,6 +234,25 @@
                                         </template>
                                     </button>
                                 </label>
+                            </div>
+
+                            <!-- Trust Device checkbox -->
+                            <div class="flex items-center gap-2 mb-6">
+                                <label class="checkbox">
+                                    <input type="checkbox"
+                                           class="checkbox-input"
+                                           x-model="trustDevice">
+                                    <span class="checkbox-box">
+                                        {% icon "checkmark-outline" class="checkbox-mark" %}
+                                    </span>
+                                    <span class="checkbox-label">{% trans "Trust this device" %}</span>
+                                </label>
+                                <button type="button"
+                                        class="bg-transparent border-none cursor-pointer p-0 opacity-50 hover:opacity-100"
+                                        @click="showTrustInfo = true"
+                                        title="{% trans 'More info' %}">
+                                    {% icon "information-circle-outline" class="text-base" %}
+                                </button>
                             </div>
 
                             <button type="submit"
@@ -310,28 +329,29 @@
         </div>
     </div>
 
-    <!-- Trust Device Modal (shown after Cloud SSO login) -->
+    <!-- Trust Device Info Modal -->
     <div class="modal-backdrop"
-         :data-state="showTrustPrompt ? 'open' : 'closed'"
-         @click.self="trustThisDevice(false)">
+         :data-state="showTrustInfo ? 'open' : 'closed'"
+         @click.self="showTrustInfo = false">
         <div class="modal modal-sm">
             <div class="modal-header">
-                <h3 class="modal-title">{% trans "Trust this device?" %}</h3>
+                <h3 class="modal-title">{% trans "Trust this device" %}</h3>
+                <button @click="showTrustInfo = false" class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <p class="text-base-content/70 mb-4">
-                    {% trans "If you trust this device, you can use your PIN for quick access next time. Otherwise, you'll need to enter your email and password every time." %}
+                <p class="text-base-content/70 mb-3">
+                    {% trans "When you mark a device as trusted, you can log in quickly using just your PIN — without entering your email and password each time." %}
+                </p>
+                <p class="text-base-content/70 mb-3">
+                    {% trans "If you don't trust the device, you'll always need to enter your email and password to access this Hub." %}
                 </p>
                 <p class="text-sm text-base-content/50">
-                    {% trans "Only trust devices you control. Don't trust shared or public computers." %}
+                    {% trans "Only trust devices you own and control. Don't trust shared or public computers. Trust expires after 90 days of inactivity." %}
                 </p>
             </div>
             <div class="modal-footer">
-                <button @click="trustThisDevice(false)" class="btn">
-                    {% trans "No, don't trust" %}
-                </button>
-                <button @click="trustThisDevice(true)" class="btn color-primary">
-                    {% trans "Yes, trust this device" %}
+                <button @click="showTrustInfo = false" class="btn color-primary">
+                    {% trans "Got it" %}
                 </button>
             </div>
         </div>
@@ -370,9 +390,9 @@
             setupPinFirst: '',
             setupPinError: false,
 
-            // Trust Device prompt
-            showTrustPrompt: false,
-            pendingTrustUser: null,
+            // Trust Device
+            trustDevice: false,
+            showTrustInfo: false,
 
             async init() {
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
@@ -497,11 +517,11 @@
                         if (data.first_time) {
                             this.newUser = data.user;
                             this.showPinSetup = true;
-                        } else if (data.can_trust_device) {
-                            // Show "Trust this device?" dialog
-                            this.pendingTrustUser = data.user;
-                            this.showTrustPrompt = true;
                         } else {
+                            // Trust device if checkbox was checked
+                            if (this.trustDevice && data.user) {
+                                await this.registerTrustedDevice(data.user.id);
+                            }
                             // Cloud session saved -- now select profile + enter PIN
                             await this.showToast('{% trans "Now select your profile and enter PIN" %}', 'success');
                             this.loginMode = 'local';
@@ -516,38 +536,23 @@
                 }
             },
 
-            async trustThisDevice(trust) {
-                this.showTrustPrompt = false;
+            async registerTrustedDevice(userId) {
+                try {
+                    const response = await fetch('{% url "auth:trust_device" %}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_id: userId })
+                    });
+                    const data = await response.json();
 
-                if (trust && this.pendingTrustUser) {
-                    try {
-                        const response = await fetch('{% url "auth:trust_device" %}', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ user_id: this.pendingTrustUser.id })
-                        });
-                        const data = await response.json();
-
-                        if (data.success) {
-                            localStorage.setItem('erplora_device_token', data.device_token);
-                            this.deviceToken = data.device_token;
-                            this.deviceTrusted = true;
-                            await this.showToast('{% trans "Device trusted. You can use PIN next time." %}', 'success');
-                        }
-                    } catch (error) {
-                        console.error('Failed to trust device:', error);
+                    if (data.success) {
+                        localStorage.setItem('erplora_device_token', data.device_token);
+                        this.deviceToken = data.device_token;
+                        this.deviceTrusted = true;
                     }
+                } catch (error) {
+                    console.error('Failed to trust device:', error);
                 }
-
-                // If session is already established (PIN setup just completed), go to dashboard
-                if (this.newUser) {
-                    window.location.href = '{% url "main:index" %}';
-                    return;
-                }
-
-                // Otherwise, proceed to PIN selection
-                await this.showToast('{% trans "Now select your profile and enter PIN" %}', 'success');
-                this.loginMode = 'local';
             },
 
             addSetupPinDigit(digit) {
@@ -591,9 +596,11 @@
                         if (data.success) {
                             await this.showToast('{% trans "PIN configured successfully!" %}', 'success');
                             this.showPinSetup = false;
-                            // Show trust device prompt before going to dashboard
-                            this.pendingTrustUser = this.newUser;
-                            this.showTrustPrompt = true;
+                            // Trust device if checkbox was checked
+                            if (this.trustDevice && this.newUser) {
+                                await this.registerTrustedDevice(this.newUser.id);
+                            }
+                            window.location.href = '{% url "main:index" %}';
                         }
                     } catch (error) {
                         console.error('Error setting up PIN:', error);

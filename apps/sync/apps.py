@@ -45,12 +45,18 @@ class SyncConfig(AppConfig):
             config = HubConfig.get_solo()
             updated_fields = []
 
-            # Update hub_id from env
+            # Always set hub_id from env (authoritative source in web mode)
             hub_id_env = os.environ.get('HUB_ID')
-            if hub_id_env and str(config.hub_id) != hub_id_env:
+            if hub_id_env:
                 import uuid
                 try:
-                    config.hub_id = uuid.UUID(hub_id_env)
+                    new_hub_id = uuid.UUID(hub_id_env)
+                    old_hub_id = str(config.hub_id) if config.hub_id else None
+                    if old_hub_id != hub_id_env:
+                        # Cascade hub_id change to all records with old hub_id
+                        if old_hub_id:
+                            self._cascade_hub_id(old_hub_id, hub_id_env)
+                    config.hub_id = new_hub_id
                     updated_fields.append('hub_id')
                 except ValueError:
                     pass
@@ -68,11 +74,38 @@ class SyncConfig(AppConfig):
                 updated_fields.append('cloud_api_token')
 
             if updated_fields:
-                config.save()
+                config.save(update_fields=updated_fields)
                 print(f"[SYNC] HubConfig updated from env: {', '.join(updated_fields)}")
 
         except Exception as e:
             print(f"[SYNC] Error initializing HubConfig: {e}")
+
+    def _cascade_hub_id(self, old_hub_id, new_hub_id):
+        """Update hub_id in all tables when HubConfig hub_id changes."""
+        from django.db import connection
+
+        try:
+            with connection.cursor() as cursor:
+                # Find all tables with a hub_id column (except core_hubconfig)
+                cursor.execute("""
+                    SELECT table_name FROM information_schema.columns
+                    WHERE column_name = 'hub_id' AND table_schema = 'public'
+                    AND table_name != 'core_hubconfig'
+                """)
+                tables = [row[0] for row in cursor.fetchall()]
+
+                total = 0
+                for table in tables:
+                    cursor.execute(
+                        f'UPDATE "{table}" SET hub_id = %s WHERE hub_id = %s',
+                        [new_hub_id, old_hub_id],
+                    )
+                    total += cursor.rowcount
+
+                if total:
+                    print(f"[SYNC] Cascaded hub_id change: {total} rows in {len(tables)} tables")
+        except Exception as e:
+            print(f"[SYNC] Error cascading hub_id: {e}")
 
     def _start_heartbeat_service(self):
         """Start Cloud sync service (WebSocket or HTTP polling)."""

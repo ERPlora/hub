@@ -1,23 +1,15 @@
 # ==============================================================================
 # ERPlora Hub - Docker Compose
 # ==============================================================================
-# Used for Dokploy (Hetzner) deployment. On AWS, App Runner uses the Dockerfile
+# Useful for local Docker testing. On AWS, App Runner uses the Dockerfile
 # directly without docker-compose.
 #
-# Variables de entorno (inyectadas por Dokploy via .env):
+# Variables de entorno (via .env):
 #   - HUB_ID: UUID del Hub
 #   - HUB_NAME: Nombre/subdomain del Hub
 #   - VOLUME_PATH: Ruta base de Hubs en el host (ej: /data/hubs)
 #   - DATABASE_URL: PostgreSQL connection string
 #   - AWS_*: S3 credentials
-#   - Todas las demás env vars configuradas en Dokploy
-#
-# Volumen persistente (NVMe local del servidor):
-#   Host: ${VOLUME_PATH}/${HUB_ID}/  →  Container: /app/data/
-#   - /app/data/modules/       - Installed modules
-#
-# Red:
-#   - dokploy-network: Red de Dokploy para Traefik
 # ==============================================================================
 
 services:
@@ -27,20 +19,19 @@ services:
       dockerfile: Dockerfile
       network: host
     restart: unless-stopped
-    # Resource limits (injected by Cloud via Dokploy env vars)
+    # Resource limits (via env vars)
     cpus: ${CPU_LIMIT:-0.25}
     mem_limit: ${MEMORY_LIMIT:-256m}
     mem_reservation: ${MEMORY_LIMIT:-256m}
-    # Command: create data dirs, run migrations, start gunicorn
-    command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && python manage.py migrate --noinput && python manage.py ensure_assistant && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --pid /run/gunicorn.pid --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
+    # Command: run migrations, restore modules, start gunicorn
+    command: ["sh", "-c", "echo '=== ERPlora Hub Starting ===' && python manage.py migrate --noinput && python manage.py ensure_modules && echo 'Starting Gunicorn server...' && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 120 --pid /run/gunicorn.pid --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance"]
     volumes:
-      # Bind mount: host NVMe → fixed /app/data inside container
+      # Bind mount: host → fixed /app/data inside container
       # VOLUME_PATH should include the full base path (e.g. /data/hubs)
       # Each Hub gets its own subdirectory by HUB_ID
       # Container path is always /app/data (deterministic)
       - ${VOLUME_PATH:-/data/hubs}/${HUB_ID}:/app/data
     environment:
-      # Estas variables son inyectadas por Dokploy via .env
       - HUB_ID=${HUB_ID}
       - HUB_NAME=${HUB_NAME}
       - DEPLOYMENT_MODE=web
@@ -64,9 +55,3 @@ services:
       timeout: 10s
       start_period: 60s
       retries: 3
-    networks:
-      - dokploy-network
-
-networks:
-  dokploy-network:
-    external: true

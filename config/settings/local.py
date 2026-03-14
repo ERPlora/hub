@@ -37,12 +37,8 @@ if _database_url:
     import dj_database_url
     DATABASES = {'default': dj_database_url.parse(_database_url)}
 
-# Modules
-_modules_dir_env = config('MODULES_DIR', default='')
-if _modules_dir_env:
-    MODULES_DIR = Path(_modules_dir_env)
-else:
-    MODULES_DIR = _paths.modules_dir
+# Modules (hub/modules/ for local, /app/modules/ for Docker)
+MODULES_DIR = _paths.modules_dir
 MODULES_ROOT = MODULES_DIR
 MODULE_DISCOVERY_PATHS = [MODULES_DIR]
 
@@ -65,40 +61,6 @@ MODULE_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 # Add modules to sys.path
 if MODULES_DIR.exists() and str(MODULES_DIR) not in sys.path:
     sys.path.insert(0, str(MODULES_DIR))
-
-# =============================================================================
-# SYMLINKS - Create convenience symlinks in ERPlora root (parent of hub/)
-# =============================================================================
-# Creates symlinks for easy access during development:
-#   ERPlora/hub_data -> ~/Library/Application Support/ERPloraHub/
-#   ERPlora/hub_modules -> ~/Library/Application Support/ERPloraHub/modules/
-
-def _create_dev_symlinks():
-    """Create symlinks in ERPlora root for development convenience."""
-    import os
-
-    # ERPlora root is parent of hub/
-    erplora_root = BASE_DIR.parent
-
-    # Symlink: ERPlora/hub_data -> DATA_DIR
-    data_link = erplora_root / 'hub_data'
-    if not data_link.exists():
-        try:
-            os.symlink(DATA_DIR, data_link)
-            print(f"[LOCAL] Created symlink: hub_data -> {DATA_DIR}")
-        except (OSError, FileExistsError):
-            pass  # Symlink already exists or can't create
-
-    # Symlink: ERPlora/hub_modules -> MODULES_DIR
-    modules_link = erplora_root / 'hub_modules'
-    if not modules_link.exists():
-        try:
-            os.symlink(MODULES_DIR, modules_link)
-            print(f"[LOCAL] Created symlink: hub_modules -> {MODULES_DIR}")
-        except (OSError, FileExistsError):
-            pass
-
-_create_dev_symlinks()
 
 # =============================================================================
 # CLOUD SYNC - Disabled for local development

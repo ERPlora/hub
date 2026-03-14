@@ -23,11 +23,8 @@ PATHS POR ENTORNO:
                     para que los datos sobrevivan recreaciones del contenedor.
 
     LOCAL (Desarrollo):
-        macOS:
-            Base:     /Users/<usuario>/Library/Application Support/ERPloraHub/
-
-        Linux:
-            Base:     /home/<usuario>/.erplora-hub/
+        Base:     ERPlora/hub_data/        (datos: media, backups, logs, etc.)
+        Modules:  ERPlora/hub/modules/     (módulos como Django apps)
 
 Subdirectorios (comunes a todos los entornos):
     - media/           Archivos subidos (imágenes, logos, etc.)
@@ -80,9 +77,15 @@ class DataPaths:
     APP_NAME = "ERPloraHub"
     APP_NAME_HIDDEN = ".erplora-hub"  # Para Linux
 
+    # HUB_DIR = hub/ (where manage.py lives)
+    HUB_DIR = Path(__file__).resolve().parent.parent
+    # PROJECT_DIR = ERPlora/ (parent of hub/)
+    PROJECT_DIR = HUB_DIR.parent
+
     def __init__(self):
         self.platform = sys.platform
         self._base_dir = None
+        self._modules_dir = None
         self._ensure_directories()
 
     @property
@@ -95,8 +98,7 @@ class DataPaths:
               DOCKER (Web/Cloud):
                 - /app (root del contenedor, montado como volumen)
               LOCAL (Desarrollo):
-                - macOS: /Users/<user>/Library/Application Support/ERPloraHub
-                - Linux: /home/<user>/.erplora-hub
+                - ERPlora/hub_data/ (junto al código fuente)
         """
         if self._base_dir is None:
             # DATA_PATH from .env overrides platform defaults (local dev only)
@@ -108,13 +110,9 @@ class DataPaths:
                 # Docker: Usar /app como base (montado como volumen persistente)
                 self._base_dir = Path("/app")
 
-            elif self.platform == "darwin":
-                # macOS: Library/Application Support
-                self._base_dir = Path.home() / "Library" / "Application Support" / self.APP_NAME
-
             else:
-                # Linux: directorio oculto en home
-                self._base_dir = Path.home() / self.APP_NAME_HIDDEN
+                # Local development: ERPlora/hub_data/
+                self._base_dir = self.PROJECT_DIR / "hub_data"
 
         return self._base_dir
 
@@ -126,7 +124,16 @@ class DataPaths:
     @property
     def modules_dir(self) -> Path:
         """Directorio de modules instalados"""
-        return self.base_dir / "modules"
+        if self._modules_dir is None:
+            custom_path = config('MODULES_DIR', default='')
+            if custom_path:
+                self._modules_dir = Path(custom_path)
+            elif is_docker_environment():
+                self._modules_dir = self.base_dir / "modules"
+            else:
+                # Local: hub/modules/ (same relative path as production /app/modules/)
+                self._modules_dir = self.HUB_DIR / "modules"
+        return self._modules_dir
 
     @property
     def reports_dir(self) -> Path:
@@ -181,21 +188,6 @@ class DataPaths:
 
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
-
-            # En macOS y Linux, hacer el directorio base oculto (ya viene con . en Linux)
-            if self.platform == "darwin":
-                # En macOS, podemos añadir el flag de oculto
-                try:
-                    import subprocess
-                    if directory == self.base_dir:
-                        # Marcar como oculto en macOS
-                        subprocess.run(
-                            ["chflags", "hidden", str(directory)],
-                            check=False,
-                            capture_output=True
-                        )
-                except Exception:
-                    pass  # Si falla, no es crítico
 
     def cleanup_temp(self):
         """
@@ -307,10 +299,10 @@ if __name__ == "__main__":
     if is_docker:
         print("  Running in DOCKER - using /app as base")
         print("  Ensure volumes are mounted:")
-        print("    -v hub_db:/app/db")
-        print("    -v hub_media:/app/media")
+        print("    -v hub_data:/app/data")
         print("    -v hub_modules:/app/modules")
     else:
-        print("  Running LOCAL - using OS-specific user directory")
+        print("  Running LOCAL - data in ERPlora/hub_data/, modules in hub/modules/")
         print(f"  Data will persist in: {paths.base_dir}")
+        print(f"  Modules in: {paths.modules_dir}")
     print("=" * 70)

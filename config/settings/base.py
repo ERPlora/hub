@@ -92,14 +92,12 @@ CSRF_TRUSTED_ORIGINS = [
 # =============================================================================
 # CONTENT SECURITY POLICY (CSP) — report-only mode
 # =============================================================================
-SECURE_CSP = None  # Not enforcing yet
-
-SECURE_CSP_REPORT_ONLY = {
+SECURE_CSP = {
     "default-src": [CSP.SELF],
-    "script-src": [CSP.SELF, CSP.NONCE, CSP.UNSAFE_EVAL, "unpkg.com"],
-    "style-src": [CSP.SELF, CSP.UNSAFE_INLINE, "cdn.jsdelivr.net", "unpkg.com"],
+    "script-src": [CSP.SELF, CSP.NONCE, CSP.UNSAFE_EVAL],  # UNSAFE_EVAL required by Alpine.js standard build
+    "style-src": [CSP.SELF, CSP.UNSAFE_INLINE],
     "font-src": [CSP.SELF],
-    "img-src": [CSP.SELF, "data:"],
+    "img-src": [CSP.SELF, "data:", "*.amazonaws.com"],
     "connect-src": [CSP.SELF, "ws://localhost:12321"],
     "manifest-src": [CSP.SELF],
     "frame-ancestors": [CSP.NONE],
@@ -107,6 +105,8 @@ SECURE_CSP_REPORT_ONLY = {
     "form-action": [CSP.SELF],
     "report-uri": ["/csp-report/"],
 }
+
+SECURE_CSP_REPORT_ONLY = None
 
 # =============================================================================
 # APPLICATION DEFINITION
@@ -294,6 +294,34 @@ if _UX_DIST.is_dir():
     STATICFILES_DIRS.append(('ux', _UX_DIST))
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Vendor assets downloaded from CDN by `python manage.py vendor_fetch`
+VENDOR_ASSETS = [
+    {
+        'url': 'https://cdn.jsdelivr.net/gh/ERPlora/ux@main/dist/ux-full.min.css',
+        'path': 'css/vendor/ux-full.min.css',
+    },
+    {
+        'url': 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js',
+        'path': 'js/vendor/html2canvas-pro.min.js',
+    },
+    {
+        'url': 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js',
+        'path': 'js/vendor/qrcode-generator.min.js',
+    },
+    {
+        'url': 'https://unpkg.com/swagger-ui-dist@5/swagger-ui.css',
+        'path': 'css/vendor/swagger-ui.css',
+    },
+    {
+        'url': 'https://unpkg.com/swagger-ui-dist@5/swagger-ui.css.map',
+        'path': 'css/vendor/swagger-ui.css.map',
+    },
+    {
+        'url': 'https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js',
+        'path': 'js/vendor/swagger-ui-bundle.js',
+    },
+]
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -527,11 +555,12 @@ LOGGING = {
 # =============================================================================
 
 DJICONS = {
+    "MODE": "local",  # Serve all icons from local files (no CDN)
     "DEFAULT_NAMESPACE": "ion",  # Ionicons SVGs as default icon set
     "ICON_DIRS": {
         "ion": BASE_DIR / "static" / "icons" / "ionicons",
     },
-    "PACKS": ["material"],  # Material Symbols via CDN for material:icon_name
+    "PACKS": ["material"],  # Material Symbols (local, collected via djicons_collect)
     "MISSING_ICON_SILENT": False,  # Show error in development
     "CACHE_TIMEOUT": 86400,  # 24 hours
     "DEFAULT_CLASS": "icon",  # Base CSS class for all icons

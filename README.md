@@ -15,7 +15,7 @@ Modular POS (Point of Sale) system built with Django 6.0 + HTMX + Alpine.js.
 | Auth | LocalUser with PIN + JWT (Cloud API) |
 | API | Django REST Framework + drf-spectacular |
 | Scheduler | APScheduler (backups) |
-| Deployment | Docker (Dokploy) for Cloud Hubs |
+| Deployment | AWS App Runner (Docker) |
 
 ### Deployment Modes
 

@@ -34,7 +34,7 @@ dependencies = [
     "django-money>=3.0.0", # Currency handling
     "Babel>=2.17.0", # Locale-aware currency/number formatting (ISO 4217)
     "django-htmx>=1.17.0", # HTMX integration for Django
-    "djicons>=0.3.0", # SVG icons for Django templates
+    "djicons @ git+https://github.com/ioanbeilic/djicons.git@main", # SVG icons for Django templates
     "django-health-check>=3.18.0,<4.0", # Health check endpoint for monitoring (v4 removed sub-apps)
     # === LIBRERÍAS PARA MODULES (25 pre-empaquetadas) ===
     # Ver: config/module_allowed_deps.py para casos de uso
@@ -83,7 +83,7 @@ dependencies = [
     "django-debug-toolbar>=6.1.0",
     # Background scheduler for automated backups
     "APScheduler>=3.10.0",
-    # S3-compatible storage for media files (Hetzner Object Storage)
+    # S3 storage for media files (AWS S3)
     "boto3>=1.34.0",
     "django-storages>=1.14.0",
     "drf-spectacular[sidecar]>=0.29.0",
@@ -108,6 +108,9 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["apps", "config", "."]

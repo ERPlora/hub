@@ -558,7 +558,7 @@ class TrustedDevice(HubBaseModel):
     If valid, the user can log in with PIN only. If not, Cloud SSO is required.
 
     This model is used on AWS deployments where Hub auth is independent
-    (no shared cookies with Cloud). On Hetzner, CloudSSOMiddleware handles auth.
+    (no shared cookies with Cloud).
     """
 
     user = models.ForeignKey(

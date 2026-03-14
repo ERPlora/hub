@@ -242,3 +242,9 @@ backups/
 *.old
 *~
 .secret_key
+
+modules
+
+# Vendor assets (downloaded by `python manage.py vendor_fetch`)
+static/css/vendor/
+static/js/vendor/

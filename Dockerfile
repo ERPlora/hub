@@ -1,11 +1,11 @@
 # ==============================================================================
 # ERPlora Hub - Production Dockerfile
 # ==============================================================================
-# Used for deployment via App Runner (AWS) or Docker Compose (Dokploy/Hetzner).
+# Used for deployment via AWS App Runner or Docker Compose (local testing).
 #
 # STORAGE (automatic via HUB_ID):
 #   AWS App Runner: ephemeral filesystem, S3 for persistent data
-#   Docker Compose: bind mount from host NVMe → /app/data/
+#   Docker Compose: bind mount from host → /app/data/
 #
 #   S3 hubs/{HUB_ID}/:
 #     - backups/     - Database backups
@@ -36,7 +36,7 @@ LABEL org.opencontainers.image.source="https://github.com/ERPlora/hub"
 WORKDIR /app
 
 # Install postgresql-client for pg_dump (database backups)
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client \
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (fast Python package manager)
@@ -49,17 +49,27 @@ COPY . .
 # Note: We use regular install, not editable (-e) since this is production
 RUN uv pip install --system --no-cache .
 
-# Collect static files during build (don't change between Hubs)
-# Use web settings with dummy values (only needed for settings import, not collectstatic)
-# Real values come from environment at runtime
-ENV DJANGO_SETTINGS_MODULE=config.settings.web \
+# Download vendor assets (CSS/JS) from CDN → local static files
+RUN DJANGO_SETTINGS_MODULE=config.settings.web \
     HUB_ID=00000000-0000-0000-0000-000000000000 \
     HUB_NAME=build \
     DATABASE_URL=postgres://build:build@localhost:5432/build \
     AWS_STORAGE_BUCKET_NAME=dummy \
     AWS_S3_REGION_NAME=eu-west-1 \
-    AWS_LOCATION=dummy
-RUN python manage.py collectstatic --noinput --clear
+    AWS_LOCATION=dummy \
+    python manage.py vendor_fetch
+
+# Collect static files during build (don't change between Hubs)
+# Use web settings with dummy values (only needed for settings import, not collectstatic)
+# Real values come from environment at runtime
+RUN DJANGO_SETTINGS_MODULE=config.settings.web \
+    HUB_ID=00000000-0000-0000-0000-000000000000 \
+    HUB_NAME=build \
+    DATABASE_URL=postgres://build:build@localhost:5432/build \
+    AWS_STORAGE_BUCKET_NAME=dummy \
+    AWS_S3_REGION_NAME=eu-west-1 \
+    AWS_LOCATION=dummy \
+    python manage.py collectstatic --noinput --clear
 
 # =============================================================================
 # ENVIRONMENT VARIABLES
@@ -69,6 +79,7 @@ RUN python manage.py collectstatic --noinput --clear
 # App Runner env vars or docker-compose.yaml
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    DJANGO_SETTINGS_MODULE=config.settings.web \
     DEBUG=false
 
 # =============================================================================
@@ -82,5 +93,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # =============================================================================
 # DEFAULT COMMAND
 # =============================================================================
-# Runs migrations then starts gunicorn on port 8000 (required by App Runner)
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120 --pid /run/gunicorn.pid"]
+# Runs migrations, restores modules, then starts gunicorn on port 8000 (required by App Runner)
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py createcachetable --database default 2>/dev/null; python manage.py ensure_modules && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120 --pid /run/gunicorn.pid"]
