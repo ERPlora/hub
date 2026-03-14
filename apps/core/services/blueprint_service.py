@@ -279,6 +279,9 @@ class BlueprintService:
         # Add extra modules (type-specific like kitchen, tables, etc.)
         module_slugs.update(extra_modules)
 
+        # Always include assistant — required for setup and ongoing AI help
+        module_slugs.add('assistant')
+
         logger.info(
             'Resolved %d modules for types %s (UFOs: %s, extras: %s)',
             len(module_slugs), type_codes,
