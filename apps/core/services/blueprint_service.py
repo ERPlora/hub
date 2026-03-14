@@ -426,10 +426,11 @@ class BlueprintService:
             hub_token = ModuleInstallService.get_hub_token()
             for slug in all_installed_slugs:
                 try:
+                    version = ModuleInstallService.get_installed_version(slug)
                     http_requests.post(
                         f'{cloud_url}/api/marketplace/modules/{slug}/mark_installed/',
                         headers={'X-Hub-Token': hub_token},
-                        json={'version': '1.0.0'},
+                        json={'version': version},
                         timeout=10,
                     )
                 except Exception:
