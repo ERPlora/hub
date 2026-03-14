@@ -665,25 +665,21 @@
             }, 2000);
         }
 
-        // HTMX connection error (server down / restart)
+        // Expose globally so views can trigger it explicitly when server is restarting
+        window.ERPlora = window.ERPlora || {};
+        window.ERPlora.showReconnectOverlay = showOverlay;
+
+        // HTMX connection error (server genuinely down / restarting)
         document.body.addEventListener('htmx:sendError', function() { showOverlay(); });
-        // Intercept all fetch calls: detect connection errors and requires_restart
+
+        // Intercept fetch: only show overlay on actual connection failures
+        // (server unreachable), NOT on requires_restart JSON responses.
+        // Views that schedule a real server restart should call
+        // window.ERPlora.showReconnectOverlay() explicitly.
         var origFetch = window.fetch;
         window.fetch = function() {
-            return origFetch.apply(this, arguments).then(function(response) {
-                if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
-                    var cloned = response.clone();
-                    cloned.json().then(function(data) {
-                        if (data && data.requires_restart) {
-                            showOverlay(
-                                '{% trans "Applying changes..." %}',
-                                '{% trans "The server is restarting. This page will reload automatically." %}'
-                            );
-                        }
-                    }).catch(function() {});
-                }
-                return response;
-            }).catch(function(err) {
+            return origFetch.apply(this, arguments).catch(function(err) {
+                // Network error = server is genuinely down
                 showOverlay();
                 return Promise.reject(err);
             });

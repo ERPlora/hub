@@ -168,7 +168,7 @@ class ModuleLoader:
             return {
                 'success': True,
                 'message': f'Module {module_id} activated. Restart required to load.',
-                'requires_restart': True
+                'server_restarting': True
             }
         except Exception as e:
             return {'success': False, 'error': str(e)}
@@ -202,7 +202,7 @@ class ModuleLoader:
             return {
                 'success': True,
                 'message': f'Module {module_id} deactivated. Restart required.',
-                'requires_restart': True
+                'server_restarting': True
             }
         except Exception as e:
             return {'success': False, 'error': str(e)}
