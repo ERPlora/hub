@@ -73,7 +73,7 @@ class ModuleInstallService:
         return getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
 
     @classmethod
-    def download_and_install(cls, module_slug, download_url, hub_token=''):
+    def download_and_install(cls, module_slug, download_url, hub_token='', force=False):
         """Download a module ZIP from URL, extract, and install to MODULES_DIR.
 
         This is the single canonical install path. Does NOT perform post-install
@@ -83,6 +83,7 @@ class ModuleInstallService:
             module_slug: Module slug/identifier (used as fallback for module_id)
             download_url: URL to download the module ZIP from
             hub_token: Hub JWT token for authentication
+            force: If True, delete existing module directory before installing (for updates)
 
         Returns:
             InstallResult with success status, resolved module_id, and message
@@ -164,12 +165,18 @@ class ModuleInstallService:
 
                 # Check if already installed
                 target = modules_dir / module_id
-                if target.exists() or (modules_dir / f"_{module_id}").exists():
-                    return InstallResult(
-                        success=True,
-                        module_id=module_id,
-                        message=f"{module_id} already installed",
-                    )
+                disabled_target = modules_dir / f"_{module_id}"
+                if target.exists() or disabled_target.exists():
+                    if not force:
+                        return InstallResult(
+                            success=True,
+                            module_id=module_id,
+                            message=f"{module_id} already installed",
+                        )
+                    # Force update: remove existing before replacing
+                    existing = target if target.exists() else disabled_target
+                    shutil.rmtree(existing)
+                    logger.info("[INSTALL] Force-removed existing %s for update", existing)
 
                 # Copy to modules directory
                 shutil.copytree(extracted_root, target)

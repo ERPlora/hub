@@ -934,7 +934,7 @@ def solutions_bulk_install(request):
         'success': True,
         'installed': result.installed,
         'errors': result.errors,
-        'requires_restart': result.installed > 0,
+        'server_restarting': result.installed > 0,
     }), content_type='application/json')
 
 
@@ -1035,7 +1035,7 @@ def modules_bulk_install(request):
         'success': True,
         'installed': installed_count,
         'errors': errors,
-        'requires_restart': installed_count > 0,
+        'server_restarting': installed_count > 0,
     }), content_type='application/json')
 
 
@@ -1196,7 +1196,7 @@ def solution_install(request, slug):
             'installed': installed_count,
             'total': len(required_modules),
             'errors': errors,
-            'requires_restart': installed_count > 0,
+            'server_restarting': installed_count > 0,
         }
         return HttpResponse(json.dumps(result), content_type='application/json')
 
@@ -1273,7 +1273,7 @@ def block_toggle(request, slug):
                 'active_count': len(active_types),
                 'modules_installed': result.installed,
                 'install_errors': result.errors,
-                'requires_restart': result.installed > 0,
+                'server_restarting': result.installed > 0,
             }),
             content_type='application/json',
         )
@@ -1402,7 +1402,7 @@ def business_type_activate(request, slug):
         'modules_installed': result.get('modules_installed', 0),
         'roles_created': result.get('roles_created', 0),
         'seeds_imported': result.get('seeds_imported', 0),
-        'requires_restart': result.get('restart_scheduled', False),
+        'server_restarting': result.get('restart_scheduled', False),
     }), content_type='application/json')
 
 

@@ -799,7 +799,7 @@ def module_activate(request, module_id):
             'success': True,
             'message': _('Module activated. Server restarting.'),
             'activated': activated,
-            'requires_restart': True
+            'server_restarting': True
         })
     except Exception as e:
         if request.htmx:
@@ -1149,6 +1149,7 @@ def install_from_marketplace(request):
         data = json.loads(request.body)
         module_slug = data.get('module_slug')
         download_url = data.get('download_url')
+        force = data.get('force', False)
 
         if not module_slug:
             return JsonResponse({
@@ -1170,7 +1171,7 @@ def install_from_marketplace(request):
             }, status=401)
 
         result = ModuleInstallService.download_and_install(
-            module_slug, download_url, hub_token
+            module_slug, download_url, hub_token, force=bool(force)
         )
 
         if not result.success:
@@ -1192,7 +1193,7 @@ def install_from_marketplace(request):
         return JsonResponse({
             'success': True,
             'message': f'Module {module_slug} installed successfully',
-            'requires_restart': True
+            'pending_restart': True
         })
 
     except Exception as e:

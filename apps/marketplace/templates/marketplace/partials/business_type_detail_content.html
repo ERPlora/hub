@@ -40,7 +40,17 @@
                                     headers: {'X-CSRFToken': '{{ csrf_token }}'}
                                 })
                                 .then(r => r.json())
-                                .then(d => { if(d.success) activated = true; })
+                                .then(d => {
+                                    if(d.success) {
+                                        activated = true;
+                                        if (d.server_restarting && window.ERPlora && window.ERPlora.showReconnectOverlay) {
+                                            window.ERPlora.showReconnectOverlay(
+                                                '{% trans "Applying changes..." %}',
+                                                '{% trans "The server is restarting. This page will reload automatically." %}'
+                                            );
+                                        }
+                                    }
+                                })
                                 .finally(() => activating = false)
                             ">
                         <span x-show="!activating">{% icon "checkmark-circle-outline" %} {% trans "Activate Business Type" %}</span>

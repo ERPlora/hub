@@ -282,7 +282,7 @@ async function downloadAndInstall(moduleSlug, downloadUrl, button, moduleDir) {
         }
 
         if (data.success) {
-            Toast.success('{% trans "Module installed!" %}');
+            Toast.success('{% trans "Module installed! A server restart is needed to load it." %}');
             markAsInstalled(button);
         } else {
             Toast.error(data.error || '{% trans "Error installing module" %}');
