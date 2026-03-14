@@ -63,6 +63,12 @@ def _render_list(request, hub_id, per_page=10):
     return django_render(request, 'main/employees/partials/employees_list.html', context)
 
 
+def _render_content(request, hub_id, per_page=10):
+    """Render the full content partial (with Alpine x-data wrapper) after a mutation."""
+    context = _build_list_context(hub_id, per_page)
+    return django_render(request, 'main/employees/partials/content.html', context)
+
+
 @login_required
 @htmx_view('main/employees/pages/index.html', 'main/employees/partials/content.html')
 def index(request):
@@ -270,21 +276,21 @@ def toggle_status(request, employee_id):
     # Prevent deactivating admin users
     if employee.get_role_name() == 'admin' and employee.is_active:
         messages.error(request, _('Cannot deactivate admin users'))
-        return _render_list(request, hub_id)
+        return _render_content(request, hub_id)
 
     # Prevent deactivating the last active user
     if employee.is_active:
         active_count = LocalUser.objects.filter(hub_id=hub_id, is_active=True).count()
         if active_count <= 1:
             messages.error(request, _('Cannot deactivate the last active employee'))
-            return _render_list(request, hub_id)
+            return _render_content(request, hub_id)
 
     employee.is_active = not employee.is_active
     employee.save()
 
     status = _('activated') if employee.is_active else _('deactivated')
     messages.success(request, _('Employee %(status)s successfully') % {'status': status})
-    return _render_list(request, hub_id)
+    return _render_content(request, hub_id)
 
 
 @admin_required

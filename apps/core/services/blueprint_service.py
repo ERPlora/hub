@@ -700,13 +700,14 @@ class BlueprintService:
             if not code:
                 return False
 
-            # Idempotency: skip if SKU already exists (but retry missing images)
+            # Idempotency: skip if SKU already exists (but set image_url if missing)
             existing = Product.objects.filter(sku=code).first()
             if existing:
                 image_path = prod_data.get('image', '')
-                if image_path and not existing.image:
-                    logger.info('[SEEDS] Retrying image for %s: %s', code, image_path)
-                    cls._download_and_save_image(existing, image_path)
+                if image_path and not existing.image and not getattr(existing, 'image_url', ''):
+                    existing.image_url = cls._build_asset_url(image_path)
+                    existing.save(update_fields=['image_url'])
+                    logger.info('[SEEDS] Image URL set for %s: %s', code, image_path)
                 return False
 
             # Resolve tax_class from hint
@@ -720,6 +721,7 @@ class BlueprintService:
                 name=prod_data.get('name', code),
                 description=prod_data.get('description', ''),
                 price=prod_data.get('price', 0),
+                product_type=prod_data.get('product_type', 'service'),
                 tax_class=tax_class,
                 source='blueprint',
             )
@@ -731,34 +733,22 @@ class BlueprintService:
                 if category:
                     product.categories.add(category)
 
-            # Download and save product image
+            # Set public image URL (no download needed — assets are public on S3)
             image_path = prod_data.get('image', '')
             if image_path:
-                cls._download_and_save_image(product, image_path)
+                product.image_url = cls._build_asset_url(image_path)
+                product.save(update_fields=['image_url'])
 
             return True
         except Exception as e:
             logger.warning('Failed to import product %s: %s', prod_data.get('code', '?'), e)
             return False
 
-    @classmethod
-    def _download_and_save_image(cls, product, image_path):
-        """Download a product image from Cloud Blueprint API and save to ImageField."""
-        from django.core.files.base import ContentFile
-
-        if not image_path:
-            return
-
-        try:
-            url = _cloud_url(f'assets/{image_path}')
-            resp = _get_session().get(url, timeout=15)
-            resp.raise_for_status()
-
-            filename = image_path.split('/')[-1]
-            product.image.save(filename, ContentFile(resp.content), save=True)
-            logger.info('[SEEDS] Image saved: %s → %s', product.sku, filename)
-        except Exception as e:
-            logger.warning('[SEEDS] Image FAILED for %s (%s): %s', product.sku, image_path, e)
+    @staticmethod
+    def _build_asset_url(image_path):
+        """Build public Cloud API URL for a blueprint asset image."""
+        base = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
+        return f'{base}/api/blueprints/assets/{image_path}'
 
     @staticmethod
     def _pending_seed_flag_path():
