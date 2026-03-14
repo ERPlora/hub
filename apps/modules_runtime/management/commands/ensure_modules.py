@@ -74,6 +74,13 @@ class Command(BaseCommand):
                 self.stdout.write('No modules to restore')
                 return
 
+        # Always ensure assistant module is included (it may not be in
+        # Cloud's hub-modules list since it's a built-in, not a marketplace purchase)
+        existing_slugs = {m['slug'] for m in modules_info}
+        if 'assistant' not in existing_slugs:
+            modules_info.append({'slug': 'assistant', 'is_active': True})
+            self.stdout.write('Added assistant module (always required)')
+
         all_slugs = [m['slug'] for m in modules_info]
         inactive_slugs = {m['slug'] for m in modules_info if not m['is_active']}
 
