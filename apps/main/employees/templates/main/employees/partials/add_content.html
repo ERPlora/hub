@@ -2,28 +2,28 @@
 <div data-back-url="{% url 'main:employees' %}" hidden></div>
 
 <div class="p-4">
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold">{% trans "Add Employee" %}</h1>
-        <div class="flex gap-2">
-            <a class="btn btn-ghost btn-sm"
-               hx-get="{% url 'main:employees' %}"
-               hx-target="#main-content-area"
-               hx-push-url="true">
-                {% trans "Cancel" %}
-            </a>
-            <button type="submit" form="add-employee-form" class="btn btn-sm color-primary">
-                {% icon "checkmark-outline" %}
-                {% trans "Save" %}
-            </button>
-        </div>
-    </div>
-
-    <!-- Form -->
     <form id="add-employee-form"
           hx-post="{% url 'main:employee_add' %}"
+          hx-target="#main-content-area"
           class="max-w-2xl">
         {% csrf_token %}
+
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-bold">{% trans "Add Employee" %}</h1>
+            <div class="flex gap-2">
+                <a class="btn btn-ghost btn-sm"
+                   hx-get="{% url 'main:employees' %}"
+                   hx-target="#main-content-area"
+                   hx-push-url="true">
+                    {% trans "Cancel" %}
+                </a>
+                <button type="submit" class="btn btn-sm color-primary">
+                    {% icon "checkmark-outline" %}
+                    {% trans "Save" %}
+                </button>
+            </div>
+        </div>
 
         <div class="card mb-4">
             <div class="card-header">

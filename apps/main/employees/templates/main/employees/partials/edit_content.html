@@ -2,28 +2,28 @@
 <div data-back-url="{% url 'main:employees' %}" hidden></div>
 
 <div class="p-4">
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold">{% trans "Edit Employee" %}</h1>
-        <div class="flex gap-2">
-            <a class="btn btn-ghost btn-sm"
-               hx-get="{% url 'main:employees' %}"
-               hx-target="#main-content-area"
-               hx-push-url="true">
-                {% trans "Cancel" %}
-            </a>
-            <button type="submit" form="edit-employee-form" class="btn btn-sm color-primary">
-                {% icon "checkmark-outline" %}
-                {% trans "Save" %}
-            </button>
-        </div>
-    </div>
-
-    <!-- Form -->
     <form id="edit-employee-form"
           hx-post="{% url 'main:employee_edit' employee.id %}"
+          hx-target="#main-content-area"
           class="max-w-2xl">
         {% csrf_token %}
+
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-bold">{% trans "Edit Employee" %}</h1>
+            <div class="flex gap-2">
+                <a class="btn btn-ghost btn-sm"
+                   hx-get="{% url 'main:employees' %}"
+                   hx-target="#main-content-area"
+                   hx-push-url="true">
+                    {% trans "Cancel" %}
+                </a>
+                <button type="submit" class="btn btn-sm color-primary">
+                    {% icon "checkmark-outline" %}
+                    {% trans "Save" %}
+                </button>
+            </div>
+        </div>
 
         <div class="card mb-4">
             <div class="card-header">
@@ -70,8 +70,10 @@
                 </div>
             </div>
         </div>
+    </form>
 
-        <!-- Status -->
+    <!-- Status (outside form to avoid submitting form data on toggle) -->
+    <div class="max-w-2xl">
         <div class="card mb-4">
             <div class="card-header">
                 <h3 class="card-title">{% icon "shield-outline" css_class="text-primary" %} {% trans "Status" %}</h3>
@@ -87,7 +89,7 @@
                     <button type="button" class="btn btn-sm {% if employee.is_active %}color-success{% else %}btn-outline{% endif %}"
                             hx-post="{% url 'main:employee_toggle_status' employee.id %}"
                             hx-target="#main-content-area"
-                            hx-push-url="false">
+                            hx-push-url="{% url 'main:employees' %}">
                         {% if employee.is_active %}
                         {% icon "checkmark-circle-outline" %}
                         {% trans "Active" %}
@@ -99,7 +101,7 @@
                 </div>
             </div>
         </div>
-    </form>
+    </div>
 
     <!-- Security (outside form) -->
     <div class="max-w-2xl">

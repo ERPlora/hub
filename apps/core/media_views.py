@@ -97,7 +97,7 @@ def shared_assets(request):
     folder = request.GET.get('folder', '')
     search = request.GET.get('q', '')
 
-    cloud_url = getattr(settings, 'CLOUD_BASE_URL', 'https://erplora.com')
+    cloud_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
 
     # Fetch asset listing from Cloud
     assets = []
@@ -131,7 +131,7 @@ def shared_assets(request):
 @login_required
 def shared_folders(request):
     """Return JSON list of shared asset folder names."""
-    cloud_url = getattr(settings, 'CLOUD_BASE_URL', 'https://erplora.com')
+    cloud_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
 
     folders = []
     try:
