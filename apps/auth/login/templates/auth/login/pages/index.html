@@ -99,7 +99,8 @@
                                 <button type="button"
                                         class="segment-btn"
                                         :class="{ 'segment-btn-selected': loginMode === 'local' }"
-                                        @click="loginMode = 'local'">
+                                        :disabled="!pinEnabled"
+                                        @click="if (pinEnabled) loginMode = 'local'">
                                     {% icon "key-outline" class="segment-btn-icon" %}
                                     <span class="segment-btn-label">{% trans "PIN" %}</span>
                                 </button>
@@ -116,7 +117,7 @@
 
                     <!-- Local Login (Employee Selection + PIN) -->
                     <div x-show="loginMode === 'local'" x-cloak>
-                        <!-- Employee Selection -->
+                        <!-- Employee Selection (conditionally rendered — server decides via /get-employees/) -->
                         <div x-show="!selectedEmployee">
                             <p class="text-center text-sm text-base-content/60 mb-4">{% trans "Select your profile" %}</p>
 
@@ -124,7 +125,7 @@
                                 <template x-for="employee in employees" :key="employee.id">
                                     <div class="employee-card glass employee-card-clickable"
                                          @click="selectEmployee(employee)">
-                                        <div class="employee-card-avatar" :class="'employee-card-avatar-' + employee.avatarColor">
+                                        <div class="employee-card-avatar">
                                             <span x-text="employee.initials"></span>
                                         </div>
                                         <div class="employee-card-info">
@@ -371,12 +372,13 @@
             deviceTrusted: false,
             deviceToken: localStorage.getItem('erplora_device_token') || null,
 
-            // Local Login
+            // PIN access
+            pinEnabled: false,
             selectedEmployee: null,
             pinInput: '',
             pinError: false,
             pinVerifying: false,
-            employees: {{ local_users_json|safe }},
+            employees: [],
 
             // Cloud Login
             cloudCredentials: { email: '', password: '' },
@@ -396,41 +398,35 @@
 
             async init() {
                 localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
-
-                if (this.deviceToken) {
-                    await this.checkDeviceTrust();
-                } else {
-                    // No device token -- show Cloud login
-                    this.loginMode = 'cloud';
-                }
+                // Try to load employees (checks device trust + cloud session server-side)
+                await this.loadEmployees();
             },
 
-            async checkDeviceTrust() {
+            async loadEmployees() {
                 try {
-                    const response = await fetch('{% url "auth:verify_device_trust" %}', {
+                    const response = await fetch('{% url "auth:get_employees" %}', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ device_token: this.deviceToken })
                     });
                     const data = await response.json();
 
-                    if (data.trusted) {
+                    if (data.authorized) {
+                        this.employees = data.employees;
+                        this.pinEnabled = true;
                         this.deviceTrusted = true;
-                        // Mark trusted Cloud users and keep all local-only employees
-                        const trustedIds = new Set(data.trusted_user_ids || []);
-                        this.employees = this.employees.map(emp => ({
-                            ...emp,
-                            isTrusted: trustedIds.has(emp.id),
-                        }));
                         this.loginMode = 'local';
                     } else {
-                        // Token invalid or expired -- clear it
-                        localStorage.removeItem('erplora_device_token');
-                        this.deviceToken = null;
+                        // Not authorized — clear invalid device token
+                        if (this.deviceToken) {
+                            localStorage.removeItem('erplora_device_token');
+                            this.deviceToken = null;
+                        }
+                        this.pinEnabled = false;
                         this.loginMode = 'cloud';
                     }
                 } catch (error) {
-                    // Network error -- fall back to Cloud login
+                    // Network error — fall back to email login
                     this.loginMode = 'cloud';
                 }
             },
@@ -474,7 +470,7 @@
                         await this.showToast(`{% trans "Welcome" %}, ${this.selectedEmployee.name}!`, 'success');
                         setTimeout(() => window.location.href = '{% url "main:index" %}', 1000);
                     } else if (data.device_untrusted) {
-                        // Device not trusted for this user -- switch to Cloud login
+                        // Device not trusted for this user — switch to Cloud login
                         this.loginMode = 'cloud';
                         this.selectedEmployee = null;
                         this.pinInput = '';
@@ -522,9 +518,9 @@
                             if (this.trustDevice && data.user) {
                                 await this.registerTrustedDevice(data.user.id);
                             }
-                            // Cloud session saved -- now select profile + enter PIN
+                            // Cloud session saved — now load employees and switch to PIN
+                            await this.loadEmployees();
                             await this.showToast('{% trans "Now select your profile and enter PIN" %}', 'success');
-                            this.loginMode = 'local';
                         }
                     } else {
                         await this.showToast(data.error || '{% trans "Login failed" %}', 'danger');

@@ -148,6 +148,118 @@
         </div>
     </section>
 
+    {# ── Business Hours ── #}
+    <section class="card" x-data="{
+        enabled: {{ store_config.business_hours_enabled|yesno:'true,false' }},
+        hours: {{ store_config.business_hours|default:'{}' }},
+        days: [
+            {key: 'mon', label: '{% trans "Monday" %}'},
+            {key: 'tue', label: '{% trans "Tuesday" %}'},
+            {key: 'wed', label: '{% trans "Wednesday" %}'},
+            {key: 'thu', label: '{% trans "Thursday" %}'},
+            {key: 'fri', label: '{% trans "Friday" %}'},
+            {key: 'sat', label: '{% trans "Saturday" %}'},
+            {key: 'sun', label: '{% trans "Sunday" %}'}
+        ],
+        toggleDay(key) {
+            if (this.hours[key]) {
+                delete this.hours[key];
+            } else {
+                this.hours[key] = {open: '09:00', close: '22:00'};
+            }
+            this.hours = {...this.hours};
+        },
+        copyToAll() {
+            let first = this.days.find(d => this.hours[d.key]);
+            if (!first) return;
+            let src = this.hours[first.key];
+            this.days.forEach(d => {
+                if (this.hours[d.key]) {
+                    this.hours[d.key] = {open: src.open, close: src.close};
+                }
+            });
+            this.hours = {...this.hours};
+        }
+    }">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "time-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Business Hours" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Set operating hours to keep the system responsive during business times" %}</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-swap="none">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_business_hours">
+                <input type="hidden" name="business_hours_json" :value="JSON.stringify(hours)">
+
+                <div class="flex flex-col gap-4">
+                    <div class="form-group">
+                        <label class="form-group-label">{% trans "Enable Business Hours" %}</label>
+                        <span class="form-group-helper">{% trans "When enabled, the system sends keepalive signals during operating hours to minimize startup times. Without business hours, the system may take longer to respond after periods of inactivity." %}</span>
+                        <label class="toggle mt-2">
+                            <input type="checkbox" name="business_hours_enabled" value="true"
+                                   x-model="enabled" @change="$el.closest('form').requestSubmit()">
+                            <span class="toggle-track">
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <template x-if="enabled">
+                        <div class="flex flex-col gap-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium">{% trans "Operating Days & Hours" %}</span>
+                                <button type="button" @click="copyToAll()" class="btn btn-xs btn-ghost">
+                                    {% icon "copy-outline" %}
+                                    {% trans "Copy first to all" %}
+                                </button>
+                            </div>
+
+                            <template x-for="day in days" :key="day.key">
+                                <div class="flex items-center gap-3">
+                                    <label class="toggle">
+                                        <input type="checkbox" :checked="!!hours[day.key]"
+                                               @change="toggleDay(day.key)">
+                                        <span class="toggle-track">
+                                            <span class="toggle-thumb"></span>
+                                        </span>
+                                    </label>
+                                    <span class="w-24 text-sm" x-text="day.label"></span>
+                                    <template x-if="hours[day.key]">
+                                        <div class="flex items-center gap-2">
+                                            <input type="time" class="input input-sm w-28"
+                                                   :value="hours[day.key]?.open || '09:00'"
+                                                   @change="hours[day.key].open = $el.value; hours = {...hours}">
+                                            <span class="text-sm opacity-50">—</span>
+                                            <input type="time" class="input input-sm w-28"
+                                                   :value="hours[day.key]?.close || '22:00'"
+                                                   @change="hours[day.key].close = $el.value; hours = {...hours}">
+                                        </div>
+                                    </template>
+                                    <template x-if="!hours[day.key]">
+                                        <span class="text-sm opacity-40">{% trans "Closed" %}</span>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <div class="mt-2">
+                                <button type="submit" class="btn btn-sm color-primary">
+                                    {% icon "save-outline" %}
+                                    {% trans "Save Hours" %}
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </form>
+        </div>
+    </section>
+
     {# ── Tax Classes ── #}
     <section class="card">
         <div class="card-header">

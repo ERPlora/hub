@@ -466,6 +466,20 @@ class StoreConfig(SingletonConfigMixin, models.Model):
     receipt_header = models.TextField(blank=True, help_text='Additional text to show at the top of receipts')
     receipt_footer = models.TextField(blank=True, help_text='Additional text to show at the bottom of receipts')
 
+    # Business Hours — keeps App Runner warm during operating hours
+    business_hours_enabled = models.BooleanField(
+        default=False,
+        help_text=_('Enable business hours to keep the system responsive during operating times'),
+    )
+    business_hours = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=_(
+            'Operating hours per weekday. Format: {"mon": {"open": "09:00", "close": "22:00"}, ...}. '
+            'Days without entries are considered closed.'
+        ),
+    )
+
     # Configuration status
     is_configured = models.BooleanField(default=False)
 
@@ -488,6 +502,43 @@ class StoreConfig(SingletonConfigMixin, models.Model):
             self.business_address and
             self.vat_number
         )
+
+    def is_within_business_hours(self):
+        """
+        Check if the current time falls within configured business hours.
+
+        Returns True if business hours are enabled and we're within operating
+        hours for today. Returns False if disabled or outside hours.
+        """
+        if not self.business_hours_enabled or not self.business_hours:
+            return False
+
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        hub_tz = 'UTC'
+        try:
+            from .models import HubConfig
+            hub_tz = HubConfig.get_solo().timezone or 'UTC'
+        except Exception:
+            pass
+
+        now = datetime.now(ZoneInfo(hub_tz))
+        day_key = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][now.weekday()]
+
+        day_hours = self.business_hours.get(day_key)
+        if not day_hours or not day_hours.get('open') or not day_hours.get('close'):
+            return False
+
+        try:
+            open_h, open_m = map(int, day_hours['open'].split(':'))
+            close_h, close_m = map(int, day_hours['close'].split(':'))
+            open_minutes = open_h * 60 + open_m
+            close_minutes = close_h * 60 + close_m
+            now_minutes = now.hour * 60 + now.minute
+            return open_minutes <= now_minutes < close_minutes
+        except (ValueError, TypeError):
+            return False
 
     @property
     def pwa_favicon_url(self):
