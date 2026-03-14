@@ -472,22 +472,22 @@
                     <div class="callout-title">{% trans "ERPlora Bridge not detected" %}</div>
                     <div class="callout-text mb-3">{% trans "Install and run the ERPlora Bridge app on this device to enable hardware printing, cash drawer, and barcode scanning." %}</div>
                     <div class="flex flex-wrap gap-2">
-                        <a href="https://github.com/ERPlora/bridge-native/releases/latest/download/erplora-bridge.exe"
+                        <a href="{{ CLOUD_URL }}/bridge/download/windows/"
                            target="_blank" class="btn btn-sm btn-outline">
                             {% icon "desktop-outline" %}
                             Windows
                         </a>
-                        <a href="https://github.com/ERPlora/bridge-native/releases/latest/download/ERPlora.Bridge.dmg"
+                        <a href="{{ CLOUD_URL }}/bridge/download/macos/"
                            target="_blank" class="btn btn-sm btn-outline">
                             {% icon "laptop-outline" %}
                             macOS
                         </a>
-                        <a href="https://github.com/ERPlora/bridge-native/releases/latest/download/erplora-bridge"
+                        <a href="{{ CLOUD_URL }}/bridge/download/linux/"
                            target="_blank" class="btn btn-sm btn-outline">
                             {% icon "terminal-outline" %}
                             Linux
                         </a>
-                        <a href="https://github.com/ERPlora/bridge-native/releases/latest/download/erplora-bridge.apk"
+                        <a href="{{ CLOUD_URL }}/bridge/download/android/"
                            target="_blank" class="btn btn-sm btn-outline">
                             {% icon "phone-portrait-outline" %}
                             Android
