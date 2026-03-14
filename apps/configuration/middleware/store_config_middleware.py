@@ -17,6 +17,7 @@ class StoreConfigCheckMiddleware:
             reverse('auth:login'),
             reverse('auth:logout'),
             reverse('auth:cloud_login'),
+            reverse('auth:get_employees'),
             reverse('auth:verify_pin'),
             reverse('auth:setup_pin'),
             reverse('auth:trust_device'),
