@@ -112,7 +112,9 @@
                     </div>
                 </td>
                 <td class="datatable-td datatable-td-center whitespace-nowrap min-w-[80px]" data-col="status" data-label="{% trans 'Status' %}">
-                    {% if product.is_installed %}
+                    {% if product.has_update %}
+                    <span class="badge badge-sm color-warning">{% trans "Update" %}</span>
+                    {% elif product.is_installed %}
                     <span class="badge badge-sm color-success">{% trans "Installed" %}</span>
                     {% elif product.is_owned %}
                     <span class="badge badge-sm color-info">{% trans "Owned" %}</span>
@@ -122,7 +124,12 @@
                 </td>
                 <td class="datatable-td datatable-td-actions">
                     <div class="datatable-row-actions">
-                        {% if product.is_installed %}
+                        {% if product.has_update %}
+                        <button class="btn btn-sm color-warning"
+                                onclick="downloadAndInstall('{{ product.slug }}', '{{ product.download_url }}', this, '{{ product.module_id }}')">
+                            {% icon "arrow-up-circle-outline" %}
+                        </button>
+                        {% elif product.is_installed %}
                         <button class="btn btn-sm btn-ghost" disabled title="{% trans 'Installed' %}">
                             {% icon "checkmark-circle-outline" %}
                         </button>

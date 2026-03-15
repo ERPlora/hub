@@ -672,9 +672,17 @@ def _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_
     if type_filter:
         modules = [m for m in modules if m.get('module_type') == type_filter]
 
-    # Mark installed and add URLs
+    # Mark installed, check updates, and add URLs
     for module in modules:
         module['is_installed'] = module.get('slug', '') in installed_module_ids or module.get('module_id', '') in installed_module_ids
+        module['has_update'] = False
+        if module['is_installed']:
+            mod_id = module.get('module_id', '') or module.get('slug', '')
+            installed_version = _get_installed_module_version(mod_id)
+            cloud_version = module.get('version', '')
+            if installed_version and cloud_version and installed_version != cloud_version:
+                module['has_update'] = True
+                module['installed_version'] = installed_version
         module['detail_url'] = reverse('marketplace:module_detail', kwargs={'slug': module.get('slug', '')})
         if not module.get('download_url'):
             module['download_url'] = f"{_get_cloud_api_url()}/api/marketplace/modules/{module.get('slug', '')}/download/"

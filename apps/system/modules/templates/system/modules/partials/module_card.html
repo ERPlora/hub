@@ -37,7 +37,12 @@
                         <span class="badge badge-sm color-info">{% trans "Recommended" %}</span>
                         {% endif %}
 
-                        {% if module.is_installed %}
+                        {% if module.has_update %}
+                        <span class="chip chip-sm color-warning">
+                            {% icon "arrow-up-circle-outline" %}
+                            {% trans "Update" %}
+                        </span>
+                        {% elif module.is_installed %}
                         <span class="chip chip-sm color-success">
                             {% icon "checkmark-circle-outline" %}
                             {% trans "Installed" %}
@@ -123,7 +128,13 @@
             </div>
 
             <div class="module-card-actions">
-                {% if module.is_installed %}
+                {% if module.has_update %}
+                <button class="btn btn-sm color-warning" @click.stop
+                        onclick="event.stopPropagation(); downloadAndInstall('{{ module.slug }}', '{{ module.download_url }}', this, '{{ module.module_id }}')">
+                    {% icon "arrow-up-circle-outline" %}
+                    {% trans "Update" %}
+                </button>
+                {% elif module.is_installed %}
                 <span class="badge badge-sm color-success">{% icon "checkmark-circle-outline" %} {% trans "Installed" %}</span>
                 {% else %}
                 <button class="btn btn-sm btn-outline" @click.stop="toggle('{{ module.slug }}')">
