@@ -127,7 +127,8 @@
                         {% if product.has_update %}
                         <button class="btn btn-sm color-warning"
                                 hx-post="{% url 'mymodules:htmx_update' slug=product.slug %}"
-                                hx-swap="outerHTML"
+                                hx-swap="innerHTML"
+                                hx-target="closest .datatable-row-actions"
                                 hx-indicator="closest tr">
                             {% icon "arrow-up-circle-outline" %}
                         </button>

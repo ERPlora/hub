@@ -1214,7 +1214,9 @@ def htmx_update_module(request, slug):
     hub_token = ModuleInstallService.get_hub_token()
     if not hub_token:
         return HttpResponse(
-            '<span class="badge badge-sm color-error">Auth error</span>',
+            '<div class="module-card-actions">'
+            '<span class="badge badge-sm color-error">Auth error</span>'
+            '</div>',
             status=200,
         )
 
@@ -1227,8 +1229,10 @@ def htmx_update_module(request, slug):
 
     if not result.success:
         return HttpResponse(
+            '<div class="module-card-actions">'
             f'<span class="badge badge-sm color-error" title="{html_escape(result.message)}">'
-            f'{_("Error")}</span>',
+            f'{_("Error")}</span>'
+            '</div>',
             status=200,
         )
 
@@ -1252,9 +1256,11 @@ def htmx_update_module(request, slug):
     schedule_server_restart(delay=2)
 
     return HttpResponse(
+        '<div class="module-card-actions">'
         '<span class="badge badge-sm color-success">'
         f'{_("Updated! Restarting...")}'
         '</span>'
+        '</div>'
         '<script>setTimeout(function(){location.reload()},4000)</script>',
         status=200,
     )

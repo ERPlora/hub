@@ -129,10 +129,13 @@
 
             <div class="module-card-actions">
                 {% if module.has_update %}
-                <button class="btn btn-sm color-warning" @click.stop
+                <button class="btn btn-sm color-warning"
                         hx-post="{% url 'mymodules:htmx_update' slug=module.slug %}"
                         hx-swap="outerHTML"
-                        hx-indicator="closest .module-card">
+                        hx-target="closest .module-card-actions"
+                        hx-indicator="closest .module-card"
+                        hx-disinherit="*"
+                        onclick="event.stopPropagation()">
                     {% icon "arrow-up-circle-outline" %}
                     {% trans "Update" %}
                 </button>
