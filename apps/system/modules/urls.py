@@ -46,6 +46,7 @@ urlpatterns = [
     path('api/marketplace/', views.fetch_marketplace, name='api_fetch'),
     path('api/marketplace/purchase/', views.purchase_module, name='api_purchase'),
     path('api/marketplace/install/', views.install_from_marketplace, name='api_install'),
+    path('api/marketplace/update/<slug:slug>/', views.htmx_update_module, name='htmx_update'),
     path('api/marketplace/ownership/<str:module_id>/', views.check_ownership, name='api_ownership'),
     path('api/marketplace/rate/', views.rate_module, name='api_rate'),
 ]

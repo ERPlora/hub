@@ -1202,3 +1202,51 @@ def install_from_marketplace(request):
 
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@require_http_methods(["POST"])
+@admin_required
+def htmx_update_module(request, slug):
+    """HTMX endpoint: update (force-reinstall) a module and return HTML snippet."""
+    from apps.core.services.module_install_service import ModuleInstallService
+    from django.http import HttpResponse
+
+    hub_token = ModuleInstallService.get_hub_token()
+    if not hub_token:
+        return HttpResponse(
+            '<span class="badge badge-sm color-error">Auth error</span>',
+            status=200,
+        )
+
+    cloud_api_url = getattr(django_settings, 'CLOUD_API_URL', 'https://erplora.com').rstrip('/')
+    download_url = f"{cloud_api_url}/api/marketplace/modules/{slug}/download/"
+
+    result = ModuleInstallService.download_and_install(
+        slug, download_url, hub_token, force=True
+    )
+
+    if not result.success:
+        return HttpResponse(
+            f'<span class="badge badge-sm color-error" title="{html_escape(result.message)}">'
+            f'{_("Error")}</span>',
+            status=200,
+        )
+
+    ModuleInstallService.run_post_install(
+        load_single=result.module_id, run_migrations=True
+    )
+
+    # Invalidate marketplace cache
+    from django.core.cache import cache
+    cache.delete('mp:installed_ids')
+
+    # Track pending restart
+    request.session.setdefault('modules_pending_restart', [])
+    if result.module_id not in request.session['modules_pending_restart']:
+        request.session['modules_pending_restart'].append(result.module_id)
+        request.session.modified = True
+
+    return HttpResponse(
+        f'<span class="badge badge-sm color-success">{_("Updated! Restart needed")}</span>',
+        status=200,
+    )

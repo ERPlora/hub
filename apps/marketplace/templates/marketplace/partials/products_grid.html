@@ -126,7 +126,9 @@
                     <div class="datatable-row-actions">
                         {% if product.has_update %}
                         <button class="btn btn-sm color-warning"
-                                onclick="downloadAndInstall('{{ product.slug }}', '{{ product.download_url }}', this, '{{ product.module_id }}')">
+                                hx-post="{% url 'mymodules:htmx_update' slug=product.slug %}"
+                                hx-swap="outerHTML"
+                                hx-indicator="closest tr">
                             {% icon "arrow-up-circle-outline" %}
                         </button>
                         {% elif product.is_installed %}
