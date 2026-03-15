@@ -326,7 +326,6 @@ def cloud_login(request):
                 if user_response.status_code == 200:
                     user_info = user_response.json()
                     hub_config = HubConfig.get_config()
-                    is_first_user = LocalUser.objects.count() == 0
                     cloud_user_id = user_info.get('id')
 
                     local_user = None
@@ -344,7 +343,7 @@ def cloud_login(request):
                                 cloud_user_id=cloud_user_id,
                                 email=email,
                                 name=user_info.get('name', email.split('@')[0]),
-                                role='admin' if is_first_user else 'employee',
+                                role='admin',
                                 pin_hash='',
                                 language=user_info.get('language', hub_config.os_language),
                             )

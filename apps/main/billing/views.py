@@ -2,10 +2,10 @@
 Hub Billing Views — displays invoices from Cloud.
 """
 import logging
+import traceback
 
-from django.shortcuts import render
 from apps.accounts.decorators import login_required
-from apps.core.htmx import htmx_view, is_htmx_request
+from apps.core.htmx import htmx_view
 from apps.sync.services.cloud_api import get_cloud_api, CloudAPIError
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def index(request):
         logger.error(f"[BILLING] Failed to fetch invoices: {e}")
         error = str(e)
     except Exception as e:
-        logger.error(f"[BILLING] Unexpected error: {e}")
+        logger.error(f"[BILLING] Unexpected error: {e}\n{traceback.format_exc()}")
         error = str(e)
 
     return {
