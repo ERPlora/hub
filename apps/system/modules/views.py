@@ -1240,13 +1240,21 @@ def htmx_update_module(request, slug):
     from django.core.cache import cache
     cache.delete('mp:installed_ids')
 
-    # Track pending restart
-    request.session.setdefault('modules_pending_restart', [])
-    if result.module_id not in request.session['modules_pending_restart']:
-        request.session['modules_pending_restart'].append(result.module_id)
+    # Run migrations and schedule automatic restart
+    from django.core.management import call_command
+    call_command('migrate', '--run-syncdb')
+
+    if 'modules_pending_restart' in request.session:
+        del request.session['modules_pending_restart']
         request.session.modified = True
 
+    from apps.core.utils import schedule_server_restart
+    schedule_server_restart(delay=2)
+
     return HttpResponse(
-        f'<span class="badge badge-sm color-success">{_("Updated! Restart needed")}</span>',
+        '<span class="badge badge-sm color-success">'
+        f'{_("Updated! Restarting...")}'
+        '</span>'
+        '<script>setTimeout(function(){location.reload()},4000)</script>',
         status=200,
     )
