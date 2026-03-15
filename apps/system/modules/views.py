@@ -1261,6 +1261,11 @@ def htmx_update_module(request, slug):
         f'{_("Updated! Restarting...")}'
         '</span>'
         '</div>'
-        '<script>setTimeout(function(){window.location.href="/marketplace/"},4000)</script>',
+        '<script>if(window.ERPlora&&window.ERPlora.showReconnectOverlay)'
+        '{window.ERPlora.showReconnectOverlay("'
+        + str(_("Applying changes...")).replace('"', '\\"')
+        + '","'
+        + str(_("The server is restarting. This page will reload automatically.")).replace('"', '\\"')
+        + '")}</script>',
         status=200,
     )
