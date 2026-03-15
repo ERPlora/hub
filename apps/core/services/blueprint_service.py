@@ -749,7 +749,7 @@ class BlueprintService:
                 name=prod_data.get('name', code),
                 description=prod_data.get('description', ''),
                 price=prod_data.get('price', 0),
-                product_type=prod_data.get('product_type', 'service'),
+                product_type=prod_data.get('product_type', 'physical'),
                 tax_class=tax_class,
                 source='blueprint',
             )
