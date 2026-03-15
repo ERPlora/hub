@@ -171,6 +171,7 @@ MIDDLEWARE = [
     'apps.configuration.middleware.StoreConfigCheckMiddleware',
     'apps.core.middleware.module_subscription.ModuleSubscriptionMiddleware',
     'apps.core.middleware.module_middleware_manager.ModuleMiddlewareManager',
+    'apps.core.middleware.error_pages.ErrorPageMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

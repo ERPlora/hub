@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% trans "Page Not Found" %} - ERPlora Hub</title>
+<title>{% trans "Access Denied" %} - ERPlora Hub</title>
 
 <link rel="stylesheet" href="/static/css/vendor/ux-full.min.css">
 
@@ -57,7 +57,7 @@
     .error-code {
         font-size: 8rem;
         font-weight: 900;
-        color: var(--color-error);
+        color: var(--color-warning);
         margin: 0;
         line-height: 1;
     }
@@ -88,9 +88,9 @@
     <div class="error-container">
         <div class="card glass error-card">
             <div class="card-body">
-                <h1 class="error-code">404</h1>
-                <h2 class="error-title">{% trans "Page Not Found" %}</h2>
-                <p class="error-message">{% trans "The page you're looking for doesn't exist or has been moved." %}</p>
+                <h1 class="error-code">403</h1>
+                <h2 class="error-title">{% trans "Access Denied" %}</h2>
+                <p class="error-message">{% trans "You don't have permission to access this page." %}</p>
                 <a href="/" class="btn color-primary">{% trans "Go to Home" %}</a>
             </div>
         </div>

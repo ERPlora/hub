@@ -1261,6 +1261,6 @@ def htmx_update_module(request, slug):
         f'{_("Updated! Restarting...")}'
         '</span>'
         '</div>'
-        '<script>setTimeout(function(){location.reload()},4000)</script>',
+        '<script>setTimeout(function(){window.location.href="/marketplace/"},4000)</script>',
         status=200,
     )
