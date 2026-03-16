@@ -926,10 +926,16 @@ def solutions_bulk_install(request):
     hub_config.save(update_fields=['selected_business_types'])
 
     from apps.core.services.module_install_service import ModuleInstallService
+    hub_token = ModuleInstallService.get_hub_token(hub_config)
     result = ModuleInstallService.install_block_modules(block_slugs, hub_config)
 
     if result.installed > 0:
         _invalidate_installed_cache()
+        installed_slugs = [r.module_id for r in result.results if r.success]
+        if installed_slugs:
+            ModuleInstallService.notify_cloud_installations(
+                installed_slugs, hub_token,
+            )
         ModuleInstallService.run_post_install(
             load_all=True, run_migrations=True, schedule_restart=True,
         )
@@ -1052,10 +1058,13 @@ def modules_bulk_install(request):
 
         if result.installed > 0:
             _invalidate_installed_cache()
+            installed_slugs = [m['slug'] for m in modules_to_install]
+            ModuleInstallService.notify_cloud_installations(
+                installed_slugs, hub_token,
+            )
             ModuleInstallService.run_post_install(
                 load_all=True, run_migrations=True, schedule_restart=True,
             )
-            installed_slugs = [m['slug'] for m in modules_to_install]
             _create_roles_for_installed_modules(installed_slugs)
 
     return HttpResponse(json.dumps({
@@ -1204,6 +1213,10 @@ def solution_install(request, slug):
         # Post-install: load, migrate, create roles
         if installed_count > 0:
             _invalidate_installed_cache()
+            installed_slugs = [m['slug'] for m in modules_to_install]
+            ModuleInstallService.notify_cloud_installations(
+                installed_slugs, hub_token,
+            )
             ModuleInstallService.run_post_install(
                 load_all=True, run_migrations=True,
                 schedule_restart=True,

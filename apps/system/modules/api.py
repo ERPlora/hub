@@ -565,6 +565,11 @@ class ModuleInstallView(APIView):
                 {'success': False, 'error': result.message}, status=err_status
             )
 
+        # Notify Cloud so ensure_modules can restore on container restart
+        ModuleInstallService.notify_cloud_installations(
+            [result.module_id], hub_token,
+        )
+
         ModuleInstallService.run_post_install(
             load_single=result.module_id,
             run_migrations=True,

@@ -555,3 +555,33 @@ class ModuleInstallService:
                 pass
         # Slugs use hyphens, Python identifiers use underscores
         return fallback.replace('-', '_')
+
+    @classmethod
+    def notify_cloud_installations(cls, module_ids, hub_token=None):
+        """Report installed modules to Cloud (best-effort).
+
+        Cloud uses this to know which modules to restore on container restart
+        via ensure_modules. Without this, modules installed from the marketplace
+        would be lost when App Runner creates a new container.
+        """
+        if not hub_token:
+            hub_token = cls.get_hub_token()
+        if not hub_token:
+            return
+
+        cloud_url = getattr(settings, 'CLOUD_API_URL', 'https://erplora.com')
+
+        for module_id in module_ids:
+            version = cls.get_installed_version(module_id)
+            try:
+                http_requests.post(
+                    f'{cloud_url}/api/marketplace/hub-modules/',
+                    json={'module_slug': module_id, 'version': version},
+                    headers={
+                        'X-Hub-Token': hub_token,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout=10,
+                )
+            except Exception:
+                pass  # Best-effort

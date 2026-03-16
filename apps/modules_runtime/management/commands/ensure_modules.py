@@ -145,22 +145,28 @@ class Command(BaseCommand):
 
         from apps.core.services.module_install_service import ModuleInstallService
 
-        # Build map of Cloud versions from hub-modules API
-        # The API returns module_version field from HubModuleInstallation
-        # But the real source of truth is the Module.version in Cloud
-        # For now, compare with what Cloud reports
         updated = 0
+        installed = 0
         for mod_info in cloud_modules:
             slug = mod_info['slug']
             cloud_version = mod_info.get('version', '')
-            if not cloud_version:
-                continue
 
             local_version = ModuleInstallService.get_installed_version(slug)
-            if local_version == '0.0.0':
-                continue  # Not installed locally
 
-            if local_version != cloud_version:
+            if local_version == '0.0.0':
+                # Module in Cloud but not locally — install it
+                self.stdout.write(f'  Installing missing module: {slug}')
+                download_url = f'{cloud_url}/api/marketplace/modules/{slug}/download/'
+                result = ModuleInstallService.download_and_install(
+                    slug, download_url, hub_token,
+                )
+                if result.success:
+                    installed += 1
+                else:
+                    self.stdout.write(self.style.WARNING(
+                        f'  Failed to install {slug}: {result.message}'
+                    ))
+            elif cloud_version and local_version != cloud_version:
                 self.stdout.write(
                     f'  Updating {slug}: v{local_version} -> v{cloud_version}'
                 )
@@ -175,8 +181,10 @@ class Command(BaseCommand):
                         f'  Failed to update {slug}: {result.message}'
                     ))
 
-        if updated > 0:
-            self.stdout.write(f'Updated {updated} modules, running migrations...')
+        if updated > 0 or installed > 0:
+            self.stdout.write(
+                f'Updated {updated}, installed {installed} modules, running migrations...'
+            )
             ModuleInstallService.run_post_install(
                 load_all=True, run_migrations=True, schedule_restart=False,
             )
