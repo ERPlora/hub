@@ -246,6 +246,14 @@ def index(request):
             except TaxClass.DoesNotExist:
                 return toast_response('Tax class not found', 'error', status=404)
 
+        # Toggle sidebar modules
+        if action == 'toggle_sidebar_modules':
+            hub_config.show_modules_in_sidebar = 'show_modules_in_sidebar' in request.POST
+            hub_config.save(update_fields=['show_modules_in_sidebar'])
+            response = toast_response('Sidebar updated')
+            response['HX-Refresh'] = 'true'
+            return response
+
         # Toggle bridge on/off (master switch)
         if action == 'toggle_bridge':
             hub_config.bridge_enabled = 'bridge_enabled' in request.POST

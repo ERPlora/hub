@@ -276,6 +276,12 @@ class HubConfig(SingletonConfigMixin, models.Model):
         help_text='Version of the blueprint data used during setup'
     )
 
+    # Sidebar
+    show_modules_in_sidebar = models.BooleanField(
+        default=False,
+        help_text='Show installed modules in the sidebar navigation'
+    )
+
     # Hardware Bridge
     bridge_enabled = models.BooleanField(
         default=False,
