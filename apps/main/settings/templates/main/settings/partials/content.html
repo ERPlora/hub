@@ -418,6 +418,32 @@
                     </div>
                 </div>
             </form>
+
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-swap="none"
+                  hx-trigger="change">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_sidebar_modules">
+                <div class="list list-inset mt-4">
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Show modules in sidebar" %}</span>
+                            <span class="list-item-note">{% trans "Display installed modules as shortcuts in the sidebar navigation" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <label class="toggle">
+                                <input type="checkbox"
+                                       name="show_modules_in_sidebar"
+                                       value="true"
+                                       {% if hub_config.show_modules_in_sidebar %}checked{% endif %}>
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </form>
         </div>
     </section>
 

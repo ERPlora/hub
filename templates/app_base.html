@@ -107,7 +107,7 @@
                         </a>
                     </div>
 
-                    {% if MODULE_MENU_ITEMS %}
+                    {% if hub_config.show_modules_in_sidebar and MODULE_MENU_ITEMS %}
                     <div class="sidebar-separator"></div>
                     {% for item in MODULE_MENU_ITEMS %}
                     <div class="sidebar-menu-item">
