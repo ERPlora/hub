@@ -656,8 +656,9 @@
         window.ERPlora = window.ERPlora || {};
         window.ERPlora.showReconnectOverlay = showOverlay;
 
-        // Health check every 2s — if server is down, show overlay; when back, reload
-        var wasDown = false;
+        // Health check every 2s — show overlay after 3 consecutive failures
+        var failCount = 0;
+        var FAIL_THRESHOLD = 3;
         setInterval(function() {
             var ctrl = new AbortController();
             var tid = setTimeout(function() { ctrl.abort(); }, 1500);
@@ -665,16 +666,17 @@
                 .then(function(r) {
                     clearTimeout(tid);
                     if (r.ok) {
-                        if (wasDown) hideAndReload();
+                        if (failCount >= FAIL_THRESHOLD) hideAndReload();
+                        failCount = 0;
                     } else {
-                        wasDown = true;
-                        showOverlay();
+                        failCount++;
+                        if (failCount >= FAIL_THRESHOLD) showOverlay();
                     }
                 })
                 .catch(function() {
                     clearTimeout(tid);
-                    wasDown = true;
-                    showOverlay();
+                    failCount++;
+                    if (failCount >= FAIL_THRESHOLD) showOverlay();
                 });
         }, 2000);
     })();
