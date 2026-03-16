@@ -37,17 +37,9 @@
                         msg = '{% trans 'Solution deactivated' %}';
                     }
                     this.toggleResult = { success: true, message: msg };
-                    // If server is restarting, show the reconnect overlay
-                    if (data.server_restarting && window.ERPlora && window.ERPlora.showReconnectOverlay) {
-                        window.ERPlora.showReconnectOverlay(
-                            '{% trans 'Applying changes...' %}',
-                            '{% trans 'The server is restarting. This page will reload automatically.' %}'
-                        );
-                    } else {
-                        setTimeout(function() {
-                            htmx.ajax('GET', '/marketplace/solutions/{{ solution.slug }}/', {target: '#main-content-area', swap: 'innerHTML'});
-                        }, 800);
-                    }
+                    setTimeout(function() {
+                        htmx.ajax('GET', '/marketplace/solutions/{{ solution.slug }}/', {target: '#main-content-area', swap: 'innerHTML'});
+                    }, 800);
                 } else {
                     this.toggleResult = { success: false, message: data.error || '{% trans 'Action failed.' %}' };
                 }

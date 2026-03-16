@@ -43,12 +43,6 @@
                                 .then(d => {
                                     if(d.success) {
                                         activated = true;
-                                        if (d.server_restarting && window.ERPlora && window.ERPlora.showReconnectOverlay) {
-                                            window.ERPlora.showReconnectOverlay(
-                                                '{% trans "Applying changes..." %}',
-                                                '{% trans "The server is restarting. This page will reload automatically." %}'
-                                            );
-                                        }
                                     }
                                 })
                                 .finally(() => activating = false)

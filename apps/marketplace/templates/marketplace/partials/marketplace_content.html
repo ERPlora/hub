@@ -85,15 +85,7 @@
                 }
                 self.clearSelection();
                 self.installing = false;
-                // If server is restarting (new modules loaded), show reconnect overlay
-                if (data.server_restarting && window.ERPlora && window.ERPlora.showReconnectOverlay) {
-                    window.ERPlora.showReconnectOverlay(
-                        '{% trans "Applying changes..." %}',
-                        '{% trans "The server is restarting. This page will reload automatically." %}'
-                    );
-                } else {
-                    htmx.ajax('GET', '{% url "marketplace:products_list" %}', {target: '#datatable-body', swap: 'innerHTML'});
-                }
+                htmx.ajax('GET', '{% url "marketplace:products_list" %}', {target: '#datatable-body', swap: 'innerHTML'});
             } else {
                 Toast.error(data.error || '{% trans "Install failed" %}');
                 self.installing = false;

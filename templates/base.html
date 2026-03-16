@@ -629,13 +629,9 @@
         var overlay = document.getElementById('reconnect-overlay');
         var titleEl = document.getElementById('reconnect-overlay-title');
         var subtitleEl = document.getElementById('reconnect-overlay-subtitle');
-        var pollInterval = null;
         var shown = false;
         var SK = '_erplora_reloading';
-        var defaultTitle = '{% trans "Reconnecting to server..." %}';
-        var defaultSubtitle = '{% trans "Please wait a moment" %}';
 
-        // If we're coming back from a reload, show overlay until page is fully ready
         if (sessionStorage.getItem(SK)) {
             overlay.style.display = 'flex';
             shown = true;
@@ -646,44 +642,41 @@
             });
         }
 
-        function showOverlay(title, subtitle) {
+        function showOverlay() {
             if (shown) return;
             shown = true;
-            titleEl.textContent = title || defaultTitle;
-            subtitleEl.textContent = subtitle || defaultSubtitle;
             overlay.style.display = 'flex';
-            pollInterval = setInterval(function() {
-                fetch('/health/', {cache: 'no-store'})
-                    .then(function(r) {
-                        if (r.ok) {
-                            if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-                            sessionStorage.setItem(SK, '1');
-                            window.location.reload();
-                        }
-                    })
-                    .catch(function() {});
-            }, 2000);
         }
 
-        // Expose globally so views can trigger it explicitly when server is restarting
+        function hideAndReload() {
+            sessionStorage.setItem(SK, '1');
+            window.location.reload();
+        }
+
         window.ERPlora = window.ERPlora || {};
         window.ERPlora.showReconnectOverlay = showOverlay;
 
-        // HTMX connection error (server genuinely down / restarting)
-        document.body.addEventListener('htmx:sendError', function() { showOverlay(); });
-
-        // Intercept fetch: only show overlay on actual connection failures
-        // (server unreachable), NOT on requires_restart JSON responses.
-        // Views that schedule a real server restart should call
-        // window.ERPlora.showReconnectOverlay() explicitly.
-        var origFetch = window.fetch;
-        window.fetch = function() {
-            return origFetch.apply(this, arguments).catch(function(err) {
-                // Network error = server is genuinely down
-                showOverlay();
-                return Promise.reject(err);
-            });
-        };
+        // Health check every 2s — if server is down, show overlay; when back, reload
+        var wasDown = false;
+        setInterval(function() {
+            var ctrl = new AbortController();
+            var tid = setTimeout(function() { ctrl.abort(); }, 1500);
+            fetch('/health/', {cache: 'no-store', signal: ctrl.signal})
+                .then(function(r) {
+                    clearTimeout(tid);
+                    if (r.ok) {
+                        if (wasDown) hideAndReload();
+                    } else {
+                        wasDown = true;
+                        showOverlay();
+                    }
+                })
+                .catch(function() {
+                    clearTimeout(tid);
+                    wasDown = true;
+                    showOverlay();
+                });
+        }, 2000);
     })();
     </script>
 
