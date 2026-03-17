@@ -294,6 +294,7 @@ def _get_filters_for_store(store_type, language, request):
         # Fetch sectors and business types from blueprints API
         sectors = _fetch_sectors_for_filters()
         business_types = _fetch_business_types_for_filters()
+        functional_units = _fetch_functional_units()
 
         filters['sectors'] = sectors
         filters['business_types'] = business_types
@@ -302,6 +303,29 @@ def _get_filters_for_store(store_type, language, request):
             {'id': 'one_time', 'name': 'One-time', 'name_es': 'Pago único', 'icon': 'card-outline'},
             {'id': 'subscription', 'name': 'Subscription', 'name_es': 'Suscripción', 'icon': 'sync-outline'},
         ]
+
+        # Build industries_list for the template filter modal
+        industries_list = [
+            {'id': t.get('code', ''), 'name': t.get('name', t.get('code', ''))}
+            for t in business_types
+            if t.get('code')
+        ]
+        filters['industries_list'] = industries_list
+        filters['industries'] = bool(industries_list)
+
+        # Build solutions_grouped from functional units (grouped by block_type or ungrouped)
+        groups_map = {}
+        for unit in functional_units:
+            block_type = unit.get('block_type') or unit.get('group') or ''
+            block_type_name = unit.get('block_type_name') or block_type or 'Other'
+            if block_type not in groups_map:
+                groups_map[block_type] = {'name': block_type_name, 'blocks': []}
+            groups_map[block_type]['blocks'].append({
+                'id': unit.get('code') or unit.get('id', ''),
+                'name': unit.get('name', ''),
+                'is_active': False,
+            })
+        filters['solutions_grouped'] = list(groups_map.values())
 
     elif store_type == 'hubs':
         filters['regions'] = [
@@ -550,6 +574,7 @@ def products_list(request, store_type):
     type_filter = request.GET.get('type', '').strip()
     industry_filter = request.GET.get('industry', '').strip()
     solution_filter = request.GET.get('solution', '').strip()
+    status_filter = request.GET.get('status', '').strip()
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
     current_view = request.GET.get('view', 'cards')
@@ -564,7 +589,7 @@ def products_list(request, store_type):
     config = get_store_config(store_type)
 
     if store_type == 'modules':
-        return _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number, industry_filter, solution_filter)
+        return _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number, industry_filter, solution_filter, status_filter)
     elif store_type == 'hubs':
         return _fetch_hubs_list(request, search_query, '', 12)
     else:
@@ -623,7 +648,7 @@ def _fetch_all_modules():
         return None, str(_('Could not connect to Cloud. Please try again.'))
 
 
-def _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number, industry_filter='', solution_filter=''):
+def _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_field, sort_dir, current_view, per_page, page_number, industry_filter='', solution_filter='', status_filter=''):
     """Fetch modules from Cloud API with DataTable pagination"""
     from django.core.paginator import Paginator
 
@@ -672,9 +697,18 @@ def _fetch_modules_list(request, search_query, sector_filter, type_filter, sort_
     if type_filter:
         modules = [m for m in modules if m.get('module_type') == type_filter]
 
-    # Mark installed, check updates, and add URLs
+    # Mark installed
     for module in modules:
         module['is_installed'] = module.get('slug', '') in installed_module_ids or module.get('module_id', '') in installed_module_ids
+
+    # Filter by installation status
+    if status_filter == 'installed':
+        modules = [m for m in modules if m.get('is_installed')]
+    elif status_filter == 'not_installed':
+        modules = [m for m in modules if not m.get('is_installed')]
+
+    # Check updates and add URLs
+    for module in modules:
         module['has_update'] = False
         if module['is_installed']:
             mod_id = module.get('module_id', '') or module.get('slug', '')

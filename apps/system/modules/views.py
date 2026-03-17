@@ -38,7 +38,7 @@ def modules_index(request):
     search_query = request.GET.get('q', '').strip()
     sort_field = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
-    current_view = request.GET.get('view', 'table')
+    current_view = request.GET.get('view', 'cards')
     try:
         per_page = int(request.GET.get('per_page', 12))
     except (ValueError, TypeError):
@@ -568,7 +568,7 @@ def _render_modules_page(request, error=None):
         'page_obj': page_obj,
         'sort_field': 'name',
         'sort_dir': 'asc',
-        'current_view': 'table',
+        'current_view': 'cards',
         'per_page': per_page,
         'search_query': '',
         'status_filter': '',

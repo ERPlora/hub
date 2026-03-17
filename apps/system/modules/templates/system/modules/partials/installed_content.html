@@ -1,7 +1,7 @@
 {% load i18n djicons %}
 
 <div x-data="{
-    view: '{{ current_view|default:'table' }}',
+    view: '{{ current_view|default:'cards' }}',
     columnsModal: false,
     cols: { author: true, version: true, status: true },
     toggleCol(col) {

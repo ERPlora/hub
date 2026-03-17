@@ -210,6 +210,7 @@
         <input type="hidden" name="solution" id="filter-solution" value="">
         <input type="hidden" name="industry" id="filter-industry" value="{% for bt in default_business_types %}{{ bt.code }}{% if not forloop.last %},{% endif %}{% endfor %}">
         <input type="hidden" name="type" id="filter-type" value="">
+        <input type="hidden" name="status" id="filter-status" value="">
 
         <!-- Datatable Body (HTMX swap target) -->
         <div id="datatable-body">
@@ -321,6 +322,36 @@
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+
+            <!-- Status Filter (single-select) -->
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold mb-2">{% trans "Status" %}</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            class="filter-chip filter-chip-active"
+                            data-filter="status"
+                            data-value=""
+                            onclick="setFilter('status', '')">
+                        {% trans "All" %}
+                    </button>
+                    <button type="button"
+                            class="filter-chip"
+                            data-filter="status"
+                            data-value="installed"
+                            onclick="setFilter('status', 'installed')">
+                        {% icon "checkmark-circle-outline" %}
+                        {% trans "Installed" %}
+                    </button>
+                    <button type="button"
+                            class="filter-chip"
+                            data-filter="status"
+                            data-value="not_installed"
+                            onclick="setFilter('status', 'not_installed')">
+                        {% icon "cloud-download-outline" %}
+                        {% trans "Not installed" %}
+                    </button>
+                </div>
             </div>
 
             <!-- Pricing Type Filter (single-select) -->
@@ -490,7 +521,7 @@
             setMultiValues(filter, []);
         });
         // Single-select filters
-        ['type'].forEach(function (filter) {
+        ['type', 'status'].forEach(function (filter) {
             var input = document.getElementById('filter-' + filter);
             if (input) {
                 input.value = '';
@@ -537,7 +568,8 @@
         var filterLabels = {
             solution: '{% trans "Solution" %}',
             industry: '{% trans "Business Type" %}',
-            type: '{% trans "Type" %}'
+            type: '{% trans "Type" %}',
+            status: '{% trans "Status" %}'
         };
 
         function getChipLabel(filterName, value) {
@@ -562,7 +594,7 @@
         });
 
         // Single-select filters
-        ['type'].forEach(function (filter) {
+        ['type', 'status'].forEach(function (filter) {
             var input = document.getElementById('filter-' + filter);
             if (input && input.value) {
                 var displayValue = getChipLabel(filter, input.value);
