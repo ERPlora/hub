@@ -22,7 +22,8 @@ def _get_database_size():
 
 
 def _get_resource_metrics():
-    """Get container resource metrics from cgroups v2 (Docker) or env vars."""
+    """Get resource metrics from Cloud API (CloudWatch) for cloud hubs."""
+    is_cloud = bool(os.environ.get('HUB_ID'))
     metrics = {
         'memory_used_mb': 0,
         'memory_limit_mb': 0,
@@ -30,75 +31,37 @@ def _get_resource_metrics():
         'cpu_limit': 0,
         'cpu_used': 0,
         'cpu_percent': 0,
-        'is_cloud': bool(os.environ.get('HUB_ID')),
+        'is_cloud': is_cloud,
     }
 
-    # Memory used: cgroup v2
+    if not is_cloud:
+        return metrics
+
+    # Fetch from Cloud API (CloudWatch metrics)
     try:
-        with open('/sys/fs/cgroup/memory.current', 'r') as f:
-            memory_used = int(f.read().strip())
-        metrics['memory_used_mb'] = round(memory_used / (1024 * 1024))
-    except (FileNotFoundError, ValueError):
-        pass
+        from apps.sync.services.cloud_api import get_cloud_api
+        cloud_api = get_cloud_api()
+        if cloud_api.is_configured:
+            data = cloud_api.get_metrics()
+            if data:
+                cpu_percent = data.get('cpu_percent')
+                memory_percent = data.get('memory_percent')
+                memory_used_mb = data.get('memory_used_mb')
+                memory_limit_mb = data.get('memory_limit_mb')
+                cpu_limit = data.get('cpu_limit')
 
-    # Memory limit: env var, cgroup, or Docker inspect
-    mem_limit_env = os.environ.get('MEMORY_LIMIT', '')
-    if mem_limit_env.endswith('m'):
-        metrics['memory_limit_mb'] = int(mem_limit_env[:-1])
-    elif mem_limit_env.endswith('g'):
-        metrics['memory_limit_mb'] = int(mem_limit_env[:-1]) * 1024
-    else:
-        try:
-            with open('/sys/fs/cgroup/memory.max', 'r') as f:
-                val = f.read().strip()
-                if val != 'max':
-                    metrics['memory_limit_mb'] = round(int(val) / (1024 * 1024))
-        except (FileNotFoundError, ValueError):
-            pass
-
-    if metrics['memory_limit_mb'] > 0 and metrics['memory_used_mb'] > 0:
-        metrics['memory_percent'] = round(
-            metrics['memory_used_mb'] / metrics['memory_limit_mb'] * 100
-        )
-
-    # CPU limit: env var or cgroup
-    cpu_limit_env = os.environ.get('CPU_LIMIT', '')
-    if cpu_limit_env:
-        try:
-            metrics['cpu_limit'] = float(cpu_limit_env)
-        except ValueError:
-            pass
-    else:
-        try:
-            with open('/sys/fs/cgroup/cpu.max', 'r') as f:
-                parts = f.read().strip().split()
-                if parts[0] != 'max':
-                    metrics['cpu_limit'] = round(int(parts[0]) / int(parts[1]), 2)
-        except (FileNotFoundError, ValueError, IndexError):
-            pass
-
-    # CPU usage: cgroup v2 usage_usec / uptime = average CPU cores used
-    try:
-        with open('/sys/fs/cgroup/cpu.stat', 'r') as f:
-            for line in f:
-                if line.startswith('usage_usec'):
-                    cpu_usage_usec = int(line.split()[1])
-                    break
-            else:
-                cpu_usage_usec = 0
-
-        with open('/proc/uptime', 'r') as f:
-            uptime_sec = float(f.read().split()[0])
-
-        if uptime_sec > 0 and cpu_usage_usec > 0:
-            cpu_used = cpu_usage_usec / (uptime_sec * 1_000_000)
-            metrics['cpu_used'] = round(cpu_used, 2)
-
-            if metrics['cpu_limit'] > 0:
-                metrics['cpu_percent'] = min(100, round(
-                    cpu_used / metrics['cpu_limit'] * 100
-                ))
-    except (FileNotFoundError, ValueError, IndexError):
+                if memory_limit_mb:
+                    metrics['memory_limit_mb'] = memory_limit_mb
+                if memory_used_mb:
+                    metrics['memory_used_mb'] = memory_used_mb
+                if memory_percent:
+                    metrics['memory_percent'] = round(memory_percent)
+                if cpu_limit:
+                    metrics['cpu_limit'] = cpu_limit
+                if cpu_percent is not None and cpu_limit:
+                    metrics['cpu_used'] = round(cpu_percent * cpu_limit / 100, 2)
+                    metrics['cpu_percent'] = round(cpu_percent)
+    except Exception:
         pass
 
     return metrics
