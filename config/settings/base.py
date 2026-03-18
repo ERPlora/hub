@@ -560,6 +560,7 @@ DJICONS = {
     "DEFAULT_NAMESPACE": "ion",  # Ionicons SVGs as default icon set
     "ICON_DIRS": {
         "ion": BASE_DIR / "static" / "icons" / "ionicons",
+        "material": BASE_DIR / "static" / "icons" / "material",
     },
     "PACKS": ["material"],  # Material Symbols (local, collected via djicons_collect)
     "MISSING_ICON_SILENT": False,  # Show error in development
