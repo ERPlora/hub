@@ -556,17 +556,22 @@ LOGGING = {
 # =============================================================================
 
 DJICONS = {
-    "MODE": "local",  # Serve all icons from local files (no CDN)
-    "DEFAULT_NAMESPACE": "ion",  # Ionicons SVGs as default icon set
+    "MODE": "local",
+    "DEFAULT_NAMESPACE": "ion",
     "ICON_DIRS": {
-        "ion": BASE_DIR / "static" / "icons" / "ionicons",
-        "material": BASE_DIR / "static" / "icons" / "material",
+        "ion": BASE_DIR / "static" / "icons" / "ionicons",  # Local — 1300+ icons, offline resilient
     },
-    "PACKS": ["material"],  # Material Symbols (local, collected via djicons_collect)
     "MISSING_ICON_SILENT": False,  # Show error in development
     "CACHE_TIMEOUT": 86400,  # 24 hours
-    "DEFAULT_CLASS": "icon",  # Base CSS class for all icons
-    "DEFAULT_FILL": "currentColor",  # Inherit color from parent CSS
+    "DEFAULT_CLASS": "icon",
+    "DEFAULT_FILL": "currentColor",
+    "S3": {
+        "bucket": "erplora-storage",
+        "region": "eu-west-1",
+        "namespaces": {
+            "material": "djicons/material/",  # Material Symbols from S3
+        },
+    },
 }
 
 # =============================================================================
