@@ -365,7 +365,7 @@ function setButtonLoading(button, loading) {
     if (loading) {
         const originalContent = button.innerHTML;
         button.dataset.originalContent = originalContent;
-        button.innerHTML = '<div class="loading loading-sm"></div>';
+        button.innerHTML = '<div class="spinner spinner-sm"></div>';
     } else if (button.dataset.originalContent) {
         button.innerHTML = button.dataset.originalContent;
     }

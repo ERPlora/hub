@@ -1204,10 +1204,14 @@ def install_from_marketplace(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
-@require_http_methods(["POST"])
+@require_http_methods(["POST", "GET"])
 @admin_required
 def htmx_update_module(request, slug):
     """HTMX endpoint: update (force-reinstall) a module and return HTML snippet."""
+    if request.method == 'GET':
+        from django.shortcuts import redirect
+        return redirect('mymodules:marketplace')
+
     from apps.core.services.module_install_service import ModuleInstallService
     from django.http import HttpResponse
 

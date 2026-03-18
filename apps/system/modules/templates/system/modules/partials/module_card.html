@@ -133,8 +133,9 @@
                         hx-post="{% url 'mymodules:htmx_update' slug=module.slug %}"
                         hx-swap="outerHTML"
                         hx-target="closest .module-card-actions"
-                        hx-indicator="closest .module-card"
                         hx-disinherit="*"
+                        hx-on:htmx:before-request="this.disabled=true; this.innerHTML='<div class=\'spinner spinner-xs\'></div>'"
+                        hx-on:htmx:after-request="this.disabled=false"
                         onclick="event.stopPropagation()">
                     {% icon "arrow-up-circle-outline" %}
                     {% trans "Update" %}
