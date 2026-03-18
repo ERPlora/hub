@@ -72,7 +72,8 @@ AWS_LOCATION = config('AWS_LOCATION', default=f'hubs/{HUB_ID}')  # Shared per or
 AWS_DEFAULT_ACL = None  # Bucket uses ownership-enforced ACLs
 AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
 AWS_S3_FILE_OVERWRITE = False
-AWS_QUERYSTRING_AUTH = False
+AWS_QUERYSTRING_AUTH = True
+AWS_QUERYSTRING_EXPIRE = 3600  # 1 hour signed URLs
 AWS_S3_USE_SSL = True
 AWS_S3_VERIFY = True
 
