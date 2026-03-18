@@ -26,6 +26,7 @@
                             <th class="datatable-th">{% trans "Date" %}</th>
                             <th class="datatable-th">{% trans "Total" %}</th>
                             <th class="datatable-th datatable-th-center">{% trans "Status" %}</th>
+                            {% if can_download %}<th class="datatable-th datatable-th-center">{% trans "PDF" %}</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody class="datatable-tbody">
@@ -59,6 +60,15 @@
                                     {{ invoice.status }}
                                 </span>
                             </td>
+                            {% if can_download %}
+                            <td class="datatable-td datatable-td-center">
+                                {% if invoice.pdf_url %}
+                                <a href="{{ invoice.pdf_url }}" target="_blank" class="btn btn-ghost btn-sm" title="{% trans 'Download PDF' %}">
+                                    {% icon "download-outline" %}
+                                </a>
+                                {% endif %}
+                            </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>

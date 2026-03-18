@@ -29,7 +29,11 @@ def index(request):
         logger.error(f"[BILLING] Unexpected error: {e}\n{traceback.format_exc()}")
         error = str(e)
 
+    user_role = request.session.get('user_role', '')
+    can_download = user_role in ('admin', 'manager')
+
     return {
         'invoices': invoices,
         'error': error,
+        'can_download': can_download,
     }
