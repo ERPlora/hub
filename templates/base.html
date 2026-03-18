@@ -439,6 +439,8 @@
         async function installPWA() {
             // iOS: show instructions modal (no native prompt)
             if (isIOS) {
+                // Small delay to let the drawer close animation finish
+                await new Promise(r => setTimeout(r, 350));
                 document.dispatchEvent(new CustomEvent('pwa-show-ios-install'));
                 return false;
             }

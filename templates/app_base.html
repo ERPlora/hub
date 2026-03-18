@@ -161,7 +161,7 @@
                      @pwa-installable.document="canInstall = true"
                      @pwa-installed.document="canInstall = false; installing = false">
                     <div class="sidebar-menu-item" x-show="canInstall" x-cloak>
-                        <button @click="installing = true; installPWA().then(() => { canInstall = canInstallPWA(); installing = false; }).catch(() => installing = false)" class="sidebar-menu-button" :disabled="installing">
+                        <button @click="drawerOpen = false; installing = true; installPWA().then(() => { canInstall = canInstallPWA(); installing = false; }).catch(() => installing = false)" class="sidebar-menu-button" :disabled="installing">
                             <span class="sidebar-menu-icon">
                                 <template x-if="installing"><span class="loading loading-sm"></span></template>
                                 <template x-if="!installing">{% icon "download-outline" %}</template>
