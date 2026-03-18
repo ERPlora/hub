@@ -33,11 +33,11 @@
     <div id="main-content-area" class="padding flex-1 scroll-area-viewport">
         {% block page_content %}{% endblock %}
     </div>
-
-    {% block page_footer %}
-    <footer id="global-tabbar-footer"></footer>
-    {% endblock %}
 </main>
+
+{% block page_footer %}
+<footer id="global-tabbar-footer"></footer>
+{% endblock %}
 
 <style>
 @keyframes htmx-progress {
