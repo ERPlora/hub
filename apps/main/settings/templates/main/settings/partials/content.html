@@ -957,6 +957,22 @@
                     </div>
                 </div>
 
+                {% if system_metrics.cpu_percent != None %}
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <span class="list-item-label">{% trans "CPU" %}</span>
+                        <span class="list-item-note">
+                            {{ system_metrics.cpu_percent }}%
+                            {% if system_metrics.cpu_limit %}
+                                <span class="ml-1 text-xs opacity-60">
+                                    ({{ system_metrics.cpu_limit }} vCPU)
+                                </span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+
                 {% if system_metrics.memory_used_mb %}
                 <div class="list-item">
                     <div class="list-item-content">

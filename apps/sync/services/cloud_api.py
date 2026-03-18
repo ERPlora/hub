@@ -425,6 +425,13 @@ class CloudAPIService:
         response = self._request('GET', '/api/hubs/me/invoices/', params=params)
         return response.get('invoices', [])
 
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get CloudWatch CPU/RAM metrics for this Hub from Cloud."""
+        try:
+            return self._request('GET', '/api/hubs/me/metrics/', timeout=5)
+        except CloudAPIError:
+            return {}
+
 
 # Singleton instance for convenience
 _cloud_api_instance = None

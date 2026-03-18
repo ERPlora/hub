@@ -370,6 +370,16 @@ def index(request):
     # Business types
     active_business_types, available_business_types = _get_business_types_context(hub_config)
 
+    # System metrics from Cloud (CloudWatch)
+    system_metrics = {}
+    try:
+        from apps.sync.services.cloud_api import get_cloud_api
+        cloud_api = get_cloud_api()
+        if cloud_api.is_configured:
+            system_metrics = cloud_api.get_metrics()
+    except Exception:
+        pass
+
     return {
         'current_section': 'settings',
         'page_title': 'Settings',
@@ -386,6 +396,7 @@ def index(request):
         'timezone_choices': get_sorted_timezones(),
         'currency_choices': django_settings.POPULAR_CURRENCY_CHOICES,
         'backup_frequency_choices': BackupConfig.Frequency.choices,
+        'system_metrics': system_metrics,
         'printers': printers,
         'document_type_choices': [
             ('receipt', 'Receipt'),
