@@ -144,7 +144,7 @@
                         <h3 class="card-title">{% trans "About this module" %}</h3>
                     </div>
                     <div class="card-body">
-                        <div class="markdown-content">
+                        <div class="md-content">
                             {% if module.long_description %}
                             {{ module.long_description|linebreaks }}
                             {% else %}
@@ -228,7 +228,7 @@
                     </div>
                     <div class="card-body">
                         {% if module.changelog %}
-                        <div class="markdown-content">
+                        <div class="md-content">
                             {{ module.changelog|linebreaks }}
                         </div>
                         {% else %}
@@ -480,9 +480,3 @@ if (typeof window.openReviewModal !== 'function') {
 } // end guard
 </script>
 
-<style>
-.markdown-content { line-height: 1.6; }
-.markdown-content p { margin-bottom: 1rem; }
-.markdown-content ul, .markdown-content ol { margin-bottom: 1rem; padding-left: 2rem; }
-.markdown-content li { margin-bottom: 0.5rem; }
-</style>
