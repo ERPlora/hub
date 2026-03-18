@@ -1,0 +1,34 @@
+{% load i18n %}
+{% load djicons %}
+{% if pwa_ready %}
+{# Icons ready — show success banner once, then stop polling #}
+<div id="pwa-status-banner"
+     class="callout callout-success"
+     hx-on::load="setTimeout(() => htmx.remove(document.getElementById('pwa-status-banner')), 4000)">
+    <span class="callout-icon">{% icon "checkmark-circle-outline" %}</span>
+    <div class="callout-content">
+        <div class="callout-title">{% trans "Logo applied" %}</div>
+        <div class="callout-text">{% trans "Your logo and app icons have been updated. Reload the page to see the new favicon." %}</div>
+    </div>
+    <button class="btn btn-sm btn-ghost ml-auto"
+            onclick="htmx.remove(document.getElementById('pwa-status-banner'))">
+        {% icon "close-outline" %}
+    </button>
+</div>
+{% else %}
+{# Still processing — keep polling every 4s #}
+<div id="pwa-status-banner"
+     class="callout callout-info"
+     hx-get="{% url 'main:settings_pwa_status' %}"
+     hx-target="#pwa-status-banner"
+     hx-swap="outerHTML"
+     hx-trigger="every 4s">
+    <span class="callout-icon">
+        <span class="loading loading-spinner loading-sm"></span>
+    </span>
+    <div class="callout-content">
+        <div class="callout-title">{% trans "Generating icons…" %}</div>
+        <div class="callout-text">{% trans "Your logo is being processed. Favicon and app icons will be ready in a moment." %}</div>
+    </div>
+</div>
+{% endif %}

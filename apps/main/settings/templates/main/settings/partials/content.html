@@ -138,6 +138,18 @@
                 </div>
             </form>
 
+            {# PWA icon generation status banner (injected by JS when logoUploaded trigger fires) #}
+            <div id="pwa-status-container" class="mt-4"></div>
+
+            <script>
+            document.body.addEventListener('logoUploaded', function() {
+                htmx.ajax('GET', '{% url "main:settings_pwa_status" %}', {
+                    target: '#pwa-status-container',
+                    swap: 'innerHTML'
+                });
+            });
+            </script>
+
             <div class="callout callout-info mt-4" x-data x-show="!$store.bridge.connected" x-cloak>
                 <span class="callout-icon">{% icon "hardware-chip-outline" %}</span>
                 <div class="callout-content">

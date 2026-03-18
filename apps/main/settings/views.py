@@ -88,13 +88,16 @@ def index(request):
             store_config.tax_included = 'tax_included' in request.POST
 
             # Handle logo upload
-            if 'logo' in request.FILES:
+            logo_changed = 'logo' in request.FILES
+            if logo_changed:
                 store_config.logo = request.FILES['logo']
 
             # Update is_configured based on required fields
             store_config.is_configured = store_config.is_complete()
             store_config.save()
 
+            if logo_changed:
+                return toast_response('Store settings saved', logoUploaded=True)
             return toast_response('Store settings saved')
 
         # Handle business hours form
@@ -407,6 +410,16 @@ def index(request):
             ('cash_session_report', 'Cash Session Report'),
         ],
     }
+
+
+@admin_required
+def pwa_status(request):
+    """Return PWA icon generation status as an HTML fragment for HTMX polling."""
+    from apps.configuration.services.pwa_icons import pwa_icons_exist
+    from django.shortcuts import render as django_render
+
+    ready = pwa_icons_exist()
+    return django_render(request, 'main/settings/partials/pwa_status.html', {'pwa_ready': ready})
 
 
 def _fetch_all_business_types():

@@ -28,6 +28,7 @@ urlpatterns = [
 
     # Settings
     path('settings/', settings_views.index, name='settings'),
+    path('settings/pwa-status/', settings_views.pwa_status, name='settings_pwa_status'),
 
     # Employees (includes index + API endpoints)
     path('employees/', include('apps.main.employees.urls')),
