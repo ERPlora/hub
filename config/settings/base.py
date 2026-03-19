@@ -562,6 +562,9 @@ DJICONS = {
     "CACHE_TIMEOUT": 86400,  # 24 hours
     "DEFAULT_CLASS": "icon",
     "DEFAULT_FILL": "currentColor",
+    "ICON_DIRS": {
+        "ion": BASE_DIR / "static" / "icons" / "ionicons",
+    },
     "S3": {
         "bucket": "erplora-storage",
         "region": "eu-west-1",
