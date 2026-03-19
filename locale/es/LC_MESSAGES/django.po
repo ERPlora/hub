@@ -2080,15 +2080,11 @@ msgstr "Error al eliminar"
 msgid "Confirm"
 msgstr "Confirmar"
 
-#, fuzzy
-#| msgid "Connecting..."
-msgid "Reconnecting to server..."
-msgstr "Conectando..."
+msgid "Installing or updating module, please wait"
+msgstr "Instalando o actualizando módulo, por favor espera"
 
-#, fuzzy
-#| msgid "Please select a file"
 msgid "Please wait a moment"
-msgstr "Por favor selecciona un archivo"
+msgstr "Un momento por favor"
 
 msgid "Applying changes..."
 msgstr "Aplicando cambios..."
