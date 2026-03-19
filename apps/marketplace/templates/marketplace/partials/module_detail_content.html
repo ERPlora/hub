@@ -363,9 +363,10 @@ function setButtonLoading(button, loading) {
     if (!button) return;
     button.disabled = loading;
     if (loading) {
-        const originalContent = button.innerHTML;
-        button.dataset.originalContent = originalContent;
-        button.innerHTML = '<div class="spinner spinner-sm"></div>';
+        button.dataset.originalContent = button.innerHTML;
+        const isUpdate = button.dataset.action === 'update-module';
+        const label = isUpdate ? '{% trans Updating... %}' : '{% trans Installing... %}';
+        button.innerHTML = '<span class="loading loading-sm"></span><span>' + label + '</span>';
     } else if (button.dataset.originalContent) {
         button.innerHTML = button.dataset.originalContent;
     }
