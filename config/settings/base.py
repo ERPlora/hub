@@ -556,11 +556,8 @@ LOGGING = {
 # =============================================================================
 
 DJICONS = {
-    "MODE": "local",
+    "MODE": "s3",
     "DEFAULT_NAMESPACE": "ion",
-    "ICON_DIRS": {
-        "ion": BASE_DIR / "static" / "icons" / "ionicons",  # Local — 1300+ icons, offline resilient
-    },
     "MISSING_ICON_SILENT": False,  # Show error in development
     "CACHE_TIMEOUT": 86400,  # 24 hours
     "DEFAULT_CLASS": "icon",
@@ -568,8 +565,14 @@ DJICONS = {
     "S3": {
         "bucket": "erplora-storage",
         "region": "eu-west-1",
+        "prefix": "djicons/icons/",
         "namespaces": {
-            "material": "djicons/material/",  # Material Symbols from S3
+            "ion": "djicons/icons/ion/",
+            "hero": "djicons/icons/hero/",
+            "material": "djicons/icons/material/",
+            "tabler": "djicons/icons/tabler/",
+            "lucide": "djicons/icons/lucide/",
+            "fa": "djicons/icons/fa/",
         },
     },
 }
