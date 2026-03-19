@@ -2,7 +2,7 @@
 {% load i18n djicons %}
 
 {% block main %}
-<main class="content padding">
+<main class="content flex flex-col overflow-hidden">
     {% block page_header %}
     <div class="header glass sticky top-0 z-200">
         <div class="header-start">
@@ -33,11 +33,11 @@
     <div id="main-content-area" class="padding flex-1 scroll-area-viewport">
         {% block page_content %}{% endblock %}
     </div>
-</main>
 
-{% block page_footer %}
-<footer id="global-tabbar-footer"></footer>
-{% endblock %}
+    {% block page_footer %}
+    <footer id="global-tabbar-footer"></footer>
+    {% endblock %}
+</main>
 
 <style>
 @keyframes htmx-progress {
