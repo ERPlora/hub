@@ -2058,12 +2058,25 @@ msgid "My Modules"
 msgstr "Mis Módulos"
 
 msgid "Install App"
-msgstr "Instalar"
+msgstr "Instalar App"
 
-#, fuzzy
-#| msgid "Select a role"
+msgid "To install this app on your iPhone:"
+msgstr "Para instalar esta app en tu iPhone:"
+
+msgid "1. Tap the Share button in Safari's toolbar"
+msgstr "1. Pulsa el botón Compartir en la barra de Safari"
+
+msgid "2. Scroll down and tap <strong>Add to Home Screen</strong>"
+msgstr "2. Desplázate y pulsa <strong>Añadir a pantalla de inicio</strong>"
+
+msgid "3. Tap <strong>Add</strong> to confirm"
+msgstr "3. Pulsa <strong>Añadir</strong> para confirmar"
+
+msgid "Got it"
+msgstr "Entendido"
+
 msgid "Report a Problem"
-msgstr "Selecciona un rol"
+msgstr "Reportar un Problema"
 
 msgid "Log Out"
 msgstr "Cerrar Sesión"
