@@ -1184,6 +1184,9 @@ msgstr "Por favor verifica tu conexión a internet e intenta de nuevo."
 msgid "Coming Soon"
 msgstr "Próximamente"
 
+msgid "In Development"
+msgstr "En Desarrollo"
+
 msgid "This store is under development. Stay tuned for updates!"
 msgstr "Esta tienda está en desarrollo. ¡Estén atentos a las novedades!"
 

@@ -39,7 +39,7 @@
         </thead>
         <tbody class="datatable-tbody">
             {% for product in products %}
-            <tr class="datatable-tr" :class="{ 'bg-primary/5': selected.has('{{ product.slug }}') }"{% if product.assistant_tiers %} data-tier-slug="{{ product.assistant_tiers.0.slug }}" data-module-price="{{ product.assistant_tiers.0.price_monthly }}"{% endif %}>
+            <tr class="datatable-tr{% if not product.is_active %} opacity-60{% endif %}" :class="{ 'bg-primary/5': selected.has('{{ product.slug }}') }"{% if product.assistant_tiers %} data-tier-slug="{{ product.assistant_tiers.0.slug }}" data-module-price="{{ product.assistant_tiers.0.price_monthly }}"{% endif %}>
                 <td class="datatable-td" data-label="{% trans 'Module' %}">
                     <div class="flex items-center gap-3">
                         {% if product.icon %}
@@ -112,7 +112,9 @@
                     </div>
                 </td>
                 <td class="datatable-td datatable-td-center whitespace-nowrap min-w-[80px]" data-col="status" data-label="{% trans 'Status' %}">
-                    {% if product.has_update %}
+                    {% if not product.is_active %}
+                    <span class="badge badge-sm color-warning">{% trans "Coming Soon" %}</span>
+                    {% elif product.has_update %}
                     <span class="badge badge-sm color-warning">{% trans "Update" %}</span>
                     {% elif product.is_installed %}
                     <span class="badge badge-sm color-success">{% trans "Installed" %}</span>
@@ -124,7 +126,11 @@
                 </td>
                 <td class="datatable-td datatable-td-actions">
                     <div class="datatable-row-actions">
-                        {% if product.has_update %}
+                        {% if not product.is_active %}
+                        <button class="btn btn-sm btn-ghost" disabled title="{% trans 'Coming Soon' %}">
+                            {% icon "construct-outline" %}
+                        </button>
+                        {% elif product.has_update %}
                         <button class="btn btn-sm color-warning"
                                 hx-post="{% url 'mymodules:htmx_update' slug=product.slug %}"
                                 hx-swap="innerHTML"
@@ -147,7 +153,7 @@
                     </div>
                 </td>
                 <td class="datatable-td datatable-td-center w-[70px]">
-                    {% if not product.is_installed %}
+                    {% if not product.is_installed and product.is_active %}
                     <label class="checkbox" @click.stop>
                         <input type="checkbox" class="checkbox-input"
                                @change="toggle('{{ product.slug }}')"
