@@ -1048,7 +1048,7 @@ def modules_bulk_install(request):
             continue
 
         cloud_mod = catalog.get(slug)
-        if cloud_mod and not cloud_mod.get('is_active', True):
+        if cloud_mod and not cloud_mod.get('can_install', cloud_mod.get('is_active', True)):
             continue
         modules_to_install.append({
             'slug': slug,
