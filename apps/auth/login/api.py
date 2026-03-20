@@ -6,6 +6,7 @@ Authentication endpoints: login, logout, PIN verification, Cloud login.
 import requests
 from django.utils import timezone
 from django.conf import settings as django_settings
+from django.core.cache import cache
 from rest_framework import status, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -122,6 +123,16 @@ class PinLoginView(APIView):
         user_id = serializer.validated_data['user_id']
         pin = serializer.validated_data['pin']
 
+        # Rate limiting: max 3 failed PIN attempts per user per 24 hours
+        cache_key = f'pin_attempts_{user_id}'
+        attempts = cache.get(cache_key, 0)
+
+        if attempts >= 3:
+            return Response(
+                {'success': False, 'error': 'Too many attempts. Try again in 24 hours or use email login.', 'locked': True},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
         try:
             user = LocalUser.objects.get(id=user_id, is_active=True)
         except LocalUser.DoesNotExist:
@@ -131,6 +142,7 @@ class PinLoginView(APIView):
             )
 
         if user.check_pin(pin):
+            cache.delete(cache_key)
             user.last_login = timezone.now()
             user.save(update_fields=['last_login'])
 
@@ -151,6 +163,7 @@ class PinLoginView(APIView):
                 },
             })
         else:
+            cache.set(cache_key, attempts + 1, timeout=86400)  # 24 hours
             return Response(
                 {'success': False, 'error': 'Incorrect PIN'},
                 status=status.HTTP_401_UNAUTHORIZED

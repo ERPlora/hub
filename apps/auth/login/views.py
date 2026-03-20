@@ -159,14 +159,14 @@ def verify_pin(request):
         except LocalUser.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'User not found'})
 
-        # Rate limiting: max 5 failed PIN attempts per user per 15 minutes
+        # Rate limiting: max 3 failed PIN attempts per user per 24 hours
         cache_key = f'pin_attempts_{user_id}'
         attempts = cache.get(cache_key, 0)
 
-        if attempts >= 5:
+        if attempts >= 3:
             return JsonResponse({
                 'success': False,
-                'error': 'Too many attempts. Try again in 15 minutes or use email login.',
+                'error': 'Too many attempts. Try again in 24 hours or use email login.',
                 'locked': True,
             })
 
@@ -236,7 +236,7 @@ def verify_pin(request):
             })
         else:
             # Increment failed attempts
-            cache.set(cache_key, attempts + 1, timeout=900)  # 15 minutes
+            cache.set(cache_key, attempts + 1, timeout=86400)  # 24 hours
             return JsonResponse({'success': False, 'error': 'Incorrect PIN'})
 
     except Exception as e:
