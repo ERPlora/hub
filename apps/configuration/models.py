@@ -282,6 +282,12 @@ class HubConfig(SingletonConfigMixin, models.Model):
         help_text='Show installed modules in the sidebar navigation'
     )
 
+    # Developer mode
+    developer_mode = models.BooleanField(
+        default=False,
+        help_text='Enable developer mode to show module development tools and info'
+    )
+
     # Hardware Bridge
     bridge_enabled = models.BooleanField(
         default=False,

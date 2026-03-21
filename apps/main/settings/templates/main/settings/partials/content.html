@@ -1094,6 +1094,116 @@
         </div>
     </section>
 
+    {# ── Developer Mode ── #}
+    <section class="card">
+        <div class="card-header">
+            <div class="flex items-center gap-3">
+                <span class="text-xl opacity-60">{% icon "code-slash-outline" %}</span>
+                <div>
+                    <h2 class="card-title">{% trans "Developer Mode" %}</h2>
+                    <p class="text-sm opacity-60 mt-0.5">{% trans "Tools and information for module developers" %}</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form hx-post="{% url 'main:settings' %}"
+                  hx-swap="none">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_developer_mode">
+
+                <div class="list list-inset">
+                    <label class="list-item cursor-pointer">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Enable Developer Mode" %}</span>
+                            <span class="list-item-note">{% trans "Show module development tools, installed module versions, and documentation links" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <label class="toggle">
+                                <input type="checkbox"
+                                       name="developer_mode"
+                                       value="true"
+                                       {% if hub_config.developer_mode %}checked{% endif %}
+                                       onchange="this.form.requestSubmit()">
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </label>
+                </div>
+            </form>
+
+            {% if hub_config.developer_mode %}
+            <div class="mt-4 flex flex-col gap-4">
+                {# Installed modules with versions #}
+                <div>
+                    <h3 class="text-sm font-semibold opacity-70 mb-2">{% trans "Installed Modules" %} ({{ dev_modules|length }})</h3>
+                    <div class="list list-inset max-h-64 overflow-y-auto">
+                        {% for mod in dev_modules %}
+                        <div class="list-item">
+                            <div class="list-item-content">
+                                <span class="list-item-label font-mono text-sm">{{ mod.id }}</span>
+                                <span class="list-item-note">{{ mod.name }}</span>
+                            </div>
+                            <div class="list-item-end">
+                                <span class="badge badge-sm">v{{ mod.version }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {# Quick links #}
+                <div>
+                    <h3 class="text-sm font-semibold opacity-70 mb-2">{% trans "Developer Resources" %}</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="https://github.com/ERPlora/hub" target="_blank" class="btn btn-sm btn-outline">
+                            {% icon "logo-github" %}
+                            Hub Repository
+                        </a>
+                        <a href="https://github.com/ERPlora/hub/blob/develop/docs/dev/creating-modules.md" target="_blank" class="btn btn-sm btn-outline">
+                            {% icon "document-text-outline" %}
+                            {% trans "Module Guide" %}
+                        </a>
+                        <a href="https://erplora.com/dashboard/vendor/developer/" target="_blank" class="btn btn-sm btn-outline">
+                            {% icon "cloud-outline" %}
+                            {% trans "Developer Portal" %}
+                        </a>
+                    </div>
+                </div>
+
+                {# Environment info #}
+                <div class="list list-inset">
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Hub Version" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <span class="font-mono text-sm">1.0.0</span>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Django Version" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <span class="font-mono text-sm">{{ django_version }}</span>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-label">{% trans "Python Version" %}</span>
+                        </div>
+                        <div class="list-item-end">
+                            <span class="font-mono text-sm">{{ python_version }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
     {# Footer info #}
     <div class="callout callout-info">
         <span class="callout-icon">{% icon "information-circle-outline" %}</span>

@@ -2,7 +2,7 @@
 Auth Login Views
 
 Handles local PIN login and Cloud login authentication.
-Supports trusted/untrusted device system for AWS deployment.
+Trusted devices are stored centrally in Cloud and verified via API.
 """
 import json
 import logging
@@ -18,20 +18,10 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
-from apps.accounts.models import LocalUser, TrustedDevice
+from apps.accounts.models import LocalUser
 from apps.configuration.models import HubConfig
 from apps.sync.models import TokenCache
-
-
-def _get_current_user(request):
-    """Get LocalUser from session if authenticated."""
-    user_id = request.session.get('local_user_id')
-    if not user_id:
-        return None
-    try:
-        return LocalUser.objects.get(id=user_id, is_active=True)
-    except LocalUser.DoesNotExist:
-        return None
+from apps.sync.services.trusted_device_service import TrustedDeviceService
 
 
 def login(request):
@@ -66,18 +56,12 @@ def get_employees(request):
 
     has_cloud_session = bool(request.session.get('jwt_token'))
 
-    # Verify device trust if token provided
+    # Verify device trust via Cloud API
     device_trusted = False
-    trusted_user_ids = []
     if device_token:
-        devices = TrustedDevice.objects.filter(
-            device_token=device_token,
-            is_revoked=False,
-        ).select_related('user')
-        valid_devices = [d for d in devices if d.is_valid() and d.user.is_active]
-        if valid_devices:
-            device_trusted = True
-            trusted_user_ids = [str(d.user.id) for d in valid_devices]
+        service = TrustedDeviceService()
+        result = service.verify(device_token)
+        device_trusted = result.get('valid', False)
 
     # Only return employees if authorized
     if not device_trusted and not has_cloud_session:
@@ -98,7 +82,6 @@ def get_employees(request):
     return JsonResponse({
         'authorized': True,
         'employees': employees,
-        'trusted_user_ids': trusted_user_ids,
     })
 
 
@@ -117,24 +100,13 @@ def verify_device_trust(request):
         if not device_token:
             return JsonResponse({'trusted': False})
 
-        devices = TrustedDevice.objects.filter(
-            device_token=device_token,
-            is_revoked=False,
-        ).select_related('user')
+        service = TrustedDeviceService()
+        result = service.verify(device_token)
 
-        # Filter to valid (non-expired) devices with active users
-        valid_devices = [d for d in devices if d.is_valid() and d.user.is_active]
+        if result.get('valid'):
+            return JsonResponse({'trusted': True})
 
-        if not valid_devices:
-            return JsonResponse({'trusted': False})
-
-        # Return IDs of trusted Cloud users (template merges with local employees)
-        trusted_user_ids = [str(d.user.id) for d in valid_devices]
-
-        return JsonResponse({
-            'trusted': True,
-            'trusted_user_ids': trusted_user_ids,
-        })
+        return JsonResponse({'trusted': False})
 
     except Exception as e:
         logger.error(f"verify_device_trust error: {e}")
@@ -170,20 +142,15 @@ def verify_pin(request):
                 'locked': True,
             })
 
-        # Verify device trust for Cloud users
+        # Verify device trust for Cloud users via Cloud API
         # Skip trust check if user just completed Cloud SSO (jwt_token in session)
         has_cloud_session = bool(request.session.get('jwt_token'))
-        trusted_device = None
 
         if user.is_cloud_user and not has_cloud_session:
             if device_token:
-                trusted_device = TrustedDevice.objects.filter(
-                    device_token=device_token,
-                    user=user,
-                    is_revoked=False,
-                ).first()
-
-                if not trusted_device or not trusted_device.is_valid():
+                service = TrustedDeviceService()
+                result = service.verify(device_token)
+                if not result.get('valid'):
                     return JsonResponse({
                         'success': False,
                         'error': 'Device not trusted. Please log in with email and password.',
@@ -196,13 +163,6 @@ def verify_pin(request):
                     'error': 'Device not trusted. Please log in with email and password.',
                     'device_untrusted': True,
                 })
-        elif user.is_cloud_user and has_cloud_session and device_token:
-            # Already authenticated via Cloud SSO, just refresh device trust if exists
-            trusted_device = TrustedDevice.objects.filter(
-                device_token=device_token,
-                user=user,
-                is_revoked=False,
-            ).first()
 
         # Local-only employees (no cloud_user_id) can always use PIN
         # (they have no Cloud account to authenticate with)
@@ -221,10 +181,6 @@ def verify_pin(request):
             request.session['user_email'] = user.email
             request.session['user_role'] = user.role
             request.session['user_language'] = user.language
-
-            # Refresh device trust on successful PIN login
-            if trusted_device:
-                trusted_device.refresh()
 
             return JsonResponse({
                 'success': True,
@@ -411,7 +367,7 @@ def cloud_login(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def trust_device(request):
-    """Register current device as trusted for the authenticated user."""
+    """Register current device as trusted via Cloud API."""
     try:
         data = json.loads(request.body)
         user_id = data.get('user_id')
@@ -420,11 +376,11 @@ def trust_device(request):
             return JsonResponse({'success': False, 'error': 'Missing user_id'})
 
         # Must have an active Cloud session (JWT in session = just did Cloud SSO)
-        if not request.session.get('jwt_token'):
+        access_token = request.session.get('jwt_token')
+        if not access_token:
             return JsonResponse({'success': False, 'error': 'Cloud session required'})
 
         # Validate that user_id matches the user who just completed Cloud SSO
-        # (pending_user_id is set during cloud_login, or local_user_id after PIN setup)
         session_user_id = (
             request.session.get('pending_user_id')
             or request.session.get('local_user_id')
@@ -432,22 +388,25 @@ def trust_device(request):
         if str(user_id) != str(session_user_id):
             return JsonResponse({'success': False, 'error': 'User mismatch'})
 
-        try:
-            user = LocalUser.objects.get(id=user_id, is_active=True)
-        except LocalUser.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'User not found'})
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+        if not ip:
+            ip = request.META.get('REMOTE_ADDR')
 
-        hub_config = HubConfig.get_config()
-        device = TrustedDevice.create_for_user(
-            user=user,
-            request=request,
-            hub_id=str(hub_config.hub_id),
+        service = TrustedDeviceService()
+        result = service.create(
+            access_token=access_token,
+            user_agent=user_agent,
+            ip_address=ip,
         )
 
-        return JsonResponse({
-            'success': True,
-            'device_token': device.device_token,
-        })
+        if result:
+            return JsonResponse({
+                'success': True,
+                'device_token': result['device_token'],
+            })
+        else:
+            return JsonResponse({'success': False, 'error': 'Failed to register device'})
 
     except Exception as e:
         logger.error(f"trust_device error: {e}")
@@ -456,26 +415,22 @@ def trust_device(request):
 
 @require_http_methods(["POST"])
 def revoke_device(request):
-    """Revoke trust for a specific device."""
+    """Revoke trust for a specific device via Cloud API."""
     try:
         data = json.loads(request.body)
         device_id = data.get('device_id')
 
-        user = _get_current_user(request)
-        if not user:
+        access_token = request.session.get('jwt_token')
+        if not access_token:
             return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
 
-        try:
-            device = TrustedDevice.objects.get(id=device_id)
-        except TrustedDevice.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'Device not found'})
+        service = TrustedDeviceService()
+        success = service.revoke(access_token, device_id)
 
-        # Users can revoke their own devices; admins can revoke anyone's
-        if str(device.user_id) != str(user.id) and user.get_role_name() != 'admin':
-            return JsonResponse({'success': False, 'error': 'Permission denied'})
-
-        device.revoke()
-        return JsonResponse({'success': True})
+        if success:
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': 'Failed to revoke device'})
 
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})

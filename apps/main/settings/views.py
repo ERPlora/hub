@@ -1,8 +1,10 @@
 """
 Main Settings Views
 """
+import django
 import json
 import logging
+import sys
 from decimal import Decimal, InvalidOperation
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -257,6 +259,16 @@ def index(request):
             response['HX-Refresh'] = 'true'
             return response
 
+        # Toggle developer mode
+        if action == 'toggle_developer_mode':
+            hub_config.developer_mode = 'developer_mode' in request.POST
+            hub_config.save(update_fields=['developer_mode'])
+            response = toast_response(
+                'Developer mode enabled' if hub_config.developer_mode else 'Developer mode disabled'
+            )
+            response['HX-Refresh'] = 'true'
+            return response
+
         # Toggle bridge on/off (master switch)
         if action == 'toggle_bridge':
             hub_config.bridge_enabled = 'bridge_enabled' in request.POST
@@ -383,6 +395,28 @@ def index(request):
     except Exception:
         pass
 
+    # Developer mode info
+    dev_modules = []
+    if hub_config.developer_mode:
+        from django.conf import settings as _settings
+        from pathlib import Path
+        modules_dir = Path(_settings.MODULES_DIR)
+        for module_dir in sorted(modules_dir.iterdir()):
+            if not module_dir.is_dir() or module_dir.name.startswith(('_', '.')):
+                continue
+            module_py = module_dir / 'module.py'
+            if not module_py.exists():
+                continue
+            mod_info = {'id': module_dir.name, 'name': module_dir.name, 'version': '—'}
+            try:
+                import importlib
+                mod = importlib.import_module(f'{module_dir.name}.module')
+                mod_info['name'] = str(getattr(mod, 'MODULE_NAME', module_dir.name))
+                mod_info['version'] = getattr(mod, 'MODULE_VERSION', '—')
+            except Exception:
+                pass
+            dev_modules.append(mod_info)
+
     return {
         'current_section': 'settings',
         'page_title': 'Settings',
@@ -394,6 +428,9 @@ def index(request):
         'tax_classes': tax_classes,
         'active_business_types': active_business_types,
         'available_business_types': available_business_types,
+        'dev_modules': dev_modules,
+        'django_version': django.get_version() if hub_config.developer_mode else '',
+        'python_version': f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}' if hub_config.developer_mode else '',
         'language_choices': django_settings.LANGUAGES,
         'system_language_choices': django_settings.LANGUAGES,
         'timezone_choices': get_sorted_timezones(),
