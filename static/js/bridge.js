@@ -159,10 +159,7 @@
 
             var event = msg.event;
 
-            if (event === 'status') {
-                this.printers = msg.printers || [];
-
-            } else if (event === 'printers') {
+            if (event === 'status' || event === 'printers') {
                 this.printers = msg.printers || [];
                 // Update Alpine store if available
                 if (typeof Alpine !== 'undefined' && Alpine.store('bridge')) {
