@@ -1,0 +1,21 @@
+# Cliente de eventos en vivo: consume el WebSocket `/ws` del server (ARQUITECTURA.md §7.5, §7.7).
+# El transporte de stream es inyectable (trait EventStream); el cliente WS real va en el binario,
+# no como dependencia obligatoria de este crate.
+[package]
+name = "erplora-sync"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+# Cliente WebSocket real (rustls, raíces webpki) detrás de la feature `ws`.
+# Opcional: el build por defecto del workspace NO lo arrastra.
+tungstenite = { version = "0.24", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"], optional = true }
+
+[features]
+# Activa `WsStream` + `connect_ws`: implementación real de `EventStream` sobre tungstenite.
+# `cargo build -p erplora-sync --features ws`.
+ws = ["dep:tungstenite"]

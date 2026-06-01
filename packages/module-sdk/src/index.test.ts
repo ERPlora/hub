@@ -1,0 +1,134 @@
+// Tests del SDK con transportes mock inyectables (sin red, sin Tauri).
+// node:test + tsx (sin dependencias extra). Correr: pnpm -F @erplora/module-sdk test
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  HttpWsTransport,
+  IpcTransport,
+  ErploraClient,
+  ErploraError,
+  createClient,
+  type TauriBridge,
+} from './index.ts';
+
+// ── HttpWsTransport: query/command desenvuelven el sobre {ok,data} ───────────
+
+test('HttpWsTransport.query hace POST /api/query y desenvuelve data', async () => {
+  const calls: Array<{ url: string; body: unknown }> = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => {
+    calls.push({ url, body: JSON.parse(init.body as string) });
+    return { json: async () => ({ ok: true, data: [{ id: '1', name: 'Café' }] }) };
+  }) as unknown as typeof fetch;
+
+  const t = new HttpWsTransport({ baseUrl: 'http://h', fetchImpl });
+  const rows = await t.query('inventory.products.list', { hub_id: 'h1' });
+
+  assert.equal(calls[0].url, 'http://h/api/query');
+  assert.deepEqual(calls[0].body, { name: 'inventory.products.list', params: { hub_id: 'h1' } });
+  assert.deepEqual(rows, [{ id: '1', name: 'Café' }]);
+});
+
+test('HttpWsTransport.command envía {name,payload}', async () => {
+  let sent: unknown;
+  const fetchImpl = (async (_url: string, init: RequestInit) => {
+    sent = JSON.parse(init.body as string);
+    return { json: async () => ({ ok: true, data: { ok: true } }) };
+  }) as unknown as typeof fetch;
+
+  const t = new HttpWsTransport({ baseUrl: '', fetchImpl });
+  await t.command('inventory.products.create', { name: 'Té' });
+  assert.deepEqual(sent, { name: 'inventory.products.create', payload: { name: 'Té' } });
+});
+
+test('un sobre {ok:false} lanza ErploraError con el code del server', async () => {
+  const fetchImpl = (async () => ({
+    json: async () => ({ ok: false, error: { code: 'permission_denied', message: 'no' } }),
+  })) as unknown as typeof fetch;
+
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.command('x.y'),
+    (e: unknown) => e instanceof ErploraError && e.code === 'permission_denied',
+  );
+});
+
+test('headers() se inyectan en cada POST (auth X-Hub-Id, etc.)', async () => {
+  let hdrs: Record<string, string> = {};
+  const fetchImpl = (async (_u: string, init: RequestInit) => {
+    hdrs = init.headers as Record<string, string>;
+    return { json: async () => ({ ok: true, data: null }) };
+  }) as unknown as typeof fetch;
+
+  const t = new HttpWsTransport({ fetchImpl, headers: () => ({ 'X-Hub-Id': 'h1' }) });
+  await t.query('q');
+  assert.equal(hdrs['X-Hub-Id'], 'h1');
+  assert.equal(hdrs['Content-Type'], 'application/json');
+});
+
+// ── HttpWsTransport: WS de eventos (solo push) ──────────────────────────────
+
+class FakeWs {
+  onmessage: ((e: { data: string }) => void) | null = null;
+  onclose: (() => void) | null = null;
+  static last: FakeWs | undefined;
+  close = () => {};
+  constructor(public url: string) {
+    FakeWs.last = this;
+  }
+}
+
+test('subscribe abre el WS lazy y enruta eventos por nombre', () => {
+  const t = new HttpWsTransport({
+    baseUrl: 'http://h',
+    WebSocketImpl: FakeWs as unknown as typeof WebSocket,
+  });
+  const seen: unknown[] = [];
+  const unsub = t.subscribe('sale.completed', (p) => seen.push(p));
+
+  assert.equal(FakeWs.last?.url, 'ws://h/ws');
+  // Llega un evento de otro tipo → ignorado; el nuestro → entregado.
+  FakeWs.last!.onmessage!({ data: JSON.stringify({ event: 'other', payload: 1 }) });
+  FakeWs.last!.onmessage!({ data: JSON.stringify({ event: 'sale.completed', payload: { total: 9 } }) });
+  assert.deepEqual(seen, [{ total: 9 }]);
+
+  unsub();
+  FakeWs.last!.onmessage!({ data: JSON.stringify({ event: 'sale.completed', payload: { total: 1 } }) });
+  assert.equal(seen.length, 1, 'tras unsub no se reciben más');
+});
+
+// ── IpcTransport (Tauri) ────────────────────────────────────────────────────
+
+test('IpcTransport.query usa invoke(erplora_query) y desenvuelve', async () => {
+  const invoked: Array<{ cmd: string; args: unknown }> = [];
+  const bridge: TauriBridge = {
+    invoke: async (cmd, args) => {
+      invoked.push({ cmd, args });
+      return { ok: true, data: ['x'] };
+    },
+    listen: async () => () => {},
+  };
+  const t = new IpcTransport(bridge);
+  const r = await t.query('q', { a: 1 });
+  assert.equal(invoked[0].cmd, 'erplora_query');
+  assert.deepEqual(invoked[0].args, { name: 'q', params: { a: 1 } });
+  assert.deepEqual(r, ['x']);
+});
+
+// ── ErploraClient: hasPermission (solo UI) ──────────────────────────────────
+
+test('hasPermission respeta wildcard y permisos namespaced', () => {
+  const admin = new ErploraClient({} as never, { permissions: () => new Set(['*']) });
+  assert.equal(admin.hasPermission('inventory.add_product'), true);
+
+  const emp = new ErploraClient({} as never, {
+    permissions: () => new Set(['inventory.view_product']),
+  });
+  assert.equal(emp.hasPermission('inventory.view_product'), true);
+  assert.equal(emp.hasPermission('inventory.add_product'), false);
+});
+
+test('createClient ipc requiere bridge de Tauri', () => {
+  assert.throws(() => createClient('ipc', {}), /Tauri/);
+  const c = createClient('http+ws', { http: { baseUrl: '' } });
+  assert.ok(c instanceof ErploraClient);
+});

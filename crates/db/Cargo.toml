@@ -1,0 +1,19 @@
+# erplora-db — DatabaseAdapter + backends SQLite (rusqlite) y Postgres. ARQUITECTURA.md §8.
+[package]
+name = "erplora-db"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[features]
+# Activa el backend Postgres (Aurora / cloud). Apagada por defecto para que el
+# workspace compile sin un toolchain de Postgres. El crate `postgres` es
+# pure-rust (no necesita libpq). Compilar con:
+#   cargo build -p erplora-db --features postgres
+postgres = ["dep:postgres"]
+
+[dependencies]
+serde_json = "1"
+thiserror = "1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+postgres = { version = "0.19", optional = true }

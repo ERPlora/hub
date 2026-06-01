@@ -1,0 +1,12 @@
+{
+  "name": "@erplora/module-sdk",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "SDK frontend de módulos (Stencil WC): erplora.query/command/on con transporte intercambiable (IPC/HTTP+WS).",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "node --disable-warning=ExperimentalWarning --experimental-transform-types --test src/*.test.ts"
+  }
+}

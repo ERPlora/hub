@@ -1,0 +1,14 @@
+{
+  "name": "@erplora/module-stencil",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Compilador Stencil COMPARTIDO de los Web Components de todos los módulos. Lee modules/*/ui/components y emite un bundle auto-registrable por módulo en modules/<id>/dist/<id>.esm.js.",
+  "scripts": {
+    "build": "node build-all.mjs"
+  },
+  "devDependencies": {
+    "@stencil/core": "^4.22.0",
+    "esbuild": "^0.24.0"
+  }
+}

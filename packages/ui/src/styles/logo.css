@@ -1,0 +1,280 @@
+/* ============================================================
+   ERPlora · Logo Component
+   ─────────────────────────────────────────────────────────────
+   Hub central + 8 módulos + 2 vectores diagonales · 100% CSS.
+
+   Nueva versión:
+   • módulos transparentes
+   • borde azul suave
+   • hub central sólido
+   • esquinas NE/SW con triángulo exterior azul
+   • sin línea diagonal visible
+   • optimizado para PNG transparente y dark/light mode
+
+   Estructura · 9 elementos en orden de rejilla (NW → SE):
+     <div class="erp-logo">
+       <i class="erp-nw"></i><i class="erp-n"></i><i class="erp-ne"></i>
+       <i class="erp-w"></i><i class="erp-hub"></i><i class="erp-e"></i>
+       <i class="erp-sw"></i><i class="erp-s"></i><i class="erp-se"></i>
+     </div>
+   ============================================================ */
+
+.erp-logo {
+  /* unit: 0.78px ≈ 56px total mark size */
+  --u: 0.78px;
+
+  /* theme tokens */
+  --erp-accent: var(--brand);
+  --erp-border: color-mix(
+    in srgb,
+    var(--erp-accent) 22%,
+    transparent
+  );
+
+  position: relative;
+  display: inline-block;
+  width: calc(72 * var(--u));
+  height: calc(72 * var(--u));
+  flex: none;
+  vertical-align: middle;
+}
+
+/* ============================================================
+   Base modules
+   ============================================================ */
+
+.erp-logo > i {
+  position: absolute;
+  display: block;
+  box-sizing: border-box;
+
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+
+  background: transparent;
+
+  border: calc(1.4 * var(--u)) solid var(--erp-border);
+
+  border-radius: calc(2 * var(--u));
+
+  overflow: hidden;
+}
+
+/* ============================================================
+   Module positions
+   ============================================================ */
+
+.erp-logo > .erp-nw {
+  left: calc(6 * var(--u));
+  top: calc(6 * var(--u));
+}
+
+.erp-logo > .erp-n {
+  left: calc(30 * var(--u));
+  top: calc(6 * var(--u));
+}
+
+.erp-logo > .erp-ne {
+  left: calc(54 * var(--u));
+  top: calc(6 * var(--u));
+}
+
+.erp-logo > .erp-w {
+  left: calc(6 * var(--u));
+  top: calc(30 * var(--u));
+}
+
+.erp-logo > .erp-e {
+  left: calc(54 * var(--u));
+  top: calc(30 * var(--u));
+}
+
+.erp-logo > .erp-sw {
+  left: calc(6 * var(--u));
+  top: calc(54 * var(--u));
+}
+
+.erp-logo > .erp-s {
+  left: calc(30 * var(--u));
+  top: calc(54 * var(--u));
+}
+
+.erp-logo > .erp-se {
+  left: calc(54 * var(--u));
+  top: calc(54 * var(--u));
+}
+
+/* ============================================================
+   Central hub
+   ============================================================ */
+
+.erp-logo > .erp-hub {
+  left: calc(24 * var(--u));
+  top: calc(24 * var(--u));
+
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+
+  background: var(--erp-accent);
+
+  border: calc(1.4 * var(--u)) solid
+    color-mix(in srgb, var(--erp-accent) 75%, white 0%);
+
+  border-radius: calc(4 * var(--u));
+}
+
+/* ============================================================
+   Diagonal accent corners
+   ─────────────────────────────────────────────────────────────
+   Only the OUTER triangle is blue.
+   Inner half stays transparent.
+   No diagonal separator line.
+   ============================================================ */
+
+/* Top-right */
+.erp-logo > .erp-ne {
+  background:
+    linear-gradient(
+      45deg,
+      transparent 50%,
+      var(--erp-accent) 50%
+    );
+}
+
+/* Bottom-left */
+.erp-logo > .erp-sw {
+  background:
+    linear-gradient(
+      45deg,
+      var(--erp-accent) 50%,
+      transparent 50%
+    );
+}
+
+/* ============================================================
+   Size presets
+   ============================================================ */
+
+.erp-logo.xs {
+  --u: 0.222px;
+} /* 16px */
+
+.erp-logo.sm {
+  --u: 0.444px;
+} /* 32px */
+
+.erp-logo.md {
+  --u: 0.778px;
+} /* 56px */
+
+.erp-logo.lg {
+  --u: 1.333px;
+} /* 96px */
+
+.erp-logo.xl {
+  --u: 2px;
+} /* 144px */
+
+/* ============================================================
+   Mono override
+   ============================================================ */
+
+.erp-logo.mono {
+  --erp-accent: currentColor;
+  --erp-border: color-mix(
+    in srgb,
+    currentColor 28%,
+    transparent
+  );
+}
+
+/* ============================================================
+   Wordmark
+   ============================================================ */
+
+.erp-wordmark {
+  font-family: var(--font-display);
+
+  font-weight: var(--weight-semibold, 600);
+
+  font-size: var(--text-2xl, 24px);
+
+  line-height: 1;
+
+  letter-spacing: var(
+    --tracking-tighter,
+    -0.025em
+  );
+
+  color: var(--ink);
+}
+
+/* ============================================================
+   Wordmark size variants
+   ============================================================ */
+
+.erp-lockup.xs .erp-wordmark {
+  font-size: var(--text-sm, 12.5px);
+}
+
+.erp-lockup.sm .erp-wordmark {
+  font-size: var(--text-lg, 16px);
+}
+
+.erp-lockup.md .erp-wordmark {
+  font-size: var(--text-2xl, 24px);
+}
+
+.erp-lockup.lg .erp-wordmark {
+  font-size: var(--text-3xl, 32px);
+}
+
+.erp-lockup.xl .erp-wordmark {
+  font-size: var(--text-4xl, 44px);
+}
+
+/* ============================================================
+   Lockup container
+   ============================================================ */
+
+.erp-lockup {
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: var(--space-3, 12px);
+
+  vertical-align: middle;
+}
+
+.erp-lockup.vertical {
+  flex-direction: column;
+
+  gap: var(--space-2, 8px);
+
+  align-items: center;
+}
+
+/* ============================================================
+   Cascading size to inner logo
+   ============================================================ */
+
+.erp-lockup.xs > .erp-logo {
+  --u: 0.222px;
+}
+
+.erp-lockup.sm > .erp-logo {
+  --u: 0.444px;
+}
+
+.erp-lockup.md > .erp-logo {
+  --u: 0.778px;
+}
+
+.erp-lockup.lg > .erp-logo {
+  --u: 1.333px;
+}
+
+.erp-lockup.xl > .erp-logo {
+  --u: 2px;
+}

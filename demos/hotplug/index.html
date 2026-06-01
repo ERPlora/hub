@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ERPlora · Mis módulos</title>
+<style>
+  :root{--brand:#1496d6;--bg:#efebe2;--surface:#fff;--ink:#1c1b17;--muted:#8b897f;--line:#e7e2d6;
+    --ok-bg:#e3f1e8;--ok-ink:#1f7a4d;--off-bg:#f1ede4;--off-ink:#8b897f;}
+  *{box-sizing:border-box} body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:#111827;color:#fff;padding:.8rem 1.2rem;font-weight:600}
+  main{max-width:1100px;margin:0 auto;padding:1.5rem}
+  h1{font-size:1.4rem;margin:.2rem 0 .2rem} .sub{color:var(--muted);margin:0 0 1.4rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1.1rem}
+  .top{display:flex;align-items:center;gap:.8rem}
+  .ico{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:rgba(20,150,214,.12);color:var(--brand);font-size:22px}
+  .name{font-weight:700} .ver{color:var(--muted);font-size:.82rem}
+  .badge{margin-left:auto;font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:999px}
+  .badge.active{background:var(--ok-bg);color:var(--ok-ink)} .badge.inactive{background:var(--off-bg);color:var(--off-ink)}
+  .row{display:flex;gap:.5rem;margin-top:1rem}
+  button{font:inherit;font-weight:600;border-radius:10px;padding:.5rem .9rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+  button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  button.warn{color:#b1761a}
+  .empty{color:var(--muted);padding:3rem;text-align:center}
+</style></head>
+<body>
+<header>ERPlora · Hub</header>
+<main>
+  <h1>Mis módulos</h1>
+  <p class="sub">Instala, activa o desactiva módulos en caliente (hot-plug). Servido por el runtime Rust real.</p>
+  <div id="grid" class="grid"><div class="empty">cargando…</div></div>
+</main>
+<script type="module" src="./app.js"></script>
+</body></html>

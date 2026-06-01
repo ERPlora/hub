@@ -1,0 +1,22 @@
+# Workspace Rust de hub-next (ARQUITECTURA.md §4, §11).
+# Implementados: erplora-{db, runtime, server, cloud-client, vector, source, installer}.
+# Stubs: guest-sdk, wasm-host, sync.
+[workspace]
+resolver = "2"
+members = [
+    "crates/runtime",
+    "crates/db",
+    "crates/installer",
+    "crates/source",
+    "crates/cloud-client",
+    "crates/guest-sdk",
+    "crates/wasm-host",
+    "crates/server",
+    "crates/sync",
+    "crates/vector",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.0.0"
+license = "MIT"

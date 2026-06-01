@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://erplora.com/schemas/envelope.schema.json",
+  "title": "ERPlora hub-next wire envelope",
+  "description": "Formato agnóstico al transporte (IPC/HTTP/WS). ARQUITECTURA.md §7.6.",
+  "oneOf": [
+    {
+      "title": "Request",
+      "type": "object",
+      "required": ["id", "kind", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string", "enum": ["query", "command"] },
+        "name": { "type": "string", "description": "p. ej. inventory.products.list" },
+        "params": {}
+      }
+    },
+    {
+      "title": "Response",
+      "type": "object",
+      "required": ["id", "ok"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "ok": { "type": "boolean" },
+        "data": {},
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" }
+          }
+        }
+      }
+    },
+    {
+      "title": "Event",
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "p. ej. inventory.stock.updated" },
+        "payload": {}
+      }
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+{ "name": "@erplora/module-notes", "private": true, "version": "1.0.0", "type": "module",
+  "dependencies": { "lit": "^3.2.0" } }

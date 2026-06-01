@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://erplora.com/schemas/module.schema.json",
+  "title": "ERPlora hub-next module manifest",
+  "description": "Contrato técnico de un módulo (module.json). La clasificación de marketplace (sectors/business_types/pricing) NO va aquí — vive en el Cloud Portal (ARQUITECTURA.md §2.4).",
+  "type": "object",
+  "required": ["id", "name", "version"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Identificador namespaced del módulo (p. ej. inventory)."
+    },
+    "name": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+",
+      "description": "SemVer."
+    },
+    "depends_on": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "permissions": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "role_permissions": {
+      "type": "object",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } },
+      "default": {}
+    },
+    "navigation": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "component"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "icon": { "type": "string" },
+          "component": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$",
+            "description": "Nombre del custom element (Web Component) a montar."
+          }
+        }
+      }
+    },
+    "migrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sqlite": { "type": "array", "items": { "type": "string" } },
+        "postgres": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "queries": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["permission"],
+        "properties": {
+          "permission": { "type": "string" },
+          "sql": { "type": "string" },
+          "schema": { "type": "string" }
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["permission"],
+        "properties": {
+          "permission": { "type": "string" },
+          "transaction": { "type": "boolean", "default": false },
+          "sql": { "type": "array", "items": { "type": "string" } },
+          "handler": {
+            "type": "object",
+            "required": ["type", "file"],
+            "properties": {
+              "type": { "type": "string", "enum": ["wasm"] },
+              "file": { "type": "string" },
+              "function": { "type": "string" }
+            }
+          },
+          "emit": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "events": {
+      "type": "object",
+      "properties": {
+        "listen": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["command"],
+            "properties": { "command": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "ai_tools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["permission", "description"],
+        "properties": {
+          "permission": { "type": "string" },
+          "description": { "type": "string" },
+          "command": { "type": "string" },
+          "query": { "type": "string" },
+          "schema": { "type": "string" }
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "description": "Capacidad http.fetch mediada por el host (ARQUITECTURA.md §5.5, Opción A).",
+      "additionalProperties": false,
+      "properties": {
+        "allow": { "type": "array", "items": { "type": "string" } },
+        "secrets": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "scheduled_tasks": { "type": "array", "items": { "type": "object" }, "default": [] },
+    "ui": {
+      "type": "object",
+      "required": ["entry"],
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "type": "string",
+          "description": "Ruta al ESM del Web Component compilado (cargado en runtime por el shell)."
+        }
+      }
+    }
+  }
+}

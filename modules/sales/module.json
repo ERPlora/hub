@@ -1,0 +1,44 @@
+{
+  "id": "sales",
+  "name": "Sales & POS",
+  "version": "2.4.9",
+  "manifest_kind": "declarative",
+  "depends_on": ["customers", "inventory"],
+  "permissions": [
+    "sales.view_sale", "sales.add_sale", "sales.change_sale", "sales.delete_sale",
+    "sales.void_sale", "sales.view_paymentmethod", "sales.add_paymentmethod",
+    "sales.change_paymentmethod", "sales.delete_paymentmethod", "sales.view_reports",
+    "sales.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": ["sales.view_sale","sales.add_sale","sales.change_sale","sales.void_sale",
+      "sales.view_paymentmethod","sales.add_paymentmethod","sales.change_paymentmethod",
+      "sales.view_reports","sales.manage_settings"],
+    "employee": ["sales.view_sale","sales.add_sale","sales.view_paymentmethod"]
+  },
+  "navigation": [
+    { "id": "sales", "label": "Sales", "icon": "shopping-cart", "component": "erp-sales-list" }
+  ],
+  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
+  "queries": {
+    "sales.list":            { "permission": "sales.view_sale", "sql": "queries/list.sql" },
+    "sales.get":             { "permission": "sales.view_sale", "sql": "queries/get.sql" },
+    "sales.lines":           { "permission": "sales.view_sale", "sql": "queries/lines.sql" },
+    "sales.stats":           { "permission": "sales.view_reports", "sql": "queries/stats.sql" },
+    "sales.payment_methods": { "permission": "sales.view_paymentmethod", "sql": "queries/payment_methods.sql" }
+  },
+  "commands": {
+    "sales.complete_sale": {
+      "permission": "sales.add_sale",
+      "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "complete_sale" },
+      "schema": "schemas/complete_sale.json"
+    },
+    "sales.void": { "permission": "sales.void_sale", "transaction": true, "sql": ["commands/void.sql"], "emit": ["sale.voided"] },
+    "sales.create_payment_method": { "permission": "sales.add_paymentmethod", "transaction": true, "sql": ["commands/create_payment_method.sql"] },
+    "sales._bump_counter": { "permission": "sales.add_sale", "sql": ["commands/_bump_counter.sql"] },
+    "sales._insert_sale":  { "permission": "sales.add_sale", "sql": ["commands/_insert_sale.sql"] },
+    "sales._insert_line":  { "permission": "sales.add_sale", "sql": ["commands/_insert_line.sql"] }
+  },
+  "ui": { "entry": "dist/sales.esm.js" }
+}

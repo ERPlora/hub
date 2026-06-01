@@ -1,0 +1,28 @@
+[package]
+name = "erplora-installer"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+# Renombrado a `cloud_client` (igual que en erplora-source) para `use cloud_client::…`.
+cloud_client = { package = "erplora-cloud-client", path = "../cloud-client" }
+# Renombrado a `source` para `use source::{Fetcher, ModuleStore, SourceError}`.
+source = { package = "erplora-source", path = "../source" }
+erplora-runtime = { path = "../runtime" }
+thiserror = "1"
+serde_json = "1"
+# Cliente HTTP real (blocking + rustls) detrás de la feature `reqwest-transport`.
+# Opcional: el build por defecto del workspace NO lo arrastra.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"], optional = true }
+
+[features]
+# Activa `ReqwestTransport`: implementación real de `Transport` (+ `source::Fetcher`)
+# sobre reqwest::blocking. `cargo build -p erplora-installer --features reqwest-transport`.
+# Reusa el `ReqwestFetcher` de `erplora-source` activando su feature transitivamente.
+reqwest-transport = ["dep:reqwest", "source/reqwest-transport"]
+
+[dev-dependencies]
+tempfile = "3"
+zip = "2"
+erplora-db = { path = "../db" }

@@ -1,0 +1,17 @@
+{
+  "name": "@erplora/module-cli",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "CLI de módulos (build/validate/pack/sign/publish). Hoy: build + validate reales.",
+  "bin": {
+    "erplora-module": "src/cli.mjs"
+  },
+  "scripts": {
+    "build:inventory": "node src/cli.mjs build ../../modules/inventory",
+    "validate:inventory": "node src/cli.mjs validate ../../modules/inventory"
+  },
+  "dependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

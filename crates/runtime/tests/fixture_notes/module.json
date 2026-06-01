@@ -1,0 +1,26 @@
+{
+  "id": "notes",
+  "name": "Notes",
+  "version": "1.0.0",
+  "permissions": ["notes.write"],
+  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
+  "commands": {
+    "notes.create": {
+      "permission": "notes.write",
+      "transaction": true,
+      "sql": ["sql/create_note.sql"]
+    },
+    "notes.bulk": {
+      "permission": "notes.write",
+      "handler": {
+        "type": "wasm",
+        "file": "handler.wasm",
+        "function": "handle"
+      },
+      "emit": ["notes.bulk_created"]
+    }
+  },
+  "events": {
+    "listen": {}
+  }
+}

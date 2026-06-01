@@ -1,0 +1,40 @@
+{
+  "name": "@erplora/web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Shell web de hub-next: Vite + React + TypeScript + Ionic React + Tailwind + react-icons (sin Capacitor; runtime nativo = Tauri). Carga Web Components de módulos en runtime.",
+  "scripts": {
+    "sync-modules": "node sync-modules.mjs",
+    "predev": "node sync-modules.mjs",
+    "dev": "vite",
+    "prebuild": "node sync-modules.mjs",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "preview": "vite preview",
+    "snapshot": "node sync-modules.mjs && vite build && node snapshot.mjs",
+    "verify": "node sync-modules.mjs && vite build && node snapshot.mjs"
+  },
+  "dependencies": {
+    "@erplora/module-types": "workspace:*",
+    "@ionic/react": "^8.8.8",
+    "@ionic/react-router": "^8.8.8",
+    "ionicons": "^8.0.13",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.5.0",
+    "react-router": "^5.3.4",
+    "react-router-dom": "^5.3.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/react-router": "^5.1.20",
+    "@types/react-router-dom": "^5.3.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

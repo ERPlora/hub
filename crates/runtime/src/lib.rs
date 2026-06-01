@@ -1,0 +1,122 @@
+//! erplora-runtime — host genérico de módulos (ARQUITECTURA.md §4).
+//!
+//! Rust NO tiene lógica de negocio hardcodeada. Despachador genérico:
+//!   `execute_command("pos.sale.create", payload)` / `execute_query("inventory.products.list", params)`
+//!
+//! Ciclo de vida (hot-plug): instalar → activar/desactivar → desinstalar. Solo los módulos
+//! ACTIVOS exponen menú, queries, commands y listeners. Estado persistido en `hub_module`.
+
+use std::path::Path;
+use std::sync::Arc;
+
+use erplora_db::{DatabaseAdapter, Params};
+use serde_json::Value as Json;
+
+pub mod commands;
+pub mod errors;
+pub mod events;
+pub mod installer;
+pub mod loader;
+pub mod manifest;
+pub mod migrations;
+pub mod permissions;
+pub mod queries;
+pub mod registry;
+pub mod ui;
+pub mod wasm;
+
+pub use errors::{Result, RuntimeError};
+pub use manifest::Manifest;
+pub use registry::{EventSink, ModuleStatus, NavEntry, Registry, RequestContext};
+
+/// Descripción de un módulo instalado (para `/api/modules`).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ModuleInfo {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub status: ModuleStatus,
+}
+
+/// El runtime: une el adaptador de BD con el registro de módulos y ejecuta queries/commands.
+pub struct Runtime {
+    db: Box<dyn DatabaseAdapter>,
+    registry: Registry,
+}
+
+impl Runtime {
+    pub fn new(db: Box<dyn DatabaseAdapter>) -> Self {
+        Self { db, registry: Registry::new() }
+    }
+
+    /// Instala un módulo ya extraído en `dir` (lee `module.json`, migra, registra, activa).
+    pub fn install_from_dir(&mut self, dir: &Path) -> Result<String> {
+        installer::install(self.db.as_ref(), &mut self.registry, dir)
+    }
+
+    /// Activa un módulo instalado (sus capacidades vuelven a estar disponibles).
+    pub fn activate(&mut self, module_id: &str) -> Result<()> {
+        installer::set_status(self.db.as_ref(), &mut self.registry, module_id, ModuleStatus::Active)
+    }
+
+    /// Desactiva un módulo instalado (oculta su menú y bloquea sus queries/commands).
+    pub fn deactivate(&mut self, module_id: &str) -> Result<()> {
+        installer::set_status(self.db.as_ref(), &mut self.registry, module_id, ModuleStatus::Inactive)
+    }
+
+    /// Desinstala un módulo (quita sus capacidades; no borra sus datos).
+    pub fn uninstall(&mut self, module_id: &str) -> Result<()> {
+        installer::uninstall(self.db.as_ref(), &mut self.registry, module_id)
+    }
+
+    /// Lista de módulos instalados con su estado (para el dashboard / `/api/modules`).
+    pub fn modules(&self) -> Vec<ModuleInfo> {
+        self.registry
+            .installed
+            .iter()
+            .map(|m| ModuleInfo {
+                id: m.id.clone(),
+                name: m.name.clone(),
+                version: m.version.clone(),
+                status: *self.registry.status.get(&m.id).unwrap_or(&ModuleStatus::Inactive),
+            })
+            .collect()
+    }
+
+    /// Registra un observador de eventos (el server lo usa para reenviar por WS).
+    pub fn set_event_sink(&mut self, sink: Arc<dyn EventSink>) {
+        self.registry.event_sink = Some(sink);
+    }
+
+    /// Ejecuta una query declarativa (solo si su módulo está activo) y devuelve filas JSON.
+    pub fn execute_query(&self, name: &str, params: &Params, ctx: &RequestContext) -> Result<Vec<Json>> {
+        queries::execute(self.db.as_ref(), &self.registry, name, params, ctx)
+    }
+
+    /// Ejecuta un command declarativo (solo si su módulo está activo) + emite sus eventos.
+    pub fn execute_command(&self, name: &str, payload: &Params, ctx: &RequestContext) -> Result<Json> {
+        commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx)
+    }
+
+    /// Menú dinámico de los módulos **activos** (lo consume el shell). ARQUITECTURA.md §7.7.
+    pub fn navigation(&self) -> Vec<NavEntry> {
+        self.registry.active_navigation().into_iter().cloned().collect()
+    }
+
+    /// Acceso de solo lectura al registro (introspección / tests).
+    pub fn registry(&self) -> &Registry {
+        &self.registry
+    }
+}
+
+/// Inyecta los parámetros del sistema en el payload del llamador: `hub_id`, `current_user_id`,
+/// `now` y `new_id`. Siempre disponibles para el SQL del módulo y no falsificables desde la UI
+/// (ARQUITECTURA.md §2.5, §2.9).
+pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
+    let mut p = base.clone();
+    p.insert("hub_id".into(), Json::String(ctx.hub_id.clone()));
+    p.insert("current_user_id".into(), Json::String(ctx.user_id.clone()));
+    p.insert("now".into(), Json::String(registry::now_rfc3339()));
+    p.insert("new_id".into(), Json::String(registry::new_id()));
+    p
+}

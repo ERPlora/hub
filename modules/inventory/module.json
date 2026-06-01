@@ -1,0 +1,196 @@
+{
+  "id": "inventory",
+  "name": "Inventory",
+  "version": "1.0.14",
+  "manifest_kind": "declarative",
+  "depends_on": [],
+  "permissions": [
+    "inventory.view_product",
+    "inventory.add_product",
+    "inventory.change_product",
+    "inventory.delete_product",
+    "inventory.view_category",
+    "inventory.add_category",
+    "inventory.change_category",
+    "inventory.delete_category",
+    "inventory.export_product",
+    "inventory.import_product",
+    "inventory.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "inventory.view_product",
+      "inventory.add_product",
+      "inventory.change_product",
+      "inventory.delete_product",
+      "inventory.view_category",
+      "inventory.add_category",
+      "inventory.change_category",
+      "inventory.delete_category",
+      "inventory.export_product",
+      "inventory.import_product",
+      "inventory.manage_settings"
+    ],
+    "employee": [
+      "inventory.view_product",
+      "inventory.view_category"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "inventory",
+      "label": "Inventory",
+      "icon": "cube",
+      "component": "erp-inventory-products"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "inventory.products.list": {
+      "permission": "inventory.view_product",
+      "sql": "queries/products_list.sql"
+    },
+    "inventory.products.get": {
+      "permission": "inventory.view_product",
+      "sql": "queries/product_get.sql"
+    },
+    "inventory.products.low_stock": {
+      "permission": "inventory.view_product",
+      "sql": "queries/low_stock.sql"
+    },
+    "inventory.products.stats": {
+      "permission": "inventory.view_product",
+      "sql": "queries/stats.sql"
+    },
+    "inventory.categories.list": {
+      "permission": "inventory.view_category",
+      "sql": "queries/categories_list.sql"
+    }
+  },
+  "commands": {
+    "inventory.products.create": {
+      "permission": "inventory.add_product",
+      "transaction": true,
+      "sql": [
+        "commands/product_create.sql"
+      ],
+      "emit": [
+        "inventory.product.created"
+      ]
+    },
+    "inventory.products.update": {
+      "permission": "inventory.change_product",
+      "transaction": true,
+      "sql": [
+        "commands/product_update.sql"
+      ],
+      "emit": [
+        "inventory.product.updated"
+      ]
+    },
+    "inventory.products.delete": {
+      "permission": "inventory.delete_product",
+      "transaction": true,
+      "sql": [
+        "commands/product_delete.sql"
+      ],
+      "emit": [
+        "inventory.product.deleted"
+      ]
+    },
+    "inventory.products.bulk_create": {
+      "permission": "inventory.add_product",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "bulk_create"
+      }
+    },
+    "inventory.stock.adjust": {
+      "permission": "inventory.change_product",
+      "transaction": true,
+      "sql": [
+        "commands/stock_adjust.sql"
+      ],
+      "emit": [
+        "inventory.stock_changed"
+      ]
+    },
+    "inventory.stock.decrease": {
+      "permission": "inventory.change_product",
+      "transaction": true,
+      "sql": [
+        "commands/stock_decrease.sql"
+      ],
+      "emit": [
+        "inventory.stock_changed"
+      ]
+    },
+    "inventory.stock.receive": {
+      "permission": "inventory.change_product",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "receive_stock"
+      }
+    },
+    "inventory.categories.create": {
+      "permission": "inventory.add_category",
+      "transaction": true,
+      "sql": [
+        "commands/category_create.sql"
+      ]
+    },
+    "inventory.categories.update": {
+      "permission": "inventory.change_category",
+      "transaction": true,
+      "sql": [
+        "commands/category_update.sql"
+      ]
+    },
+    "inventory.categories.delete": {
+      "permission": "inventory.delete_category",
+      "transaction": true,
+      "sql": [
+        "commands/category_delete.sql"
+      ]
+    },
+    "inventory._insert_product": {
+      "permission": "inventory.add_product",
+      "sql": [
+        "commands/_insert_product.sql"
+      ]
+    },
+    "inventory._receive_line": {
+      "permission": "inventory.change_product",
+      "sql": [
+        "commands/_receive_line.sql"
+      ]
+    },
+    "inventory.stock.decrease_on_sale": {
+      "permission": "inventory.change_product",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "decrease_on_sale"
+      }
+    }
+  },
+  "events": {
+    "listen": {
+      "sale.completed": {
+        "command": "inventory.stock.decrease_on_sale"
+      }
+    }
+  },
+  "ui": {
+    "entry": "dist/inventory.esm.js"
+  }
+}

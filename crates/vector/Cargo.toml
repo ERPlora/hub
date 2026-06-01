@@ -1,0 +1,11 @@
+# erplora-vector — VectorStore embebido (sqlite brute-force coseno local; pgvector cloud). ARQUITECTURA.md §9.4/§9.5.
+[package]
+name = "erplora-vector"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+erplora-db = { path = "../db" }
+serde_json = "1"
+thiserror = "1"

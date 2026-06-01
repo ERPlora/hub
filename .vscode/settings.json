@@ -1,0 +1,47 @@
+{
+  // ── La causa de las reversiones: formateo/guardado automático global.
+  //    Lo apagamos por defecto y lo activamos SOLO donde toca (apps/web).
+  "files.autoSave": "off",
+  "editor.formatOnSave": false,
+  "editor.formatOnPaste": false,
+  "editor.formatOnType": false,
+
+  // ── No formatear NUNCA estos lenguajes (aquí estaban los destrozos: .rs, .toml, .json, .sql)
+  "[rust]":   { "editor.formatOnSave": false },
+  "[toml]":   { "editor.formatOnSave": false },
+  "[json]":   { "editor.formatOnSave": false },
+  "[jsonc]":  { "editor.formatOnSave": false },
+  "[sql]":    { "editor.formatOnSave": false },
+  "[markdown]": { "editor.formatOnSave": false },
+
+  // ── apps/web (Ionic/React): aquí SÍ puedes formatear con Prettier si quieres.
+  //    (Déjalo en false si prefieres control total; ponlo en true para auto-format al guardar.)
+  "[typescript]":      { "editor.defaultFormatter": "esbenp.prettier-vscode", "editor.formatOnSave": false },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode", "editor.formatOnSave": false },
+
+  // ── Rust: rust-analyzer apuntando al workspace correcto, sin tocar al guardar.
+  "rust-analyzer.linkedProjects": ["./Cargo.toml"],
+  "rust-analyzer.check.command": "clippy",
+  "rust-analyzer.cargo.targetDir": true,
+
+  // ── Tailwind v4 + Ionic: que el IntelliSense entienda las clases en TSX.
+  "tailwindCSS.experimental.classRegex": [
+    ["className=\"([^\"]*)\"", "([a-zA-Z0-9\\-:/\\[\\]\\.]+)"]
+  ],
+
+  // ── Ruido fuera: no indexar ni vigilar lo generado.
+  "files.watcherExclude": {
+    "**/target/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/apps/web/snapshots/**": true
+  },
+  "search.exclude": {
+    "**/target": true,
+    "**/node_modules": true,
+    "**/dist": true
+  },
+  "files.exclude": {
+    "**/target": false
+  }
+}

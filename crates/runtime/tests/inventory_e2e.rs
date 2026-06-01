@@ -1,0 +1,184 @@
+//! E2E real del módulo `inventory` (portado de modules/m_inventory): instala el
+//! módulo real desde `modules/inventory` (con su `dist/handler.wasm` compilado)
+//! y ejercita CRUD declarativo + los dos handlers WASM batch (bulk_create,
+//! receive_stock) contra SQLite en memoria.
+//!
+//! Si `dist/handler.wasm` no existe (no se compiló el guest), se salta con aviso.
+use std::path::PathBuf;
+
+use erplora_db::{Params, SqliteAdapter};
+use erplora_runtime::{RequestContext, Runtime};
+use serde_json::json;
+
+fn params(v: serde_json::Value) -> Params {
+    v.as_object().cloned().unwrap_or_default()
+}
+
+fn inventory_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../modules/inventory")
+}
+
+fn admin_ctx() -> RequestContext {
+    RequestContext::new("h1", "u1", ["*".to_string()])
+}
+
+fn wasm_present() -> bool {
+    inventory_dir().join("dist/handler.wasm").exists()
+}
+
+fn fresh() -> Runtime {
+    let db = SqliteAdapter::open_in_memory().unwrap();
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(&inventory_dir()).expect("instalar inventory");
+    rt
+}
+
+#[test]
+fn install_registers_capabilities() {
+    let rt = fresh();
+    let reg = rt.registry();
+    assert!(reg.is_installed("inventory"));
+    assert!(reg.get_query("inventory.products.list").is_some());
+    assert!(reg.get_command("inventory.products.create").is_some());
+    assert!(reg.get_command("inventory.products.bulk_create").is_some());
+    assert!(reg.get_command("inventory.stock.receive").is_some());
+    // El listener de sale.completed mapea al handler WASM que expande las líneas
+    // del ticket en N bajas de stock (contrato cross-módulo).
+    assert_eq!(reg.listeners_for("sale.completed"), ["inventory.stock.decrease_on_sale"]);
+}
+
+#[test]
+fn product_crud_and_low_stock() {
+    let rt = fresh();
+    let ctx = admin_ctx();
+
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({
+            "name": "Café", "sku": "CAF", "price": 4.5, "cost": 2.0,
+            "stock": 3, "low_stock_threshold": 5, "product_type": "physical",
+            "ean13": null, "description": "", "tax_class_id": null, "image": ""
+        })),
+        &ctx,
+    )
+    .unwrap();
+
+    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["name"], json!("Café"));
+
+    // stock 3 <= threshold 5 → aparece en low_stock.
+    let low = rt.execute_query("inventory.products.low_stock", &Params::new(), &ctx).unwrap();
+    assert_eq!(low.len(), 1);
+
+    // stats: 1 producto, en stock, valor 4.5*3 = 13.5.
+    let stats = rt.execute_query("inventory.products.stats", &Params::new(), &ctx).unwrap();
+    assert_eq!(stats[0]["total_products"], json!(1));
+    assert_eq!(stats[0]["total_inventory_value"], json!(13.5));
+
+    // Otro hub no ve nada (scope hub_id).
+    let other = RequestContext::new("h2", "u9", ["*".to_string()]);
+    let rows2 = rt.execute_query("inventory.products.list", &Params::new(), &other).unwrap();
+    assert_eq!(rows2.len(), 0);
+}
+
+#[test]
+fn stock_adjust_clamps_at_zero() {
+    let rt = fresh();
+    let ctx = admin_ctx();
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({ "name": "X", "sku": "X1", "price": 1, "cost": 0, "stock": 2,
+                        "low_stock_threshold": 10, "product_type": "physical",
+                        "ean13": null, "description": "", "tax_class_id": null, "image": "" })),
+        &ctx,
+    ).unwrap();
+    let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    // -5 sobre stock 2 → MAX(0, -3) = 0 (no negativo por defecto).
+    rt.execute_command("inventory.stock.adjust",
+        &params(json!({ "product_id": id, "delta": -5 })), &ctx).unwrap();
+    let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": id})), &ctx).unwrap();
+    assert_eq!(p[0]["stock"], json!(0));
+}
+
+#[test]
+fn bulk_create_wasm_inserts_with_generated_skus() {
+    if !wasm_present() {
+        eprintln!("SKIP: modules/inventory/dist/handler.wasm no existe");
+        return;
+    }
+    let rt = fresh();
+    let ctx = admin_ctx();
+    let res = rt
+        .execute_command(
+            "inventory.products.bulk_create",
+            &params(json!({
+                "existing_count": 0,
+                "products": [
+                    { "name": "Café", "price": 4.5 },
+                    { "name": "Té", "sku": "TE-1", "price": 3.0, "stock": 20 },
+                    { "name": "Agua", "price": 1.0 }
+                ]
+            })),
+            &ctx,
+        )
+        .expect("bulk_create ejecuta el handler WASM");
+    assert_eq!(res["operations"], json!(3));
+
+    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap();
+    assert_eq!(rows.len(), 3);
+    let skus: Vec<String> = rows.iter().map(|r| r["sku"].as_str().unwrap().to_string()).collect();
+    // SKUs autogenerados PROD-001/PROD-003 + el explícito TE-1.
+    assert!(skus.contains(&"PROD-001".to_string()), "skus={skus:?}");
+    assert!(skus.contains(&"TE-1".to_string()), "skus={skus:?}");
+    assert!(skus.contains(&"PROD-003".to_string()), "skus={skus:?}");
+}
+
+#[test]
+fn receive_stock_wasm_increments_existing() {
+    if !wasm_present() {
+        eprintln!("SKIP: handler.wasm no existe");
+        return;
+    }
+    let rt = fresh();
+    let ctx = admin_ctx();
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({ "name": "Café", "sku": "CAF", "price": 4.5, "cost": 2.0, "stock": 10,
+                        "low_stock_threshold": 5, "product_type": "physical",
+                        "ean13": null, "description": "", "tax_class_id": null, "image": "" })),
+        &ctx,
+    ).unwrap();
+    let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    // Recibe 25 unidades + actualiza coste a 2.5.
+    let res = rt.execute_command(
+        "inventory.stock.receive",
+        &params(json!({ "items": [{ "product_id": id, "qty": 25, "unit_cost": 2.5 }] })),
+        &ctx,
+    ).expect("receive_stock WASM");
+    assert_eq!(res["operations"], json!(1));
+
+    let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": id})), &ctx).unwrap();
+    assert_eq!(p[0]["stock"], json!(35)); // 10 + 25
+    assert_eq!(p[0]["cost"], json!(2.5));
+}
+
+#[test]
+fn category_crud() {
+    let rt = fresh();
+    let ctx = admin_ctx();
+    rt.execute_command(
+        "inventory.categories.create",
+        &params(json!({ "name": "Bebidas", "slug": "bebidas", "icon": "cube-outline",
+                        "color": "#3880ff", "description": "", "order": 0 })),
+        &ctx,
+    ).unwrap();
+    let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx).unwrap();
+    assert_eq!(cats.len(), 1);
+    assert_eq!(cats[0]["name"], json!("Bebidas"));
+    assert_eq!(cats[0]["product_count"], json!(0));
+}

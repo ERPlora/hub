@@ -1,0 +1,55 @@
+{
+  "id": "cash_register",
+  "name": "Cash Register",
+  "version": "1.2.6",
+  "manifest_kind": "declarative",
+  "depends_on": [],
+  "permissions": [
+    "cash_register.view_session", "cash_register.add_session", "cash_register.close_session",
+    "cash_register.view_movement", "cash_register.add_movement",
+    "cash_register.view_count", "cash_register.add_count",
+    "cash_register.view_reports", "cash_register.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": ["cash_register.view_session","cash_register.add_session","cash_register.close_session",
+      "cash_register.view_movement","cash_register.add_movement","cash_register.view_count",
+      "cash_register.add_count","cash_register.view_reports"],
+    "employee": ["cash_register.view_session","cash_register.add_session","cash_register.close_session",
+      "cash_register.view_movement","cash_register.add_movement","cash_register.view_count","cash_register.add_count","cash_register.view_reports"]
+  },
+  "navigation": [
+    { "id": "cash_register", "label": "Cash Register", "icon": "dollar-sign", "component": "erp-cashregister-dashboard" }
+  ],
+  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
+  "queries": {
+    "cash_register.sessions.list":   { "permission": "cash_register.view_session",  "sql": "queries/sessions_list.sql" },
+    "cash_register.session.summary": { "permission": "cash_register.view_session",  "sql": "queries/session_summary.sql" },
+    "cash_register.movements.list":  { "permission": "cash_register.view_movement", "sql": "queries/movements_list.sql" },
+    "cash_register.counts.list":     { "permission": "cash_register.view_count",    "sql": "queries/counts_list.sql" },
+    "cash_register.registers.list":  { "permission": "cash_register.view_session",  "sql": "queries/registers_list.sql" }
+  },
+  "commands": {
+    "cash_register.registers.create": { "permission": "cash_register.manage_settings", "transaction": true, "sql": ["commands/register_create.sql"] },
+    "cash_register.session.open":  { "permission": "cash_register.add_session", "transaction": true, "sql": ["commands/open_session.sql"], "emit": ["cash_register.session_opened"] },
+    "cash_register.session.close": { "permission": "cash_register.close_session", "transaction": true, "sql": ["commands/close_session.sql"], "emit": ["cash_register.session_closed"] },
+    "cash_register.movement.add":  { "permission": "cash_register.add_movement", "transaction": true, "sql": ["commands/add_movement.sql"] },
+    "cash_register.count.add": {
+      "permission": "cash_register.add_count",
+      "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "add_count" },
+      "schema": "schemas/add_count.json"
+    },
+    "cash_register.record_sale": {
+      "permission": "cash_register.add_movement",
+      "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "record_sale" }
+    },
+    "cash_register._insert_count": { "permission": "cash_register.add_count", "sql": ["commands/_insert_count.sql"] },
+    "cash_register._movement_for_open_session": { "permission": "cash_register.add_movement", "sql": ["commands/_movement_for_open_session.sql"] }
+  },
+  "events": {
+    "listen": {
+      "sale.completed": { "command": "cash_register.record_sale" }
+    }
+  },
+  "ui": { "entry": "dist/cash_register.esm.js" }
+}

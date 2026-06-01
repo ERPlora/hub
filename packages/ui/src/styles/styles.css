@@ -1,0 +1,8 @@
+/* Hoja única que consume la app: Tailwind v4 + tokens de tema + logo.
+   Importa esto una vez en el entry de la app (apps/web/src/main.tsx). */
+@import "tailwindcss";
+@import "./theme.css";
+@import "./logo.css";
+
+/* El modo oscuro se activa por la clase .dark en <html> (no por media query). */
+@custom-variant dark (&:where(.dark, .dark *));

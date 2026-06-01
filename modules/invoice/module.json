@@ -1,0 +1,53 @@
+{
+  "id": "invoice",
+  "name": "Invoicing",
+  "version": "1.0.6",
+  "manifest_kind": "declarative",
+  "depends_on": [],
+  "permissions": [
+    "invoice.view_invoice", "invoice.add_invoice", "invoice.rectify_invoice",
+    "invoice.manage_series", "invoice.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": ["invoice.view_invoice","invoice.add_invoice","invoice.rectify_invoice","invoice.manage_series"],
+    "employee": ["invoice.view_invoice","invoice.add_invoice"]
+  },
+  "navigation": [
+    { "id": "invoice", "label": "Invoices", "icon": "file-text", "component": "erp-invoice-list" }
+  ],
+  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
+  "queries": {
+    "invoice.list":        { "permission": "invoice.view_invoice", "sql": "queries/list.sql" },
+    "invoice.get":         { "permission": "invoice.view_invoice", "sql": "queries/get.sql" },
+    "invoice.lines":       { "permission": "invoice.view_invoice", "sql": "queries/lines.sql" },
+    "invoice.series.list": { "permission": "invoice.view_invoice", "sql": "queries/series_list.sql" }
+  },
+  "commands": {
+    "invoice.create": {
+      "permission": "invoice.add_invoice",
+      "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "create_invoice" },
+      "schema": "schemas/create_invoice.json"
+    },
+    "invoice.create_from_sale": {
+      "permission": "invoice.add_invoice",
+      "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "create_from_sale" }
+    },
+    "invoice.rectify": {
+      "permission": "invoice.rectify_invoice", "transaction": true,
+      "sql": ["commands/rectify_ensure.sql","commands/rectify_bump.sql","commands/rectify_insert.sql","commands/rectify_cancel.sql"],
+      "emit": ["invoice.rectified"]
+    },
+    "invoice.mark_paid": { "permission": "invoice.add_invoice", "transaction": true, "sql": ["commands/mark_paid.sql"] },
+    "invoice._ensure_series":  { "permission": "invoice.add_invoice", "sql": ["commands/_ensure_series.sql"] },
+    "invoice._bump_series":    { "permission": "invoice.add_invoice", "sql": ["commands/_bump_series.sql"] },
+    "invoice._insert_invoice": { "permission": "invoice.add_invoice", "sql": ["commands/_insert_invoice.sql"] },
+    "invoice._insert_line":    { "permission": "invoice.add_invoice", "sql": ["commands/_insert_line.sql"] }
+  },
+  "events": {
+    "listen": {
+      "sale.completed": { "command": "invoice.create_from_sale" }
+    }
+  },
+  "ui": { "entry": "dist/invoice.esm.js" }
+}

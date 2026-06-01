@@ -1,0 +1,21 @@
+# STUB — empaquetado cloud (ARQUITECTURA.md §11). Requiere los crates Rust implementados.
+# Multi-stage: build del frontend (Vite) + build del binario Rust (Axum) → imagen slim.
+
+# FROM node:22 AS frontend
+# WORKDIR /app
+# COPY . .
+# RUN corepack enable pnpm && pnpm install --frozen-lockfile \
+#     && pnpm -F @erplora/module-cli build:inventory \
+#     && pnpm -F @erplora/web build
+
+# FROM rust:1 AS builder
+# WORKDIR /app
+# COPY . .
+# RUN cargo build --release -p erplora-server
+
+# FROM debian:bookworm-slim
+# WORKDIR /app
+# COPY --from=builder /app/target/release/erplora-server /app/erplora-server
+# COPY --from=frontend /app/apps/web/dist /app/static/dist
+# EXPOSE 8080
+# CMD ["/app/erplora-server"]

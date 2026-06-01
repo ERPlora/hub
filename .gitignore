@@ -1,0 +1,11 @@
+# JS/TS
+node_modules/
+dist/
+*.tsbuildinfo
+package-lock.json
+
+# Rust
+target/
+
+# OS / tmp
+.DS_Store

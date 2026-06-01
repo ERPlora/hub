@@ -1,0 +1,26 @@
+# erplora-source — Adquisición de artefactos: descarga + verificación SHA256 + cache local.
+# ARQUITECTURA.md §2.2, §4. Deja el zip descomprimido en disco listo para
+# `erplora-runtime::install_from_dir`.
+[package]
+name = "erplora-source"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+# Renombrado a `cloud_client` para `use cloud_client::{InstallGrant, IntegrityError}`.
+cloud_client = { package = "erplora-cloud-client", path = "../cloud-client" }
+zip = "2"
+thiserror = "1"
+# Cliente HTTP real (blocking + rustls) detrás de la feature `reqwest-transport`.
+# Opcional: el build por defecto del workspace NO lo arrastra.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"], optional = true }
+
+[features]
+# Activa `ReqwestFetcher`: una implementación real de `Fetcher` sobre reqwest::blocking.
+# `cargo build -p erplora-source --features reqwest-transport`.
+reqwest-transport = ["dep:reqwest"]
+
+[dev-dependencies]
+tempfile = "3"
+zip = "2"

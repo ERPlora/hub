@@ -1,0 +1,8 @@
+{
+  "name": "@erplora/module-types",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Tipos TS del manifest/envelope, generados desde schemas/. STUB (hoy tipos a mano).",
+  "types": "src/index.ts"
+}

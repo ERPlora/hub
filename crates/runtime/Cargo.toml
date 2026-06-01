@@ -1,0 +1,15 @@
+# erplora-runtime — host genérico de módulos (ARQUITECTURA.md §4).
+[package]
+name = "erplora-runtime"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+erplora-db = { path = "../db" }
+erplora-wasm-host = { path = "../wasm-host" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+uuid = { version = "1", features = ["v4"] }

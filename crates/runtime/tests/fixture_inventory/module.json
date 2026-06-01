@@ -1,0 +1,25 @@
+{
+  "id": "inventory",
+  "name": "Inventory",
+  "version": "1.0.0",
+  "permissions": ["inventory.products.read", "inventory.products.create", "inventory.stock.update"],
+  "role_permissions": { "admin": ["*"], "employee": ["inventory.products.read"] },
+  "navigation": [
+    { "id": "products", "label": "Inventory", "icon": "cube", "component": "erp-inventory-products" }
+  ],
+  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
+  "queries": {
+    "inventory.products.list": { "permission": "inventory.products.read", "sql": "queries/products_list.sql" }
+  },
+  "commands": {
+    "inventory.products.create": {
+      "permission": "inventory.products.create", "transaction": true,
+      "sql": ["commands/products_create.sql"], "emit": ["inventory.products.created"]
+    },
+    "inventory.stock.decrease": {
+      "permission": "inventory.stock.update", "transaction": true,
+      "sql": ["commands/stock_decrease.sql"], "emit": ["inventory.stock.updated"]
+    }
+  },
+  "events": { "listen": { "pos.sale.completed": { "command": "inventory.stock.decrease" } } }
+}
