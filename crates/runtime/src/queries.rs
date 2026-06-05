@@ -7,7 +7,7 @@ use crate::permissions;
 use crate::registry::{Registry, RequestContext};
 
 /// Ejecuta `name(params)` con el contexto dado y devuelve las filas como JSON.
-pub fn execute(
+pub async fn execute(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     name: &str,
@@ -19,5 +19,6 @@ pub fn execute(
         .ok_or_else(|| RuntimeError::QueryNotFound(name.to_string()))?;
     permissions::check(ctx, &q.def.permission)?;
     let bound = crate::system_params(params, ctx);
-    Ok(db.query(&q.sql, &bound)?)
+    // Only the rows are surfaced to callers; `QueryResult` metadata (warnings) is dropped here.
+    Ok(db.query(&q.sql, &bound).await?.rows)
 }

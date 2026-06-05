@@ -26,6 +26,21 @@ pub struct Manifest {
     pub commands: HashMap<String, CommandDef>,
     #[serde(default)]
     pub events: Events,
+    /// Resumen del módulo para el routing del asistente (nivel 1). ARQUITECTURA.md §9.2b.
+    #[serde(default)]
+    pub agent: Option<Agent>,
+    /// Conocimiento del módulo para RAG (§9.4) — aparcado/en diseño. Se captura tal cual.
+    #[serde(default)]
+    pub ai_context: Option<serde_json::Value>,
+}
+
+/// Bloque `agent` del manifest: descripción del módulo (en inglés) para el routing del
+/// asistente y palabras clave opcionales para pre-filtro léxico. ARQUITECTURA.md §9.2b.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct Agent {
+    pub description: String,
+    #[serde(default)]
+    pub keywords: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -51,6 +66,20 @@ pub struct QueryDef {
     pub sql: String,
     #[serde(default)]
     pub schema: Option<String>,
+    /// Si está presente, expone esta query al asistente como tool (nivel 2). El permiso y el
+    /// schema se heredan de la propia query, no se redeclaran. ARQUITECTURA.md §9.2.
+    #[serde(default)]
+    pub ai: Option<AiTool>,
+}
+
+/// Bloque `ai` inline de una operación: la descripción legible (en inglés) que ve el LLM.
+/// `permission`/`schema`/`sql` se heredan de la operación. ARQUITECTURA.md §9.2.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct AiTool {
+    pub description: String,
+    /// Nombre opcional que ve el LLM (por defecto, el nombre de la operación).
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -66,6 +95,10 @@ pub struct CommandDef {
     /// handler en sandbox en vez de su `sql` directo. ARQUITECTURA.md §5.3.
     #[serde(default)]
     pub handler: Option<WasmHandler>,
+    /// Si está presente, expone este command al asistente como tool (nivel 2). El permiso y el
+    /// schema se heredan del propio command, no se redeclaran. ARQUITECTURA.md §9.2.
+    #[serde(default)]
+    pub ai: Option<AiTool>,
 }
 
 /// Referencia a un handler WASM (Tier 2): el fichero `.wasm` del módulo y la

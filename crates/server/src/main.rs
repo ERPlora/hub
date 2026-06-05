@@ -12,14 +12,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sqlite_path = std::env::var("HUB_SQLITE_PATH").unwrap_or_else(|_| "erplora.db".into());
     let bind = std::env::var("HUB_BIND").unwrap_or_else(|_| "127.0.0.1:8787".into());
 
-    let db = SqliteAdapter::open(&sqlite_path)?;
+    // sqlx-style URL: `sqlite://<path>?mode=rwc` creates the file if missing.
+    let db = SqliteAdapter::connect(&format!("sqlite://{sqlite_path}?mode=rwc")).await?;
     let mut runtime = Runtime::new(Box::new(db));
 
     if let Ok(dir) = std::env::var("HUB_MODULES_DIR") {
         for entry in std::fs::read_dir(&dir)? {
             let path: PathBuf = entry?.path();
             if path.join("module.json").exists() {
-                match runtime.install_from_dir(&path) {
+                match runtime.install_from_dir(&path).await {
                     Ok(id) => eprintln!("✓ módulo instalado: {id}"),
                     Err(e) => eprintln!("✗ módulo {}: {e}", path.display()),
                 }

@@ -13,14 +13,15 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // BD SQLite en memoria (en local sería app_data/erplora.db).
-    let db = SqliteAdapter::open_in_memory()?;
+    let db = SqliteAdapter::open_in_memory().await?;
     let mut rt = Runtime::new(Box::new(db));
 
     // Instala el módulo de ejemplo desde su carpeta.
     let module_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../modules/inventory");
-    let id = rt.install_from_dir(&module_dir)?;
+    let id = rt.install_from_dir(&module_dir).await?;
     println!("✓ instalado módulo: {id}");
     println!("  menú: {:?}", rt.navigation().iter().map(|n| &n.nav.label).collect::<Vec<_>>());
 
@@ -32,16 +33,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "inventory.products.create",
         &params(json!({ "name": "Café molido 250g", "sku": "CAF-250", "price": 4.5, "stock": 20 })),
         &ctx,
-    )?;
+    )
+    .await?;
     rt.execute_command(
         "inventory.products.create",
         &params(json!({ "name": "Leche entera 1L", "sku": "LEC-1L", "price": 1.2, "stock": 50 })),
         &ctx,
-    )?;
+    )
+    .await?;
     println!("✓ 2 productos creados");
 
     // 2) Listado (query, scope hub_id automático).
-    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx)?;
+    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await?;
     println!("✓ inventory.products.list → {} filas:", rows.len());
     for r in &rows {
         println!("   - {} ({}) · {} € · stock {}", r["name"], r["sku"], r["price"], r["stock"]);
@@ -59,8 +62,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "inventory.stock.decrease",
         &params(json!({ "product_id": cafe_id, "qty": 3 })),
         &ctx,
-    )?;
-    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx)?;
+    )
+    .await?;
+    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await?;
     let cafe = rows.iter().find(|r| r["sku"] == json!("CAF-250")).unwrap();
     println!("✓ stock de café tras descontar 3: {}", cafe["stock"]);
 

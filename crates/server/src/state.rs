@@ -1,9 +1,9 @@
 //! Estado compartido del server: el runtime (tras un lock) + el canal de eventos para WS.
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use erplora_runtime::{EventSink, Runtime};
 use serde_json::Value as Json;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, Mutex};
 
 /// Evento reenviado a los clientes WebSocket.
 #[derive(Clone, Debug, serde::Serialize)]

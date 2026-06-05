@@ -26,3 +26,4 @@ reqwest-transport = ["dep:reqwest", "source/reqwest-transport"]
 tempfile = "3"
 zip = "2"
 erplora-db = { path = "../db" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

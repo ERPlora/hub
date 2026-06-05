@@ -50,23 +50,23 @@ impl Runtime {
     }
 
     /// Instala un módulo ya extraído en `dir` (lee `module.json`, migra, registra, activa).
-    pub fn install_from_dir(&mut self, dir: &Path) -> Result<String> {
-        installer::install(self.db.as_ref(), &mut self.registry, dir)
+    pub async fn install_from_dir(&mut self, dir: &Path) -> Result<String> {
+        installer::install(self.db.as_ref(), &mut self.registry, dir).await
     }
 
     /// Activa un módulo instalado (sus capacidades vuelven a estar disponibles).
-    pub fn activate(&mut self, module_id: &str) -> Result<()> {
-        installer::set_status(self.db.as_ref(), &mut self.registry, module_id, ModuleStatus::Active)
+    pub async fn activate(&mut self, module_id: &str) -> Result<()> {
+        installer::set_status(self.db.as_ref(), &mut self.registry, module_id, ModuleStatus::Active).await
     }
 
     /// Desactiva un módulo instalado (oculta su menú y bloquea sus queries/commands).
-    pub fn deactivate(&mut self, module_id: &str) -> Result<()> {
-        installer::set_status(self.db.as_ref(), &mut self.registry, module_id, ModuleStatus::Inactive)
+    pub async fn deactivate(&mut self, module_id: &str) -> Result<()> {
+        installer::set_status(self.db.as_ref(), &mut self.registry, module_id, ModuleStatus::Inactive).await
     }
 
     /// Desinstala un módulo (quita sus capacidades; no borra sus datos).
-    pub fn uninstall(&mut self, module_id: &str) -> Result<()> {
-        installer::uninstall(self.db.as_ref(), &mut self.registry, module_id)
+    pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
+        installer::uninstall(self.db.as_ref(), &mut self.registry, module_id).await
     }
 
     /// Lista de módulos instalados con su estado (para el dashboard / `/api/modules`).
@@ -89,13 +89,13 @@ impl Runtime {
     }
 
     /// Ejecuta una query declarativa (solo si su módulo está activo) y devuelve filas JSON.
-    pub fn execute_query(&self, name: &str, params: &Params, ctx: &RequestContext) -> Result<Vec<Json>> {
-        queries::execute(self.db.as_ref(), &self.registry, name, params, ctx)
+    pub async fn execute_query(&self, name: &str, params: &Params, ctx: &RequestContext) -> Result<Vec<Json>> {
+        queries::execute(self.db.as_ref(), &self.registry, name, params, ctx).await
     }
 
     /// Ejecuta un command declarativo (solo si su módulo está activo) + emite sus eventos.
-    pub fn execute_command(&self, name: &str, payload: &Params, ctx: &RequestContext) -> Result<Json> {
-        commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx)
+    pub async fn execute_command(&self, name: &str, payload: &Params, ctx: &RequestContext) -> Result<Json> {
+        commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx).await
     }
 
     /// Menú dinámico de los módulos **activos** (lo consume el shell). ARQUITECTURA.md §7.7.

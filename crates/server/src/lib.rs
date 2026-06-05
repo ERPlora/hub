@@ -26,6 +26,7 @@ use serde_json::{json, Map, Value};
 
 pub mod auth;
 pub mod state;
+pub mod session;
 
 pub use state::{AppState, WsEvent};
 
@@ -82,7 +83,7 @@ fn err_response(e: erplora_runtime::RuntimeError) -> Response {
 }
 
 async fn navigation(State(st): State<AppState>) -> Response {
-    let rt = st.runtime.lock().unwrap();
+    let rt = st.runtime.lock().await;
     let items: Vec<Value> = rt
         .navigation()
         .iter()
@@ -97,37 +98,37 @@ async fn navigation(State(st): State<AppState>) -> Response {
 }
 
 async fn list_modules(State(st): State<AppState>) -> Response {
-    let rt = st.runtime.lock().unwrap();
+    let rt = st.runtime.lock().await;
     Json(json!({ "ok": true, "data": rt.modules() })).into_response()
 }
 
 async fn install_module(State(st): State<AppState>, Json(req): Json<InstallReq>) -> Response {
-    let mut rt = st.runtime.lock().unwrap();
-    match rt.install_from_dir(std::path::Path::new(&req.dir)) {
+    let mut rt = st.runtime.lock().await;
+    match rt.install_from_dir(std::path::Path::new(&req.dir)).await {
         Ok(id) => Json(json!({ "ok": true, "data": { "module_id": id } })).into_response(),
         Err(e) => err_response(e),
     }
 }
 
 async fn activate_module(State(st): State<AppState>, Path(id): Path<String>) -> Response {
-    let mut rt = st.runtime.lock().unwrap();
-    match rt.activate(&id) {
+    let mut rt = st.runtime.lock().await;
+    match rt.activate(&id).await {
         Ok(()) => Json(json!({ "ok": true })).into_response(),
         Err(e) => err_response(e),
     }
 }
 
 async fn deactivate_module(State(st): State<AppState>, Path(id): Path<String>) -> Response {
-    let mut rt = st.runtime.lock().unwrap();
-    match rt.deactivate(&id) {
+    let mut rt = st.runtime.lock().await;
+    match rt.deactivate(&id).await {
         Ok(()) => Json(json!({ "ok": true })).into_response(),
         Err(e) => err_response(e),
     }
 }
 
 async fn uninstall_module(State(st): State<AppState>, Path(id): Path<String>) -> Response {
-    let mut rt = st.runtime.lock().unwrap();
-    match rt.uninstall(&id) {
+    let mut rt = st.runtime.lock().await;
+    match rt.uninstall(&id).await {
         Ok(()) => Json(json!({ "ok": true })).into_response(),
         Err(e) => err_response(e),
     }
@@ -135,8 +136,8 @@ async fn uninstall_module(State(st): State<AppState>, Path(id): Path<String>) ->
 
 async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<QueryReq>) -> Response {
     let ctx = auth::context_from_headers(&headers);
-    let rt = st.runtime.lock().unwrap();
-    match rt.execute_query(&req.name, &req.params, &ctx) {
+    let rt = st.runtime.lock().await;
+    match rt.execute_query(&req.name, &req.params, &ctx).await {
         Ok(rows) => Json(json!({ "ok": true, "data": rows })).into_response(),
         Err(e) => err_response(e),
     }
@@ -144,8 +145,8 @@ async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Q
 
 async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<CommandReq>) -> Response {
     let ctx = auth::context_from_headers(&headers);
-    let rt = st.runtime.lock().unwrap();
-    match rt.execute_command(&req.name, &req.payload, &ctx) {
+    let rt = st.runtime.lock().await;
+    match rt.execute_command(&req.name, &req.payload, &ctx).await {
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),
         Err(e) => err_response(e),
     }

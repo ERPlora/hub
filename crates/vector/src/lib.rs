@@ -23,6 +23,7 @@
 //! stored in a `TEXT` column**, not a little-endian f32 BLOB. In cloud/pgvector
 //! this same column would be a native `vector(N)`.
 
+use async_trait::async_trait;
 use erplora_db::{DatabaseAdapter, DbError, Params};
 use serde_json::Value;
 use thiserror::Error;
@@ -64,16 +65,17 @@ pub struct ScoredChunk {
 
 /// Storage + retrieval interface for knowledge-chunk embeddings.
 ///
-/// Synchronous, matching [`erplora_db::DatabaseAdapter`].
+/// Async, matching [`erplora_db::DatabaseAdapter`] (sqlx-backed).
+#[async_trait]
 pub trait VectorStore {
     /// Create the backing schema if it does not exist.
-    fn ensure_schema(&self) -> Result<()>;
+    async fn ensure_schema(&self) -> Result<()>;
     /// Insert or replace a chunk (by primary key `id`).
-    fn upsert(&self, chunk: &Chunk) -> Result<()>;
+    async fn upsert(&self, chunk: &Chunk) -> Result<()>;
     /// Return the `top_k` chunks of `hub_id` most similar to `query_embedding`,
     /// ordered by cosine similarity descending. If `ref_ids` is `Some`, only
     /// chunks whose `ref_id` is in that set are considered.
-    fn search(
+    async fn search(
         &self,
         hub_id: &str,
         query_embedding: &[f32],
@@ -81,7 +83,7 @@ pub trait VectorStore {
         ref_ids: Option<&[String]>,
     ) -> Result<Vec<ScoredChunk>>;
     /// Delete every chunk of `hub_id` with the given `ref_id`; returns rows removed.
-    fn delete_by_ref(&self, hub_id: &str, ref_id: &str) -> Result<usize>;
+    async fn delete_by_ref(&self, hub_id: &str, ref_id: &str) -> Result<usize>;
 }
 
 // Re-export so callers can name the adapter trait without depending on erplora-db.
@@ -107,8 +109,9 @@ impl<A: DatabaseAdapter> SqliteVectorStore<A> {
     }
 }
 
+#[async_trait]
 impl<A: DatabaseAdapter> VectorStore for SqliteVectorStore<A> {
-    fn ensure_schema(&self) -> Result<()> {
+    async fn ensure_schema(&self) -> Result<()> {
         self.db.execute_batch(
             "CREATE TABLE IF NOT EXISTS knowledge_chunk (
                 id        TEXT PRIMARY KEY,
@@ -124,11 +127,11 @@ impl<A: DatabaseAdapter> VectorStore for SqliteVectorStore<A> {
                 ON knowledge_chunk (hub_id);
             CREATE INDEX IF NOT EXISTS idx_knowledge_chunk_hub_ref
                 ON knowledge_chunk (hub_id, ref_id);",
-        )?;
+        ).await?;
         Ok(())
     }
 
-    fn upsert(&self, chunk: &Chunk) -> Result<()> {
+    async fn upsert(&self, chunk: &Chunk) -> Result<()> {
         let embedding = serialize_embedding(&chunk.embedding)?;
         let mut params = Params::new();
         params.insert("id".into(), Value::String(chunk.id.clone()));
@@ -145,11 +148,11 @@ impl<A: DatabaseAdapter> VectorStore for SqliteVectorStore<A> {
              VALUES
                 (:id, :hub_id, :ref_id, :version, :lang, :source, :content, :embedding)",
             &params,
-        )?;
+        ).await?;
         Ok(())
     }
 
-    fn search(
+    async fn search(
         &self,
         hub_id: &str,
         query_embedding: &[f32],
@@ -177,7 +180,7 @@ impl<A: DatabaseAdapter> VectorStore for SqliteVectorStore<A> {
             }
         }
 
-        let rows = self.db.query(&sql, &params)?;
+        let rows = self.db.query(&sql, &params).await?.rows;
 
         let mut scored: Vec<ScoredChunk> = Vec::with_capacity(rows.len());
         for row in &rows {
@@ -195,15 +198,15 @@ impl<A: DatabaseAdapter> VectorStore for SqliteVectorStore<A> {
         Ok(scored)
     }
 
-    fn delete_by_ref(&self, hub_id: &str, ref_id: &str) -> Result<usize> {
+    async fn delete_by_ref(&self, hub_id: &str, ref_id: &str) -> Result<usize> {
         let mut params = Params::new();
         params.insert("hub_id".into(), Value::String(hub_id.to_string()));
         params.insert("ref_id".into(), Value::String(ref_id.to_string()));
-        let n = self.db.execute(
+        let res = self.db.execute(
             "DELETE FROM knowledge_chunk WHERE hub_id = :hub_id AND ref_id = :ref_id",
             &params,
-        )?;
-        Ok(n as usize)
+        ).await?;
+        Ok(res.affected as usize)
     }
 }
 
@@ -279,21 +282,21 @@ mod tests {
         }
     }
 
-    fn store() -> SqliteVectorStore<SqliteAdapter> {
-        let db = SqliteAdapter::open_in_memory().expect("open in memory");
+    async fn store() -> SqliteVectorStore<SqliteAdapter> {
+        let db = SqliteAdapter::open_in_memory().await.expect("open in memory");
         let s = SqliteVectorStore::new(db);
-        s.ensure_schema().expect("schema");
+        s.ensure_schema().await.expect("schema");
         s
     }
 
-    #[test]
-    fn search_returns_nearest_first() {
-        let s = store();
-        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0, 0.0])).unwrap();
-        s.upsert(&chunk("b", "h1", "r2", vec![0.0, 1.0, 0.0])).unwrap();
-        s.upsert(&chunk("c", "h1", "r3", vec![0.9, 0.1, 0.0])).unwrap();
+    #[tokio::test]
+    async fn search_returns_nearest_first() {
+        let s = store().await;
+        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0, 0.0])).await.unwrap();
+        s.upsert(&chunk("b", "h1", "r2", vec![0.0, 1.0, 0.0])).await.unwrap();
+        s.upsert(&chunk("c", "h1", "r3", vec![0.9, 0.1, 0.0])).await.unwrap();
 
-        let res = s.search("h1", &[1.0, 0.0, 0.0], 3, None).unwrap();
+        let res = s.search("h1", &[1.0, 0.0, 0.0], 3, None).await.unwrap();
         assert_eq!(res.len(), 3);
         // "a" is identical to the query, "c" is close, "b" is orthogonal.
         assert_eq!(res[0].chunk.id, "a");
@@ -305,37 +308,37 @@ mod tests {
         assert!((res[0].score - 1.0).abs() < 1e-6);
     }
 
-    #[test]
-    fn top_k_limits_results() {
-        let s = store();
-        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).unwrap();
-        s.upsert(&chunk("b", "h1", "r2", vec![0.0, 1.0])).unwrap();
-        let res = s.search("h1", &[1.0, 0.0], 1, None).unwrap();
+    #[tokio::test]
+    async fn top_k_limits_results() {
+        let s = store().await;
+        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).await.unwrap();
+        s.upsert(&chunk("b", "h1", "r2", vec![0.0, 1.0])).await.unwrap();
+        let res = s.search("h1", &[1.0, 0.0], 1, None).await.unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].chunk.id, "a");
     }
 
-    #[test]
-    fn isolated_by_hub_id() {
-        let s = store();
-        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).unwrap();
-        s.upsert(&chunk("b", "h2", "r1", vec![1.0, 0.0])).unwrap();
+    #[tokio::test]
+    async fn isolated_by_hub_id() {
+        let s = store().await;
+        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).await.unwrap();
+        s.upsert(&chunk("b", "h2", "r1", vec![1.0, 0.0])).await.unwrap();
 
-        let res = s.search("h1", &[1.0, 0.0], 10, None).unwrap();
+        let res = s.search("h1", &[1.0, 0.0], 10, None).await.unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].chunk.id, "a");
         assert_eq!(res[0].chunk.hub_id, "h1");
     }
 
-    #[test]
-    fn filters_by_ref_ids() {
-        let s = store();
-        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).unwrap();
-        s.upsert(&chunk("b", "h1", "r2", vec![0.9, 0.1])).unwrap();
-        s.upsert(&chunk("c", "h1", "r3", vec![0.0, 1.0])).unwrap();
+    #[tokio::test]
+    async fn filters_by_ref_ids() {
+        let s = store().await;
+        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).await.unwrap();
+        s.upsert(&chunk("b", "h1", "r2", vec![0.9, 0.1])).await.unwrap();
+        s.upsert(&chunk("c", "h1", "r3", vec![0.0, 1.0])).await.unwrap();
 
         let refs = vec!["r2".to_string(), "r3".to_string()];
-        let res = s.search("h1", &[1.0, 0.0], 10, Some(&refs)).unwrap();
+        let res = s.search("h1", &[1.0, 0.0], 10, Some(&refs)).await.unwrap();
         let ids: Vec<&str> = res.iter().map(|r| r.chunk.id.as_str()).collect();
         assert_eq!(res.len(), 2);
         assert!(ids.contains(&"b"));
@@ -343,34 +346,34 @@ mod tests {
         assert!(!ids.contains(&"a"));
 
         // Empty allow-list matches nothing.
-        let none = s.search("h1", &[1.0, 0.0], 10, Some(&[])).unwrap();
+        let none = s.search("h1", &[1.0, 0.0], 10, Some(&[])).await.unwrap();
         assert!(none.is_empty());
     }
 
-    #[test]
-    fn delete_by_ref_removes_rows() {
-        let s = store();
-        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).unwrap();
-        s.upsert(&chunk("b", "h1", "r1", vec![0.5, 0.5])).unwrap();
-        s.upsert(&chunk("c", "h1", "r2", vec![0.0, 1.0])).unwrap();
+    #[tokio::test]
+    async fn delete_by_ref_removes_rows() {
+        let s = store().await;
+        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).await.unwrap();
+        s.upsert(&chunk("b", "h1", "r1", vec![0.5, 0.5])).await.unwrap();
+        s.upsert(&chunk("c", "h1", "r2", vec![0.0, 1.0])).await.unwrap();
 
-        let removed = s.delete_by_ref("h1", "r1").unwrap();
+        let removed = s.delete_by_ref("h1", "r1").await.unwrap();
         assert_eq!(removed, 2);
 
-        let res = s.search("h1", &[1.0, 0.0], 10, None).unwrap();
+        let res = s.search("h1", &[1.0, 0.0], 10, None).await.unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].chunk.id, "c");
     }
 
-    #[test]
-    fn upsert_replaces_existing() {
-        let s = store();
-        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).unwrap();
+    #[tokio::test]
+    async fn upsert_replaces_existing() {
+        let s = store().await;
+        s.upsert(&chunk("a", "h1", "r1", vec![1.0, 0.0])).await.unwrap();
         let mut updated = chunk("a", "h1", "r1", vec![0.0, 1.0]);
         updated.content = "updated".into();
-        s.upsert(&updated).unwrap();
+        s.upsert(&updated).await.unwrap();
 
-        let res = s.search("h1", &[0.0, 1.0], 10, None).unwrap();
+        let res = s.search("h1", &[0.0, 1.0], 10, None).await.unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].chunk.content, "updated");
         assert!((res[0].score - 1.0).abs() < 1e-6);

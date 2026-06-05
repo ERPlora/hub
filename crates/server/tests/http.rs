@@ -15,10 +15,10 @@ fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/fixture_inventory")
 }
 
-fn make_app() -> axum::Router {
-    let db = SqliteAdapter::open_in_memory().unwrap();
+async fn make_app() -> axum::Router {
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&fixture()).unwrap();
+    rt.install_from_dir(&fixture()).await.unwrap();
     app(AppState::new(rt))
 }
 
@@ -41,7 +41,7 @@ fn post(uri: &str, body: Value) -> Request<Body> {
 
 #[tokio::test]
 async fn healthz_ok() {
-    let resp = make_app()
+    let resp = make_app().await
         .oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap())
         .await
         .unwrap();
@@ -50,7 +50,7 @@ async fn healthz_ok() {
 
 #[tokio::test]
 async fn navigation_lists_module_menu() {
-    let resp = make_app()
+    let resp = make_app().await
         .oneshot(Request::builder().uri("/api/navigation").body(Body::empty()).unwrap())
         .await
         .unwrap();
@@ -62,7 +62,7 @@ async fn navigation_lists_module_menu() {
 
 #[tokio::test]
 async fn command_then_query_roundtrip() {
-    let app = make_app();
+    let app = make_app().await;
 
     let create = app
         .clone()
@@ -101,13 +101,13 @@ async fn permission_denied_is_403() {
             .to_string(),
         ))
         .unwrap();
-    let resp = make_app().oneshot(req).await.unwrap();
+    let resp = make_app().await.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     assert_eq!(body_json(resp).await["error"]["code"], json!("permission_denied"));
 }
 
 #[tokio::test]
 async fn unknown_query_is_404() {
-    let resp = make_app().oneshot(post("/api/query", json!({ "name": "nope.q" }))).await.unwrap();
+    let resp = make_app().await.oneshot(post("/api/query", json!({ "name": "nope.q" }))).await.unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }

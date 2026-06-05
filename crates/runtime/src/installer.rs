@@ -19,7 +19,7 @@ const ENSURE_HUB_MODULE: &str = "CREATE TABLE IF NOT EXISTS hub_module (\
 
 /// Instala el módulo de `dir` en el registro, aplica migraciones y lo deja **activo**.
 /// Persiste el estado en `hub_module`. Devuelve el id del módulo.
-pub fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, dir: &Path) -> Result<String> {
+pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, dir: &Path) -> Result<String> {
     let manifest = Manifest::load(dir)?;
 
     if registry.is_installed(&manifest.id) {
@@ -37,7 +37,7 @@ pub fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, dir: &Path) ->
         }
     }
 
-    migrations::apply(db, dir, &manifest)?;
+    migrations::apply(db, dir, &manifest).await?;
 
     for perm in &manifest.permissions {
         registry.permissions.insert(perm.clone());
@@ -85,12 +85,12 @@ pub fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, dir: &Path) ->
     registry.installed.push(manifest);
     registry.status.insert(id.clone(), ModuleStatus::Active);
 
-    persist_status(db, &id, &version, ModuleStatus::Active)?;
+    persist_status(db, &id, &version, ModuleStatus::Active).await?;
     Ok(id)
 }
 
 /// Cambia el estado (activar/desactivar) de un módulo instalado y lo persiste.
-pub fn set_status(db: &dyn DatabaseAdapter, registry: &mut Registry, module_id: &str, status: ModuleStatus) -> Result<()> {
+pub async fn set_status(db: &dyn DatabaseAdapter, registry: &mut Registry, module_id: &str, status: ModuleStatus) -> Result<()> {
     if !registry.set_status(module_id, status) {
         return Err(RuntimeError::CommandNotFound(format!("módulo no instalado: {module_id}")));
     }
@@ -100,23 +100,23 @@ pub fn set_status(db: &dyn DatabaseAdapter, registry: &mut Registry, module_id: 
         .find(|m| m.id == module_id)
         .map(|m| m.version.clone())
         .unwrap_or_default();
-    persist_status(db, module_id, &version, status)?;
+    persist_status(db, module_id, &version, status).await?;
     Ok(())
 }
 
 /// Desinstala: quita capacidades del registro y borra la fila de `hub_module`. No borra datos.
-pub fn uninstall(db: &dyn DatabaseAdapter, registry: &mut Registry, module_id: &str) -> Result<()> {
+pub async fn uninstall(db: &dyn DatabaseAdapter, registry: &mut Registry, module_id: &str) -> Result<()> {
     if !registry.remove_module(module_id) {
         return Err(RuntimeError::CommandNotFound(format!("módulo no instalado: {module_id}")));
     }
     let mut p = Params::new();
     p.insert("module_id".into(), json!(module_id));
-    db.execute("DELETE FROM hub_module WHERE module_id = :module_id", &p)?;
+    db.execute("DELETE FROM hub_module WHERE module_id = :module_id", &p).await?;
     Ok(())
 }
 
-fn persist_status(db: &dyn DatabaseAdapter, id: &str, version: &str, status: ModuleStatus) -> Result<()> {
-    db.execute_batch(ENSURE_HUB_MODULE)?;
+async fn persist_status(db: &dyn DatabaseAdapter, id: &str, version: &str, status: ModuleStatus) -> Result<()> {
+    db.execute_batch(ENSURE_HUB_MODULE).await?;
     let status_str = match status {
         ModuleStatus::Active => "active",
         ModuleStatus::Inactive => "inactive",
@@ -133,6 +133,6 @@ fn persist_status(db: &dyn DatabaseAdapter, id: &str, version: &str, status: Mod
          VALUES (:module_id, :version, :status, :now, :now) \
          ON CONFLICT(module_id) DO UPDATE SET status = :status, version = :version, updated_at = :now",
         &p,
-    )?;
+    ).await?;
     Ok(())
 }

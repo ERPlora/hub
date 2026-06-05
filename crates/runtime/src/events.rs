@@ -7,20 +7,26 @@ use crate::errors::Result;
 use crate::registry::{Registry, RequestContext};
 
 /// Despacha un evento: notifica observadores y ejecuta cada command suscrito (módulos activos).
-pub fn dispatch(
-    db: &dyn DatabaseAdapter,
-    registry: &Registry,
-    event: &str,
-    payload: &Params,
-    ctx: &RequestContext,
+///
+/// `dispatch` and `commands::execute_at` are mutually recursive (a command emits events, an
+/// event runs subscribed commands), so the returned future is boxed to break the infinite
+/// async type recursion.
+pub fn dispatch<'a>(
+    db: &'a dyn DatabaseAdapter,
+    registry: &'a Registry,
+    event: &'a str,
+    payload: &'a Params,
+    ctx: &'a RequestContext,
     depth: u32,
-) -> Result<()> {
-    // Observadores externos (p. ej. el WS del server).
-    if let Some(sink) = &registry.event_sink {
-        sink.emit(event, &serde_json::Value::Object(payload.clone()));
-    }
-    for command in registry.listeners_for(event) {
-        commands::execute_at(db, registry, &command, payload, ctx, depth)?;
-    }
-    Ok(())
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
+    Box::pin(async move {
+        // Observadores externos (p. ej. el WS del server).
+        if let Some(sink) = &registry.event_sink {
+            sink.emit(event, &serde_json::Value::Object(payload.clone()));
+        }
+        for command in registry.listeners_for(event) {
+            commands::execute_at(db, registry, &command, payload, ctx, depth).await?;
+        }
+        Ok(())
+    })
 }

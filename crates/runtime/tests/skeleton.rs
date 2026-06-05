@@ -13,10 +13,10 @@ fn module_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_inventory")
 }
 
-fn fresh_runtime() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().expect("sqlite en memoria");
+async fn fresh_runtime() -> Runtime {
+    let db = SqliteAdapter::open_in_memory().await.expect("sqlite en memoria");
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&module_dir()).expect("instalar inventory");
+    rt.install_from_dir(&module_dir()).await.expect("instalar inventory");
     rt
 }
 
@@ -24,9 +24,9 @@ fn admin_ctx() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
 }
 
-#[test]
-fn install_registers_capabilities() {
-    let rt = fresh_runtime();
+#[tokio::test]
+async fn install_registers_capabilities() {
+    let rt = fresh_runtime().await;
     let reg = rt.registry();
     assert!(reg.is_installed("inventory"));
     assert!(reg.get_query("inventory.products.list").is_some());
@@ -36,12 +36,12 @@ fn install_registers_capabilities() {
     assert_eq!(reg.listeners_for("pos.sale.completed"), ["inventory.stock.decrease"]);
 }
 
-#[test]
-fn create_then_list_scoped_by_hub() {
-    let rt = fresh_runtime();
+#[tokio::test]
+async fn create_then_list_scoped_by_hub() {
+    let rt = fresh_runtime().await;
     let ctx = admin_ctx();
 
-    let before = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap();
+    let before = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
     assert_eq!(before.len(), 0);
 
     rt.execute_command(
@@ -49,30 +49,32 @@ fn create_then_list_scoped_by_hub() {
         &params(json!({ "name": "Café", "sku": "CAF", "price": 4.5, "stock": 10 })),
         &ctx,
     )
+    .await
     .unwrap();
 
-    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap();
+    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["name"], json!("Café"));
     assert_eq!(rows[0]["stock"], json!(10.0));
 
     // Otro hub no ve el producto (scope hub_id).
     let other = RequestContext::new("h2", "u9", ["*".to_string()]);
-    let rows2 = rt.execute_query("inventory.products.list", &Params::new(), &other).unwrap();
+    let rows2 = rt.execute_query("inventory.products.list", &Params::new(), &other).await.unwrap();
     assert_eq!(rows2.len(), 0, "hub_id debe aislar los datos entre hubs");
 }
 
-#[test]
-fn stock_decrease_updates_value() {
-    let rt = fresh_runtime();
+#[tokio::test]
+async fn stock_decrease_updates_value() {
+    let rt = fresh_runtime().await;
     let ctx = admin_ctx();
     rt.execute_command(
         "inventory.products.create",
         &params(json!({ "name": "Café", "sku": "CAF", "price": 4.5, "stock": 10 })),
         &ctx,
     )
+    .await
     .unwrap();
-    let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap()[0]["id"]
+    let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str()
         .unwrap()
         .to_string();
@@ -82,15 +84,16 @@ fn stock_decrease_updates_value() {
         &params(json!({ "product_id": id, "qty": 4 })),
         &ctx,
     )
+    .await
     .unwrap();
 
-    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap();
+    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
     assert_eq!(rows[0]["stock"], json!(6.0));
 }
 
-#[test]
-fn permission_is_enforced() {
-    let rt = fresh_runtime();
+#[tokio::test]
+async fn permission_is_enforced() {
+    let rt = fresh_runtime().await;
     let ro = RequestContext::new("h1", "u2", ["inventory.products.read".to_string()]);
 
     let err = rt
@@ -99,22 +102,23 @@ fn permission_is_enforced() {
             &params(json!({ "name": "X", "sku": "X", "price": 1, "stock": 1 })),
             &ro,
         )
+        .await
         .unwrap_err();
     assert!(matches!(err, RuntimeError::PermissionDenied(p) if p == "inventory.products.create"));
 
-    assert!(rt.execute_query("inventory.products.list", &Params::new(), &ro).is_ok());
+    assert!(rt.execute_query("inventory.products.list", &Params::new(), &ro).await.is_ok());
 }
 
-#[test]
-fn unknown_capabilities_error() {
-    let rt = fresh_runtime();
+#[tokio::test]
+async fn unknown_capabilities_error() {
+    let rt = fresh_runtime().await;
     let ctx = admin_ctx();
     assert!(matches!(
-        rt.execute_query("nope.query", &Params::new(), &ctx).unwrap_err(),
+        rt.execute_query("nope.query", &Params::new(), &ctx).await.unwrap_err(),
         RuntimeError::QueryNotFound(_)
     ));
     assert!(matches!(
-        rt.execute_command("nope.cmd", &Params::new(), &ctx).unwrap_err(),
+        rt.execute_command("nope.cmd", &Params::new(), &ctx).await.unwrap_err(),
         RuntimeError::CommandNotFound(_)
     ));
 }

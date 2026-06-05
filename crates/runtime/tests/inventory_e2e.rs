@@ -26,16 +26,16 @@ fn wasm_present() -> bool {
     inventory_dir().join("dist/handler.wasm").exists()
 }
 
-fn fresh() -> Runtime {
-    let db = SqliteAdapter::open_in_memory().unwrap();
+async fn fresh() -> Runtime {
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&inventory_dir()).expect("instalar inventory");
+    rt.install_from_dir(&inventory_dir()).await.expect("instalar inventory");
     rt
 }
 
-#[test]
-fn install_registers_capabilities() {
-    let rt = fresh();
+#[tokio::test]
+async fn install_registers_capabilities() {
+    let rt = fresh().await;
     let reg = rt.registry();
     assert!(reg.is_installed("inventory"));
     assert!(reg.get_query("inventory.products.list").is_some());
@@ -47,9 +47,9 @@ fn install_registers_capabilities() {
     assert_eq!(reg.listeners_for("sale.completed"), ["inventory.stock.decrease_on_sale"]);
 }
 
-#[test]
-fn product_crud_and_low_stock() {
-    let rt = fresh();
+#[tokio::test]
+async fn product_crud_and_low_stock() {
+    let rt = fresh().await;
     let ctx = admin_ctx();
 
     rt.execute_command(
@@ -60,31 +60,31 @@ fn product_crud_and_low_stock() {
             "ean13": null, "description": "", "tax_class_id": null, "image": ""
         })),
         &ctx,
-    )
+    ).await
     .unwrap();
 
-    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap();
+    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["name"], json!("Café"));
 
     // stock 3 <= threshold 5 → aparece en low_stock.
-    let low = rt.execute_query("inventory.products.low_stock", &Params::new(), &ctx).unwrap();
+    let low = rt.execute_query("inventory.products.low_stock", &Params::new(), &ctx).await.unwrap();
     assert_eq!(low.len(), 1);
 
     // stats: 1 producto, en stock, valor 4.5*3 = 13.5.
-    let stats = rt.execute_query("inventory.products.stats", &Params::new(), &ctx).unwrap();
+    let stats = rt.execute_query("inventory.products.stats", &Params::new(), &ctx).await.unwrap();
     assert_eq!(stats[0]["total_products"], json!(1));
     assert_eq!(stats[0]["total_inventory_value"], json!(13.5));
 
     // Otro hub no ve nada (scope hub_id).
     let other = RequestContext::new("h2", "u9", ["*".to_string()]);
-    let rows2 = rt.execute_query("inventory.products.list", &Params::new(), &other).unwrap();
+    let rows2 = rt.execute_query("inventory.products.list", &Params::new(), &other).await.unwrap();
     assert_eq!(rows2.len(), 0);
 }
 
-#[test]
-fn stock_adjust_clamps_at_zero() {
-    let rt = fresh();
+#[tokio::test]
+async fn stock_adjust_clamps_at_zero() {
+    let rt = fresh().await;
     let ctx = admin_ctx();
     rt.execute_command(
         "inventory.products.create",
@@ -92,24 +92,24 @@ fn stock_adjust_clamps_at_zero() {
                         "low_stock_threshold": 10, "product_type": "physical",
                         "ean13": null, "description": "", "tax_class_id": null, "image": "" })),
         &ctx,
-    ).unwrap();
-    let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap()[0]["id"]
+    ).await.unwrap();
+    let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
     // -5 sobre stock 2 → MAX(0, -3) = 0 (no negativo por defecto).
     rt.execute_command("inventory.stock.adjust",
-        &params(json!({ "product_id": id, "delta": -5 })), &ctx).unwrap();
-    let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": id})), &ctx).unwrap();
+        &params(json!({ "product_id": id, "delta": -5 })), &ctx).await.unwrap();
+    let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": id})), &ctx).await.unwrap();
     assert_eq!(p[0]["stock"], json!(0));
 }
 
-#[test]
-fn bulk_create_wasm_inserts_with_generated_skus() {
+#[tokio::test]
+async fn bulk_create_wasm_inserts_with_generated_skus() {
     if !wasm_present() {
         eprintln!("SKIP: modules/inventory/dist/handler.wasm no existe");
         return;
     }
-    let rt = fresh();
+    let rt = fresh().await;
     let ctx = admin_ctx();
     let res = rt
         .execute_command(
@@ -123,11 +123,11 @@ fn bulk_create_wasm_inserts_with_generated_skus() {
                 ]
             })),
             &ctx,
-        )
+        ).await
         .expect("bulk_create ejecuta el handler WASM");
     assert_eq!(res["operations"], json!(3));
 
-    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap();
+    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
     assert_eq!(rows.len(), 3);
     let skus: Vec<String> = rows.iter().map(|r| r["sku"].as_str().unwrap().to_string()).collect();
     // SKUs autogenerados PROD-001/PROD-003 + el explícito TE-1.
@@ -136,13 +136,13 @@ fn bulk_create_wasm_inserts_with_generated_skus() {
     assert!(skus.contains(&"PROD-003".to_string()), "skus={skus:?}");
 }
 
-#[test]
-fn receive_stock_wasm_increments_existing() {
+#[tokio::test]
+async fn receive_stock_wasm_increments_existing() {
     if !wasm_present() {
         eprintln!("SKIP: handler.wasm no existe");
         return;
     }
-    let rt = fresh();
+    let rt = fresh().await;
     let ctx = admin_ctx();
     rt.execute_command(
         "inventory.products.create",
@@ -150,8 +150,8 @@ fn receive_stock_wasm_increments_existing() {
                         "low_stock_threshold": 5, "product_type": "physical",
                         "ean13": null, "description": "", "tax_class_id": null, "image": "" })),
         &ctx,
-    ).unwrap();
-    let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).unwrap()[0]["id"]
+    ).await.unwrap();
+    let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
     // Recibe 25 unidades + actualiza coste a 2.5.
@@ -159,25 +159,25 @@ fn receive_stock_wasm_increments_existing() {
         "inventory.stock.receive",
         &params(json!({ "items": [{ "product_id": id, "qty": 25, "unit_cost": 2.5 }] })),
         &ctx,
-    ).expect("receive_stock WASM");
+    ).await.expect("receive_stock WASM");
     assert_eq!(res["operations"], json!(1));
 
-    let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": id})), &ctx).unwrap();
+    let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": id})), &ctx).await.unwrap();
     assert_eq!(p[0]["stock"], json!(35)); // 10 + 25
     assert_eq!(p[0]["cost"], json!(2.5));
 }
 
-#[test]
-fn category_crud() {
-    let rt = fresh();
+#[tokio::test]
+async fn category_crud() {
+    let rt = fresh().await;
     let ctx = admin_ctx();
     rt.execute_command(
         "inventory.categories.create",
         &params(json!({ "name": "Bebidas", "slug": "bebidas", "icon": "cube-outline",
                         "color": "#3880ff", "description": "", "order": 0 })),
         &ctx,
-    ).unwrap();
-    let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx).unwrap();
+    ).await.unwrap();
+    let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx).await.unwrap();
     assert_eq!(cats.len(), 1);
     assert_eq!(cats[0]["name"], json!("Bebidas"));
     assert_eq!(cats[0]["product_count"], json!(0));

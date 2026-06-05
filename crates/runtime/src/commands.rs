@@ -20,17 +20,17 @@ pub(crate) const NEW_IDS_BATCH: usize = 256;
 
 /// Ejecuta `name(payload)` con el contexto dado. Aplica permiso, ejecuta SQL (en transacción
 /// si está declarada) y emite los eventos resultantes.
-pub fn execute(
+pub async fn execute(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     name: &str,
     payload: &Params,
     ctx: &RequestContext,
 ) -> Result<Json> {
-    execute_at(db, registry, name, payload, ctx, 0)
+    execute_at(db, registry, name, payload, ctx, 0).await
 }
 
-pub(crate) fn execute_at(
+pub(crate) async fn execute_at(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     name: &str,
@@ -51,7 +51,7 @@ pub(crate) fn execute_at(
 
     // ── Tier 2: handler WASM ────────────────────────────────────────────────
     if let Some(bytes) = &cmd.wasm {
-        return execute_wasm(db, registry, cmd, payload, ctx, depth, bytes);
+        return execute_wasm(db, registry, cmd, payload, ctx, depth, bytes).await;
     }
 
     // ── Tier 0/1: SQL declarativo ───────────────────────────────────────────
@@ -65,16 +65,16 @@ pub(crate) fn execute_at(
     if cmd.def.transaction {
         let ops: Vec<(String, Params)> =
             cmd.sql.iter().map(|sql| (sql.clone(), bound.clone())).collect();
-        db.execute_tx(&ops)?;
+        db.execute_tx(&ops).await?;
     } else {
         for sql in &cmd.sql {
-            db.execute(sql, &bound)?;
+            db.execute(sql, &bound).await?;
         }
     }
 
     // Emite eventos declarados; los payloads de evento llevan los params del command.
     for event in &cmd.def.emit {
-        events::dispatch(db, registry, event, &bound, ctx, depth + 1)?;
+        events::dispatch(db, registry, event, &bound, ctx, depth + 1).await?;
     }
 
     Ok(json!({ "ok": true }))
@@ -82,7 +82,7 @@ pub(crate) fn execute_at(
 
 /// Ejecuta un command Tier 2: invoca el handler WASM, valida cada intención y
 /// aplica todas las operaciones + el `emit` del command en una sola transacción.
-fn execute_wasm(
+async fn execute_wasm(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     cmd: &RegisteredCommand,
@@ -133,12 +133,12 @@ fn execute_wasm(
     }
 
     // Todas las intenciones + el emit del command original van en UNA transacción.
-    db.execute_tx(&tx_ops)?;
+    db.execute_tx(&tx_ops).await?;
 
     // Eventos declarados por el command + eventos devueltos por el handler.
     let declared_payload = crate::system_params(payload, ctx);
     for event in &cmd.def.emit {
-        events::dispatch(db, registry, event, &declared_payload, ctx, depth + 1)?;
+        events::dispatch(db, registry, event, &declared_payload, ctx, depth + 1).await?;
     }
     for ev in &output.events {
         let payload = match &ev.payload {
@@ -149,7 +149,7 @@ fn execute_wasm(
                 m
             }
         };
-        events::dispatch(db, registry, &ev.name, &payload, ctx, depth + 1)?;
+        events::dispatch(db, registry, &ev.name, &payload, ctx, depth + 1).await?;
     }
 
     Ok(json!({ "ok": true, "operations": output.operations.len() }))
@@ -203,6 +203,7 @@ mod tests {
             sql: vec!["INSERT INTO x VALUES (1);".to_string()],
             emit: vec![],
             handler: None,
+            ai: None,
         }
     }
 

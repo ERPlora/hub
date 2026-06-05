@@ -93,7 +93,7 @@ impl<'a> Installer<'a> {
     /// Encadena: `request_install` (Cloud) → `get_text` (Transport) → `InstallGrant::parse`
     /// → `ModuleStore::install` (descarga + verifica SHA256 + descomprime, idempotente por
     /// cache) → `Runtime::install_from_dir` (migra + registra + activa).
-    pub fn install(
+    pub async fn install(
         &self,
         transport: &dyn Transport,
         auth: &Auth,
@@ -121,6 +121,7 @@ impl<'a> Installer<'a> {
         // (5) Runtime: instalar desde la carpeta extraída (migra, registra, activa).
         let installed_id = runtime
             .install_from_dir(&path)
+            .await
             .map_err(|e| InstallError::Runtime(e.to_string()))?;
 
         Ok(InstallOutcome {
@@ -338,22 +339,24 @@ mod tests {
         RequestContext::new("hub-1", "user-1", ["*".to_string()])
     }
 
-    fn runtime() -> Runtime {
-        let db: Box<dyn erplora_db::DatabaseAdapter> = Box::new(SqliteAdapter::open_in_memory().unwrap());
+    async fn runtime() -> Runtime {
+        let db: Box<dyn erplora_db::DatabaseAdapter> =
+            Box::new(SqliteAdapter::open_in_memory().await.unwrap());
         Runtime::new(db)
     }
 
-    #[test]
-    fn install_e2e_module_active_and_query_works() {
+    #[tokio::test]
+    async fn install_e2e_module_active_and_query_works() {
         let tmp = tempfile::tempdir().unwrap();
         let cloud = CloudClient::new("https://erplora.com");
         let store = ModuleStore::new(tmp.path());
         let installer = Installer::new(&cloud, &store);
         let transport = MockTransport::new(fixture_zip());
-        let mut rt = runtime();
+        let mut rt = runtime().await;
 
         let outcome = installer
             .install(&transport, &auth(), &mut rt, "inventory", "1.0.0")
+            .await
             .unwrap();
 
         assert_eq!(outcome.module_id, "inventory");
@@ -370,6 +373,7 @@ mod tests {
         // Una query del módulo funciona (tabla recién migrada → vacía).
         let rows = rt
             .execute_query("inventory.products.list", &erplora_db::Params::new(), &ctx())
+            .await
             .unwrap();
         assert_eq!(rows.len(), 0);
 
@@ -378,8 +382,8 @@ mod tests {
         assert_eq!(transport.fetch_calls.get(), 1);
     }
 
-    #[test]
-    fn second_install_uses_cache_no_refetch() {
+    #[tokio::test]
+    async fn second_install_uses_cache_no_refetch() {
         let tmp = tempfile::tempdir().unwrap();
         let cloud = CloudClient::new("https://erplora.com");
         let store = ModuleStore::new(tmp.path());
@@ -387,31 +391,32 @@ mod tests {
         let transport = MockTransport::new(fixture_zip());
 
         // Primera instalación: descarga real.
-        let mut rt1 = runtime();
-        let first = installer.install(&transport, &auth(), &mut rt1, "inventory", "1.0.0").unwrap();
+        let mut rt1 = runtime().await;
+        let first = installer.install(&transport, &auth(), &mut rt1, "inventory", "1.0.0").await.unwrap();
         assert!(!first.from_cache);
         assert_eq!(transport.grant_calls.get(), 1);
         assert_eq!(transport.fetch_calls.get(), 1);
 
         // Segunda instalación (mismo cache): hit, sin volver a descargar el zip.
         // (get_text aún se llama: el grant trae el sha que decide el cache; fetch NO.)
-        let mut rt2 = runtime();
-        let second = installer.install(&transport, &auth(), &mut rt2, "inventory", "1.0.0").unwrap();
+        let mut rt2 = runtime().await;
+        let second = installer.install(&transport, &auth(), &mut rt2, "inventory", "1.0.0").await.unwrap();
         assert!(second.from_cache);
         assert_eq!(transport.fetch_calls.get(), 1, "no debe re-descargar el zip");
     }
 
-    #[test]
-    fn bad_sha_fails_and_runtime_stays_empty() {
+    #[tokio::test]
+    async fn bad_sha_fails_and_runtime_stays_empty() {
         let tmp = tempfile::tempdir().unwrap();
         let cloud = CloudClient::new("https://erplora.com");
         let store = ModuleStore::new(tmp.path());
         let installer = Installer::new(&cloud, &store);
         let transport = MockTransport::new(fixture_zip()).with_bad_announced_sha();
-        let mut rt = runtime();
+        let mut rt = runtime().await;
 
         let err = installer
             .install(&transport, &auth(), &mut rt, "inventory", "1.0.0")
+            .await
             .unwrap_err();
 
         // El fallo de integridad sube como Source(Integrity).

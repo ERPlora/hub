@@ -16,11 +16,11 @@ fn notes_fixture() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixture_notes")
 }
 
-#[test]
-fn installer_loads_wasm_bytes_into_registry() {
-    let db = SqliteAdapter::open_in_memory().unwrap();
+#[tokio::test]
+async fn installer_loads_wasm_bytes_into_registry() {
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
-    let id = rt.install_from_dir(&notes_fixture()).unwrap();
+    let id = rt.install_from_dir(&notes_fixture()).await.unwrap();
     assert_eq!(id, "notes");
 
     // El command con handler tiene bytes wasm cargados; el SQL-only no.
@@ -47,17 +47,17 @@ fn installer_loads_wasm_bytes_into_registry() {
 /// # 4. Copia el .wasm sobre tests/fixture_notes/handler.wasm
 /// # 5. cargo test -p erplora-runtime -- --ignored real_guest_bulk_create
 /// ```
-#[test]
+#[tokio::test]
 #[ignore = "requires a real Extism guest .wasm at tests/fixture_notes/handler.wasm"]
-fn real_guest_bulk_create() {
+async fn real_guest_bulk_create() {
     use erplora_db::Params;
     use erplora_runtime::RequestContext;
-    let db = SqliteAdapter::open_in_memory().unwrap();
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&notes_fixture()).unwrap();
+    rt.install_from_dir(&notes_fixture()).await.unwrap();
     let ctx = RequestContext::new("hub-1", "user-1", ["notes.write".to_string()]);
     let mut payload = Params::new();
     payload.insert("items".into(), serde_json::json!(["a", "b", "c"]));
-    let out = rt.execute_command("notes.bulk", &payload, &ctx).expect("notes.bulk");
+    let out = rt.execute_command("notes.bulk", &payload, &ctx).await.expect("notes.bulk");
     assert_eq!(out["operations"], serde_json::json!(3));
 }
