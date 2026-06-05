@@ -13,10 +13,40 @@
       "description": "Identificador namespaced del módulo (p. ej. inventory)."
     },
     "name": { "type": "string" },
+    "description": {
+      "type": "string",
+      "description": "Descripción corta user-facing del módulo (se muestra al usuario). SIEMPRE en INGLÉS canónico; la app la traduce al idioma del usuario en runtime (no se almacena traducida aquí)."
+    },
+    "icon": {
+      "type": "string",
+      "description": "Nombre del icono del módulo (p. ej. ionicon `storefront-outline`)."
+    },
     "version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+",
       "description": "SemVer."
+    },
+    "agent": {
+      "type": "object",
+      "description": "Resumen del módulo para el ROUTING del asistente (nivel 1): qué tareas resuelve. SIEMPRE en INGLÉS (texto orientado al LLM). El hub lo usa para decidir qué módulo(s) son relevantes antes de exponer sus tools `ai` (nivel 2). ARQUITECTURA.md §9.2.",
+      "required": ["description"],
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Una frase en INGLÉS describiendo qué tareas resuelve el módulo (verbos). Usada por el router del hub."
+        },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Opcional. Palabras clave en INGLÉS para un pre-filtro léxico barato cuando hay muchísimos módulos instalados."
+        }
+      }
+    },
+    "ai_context": {
+      "type": "object",
+      "description": "Conocimiento del módulo para RAG (ARQUITECTURA.md §9.4) — APARCADO / en diseño. Hoy algunos módulos lo usan como { summary, keywords }; pendiente de reconciliar con `agent` (routing) cuando se diseñe el RAG de documentación. Permisivo mientras tanto.",
+      "additionalProperties": true
     },
     "depends_on": { "type": "array", "items": { "type": "string" }, "default": [] },
     "permissions": { "type": "array", "items": { "type": "string" }, "default": [] },
@@ -60,7 +90,8 @@
         "properties": {
           "permission": { "type": "string" },
           "sql": { "type": "string" },
-          "schema": { "type": "string" }
+          "schema": { "type": "string" },
+          "ai": { "$ref": "#/$defs/aiTool" }
         }
       }
     },
@@ -82,7 +113,8 @@
               "function": { "type": "string" }
             }
           },
-          "emit": { "type": "array", "items": { "type": "string" } }
+          "emit": { "type": "array", "items": { "type": "string" } },
+          "ai": { "$ref": "#/$defs/aiTool" }
         }
       }
     },
@@ -96,20 +128,6 @@
             "required": ["command"],
             "properties": { "command": { "type": "string" } }
           }
-        }
-      }
-    },
-    "ai_tools": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "required": ["permission", "description"],
-        "properties": {
-          "permission": { "type": "string" },
-          "description": { "type": "string" },
-          "command": { "type": "string" },
-          "query": { "type": "string" },
-          "schema": { "type": "string" }
         }
       }
     },
@@ -131,6 +149,24 @@
         "entry": {
           "type": "string",
           "description": "Ruta al ESM del Web Component compilado (cargado en runtime por el shell)."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "aiTool": {
+      "type": "object",
+      "description": "Expone esta operación (query/command) al asistente de IA como tool. permission, schema (input) y sql se HEREDAN de la operación — no se redeclaran aquí; solo la descripción legible. Una operación sin bloque `ai` no se expone a la IA (sigue disponible para la UI). ARQUITECTURA.md §9.2.",
+      "required": ["description"],
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Qué hace la operación, en lenguaje natural, para que el LLM sepa cuándo invocarla. SIEMPRE en INGLÉS (texto canónico orientado al LLM; el usuario nunca lo ve — la IA responde en el idioma del usuario vía el locale del system prompt, no traduciendo esto)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Nombre opcional que ve el LLM (por defecto = el nombre de la operación, p. ej. inventory.products.list)."
         }
       }
     }

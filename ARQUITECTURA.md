@@ -169,14 +169,17 @@ tools). Igual que la política actual con `module.py`.
   local en la BD compartida de la org, los IDs numéricos **se remapean** (no se conservan tal cual)
   y se reescriben las FKs — porque varios hubs comparten secuencia en esa BD.
 
-### 2.6 El sync Git del Cloud parsea `module.py` (rotura concreta más probable)
+### 2.6 El sync Git del Cloud lee `module.json` (formato único)
 
-Hoy el Cloud sincroniza módulos desde GitHub **parseando `module.py` (Python)** — *el
-usuario solo pone el link de Git y Cloud se encarga de todo*. Los módulos de hub-next
-traen `module.json` → **el parser actual no los ingiere**. Resolución:
+**Decisión (2026-06-01): no hay formato legacy.** Todos los módulos son declarativos
+(`module.json`); los ~100 módulos `module.py` (Python) se reescriben, no se mantienen.
+El sync Git del Cloud lee **solo `module.json`**:
 
-- Discriminador **`manifest_kind: "python" | "declarative"`** que el sync use para elegir
-  el code path (parser Python vs lector JSON). Trabajo cloud-side (Fase 4).
+- Se eliminó el discriminador `manifest_kind` (modelo, schema, parser TS/Rust) y todo el
+  parser Python del Cloud (`parse_module_py`/`parse_ai_context_py`/`_extract_ast_value`).
+  `parse_module_json` es el único parser; el sync ya no hace fallback a `module.py`.
+- El contexto RAG (`ai_context`) ahora vive como campo de `module.json` (antes salía del
+  `CONTEXT` de `ai_context.py`).
 - **Inmutabilidad S3**: el publish debe usar la ruta versionada *create-only*
   (`ModuleVersion.create_from_zip`); reescribir un `v{ver}.zip` existente rompe el SHA256
   de clientes desplegados (el Cloud ya lo bloquea).
@@ -695,19 +698,73 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
 ## 8. Base de datos, adapters y migraciones
 
 ```
-DatabaseAdapter
-├─ SqliteAdapter     (local / Tauri)
-└─ PostgresAdapter   (cloud / Aurora)
+trait DatabaseAdapter  (async, #[async_trait])
+├─ SqliteAdapter   → sqlx::SqlitePool   (local / Tauri)
+└─ PgAdapter       → sqlx::PgPool       (cloud / Aurora)
 ```
 
-- **Configuración por entorno (sin nada adicional, como el transporte §7.6)**: el adapter
-  se elige y configura **en el boot** desde variables de entorno/config:
-  - **Cloud (ECS)**: cada hub recibe su **DSN de Postgres en `HUB_DATABASE_URL`** (inyectada
-    por ECS al crear la task). Los hubs de la **misma organización comparten el mismo DSN**
-    (misma Aurora de la org); `hub_id` desambigua por fila (§2.5).
-  - **Local (Tauri)**: recibe el **path del fichero SQLite** (p. ej. `HUB_SQLITE_PATH`).
-  - Misma interfaz `DatabaseAdapter`; **solo cambia la config del entorno**.
-- SQL portable: placeholders abstractos; cuando haga falta, **migrations por dialecto**.
+### 8.1 Motor único: SQLx (decisión 2026-06-02)
+
+**SQLx es el único motor de base de datos** para ambos backends — se eliminan `rusqlite`
+y `rust-postgres`. Razón: el producto que se vende es **cloud + Aurora**, donde lo que
+importa es **pool de conexiones + async + TLS**, y SQLx lo trae probado para Postgres y
+SQLite con la **misma API** (`sqlx::query(...)`). Un solo crate, un solo modelo mental;
+el día que se añada sync/replicación/workers se sigue con la misma librería.
+
+Matices que esta decisión **NO** cambia (siguen siendo trabajo propio, ortogonal al motor):
+
+- **El SQL es dinámico** (viene de `module.json` / `queries/*.sql` en runtime), así que
+  `query_as::<T>` **no aplica** — no hay struct en compile-time. Se usa `sqlx::query(sql)`
+  y se convierte `Row → serde_json::Value` a mano (decode dirigido por tipo de columna),
+  igual que antes. `query_as` sólo para tablas internas con struct fijo (sessions, hub_module).
+- **Los módulos escriben siempre params nombrados `:id`** (nunca `$1` ni `?1`, para no
+  acoplar el módulo a un dialecto). Un **translator** reescribe `:id` → `$1` (Postgres) o
+  `?1` (SQLite) según el dialecto del adapter activo. SQLx **no** abstrae el placeholder,
+  así que el translator se queda.
+- **Portabilidad SQL SQLite↔Postgres**: SQLx ejecuta el SQL que se le da, no traduce
+  dialectos → **migrations por dialecto** (decisión abierta §14, sin cambios).
+- **Decode `Row → JSON` dirigido por tipo de columna** (riesgo abierto, marcado como TODO en
+  `crates/db`): hoy se cubre lo escalar (int/float/bool/text). **NUMERIC (dinero)**,
+  `TIMESTAMPTZ`, `UUID` y `JSONB` caen a string/`null` → para el ERP fiscal hay que activar
+  las features SQLx (`bigdecimal`/`rust_decimal`, `chrono`/`time`, `uuid`) y decodificarlos
+  explícitamente. Validar contra Aurora real en Fase 0. Relacionado: el bind de `NULL` en
+  Postgres se tipa hoy como TEXT y puede chocar con columnas de otro tipo — verificar igual.
+
+> SQLx sobre SQLite no es async real (SQLite es síncrono; SQLx lo corre en un threadpool).
+> En local da igual: 1 POS, 1 usuario, `SqlitePool` con `max_connections(1)`.
+
+### 8.2 Tipos de retorno envueltos (no `Vec<Json>` pelado)
+
+El trait **no** devuelve `Vec<Json>`/`Json` directos, sino envoltorios para poder crecer
+(`execution_time`, `warnings`, paginación) sin romper la API:
+
+```rust
+pub struct QueryResult   { pub rows: Vec<Json>, pub warnings: Vec<String> }
+pub struct CommandResult { pub affected: u64, pub returning: Option<Vec<Json>>, pub warnings: Vec<String> }
+```
+
+Estos envoltorios son lo que viaja dentro de `data` del `envelope.schema.json` (§7.6) —
+single-source-of-truth compartido por Rust, el SDK TS y el CLI. Lo que se añada se añade
+en un sitio.
+
+### 8.3 Configuración por entorno (como el transporte §7.6)
+
+El adapter se elige y configura **en el boot** desde variables de entorno/config:
+
+- **Cloud (ECS)**: cada hub recibe su **DSN de Postgres en `HUB_DATABASE_URL`** (inyectada
+  por ECS al crear la task). Los hubs de la **misma organización comparten el mismo DSN**
+  (misma Aurora de la org); `hub_id` desambigua por fila (§2.5).
+- **Local (Tauri)**: recibe el **path del fichero SQLite** (p. ej. `HUB_SQLITE_PATH`).
+- Misma interfaz `DatabaseAdapter`; **solo cambia la config del entorno**.
+
+**Sizing del `PgPool` (`max_connections`, etc.) — decisión abierta.** Depende del plan
+contratado y del modelo "una Aurora compartida por org / un contenedor ECS por hub": el
+límite real es agregado (`Σ pools de los hubs de la org ≤ conexiones de su Aurora`). El
+Cloud Portal ya gestionaba esto con la app FastAPI; **a revisar cómo se traslada a
+hub-next** (probablemente env inyectada por el provisioning + clamp/fail-fast al boot,
+y `acquire_timeout`/`max_lifetime`/`idle_timeout` fijos por ser operacionales, no de plan).
+Pendiente, no bloquea la Fase 0/1.
+
 - Estado de módulos + integridad (SHA256) + versión instalada por hub.
 - Riesgo (decisión abierta, §14): SQL compatible SQLite↔Postgres es trabajo; valorar capa
   de query mínima o dialecto canónico.
@@ -727,11 +784,83 @@ Hereda el diseño actual (ya sofisticado) y lo adapta a Rust + SQLite/Postgres. 
    vectorial** sobre la documentación de los módulos instalados **a su versión**.
 3. **Capacidades** → texto en el prompt (módulos + `ai_tools`). No es RAG.
 
-### 9.2 AI tools por módulo (en `module.json`)
+### 9.2 AI tools por módulo (en `module.json`) — bloque `ai` inline (decisión 2026-06-04)
 
-`ai_tools` mapean a un `command`/`query` con su `permission` y `schema`. El asistente solo
-invoca tools cuyo permiso tenga el usuario logueado — **mismo gate que la UI**. Sin
-text-to-SQL. Acciones destructivas → confirmación/draft.
+**Un AI tool ES una `query`/`command` que ya existe en el manifest** (declarativo). No hay una
+sección de tools aparte: para exponer una operación al asistente, se le añade un bloque `ai`
+**inline** con solo su descripción legible:
+
+```json
+"inventory.products.list": {
+  "permission": "inventory.view_product",
+  "sql": "queries/products_list.sql",
+  "ai": { "description": "Lista productos y su stock actual" }
+}
+```
+
+- **El `permission` (y el `schema` de input y el `sql`) se HEREDAN de la operación** — no se
+  redeclaran en `ai`. Esto cierra por construcción el invariante del gate: el tool no puede
+  tener un permiso distinto al de la operación, porque **es** la misma operación.
+- Una operación **sin** bloque `ai` no se expone a la IA (sigue disponible para la UI). Así se
+  cura, por operación, qué es invocable por IA. Las **internas** (`_`-prefijadas) nunca se exponen.
+- La "lista de tools" no se declara: **se deriva** (todo query/command con bloque `ai`).
+- **Idioma: `ai.description` (y `agent.description`) van SIEMPRE en INGLÉS** — son texto canónico
+  orientado al LLM, que el usuario **nunca ve**. No se traducen ni se almacenan en N idiomas. La
+  app es multilingüe en **otra capa**: la IA **responde en el idioma del usuario** porque la
+  orquestación inyecta el **locale del usuario en el system prompt**, no porque las descripciones
+  estén traducidas. Una sola descripción en inglés por tool.
+
+**La IA no ejecuta SQL ni lo ve.** El LLM recibe (del hub, que parsea el manifest de forma
+determinista) tool-specs = `nombre + ai.description + schema de args`. Decide *qué tool llamar
+con qué args* y devuelve un tool-call. **El runtime** busca la operación, valida `permission` +
+`hub_id` + payload, carga el `sql` y lo ejecuta vía `DatabaseAdapter` — **idéntico camino que
+la UI**. La IA es solo otro llamante del mismo dispatcher (`execute_query`/`execute_command`).
+Sin text-to-SQL (§9.3). Acciones destructivas → confirmación/draft.
+
+> **Capacidades declarativas ⇒ sin reentreno.** Como las tools se leen en vivo del manifest
+> (no se embeben), cargar/cambiar un módulo NO requiere reindexar nada: el `module.json` está
+> siempre al día por definición. RAG (§9.4) es solo para el **conocimiento** (docs), no para
+> las capacidades. (Routing multi-módulo a escala → por **búsqueda vectorial**, ver §9.2b.)
+
+> Histórico: la sección `ai_tools` (con `permission` redeclarado) quedó obsoleta y se eliminó
+> del schema el 2026-06-04 — ningún módulo la usaba. Reemplazada por el bloque `ai` inline.
+
+### 9.2b Routing de módulos por vectores (nivel 1) — decisión 2026-06-05
+
+**Problema:** con muchos módulos instalados, mandar TODOS los tools (`ai`) al LLM en cada
+petición no escala (prompt enorme, caro). **Solución:** el hub elige dinámicamente **qué
+módulo(s) cargar** según el contexto de la petición — uno o varios, no todos.
+
+**Mecanismo = búsqueda vectorial** (reusa la infra de §9.4/§9.5, no es infra nueva):
+
+1. **Al instalar un módulo** (lifecycle, §9.6): se calcula el *embedding* de su
+   `agent.description` (vía el proxy Cloud, §9.3) y se **registra** en el índice vectorial.
+2. **En cada petición**: se embebe lo que pide el usuario → se **busca** en el índice → salen
+   los **1–N módulos relevantes** → solo de esos se cargan los tools `ai`.
+
+El **tool-assembly** queda en dos fases:
+- **(router)** embeber petición → buscar en el índice → top módulos.
+- **(assembler)** de esos módulos: filtrar tools por **permiso del usuario** → empaquetar en el
+  formato function-calling del Cloud (`{type:function, function:{name, description, parameters}}`,
+  ver contrato §9.3) → enviar.
+
+**Dos usos del vector — NO confundir** (misma infraestructura, distinto contenido):
+
+| Uso | Qué se embebe | Para qué |
+|-----|---------------|----------|
+| **Routing** (§9.2b) | descripciones de **módulos/tools** (`agent.description`) | elegir **qué módulo** cargar |
+| **RAG** (§9.4, aún sin diseñar) | la **documentación** de los módulos (`ai_context`) | responder preguntas de **conocimiento** |
+
+Routing decide *qué herramientas*; RAG responde *cómo se hace algo*.
+
+**Coste honesto:** embeber necesita el Cloud (§9.3), así que el routing añade una llamada de
+embedding **por petición** antes de la principal. Con **pocos** módulos instalados es más barato
+mandar las `agent.description` como texto y que el LLM elija; el **vector gana a escala** (muchos
+módulos). El `keywords` opcional de `agent` permite un pre-filtro léxico barato antes del vector.
+
+> **Pendiente de construir** (lo escribe el humano; la IA solo guía): el crate/módulo de
+> tool-assembly (router + assembler), el registro de embeddings de módulos al instalar, y la
+> búsqueda en query-time. La infra vectorial (`erplora-vector` local / pgvector cloud) ya existe.
 
 ### 9.3 El hub-next NUNCA habla con LLMs directamente
 
