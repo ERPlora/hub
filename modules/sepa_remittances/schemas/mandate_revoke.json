@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sepa_remittances.mandates.revoke",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mandate_id"],
+  "properties": {
+    "mandate_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "default": "" }
+  }
+}

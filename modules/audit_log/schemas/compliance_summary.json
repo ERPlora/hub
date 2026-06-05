@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "audit_log.compliance.summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["start_date", "end_date"],
+  "properties": {
+    "start_date": { "type": "string", "minLength": 1 },
+    "end_date": { "type": "string", "minLength": 1 }
+  }
+}

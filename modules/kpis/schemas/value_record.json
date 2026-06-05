@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kpis.values.record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kpi_id", "period_start", "period_end", "value"],
+  "properties": {
+    "kpi_id": { "type": "string", "minLength": 1 },
+    "period_start": { "type": "string", "format": "date" },
+    "period_end": { "type": "string", "format": "date" },
+    "value": { "type": "number" },
+    "notes": { "type": ["string", "null"], "default": null },
+    "recorded_by_ref": { "type": ["string", "null"], "default": null }
+  }
+}

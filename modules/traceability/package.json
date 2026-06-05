@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-traceability",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo traceability (manifest declarativo + Web Component Stencil): rastro de eventos (received/produced/transferred/sold/returned/scrapped/recalled) por producto/lote/serie, línea de tiempo por entidad y análisis de impacto de retirada (recall). Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

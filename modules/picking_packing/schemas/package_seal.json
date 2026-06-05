@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "picking_packing.packages.seal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["package_id"],
+  "properties": {
+    "package_id": { "type": "string", "minLength": 1 },
+    "tracking_number": { "type": "string", "default": "", "maxLength": 120 }
+  }
+}

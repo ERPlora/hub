@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-leave",
+  "private": true,
+  "version": "2.1.5",
+  "type": "module",
+  "description": "Módulo leave (manifest declarativo + Web Components Stencil): gestión de ausencias de empleados — tipos, solicitudes con workflow de aprobación, saldos por empleado/año. La lógica de cálculo de días hábiles, validación de saldo y rollups va a un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

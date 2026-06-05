@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "project_costing.budgets.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_ref", "budget_amount", "fiscal_year"],
+  "properties": {
+    "project_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "budget_amount": { "type": "number", "minimum": 0 },
+    "fiscal_year": { "type": "integer", "minimum": 0, "maximum": 9999 },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 3, "default": "EUR" },
+    "notes": { "type": "string", "default": "", "maxLength": 2000 }
+  }
+}

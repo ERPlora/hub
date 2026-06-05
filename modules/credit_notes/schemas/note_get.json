@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "credit_notes note id param",
+  "description": "Compartido por get/lines/applications/remaining_credit.",
+  "type": "object",
+  "properties": {
+    "cn_id": {
+      "type": "string",
+      "description": "Id de la nota de abono."
+    }
+  },
+  "required": ["cn_id"],
+  "additionalProperties": false
+}

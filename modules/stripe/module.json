@@ -1,0 +1,160 @@
+{
+  "id": "stripe",
+  "name": "Stripe",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Integrates with Stripe to process and record payments: manage Stripe connections, record charges and refunds, handle incoming webhooks, and summarise payment activity.",
+    "keywords": ["stripe", "payment", "charge", "refund", "webhook", "connection"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "stripe.view_stripe",
+    "stripe.manage_stripe",
+    "stripe.process_stripe"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "stripe.view_stripe",
+      "stripe.manage_stripe",
+      "stripe.process_stripe"
+    ],
+    "employee": [
+      "stripe.view_stripe"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "connections",
+      "label": "Connections",
+      "icon": "card-outline",
+      "component": "erp-stripe-connections"
+    },
+    {
+      "id": "events",
+      "label": "Events",
+      "icon": "card-outline",
+      "component": "erp-stripe-events"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "stripe.connections.list": {
+      "permission": "stripe.view_stripe",
+      "sql": "queries/connections_list.sql",
+      "ai": { "description": "Lists the configured Stripe account connections." }
+    },
+    "stripe.charges.list": {
+      "permission": "stripe.view_stripe",
+      "sql": "queries/charges_list.sql",
+      "ai": { "description": "Lists charges processed through Stripe." }
+    },
+    "stripe.charges.get": {
+      "permission": "stripe.view_stripe",
+      "sql": "queries/charge_get.sql",
+      "ai": { "description": "Returns the details of a single Stripe charge by its identifier." }
+    },
+    "stripe.refunds.by_charge": {
+      "permission": "stripe.view_stripe",
+      "sql": "queries/refunds_by_charge.sql",
+      "ai": { "description": "Lists refunds associated with a specific Stripe charge." }
+    },
+    "stripe.events.list": {
+      "permission": "stripe.view_stripe",
+      "sql": "queries/events_list.sql",
+      "ai": { "description": "Lists webhook events received from Stripe." }
+    }
+  },
+  "commands": {
+    "stripe.connections.create": {
+      "permission": "stripe.manage_stripe",
+      "transaction": true,
+      "sql": [
+        "commands/connection_create.sql"
+      ],
+      "schema": "schemas/connection_create.json",
+      "emit": [
+        "stripe.connection.created"
+      ],
+      "ai": { "description": "Creates a new connection to a Stripe account." }
+    },
+    "stripe.connections.deactivate": {
+      "permission": "stripe.manage_stripe",
+      "transaction": true,
+      "sql": [
+        "commands/connection_deactivate.sql"
+      ],
+      "schema": "schemas/connection_deactivate.json",
+      "emit": [
+        "stripe.connection.deactivated"
+      ],
+      "ai": { "description": "Deactivates an existing Stripe account connection." }
+    },
+    "stripe.webhooks.mark_processed": {
+      "permission": "stripe.process_stripe",
+      "transaction": true,
+      "sql": [
+        "commands/webhook_mark_processed.sql"
+      ],
+      "schema": "schemas/webhook_mark_processed.json",
+      "emit": [
+        "stripe.webhook.processed"
+      ],
+      "ai": { "description": "Marks a Stripe webhook event as processed." }
+    },
+    "stripe.charges.record": {
+      "permission": "stripe.process_stripe",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "record_charge"
+      },
+      "emit": [
+        "stripe.charge.recorded"
+      ],
+      "ai": { "description": "Records a charge received from Stripe into the system." }
+    },
+    "stripe.refunds.record": {
+      "permission": "stripe.process_stripe",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "record_refund"
+      },
+      "emit": [
+        "stripe.refund.recorded"
+      ],
+      "ai": { "description": "Records a refund received from Stripe into the system." }
+    },
+    "stripe.webhooks.record": {
+      "permission": "stripe.process_stripe",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "record_webhook_event"
+      },
+      "emit": [
+        "stripe.webhook.received"
+      ],
+      "ai": { "description": "Records an incoming Stripe webhook event for later processing." }
+    },
+    "stripe.charges.summary": {
+      "permission": "stripe.view_stripe",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "get_charges_summary"
+      },
+      "ai": { "description": "Returns an aggregated summary of charges processed through Stripe." }
+    }
+  },
+  "ui": {
+    "entry": "dist/stripe.esm.js"
+  }
+}

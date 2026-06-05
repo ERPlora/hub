@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "manufacturing_orders.orders.summary",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "period_days": { "type": "integer", "minimum": 1, "default": 30 }
+  }
+}

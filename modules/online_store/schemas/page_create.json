@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "online_store.pages.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug", "title"],
+  "properties": {
+    "slug": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "content_html": { "type": "string", "default": "" }
+  }
+}

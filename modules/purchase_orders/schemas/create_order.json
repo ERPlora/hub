@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "purchase_orders.orders.create payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["supplier_id", "lines"],
+  "properties": {
+    "supplier_id": { "type": "string", "minLength": 1 },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["product_name"],
+        "properties": {
+          "product_name": { "type": "string", "minLength": 1 },
+          "quantity": { "type": "number", "exclusiveMinimum": 0, "default": 1 },
+          "unit_price": { "type": "number", "minimum": 0, "default": 0 }
+        }
+      }
+    },
+    "expected_date": {
+      "type": "string",
+      "description": "ISO 8601 date/datetime; empty string -> NULL",
+      "default": ""
+    },
+    "notes": { "type": "string", "default": "" }
+  }
+}

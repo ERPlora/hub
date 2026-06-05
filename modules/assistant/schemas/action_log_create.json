@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "assistant.actions.log",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tool_name"],
+  "properties": {
+    "conversation_id": { "type": ["string", "null"], "default": null },
+    "tool_name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "tool_args": { "type": "string", "default": "{}", "maxLength": 100000 },
+    "result": { "type": "string", "default": "{}", "maxLength": 100000 },
+    "success": { "type": "integer", "enum": [0, 1], "default": 0 },
+    "confirmed": { "type": "integer", "enum": [0, 1], "default": 0 },
+    "error_message": { "type": "string", "default": "", "maxLength": 10000 },
+    "openai_call_id": { "type": ["string", "null"], "default": null, "maxLength": 64 }
+  }
+}

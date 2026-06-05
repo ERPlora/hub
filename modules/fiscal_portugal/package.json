@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-fiscal_portugal",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo fiscal_portugal (manifest declarativo + Web Components Stencil): cumplimiento fiscal portugués — exports SAF-T PT, códigos ATCUD y Comunicação à AT. La lógica fiscal (validación NIF, autonumeración, composición ATCUD, encadenado de hash, generación XML y máquina de estados) vive en el handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

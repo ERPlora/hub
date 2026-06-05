@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "stock_sync.runs.start",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_channel_id", "target_channel_id"],
+  "properties": {
+    "source_channel_id": { "type": "string", "minLength": 1 },
+    "target_channel_id": { "type": "string", "minLength": 1 },
+    "products": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["product_ref"],
+        "properties": {
+          "product_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "source_quantity": { "type": "number", "minimum": 0, "default": 0 },
+          "target_quantity": { "type": "number", "minimum": 0, "default": 0 },
+          "action": {
+            "type": "string",
+            "enum": ["push", "pull", "skip", "conflict"],
+            "default": "push"
+          }
+        }
+      }
+    }
+  }
+}

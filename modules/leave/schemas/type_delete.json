@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "leave.types.delete",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["leave_type_id"],
+  "properties": {
+    "leave_type_id": { "type": "string", "minLength": 1 }
+  }
+}

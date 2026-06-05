@@ -1,4 +1,8 @@
 import { Component, State, h } from '@stencil/core';
+// Importa el DataTable compartido (Stencil) para que se auto-registre y esbuild
+// lo empaquete dentro del bundle del módulo. El shell provee los `ion-*`.
+import '../../../../_shared/ui/components/data-table/data-table';
+import type { DataTableColumn } from '../../../../_shared/ui/components/data-table/data-table';
 
 // Web Component del módulo `inventory` (Stencil). Mini-app: lista de productos +
 // búsqueda + alta rápida + indicador de stock bajo. Es la pieza `ui.entry` que el
@@ -8,6 +12,7 @@ import { Component, State, h } from '@stencil/core';
 // (erplora.query/command/on). Toda escritura la valida y ejecuta el runtime.
 // El cliente se obtiene de `globalThis.erplora` (lo monta el shell en el boot,
 // eligiendo HttpWsTransport en cloud o IpcTransport en Tauri).
+// El listado usa el DataTable compartido + Ionic.
 
 interface ErploraClientLike {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
@@ -36,29 +41,29 @@ function erplora(): ErploraClientLike {
     :host { display:block; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
     header { display:flex; gap:.5rem; align-items:center; margin-bottom:.75rem; }
     h2 { margin:0; font-size:1.15rem; flex:1; }
-    input { padding:.45rem .6rem; border:1px solid var(--ion-border-color,#e0ddd4); border-radius:8px; font-size:.9rem; }
-    button { padding:.45rem .8rem; border:0; border-radius:8px; background:#1496d6; color:#fff; font-size:.85rem; cursor:pointer; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    table { width:100%; border-collapse:collapse; font-size:.9rem; }
-    th { text-align:left; color:#8b897f; font-weight:600; padding:.5rem .6rem; border-bottom:1px solid #e7e2d6; }
-    td { padding:.55rem .6rem; border-bottom:1px solid #f1ede4; }
+    .form { display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; margin:.5rem 0 1rem; }
+    .form ion-input { --background:var(--surface-2,#f7f4ec); border:1px solid var(--ion-border-color,#e0ddd4); border-radius:8px; flex:1; min-width:7rem; }
+    .err { color:#d9480f; font-weight:600; }
     .low { color:#d9480f; font-weight:600; }
-    .muted { color:#8b897f; font-size:.85rem; }
-    .form { display:flex; gap:.4rem; flex-wrap:wrap; margin:.5rem 0 1rem; }
-    .form input { flex:1; min-width:7rem; }
   `,
 })
 export class ErpInventoryProducts {
   @State() products: Product[] = [];
   @State() loading = true;
   @State() error = '';
-  @State() search = '';
   @State() newName = '';
   @State() newSku = '';
   @State() newPrice = '';
   @State() saving = false;
 
   private unsub?: () => void;
+
+  private columns: DataTableColumn[] = [
+    { key: 'name', header: 'Nombre' },
+    { key: 'sku', header: 'SKU' },
+    { key: 'price', header: 'Precio', align: 'right', format: (r) => Number(r.price).toFixed(2) },
+    { key: 'stock', header: 'Stock', align: 'right' },
+  ];
 
   async componentWillLoad() {
     await this.refresh();
@@ -122,77 +127,45 @@ export class ErpInventoryProducts {
     }
   }
 
-  private get filtered(): Product[] {
-    const q = this.search.trim().toLowerCase();
-    if (!q) return this.products;
-    return this.products.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
-    );
-  }
-
   render() {
     return (
       <div>
         <header>
           <h2>Productos</h2>
-          <input
-            type="search"
-            placeholder="Buscar nombre o SKU…"
-            value={this.search}
-            onInput={(e) => (this.search = (e.target as HTMLInputElement).value)}
-          />
         </header>
 
         <form class="form" onSubmit={(e) => this.createProduct(e)}>
-          <input
+          <ion-input
             placeholder="Nombre"
             value={this.newName}
-            onInput={(e) => (this.newName = (e.target as HTMLInputElement).value)}
+            onIonInput={(e: any) => (this.newName = e.target.value)}
           />
-          <input
+          <ion-input
             placeholder="SKU"
             value={this.newSku}
-            onInput={(e) => (this.newSku = (e.target as HTMLInputElement).value)}
+            onIonInput={(e: any) => (this.newSku = e.target.value)}
           />
-          <input
-            placeholder="Precio"
+          <ion-input
             type="number"
             step="0.01"
+            placeholder="Precio"
             value={this.newPrice}
-            onInput={(e) => (this.newPrice = (e.target as HTMLInputElement).value)}
+            onIonInput={(e: any) => (this.newPrice = e.target.value)}
           />
-          <button type="submit" disabled={this.saving || !this.newName || !this.newSku}>
+          <ion-button type="submit" size="small" disabled={this.saving || !this.newName || !this.newSku}>
             {this.saving ? 'Guardando…' : 'Añadir'}
-          </button>
+          </ion-button>
         </form>
 
-        {this.error && <p class="low">{this.error}</p>}
-        {this.loading ? (
-          <p class="muted">Cargando…</p>
-        ) : this.filtered.length === 0 ? (
-          <p class="muted">Sin productos.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>SKU</th>
-                <th>Precio</th>
-                <th>Stock</th>
-              </tr>
-            </thead>
-            <tbody>
-              {this.filtered.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.name}</td>
-                  <td>{p.sku}</td>
-                  <td>{Number(p.price).toFixed(2)}</td>
-                  <td class={p.stock <= 0 ? 'low' : ''}>{p.stock}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        {this.error && <p class="err">{this.error}</p>}
+
+        <data-table
+          columns={this.columns}
+          rows={this.products as unknown as Record<string, unknown>[]}
+          searchKeys={['name', 'sku']}
+          searchPlaceholder="Buscar nombre o SKU…"
+          emptyMessage={this.loading ? 'Cargando…' : 'Sin productos.'}
+        />
       </div>
     );
   }

@@ -1,0 +1,6 @@
+{ "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "invoice_series.allocations.list params", "type": "object", "additionalProperties": false,
+  "required": ["series_id"],
+  "properties": {
+    "series_id": { "type": "string" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 } } }

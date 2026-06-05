@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-purchase-orders",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo purchase_orders (manifest declarativo + Web Components Stencil): pedidos de compra (alta + workflow draft/confirmed/received/cancelled) y directorio de proveedores. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

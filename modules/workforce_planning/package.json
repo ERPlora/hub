@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-workforce_planning",
+  "private": true,
+  "version": "1.2.4",
+  "type": "module",
+  "description": "Módulo workforce_planning (manifest declarativo + Web Components Stencil): planificación de plantilla multi-sede — sedes, plantillas de turno, asignaciones, calendario laboral y requisitos de cobertura. La detección de conflictos (doble reserva, horas extra, descanso) vive en WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

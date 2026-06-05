@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-expenses",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo expenses (manifest declarativo + Web Components Stencil): gastos de empresa con categorías jerárquicas y flujo de aprobación draft -> submitted -> approved | rejected. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

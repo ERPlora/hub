@@ -1,0 +1,131 @@
+{
+  "id": "collections",
+  "name": "Collections",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages customer payment collections: record received payments, allocate them to invoices, unallocate, process refunds, and cancel collections.",
+    "keywords": ["collections", "payment", "receipt", "allocation", "invoice", "refund", "accounts receivable"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "collections.view_collection",
+    "collections.add_collection",
+    "collections.allocate"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "collections.view_collection",
+      "collections.add_collection",
+      "collections.allocate"
+    ],
+    "employee": [
+      "collections.view_collection"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Collections",
+      "icon": "download-outline",
+      "component": "erp-collections-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "collections.collections.list": {
+      "permission": "collections.view_collection",
+      "sql": "queries/collections_list.sql",
+      "ai": { "description": "Lists recorded collections with their status and outstanding balance" }
+    },
+    "collections.collections.get": {
+      "permission": "collections.view_collection",
+      "sql": "queries/collection_get.sql",
+      "ai": { "description": "Returns the details of a collection including its invoice allocations" }
+    },
+    "collections.allocations.list": {
+      "permission": "collections.view_collection",
+      "sql": "queries/allocations_list.sql",
+      "ai": { "description": "Lists the allocations of collections to invoices" }
+    }
+  },
+  "commands": {
+    "collections.collections.create": {
+      "permission": "collections.add_collection",
+      "schema": "schemas/create_collection.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_collection"
+      },
+      "emit": [
+        "collections.collection.created"
+      ],
+      "ai": { "description": "Records a new payment received from a customer" }
+    },
+    "collections.collections.allocate": {
+      "permission": "collections.allocate",
+      "schema": "schemas/allocate_to_invoice.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "allocate_to_invoice"
+      },
+      "emit": [
+        "collections.allocation.created"
+      ],
+      "ai": { "description": "Allocates a collection to one or more outstanding invoices" }
+    },
+    "collections.collections.unallocate": {
+      "permission": "collections.allocate",
+      "schema": "schemas/unallocate.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "unallocate"
+      },
+      "emit": [
+        "collections.allocation.removed"
+      ],
+      "ai": { "description": "Removes the allocation of a collection from an invoice, freeing the amount" }
+    },
+    "collections.collections.refund": {
+      "permission": "collections.add_collection",
+      "schema": "schemas/refund_collection.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "refund_collection"
+      },
+      "emit": [
+        "collections.collection.refunded"
+      ],
+      "ai": { "description": "Records a refund of a collection back to the customer" }
+    },
+    "collections.collections.cancel": {
+      "permission": "collections.add_collection",
+      "schema": "schemas/cancel_collection.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "cancel_collection"
+      },
+      "emit": [
+        "collections.collection.cancelled"
+      ],
+      "ai": { "description": "Cancels a recorded collection and voids all its associated allocations (destructive)" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/collections.esm.js"
+  }
+}

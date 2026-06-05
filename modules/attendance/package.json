@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-attendance",
+  "private": true,
+  "version": "2.0.8",
+  "type": "module",
+  "description": "Módulo attendance (manifest declarativo + Web Components Stencil): control de fichajes de empleados con clock-in/out, gestión de descansos, corrección de registros y configuración por hub. La lógica de cálculo de horas y validaciones va en un handler Rust→WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

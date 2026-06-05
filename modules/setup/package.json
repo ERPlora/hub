@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-setup",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Módulo setup (manifest declarativo + Web Component Stencil): asistente de primer arranque que aplica plantillas de sector. La orquestación (instalar módulos, sembrar IVA/categorías/productos, identidad de negocio) vive en un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

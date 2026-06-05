@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "uber_eats.events.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "store_id": { "type": "string", "default": "" },
+    "status": {
+      "type": "string",
+      "enum": ["", "received", "processed", "failed"],
+      "default": ""
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["", "order_created", "order_updated", "order_cancelled", "menu_published", "store_online", "store_offline"],
+      "default": ""
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "project_costing.budgets.approve",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["budget_id"],
+  "properties": {
+    "budget_id": { "type": "string", "minLength": 1 }
+  }
+}

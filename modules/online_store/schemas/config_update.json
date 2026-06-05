@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "online_store.config.update",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["config_id"],
+  "properties": {
+    "config_id": { "type": "string", "minLength": 1 },
+    "store_name": { "type": "string", "default": "", "maxLength": 255 },
+    "domain": { "type": "string", "default": "", "maxLength": 255 },
+    "default_currency": { "type": "string", "default": "EUR", "minLength": 3, "maxLength": 3 },
+    "language": { "type": "string", "default": "es", "maxLength": 8 },
+    "is_published": { "type": "integer", "enum": [0, 1], "default": 0 },
+    "theme": { "type": "string", "default": "default", "maxLength": 50 },
+    "primary_color": { "type": "string", "default": "", "maxLength": 16 },
+    "logo_url": { "type": "string", "default": "", "maxLength": 500 }
+  }
+}

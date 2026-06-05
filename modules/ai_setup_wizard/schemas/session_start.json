@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai_setup_wizard.sessions.start",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["business_type"],
+  "properties": {
+    "business_type": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "industry_description": { "type": "string", "default": "" },
+    "team_size": { "type": "integer", "minimum": 1, "default": 1 }
+  }
+}

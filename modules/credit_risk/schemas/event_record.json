@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "credit_risk.events.record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["customer_credit_id", "event_type"],
+  "properties": {
+    "customer_credit_id": { "type": "string", "minLength": 1 },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "invoice_issued",
+        "payment_received",
+        "limit_exceeded",
+        "late_payment",
+        "score_updated",
+        "manual_review"
+      ]
+    },
+    "amount": { "type": "number", "minimum": 0, "default": 0 },
+    "description": { "type": "string", "default": "", "maxLength": 500 },
+    "reference": { "type": "string", "default": "", "maxLength": 100 }
+  }
+}

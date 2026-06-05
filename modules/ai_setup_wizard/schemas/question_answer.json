@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai_setup_wizard.questions.answer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["question_id", "answer"],
+  "properties": {
+    "question_id": { "type": "string", "minLength": 1 },
+    "answer": { "type": "string", "default": "" }
+  }
+}

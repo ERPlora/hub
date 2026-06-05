@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "commissions.transactions.accrue_from_sale",
+  "description": "Payload del evento sales.completed que dispara el devengo automático de comisión. El runtime mapea el payload del evento a estos campos.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sale_id", "sale_total"],
+  "properties": {
+    "sale_id": { "type": "string", "minLength": 1 },
+    "sale_reference": { "type": "string", "default": "" },
+    "sale_total": { "type": "number", "minimum": 0 },
+    "staff_id": { "type": ["string", "null"], "default": null },
+    "staff_name": { "type": "string", "default": "" },
+    "appointment_id": { "type": ["string", "null"], "default": null },
+    "transaction_date": { "type": ["string", "null"], "format": "date", "default": null }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "delivery.drivers.update",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["driver_id"],
+  "properties": {
+    "driver_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 150 },
+    "phone": { "type": "string", "minLength": 1, "maxLength": 30 },
+    "vehicle_type": { "type": "string", "maxLength": 30 },
+    "is_active": { "type": "boolean" },
+    "is_external": { "type": "boolean" },
+    "notes": { "type": "string" }
+  }
+}

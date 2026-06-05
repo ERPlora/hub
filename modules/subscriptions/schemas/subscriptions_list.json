@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "subscriptions.subscriptions.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["", "trialing", "active", "past_due", "cancelled", "expired"],
+      "default": ""
+    },
+    "customer_name": { "type": "string", "default": "", "maxLength": 255 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+  }
+}

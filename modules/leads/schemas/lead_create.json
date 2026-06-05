@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "leads.leads.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["first_name"],
+  "properties": {
+    "first_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "last_name": { "type": "string", "default": "", "maxLength": 120 },
+    "email": { "type": "string", "default": "", "maxLength": 255 },
+    "phone": { "type": "string", "default": "", "maxLength": 50 },
+    "company": { "type": "string", "default": "", "maxLength": 255 },
+    "job_title": { "type": "string", "default": "", "maxLength": 120 },
+    "source_id": { "type": "string", "default": "" },
+    "assigned_to": { "type": "string", "default": "", "maxLength": 64 },
+    "estimated_value": { "type": "string", "default": "0.00" },
+    "notes": { "type": "string", "default": "" }
+  }
+}

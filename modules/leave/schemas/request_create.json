@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "leave.requests.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["employee_id", "employee_name", "leave_type_id", "start_date", "end_date"],
+  "properties": {
+    "employee_id": { "type": "string", "minLength": 1 },
+    "employee_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "leave_type_id": { "type": "string", "minLength": 1 },
+    "start_date": { "type": "string", "format": "date" },
+    "end_date": { "type": "string", "format": "date" },
+    "is_half_day": { "type": "boolean", "default": false },
+    "half_day_period": { "type": "string", "enum": ["", "morning", "afternoon"], "default": "" },
+    "reason": { "type": "string", "default": "", "maxLength": 2000 }
+  }
+}

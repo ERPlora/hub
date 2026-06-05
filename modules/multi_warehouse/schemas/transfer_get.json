@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "multi_warehouse.transfers.get",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["transfer_id"],
+  "properties": {
+    "transfer_id": { "type": "string", "minLength": 1 }
+  }
+}

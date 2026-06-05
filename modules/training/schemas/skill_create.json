@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.skills.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "category": { "type": ["string", "null"], "maxLength": 100, "default": null },
+    "description": { "type": ["string", "null"], "default": null }
+  }
+}

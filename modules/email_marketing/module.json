@@ -1,0 +1,171 @@
+{
+  "id": "email_marketing",
+  "name": "Email Marketing",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages email marketing campaigns, contact lists, and subscribers: create campaigns, manage mailing lists, subscribe/unsubscribe contacts, schedule or send campaigns, and track engagement events.",
+    "keywords": ["email", "campaign", "marketing", "newsletter", "subscriber", "mailing", "list", "send"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "email_marketing.view_email",
+    "email_marketing.manage_email",
+    "email_marketing.send_email"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "email_marketing.view_email",
+      "email_marketing.manage_email",
+      "email_marketing.send_email"
+    ],
+    "employee": [
+      "email_marketing.view_email"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "campaigns",
+      "label": "Campaigns",
+      "icon": "mail-outline",
+      "component": "erp-email-marketing-campaigns"
+    },
+    {
+      "id": "lists",
+      "label": "Lists",
+      "icon": "people-outline",
+      "component": "erp-email-marketing-lists"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "email_marketing.lists.list": {
+      "permission": "email_marketing.view_email",
+      "sql": "queries/lists_list.sql",
+      "ai": { "description": "Lists the email marketing contact lists" }
+    },
+    "email_marketing.subscribers.list": {
+      "permission": "email_marketing.view_email",
+      "sql": "queries/subscribers_list.sql",
+      "ai": { "description": "Lists the subscribers of an email marketing list" }
+    },
+    "email_marketing.campaigns.list": {
+      "permission": "email_marketing.view_email",
+      "sql": "queries/campaigns_list.sql",
+      "ai": { "description": "Lists the email marketing campaigns" }
+    },
+    "email_marketing.campaigns.get": {
+      "permission": "email_marketing.view_email",
+      "sql": "queries/campaign_get.sql",
+      "ai": { "description": "Retrieves the details of an email campaign by its identifier" }
+    },
+    "email_marketing.events.list": {
+      "permission": "email_marketing.view_email",
+      "sql": "queries/campaign_events.sql",
+      "ai": { "description": "Lists the engagement events of a campaign (opens, clicks, unsubscribes, etc.)" }
+    }
+  },
+  "commands": {
+    "email_marketing.lists.create": {
+      "permission": "email_marketing.manage_email",
+      "transaction": true,
+      "sql": [
+        "commands/list_create.sql"
+      ],
+      "schema": "schemas/list_create.json",
+      "emit": [
+        "email_marketing.list.created"
+      ],
+      "ai": { "description": "Creates a new email marketing contact list" }
+    },
+    "email_marketing.campaigns.create": {
+      "permission": "email_marketing.manage_email",
+      "transaction": true,
+      "sql": [
+        "commands/campaign_create.sql"
+      ],
+      "schema": "schemas/campaign_create.json",
+      "emit": [
+        "email_marketing.campaign.created"
+      ],
+      "ai": { "description": "Creates a new email marketing campaign" }
+    },
+    "email_marketing.subscribers.subscribe": {
+      "permission": "email_marketing.manage_email",
+      "schema": "schemas/subscribe.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "subscribe"
+      },
+      "emit": [
+        "email_marketing.subscriber.subscribed"
+      ],
+      "ai": { "description": "Subscribes a contact to an email marketing list" }
+    },
+    "email_marketing.subscribers.unsubscribe": {
+      "permission": "email_marketing.manage_email",
+      "schema": "schemas/unsubscribe.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "unsubscribe"
+      },
+      "emit": [
+        "email_marketing.subscriber.unsubscribed"
+      ],
+      "ai": { "description": "Unsubscribes a contact from an email marketing list" }
+    },
+    "email_marketing.campaigns.schedule": {
+      "permission": "email_marketing.send_email",
+      "schema": "schemas/campaign_schedule.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "schedule_campaign"
+      },
+      "emit": [
+        "email_marketing.campaign.scheduled"
+      ],
+      "ai": { "description": "Schedules an email campaign to be sent at a specific date and time" }
+    },
+    "email_marketing.campaigns.send": {
+      "permission": "email_marketing.send_email",
+      "schema": "schemas/campaign_send.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "send_campaign"
+      },
+      "emit": [
+        "email_marketing.campaign.sent"
+      ],
+      "ai": { "description": "Immediately sends an email campaign to its recipient list" }
+    },
+    "email_marketing.events.record": {
+      "permission": "email_marketing.manage_email",
+      "schema": "schemas/event_record.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "record_event"
+      },
+      "emit": [
+        "email_marketing.event.recorded"
+      ],
+      "ai": { "description": "Records a campaign engagement event (open, click, unsubscribe, etc.)" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/email_marketing.esm.js"
+  }
+}

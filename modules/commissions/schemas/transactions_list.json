@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "commissions.transactions.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["", "pending", "approved", "paid", "cancelled", "adjusted"],
+      "default": ""
+    },
+    "staff_id": { "type": "string", "default": "" },
+    "date_from": { "type": "string", "default": "" },
+    "date_to": { "type": "string", "default": "" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 }
+  }
+}

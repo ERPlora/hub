@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "general_ledger.entries.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entry_date", "period_id", "lines"],
+  "properties": {
+    "entry_date": { "type": "string", "format": "date" },
+    "period_id": { "type": "string", "minLength": 1 },
+    "reference": { "type": "string", "default": "", "maxLength": 100 },
+    "description": { "type": "string", "default": "" },
+    "lines": {
+      "type": "array",
+      "minItems": 2,
+      "description": "Apuntes; exactamente uno de debit/credit no-cero por línea. sum(debit)==sum(credit).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["account_id"],
+        "properties": {
+          "account_id": { "type": "string", "minLength": 1 },
+          "cost_center_id": { "type": ["string", "null"], "default": null },
+          "debit": { "type": "number", "minimum": 0, "default": 0 },
+          "credit": { "type": "number", "minimum": 0, "default": 0 },
+          "description": { "type": "string", "default": "" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,205 @@
+{
+  "id": "sepa_remittances",
+  "name": "SEPA Remittances",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages SEPA direct debit and credit transfer remittances: create and revoke mandates, generate remittance batches, produce XML files for the bank, and track processing or rejection status.",
+    "keywords": ["sepa", "remittance", "direct debit", "credit transfer", "mandate", "bank", "payment", "xml"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "sepa_remittances.view_sepa",
+    "sepa_remittances.create_sepa",
+    "sepa_remittances.send_sepa",
+    "sepa_remittances.manage_mandate"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "sepa_remittances.view_sepa",
+      "sepa_remittances.create_sepa",
+      "sepa_remittances.send_sepa",
+      "sepa_remittances.manage_mandate"
+    ],
+    "employee": [
+      "sepa_remittances.view_sepa"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Remittances",
+      "icon": "send-outline",
+      "component": "erp-sepa-remittances-list"
+    },
+    {
+      "id": "mandates",
+      "label": "Mandates",
+      "icon": "document-text-outline",
+      "component": "erp-sepa-remittances-mandates"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "sepa_remittances.mandates.list": {
+      "permission": "sepa_remittances.view_sepa",
+      "sql": "queries/mandates_list.sql",
+      "schema": "schemas/mandates_list.json",
+      "ai": { "description": "Lists the registered SEPA direct-debit mandates" }
+    },
+    "sepa_remittances.mandates.get": {
+      "permission": "sepa_remittances.view_sepa",
+      "sql": "queries/mandate_get.sql",
+      "schema": "schemas/mandate_get.json",
+      "ai": { "description": "Retrieves the full detail of a SEPA mandate by its identifier" }
+    },
+    "sepa_remittances.remittances.list": {
+      "permission": "sepa_remittances.view_sepa",
+      "sql": "queries/remittances_list.sql",
+      "schema": "schemas/remittances_list.json",
+      "ai": { "description": "Lists generated SEPA remittance batches" }
+    },
+    "sepa_remittances.remittances.get": {
+      "permission": "sepa_remittances.view_sepa",
+      "sql": "queries/remittance_get.sql",
+      "schema": "schemas/remittance_get.json",
+      "ai": { "description": "Retrieves the full detail of a SEPA remittance batch by its identifier" }
+    },
+    "sepa_remittances.lines.list": {
+      "permission": "sepa_remittances.view_sepa",
+      "sql": "queries/lines_list.sql",
+      "schema": "schemas/lines_list.json",
+      "ai": { "description": "Lists the collection or payment lines included in a SEPA remittance batch" }
+    }
+  },
+  "commands": {
+    "sepa_remittances.mandates.create": {
+      "permission": "sepa_remittances.manage_mandate",
+      "transaction": true,
+      "sql": [
+        "commands/mandate_create.sql"
+      ],
+      "schema": "schemas/mandate_create.json",
+      "emit": [
+        "sepa_remittances.mandate.created"
+      ],
+      "ai": { "description": "Creates a new SEPA direct-debit mandate for a customer" }
+    },
+    "sepa_remittances.mandates.revoke": {
+      "permission": "sepa_remittances.manage_mandate",
+      "transaction": true,
+      "sql": [
+        "commands/mandate_revoke.sql"
+      ],
+      "schema": "schemas/mandate_revoke.json",
+      "emit": [
+        "sepa_remittances.mandate.revoked"
+      ],
+      "ai": { "description": "Revokes an existing SEPA mandate, cancelling future direct debits (destructive)" }
+    },
+    "sepa_remittances.remittances.create_direct_debit": {
+      "permission": "sepa_remittances.create_sepa",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_direct_debit"
+      },
+      "schema": "schemas/create_direct_debit.json",
+      "emit": [
+        "sepa_remittances.remittance.created"
+      ],
+      "ai": { "description": "Creates a SEPA direct-debit remittance batch for collecting payments from customers" }
+    },
+    "sepa_remittances.remittances.create_credit_transfer": {
+      "permission": "sepa_remittances.create_sepa",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_credit_transfer"
+      },
+      "schema": "schemas/create_credit_transfer.json",
+      "emit": [
+        "sepa_remittances.remittance.created"
+      ],
+      "ai": { "description": "Creates a SEPA credit transfer remittance batch for paying suppliers" }
+    },
+    "sepa_remittances.remittances.generate_xml": {
+      "permission": "sepa_remittances.create_sepa",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "generate_xml"
+      },
+      "schema": "schemas/generate_xml.json",
+      "emit": [
+        "sepa_remittances.remittance.generated"
+      ],
+      "ai": { "description": "Generates the SEPA XML file ready to be submitted to the bank" }
+    },
+    "sepa_remittances.remittances.mark_sent": {
+      "permission": "sepa_remittances.send_sepa",
+      "transaction": true,
+      "sql": [
+        "commands/remittance_mark_sent.sql"
+      ],
+      "schema": "schemas/mark_sent.json",
+      "emit": [
+        "sepa_remittances.remittance.sent"
+      ],
+      "ai": { "description": "Marks a SEPA remittance batch as sent to the bank" }
+    },
+    "sepa_remittances.remittances.mark_processed": {
+      "permission": "sepa_remittances.send_sepa",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "mark_processed"
+      },
+      "schema": "schemas/mark_processed.json",
+      "emit": [
+        "sepa_remittances.remittance.processed"
+      ],
+      "ai": { "description": "Marks a SEPA remittance batch as processed and updates the status of its lines" }
+    },
+    "sepa_remittances.remittances.mark_rejected": {
+      "permission": "sepa_remittances.send_sepa",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "mark_rejected"
+      },
+      "schema": "schemas/mark_rejected.json",
+      "emit": [
+        "sepa_remittances.remittance.rejected"
+      ],
+      "ai": { "description": "Marks a SEPA remittance batch as rejected by the bank and handles the returns" }
+    },
+    "sepa_remittances._insert_line": {
+      "permission": "sepa_remittances.create_sepa",
+      "sql": [
+        "commands/_insert_line.sql"
+      ]
+    },
+    "sepa_remittances._update_remittance_state": {
+      "permission": "sepa_remittances.create_sepa",
+      "sql": [
+        "commands/_update_remittance_state.sql"
+      ]
+    },
+    "sepa_remittances._set_line_status": {
+      "permission": "sepa_remittances.send_sepa",
+      "sql": [
+        "commands/_set_line_status.sql"
+      ]
+    }
+  },
+  "ui": {
+    "entry": "dist/sepa_remittances.esm.js"
+  }
+}

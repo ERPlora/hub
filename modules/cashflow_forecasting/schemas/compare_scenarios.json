@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "cashflow_forecasting.scenarios.compare",
+  "description": "Compara las últimas proyecciones completadas de dos escenarios periodo a periodo. La agregación cross-fila vive en el handler WASM — ver WASM-TODO.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scenario_id_a", "scenario_id_b"],
+  "properties": {
+    "scenario_id_a": { "type": "string", "minLength": 1 },
+    "scenario_id_b": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "general_ledger.accounts.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "name", "account_type"],
+  "properties": {
+    "code": { "type": "string", "minLength": 1, "maxLength": 20 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "account_type": {
+      "type": "string",
+      "enum": ["asset", "liability", "equity", "income", "expense"]
+    },
+    "normal_balance": {
+      "type": "string",
+      "description": "Si se omite, el runtime lo infiere de account_type (asset/expense=debit; resto=credit).",
+      "enum": ["debit", "credit"]
+    },
+    "parent_id": {
+      "type": ["string", "null"],
+      "description": "Cuenta padre opcional; '' o null = raíz.",
+      "default": null
+    },
+    "is_summary": { "type": "boolean", "default": false },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 3, "default": "EUR" }
+  }
+}

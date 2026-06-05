@@ -1,0 +1,177 @@
+{
+  "id": "opportunities",
+  "name": "Opportunities",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages sales opportunities and pipeline: track stages, log activities, update values, and close deals as won or lost.",
+    "keywords": ["opportunity", "pipeline", "deal", "sales", "crm", "stage", "activity"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "opportunities.view_opp",
+    "opportunities.add_opp",
+    "opportunities.manage_opp",
+    "opportunities.close_opp"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "opportunities.view_opp",
+      "opportunities.add_opp",
+      "opportunities.manage_opp",
+      "opportunities.close_opp"
+    ],
+    "employee": [
+      "opportunities.view_opp",
+      "opportunities.add_opp"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Pipeline",
+      "icon": "briefcase-outline",
+      "component": "erp-opportunities-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "opportunities.opportunities.list": {
+      "permission": "opportunities.view_opp",
+      "sql": "queries/opportunities_list.sql",
+      "schema": "schemas/opportunities_list.json",
+      "ai": { "description": "Lists all sales opportunities in the pipeline with their stage and value." }
+    },
+    "opportunities.opportunities.get": {
+      "permission": "opportunities.view_opp",
+      "sql": "queries/opportunity_get.sql",
+      "schema": "schemas/opportunity_get.json",
+      "ai": { "description": "Retrieves the full details of a single opportunity by its ID." }
+    },
+    "opportunities.activities.list": {
+      "permission": "opportunities.view_opp",
+      "sql": "queries/activities_list.sql",
+      "schema": "schemas/activities_list.json",
+      "ai": { "description": "Lists all activities (calls, meetings, emails) logged for an opportunity." }
+    },
+    "opportunities.pipeline.summary": {
+      "permission": "opportunities.view_opp",
+      "sql": "queries/pipeline_summary.sql",
+      "schema": "schemas/pipeline_summary.json",
+      "ai": { "description": "Returns an aggregated pipeline summary grouped by stage with total deal values." }
+    }
+  },
+  "commands": {
+    "opportunities.opportunities.create": {
+      "permission": "opportunities.add_opp",
+      "schema": "schemas/opportunity_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_opportunity"
+      },
+      "emit": [
+        "opportunities.opportunity.created"
+      ],
+      "ai": { "description": "Creates a new sales opportunity in the pipeline." }
+    },
+    "opportunities.opportunities.update_stage": {
+      "permission": "opportunities.manage_opp",
+      "transaction": true,
+      "sql": [
+        "commands/update_stage.sql"
+      ],
+      "schema": "schemas/update_stage.json",
+      "emit": [
+        "opportunities.opportunity.stage_changed"
+      ],
+      "ai": { "description": "Moves an opportunity to a different pipeline stage." }
+    },
+    "opportunities.opportunities.update_value_probability": {
+      "permission": "opportunities.manage_opp",
+      "transaction": true,
+      "sql": [
+        "commands/update_value_probability.sql"
+      ],
+      "schema": "schemas/update_value_probability.json",
+      "emit": [
+        "opportunities.opportunity.updated"
+      ],
+      "ai": { "description": "Updates the monetary value and close probability of an opportunity." }
+    },
+    "opportunities.opportunities.mark_won": {
+      "permission": "opportunities.close_opp",
+      "schema": "schemas/mark_won.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "mark_won"
+      },
+      "emit": [
+        "opportunities.opportunity.won"
+      ],
+      "ai": { "description": "Marks an opportunity as won and records the successful close." }
+    },
+    "opportunities.opportunities.mark_lost": {
+      "permission": "opportunities.close_opp",
+      "transaction": true,
+      "sql": [
+        "commands/mark_lost.sql"
+      ],
+      "schema": "schemas/mark_lost.json",
+      "emit": [
+        "opportunities.opportunity.lost"
+      ],
+      "ai": { "description": "Marks an opportunity as lost with the reason for the close." }
+    },
+    "opportunities.activities.log": {
+      "permission": "opportunities.manage_opp",
+      "schema": "schemas/log_activity.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "log_activity"
+      },
+      "emit": [
+        "opportunities.activity.logged"
+      ],
+      "ai": { "description": "Logs a new activity (call, meeting, email) against an opportunity." }
+    },
+    "opportunities.activities.complete": {
+      "permission": "opportunities.manage_opp",
+      "transaction": true,
+      "sql": [
+        "commands/complete_activity.sql"
+      ],
+      "schema": "schemas/complete_activity.json",
+      "emit": [
+        "opportunities.activity.completed"
+      ],
+      "ai": { "description": "Marks a scheduled activity on an opportunity as completed." }
+    },
+    "opportunities._insert_opportunity": {
+      "permission": "opportunities.add_opp",
+      "sql": [
+        "commands/_insert_opportunity.sql"
+      ]
+    },
+    "opportunities._insert_activity": {
+      "permission": "opportunities.manage_opp",
+      "sql": [
+        "commands/_insert_activity.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/opportunities.esm.js"
+  }
+}

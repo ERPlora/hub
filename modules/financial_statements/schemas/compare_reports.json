@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "financial_statements.reports.compare",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_id_a", "report_id_b"],
+  "properties": {
+    "report_id_a": { "type": "string", "minLength": 1 },
+    "report_id_b": { "type": "string", "minLength": 1 }
+  }
+}

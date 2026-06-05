@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "setup.state.fail",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["error_message"],
+  "properties": {
+    "error_message": { "type": "string", "default": "", "maxLength": 500 }
+  }
+}

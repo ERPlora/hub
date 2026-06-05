@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.enrollments.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "program_id": { "type": "string", "default": "" },
+    "status": {
+      "type": "string",
+      "enum": ["", "not_started", "in_progress", "completed", "failed", "expired"],
+      "default": ""
+    }
+  }
+}

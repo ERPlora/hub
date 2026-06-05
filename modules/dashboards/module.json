@@ -1,0 +1,197 @@
+{
+  "id": "dashboards",
+  "name": "Dashboards",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages analytical dashboards and widgets: create, update, duplicate, and share dashboards with other users, and add or refresh data widgets.",
+    "keywords": ["dashboard", "widget", "analytics", "chart", "share", "report", "kpi"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "dashboards.view_dashboard",
+    "dashboards.manage_dashboard",
+    "dashboards.share_dashboard"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "dashboards.view_dashboard",
+      "dashboards.manage_dashboard",
+      "dashboards.share_dashboard"
+    ],
+    "employee": [
+      "dashboards.view_dashboard"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Dashboards",
+      "icon": "bar-chart-outline",
+      "component": "erp-dashboards-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "dashboards.dashboards.list": {
+      "permission": "dashboards.view_dashboard",
+      "sql": "queries/dashboards_list.sql",
+      "schema": "schemas/dashboards_list.json",
+      "ai": { "description": "Lists all dashboards available to the current user" }
+    },
+    "dashboards.dashboards.get": {
+      "permission": "dashboards.view_dashboard",
+      "sql": "queries/dashboard_get.sql",
+      "schema": "schemas/dashboard_get.json",
+      "ai": { "description": "Retrieves the details of a dashboard by its identifier" }
+    },
+    "dashboards.widgets.list": {
+      "permission": "dashboards.view_dashboard",
+      "sql": "queries/widgets_list.sql",
+      "schema": "schemas/widgets_list.json",
+      "ai": { "description": "Lists the widgets belonging to a dashboard" }
+    },
+    "dashboards.shares.list": {
+      "permission": "dashboards.view_dashboard",
+      "sql": "queries/shares_list.sql",
+      "schema": "schemas/shares_list.json",
+      "ai": { "description": "Lists the users a dashboard has been shared with" }
+    }
+  },
+  "commands": {
+    "dashboards.dashboards.create": {
+      "permission": "dashboards.manage_dashboard",
+      "transaction": true,
+      "sql": [
+        "commands/dashboard_create.sql"
+      ],
+      "schema": "schemas/dashboard_create.json",
+      "emit": [
+        "dashboards.dashboard.created"
+      ],
+      "ai": { "description": "Creates a new dashboard" }
+    },
+    "dashboards.dashboards.update": {
+      "permission": "dashboards.manage_dashboard",
+      "transaction": true,
+      "sql": [
+        "commands/dashboard_update.sql"
+      ],
+      "schema": "schemas/dashboard_update.json",
+      "emit": [
+        "dashboards.dashboard.updated"
+      ],
+      "ai": { "description": "Updates the metadata of an existing dashboard" }
+    },
+    "dashboards.dashboards.delete": {
+      "permission": "dashboards.manage_dashboard",
+      "transaction": true,
+      "sql": [
+        "commands/dashboard_delete.sql"
+      ],
+      "schema": "schemas/dashboard_delete.json",
+      "emit": [
+        "dashboards.dashboard.deleted"
+      ],
+      "ai": { "description": "Deletes a dashboard (destructive)" }
+    },
+    "dashboards.dashboards.duplicate": {
+      "permission": "dashboards.manage_dashboard",
+      "schema": "schemas/dashboard_duplicate.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "duplicate_dashboard"
+      },
+      "emit": [
+        "dashboards.dashboard.created"
+      ],
+      "ai": { "description": "Duplicates an existing dashboard by creating a copy" }
+    },
+    "dashboards.widgets.add": {
+      "permission": "dashboards.manage_dashboard",
+      "transaction": true,
+      "sql": [
+        "commands/widget_add.sql"
+      ],
+      "schema": "schemas/widget_add.json",
+      "emit": [
+        "dashboards.widget.added"
+      ],
+      "ai": { "description": "Adds a widget to a dashboard" }
+    },
+    "dashboards.widgets.update": {
+      "permission": "dashboards.manage_dashboard",
+      "transaction": true,
+      "sql": [
+        "commands/widget_update.sql"
+      ],
+      "schema": "schemas/widget_update.json",
+      "emit": [
+        "dashboards.widget.updated"
+      ],
+      "ai": { "description": "Updates the configuration or position of a widget" }
+    },
+    "dashboards.widgets.remove": {
+      "permission": "dashboards.manage_dashboard",
+      "transaction": true,
+      "sql": [
+        "commands/widget_remove.sql"
+      ],
+      "schema": "schemas/widget_remove.json",
+      "emit": [
+        "dashboards.widget.removed"
+      ],
+      "ai": { "description": "Removes a widget from a dashboard" }
+    },
+    "dashboards.widgets.refresh_data": {
+      "permission": "dashboards.manage_dashboard",
+      "transaction": true,
+      "sql": [
+        "commands/widget_refresh_data.sql"
+      ],
+      "schema": "schemas/widget_refresh_data.json",
+      "emit": [
+        "dashboards.widget.refreshed"
+      ],
+      "ai": { "description": "Forces a refresh of a widget's data" }
+    },
+    "dashboards.shares.share": {
+      "permission": "dashboards.share_dashboard",
+      "schema": "schemas/share_dashboard.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "share_dashboard"
+      },
+      "emit": [
+        "dashboards.dashboard.shared"
+      ],
+      "ai": { "description": "Shares a dashboard with another user or role" }
+    },
+    "dashboards.shares.revoke": {
+      "permission": "dashboards.share_dashboard",
+      "transaction": true,
+      "sql": [
+        "commands/share_revoke.sql"
+      ],
+      "schema": "schemas/share_revoke.json",
+      "emit": [
+        "dashboards.dashboard.share_revoked"
+      ],
+      "ai": { "description": "Revokes a user's shared access to a dashboard" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/dashboards.esm.js"
+  }
+}

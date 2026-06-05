@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "services.packages.get params",
+  "description": "Parámetros de queries/package_get.sql. El scope hub_id lo inyecta el runtime (§2.5). Las líneas se piden aparte con services.package_items.list.",
+  "type": "object",
+  "properties": {
+    "package_id": {
+      "type": "string",
+      "description": "Id del paquete a recuperar."
+    }
+  },
+  "required": ["package_id"],
+  "additionalProperties": false
+}

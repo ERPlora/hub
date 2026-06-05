@@ -1,0 +1,159 @@
+{
+  "id": "bank_reconciliation",
+  "name": "Bank Reconciliation",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages bank statement reconciliation: import statements, match lines to accounting entries, run auto-matching, and close reconciled periods.",
+    "keywords": ["bank reconciliation", "statement", "matching", "accounting", "reconcile", "bank line"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "bank_reconciliation.view_recon",
+    "bank_reconciliation.create_statement",
+    "bank_reconciliation.match",
+    "bank_reconciliation.close_recon"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": [
+      "bank_reconciliation.view_recon",
+      "bank_reconciliation.create_statement",
+      "bank_reconciliation.match",
+      "bank_reconciliation.close_recon"
+    ],
+    "employee": [
+      "bank_reconciliation.view_recon",
+      "bank_reconciliation.match"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "statements",
+      "label": "Statements",
+      "icon": "checkmark-circle-outline",
+      "component": "erp-bank-reconciliation-statements"
+    },
+    {
+      "id": "matches",
+      "label": "Matches",
+      "icon": "git-compare-outline",
+      "component": "erp-bank-reconciliation-matches"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "bank_reconciliation.statements.list": {
+      "permission": "bank_reconciliation.view_recon",
+      "sql": "queries/statements_list.sql",
+      "ai": { "description": "Lists available bank statements for reconciliation" }
+    },
+    "bank_reconciliation.statements.get": {
+      "permission": "bank_reconciliation.view_recon",
+      "sql": "queries/statement_get.sql",
+      "ai": { "description": "Retrieves the full detail of a specific bank statement" }
+    },
+    "bank_reconciliation.lines.list": {
+      "permission": "bank_reconciliation.view_recon",
+      "sql": "queries/lines_list.sql",
+      "ai": { "description": "Lists all lines belonging to a bank statement" }
+    },
+    "bank_reconciliation.lines.unmatched": {
+      "permission": "bank_reconciliation.view_recon",
+      "sql": "queries/unmatched_lines_list.sql",
+      "ai": { "description": "Lists bank statement lines that have not yet been matched to an accounting entry" }
+    },
+    "bank_reconciliation.matches.list": {
+      "permission": "bank_reconciliation.view_recon",
+      "sql": "queries/matches_list.sql",
+      "ai": { "description": "Lists reconciliation matches linking statement lines to accounting entries" }
+    }
+  },
+  "commands": {
+    "bank_reconciliation.lines.add": {
+      "permission": "bank_reconciliation.create_statement",
+      "transaction": true,
+      "sql": [
+        "commands/statement_line_add.sql"
+      ],
+      "schema": "schemas/statement_line_add.json",
+      "emit": [
+        "bank_reconciliation.line.added"
+      ],
+      "ai": { "description": "Adds a transaction line to a bank statement" }
+    },
+    "bank_reconciliation.matches.create": {
+      "permission": "bank_reconciliation.match",
+      "transaction": true,
+      "sql": [
+        "commands/match_create.sql"
+      ],
+      "schema": "schemas/match_create.json",
+      "emit": [
+        "bank_reconciliation.match.created"
+      ],
+      "ai": { "description": "Creates a manual reconciliation match between a statement line and an accounting entry" }
+    },
+    "bank_reconciliation.statements.create": {
+      "permission": "bank_reconciliation.create_statement",
+      "schema": "schemas/statement_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_statement"
+      },
+      "emit": [
+        "bank_reconciliation.statement.created"
+      ],
+      "ai": { "description": "Creates a new bank statement to begin the reconciliation process" }
+    },
+    "bank_reconciliation.matches.remove": {
+      "permission": "bank_reconciliation.match",
+      "schema": "schemas/match_remove.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "remove_match"
+      },
+      "emit": [
+        "bank_reconciliation.match.removed"
+      ],
+      "ai": { "description": "Removes an existing reconciliation match between a statement line and an accounting entry (destructive)" }
+    },
+    "bank_reconciliation.matches.auto_match": {
+      "permission": "bank_reconciliation.match",
+      "schema": "schemas/auto_match.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "auto_match_by_amount_and_date"
+      },
+      "emit": [
+        "bank_reconciliation.match.created"
+      ],
+      "ai": { "description": "Runs automatic reconciliation matching statement lines to accounting entries by amount and date" }
+    },
+    "bank_reconciliation.statements.close": {
+      "permission": "bank_reconciliation.close_recon",
+      "schema": "schemas/statement_close.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "close_statement"
+      },
+      "emit": [
+        "bank_reconciliation.statement.closed"
+      ],
+      "ai": { "description": "Closes a fully reconciled bank statement, marking it as final and locked" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/bank_reconciliation.esm.js"
+  }
+}

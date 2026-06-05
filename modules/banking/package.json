@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-banking",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo banking (manifest declarativo + Web Components Stencil): cuentas bancarias, libro de apuntes con importe firmado y conciliación de extractos. El alta de apuntes mantiene el saldo cacheado y se valida con un invariant fiscal en WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

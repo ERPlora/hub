@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-accounting",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo accounting (manifest declarativo + Web Component Stencil): plan de cuentas, diario por partida doble, contabilización/cancelación de asientos y balance de comprobación. La lógica de partida doble (equilibrio débito=crédito, contador atómico de nº de asiento, contra-asiento) vive en un handler Rust→WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

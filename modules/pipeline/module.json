@@ -1,0 +1,149 @@
+{
+  "id": "pipeline",
+  "name": "Pipeline",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages sales pipelines and deal tracking: create pipelines with stages, move deals through stages, mark deals won or lost, and compute conversion metrics.",
+    "keywords": ["pipeline", "deal", "stage", "crm", "sales", "opportunity", "conversion", "kanban"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "pipeline.view_pipe",
+    "pipeline.manage_pipe",
+    "pipeline.move_deal"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "pipeline.view_pipe",
+      "pipeline.manage_pipe",
+      "pipeline.move_deal"
+    ],
+    "employee": [
+      "pipeline.view_pipe",
+      "pipeline.move_deal"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "boards",
+      "label": "Boards",
+      "icon": "git-branch-outline",
+      "component": "erp-pipeline-boards"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "pipeline.pipelines.list": {
+      "permission": "pipeline.view_pipe",
+      "sql": "queries/pipelines_list.sql",
+      "schema": "schemas/pipelines_list.json",
+      "ai": { "description": "Lists all available sales pipelines." }
+    },
+    "pipeline.pipelines.get": {
+      "permission": "pipeline.view_pipe",
+      "sql": "queries/pipeline_get.sql",
+      "schema": "schemas/pipeline_get.json",
+      "ai": { "description": "Retrieves the full detail of a specific sales pipeline." }
+    },
+    "pipeline.stages.list": {
+      "permission": "pipeline.view_pipe",
+      "sql": "queries/stages_list.sql",
+      "schema": "schemas/stages_list.json",
+      "ai": { "description": "Lists the stages of a pipeline with the number of deals in each stage." }
+    },
+    "pipeline.deals.list": {
+      "permission": "pipeline.view_pipe",
+      "sql": "queries/deals_list.sql",
+      "schema": "schemas/deals_list.json",
+      "ai": { "description": "Lists business deals with their current stage and estimated value." }
+    }
+  },
+  "commands": {
+    "pipeline.stages.add": {
+      "permission": "pipeline.manage_pipe",
+      "transaction": true,
+      "sql": [
+        "commands/stage_add.sql"
+      ],
+      "schema": "schemas/stage_add.json",
+      "emit": [
+        "pipeline.stage.added"
+      ],
+      "ai": { "description": "Adds a new stage to an existing sales pipeline." }
+    },
+    "pipeline.deals.mark_lost": {
+      "permission": "pipeline.move_deal",
+      "transaction": true,
+      "sql": [
+        "commands/deal_mark_lost.sql"
+      ],
+      "schema": "schemas/deal_mark_lost.json",
+      "emit": [
+        "pipeline.deal.lost"
+      ],
+      "ai": { "description": "Marks a deal as lost with a reason for the loss." }
+    },
+    "pipeline.pipelines.create": {
+      "permission": "pipeline.manage_pipe",
+      "schema": "schemas/pipeline_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_pipeline"
+      },
+      "emit": [
+        "pipeline.pipeline.created"
+      ],
+      "ai": { "description": "Creates a new sales pipeline with its initial stages." }
+    },
+    "pipeline.deals.create": {
+      "permission": "pipeline.move_deal",
+      "schema": "schemas/deal_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_deal"
+      },
+      "emit": [
+        "pipeline.deal.created"
+      ],
+      "ai": { "description": "Creates a new business deal in a pipeline stage." }
+    },
+    "pipeline.deals.move": {
+      "permission": "pipeline.move_deal",
+      "schema": "schemas/deal_move.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "move_deal"
+      },
+      "emit": [
+        "pipeline.deal.moved"
+      ],
+      "ai": { "description": "Moves a deal to a different stage within the pipeline." }
+    },
+    "pipeline.pipelines.metrics": {
+      "permission": "pipeline.view_pipe",
+      "schema": "schemas/pipeline_metrics.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "pipeline_metrics"
+      },
+      "ai": { "description": "Calculates conversion metrics and total deal value for a pipeline." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/pipeline.esm.js"
+  }
+}

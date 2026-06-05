@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "commissions.adjustments.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["staff_id", "staff_name", "adjustment_type", "amount", "reason", "adjustment_date"],
+  "properties": {
+    "staff_id": { "type": "string", "minLength": 1 },
+    "staff_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "adjustment_type": {
+      "type": "string",
+      "enum": ["bonus", "correction", "deduction", "refund_adjustment", "other"],
+      "default": "correction"
+    },
+    "amount": { "type": "number" },
+    "reason": { "type": "string", "minLength": 1 },
+    "payout_id": { "type": ["string", "null"], "default": null },
+    "adjustment_date": { "type": "string", "format": "date" }
+  }
+}

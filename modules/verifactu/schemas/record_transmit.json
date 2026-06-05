@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "verifactu.records.transmit",
+  "description": "Transmite manualmente un registro a la AEAT (SOAP, certificado). Toda la lógica de red/firma/respuesta vive en WASM + capacidades de host — ver WASM-TODO.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record_id"],
+  "properties": {
+    "record_id": { "type": "string", "minLength": 1 }
+  }
+}

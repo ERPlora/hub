@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "audit_log.reports.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": { "type": "string", "enum": ["", "generating", "ready", "failed"], "default": "" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 }
+  }
+}

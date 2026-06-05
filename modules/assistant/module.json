@@ -1,0 +1,160 @@
+{
+  "id": "assistant",
+  "name": "AI Assistant",
+  "version": "1.9.7",
+  "agent": {
+    "description": "Provides an AI-powered business assistant: manages chat conversations with typed tools over inventory, sales, customers and invoicing, logs assistant actions, and allows confirming or cancelling proposed operations.",
+    "keywords": ["assistant", "ai", "chat", "copilot", "conversation", "action", "log"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "assistant.use_chat",
+    "assistant.use_setup_mode",
+    "assistant.view_logs",
+    "assistant.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "assistant.use_chat",
+      "assistant.view_logs"
+    ],
+    "employee": [
+      "assistant.use_chat"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "chat",
+      "label": "Chat",
+      "icon": "chatbubbles-outline",
+      "component": "erp-assistant-chat"
+    },
+    {
+      "id": "logs",
+      "label": "Action Log",
+      "icon": "list-outline",
+      "component": "erp-assistant-logs"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "assistant.conversations.list": {
+      "permission": "assistant.use_chat",
+      "sql": "queries/conversations_list.sql",
+      "ai": { "description": "Lists the current user's AI assistant conversations." }
+    },
+    "assistant.conversations.get": {
+      "permission": "assistant.use_chat",
+      "sql": "queries/conversation_get.sql",
+      "ai": { "description": "Retrieves the full detail and messages of an AI assistant conversation by its identifier." }
+    },
+    "assistant.messages.list": {
+      "permission": "assistant.use_chat",
+      "sql": "queries/messages_list.sql",
+      "ai": { "description": "Lists the messages in a specific AI assistant conversation." }
+    },
+    "assistant.logs.list": {
+      "permission": "assistant.view_logs",
+      "sql": "queries/logs_list.sql",
+      "ai": { "description": "Lists the action log of operations executed by the AI assistant." }
+    }
+  },
+  "commands": {
+    "assistant.conversations.create": {
+      "permission": "assistant.use_chat",
+      "transaction": true,
+      "sql": [
+        "commands/conversation_create.sql"
+      ],
+      "schema": "schemas/conversation_create.json",
+      "emit": [
+        "assistant.conversation.created"
+      ],
+      "ai": { "description": "Creates a new AI assistant conversation thread." }
+    },
+    "assistant.conversations.delete": {
+      "permission": "assistant.use_chat",
+      "transaction": true,
+      "sql": [
+        "commands/conversation_delete.sql"
+      ],
+      "schema": "schemas/conversation_delete.json",
+      "emit": [
+        "assistant.conversation.deleted"
+      ],
+      "ai": { "description": "Deletes an AI assistant conversation and all its messages (destructive)." }
+    },
+    "assistant.messages.append": {
+      "permission": "assistant.use_chat",
+      "transaction": true,
+      "sql": [
+        "commands/message_append.sql"
+      ],
+      "schema": "schemas/message_append.json",
+      "emit": [
+        "assistant.message.appended"
+      ],
+      "ai": { "description": "Appends a message (user or assistant) to a conversation thread." }
+    },
+    "assistant.actions.log": {
+      "permission": "assistant.use_chat",
+      "transaction": true,
+      "sql": [
+        "commands/action_log_create.sql"
+      ],
+      "schema": "schemas/action_log_create.json",
+      "ai": { "description": "Records an action executed by the AI assistant in the action log." }
+    },
+    "assistant.actions.cancel": {
+      "permission": "assistant.use_chat",
+      "transaction": true,
+      "sql": [
+        "commands/action_cancel.sql"
+      ],
+      "schema": "schemas/action_cancel.json",
+      "emit": [
+        "assistant.action.cancelled"
+      ],
+      "ai": { "description": "Cancels a proposed AI assistant action before it is executed." }
+    },
+    "assistant.actions.confirm": {
+      "permission": "assistant.use_chat",
+      "schema": "schemas/action_confirm.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "confirm_action"
+      },
+      "emit": [
+        "assistant.action.confirmed"
+      ],
+      "ai": { "description": "Confirms and executes a proposed AI assistant action." }
+    },
+    "assistant.chat.send": {
+      "permission": "assistant.use_chat",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "chat_send"
+      },
+      "ai": { "description": "Sends a message to the AI assistant and receives a response with possible typed actions." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ai_context": {
+    "summary": "AI business assistant with contextual chat and typed tools over inventory, sales, customers and invoicing, setup mode and subscription plans.",
+    "keywords": ["assistant", "ai", "chat", "copilot", "action", "conversation"]
+  },
+  "ui": {
+    "entry": "dist/assistant.esm.js"
+  }
+}

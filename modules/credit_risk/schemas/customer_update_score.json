@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "credit_risk.customers.update_score",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["customer_credit_id", "new_score"],
+  "properties": {
+    "customer_credit_id": { "type": "string", "minLength": 1 },
+    "new_score": { "type": "integer", "minimum": 0, "maximum": 1000 }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_germany.config.upsert",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ust_id", "steuernummer", "company_name"],
+  "properties": {
+    "ust_id": { "type": "string", "pattern": "^DE[0-9]{9}$", "maxLength": 20 },
+    "steuernummer": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "company_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "leitweg_id_default": { "type": "string", "maxLength": 60, "default": "" },
+    "xrechnung_environment": { "type": "string", "enum": ["test", "production"], "default": "test" }
+  }
+}

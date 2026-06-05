@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kpis.kpis.update",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kpi_id", "name", "unit", "kpi_type", "aggregation", "target_direction", "is_active"],
+  "properties": {
+    "kpi_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": "string", "default": "" },
+    "unit": {
+      "type": "string",
+      "enum": ["currency", "percent", "count", "duration", "ratio", "score", "other"]
+    },
+    "kpi_type": {
+      "type": "string",
+      "enum": ["numerical", "percentage", "count", "ratio"]
+    },
+    "aggregation": {
+      "type": "string",
+      "enum": ["sum", "avg", "max", "min", "last"]
+    },
+    "category": { "type": "string", "default": "", "maxLength": 80 },
+    "target_value": { "type": ["number", "null"], "default": null },
+    "target_direction": {
+      "type": "string",
+      "enum": ["higher_is_better", "lower_is_better"]
+    },
+    "critical_threshold": { "type": ["number", "null"], "default": null },
+    "warning_threshold": { "type": ["number", "null"], "default": null },
+    "owner_ref": { "type": ["string", "null"], "default": null },
+    "is_active": { "type": "boolean", "default": true }
+  }
+}

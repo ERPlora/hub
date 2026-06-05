@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "messaging.automations.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "trigger", "channel", "template_id"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": "string", "default": "" },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "welcome", "birthday", "anniversary", "post_sale", "post_appointment",
+        "inactivity", "loyalty_tier_change", "lead_stage_change", "ticket_resolved",
+        "booking_confirmed", "booking_reminder", "custom"
+      ]
+    },
+    "channel": { "type": "string", "enum": ["whatsapp", "sms", "email", "all"] },
+    "template_id": { "type": "string", "minLength": 1 },
+    "delay_hours": { "type": "integer", "minimum": 0, "default": 0 },
+    "conditions": { "type": "string", "default": "{}" }
+  }
+}

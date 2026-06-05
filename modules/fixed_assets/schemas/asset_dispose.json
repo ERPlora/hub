@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fixed_assets.assets.dispose",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["asset_id", "disposal_type"],
+  "properties": {
+    "asset_id": { "type": "string", "minLength": 1 },
+    "disposal_type": {
+      "type": "string",
+      "enum": ["sale", "scrap", "donation", "loss"]
+    },
+    "sale_price": { "type": "number", "minimum": 0, "default": 0 },
+    "disposal_date": { "type": ["string", "null"], "format": "date", "default": null },
+    "notes": { "type": ["string", "null"], "default": "" }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "traceability.events.record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_type", "entity_type", "entity_ref"],
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "enum": ["received", "produced", "transferred", "sold", "returned", "scrapped", "recalled"]
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": ["lot", "serial", "product"]
+    },
+    "entity_ref": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "quantity": { "type": ["number", "string"], "default": 0 },
+    "source_ref": { "type": "string", "default": "", "maxLength": 255 },
+    "destination_ref": { "type": "string", "default": "", "maxLength": 255 },
+    "related_document_type": { "type": "string", "default": "", "maxLength": 50 },
+    "related_document_ref": { "type": "string", "default": "", "maxLength": 255 },
+    "occurred_at": { "type": ["string", "null"], "default": null },
+    "notes": { "type": "string", "default": "" },
+    "metadata": { "type": "object", "default": {} },
+    "parent_event_id": { "type": ["string", "null"], "default": null }
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "id": "expenses",
+  "name": "Expenses",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages employee expense records and categories: create, submit, approve, and reject expenses through an approval workflow.",
+    "keywords": ["expense", "reimbursement", "approval", "category", "cost", "budget", "spend"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "expenses.view_expense",
+    "expenses.add_expense",
+    "expenses.approve_expense"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "expenses.view_expense",
+      "expenses.add_expense",
+      "expenses.approve_expense"
+    ],
+    "employee": [
+      "expenses.view_expense",
+      "expenses.add_expense"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "All",
+      "icon": "wallet-outline",
+      "component": "erp-expenses-list"
+    },
+    {
+      "id": "categories",
+      "label": "Categories",
+      "icon": "wallet-outline",
+      "component": "erp-expenses-categories"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "expenses.expenses.list": {
+      "permission": "expenses.view_expense",
+      "sql": "queries/expenses_list.sql",
+      "ai": { "description": "Lists recorded expenses with their approval status" }
+    },
+    "expenses.expenses.get": {
+      "permission": "expenses.view_expense",
+      "sql": "queries/expense_get.sql",
+      "ai": { "description": "Retrieves the details of an expense by its identifier" }
+    },
+    "expenses.categories.list": {
+      "permission": "expenses.view_expense",
+      "sql": "queries/categories_list.sql",
+      "ai": { "description": "Lists the available expense categories" }
+    }
+  },
+  "commands": {
+    "expenses.expenses.create": {
+      "permission": "expenses.add_expense",
+      "transaction": true,
+      "sql": [
+        "commands/expense_create.sql"
+      ],
+      "schema": "schemas/expense_create.json",
+      "emit": [
+        "expenses.expense.created"
+      ],
+      "ai": { "description": "Creates a new expense record" }
+    },
+    "expenses.expenses.submit": {
+      "permission": "expenses.add_expense",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "submit_expense"
+      },
+      "schema": "schemas/expense_submit.json",
+      "emit": [
+        "expenses.expense.submitted"
+      ],
+      "ai": { "description": "Submits an expense for review and approval" }
+    },
+    "expenses.expenses.approve": {
+      "permission": "expenses.approve_expense",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "approve_expense"
+      },
+      "schema": "schemas/expense_approve.json",
+      "emit": [
+        "expenses.expense.approved"
+      ],
+      "ai": { "description": "Approves a pending expense" }
+    },
+    "expenses.expenses.reject": {
+      "permission": "expenses.approve_expense",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "reject_expense"
+      },
+      "schema": "schemas/expense_reject.json",
+      "emit": [
+        "expenses.expense.rejected"
+      ],
+      "ai": { "description": "Rejects a pending expense" }
+    },
+    "expenses.categories.create": {
+      "permission": "expenses.add_expense",
+      "transaction": true,
+      "sql": [
+        "commands/category_create.sql"
+      ],
+      "schema": "schemas/category_create.json",
+      "emit": [
+        "expenses.category.created"
+      ],
+      "ai": { "description": "Creates a new expense category" }
+    }
+  },
+  "ui": {
+    "entry": "dist/expenses.esm.js"
+  }
+}

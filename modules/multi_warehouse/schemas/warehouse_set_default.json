@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "multi_warehouse.warehouses.set_default",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["warehouse_id"],
+  "properties": {
+    "warehouse_id": { "type": "string", "minLength": 1 }
+  }
+}

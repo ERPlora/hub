@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "payment_gateways.gateways.create params",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "name", "provider"],
+  "properties": {
+    "code": { "type": "string", "minLength": 1, "maxLength": 64, "description": "Identificador estable único por hub (p.ej. stripe_main)." },
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "provider": { "type": "string", "enum": ["stripe", "redsys", "paypal", "manual", "other"] },
+    "is_test_mode": { "type": "integer", "enum": [0, 1], "default": 1 },
+    "config": { "type": "string", "default": "{}", "description": "JSON serializado de config del proveedor." },
+    "supports_refunds": { "type": "integer", "enum": [0, 1], "default": 1 },
+    "supported_currencies": { "type": "string", "default": "[]", "description": "JSON array serializado de códigos ISO-4217." }
+  }
+}

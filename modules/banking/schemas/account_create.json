@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "banking.accounts.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "iban"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "iban": { "type": "string", "minLength": 1, "maxLength": 34 },
+    "bic": { "type": "string", "default": "", "maxLength": 11 },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 3, "default": "EUR" },
+    "opening_balance": { "type": "number", "default": 0 },
+    "notes": { "type": "string", "default": "" }
+  }
+}

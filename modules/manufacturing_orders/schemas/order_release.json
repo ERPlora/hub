@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "manufacturing_orders.orders.release",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mo_id"],
+  "properties": {
+    "mo_id": { "type": "string", "minLength": 1 }
+  }
+}

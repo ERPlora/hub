@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "commissions.calculate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["amount", "rule_id"],
+  "properties": {
+    "amount": { "type": "number", "minimum": 0 },
+    "rule_id": { "type": "string", "minLength": 1 },
+    "sales_volume": { "type": ["number", "null"], "minimum": 0, "default": null }
+  }
+}

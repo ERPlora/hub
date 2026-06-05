@@ -1,0 +1,14 @@
+{ "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "invoice_series.series.update payload", "type": "object", "additionalProperties": false,
+  "required": ["series_id"],
+  "properties": {
+    "series_id": { "type": "string" },
+    "name": { "type": "string", "maxLength": 255 },
+    "prefix": { "type": "string", "maxLength": 20 },
+    "suffix": { "type": "string", "maxLength": 20 },
+    "format": { "type": "string", "maxLength": 255 },
+    "country_code": { "type": "string", "maxLength": 2 },
+    "region_code": { "type": "string", "maxLength": 10 },
+    "start_date": { "type": ["string", "null"] },
+    "end_date": { "type": ["string", "null"] },
+    "is_active": { "type": "integer", "enum": [0, 1] } } }

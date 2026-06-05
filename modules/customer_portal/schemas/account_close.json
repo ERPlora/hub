@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "customer_portal.accounts.close",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account_id"],
+  "properties": {
+    "account_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "default": "", "maxLength": 1000 }
+  }
+}

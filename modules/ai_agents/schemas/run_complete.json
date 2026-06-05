@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai_agents.runs.complete",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "final_output"],
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "final_output": { "type": "string" },
+    "tokens_used": { "type": "integer", "minimum": 0, "default": 0 },
+    "cost_eur": { "type": "string", "default": "0.00" }
+  }
+}

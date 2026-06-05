@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-subscriptions",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo subscriptions (manifest declarativo + Web Components Stencil): planes recurrentes, suscripciones de cliente con ciclo de vida (trialing→active→cancelled/expired) y ciclos de facturación. La lógica de fechas/periodos y la generación batch de ciclos va a WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

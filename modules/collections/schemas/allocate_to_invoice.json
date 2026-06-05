@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "collections.collections.allocate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["collection_id", "invoice_ref", "amount_allocated"],
+  "properties": {
+    "collection_id": { "type": "string", "minLength": 1 },
+    "invoice_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "amount_allocated": { "type": "string", "minLength": 1, "description": "Decimal como string; debe ser > 0 y no superar el importe no asignado" }
+  }
+}

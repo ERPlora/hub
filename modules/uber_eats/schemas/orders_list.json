@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "uber_eats.orders.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "store_id": { "type": "string", "default": "" },
+    "status": {
+      "type": "string",
+      "enum": ["", "created", "accepted", "preparing", "ready", "delivered", "cancelled"],
+      "default": ""
+    }
+  }
+}

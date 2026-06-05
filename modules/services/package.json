@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-services",
+  "private": true,
+  "version": "1.1.7",
+  "type": "module",
+  "description": "Módulo services (manifest declarativo + Web Component Stencil): catálogo de servicios, categorías y paquetes. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

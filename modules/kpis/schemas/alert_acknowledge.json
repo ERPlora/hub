@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kpis.alerts.acknowledge",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["alert_id"],
+  "properties": {
+    "alert_id": { "type": "string", "minLength": 1 },
+    "notes": { "type": ["string", "null"], "default": null },
+    "acknowledged_by_ref": { "type": ["string", "null"], "default": null }
+  }
+}

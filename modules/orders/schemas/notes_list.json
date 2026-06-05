@@ -1,0 +1,6 @@
+{ "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "orders.notes.list params", "type": "object", "additionalProperties": false,
+  "required": ["order_id"],
+  "properties": {
+    "order_id": { "type": "string" }
+  } }

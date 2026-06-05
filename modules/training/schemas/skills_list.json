@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.skills.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "search": { "type": "string", "default": "", "maxLength": 100 },
+    "category": { "type": "string", "default": "", "maxLength": 100 }
+  }
+}

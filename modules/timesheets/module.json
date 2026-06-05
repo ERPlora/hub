@@ -1,0 +1,181 @@
+{
+  "id": "timesheets",
+  "name": "Timesheets",
+  "version": "2.0.6",
+  "agent": {
+    "description": "Manages employee time entries, hourly rates, and timesheet approvals: log time, approve periods, configure rates and module settings.",
+    "keywords": ["timesheets", "time entry", "hours", "approval", "rates", "attendance", "payroll"]
+  },
+  "depends_on": ["staff"],
+  "permissions": [
+    "timesheets.view_time_entry",
+    "timesheets.add_time_entry",
+    "timesheets.change_time_entry",
+    "timesheets.delete_time_entry",
+    "timesheets.approve_timesheet",
+    "timesheets.manage_rates",
+    "timesheets.view_reports",
+    "timesheets.view_settings",
+    "timesheets.change_settings"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": [
+      "timesheets.view_time_entry",
+      "timesheets.add_time_entry",
+      "timesheets.change_time_entry",
+      "timesheets.approve_timesheet",
+      "timesheets.manage_rates",
+      "timesheets.view_reports",
+      "timesheets.view_settings"
+    ],
+    "employee": [
+      "timesheets.view_time_entry",
+      "timesheets.add_time_entry",
+      "timesheets.change_time_entry"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "my_time",
+      "label": "My Time",
+      "icon": "time-outline",
+      "component": "erp-timesheets-entries"
+    },
+    {
+      "id": "approvals",
+      "label": "Approvals",
+      "icon": "checkmark-circle-outline",
+      "component": "erp-timesheets-approvals"
+    },
+    {
+      "id": "rates",
+      "label": "Rates",
+      "icon": "cash-outline",
+      "component": "erp-timesheets-rates"
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "settings-outline",
+      "component": "erp-timesheets-settings"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "timesheets.entries.list": {
+      "permission": "timesheets.view_time_entry",
+      "sql": "queries/entries_list.sql",
+      "ai": { "description": "Lists employee time entries with their hours and status." }
+    },
+    "timesheets.entries.get": {
+      "permission": "timesheets.view_time_entry",
+      "sql": "queries/entry_get.sql",
+      "ai": { "description": "Retrieves the full detail of a single time entry." }
+    },
+    "timesheets.rates.list": {
+      "permission": "timesheets.view_time_entry",
+      "sql": "queries/rates_list.sql",
+      "ai": { "description": "Lists the configured hourly rates used for time cost calculation." }
+    },
+    "timesheets.approvals.list": {
+      "permission": "timesheets.approve_timesheet",
+      "sql": "queries/approvals_list.sql",
+      "ai": { "description": "Lists time entries pending manager approval." }
+    },
+    "timesheets.settings.get": {
+      "permission": "timesheets.view_settings",
+      "sql": "queries/settings_get.sql",
+      "ai": { "description": "Retrieves the current configuration of the timesheets module." }
+    }
+  },
+  "commands": {
+    "timesheets.rates.create": {
+      "permission": "timesheets.manage_rates",
+      "transaction": true,
+      "sql": [
+        "commands/rate_create.sql"
+      ],
+      "schema": "schemas/rate_create.json",
+      "emit": [
+        "timesheets.rate.created"
+      ],
+      "ai": { "description": "Creates a new hourly rate for time cost calculation." }
+    },
+    "timesheets.entries.delete": {
+      "permission": "timesheets.delete_time_entry",
+      "transaction": true,
+      "sql": [
+        "commands/entry_delete.sql"
+      ],
+      "schema": "schemas/entry_delete.json",
+      "emit": [
+        "timesheets.entry.deleted"
+      ],
+      "ai": { "description": "Deletes an existing time entry (destructive)." }
+    },
+    "timesheets.settings.update": {
+      "permission": "timesheets.change_settings",
+      "transaction": true,
+      "sql": [
+        "commands/settings_update.sql"
+      ],
+      "schema": "schemas/settings_update.json",
+      "emit": [
+        "timesheets.settings.updated"
+      ],
+      "ai": { "description": "Updates the timesheets module configuration." }
+    },
+    "timesheets.entries.create": {
+      "permission": "timesheets.add_time_entry",
+      "schema": "schemas/entry_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_entry"
+      },
+      "emit": [
+        "timesheets.entry.created"
+      ],
+      "ai": { "description": "Records a new time entry for an employee." }
+    },
+    "timesheets.entries.update": {
+      "permission": "timesheets.change_time_entry",
+      "schema": "schemas/entry_update.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "update_entry"
+      },
+      "emit": [
+        "timesheets.entry.updated"
+      ],
+      "ai": { "description": "Updates the data of an existing time entry." }
+    },
+    "timesheets.approvals.approve": {
+      "permission": "timesheets.approve_timesheet",
+      "schema": "schemas/approval_approve.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "approve_timesheet"
+      },
+      "emit": [
+        "timesheets.period_approved"
+      ],
+      "ai": { "description": "Approves the timesheet for a given period and employee." }
+    }
+  },
+  "events": {
+    "listen": [
+      "staff.member_deactivated"
+    ]
+  },
+  "ui": {
+    "entry": "dist/timesheets.esm.js"
+  }
+}

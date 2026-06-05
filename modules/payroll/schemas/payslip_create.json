@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "payroll.payslips.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["employee_id", "employee_name", "period_start", "period_end", "gross_salary"],
+  "properties": {
+    "employee_id": { "type": "string", "minLength": 1 },
+    "employee_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "period_start": { "type": "string", "format": "date" },
+    "period_end": { "type": "string", "format": "date" },
+    "gross_salary": { "type": "number", "exclusiveMinimum": 0 },
+    "notes": { "type": "string", "default": "" }
+  }
+}

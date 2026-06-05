@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-kpis",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo kpis (manifest declarativo + Web Components Stencil): definición de KPIs con objetivos y umbrales, registro de valores por periodo y alertas cuando se cruzan umbrales. La clasificación de valores y los resúmenes/agregados van a un handler Rust→WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

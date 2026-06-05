@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-fiscal_italy",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo fiscal_italy (manifest declarativo + Web Components Stencil): cumplimiento fiscal italiano — FatturaPA (factura electrónica vía SdI) y Esterometro (transacciones transfronterizas). La lógica fiscal (auto-numeración, XML 1.2, transiciones SdI, agregación de declaraciones) va en un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

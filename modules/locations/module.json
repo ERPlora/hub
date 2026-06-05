@@ -1,0 +1,168 @@
+{
+  "id": "locations",
+  "name": "Locations",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages warehouse locations: create warehouses, zones, and bins; block or unblock bins; and track stock counts at specific bin positions.",
+    "keywords": ["warehouse", "location", "bin", "zone", "stock", "inventory", "storage", "count"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "locations.view_location",
+    "locations.manage_location",
+    "locations.count_stock"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "locations.view_location",
+      "locations.manage_location",
+      "locations.count_stock"
+    ],
+    "employee": [
+      "locations.view_location",
+      "locations.count_stock"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "zones",
+      "label": "Zones",
+      "icon": "location-outline",
+      "component": "erp-locations-zones"
+    },
+    {
+      "id": "bins",
+      "label": "Bins",
+      "icon": "location-outline",
+      "component": "erp-locations-bins"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "locations.warehouses.list": {
+      "permission": "locations.view_location",
+      "sql": "queries/warehouses_list.sql",
+      "schema": "schemas/warehouses_list.json",
+      "ai": { "description": "Lists the available warehouses" }
+    },
+    "locations.zones.list": {
+      "permission": "locations.view_location",
+      "sql": "queries/zones_list.sql",
+      "schema": "schemas/zones_list.json",
+      "ai": { "description": "Lists the zones within a warehouse" }
+    },
+    "locations.bins.list": {
+      "permission": "locations.view_location",
+      "sql": "queries/bins_list.sql",
+      "schema": "schemas/bins_list.json",
+      "ai": { "description": "Lists the bin locations within a zone or warehouse" }
+    },
+    "locations.stock.at_bin": {
+      "permission": "locations.view_location",
+      "sql": "queries/stock_at_bin.sql",
+      "schema": "schemas/stock_at_bin.json",
+      "ai": { "description": "Queries the available stock at a specific bin location" }
+    }
+  },
+  "commands": {
+    "locations.warehouses.create": {
+      "permission": "locations.manage_location",
+      "transaction": true,
+      "sql": [
+        "commands/warehouse_create.sql"
+      ],
+      "schema": "schemas/warehouse_create.json",
+      "emit": [
+        "locations.warehouse.created"
+      ],
+      "ai": { "description": "Creates a new warehouse" }
+    },
+    "locations.zones.create": {
+      "permission": "locations.manage_location",
+      "transaction": true,
+      "sql": [
+        "commands/zone_create.sql"
+      ],
+      "schema": "schemas/zone_create.json",
+      "emit": [
+        "locations.zone.created"
+      ],
+      "ai": { "description": "Creates a new zone within a warehouse" }
+    },
+    "locations.bins.create": {
+      "permission": "locations.manage_location",
+      "transaction": true,
+      "sql": [
+        "commands/bin_create.sql"
+      ],
+      "schema": "schemas/bin_create.json",
+      "emit": [
+        "locations.bin.created"
+      ],
+      "ai": { "description": "Creates a new bin location within a zone" }
+    },
+    "locations.bins.block": {
+      "permission": "locations.manage_location",
+      "transaction": true,
+      "sql": [
+        "commands/bin_block.sql"
+      ],
+      "schema": "schemas/bin_block.json",
+      "emit": [
+        "locations.bin.blocked"
+      ],
+      "ai": { "description": "Blocks a bin to prevent stock movements in or out" }
+    },
+    "locations.bins.unblock": {
+      "permission": "locations.manage_location",
+      "transaction": true,
+      "sql": [
+        "commands/bin_unblock.sql"
+      ],
+      "schema": "schemas/bin_unblock.json",
+      "emit": [
+        "locations.bin.unblocked"
+      ],
+      "ai": { "description": "Unblocks a previously blocked bin location" }
+    },
+    "locations.stock.update_position": {
+      "permission": "locations.count_stock",
+      "schema": "schemas/stock_update.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "update_stock_position"
+      },
+      "emit": [
+        "locations.stock.counted"
+      ],
+      "ai": { "description": "Updates the stock position of a product at a bin location" }
+    },
+    "locations.stock.count_bin": {
+      "permission": "locations.count_stock",
+      "schema": "schemas/count_bin.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "count_bin"
+      },
+      "emit": [
+        "locations.stock.counted"
+      ],
+      "ai": { "description": "Records the physical stock count at a bin location" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/locations.esm.js"
+  }
+}

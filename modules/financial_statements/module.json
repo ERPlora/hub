@@ -1,0 +1,160 @@
+{
+  "id": "financial_statements",
+  "name": "Financial Statements",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Generates and manages financial statements: balance sheets, profit & loss, cash flow reports, and exportable financial report templates.",
+    "keywords": ["financial statements", "balance sheet", "profit loss", "cash flow", "report", "export", "accounting"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "financial_statements.view_report",
+    "financial_statements.generate_report",
+    "financial_statements.export_report"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": [
+      "financial_statements.view_report",
+      "financial_statements.generate_report",
+      "financial_statements.export_report"
+    ],
+    "employee": ["financial_statements.view_report"]
+  },
+  "navigation": [
+    {
+      "id": "templates",
+      "label": "Templates",
+      "icon": "stats-chart-outline",
+      "component": "erp-financial-statements-templates"
+    },
+    {
+      "id": "reports",
+      "label": "Financial Reports",
+      "icon": "stats-chart-outline",
+      "component": "erp-financial-statements-reports"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "financial_statements.templates.list": {
+      "permission": "financial_statements.view_report",
+      "sql": "queries/templates_list.sql",
+      "schema": "schemas/templates_list.json",
+      "ai": { "description": "Lists available financial statement templates." }
+    },
+    "financial_statements.templates.get": {
+      "permission": "financial_statements.view_report",
+      "sql": "queries/template_get.sql",
+      "schema": "schemas/template_get.json",
+      "ai": { "description": "Retrieves the details of a financial statement template by its ID." }
+    },
+    "financial_statements.templates.lines": {
+      "permission": "financial_statements.view_report",
+      "sql": "queries/template_lines_list.sql",
+      "schema": "schemas/template_lines_list.json",
+      "ai": { "description": "Lists the line items of a financial statement template." }
+    },
+    "financial_statements.reports.list": {
+      "permission": "financial_statements.view_report",
+      "sql": "queries/reports_list.sql",
+      "schema": "schemas/reports_list.json",
+      "ai": { "description": "Lists generated financial reports." }
+    },
+    "financial_statements.reports.get": {
+      "permission": "financial_statements.view_report",
+      "sql": "queries/report_get.sql",
+      "schema": "schemas/report_get.json",
+      "ai": { "description": "Retrieves the details of a financial report by its ID." }
+    }
+  },
+  "commands": {
+    "financial_statements.templates.create": {
+      "permission": "financial_statements.generate_report",
+      "transaction": true,
+      "sql": ["commands/template_create.sql"],
+      "schema": "schemas/template_create.json",
+      "emit": ["financial_statements.template.created"],
+      "ai": { "description": "Creates a new financial statement template." }
+    },
+    "financial_statements.templates.add_line": {
+      "permission": "financial_statements.generate_report",
+      "transaction": true,
+      "sql": ["commands/line_item_add.sql"],
+      "schema": "schemas/line_item_add.json",
+      "emit": ["financial_statements.line_item.added"],
+      "ai": { "description": "Adds a line item to a financial statement template." }
+    },
+    "financial_statements.reports.finalize": {
+      "permission": "financial_statements.generate_report",
+      "transaction": true,
+      "sql": ["commands/report_finalize.sql"],
+      "schema": "schemas/report_finalize.json",
+      "emit": ["financial_statements.report.finalized"],
+      "ai": { "description": "Finalizes a financial report, marking it as closed and definitive." }
+    },
+    "financial_statements.reports.generate_balance_sheet": {
+      "permission": "financial_statements.generate_report",
+      "schema": "schemas/generate_balance_sheet.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "generate_balance_sheet"
+      },
+      "emit": ["financial_statements.report.generated"],
+      "ai": { "description": "Generates the balance sheet (assets, liabilities, and equity) for a given period." }
+    },
+    "financial_statements.reports.generate_profit_loss": {
+      "permission": "financial_statements.generate_report",
+      "schema": "schemas/generate_profit_loss.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "generate_profit_loss"
+      },
+      "emit": ["financial_statements.report.generated"],
+      "ai": { "description": "Generates the profit and loss statement for a given period." }
+    },
+    "financial_statements.reports.generate_cash_flow": {
+      "permission": "financial_statements.generate_report",
+      "schema": "schemas/generate_cash_flow.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "generate_cash_flow"
+      },
+      "emit": ["financial_statements.report.generated"],
+      "ai": { "description": "Generates the cash flow statement for a given period." }
+    },
+    "financial_statements.reports.export": {
+      "permission": "financial_statements.export_report",
+      "schema": "schemas/export_report.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "export_report"
+      },
+      "ai": { "description": "Exports a financial report in the requested format (PDF, Excel, etc.)." }
+    },
+    "financial_statements.reports.compare": {
+      "permission": "financial_statements.view_report",
+      "schema": "schemas/compare_reports.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "compare_reports"
+      },
+      "ai": { "description": "Compares two or more financial reports to analyse period-over-period variances." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/financial_statements.esm.js"
+  }
+}

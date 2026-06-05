@@ -1,9 +1,14 @@
 import { Component, State, h } from '@stencil/core';
+// Importa el DataTable compartido (Stencil) para que se auto-registre y esbuild
+// lo empaquete dentro del bundle del módulo. El shell provee los `ion-*`.
+import '../../../../_shared/ui/components/data-table/data-table';
+import type { DataTableColumn } from '../../../../_shared/ui/components/data-table/data-table';
 
 // WC del módulo `customers` (Stencil). Mini-app: lista de clientes + búsqueda +
 // alta rápida + lifecycle. ui.entry que el shell carga en runtime.
 // 90% de la lógica en Rust: este componente llama al SDK (erplora.query/command);
-// no toca BD ni valida permisos para seguridad (Rust revalida).
+// no toca BD ni valida permisos para seguridad (Rust revalida). El listado usa el
+// DataTable compartido + Ionic.
 
 interface ErploraClientLike {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
@@ -37,28 +42,27 @@ const STAGE_LABEL: Record<string, string> = {
     :host { display:block; font-family: system-ui, sans-serif; color: var(--ion-text-color,#1c1b18); }
     header { display:flex; gap:.5rem; align-items:center; margin-bottom:.75rem; }
     h2 { margin:0; font-size:1.15rem; flex:1; }
-    input { padding:.45rem .6rem; border:1px solid var(--ion-border-color,#e0ddd4); border-radius:8px; font-size:.9rem; }
-    button { padding:.45rem .8rem; border:0; border-radius:8px; background:#1496d6; color:#fff; font-size:.85rem; cursor:pointer; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    table { width:100%; border-collapse:collapse; font-size:.9rem; }
-    th { text-align:left; color:#8b897f; font-weight:600; padding:.5rem .6rem; border-bottom:1px solid #e7e2d6; }
-    td { padding:.55rem .6rem; border-bottom:1px solid #f1ede4; }
-    .muted { color:#8b897f; font-size:.85rem; }
-    .err { color:#d9480f; }
-    .badge { font-size:.72rem; padding:.1rem .5rem; border-radius:999px; background:#e4f1fb; color:#1496d6; }
-    .form { display:flex; gap:.4rem; flex-wrap:wrap; margin:.5rem 0 1rem; }
-    .form input { flex:1; min-width:7rem; }
+    .form { display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; margin:.5rem 0 1rem; }
+    .form ion-input { --background:var(--surface-2,#f7f4ec); border:1px solid var(--line,#e7e2d6); border-radius:8px; flex:1; min-width:8rem; }
+    .err { color:#d9480f; font-weight:600; }
   `,
 })
 export class ErpCustomersList {
   @State() customers: Customer[] = [];
   @State() loading = true;
   @State() error = '';
-  @State() search = '';
   @State() newName = '';
   @State() newEmail = '';
   @State() saving = false;
   private unsub?: () => void;
+
+  private columns: DataTableColumn[] = [
+    { key: 'name', header: 'Nombre' },
+    { key: 'email', header: 'Email' },
+    { key: 'phone', header: 'Teléfono' },
+    { key: 'lifecycle_stage', header: 'Etapa', format: (r) => STAGE_LABEL[r.lifecycle_stage as string] ?? (r.lifecycle_stage as string) },
+    { key: 'total_spent', header: 'Gastado', align: 'right', format: (r) => Number(r.total_spent || 0).toFixed(2) },
+  ];
 
   async componentWillLoad() {
     await this.refresh();
@@ -102,51 +106,36 @@ export class ErpCustomersList {
     }
   }
 
-  private get filtered(): Customer[] {
-    const q = this.search.trim().toLowerCase();
-    if (!q) return this.customers;
-    return this.customers.filter((c) =>
-      c.name.toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q));
-  }
-
   render() {
     return (
       <div>
         <header>
           <h2>Clientes</h2>
-          <input type="search" placeholder="Buscar nombre o email…" value={this.search}
-            onInput={(e) => (this.search = (e.target as HTMLInputElement).value)} />
         </header>
         <form class="form" onSubmit={(e) => this.create(e)}>
-          <input placeholder="Nombre" value={this.newName}
-            onInput={(e) => (this.newName = (e.target as HTMLInputElement).value)} />
-          <input placeholder="Email" type="email" value={this.newEmail}
-            onInput={(e) => (this.newEmail = (e.target as HTMLInputElement).value)} />
-          <button type="submit" disabled={this.saving || !this.newName}>
+          <ion-input
+            placeholder="Nombre"
+            value={this.newName}
+            onIonInput={(e: any) => (this.newName = e.target.value)}
+          />
+          <ion-input
+            type="email"
+            placeholder="Email"
+            value={this.newEmail}
+            onIonInput={(e: any) => (this.newEmail = e.target.value)}
+          />
+          <ion-button type="submit" size="small" disabled={this.saving || !this.newName}>
             {this.saving ? 'Guardando…' : 'Añadir'}
-          </button>
+          </ion-button>
         </form>
         {this.error && <p class="err">{this.error}</p>}
-        {this.loading ? (
-          <p class="muted">Cargando…</p>
-        ) : this.filtered.length === 0 ? (
-          <p class="muted">Sin clientes.</p>
-        ) : (
-          <table>
-            <thead><tr><th>Nombre</th><th>Email</th><th>Teléfono</th><th>Etapa</th><th>Gastado</th></tr></thead>
-            <tbody>
-              {this.filtered.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td>{c.email}</td>
-                  <td>{c.phone}</td>
-                  <td><span class="badge">{STAGE_LABEL[c.lifecycle_stage] ?? c.lifecycle_stage}</span></td>
-                  <td>{Number(c.total_spent || 0).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <data-table
+          columns={this.columns}
+          rows={this.customers as unknown as Record<string, unknown>[]}
+          searchKeys={['name', 'email']}
+          searchPlaceholder="Buscar nombre o email…"
+          emptyMessage={this.loading ? 'Cargando…' : 'Sin clientes.'}
+        />
       </div>
     );
   }

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "project_billing.invoices.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["", "draft", "sent", "paid", "cancelled"],
+      "default": ""
+    },
+    "contract_id": { "type": "string", "default": "" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+  }
+}

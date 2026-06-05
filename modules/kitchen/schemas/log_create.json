@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kitchen.logs.create",
+  "description": "Parámetros para registrar una acción de auditoría del KDS.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "order_id": { "type": "string", "minLength": 1 },
+    "action": {
+      "type": "string",
+      "enum": [
+        "received", "accepted", "started", "bumped", "completed",
+        "served", "recalled", "cancelled", "priority_changed", "item_bumped"
+      ]
+    },
+    "order_item_id": { "type": ["string", "null"] },
+    "station_id": { "type": ["string", "null"] },
+    "performed_by_id": { "type": ["string", "null"] },
+    "notes": { "type": "string", "default": "" }
+  },
+  "required": ["order_id", "action"]
+}

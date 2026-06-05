@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-ai_setup_wizard",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo ai_setup_wizard (manifest declarativo + Web Component Stencil): asistente conversacional de onboarding guiado por IA — sesiones, preguntas/respuestas y recomendaciones accionables (módulos, integraciones, workflows, config). La lógica no-CRUD (autonumeración de sesión, guardas de estado, aplicar recomendación → applied_modules) va a WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

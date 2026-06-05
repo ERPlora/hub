@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "glovo.stores.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "active_only": { "type": ["integer", "string"], "enum": [0, 1, ""], "default": 1 }
+  }
+}

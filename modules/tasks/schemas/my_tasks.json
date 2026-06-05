@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tasks.tasks.my",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assigned_to_ref"],
+  "properties": {
+    "assigned_to_ref": { "type": "string", "minLength": 1 },
+    "apply_horizon": { "type": "integer", "enum": [0, 1], "default": 1 },
+    "due_horizon": {
+      "type": ["string", "null"],
+      "description": "ISO datetime calculado por el SDK = ahora + due_within_days. Solo se usa si apply_horizon = 1.",
+      "default": null
+    }
+  }
+}

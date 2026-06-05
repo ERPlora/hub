@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "opportunities.opportunities.update_value_probability",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["opportunity_id"],
+  "anyOf": [
+    { "required": ["value"] },
+    { "required": ["probability"] }
+  ],
+  "properties": {
+    "opportunity_id": { "type": "string", "minLength": 1 },
+    "value": { "type": "string" },
+    "probability": { "type": "integer", "minimum": 0, "maximum": 100 }
+  }
+}

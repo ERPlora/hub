@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai_reports.templates.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "active_only": {
+      "type": "string",
+      "description": "'1' to return only active templates, '' for all.",
+      "default": "1"
+    }
+  }
+}

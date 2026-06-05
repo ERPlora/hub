@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-fixed_assets",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo fixed_assets (manifest declarativo + Web Components Stencil): registro de activos fijos, amortización periódica (lineal/decreciente/unidades) y bajas (venta/desguace/donación/pérdida). La lógica contable vive en WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

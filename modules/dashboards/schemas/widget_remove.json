@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dashboards.widgets.remove",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["widget_id"],
+  "properties": {
+    "widget_id": { "type": "string", "minLength": 1 }
+  }
+}

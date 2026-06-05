@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "expenses.expenses.reject",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expense_id", "reason"],
+  "properties": {
+    "expense_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 }
+  }
+}

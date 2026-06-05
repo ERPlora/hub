@@ -1,0 +1,171 @@
+{
+  "id": "subscriptions",
+  "name": "Subscriptions",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages subscription plans and customer subscriptions: create and list plans, subscribe customers, activate and cancel subscriptions, generate billing cycles, and process renewals.",
+    "keywords": ["subscription", "plan", "billing", "renewal", "cycle", "recurring"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "subscriptions.view_sub",
+    "subscriptions.manage_plan",
+    "subscriptions.manage_sub",
+    "subscriptions.cancel_sub"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "subscriptions.view_sub",
+      "subscriptions.manage_plan",
+      "subscriptions.manage_sub",
+      "subscriptions.cancel_sub"
+    ],
+    "employee": [
+      "subscriptions.view_sub"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "plans",
+      "label": "Plans",
+      "icon": "repeat-outline",
+      "component": "erp-subscriptions-plans"
+    },
+    {
+      "id": "subs",
+      "label": "Subscriptions",
+      "icon": "repeat-outline",
+      "component": "erp-subscriptions-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "subscriptions.plans.list": {
+      "permission": "subscriptions.view_sub",
+      "sql": "queries/plans_list.sql",
+      "schema": "schemas/plans_list.json",
+      "ai": { "description": "Lists the available subscription plans." }
+    },
+    "subscriptions.subscriptions.list": {
+      "permission": "subscriptions.view_sub",
+      "sql": "queries/subscriptions_list.sql",
+      "schema": "schemas/subscriptions_list.json",
+      "ai": { "description": "Lists all subscriptions with their current status." }
+    },
+    "subscriptions.subscriptions.get": {
+      "permission": "subscriptions.view_sub",
+      "sql": "queries/subscription_get.sql",
+      "schema": "schemas/subscription_get.json",
+      "ai": { "description": "Returns the details of a single subscription by its identifier." }
+    },
+    "subscriptions.cycles.list": {
+      "permission": "subscriptions.view_sub",
+      "sql": "queries/cycles_list.sql",
+      "schema": "schemas/cycles_list.json",
+      "ai": { "description": "Lists the billing cycles for subscriptions." }
+    }
+  },
+  "commands": {
+    "subscriptions.plans.create": {
+      "permission": "subscriptions.manage_plan",
+      "transaction": true,
+      "sql": [
+        "commands/plan_create.sql"
+      ],
+      "schema": "schemas/plan_create.json",
+      "emit": [
+        "subscriptions.plan.created"
+      ],
+      "ai": { "description": "Creates a new subscription plan with a price and billing period." }
+    },
+    "subscriptions.cycles.mark_paid": {
+      "permission": "subscriptions.manage_sub",
+      "transaction": true,
+      "sql": [
+        "commands/cycle_mark_paid.sql"
+      ],
+      "schema": "schemas/cycle_mark_paid.json",
+      "emit": [
+        "subscriptions.cycle.paid"
+      ],
+      "ai": { "description": "Marks a billing cycle as paid." }
+    },
+    "subscriptions.subscriptions.create": {
+      "permission": "subscriptions.manage_sub",
+      "schema": "schemas/subscription_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_subscription"
+      },
+      "emit": [
+        "subscriptions.subscription.created"
+      ],
+      "ai": { "description": "Creates a new subscription for a customer on a given plan." }
+    },
+    "subscriptions.subscriptions.activate": {
+      "permission": "subscriptions.manage_sub",
+      "schema": "schemas/subscription_activate.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "activate_subscription"
+      },
+      "emit": [
+        "subscriptions.subscription.activated"
+      ],
+      "ai": { "description": "Activates a pending or suspended subscription." }
+    },
+    "subscriptions.subscriptions.cancel": {
+      "permission": "subscriptions.cancel_sub",
+      "schema": "schemas/subscription_cancel.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "cancel_subscription"
+      },
+      "emit": [
+        "subscriptions.subscription.cancelled"
+      ],
+      "ai": { "description": "Cancels an active customer subscription (destructive)." }
+    },
+    "subscriptions.cycles.generate": {
+      "permission": "subscriptions.manage_sub",
+      "schema": "schemas/cycle_generate.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "generate_billing_cycle"
+      },
+      "emit": [
+        "subscriptions.cycle.generated"
+      ],
+      "ai": { "description": "Generates the next billing cycle for a subscription." }
+    },
+    "subscriptions.subscriptions.process_renewals": {
+      "permission": "subscriptions.manage_sub",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "process_renewals"
+      },
+      "emit": [
+        "subscriptions.renewals.processed"
+      ],
+      "ai": { "description": "Processes automatic renewals for all due subscriptions." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/subscriptions.esm.js"
+  }
+}

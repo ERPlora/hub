@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "communications.threads.set_status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "status", "folder"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["open", "snoozed", "closed", "archived", "spam"] },
+    "folder": { "type": "string", "enum": ["inbox", "sent", "drafts", "archive", "spam", "trash"] }
+  }
+}

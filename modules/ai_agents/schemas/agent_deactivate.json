@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai_agents.agents.deactivate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id"],
+  "properties": {
+    "agent_id": { "type": "string", "minLength": 1 }
+  }
+}

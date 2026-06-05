@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reports.reports.get",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_id"],
+  "properties": {
+    "report_id": { "type": "string", "minLength": 1 }
+  }
+}

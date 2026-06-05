@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "stock_sync.conflicts.resolve",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["conflict_id"],
+  "properties": {
+    "conflict_id": { "type": "string", "minLength": 1 },
+    "strategy": {
+      "type": "string",
+      "enum": ["use_source", "use_target", "manual", "ignore"],
+      "default": "use_source"
+    }
+  }
+}

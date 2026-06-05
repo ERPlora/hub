@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-bank_reconciliation",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo bank_reconciliation (manifest declarativo + Web Components Stencil): extractos bancarios, líneas/movimientos y conciliación (manual y auto por importe+fecha) contra apuntes contables. Lógica de auto-match/cierre/resumen en handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

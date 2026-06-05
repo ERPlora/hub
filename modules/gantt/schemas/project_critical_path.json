@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gantt.projects.critical_path",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id"],
+  "properties": {
+    "project_id": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-sepa_remittances",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo sepa_remittances (manifest declarativo + Web Components Stencil): remesas SEPA en bloque (adeudos directos / transferencias), gestión de mandatos y generación de XML pain.008 / pain.001. La lógica de batch, totales, contador atómico y XML vive en un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

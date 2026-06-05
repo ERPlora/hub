@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "time_control.workplaces.update",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workplace_id"],
+  "properties": {
+    "workplace_id": { "type": "string", "minLength": 1 },
+    "name": { "type": ["string", "null"], "maxLength": 255, "default": null },
+    "address": { "type": ["string", "null"], "maxLength": 1000, "default": null },
+    "latitude": { "type": ["number", "null"], "minimum": -90, "maximum": 90, "default": null },
+    "longitude": { "type": ["number", "null"], "minimum": -180, "maximum": 180, "default": null },
+    "radius_meters": { "type": ["integer", "null"], "minimum": 10, "maximum": 10000, "default": null },
+    "is_active": { "type": ["boolean", "null"], "default": null },
+    "is_default": { "type": ["boolean", "null"], "default": null }
+  }
+}

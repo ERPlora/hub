@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai_predictions.models.deactivate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["model_id"],
+  "properties": {
+    "model_id": { "type": "string", "minLength": 1 }
+  }
+}

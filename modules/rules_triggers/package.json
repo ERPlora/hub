@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-rules_triggers",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo rules_triggers (manifest declarativo + Web Components Stencil): motor de reglas de negocio condición→acción con triggers por evento y auditoría de evaluaciones. El CRUD plano es SQL Tier 0; el motor de evaluación, validación de reglas y stats van a WASM (ver WASM-TODO.md). Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

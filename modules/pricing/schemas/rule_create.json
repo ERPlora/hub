@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pricing.rules.create payload",
+  "type": "object",
+  "properties": {
+    "code": { "type": "string", "minLength": 1, "maxLength": 50 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "rule_type": {
+      "type": "string",
+      "enum": ["percent", "fixed", "buy_x_get_y", "tiered"]
+    },
+    "value": { "type": ["string", "number"] },
+    "min_amount": { "type": ["string", "number", "null"], "default": null },
+    "max_amount": { "type": ["string", "number", "null"], "default": null },
+    "applies_to": {
+      "type": "string",
+      "enum": ["all", "customer_segment", "product_category"],
+      "default": "all"
+    },
+    "conditions": {
+      "type": "string",
+      "description": "Documento JSON serializado (tiers, buy/get, segment…).",
+      "default": "{}"
+    },
+    "valid_from": { "type": ["string", "null"], "format": "date", "default": null },
+    "valid_until": { "type": ["string", "null"], "format": "date", "default": null },
+    "priority": { "type": "integer", "default": 100 }
+  },
+  "required": ["code", "name", "rule_type", "value"],
+  "additionalProperties": false
+}

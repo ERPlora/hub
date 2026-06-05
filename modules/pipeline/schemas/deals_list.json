@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pipeline.deals.list params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "pipeline_id": { "type": "string", "description": "'' = sin filtro.", "default": "" },
+    "stage_id": { "type": "string", "description": "'' = sin filtro.", "default": "" },
+    "status": {
+      "type": "string",
+      "description": "Filtro por estado; '' = todos.",
+      "enum": ["", "open", "won", "lost"],
+      "default": "open"
+    },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 }
+  }
+}

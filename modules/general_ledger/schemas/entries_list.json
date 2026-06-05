@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "general_ledger.entries.list params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "description": "Filtro opcional por estado; '' = todos.",
+      "enum": ["", "draft", "posted", "reversed"],
+      "default": "posted"
+    },
+    "period_id": {
+      "type": "string",
+      "description": "Filtro opcional por periodo; '' = todos.",
+      "default": ""
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 100
+    }
+  }
+}

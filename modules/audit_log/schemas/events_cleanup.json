@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "audit_log.events.cleanup",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "category": { "type": "string", "default": "" },
+    "older_than_days": { "type": "integer", "minimum": 0, "default": 365 }
+  }
+}

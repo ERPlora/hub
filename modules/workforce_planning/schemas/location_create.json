@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "workforce_planning.locations.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "address": { "type": ["string", "null"], "default": null },
+    "phone": { "type": ["string", "null"], "maxLength": 50, "default": null },
+    "email": { "type": ["string", "null"], "maxLength": 254, "default": null },
+    "manager_employee_id": { "type": ["string", "null"], "default": null },
+    "timezone": { "type": "string", "maxLength": 50, "default": "Europe/Madrid" },
+    "color": { "type": "string", "maxLength": 7, "default": "#3b82f6" },
+    "sort_order": { "type": "integer", "default": 0 }
+  }
+}

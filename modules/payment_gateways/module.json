@@ -1,0 +1,165 @@
+{
+  "id": "payment_gateways",
+  "name": "Payment Gateways",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages payment gateway integrations: configure gateways, initiate and track transactions, process refunds, and report on payment outcomes.",
+    "keywords": ["payment", "gateway", "transaction", "refund", "stripe", "checkout", "card"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "payment_gateways.view_pg",
+    "payment_gateways.manage_pg",
+    "payment_gateways.process_payment"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": [
+      "payment_gateways.view_pg",
+      "payment_gateways.manage_pg",
+      "payment_gateways.process_payment"
+    ],
+    "employee": [
+      "payment_gateways.view_pg"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "gateways",
+      "label": "Gateways",
+      "icon": "card",
+      "component": "erp-payment-gateways-gateways"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "payment_gateways.gateways.list": {
+      "permission": "payment_gateways.view_pg",
+      "sql": "queries/gateways_list.sql",
+      "ai": { "description": "Lists all configured payment gateways in the system." }
+    },
+    "payment_gateways.transactions.list": {
+      "permission": "payment_gateways.view_pg",
+      "sql": "queries/transactions_list.sql",
+      "schema": "schemas/transactions_list.json",
+      "ai": { "description": "Lists transactions processed through the payment gateways." }
+    },
+    "payment_gateways.transactions.get": {
+      "permission": "payment_gateways.view_pg",
+      "sql": "queries/transaction_get.sql",
+      "schema": "schemas/transaction_id.json",
+      "ai": { "description": "Retrieves the full details of a single payment transaction by its ID." }
+    },
+    "payment_gateways.transactions.refunds": {
+      "permission": "payment_gateways.view_pg",
+      "sql": "queries/refunds_for_transaction.sql",
+      "schema": "schemas/transaction_id.json",
+      "ai": { "description": "Lists all refunds associated with a specific payment transaction." }
+    }
+  },
+  "commands": {
+    "payment_gateways.gateways.create": {
+      "permission": "payment_gateways.manage_pg",
+      "transaction": true,
+      "sql": [
+        "commands/gateway_create.sql"
+      ],
+      "schema": "schemas/gateway_create.json",
+      "emit": [
+        "payment_gateways.gateway.created"
+      ],
+      "ai": { "description": "Creates and registers a new payment gateway with its configuration." }
+    },
+    "payment_gateways.gateways.update_config": {
+      "permission": "payment_gateways.manage_pg",
+      "transaction": true,
+      "sql": [
+        "commands/gateway_update_config.sql"
+      ],
+      "schema": "schemas/gateway_update_config.json",
+      "ai": { "description": "Updates the credentials and parameters of an existing payment gateway." }
+    },
+    "payment_gateways.gateways.deactivate": {
+      "permission": "payment_gateways.manage_pg",
+      "transaction": true,
+      "sql": [
+        "commands/gateway_deactivate.sql"
+      ],
+      "schema": "schemas/gateway_id.json",
+      "ai": { "description": "Deactivates a payment gateway without deleting it from the system." }
+    },
+    "payment_gateways.gateways.delete": {
+      "permission": "payment_gateways.manage_pg",
+      "transaction": true,
+      "sql": [
+        "commands/gateway_delete.sql"
+      ],
+      "schema": "schemas/gateway_id.json",
+      "ai": { "description": "Permanently deletes a payment gateway from the system (destructive)." }
+    },
+    "payment_gateways.transactions.initiate": {
+      "permission": "payment_gateways.process_payment",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "initiate_payment"
+      },
+      "emit": [
+        "payment_gateways.transaction.initiated"
+      ],
+      "ai": { "description": "Initiates a new payment transaction through the selected gateway." }
+    },
+    "payment_gateways.transactions.mark_succeeded": {
+      "permission": "payment_gateways.process_payment",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "mark_succeeded"
+      },
+      "emit": [
+        "payment_gateways.transaction.succeeded"
+      ],
+      "ai": { "description": "Marks a payment transaction as succeeded and updates its status." }
+    },
+    "payment_gateways.transactions.mark_failed": {
+      "permission": "payment_gateways.process_payment",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "mark_failed"
+      },
+      "emit": [
+        "payment_gateways.transaction.failed"
+      ],
+      "ai": { "description": "Marks a payment transaction as failed, recording the error reason." }
+    },
+    "payment_gateways.transactions.refund": {
+      "permission": "payment_gateways.process_payment",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "refund_transaction"
+      },
+      "emit": [
+        "payment_gateways.transaction.refunded"
+      ],
+      "ai": { "description": "Processes a full or partial refund for a payment transaction." }
+    },
+    "payment_gateways.transactions.summary": {
+      "permission": "payment_gateways.view_pg",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "transactions_summary"
+      },
+      "ai": { "description": "Generates an aggregated summary of transactions by gateway, status, and amount." }
+    }
+  },
+  "ui": {
+    "entry": "dist/payment_gateways.esm.js"
+  }
+}

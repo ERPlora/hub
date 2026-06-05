@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_france.facturx.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["", "draft", "generated", "submitted", "validated"],
+      "default": ""
+    },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 }
+  }
+}

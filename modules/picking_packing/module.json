@@ -1,0 +1,198 @@
+{
+  "id": "picking_packing",
+  "name": "Picking & Packing",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages warehouse picking and packing operations: create and track pick orders, record picked quantities, pack items into packages, and ship or mark deliveries.",
+    "keywords": ["picking", "packing", "warehouse", "fulfillment", "shipment", "delivery", "pick order", "package"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "picking_packing.view_pick",
+    "picking_packing.manage_pick",
+    "picking_packing.manage_pack"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "picking_packing.view_pick",
+      "picking_packing.manage_pick",
+      "picking_packing.manage_pack"
+    ],
+    "employee": [
+      "picking_packing.view_pick",
+      "picking_packing.manage_pick",
+      "picking_packing.manage_pack"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "pick",
+      "label": "Pick Lists",
+      "icon": "cube-outline",
+      "component": "erp-picking-packing-picks"
+    },
+    {
+      "id": "pack",
+      "label": "Packages",
+      "icon": "cube-outline",
+      "component": "erp-picking-packing-packages"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "picking_packing.picks.list": {
+      "permission": "picking_packing.view_pick",
+      "sql": "queries/picks_list.sql",
+      "schema": "schemas/picks_list.json",
+      "ai": { "description": "Lists picking orders with their current status." }
+    },
+    "picking_packing.picks.get": {
+      "permission": "picking_packing.view_pick",
+      "sql": "queries/pick_get.sql",
+      "schema": "schemas/pick_get.json",
+      "ai": { "description": "Retrieves the full detail of a specific picking order." }
+    },
+    "picking_packing.picks.lines": {
+      "permission": "picking_packing.view_pick",
+      "sql": "queries/pick_lines.sql",
+      "schema": "schemas/pick_lines.json",
+      "ai": { "description": "Lists the product lines of a picking order with quantities to pick." }
+    },
+    "picking_packing.packages.list": {
+      "permission": "picking_packing.view_pick",
+      "sql": "queries/packages_list.sql",
+      "schema": "schemas/packages_list.json",
+      "ai": { "description": "Lists created packages with their shipping status." }
+    }
+  },
+  "commands": {
+    "picking_packing.picks.create": {
+      "permission": "picking_packing.manage_pick",
+      "schema": "schemas/pick_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_pick"
+      },
+      "emit": [
+        "picking_packing.pick.created"
+      ],
+      "ai": { "description": "Creates a new picking order from a sales order or stock transfer." }
+    },
+    "picking_packing.picks.start": {
+      "permission": "picking_packing.manage_pick",
+      "transaction": true,
+      "sql": [
+        "commands/pick_start.sql"
+      ],
+      "schema": "schemas/pick_start.json",
+      "emit": [
+        "picking_packing.pick.started"
+      ],
+      "ai": { "description": "Starts the picking process by marking the order as in progress." }
+    },
+    "picking_packing.picks.record_line": {
+      "permission": "picking_packing.manage_pick",
+      "schema": "schemas/pick_record_line.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "record_pick_line"
+      },
+      "emit": [
+        "picking_packing.pick.line_recorded"
+      ],
+      "ai": { "description": "Records the picked quantity for a product line in a picking order." }
+    },
+    "picking_packing.picks.complete": {
+      "permission": "picking_packing.manage_pick",
+      "schema": "schemas/pick_complete.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "complete_pick"
+      },
+      "emit": [
+        "picking_packing.pick.completed"
+      ],
+      "ai": { "description": "Completes a picking order and updates the corresponding stock levels." }
+    },
+    "picking_packing.picks.cancel": {
+      "permission": "picking_packing.manage_pick",
+      "schema": "schemas/pick_cancel.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "cancel_pick"
+      },
+      "emit": [
+        "picking_packing.pick.cancelled"
+      ],
+      "ai": { "description": "Cancels a pending or in-progress picking order (destructive)." }
+    },
+    "picking_packing.packages.create": {
+      "permission": "picking_packing.manage_pack",
+      "schema": "schemas/package_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_package"
+      },
+      "emit": [
+        "picking_packing.package.created"
+      ],
+      "ai": { "description": "Creates a new physical package by associating picked product lines." }
+    },
+    "picking_packing.packages.seal": {
+      "permission": "picking_packing.manage_pack",
+      "schema": "schemas/package_seal.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "seal_package"
+      },
+      "emit": [
+        "picking_packing.package.sealed"
+      ],
+      "ai": { "description": "Seals a package indicating it is ready for shipment." }
+    },
+    "picking_packing.packages.ship": {
+      "permission": "picking_packing.manage_pack",
+      "schema": "schemas/package_ship.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "ship_package"
+      },
+      "emit": [
+        "picking_packing.package.shipped"
+      ],
+      "ai": { "description": "Records the shipment of a sealed package to the carrier." }
+    },
+    "picking_packing.packages.mark_delivered": {
+      "permission": "picking_packing.manage_pack",
+      "transaction": true,
+      "sql": [
+        "commands/package_mark_delivered.sql"
+      ],
+      "schema": "schemas/package_mark_delivered.json",
+      "emit": [
+        "picking_packing.package.delivered"
+      ],
+      "ai": { "description": "Marks a package as delivered to the final recipient." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/picking_packing.esm.js"
+  }
+}

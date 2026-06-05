@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "messaging.messages.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "channel": {
+      "type": "string",
+      "enum": ["", "whatsapp", "sms", "email"],
+      "default": ""
+    },
+    "status": {
+      "type": "string",
+      "enum": ["", "queued", "sent", "delivered", "failed", "read"],
+      "default": ""
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200,
+      "default": 20
+    }
+  }
+}

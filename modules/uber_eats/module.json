@@ -1,0 +1,228 @@
+{
+  "id": "uber_eats",
+  "name": "Uber Eats",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Integrates with the Uber Eats platform: manage linked restaurants, import and update delivery orders, sync menus, and process webhook events.",
+    "keywords": ["uber eats", "delivery", "orders", "restaurant", "menu", "sync", "food delivery"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "uber_eats.view_ue",
+    "uber_eats.manage_ue",
+    "uber_eats.sync_ue"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "uber_eats.view_ue",
+      "uber_eats.manage_ue",
+      "uber_eats.sync_ue"
+    ],
+    "employee": [
+      "uber_eats.view_ue"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "restaurants",
+      "label": "Restaurants",
+      "icon": "fast-food-outline",
+      "component": "erp-uber-eats-restaurants"
+    },
+    {
+      "id": "orders",
+      "label": "Orders",
+      "icon": "fast-food-outline",
+      "component": "erp-uber-eats-orders"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "uber_eats.stores.list": {
+      "permission": "uber_eats.view_ue",
+      "sql": "queries/stores_list.sql",
+      "schema": "schemas/stores_list.json",
+      "ai": { "description": "Lists the restaurants/stores linked to the Uber Eats integration." }
+    },
+    "uber_eats.orders.list": {
+      "permission": "uber_eats.view_ue",
+      "sql": "queries/orders_list.sql",
+      "schema": "schemas/orders_list.json",
+      "ai": { "description": "Lists orders received from Uber Eats." }
+    },
+    "uber_eats.orders.get": {
+      "permission": "uber_eats.view_ue",
+      "sql": "queries/order_get.sql",
+      "schema": "schemas/order_get.json",
+      "ai": { "description": "Retrieves the full detail of a single Uber Eats order." }
+    },
+    "uber_eats.menus.list": {
+      "permission": "uber_eats.view_ue",
+      "sql": "queries/menus_list.sql",
+      "schema": "schemas/menus_list.json",
+      "ai": { "description": "Lists menus synchronized with Uber Eats." }
+    },
+    "uber_eats.events.list": {
+      "permission": "uber_eats.view_ue",
+      "sql": "queries/events_list.sql",
+      "schema": "schemas/events_list.json",
+      "ai": { "description": "Lists webhook events received from the Uber Eats platform." }
+    }
+  },
+  "commands": {
+    "uber_eats.stores.create": {
+      "permission": "uber_eats.manage_ue",
+      "transaction": true,
+      "sql": [
+        "commands/store_create.sql"
+      ],
+      "schema": "schemas/store_create.json",
+      "emit": [
+        "uber_eats.store.created"
+      ],
+      "ai": { "description": "Creates and links a new restaurant/store in the Uber Eats integration." }
+    },
+    "uber_eats.stores.update_status": {
+      "permission": "uber_eats.sync_ue",
+      "transaction": true,
+      "sql": [
+        "commands/store_update_status.sql"
+      ],
+      "schema": "schemas/store_update_status.json",
+      "emit": [
+        "uber_eats.store.status_changed"
+      ],
+      "ai": { "description": "Updates the operational status of a restaurant on Uber Eats." }
+    },
+    "uber_eats.orders.import": {
+      "permission": "uber_eats.sync_ue",
+      "schema": "schemas/order_import.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "import_order"
+      },
+      "emit": [
+        "uber_eats.order.imported"
+      ],
+      "ai": { "description": "Imports an incoming Uber Eats order into the system." }
+    },
+    "uber_eats.orders.update_status": {
+      "permission": "uber_eats.sync_ue",
+      "schema": "schemas/order_update_status.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "update_order_status"
+      },
+      "emit": [
+        "uber_eats.order.status_changed"
+      ],
+      "ai": { "description": "Updates the status of an Uber Eats order." }
+    },
+    "uber_eats.orders.cancel": {
+      "permission": "uber_eats.sync_ue",
+      "schema": "schemas/order_cancel.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "cancel_order"
+      },
+      "emit": [
+        "uber_eats.order.cancelled"
+      ],
+      "ai": { "description": "Cancels an Uber Eats order (destructive)." }
+    },
+    "uber_eats.menus.sync": {
+      "permission": "uber_eats.sync_ue",
+      "schema": "schemas/menu_sync.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "sync_menu"
+      },
+      "emit": [
+        "uber_eats.menu.synced"
+      ],
+      "ai": { "description": "Synchronizes the restaurant menu with the Uber Eats platform." }
+    },
+    "uber_eats.events.record": {
+      "permission": "uber_eats.sync_ue",
+      "schema": "schemas/event_record.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "record_event"
+      },
+      "emit": [
+        "uber_eats.event.recorded"
+      ],
+      "ai": { "description": "Records an Uber Eats webhook event for processing." }
+    },
+    "uber_eats.events.mark_processed": {
+      "permission": "uber_eats.sync_ue",
+      "transaction": true,
+      "sql": [
+        "commands/event_mark_processed.sql"
+      ],
+      "schema": "schemas/event_mark_processed.json",
+      "emit": [
+        "uber_eats.event.processed"
+      ],
+      "ai": { "description": "Marks an Uber Eats webhook event as processed." }
+    },
+    "uber_eats.stores.summary": {
+      "permission": "uber_eats.view_ue",
+      "schema": "schemas/store_summary.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "store_summary"
+      },
+      "ai": { "description": "Returns a performance summary for a restaurant on Uber Eats." }
+    },
+    "uber_eats._insert_order": {
+      "permission": "uber_eats.sync_ue",
+      "sql": [
+        "commands/_insert_order.sql"
+      ]
+    },
+    "uber_eats._set_order_status": {
+      "permission": "uber_eats.sync_ue",
+      "sql": [
+        "commands/_set_order_status.sql"
+      ]
+    },
+    "uber_eats._insert_menu": {
+      "permission": "uber_eats.sync_ue",
+      "sql": [
+        "commands/_insert_menu.sql"
+      ]
+    },
+    "uber_eats._update_menu": {
+      "permission": "uber_eats.sync_ue",
+      "sql": [
+        "commands/_update_menu.sql"
+      ]
+    },
+    "uber_eats._insert_event": {
+      "permission": "uber_eats.sync_ue",
+      "sql": [
+        "commands/_insert_event.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": {}
+  },
+  "ui": {
+    "entry": "dist/uber_eats.esm.js"
+  }
+}

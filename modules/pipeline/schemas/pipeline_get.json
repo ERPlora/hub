@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pipeline.pipelines.get params",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pipeline_id"],
+  "properties": {
+    "pipeline_id": { "type": "string", "minLength": 1 }
+  }
+}

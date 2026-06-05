@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_portugal.saft.submit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["saft_id"],
+  "properties": {
+    "saft_id": { "type": "string", "minLength": 1 }
+  }
+}

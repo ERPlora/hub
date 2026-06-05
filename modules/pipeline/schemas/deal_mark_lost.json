@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pipeline.deals.mark_lost",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deal_id", "reason"],
+  "properties": {
+    "deal_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+  }
+}

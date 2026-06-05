@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "email_marketing.campaigns.schedule",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["campaign_id", "scheduled_for"],
+  "properties": {
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "scheduled_for": { "type": "string", "format": "date-time", "minLength": 1 }
+  }
+}

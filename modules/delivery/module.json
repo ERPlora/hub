@@ -1,0 +1,195 @@
+{
+  "id": "delivery",
+  "name": "Delivery",
+  "version": "3.0.4",
+  "agent": {
+    "description": "Manages delivery orders, zones, and drivers: create and track deliveries, assign drivers, configure delivery zones, and update order status.",
+    "keywords": ["delivery", "order", "driver", "zone", "dispatch", "shipping", "logistics"]
+  },
+  "depends_on": ["sales", "customers"],
+  "permissions": [
+    "delivery.view_delivery_order",
+    "delivery.add_delivery_order",
+    "delivery.change_delivery_order",
+    "delivery.delete_delivery_order",
+    "delivery.manage_zones",
+    "delivery.manage_drivers",
+    "delivery.view_settings",
+    "delivery.change_settings"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": [
+      "delivery.view_delivery_order",
+      "delivery.add_delivery_order",
+      "delivery.change_delivery_order",
+      "delivery.delete_delivery_order",
+      "delivery.manage_zones",
+      "delivery.manage_drivers",
+      "delivery.view_settings"
+    ],
+    "employee": [
+      "delivery.view_delivery_order",
+      "delivery.add_delivery_order",
+      "delivery.change_delivery_order"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "orders",
+      "label": "Orders",
+      "icon": "bicycle-outline",
+      "component": "erp-delivery-orders"
+    },
+    {
+      "id": "zones",
+      "label": "Zones",
+      "icon": "map-outline",
+      "component": "erp-delivery-zones"
+    },
+    {
+      "id": "drivers",
+      "label": "Drivers",
+      "icon": "person-outline",
+      "component": "erp-delivery-drivers"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "delivery.zones.list": {
+      "permission": "delivery.view_delivery_order",
+      "sql": "queries/zones_list.sql",
+      "ai": { "description": "Lists the configured delivery zones" }
+    },
+    "delivery.zones.get": {
+      "permission": "delivery.view_delivery_order",
+      "sql": "queries/zone_get.sql",
+      "ai": { "description": "Retrieves the details of a delivery zone by its identifier" }
+    },
+    "delivery.drivers.list": {
+      "permission": "delivery.view_delivery_order",
+      "sql": "queries/drivers_list.sql",
+      "ai": { "description": "Lists available delivery drivers" }
+    },
+    "delivery.drivers.get": {
+      "permission": "delivery.view_delivery_order",
+      "sql": "queries/driver_get.sql",
+      "ai": { "description": "Retrieves a driver's details by their identifier" }
+    },
+    "delivery.orders.list": {
+      "permission": "delivery.view_delivery_order",
+      "sql": "queries/orders_list.sql",
+      "ai": { "description": "Lists delivery orders with their current status" }
+    },
+    "delivery.orders.get": {
+      "permission": "delivery.view_delivery_order",
+      "sql": "queries/order_get.sql",
+      "ai": { "description": "Retrieves the details of a delivery order by its identifier" }
+    },
+    "delivery.orders.items": {
+      "permission": "delivery.view_delivery_order",
+      "sql": "queries/order_items.sql",
+      "ai": { "description": "Lists the product lines of a delivery order" }
+    }
+  },
+  "commands": {
+    "delivery.zones.create": {
+      "permission": "delivery.manage_zones",
+      "transaction": true,
+      "sql": ["commands/zone_create.sql"],
+      "schema": "schemas/zone_create.json",
+      "emit": ["delivery.zone.created"],
+      "ai": { "description": "Creates a new delivery zone" }
+    },
+    "delivery.zones.update": {
+      "permission": "delivery.manage_zones",
+      "transaction": true,
+      "sql": ["commands/zone_update.sql"],
+      "schema": "schemas/zone_update.json",
+      "emit": ["delivery.zone.updated"],
+      "ai": { "description": "Updates an existing delivery zone's data" }
+    },
+    "delivery.zones.delete": {
+      "permission": "delivery.manage_zones",
+      "transaction": true,
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "delete_zone"
+      },
+      "schema": "schemas/zone_delete.json",
+      "emit": ["delivery.zone.deleted"],
+      "ai": { "description": "Deletes a delivery zone (destructive)" }
+    },
+    "delivery.drivers.create": {
+      "permission": "delivery.manage_drivers",
+      "transaction": true,
+      "sql": ["commands/driver_create.sql"],
+      "schema": "schemas/driver_create.json",
+      "emit": ["delivery.driver.created"],
+      "ai": { "description": "Registers a new delivery driver" }
+    },
+    "delivery.drivers.update": {
+      "permission": "delivery.manage_drivers",
+      "transaction": true,
+      "sql": ["commands/driver_update.sql"],
+      "schema": "schemas/driver_update.json",
+      "emit": ["delivery.driver.updated"],
+      "ai": { "description": "Updates an existing driver's data" }
+    },
+    "delivery.drivers.delete": {
+      "permission": "delivery.manage_drivers",
+      "transaction": true,
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "delete_driver"
+      },
+      "schema": "schemas/driver_delete.json",
+      "emit": ["delivery.driver.deleted"],
+      "ai": { "description": "Deletes a delivery driver (destructive)" }
+    },
+    "delivery.orders.create": {
+      "permission": "delivery.add_delivery_order",
+      "transaction": true,
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_order"
+      },
+      "schema": "schemas/order_create.json",
+      "emit": ["delivery.order.created"],
+      "ai": { "description": "Creates a new delivery order" }
+    },
+    "delivery.orders.update": {
+      "permission": "delivery.change_delivery_order",
+      "transaction": true,
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "update_order"
+      },
+      "schema": "schemas/order_update.json",
+      "emit": ["delivery.order.updated", "delivery.order_completed"],
+      "ai": { "description": "Updates the status or data of a delivery order" }
+    },
+    "delivery.orders.delete": {
+      "permission": "delivery.delete_delivery_order",
+      "transaction": true,
+      "sql": ["commands/order_delete.sql"],
+      "schema": "schemas/order_delete.json",
+      "emit": ["delivery.order.deleted"],
+      "ai": { "description": "Deletes a delivery order (destructive)" }
+    }
+  },
+  "events": {
+    "listen": ["delivery.order_completed"]
+  },
+  "ui": {
+    "entry": "dist/delivery.esm.js"
+  }
+}

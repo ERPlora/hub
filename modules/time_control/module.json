@@ -1,0 +1,178 @@
+{
+  "id": "time_control",
+  "name": "Time Control",
+  "version": "2.0.8",
+  "agent": {
+    "description": "Manages employee time tracking: clock in/out, view attendance records, generate daily work summaries, manage workplaces, and configure time control settings.",
+    "keywords": ["clock", "attendance", "time tracking", "workplace", "schedule", "hours", "employee"]
+  },
+  "depends_on": ["staff"],
+  "permissions": [
+    "time_control.view_clock_record",
+    "time_control.add_clock_record",
+    "time_control.view_reports",
+    "time_control.export_reports",
+    "time_control.manage_workplaces",
+    "time_control.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": [
+      "time_control.view_clock_record",
+      "time_control.add_clock_record",
+      "time_control.view_reports",
+      "time_control.export_reports",
+      "time_control.manage_workplaces"
+    ],
+    "employee": [
+      "time_control.view_clock_record",
+      "time_control.add_clock_record"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "records",
+      "label": "Records",
+      "icon": "time-outline",
+      "component": "erp-time-control-records"
+    },
+    {
+      "id": "workplaces",
+      "label": "Workplaces",
+      "icon": "location-outline",
+      "component": "erp-time-control-workplaces"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "time_control.records.list": {
+      "permission": "time_control.view_clock_record",
+      "sql": "queries/records_list.sql",
+      "schema": "schemas/records_list.json",
+      "ai": { "description": "Lists employee clock-in/out records" }
+    },
+    "time_control.records.get": {
+      "permission": "time_control.view_clock_record",
+      "sql": "queries/record_get.sql",
+      "schema": "schemas/record_get.json",
+      "ai": { "description": "Gets the details of a clock record by its identifier" }
+    },
+    "time_control.records.status": {
+      "permission": "time_control.view_clock_record",
+      "sql": "queries/record_status.sql",
+      "schema": "schemas/record_status.json",
+      "ai": { "description": "Returns the current clock status of an employee (clocked in or out)" }
+    },
+    "time_control.summaries.list": {
+      "permission": "time_control.view_reports",
+      "sql": "queries/summaries_list.sql",
+      "schema": "schemas/summaries_list.json",
+      "ai": { "description": "Lists daily worked-hours summaries per employee" }
+    },
+    "time_control.summaries.get": {
+      "permission": "time_control.view_clock_record",
+      "sql": "queries/summary_get.sql",
+      "schema": "schemas/summary_get.json",
+      "ai": { "description": "Gets the hours summary for an employee over a specific period" }
+    },
+    "time_control.workplaces.list": {
+      "permission": "time_control.view_clock_record",
+      "sql": "queries/workplaces_list.sql",
+      "ai": { "description": "Lists the workplaces configured for time tracking" }
+    },
+    "time_control.settings.get": {
+      "permission": "time_control.manage_settings",
+      "sql": "queries/settings_get.sql",
+      "ai": { "description": "Gets the current configuration of the time control module" }
+    }
+  },
+  "commands": {
+    "time_control.workplaces.create": {
+      "permission": "time_control.manage_workplaces",
+      "transaction": true,
+      "sql": [
+        "commands/workplace_create.sql"
+      ],
+      "schema": "schemas/workplace_create.json",
+      "emit": [
+        "time_control.workplace.created"
+      ],
+      "ai": { "description": "Creates a new workplace for employee clock records" }
+    },
+    "time_control.workplaces.update": {
+      "permission": "time_control.manage_workplaces",
+      "transaction": true,
+      "sql": [
+        "commands/workplace_update.sql"
+      ],
+      "schema": "schemas/workplace_update.json",
+      "emit": [
+        "time_control.workplace.updated"
+      ],
+      "ai": { "description": "Updates the data of an existing workplace" }
+    },
+    "time_control.workplaces.delete": {
+      "permission": "time_control.manage_workplaces",
+      "transaction": true,
+      "sql": [
+        "commands/workplace_delete.sql"
+      ],
+      "schema": "schemas/workplace_delete.json",
+      "emit": [
+        "time_control.workplace.deleted"
+      ],
+      "ai": { "description": "Deletes a workplace from the time control system (destructive)" }
+    },
+    "time_control.settings.update": {
+      "permission": "time_control.manage_settings",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "update_settings"
+      },
+      "schema": "schemas/settings_update.json",
+      "emit": [
+        "time_control.settings.updated"
+      ],
+      "ai": { "description": "Updates the configuration of the time control module" }
+    },
+    "time_control.records.clock": {
+      "permission": "time_control.add_clock_record",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "clock_action"
+      },
+      "schema": "schemas/record_clock.json",
+      "emit": [
+        "time_control.clock.recorded"
+      ],
+      "ai": { "description": "Records a clock action (in or out) for an employee" }
+    },
+    "time_control.summaries.recalculate": {
+      "permission": "time_control.add_clock_record",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "recalculate_daily_summary"
+      },
+      "schema": "schemas/summary_recalculate.json",
+      "emit": [
+        "time_control.summary.recalculated"
+      ],
+      "ai": { "description": "Recalculates the daily worked-hours summary for an employee on a given date" }
+    }
+  },
+  "events": {
+    "listen": [
+      "staff.member_deactivated"
+    ]
+  },
+  "ui": {
+    "entry": "dist/time_control.esm.js"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "commissions.adjustments.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "adjustment_type": {
+      "type": "string",
+      "enum": ["", "bonus", "correction", "deduction", "refund_adjustment", "other"],
+      "default": ""
+    },
+    "staff_id": { "type": "string", "default": "" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 }
+  }
+}

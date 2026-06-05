@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sepa_remittances.remittances.mark_processed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["remittance_id"],
+  "properties": {
+    "remittance_id": { "type": "string", "minLength": 1 },
+    "processed_lines": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["line_id"],
+        "properties": {
+          "line_id": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["processed", "rejected"], "default": "processed" },
+          "rejection_reason": { "type": "string", "default": "" }
+        }
+      }
+    }
+  }
+}

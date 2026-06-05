@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_germany.zugferd.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": { "type": "string", "enum": ["", "basic", "comfort", "extended"], "default": "" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 }
+  }
+}

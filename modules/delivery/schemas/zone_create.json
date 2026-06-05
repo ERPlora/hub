@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "delivery.zones.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "min_order": { "type": "number", "minimum": 0, "default": 0 },
+    "delivery_fee": { "type": "number", "minimum": 0, "default": 0 },
+    "estimated_time": { "type": "integer", "minimum": 1, "default": 30 },
+    "is_active": { "type": "boolean", "default": true },
+    "zip_codes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "max_radius_km": { "type": ["number", "null"], "minimum": 0, "default": null },
+    "sort_order": { "type": "integer", "default": 0 }
+  }
+}

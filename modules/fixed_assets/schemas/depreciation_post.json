@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fixed_assets.depreciations.post",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["asset_id", "period_start", "period_end"],
+  "properties": {
+    "asset_id": { "type": "string", "minLength": 1 },
+    "period_start": { "type": "string", "format": "date" },
+    "period_end": { "type": "string", "format": "date" }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-contracts",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo contracts (manifest declarativo + Web Component Stencil): contratos de cliente (recurrentes, servicio, mantenimiento) con ciclo de vida, importes mensual/total, auto-renovación e hitos de facturación. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

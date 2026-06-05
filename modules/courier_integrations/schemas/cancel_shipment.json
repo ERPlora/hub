@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "courier_integrations.shipments.cancel",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["shipment_mapping_id", "reason"],
+  "properties": {
+    "shipment_mapping_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+  }
+}

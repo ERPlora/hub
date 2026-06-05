@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "activities.activities.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["activity_type", "subject"],
+  "properties": {
+    "activity_type": {
+      "type": "string",
+      "enum": ["call", "email", "meeting", "task", "note", "sms"]
+    },
+    "subject": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "description": { "type": "string", "default": "" },
+    "related_entity_type": {
+      "type": "string",
+      "enum": ["", "lead", "opportunity", "customer", "deal"],
+      "default": ""
+    },
+    "related_entity_ref": { "type": "string", "default": "", "maxLength": 100 },
+    "scheduled_for": { "type": ["string", "null"], "format": "date-time", "default": null },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "default": "medium"
+    },
+    "assigned_to_ref": { "type": "string", "default": "", "maxLength": 100 },
+    "created_by_ref": { "type": "string", "default": "", "maxLength": 100 }
+  }
+}

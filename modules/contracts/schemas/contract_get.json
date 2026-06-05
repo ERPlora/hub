@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "contracts.contracts.get",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_id"],
+  "properties": {
+    "contract_id": { "type": "string", "minLength": 1 }
+  }
+}

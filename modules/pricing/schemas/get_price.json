@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pricing.price_lists.get_price payload",
+  "type": "object",
+  "properties": {
+    "product_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "quantity": { "type": ["string", "number"], "default": "1" },
+    "price_list_id": { "type": ["string", "null"], "default": null },
+    "customer_segment": {
+      "type": ["string", "null"],
+      "enum": ["customer", "business", "wholesale", "retail", null],
+      "default": null
+    }
+  },
+  "required": ["product_ref"],
+  "additionalProperties": false
+}

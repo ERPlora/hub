@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "banking.transactions.add",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account_id", "transaction_date", "amount", "description"],
+  "properties": {
+    "account_id": { "type": "string", "minLength": 1 },
+    "transaction_date": { "type": "string", "format": "date" },
+    "value_date": { "type": ["string", "null"], "format": "date", "default": null },
+    "amount": { "type": "number" },
+    "description": { "type": "string", "minLength": 1 },
+    "counterparty": { "type": "string", "default": "", "maxLength": 255 },
+    "reference": { "type": "string", "default": "", "maxLength": 100 },
+    "source": {
+      "type": "string",
+      "enum": ["manual", "import", "api"],
+      "default": "manual"
+    }
+  }
+}

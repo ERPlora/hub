@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mrp.runs.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["demand_inputs"],
+  "properties": {
+    "horizon_days": { "type": "integer", "minimum": 1, "default": 30 },
+    "demand_inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["product_ref", "quantity"],
+        "properties": {
+          "product_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "quantity": { "type": ["string", "number"] },
+          "required_date": { "type": ["string", "null"], "format": "date", "default": null },
+          "source_type": {
+            "type": "string",
+            "enum": ["mo", "sales_order", "forecast"],
+            "default": "forecast"
+          },
+          "source_ref": { "type": "string", "default": "", "maxLength": 100 },
+          "suggested_type": {
+            "type": "string",
+            "enum": ["buy", "make"],
+            "default": "buy"
+          }
+        }
+      }
+    },
+    "on_hand": {
+      "type": "object",
+      "description": "Mapa product_ref → cantidad en stock; faltantes = 0.",
+      "additionalProperties": { "type": ["string", "number"] },
+      "default": {}
+    },
+    "on_order": {
+      "type": "object",
+      "description": "Mapa product_ref → cantidad pedida; faltantes = 0.",
+      "additionalProperties": { "type": ["string", "number"] },
+      "default": {}
+    },
+    "lead_times": {
+      "type": "object",
+      "description": "Mapa product_ref → días de lead time; faltantes = 0.",
+      "additionalProperties": { "type": ["integer", "string"] },
+      "default": {}
+    }
+  }
+}

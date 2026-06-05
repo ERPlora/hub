@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "glovo.orders.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "store_id": { "type": "string", "default": "" },
+    "status": {
+      "type": "string",
+      "enum": ["", "new", "accepted", "preparing", "ready", "delivered", "cancelled"],
+      "default": ""
+    },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 }
+  }
+}

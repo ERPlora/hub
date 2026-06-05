@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_france.facturx.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["supplier_siret", "customer_siret", "total_amount_ht", "vat_amount"],
+  "properties": {
+    "invoice_ref": { "type": "string", "default": "", "maxLength": 100 },
+    "supplier_siret": { "type": "string", "minLength": 14, "maxLength": 14, "pattern": "^[0-9]{14}$" },
+    "customer_siret": { "type": "string", "minLength": 14, "maxLength": 14, "pattern": "^[0-9]{14}$" },
+    "total_amount_ht": { "type": "string", "minLength": 1 },
+    "vat_amount": { "type": "string", "minLength": 1 }
+  }
+}

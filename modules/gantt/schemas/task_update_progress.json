@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gantt.tasks.update_progress",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "progress_pct"],
+  "properties": {
+    "task_id": { "type": "string", "minLength": 1 },
+    "progress_pct": { "type": "integer", "minimum": 0, "maximum": 100 }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.enrollments.enroll",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["employee_id", "employee_name", "program_id"],
+  "properties": {
+    "employee_id": { "type": "string", "minLength": 1 },
+    "employee_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "program_id": { "type": "string", "minLength": 1 }
+  }
+}

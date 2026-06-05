@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-dashboards",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo dashboards (manifest declarativo + Web Component Stencil): paneles BI configurables con widgets (KPIs, gráficos, tablas, gauges) y compartición view/edit. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

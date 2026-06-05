@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mrp.suggestions.approve",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["suggestion_id"],
+  "properties": {
+    "suggestion_id": { "type": "string", "minLength": 1 },
+    "notes": { "type": ["string", "null"], "default": null, "maxLength": 2000 }
+  }
+}

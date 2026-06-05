@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pipeline.deals.move",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deal_id", "new_stage_id"],
+  "properties": {
+    "deal_id": { "type": "string", "minLength": 1 },
+    "new_stage_id": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kitchen_orders.stations.set_routing",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["station_id"],
+  "properties": {
+    "station_id": { "type": "string", "minLength": 1 },
+    "product_id": { "type": "string", "default": "" },
+    "category_id": { "type": "string", "default": "" }
+  }
+}

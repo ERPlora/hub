@@ -1,0 +1,145 @@
+{
+  "id": "ai_reports",
+  "name": "AI Reports",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages AI-generated report templates and requests: create and update templates, submit report generation requests, run them, cancel pending ones, and query usage statistics.",
+    "keywords": ["ai report", "report template", "report request", "generation", "analytics", "llm report"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "ai_reports.view_ai_report",
+    "ai_reports.create_ai_report",
+    "ai_reports.run_ai_report"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "ai_reports.view_ai_report",
+      "ai_reports.create_ai_report",
+      "ai_reports.run_ai_report"
+    ],
+    "employee": [
+      "ai_reports.view_ai_report",
+      "ai_reports.create_ai_report"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "requests",
+      "label": "Requests",
+      "icon": "sparkles-outline",
+      "component": "erp-ai-reports-requests"
+    },
+    {
+      "id": "templates",
+      "label": "Templates",
+      "icon": "sparkles-outline",
+      "component": "erp-ai-reports-templates"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "ai_reports.templates.list": {
+      "permission": "ai_reports.view_ai_report",
+      "sql": "queries/templates_list.sql",
+      "schema": "schemas/templates_list.json",
+      "ai": { "description": "Lists available AI report templates." }
+    },
+    "ai_reports.requests.list": {
+      "permission": "ai_reports.view_ai_report",
+      "sql": "queries/requests_list.sql",
+      "schema": "schemas/requests_list.json",
+      "ai": { "description": "Lists AI report requests with their generation status." }
+    },
+    "ai_reports.requests.get": {
+      "permission": "ai_reports.view_ai_report",
+      "sql": "queries/request_get.sql",
+      "schema": "schemas/request_get.json",
+      "ai": { "description": "Gets the detail and result of a specific AI report request." }
+    },
+    "ai_reports.requests.stats": {
+      "permission": "ai_reports.view_ai_report",
+      "sql": "queries/request_stats.sql",
+      "schema": "schemas/request_stats.json",
+      "ai": { "description": "Gets usage and cost statistics for AI report requests." }
+    }
+  },
+  "commands": {
+    "ai_reports.templates.create": {
+      "permission": "ai_reports.create_ai_report",
+      "transaction": true,
+      "sql": [
+        "commands/template_create.sql"
+      ],
+      "schema": "schemas/template_create.json",
+      "emit": [
+        "ai_reports.template.created"
+      ],
+      "ai": { "description": "Creates a new AI report template with its prompt and parameters." }
+    },
+    "ai_reports.templates.update": {
+      "permission": "ai_reports.create_ai_report",
+      "transaction": true,
+      "sql": [
+        "commands/template_update.sql"
+      ],
+      "schema": "schemas/template_update.json",
+      "emit": [
+        "ai_reports.template.updated"
+      ],
+      "ai": { "description": "Updates the prompt and configuration of an existing AI report template." }
+    },
+    "ai_reports.requests.create": {
+      "permission": "ai_reports.create_ai_report",
+      "schema": "schemas/request_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_request"
+      },
+      "emit": [
+        "ai_reports.request.created"
+      ],
+      "ai": { "description": "Creates a new AI report generation request from a template." }
+    },
+    "ai_reports.requests.run": {
+      "permission": "ai_reports.run_ai_report",
+      "schema": "schemas/request_run.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "run_request"
+      },
+      "emit": [
+        "ai_reports.request.completed"
+      ],
+      "ai": { "description": "Executes an AI report request and stores the generated result." }
+    },
+    "ai_reports.requests.cancel": {
+      "permission": "ai_reports.create_ai_report",
+      "schema": "schemas/request_cancel.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "cancel_request"
+      },
+      "emit": [
+        "ai_reports.request.cancelled"
+      ],
+      "ai": { "description": "Cancels a pending AI report request (destructive)." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/ai_reports.esm.js"
+  }
+}

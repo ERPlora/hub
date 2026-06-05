@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "glovo.orders.import",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["store_id_internal", "order_code", "customer_name", "total_amount", "items"],
+  "properties": {
+    "store_id_internal": { "type": "string", "minLength": 1 },
+    "order_code": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "customer_name": { "type": "string", "default": "", "maxLength": 255 },
+    "customer_phone": { "type": "string", "default": "", "maxLength": 50 },
+    "total_amount": { "type": ["number", "string"], "minimum": 0 },
+    "currency": { "type": "string", "default": "EUR", "maxLength": 8 },
+    "items": {
+      "type": "array",
+      "items": { "type": "object" },
+      "default": []
+    },
+    "delivery_address": { "type": ["object", "null"], "default": {} },
+    "created_at_glovo": { "type": ["string", "null"], "default": null },
+    "notes": { "type": "string", "default": "" }
+  }
+}

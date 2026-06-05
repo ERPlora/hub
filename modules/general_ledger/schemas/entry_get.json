@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "general_ledger.entries.get / .lines params",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entry_id"],
+  "properties": {
+    "entry_id": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,163 @@
+{
+  "id": "reports",
+  "name": "Reports",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages business reports: define, run, schedule and share reports, and subscribe users to periodic report executions.",
+    "keywords": ["report", "analytics", "run", "schedule", "subscription", "export"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "reports.view_report",
+    "reports.create_report",
+    "reports.run_report",
+    "reports.share_report"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "reports.view_report",
+      "reports.create_report",
+      "reports.run_report",
+      "reports.share_report"
+    ],
+    "employee": [
+      "reports.view_report",
+      "reports.run_report"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Reports",
+      "icon": "document-outline",
+      "component": "erp-reports-list"
+    },
+    {
+      "id": "runs",
+      "label": "Runs",
+      "icon": "document-outline",
+      "component": "erp-reports-runs"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "reports.reports.list": {
+      "permission": "reports.view_report",
+      "sql": "queries/reports_list.sql",
+      "schema": "schemas/reports_list.json",
+      "ai": { "description": "Lists defined reports with their name and configuration" }
+    },
+    "reports.reports.get": {
+      "permission": "reports.view_report",
+      "sql": "queries/report_get.sql",
+      "schema": "schemas/report_get.json",
+      "ai": { "description": "Retrieves the full definition of a report by its identifier" }
+    },
+    "reports.runs.list": {
+      "permission": "reports.view_report",
+      "sql": "queries/runs_list.sql",
+      "schema": "schemas/runs_list.json",
+      "ai": { "description": "Lists report runs with their status and result" }
+    },
+    "reports.runs.get": {
+      "permission": "reports.view_report",
+      "sql": "queries/run_get.sql",
+      "schema": "schemas/run_get.json",
+      "ai": { "description": "Retrieves the result and detail of a report run by its identifier" }
+    },
+    "reports.subscriptions.list": {
+      "permission": "reports.view_report",
+      "sql": "queries/subscriptions_list.sql",
+      "schema": "schemas/subscriptions_list.json",
+      "ai": { "description": "Lists active subscriptions to scheduled reports" }
+    }
+  },
+  "commands": {
+    "reports.reports.create": {
+      "permission": "reports.create_report",
+      "transaction": true,
+      "sql": [
+        "commands/report_create.sql"
+      ],
+      "schema": "schemas/report_create.json",
+      "emit": [
+        "reports.report.created"
+      ],
+      "ai": { "description": "Creates a new report with its query definition and parameters" }
+    },
+    "reports.reports.update": {
+      "permission": "reports.create_report",
+      "transaction": true,
+      "sql": [
+        "commands/report_update.sql"
+      ],
+      "schema": "schemas/report_update.json",
+      "emit": [
+        "reports.report.updated"
+      ],
+      "ai": { "description": "Updates the definition or configuration of an existing report" }
+    },
+    "reports.reports.delete": {
+      "permission": "reports.create_report",
+      "transaction": true,
+      "sql": [
+        "commands/report_delete.sql"
+      ],
+      "schema": "schemas/report_delete.json",
+      "emit": [
+        "reports.report.deleted"
+      ],
+      "ai": { "description": "Deletes a report and its run history (destructive)" }
+    },
+    "reports.reports.run": {
+      "permission": "reports.run_report",
+      "schema": "schemas/run_report.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "run_report"
+      },
+      "emit": [
+        "reports.run.completed"
+      ],
+      "ai": { "description": "Runs a report with the given parameters and saves the result" }
+    },
+    "reports.subscriptions.subscribe": {
+      "permission": "reports.share_report",
+      "transaction": true,
+      "sql": [
+        "commands/subscribe.sql"
+      ],
+      "schema": "schemas/subscribe.json",
+      "emit": [
+        "reports.subscription.created"
+      ],
+      "ai": { "description": "Subscribes a user to the periodic execution of a report" }
+    },
+    "reports.subscriptions.unsubscribe": {
+      "permission": "reports.share_report",
+      "transaction": true,
+      "sql": [
+        "commands/unsubscribe.sql"
+      ],
+      "schema": "schemas/unsubscribe.json",
+      "emit": [
+        "reports.subscription.removed"
+      ],
+      "ai": { "description": "Unsubscribes a user from a scheduled report" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/reports.esm.js"
+  }
+}

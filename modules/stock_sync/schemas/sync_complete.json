@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "stock_sync.runs.complete",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id"],
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "items_synced": { "type": "integer", "minimum": 0, "default": 0 },
+    "conflicts_count": { "type": "integer", "minimum": 0, "default": 0 },
+    "error_log": { "type": ["string", "null"], "default": null }
+  }
+}

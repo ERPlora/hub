@@ -1,8 +1,13 @@
 import { Component, State, h } from '@stencil/core';
+// Importa el DataTable compartido (Stencil) para que se auto-registre y esbuild
+// lo empaquete dentro del bundle del módulo. El shell provee los `ion-*`.
+import '../../../../_shared/ui/components/data-table/data-table';
+import type { DataTableColumn } from '../../../../_shared/ui/components/data-table/data-table';
 
 // WC del módulo `invoice` (Stencil). Mini-app: listado de facturas (F1/F2/R1…) con
 // estado y tipo. La emisión va por el runtime (handler WASM); este WC es lectura +
 // acciones ligeras. 90% lógica en Rust; reactivo a invoice.created/rectified.
+// El listado usa el DataTable compartido + Ionic.
 
 interface ErploraClientLike {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
@@ -27,18 +32,9 @@ const TYPE_LABEL: Record<string, string> = {
   shadow: true,
   styles: `
     :host { display:block; font-family: system-ui, sans-serif; color: var(--ion-text-color,#1c1b18); }
-    h2 { margin:0 0 .75rem; font-size:1.15rem; }
-    table { width:100%; border-collapse:collapse; font-size:.9rem; }
-    th { text-align:left; color:#8b897f; font-weight:600; padding:.5rem .6rem; border-bottom:1px solid #e7e2d6; }
-    td { padding:.55rem .6rem; border-bottom:1px solid #f1ede4; }
-    .muted { color:#8b897f; font-size:.85rem; }
-    .err { color:#d9480f; }
-    .neg { color:#d9480f; }
-    .st { font-size:.72rem; padding:.1rem .5rem; border-radius:999px; }
-    .st-issued { background:#e4f1fb; color:#1496d6; }
-    .st-paid { background:#e6f7ed; color:#1a7f4b; }
-    .st-cancelled { background:#fdeceb; color:#d9480f; }
-    .ty { font-size:.72rem; padding:.1rem .5rem; border-radius:6px; background:#f1ede4; color:#6b6862; }
+    header { display:flex; gap:.5rem; align-items:center; margin-bottom:.75rem; }
+    h2 { margin:0; font-size:1.15rem; flex:1; }
+    .err { color:#d9480f; font-weight:600; }
   `,
 })
 export class ErpInvoiceList {
@@ -46,6 +42,14 @@ export class ErpInvoiceList {
   @State() loading = true;
   @State() error = '';
   private unsub?: () => void;
+
+  private columns: DataTableColumn[] = [
+    { key: 'number', header: 'Número' },
+    { key: 'invoice_type', header: 'Tipo', format: (r) => TYPE_LABEL[r.invoice_type as string] ?? (r.invoice_type as string) },
+    { key: 'customer_name', header: 'Cliente', format: (r) => (r.customer_name as string) || '—' },
+    { key: 'status', header: 'Estado' },
+    { key: 'total_amount', header: 'Total', align: 'right', format: (r) => Number(r.total_amount || 0).toFixed(2) },
+  ];
 
   async componentWillLoad() {
     await this.refresh();
@@ -67,28 +71,19 @@ export class ErpInvoiceList {
   render() {
     return (
       <div>
-        <h2>Facturas</h2>
+        <header>
+          <h2>Facturas</h2>
+        </header>
+
         {this.error && <p class="err">{this.error}</p>}
-        {this.loading ? (
-          <p class="muted">Cargando…</p>
-        ) : this.invoices.length === 0 ? (
-          <p class="muted">Aún no hay facturas.</p>
-        ) : (
-          <table>
-            <thead><tr><th>Número</th><th>Tipo</th><th>Cliente</th><th>Estado</th><th>Total</th></tr></thead>
-            <tbody>
-              {this.invoices.map((inv) => (
-                <tr key={inv.id}>
-                  <td>{inv.number}</td>
-                  <td><span class="ty">{TYPE_LABEL[inv.invoice_type] ?? inv.invoice_type}</span></td>
-                  <td>{inv.customer_name || '—'}</td>
-                  <td><span class={`st st-${inv.status}`}>{inv.status}</span></td>
-                  <td class={Number(inv.total_amount) < 0 ? 'neg' : ''}>{Number(inv.total_amount || 0).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+
+        <data-table
+          columns={this.columns}
+          rows={this.invoices as unknown as Record<string, unknown>[]}
+          searchKeys={['number', 'customer_name', 'status']}
+          searchPlaceholder="Buscar número, cliente o estado…"
+          emptyMessage={this.loading ? 'Cargando…' : 'Aún no hay facturas.'}
+        />
       </div>
     );
   }

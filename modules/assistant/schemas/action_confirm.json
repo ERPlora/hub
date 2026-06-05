@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "assistant.actions.confirm",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["log_id"],
+  "properties": {
+    "log_id": { "type": "string", "minLength": 1 },
+    "success": { "type": "integer", "enum": [0, 1], "default": 1 },
+    "result": { "type": "string", "default": "{}", "maxLength": 100000 },
+    "error_message": { "type": "string", "default": "", "maxLength": 10000 }
+  }
+}

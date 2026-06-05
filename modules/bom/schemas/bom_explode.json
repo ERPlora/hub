@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bom.boms.explode",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bom_id", "target_quantity"],
+  "properties": {
+    "bom_id": { "type": "string", "minLength": 1 },
+    "target_quantity": { "type": "number", "exclusiveMinimum": 0 },
+    "max_depth": { "type": "integer", "minimum": 1, "maximum": 20, "default": 5 }
+  }
+}

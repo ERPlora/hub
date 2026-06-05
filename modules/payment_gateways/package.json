@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-payment_gateways",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo payment_gateways (registro de pasarelas Stripe/Redsys/PayPal/manual + libro de transacciones y reembolsos; manifest declarativo + Web Component Stencil). Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

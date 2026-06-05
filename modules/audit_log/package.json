@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-audit_log",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo audit_log (manifest declarativo + Web Components Stencil): log transversal de auditoría — eventos (cambios de entidad, accesos, acciones), timelines por entidad/usuario, búsqueda, categorías, informes de cumplimiento y limpieza por retención. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

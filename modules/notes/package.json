@@ -1,2 +1,10 @@
-{ "name": "@erplora/module-notes", "private": true, "version": "1.0.0", "type": "module",
-  "dependencies": { "lit": "^3.2.0" } }
+{
+  "name": "@erplora/module-notes",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo notes (manifest declarativo + Web Component Stencil). Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

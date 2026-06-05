@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-tables",
+  "private": true,
+  "version": "2.0.6",
+  "type": "module",
+  "description": "Módulo tables (gestión de plano de sala: zonas, mesas y sesiones). Manifest declarativo + Web Component Stencil. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

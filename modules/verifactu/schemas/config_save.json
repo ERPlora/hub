@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "verifactu.config.save",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "enabled": { "type": "boolean", "default": false },
+    "mode": { "type": "string", "enum": ["verifactu", "no_verifactu"], "default": "verifactu" },
+    "environment": { "type": "string", "enum": ["testing", "production"], "default": "testing" },
+    "software_name": { "type": "string", "default": "ERPlora Hub", "maxLength": 100 },
+    "software_version": { "type": "string", "default": "1.0.0", "maxLength": 20 },
+    "software_id": { "type": "string", "default": "ERPLORA-001", "maxLength": 50 },
+    "software_nif": { "type": "string", "default": "", "maxLength": 15 },
+    "certificate_path": { "type": "string", "default": "", "maxLength": 500 },
+    "certificate_password": { "type": "string", "default": "", "maxLength": 512 },
+    "certificate_expiry": { "type": ["string", "null"], "format": "date", "default": null },
+    "auto_transmit": { "type": "boolean", "default": true },
+    "retry_interval_minutes": { "type": "integer", "minimum": 1, "maximum": 1440, "default": 5 },
+    "max_retries": { "type": "integer", "minimum": 0, "maximum": 100, "default": 10 }
+  }
+}

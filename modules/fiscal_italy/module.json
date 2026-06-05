@@ -1,0 +1,189 @@
+{
+  "id": "fiscal_italy",
+  "name": "Fiscal Italy",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Handles Italian fiscal compliance: creates and submits FatturaPA e-invoices to the SDI, and manages Esterometro cross-border transaction reporting.",
+    "keywords": ["fatturapa", "sdi", "esterometro", "italy", "fiscal", "e-invoice", "cross-border"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "fiscal_italy.view_fiscal_it",
+    "fiscal_italy.submit_fatturapa",
+    "fiscal_italy.submit_esterometro"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "fiscal_italy.view_fiscal_it",
+      "fiscal_italy.submit_fatturapa",
+      "fiscal_italy.submit_esterometro"
+    ],
+    "employee": [
+      "fiscal_italy.view_fiscal_it"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "fatturapa",
+      "label": "FatturaPA",
+      "icon": "shield-checkmark-outline",
+      "component": "erp-fiscal-italy-fatturapa"
+    },
+    {
+      "id": "esterometro",
+      "label": "Esterometro",
+      "icon": "shield-checkmark-outline",
+      "component": "erp-fiscal-italy-esterometro"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "fiscal_italy.config.get": {
+      "permission": "fiscal_italy.view_fiscal_it",
+      "sql": "queries/config_get.sql",
+      "ai": { "description": "Retrieves the Italian fiscal configuration for the hub." }
+    },
+    "fiscal_italy.fatturapa.list": {
+      "permission": "fiscal_italy.view_fiscal_it",
+      "sql": "queries/fatturapa_list.sql",
+      "schema": "schemas/fatturapa_list.json",
+      "ai": { "description": "Lists generated FatturePA (Italian e-invoices)." }
+    },
+    "fiscal_italy.fatturapa.get": {
+      "permission": "fiscal_italy.view_fiscal_it",
+      "sql": "queries/fatturapa_get.sql",
+      "schema": "schemas/fatturapa_get.json",
+      "ai": { "description": "Retrieves the details of a FatturaPA by its ID." }
+    },
+    "fiscal_italy.esterometro.entries.list": {
+      "permission": "fiscal_italy.view_fiscal_it",
+      "sql": "queries/esterometro_entries_list.sql",
+      "schema": "schemas/esterometro_list.json",
+      "ai": { "description": "Lists cross-border transaction entries recorded for the Esterometro." }
+    },
+    "fiscal_italy.esterometro.declarations.list": {
+      "permission": "fiscal_italy.view_fiscal_it",
+      "sql": "queries/esterometro_declarations_list.sql",
+      "schema": "schemas/esterometro_list.json",
+      "ai": { "description": "Lists periodic Esterometro declarations submitted to the Agenzia delle Entrate." }
+    }
+  },
+  "commands": {
+    "fiscal_italy.config.upsert": {
+      "permission": "fiscal_italy.submit_fatturapa",
+      "schema": "schemas/config_upsert.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "config_upsert"
+      },
+      "emit": [
+        "fiscal_italy.config.updated"
+      ],
+      "ai": { "description": "Creates or updates the Italian fiscal configuration for the hub." }
+    },
+    "fiscal_italy.fatturapa.create": {
+      "permission": "fiscal_italy.submit_fatturapa",
+      "schema": "schemas/fatturapa_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "fatturapa_create"
+      },
+      "emit": [
+        "fiscal_italy.fatturapa.created"
+      ],
+      "ai": { "description": "Creates a new FatturaPA from an invoice for submission to the SDI." }
+    },
+    "fiscal_italy.fatturapa.generate_xml": {
+      "permission": "fiscal_italy.submit_fatturapa",
+      "schema": "schemas/fatturapa_generate_xml.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "fatturapa_generate_xml"
+      },
+      "emit": [
+        "fiscal_italy.fatturapa.xml_generated"
+      ],
+      "ai": { "description": "Generates the XML file of a FatturaPA in the format required by the SDI." }
+    },
+    "fiscal_italy.fatturapa.submit_to_sdi": {
+      "permission": "fiscal_italy.submit_fatturapa",
+      "schema": "schemas/fatturapa_submit.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "fatturapa_submit_to_sdi"
+      },
+      "emit": [
+        "fiscal_italy.fatturapa.submitted"
+      ],
+      "ai": { "description": "Submits a FatturaPA to the Sistema di Interscambio (SDI) of the Agenzia delle Entrate." }
+    },
+    "fiscal_italy.fatturapa.update_sdi_status": {
+      "permission": "fiscal_italy.submit_fatturapa",
+      "schema": "schemas/fatturapa_update_sdi_status.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "fatturapa_update_sdi_status"
+      },
+      "emit": [
+        "fiscal_italy.fatturapa.status_changed"
+      ],
+      "ai": { "description": "Updates the processing status of a FatturaPA in the SDI." }
+    },
+    "fiscal_italy.esterometro.entry.create": {
+      "permission": "fiscal_italy.submit_esterometro",
+      "transaction": true,
+      "sql": [
+        "commands/esterometro_entry_create.sql"
+      ],
+      "schema": "schemas/esterometro_entry_create.json",
+      "emit": [
+        "fiscal_italy.esterometro.entry.created"
+      ],
+      "ai": { "description": "Records a cross-border transaction entry in the Esterometro." }
+    },
+    "fiscal_italy.esterometro.declaration.generate": {
+      "permission": "fiscal_italy.submit_esterometro",
+      "schema": "schemas/esterometro_declaration_generate.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "esterometro_declaration_generate"
+      },
+      "emit": [
+        "fiscal_italy.esterometro.declaration.generated"
+      ],
+      "ai": { "description": "Generates the periodic Esterometro declaration containing cross-border transactions for the period." }
+    },
+    "fiscal_italy.esterometro.declaration.submit": {
+      "permission": "fiscal_italy.submit_esterometro",
+      "schema": "schemas/esterometro_declaration_submit.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "esterometro_declaration_submit"
+      },
+      "emit": [
+        "fiscal_italy.esterometro.declaration.submitted"
+      ],
+      "ai": { "description": "Submits the Esterometro declaration to the Agenzia delle Entrate." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/fiscal_italy.esm.js"
+  }
+}

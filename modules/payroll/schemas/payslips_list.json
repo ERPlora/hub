@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "payroll.payslips.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "employee_id": { "type": "string", "default": "" },
+    "status": {
+      "type": "string",
+      "enum": ["", "draft", "confirmed", "approved", "paid", "cancelled"],
+      "default": ""
+    },
+    "period_from": { "type": "string", "default": "" },
+    "period_to": { "type": "string", "default": "" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 20 }
+  }
+}

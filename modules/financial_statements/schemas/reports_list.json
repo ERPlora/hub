@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "financial_statements.reports.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "report_type": {
+      "type": "string",
+      "enum": ["", "balance_sheet", "profit_loss", "cash_flow", "custom"],
+      "default": ""
+    },
+    "period_start": { "type": "string", "default": "" },
+    "period_end": { "type": "string", "default": "" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+  }
+}

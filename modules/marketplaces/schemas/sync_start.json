@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "marketplaces.syncs.start",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["connection_id", "sync_type"],
+  "properties": {
+    "connection_id": { "type": "string", "minLength": 1 },
+    "sync_type": {
+      "type": "string",
+      "enum": ["products", "orders", "inventory", "prices"]
+    }
+  }
+}

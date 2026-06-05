@@ -1,9 +1,14 @@
 import { Component, State, h } from '@stencil/core';
+// Importa el DataTable compartido (Stencil) para que se auto-registre y esbuild
+// lo empaquete dentro del bundle del módulo. El shell provee los `ion-*`.
+import '../../../../_shared/ui/components/data-table/data-table';
+import type { DataTableColumn } from '../../../../_shared/ui/components/data-table/data-table';
 
 // WC del módulo `sales` (Stencil). Mini-app: historial de ventas + métricas (ticket
 // medio, total). El TPV completo (grid de productos, carrito, pago) es una vista mayor
 // que se añadirá; esta es la vista "list/history". ui.entry cargado en runtime.
 // 90% lógica en Rust: llama al SDK (erplora.query); reactivo a sale.completed.
+// El listado usa el DataTable compartido + Ionic.
 
 interface ErploraClientLike {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
@@ -35,10 +40,6 @@ function erplora(): ErploraClientLike {
     .card { flex:1; min-width:8rem; padding:.7rem .9rem; border:1px solid var(--ion-border-color,#e0ddd4); border-radius:12px; }
     .card .k { color:#8b897f; font-size:.75rem; text-transform:uppercase; }
     .card .v { font-size:1.3rem; font-weight:700; }
-    table { width:100%; border-collapse:collapse; font-size:.9rem; }
-    th { text-align:left; color:#8b897f; font-weight:600; padding:.5rem .6rem; border-bottom:1px solid #e7e2d6; }
-    td { padding:.55rem .6rem; border-bottom:1px solid #f1ede4; }
-    .muted { color:#8b897f; font-size:.85rem; }
     .err { color:#d9480f; }
     .st { font-size:.72rem; padding:.1rem .5rem; border-radius:999px; }
     .st-completed { background:#e6f7ed; color:#1a7f4b; }
@@ -51,6 +52,14 @@ export class ErpSalesList {
   @State() loading = true;
   @State() error = '';
   private unsub?: () => void;
+
+  private columns: DataTableColumn[] = [
+    { key: 'sale_number', header: 'Número' },
+    { key: 'customer_name', header: 'Cliente', format: (r) => (r.customer_name as string) || '—' },
+    { key: 'payment_method_name', header: 'Pago', format: (r) => (r.payment_method_name as string) || '—' },
+    { key: 'status', header: 'Estado' },
+    { key: 'total', header: 'Total', align: 'right', format: (r) => Number(r.total || 0).toFixed(2) },
+  ];
 
   async componentWillLoad() {
     await this.refresh();
@@ -85,26 +94,13 @@ export class ErpSalesList {
           <div class="card"><div class="k">Ticket medio</div><div class="v">{Number(this.stats.avg_ticket || 0).toFixed(2)}</div></div>
         </div>
         {this.error && <p class="err">{this.error}</p>}
-        {this.loading ? (
-          <p class="muted">Cargando…</p>
-        ) : this.sales.length === 0 ? (
-          <p class="muted">Aún no hay ventas.</p>
-        ) : (
-          <table>
-            <thead><tr><th>Número</th><th>Cliente</th><th>Pago</th><th>Estado</th><th>Total</th></tr></thead>
-            <tbody>
-              {this.sales.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.sale_number}</td>
-                  <td>{s.customer_name || '—'}</td>
-                  <td>{s.payment_method_name || '—'}</td>
-                  <td><span class={`st st-${s.status}`}>{s.status}</span></td>
-                  <td>{Number(s.total || 0).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <data-table
+          columns={this.columns}
+          rows={this.sales as unknown as Record<string, unknown>[]}
+          searchKeys={['sale_number', 'customer_name', 'payment_method_name']}
+          searchPlaceholder="Buscar número o cliente…"
+          emptyMessage={this.loading ? 'Cargando…' : 'Aún no hay ventas.'}
+        />
       </div>
     );
   }

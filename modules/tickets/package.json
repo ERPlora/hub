@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-tickets",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo tickets (manifest declarativo + Web Components Stencil): helpdesk de soporte con prioridad, categorías, comentarios hilados, máquina de estados y seguimiento de incumplimiento de SLA. Toda la lógica de estados/numeración/SLA vive en el handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

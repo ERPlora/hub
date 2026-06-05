@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "timesheets.entries.update",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entry_id"],
+  "properties": {
+    "entry_id": { "type": "string", "minLength": 1 },
+    "duration_minutes": { "type": ["integer", "null"], "exclusiveMinimum": 0, "default": null },
+    "description": { "type": ["string", "null"], "default": null },
+    "project_name": { "type": ["string", "null"], "maxLength": 200, "default": null },
+    "client_name": { "type": ["string", "null"], "maxLength": 200, "default": null },
+    "billable": { "type": ["boolean", "null"], "default": null }
+  }
+}

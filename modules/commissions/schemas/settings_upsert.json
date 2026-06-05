@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "commissions.settings.upsert",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_commission_rate", "calculation_basis", "payout_frequency", "payout_day",
+    "minimum_payout_amount", "apply_tax_withholding", "tax_withholding_rate",
+    "show_commission_on_receipt", "show_pending_commission"
+  ],
+  "properties": {
+    "default_commission_rate": { "type": "number", "minimum": 0, "maximum": 100 },
+    "calculation_basis": { "type": "string", "enum": ["gross", "net", "profit"] },
+    "payout_frequency": { "type": "string", "enum": ["weekly", "biweekly", "monthly", "custom"] },
+    "payout_day": { "type": "integer", "minimum": 1, "maximum": 31 },
+    "minimum_payout_amount": { "type": "number", "minimum": 0 },
+    "apply_tax_withholding": { "type": "integer", "enum": [0, 1] },
+    "tax_withholding_rate": { "type": "number", "minimum": 0, "maximum": 100 },
+    "show_commission_on_receipt": { "type": "integer", "enum": [0, 1] },
+    "show_pending_commission": { "type": "integer", "enum": [0, 1] }
+  }
+}

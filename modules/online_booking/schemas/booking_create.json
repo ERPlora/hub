@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "online_booking.bookings.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["customer_name", "service_name", "booking_date", "booking_time"],
+  "properties": {
+    "customer_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "customer_email": { "type": "string", "default": "", "maxLength": 254 },
+    "customer_phone": { "type": "string", "default": "", "maxLength": 50 },
+    "customer_id": { "type": ["string", "null"], "default": null },
+    "service_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "service_id": { "type": ["string", "null"], "default": null },
+    "staff_name": { "type": "string", "default": "", "maxLength": 255 },
+    "staff_id": { "type": ["string", "null"], "default": null },
+    "booking_date": { "type": "string", "format": "date" },
+    "booking_time": { "type": "string", "pattern": "^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$" },
+    "duration_minutes": { "type": "integer", "minimum": 5, "maximum": 480, "default": 30 },
+    "booking_type": {
+      "type": "string",
+      "enum": ["appointment", "table_reservation"],
+      "default": "appointment"
+    },
+    "notes": { "type": "string", "default": "" }
+  }
+}

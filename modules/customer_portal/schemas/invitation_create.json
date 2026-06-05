@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "customer_portal.invitations.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["customer_email"],
+  "properties": {
+    "customer_email": { "type": "string", "format": "email", "minLength": 1, "maxLength": 255 },
+    "customer_name": { "type": "string", "default": "", "maxLength": 255 },
+    "invited_by_ref": { "type": "string", "default": "", "maxLength": 100 }
+  }
+}

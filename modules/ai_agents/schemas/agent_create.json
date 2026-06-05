@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai_agents.agents.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "name", "agent_type"],
+  "properties": {
+    "code": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "description": { "type": "string", "default": "" },
+    "agent_type": {
+      "type": "string",
+      "enum": ["assistant", "automation", "monitor", "analyzer"]
+    },
+    "system_prompt": { "type": "string", "default": "" },
+    "tools": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "max_iterations": { "type": "integer", "minimum": 1, "default": 10 },
+    "model_preference": { "type": "string", "default": "" }
+  }
+}

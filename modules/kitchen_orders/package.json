@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-kitchen_orders",
+  "private": true,
+  "version": "3.0.3",
+  "type": "module",
+  "description": "Módulo kitchen_orders (manifest declarativo + Web Components Stencil): gestión de comandas de producción (cocinas, talleres, obradores), estaciones y enrutado. La lógica de alta/transiciones/batch va a un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

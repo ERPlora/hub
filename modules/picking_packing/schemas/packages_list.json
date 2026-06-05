@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "picking_packing.packages.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["", "open", "sealed", "shipped", "delivered", "returned"],
+      "default": ""
+    },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+  }
+}

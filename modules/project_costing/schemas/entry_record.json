@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "project_costing.entries.record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_ref", "cost_type", "amount"],
+  "properties": {
+    "project_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "cost_type": {
+      "type": "string",
+      "enum": ["labor", "material", "expense", "subcontract", "overhead"]
+    },
+    "amount": { "type": "number", "minimum": 0 },
+    "description": { "type": "string", "default": "", "maxLength": 500 },
+    "entry_date": { "type": ["string", "null"], "format": "date", "default": null },
+    "hours": { "type": ["number", "null"], "minimum": 0, "default": null },
+    "employee_ref": { "type": "string", "default": "", "maxLength": 100 },
+    "supplier_ref": { "type": "string", "default": "", "maxLength": 100 },
+    "notes": { "type": "string", "default": "", "maxLength": 2000 }
+  }
+}

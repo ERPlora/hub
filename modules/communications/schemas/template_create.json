@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "communications.templates.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "subject": { "type": "string", "default": "", "maxLength": 500 },
+    "body_html": { "type": "string", "default": "" },
+    "body_text": { "type": "string", "default": "" },
+    "variables": { "type": "string", "default": "[]" }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sepa_remittances.remittances.generate_xml",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["remittance_id"],
+  "properties": {
+    "remittance_id": { "type": "string", "minLength": 1 }
+  }
+}

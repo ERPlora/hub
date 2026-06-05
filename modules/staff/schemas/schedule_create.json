@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "staff.schedules.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["staff_id"],
+  "properties": {
+    "staff_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "default": "Default Schedule", "maxLength": 100 },
+    "is_default": { "type": "integer", "enum": [0, 1], "default": 1 },
+    "effective_from": { "type": ["string", "null"], "format": "date", "default": null },
+    "effective_until": { "type": ["string", "null"], "format": "date", "default": null },
+    "working_hours": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["day_of_week", "start_time", "end_time"],
+        "properties": {
+          "day_of_week": { "type": "integer", "minimum": 0, "maximum": 6 },
+          "start_time": { "type": "string", "default": "09:00:00" },
+          "end_time": { "type": "string", "default": "18:00:00" },
+          "break_start": { "type": ["string", "null"], "default": null },
+          "break_end": { "type": ["string", "null"], "default": null },
+          "is_working": { "type": "integer", "enum": [0, 1], "default": 1 }
+        }
+      }
+    }
+  }
+}

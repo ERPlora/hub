@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "credit_risk.customers.unblock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["customer_credit_id"],
+  "properties": {
+    "customer_credit_id": { "type": "string", "minLength": 1 }
+  }
+}

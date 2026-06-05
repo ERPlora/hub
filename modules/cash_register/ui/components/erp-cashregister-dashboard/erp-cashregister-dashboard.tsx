@@ -1,8 +1,12 @@
 import { Component, State, h } from '@stencil/core';
+// Importa el DataTable compartido (Stencil) para que se auto-registre y esbuild
+// lo empaquete dentro del bundle del módulo. El shell provee los `ion-*`.
+import '../../../../_shared/ui/components/data-table/data-table';
+import type { DataTableColumn } from '../../../../_shared/ui/components/data-table/data-table';
 
 // WC del módulo `cash_register` (Stencil). Mini-app: sesiones de caja con su estado
 // y reconciliación (esperado/contado/diferencia). 90% lógica en Rust; reactivo a
-// los eventos de apertura/cierre de sesión.
+// los eventos de apertura/cierre de sesión. El listado usa el DataTable compartido.
 
 interface ErploraClientLike {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
@@ -24,17 +28,9 @@ function erplora(): ErploraClientLike {
   shadow: true,
   styles: `
     :host { display:block; font-family: system-ui, sans-serif; color: var(--ion-text-color,#1c1b18); }
-    h2 { margin:0 0 .75rem; font-size:1.15rem; }
-    table { width:100%; border-collapse:collapse; font-size:.9rem; }
-    th { text-align:left; color:#8b897f; font-weight:600; padding:.5rem .6rem; border-bottom:1px solid #e7e2d6; }
-    td { padding:.55rem .6rem; border-bottom:1px solid #f1ede4; }
-    .muted { color:#8b897f; font-size:.85rem; }
-    .err { color:#d9480f; }
-    .st { font-size:.72rem; padding:.1rem .5rem; border-radius:999px; }
-    .st-open { background:#e6f7ed; color:#1a7f4b; }
-    .st-closed { background:#f1ede4; color:#6b6862; }
-    .diff-ok { color:#1a7f4b; }
-    .diff-bad { color:#d9480f; font-weight:600; }
+    header { display:flex; gap:.5rem; align-items:center; margin-bottom:.75rem; }
+    h2 { margin:0; font-size:1.15rem; flex:1; }
+    .err { color:#d9480f; font-weight:600; }
   `,
 })
 export class ErpCashRegisterDashboard {
@@ -42,6 +38,15 @@ export class ErpCashRegisterDashboard {
   @State() loading = true;
   @State() error = '';
   private unsub?: () => void;
+
+  private columns: DataTableColumn[] = [
+    { key: 'session_number', header: 'Sesión' },
+    { key: 'status', header: 'Estado' },
+    { key: 'opening_balance', header: 'Apertura', align: 'right', format: (r) => this.fmt(r.opening_balance as number | null) },
+    { key: 'expected_balance', header: 'Esperado', align: 'right', format: (r) => this.fmt(r.expected_balance as number | null) },
+    { key: 'closing_balance', header: 'Contado', align: 'right', format: (r) => this.fmt(r.closing_balance as number | null) },
+    { key: 'difference', header: 'Diferencia', align: 'right', format: (r) => this.fmt(r.difference as number | null) },
+  ];
 
   async componentWillLoad() {
     await this.refresh();
@@ -65,31 +70,19 @@ export class ErpCashRegisterDashboard {
   render() {
     return (
       <div>
-        <h2>Caja</h2>
+        <header>
+          <h2>Caja</h2>
+        </header>
+
         {this.error && <p class="err">{this.error}</p>}
-        {this.loading ? (
-          <p class="muted">Cargando…</p>
-        ) : this.sessions.length === 0 ? (
-          <p class="muted">Sin sesiones de caja.</p>
-        ) : (
-          <table>
-            <thead><tr><th>Sesión</th><th>Estado</th><th>Apertura</th><th>Esperado</th><th>Contado</th><th>Diferencia</th></tr></thead>
-            <tbody>
-              {this.sessions.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.session_number}</td>
-                  <td><span class={`st st-${s.status}`}>{s.status}</span></td>
-                  <td>{this.fmt(s.opening_balance)}</td>
-                  <td>{this.fmt(s.expected_balance)}</td>
-                  <td>{this.fmt(s.closing_balance)}</td>
-                  <td class={s.difference == null ? '' : Math.abs(Number(s.difference)) < 0.01 ? 'diff-ok' : 'diff-bad'}>
-                    {this.fmt(s.difference)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+
+        <data-table
+          columns={this.columns}
+          rows={this.sessions as unknown as Record<string, unknown>[]}
+          searchKeys={['session_number', 'status']}
+          searchPlaceholder="Buscar sesión o estado…"
+          emptyMessage={this.loading ? 'Cargando…' : 'Sin sesiones de caja.'}
+        />
       </div>
     );
   }

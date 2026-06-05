@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_romania.efactura.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["supplier_cif", "customer_cif", "total_amount", "vat_amount"],
+  "properties": {
+    "invoice_ref": { "type": "string", "default": "", "maxLength": 100 },
+    "supplier_cif": { "type": "string", "minLength": 1, "maxLength": 20 },
+    "customer_cif": { "type": "string", "minLength": 1, "maxLength": 20 },
+    "total_amount": { "type": "string", "minLength": 1 },
+    "vat_amount": { "type": "string", "minLength": 1 },
+    "document_type": {
+      "type": "string",
+      "enum": ["invoice", "credit_note"],
+      "default": "invoice"
+    }
+  }
+}

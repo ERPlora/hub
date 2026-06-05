@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.settings.save",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "require_completion_proof": { "type": "integer", "enum": [0, 1], "default": 0 },
+    "auto_assign_mandatory": { "type": "integer", "enum": [0, 1], "default": 1 },
+    "reminder_days_before": { "type": "integer", "minimum": 0, "default": 7 },
+    "certificate_expiry_warning_days": { "type": "integer", "minimum": 0, "default": 30 }
+  }
+}

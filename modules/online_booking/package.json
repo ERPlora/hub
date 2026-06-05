@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-online-booking",
+  "private": true,
+  "version": "1.1.3",
+  "type": "module",
+  "description": "Módulo online_booking (manifest declarativo + Web Components Stencil): gestión de reservas online (listado/estado/alta/borrado) y configuración de la página pública de reservas. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

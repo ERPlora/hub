@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tickets.tickets.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subject", "customer_name"],
+  "properties": {
+    "subject": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "description": { "type": "string", "default": "" },
+    "customer_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "customer_email": { "type": "string", "default": "", "maxLength": 255 },
+    "customer_phone": { "type": "string", "default": "", "maxLength": 50 },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "urgent"],
+      "default": "medium"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["general", "billing", "technical", "feature_request"],
+      "default": "general"
+    },
+    "created_by_ref": { "type": "string", "default": "" }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_italy.esterometro period filter",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "period_year": { "type": "integer", "minimum": 0, "default": 0 },
+    "period_month": { "type": "integer", "minimum": 0, "maximum": 12, "default": 0 }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-leads",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo leads (manifest declarativo + Web Component Stencil): CRM de prospectos con ciclo de vida new → contacted → qualified/unqualified → converted/lost, orígenes de adquisición y asignación. La lógica de auto-numeración y transiciones de estado vive en WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

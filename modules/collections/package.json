@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-collections",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo collections (manifest declarativo + Web Component Stencil): libro de cobros entrantes con asignación a facturas, reembolsos y cancelaciones. La generación de referencia, la aritmética de asignación y las transiciones de estado viven en un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

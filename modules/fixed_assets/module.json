@@ -1,0 +1,140 @@
+{
+  "id": "fixed_assets",
+  "name": "Fixed Assets",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages fixed assets: registers, updates, and disposes of assets, and runs depreciation calculations for accounting periods.",
+    "keywords": ["fixed assets", "depreciation", "disposal", "asset register", "amortization", "accounting"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "fixed_assets.view_asset",
+    "fixed_assets.manage_asset",
+    "fixed_assets.depreciate"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "fixed_assets.view_asset",
+      "fixed_assets.manage_asset",
+      "fixed_assets.depreciate"
+    ],
+    "employee": [
+      "fixed_assets.view_asset"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "assets",
+      "label": "Assets",
+      "icon": "cube-outline",
+      "component": "erp-fixed-assets-assets"
+    },
+    {
+      "id": "depreciations",
+      "label": "Depreciations",
+      "icon": "trending-down-outline",
+      "component": "erp-fixed-assets-depreciations"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "fixed_assets.assets.list": {
+      "permission": "fixed_assets.view_asset",
+      "sql": "queries/assets_list.sql",
+      "ai": { "description": "Lists registered fixed assets with their current status and book value." }
+    },
+    "fixed_assets.assets.get": {
+      "permission": "fixed_assets.view_asset",
+      "sql": "queries/asset_get.sql",
+      "ai": { "description": "Retrieves the full detail of a fixed asset by its ID." }
+    },
+    "fixed_assets.depreciations.list": {
+      "permission": "fixed_assets.view_asset",
+      "sql": "queries/depreciations_list.sql",
+      "ai": { "description": "Lists the depreciation entries recorded for fixed assets." }
+    },
+    "fixed_assets.disposals.get": {
+      "permission": "fixed_assets.view_asset",
+      "sql": "queries/disposal_get.sql",
+      "ai": { "description": "Retrieves the disposal or write-off record of a fixed asset by its ID." }
+    }
+  },
+  "commands": {
+    "fixed_assets.assets.register": {
+      "permission": "fixed_assets.manage_asset",
+      "transaction": true,
+      "sql": [
+        "commands/asset_register.sql"
+      ],
+      "schema": "schemas/asset_register.json",
+      "emit": [
+        "fixed_assets.asset.registered"
+      ],
+      "ai": { "description": "Registers a new fixed asset with its acquisition data and valuation details." }
+    },
+    "fixed_assets.assets.update": {
+      "permission": "fixed_assets.manage_asset",
+      "transaction": true,
+      "sql": [
+        "commands/asset_update.sql"
+      ],
+      "schema": "schemas/asset_update.json",
+      "emit": [
+        "fixed_assets.asset.updated"
+      ],
+      "ai": { "description": "Updates an existing fixed asset's data (location, description, value, etc.)." }
+    },
+    "fixed_assets.assets.dispose": {
+      "permission": "fixed_assets.manage_asset",
+      "schema": "schemas/asset_dispose.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "dispose_asset"
+      },
+      "emit": [
+        "fixed_assets.asset.disposed"
+      ],
+      "ai": { "description": "Disposes of (writes off or sells) a fixed asset, recording the disposal details (destructive)." }
+    },
+    "fixed_assets.depreciations.post": {
+      "permission": "fixed_assets.depreciate",
+      "schema": "schemas/depreciation_post.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "post_depreciation"
+      },
+      "emit": [
+        "fixed_assets.depreciation.posted"
+      ],
+      "ai": { "description": "Posts the depreciation of a fixed asset for the specified accounting period." }
+    },
+    "fixed_assets.depreciations.run_monthly": {
+      "permission": "fixed_assets.depreciate",
+      "schema": "schemas/depreciation_run_monthly.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "run_monthly_depreciation"
+      },
+      "emit": [
+        "fixed_assets.depreciation.posted"
+      ],
+      "ai": { "description": "Runs the automatic monthly depreciation process for all active fixed assets." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/fixed_assets.esm.js"
+  }
+}

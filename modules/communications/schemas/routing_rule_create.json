@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "communications.routing_rules.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["group_id", "name"],
+  "properties": {
+    "group_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "priority": { "type": "integer", "minimum": 0, "default": 0 },
+    "is_active": { "type": "integer", "enum": [0, 1], "default": 1 },
+    "conditions": { "type": "string", "default": "{}" },
+    "auto_assign_to_id": { "type": ["string", "null"], "default": null },
+    "auto_label": { "type": "string", "default": "[]" },
+    "auto_priority": { "type": "string", "enum": ["", "low", "normal", "high", "urgent"], "default": "" }
+  }
+}

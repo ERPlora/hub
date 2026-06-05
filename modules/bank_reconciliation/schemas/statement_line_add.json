@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bank_reconciliation.lines.add",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["statement_id", "amount"],
+  "properties": {
+    "statement_id": { "type": "string", "minLength": 1 },
+    "transaction_date": { "type": ["string", "null"], "format": "date", "default": null },
+    "amount": { "type": "number", "default": 0 },
+    "description": { "type": "string", "default": "", "maxLength": 500 },
+    "counterparty": { "type": "string", "default": "", "maxLength": 255 },
+    "reference": { "type": "string", "default": "", "maxLength": 100 }
+  }
+}

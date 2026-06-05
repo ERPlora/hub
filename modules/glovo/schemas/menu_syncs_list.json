@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "glovo.menu_syncs.list",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["store_id"],
+  "properties": {
+    "store_id": { "type": "string", "minLength": 1 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+  }
+}

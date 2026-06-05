@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-uber_eats",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo uber_eats (manifest declarativo + Web Components Stencil): conector a la API de Uber Eats — restaurantes, pedidos, menús y eventos de webhook con ingesta idempotente. La lógica de idempotencia, numeración y agregación va en WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

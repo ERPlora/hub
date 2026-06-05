@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "email_marketing.events.record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["campaign_id", "subscriber_id", "event_type"],
+  "properties": {
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "subscriber_id": { "type": "string", "minLength": 1 },
+    "event_type": {
+      "type": "string",
+      "enum": ["sent", "open", "click", "bounce", "unsubscribe"]
+    },
+    "metadata": { "type": ["object", "null"], "default": null }
+  }
+}

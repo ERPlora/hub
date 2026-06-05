@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "payment_gateways.transactions.list params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "gateway_id": { "type": "string", "default": "" },
+    "status": { "type": "string", "enum": ["", "pending", "processing", "succeeded", "failed", "refunded", "partially_refunded"], "default": "" },
+    "customer_email": { "type": "string", "default": "" }
+  }
+}

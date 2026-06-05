@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "verifactu.contingency.process",
+  "description": "Procesa por lotes la cola de contingencia (tarea programada cada 5 min o trigger manual). Backoff exponencial + transmisión a AEAT — lógica en WASM, ver WASM-TODO.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_romania.efactura.get",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["efactura_id"],
+  "properties": {
+    "efactura_id": { "type": "string", "minLength": 1 }
+  }
+}

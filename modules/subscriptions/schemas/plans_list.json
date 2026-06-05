@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "subscriptions.plans.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "active_only": { "type": "string", "enum": ["", "1"], "default": "1" }
+  }
+}

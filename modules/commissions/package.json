@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-commissions",
+  "private": true,
+  "version": "1.0.8",
+  "type": "module",
+  "description": "Módulo commissions (manifest declarativo + Web Components Stencil): reglas de comisión, transacciones devengadas, lotes de pago y ajustes manuales. La lógica de cálculo (flat/percentage/tiered), retención fiscal y batch de payouts vive en WASM (ver WASM-TODO.md). Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

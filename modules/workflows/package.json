@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-workflows",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo workflows (manifest declarativo + Web Components Stencil): motor de automatización con disparadores, condiciones y acciones, más historial de ejecuciones. La lógica de ejecución (evaluación de condiciones, generación de pasos, contadores) vive en un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

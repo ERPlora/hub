@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "audit_log.events.get",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id"],
+  "properties": {
+    "event_id": { "type": "string", "minLength": 1 }
+  }
+}

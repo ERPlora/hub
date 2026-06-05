@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "picking_packing.picks.record_line",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pick_list_id", "line_id", "quantity_picked"],
+  "properties": {
+    "pick_list_id": { "type": "string", "minLength": 1 },
+    "line_id": { "type": "string", "minLength": 1 },
+    "quantity_picked": { "type": "number", "minimum": 0 },
+    "location_ref": { "type": "string", "default": "", "maxLength": 100 }
+  }
+}

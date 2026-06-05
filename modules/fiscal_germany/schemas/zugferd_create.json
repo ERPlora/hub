@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_germany.zugferd.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["supplier_ust_id", "customer_name", "total_netto", "total_brutto"],
+  "properties": {
+    "invoice_ref": { "type": "string", "maxLength": 100, "default": "" },
+    "supplier_ust_id": { "type": "string", "pattern": "^DE[0-9]{9}$", "maxLength": 20 },
+    "customer_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "total_netto": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$" },
+    "total_brutto": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$" },
+    "profile": { "type": "string", "enum": ["basic", "comfort", "extended"], "default": "comfort" }
+  }
+}

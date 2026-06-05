@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "opportunities.activities.log",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["opportunity_id", "activity_type"],
+  "properties": {
+    "opportunity_id": { "type": "string", "minLength": 1 },
+    "activity_type": { "type": "string", "enum": ["call", "email", "meeting", "note"] },
+    "description": { "type": "string", "default": "" },
+    "scheduled_for": { "type": ["string", "null"], "default": null }
+  }
+}

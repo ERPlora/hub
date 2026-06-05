@@ -1,0 +1,168 @@
+{
+  "id": "contracts",
+  "name": "Contracts",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages customer contracts: create, activate, suspend, resume, terminate, and track billing milestones for recurring services and one-off agreements.",
+    "keywords": ["contract", "agreement", "milestone", "billing", "recurring", "service", "activation", "termination"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "contracts.view_contract",
+    "contracts.add_contract",
+    "contracts.activate_contract",
+    "contracts.terminate_contract"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "contracts.view_contract",
+      "contracts.add_contract",
+      "contracts.activate_contract",
+      "contracts.terminate_contract"
+    ],
+    "employee": [
+      "contracts.view_contract"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Contracts",
+      "icon": "reader-outline",
+      "component": "erp-contracts-list"
+    }
+  ],
+  "ai_context": "Module: Contracts (id=contracts, v1.0.0). Purpose: customer contracts — recurring services, maintenance and one-off service agreements. Models: Contract (lifecycle draft→active→suspended/terminated/expired, monthly/total amounts, auto-renew, COR-YYYYMMDD-NNNN auto number) and ContractMilestone (billing milestones with due_date, amount, invoiced state). Queries: contracts.contracts.list, contracts.contracts.get, contracts.milestones.list. Commands: contracts.contracts.create, .activate, .suspend, .resume, .terminate, .expire_old; contracts.milestones.add, .mark_invoiced. Permissions: view_contract, add_contract, activate_contract, terminate_contract.",
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "contracts.contracts.list": {
+      "permission": "contracts.view_contract",
+      "sql": "queries/contracts_list.sql",
+      "schema": "schemas/contracts_list.json",
+      "ai": { "description": "Lists all contracts with their status and main details." }
+    },
+    "contracts.contracts.get": {
+      "permission": "contracts.view_contract",
+      "sql": "queries/contract_get.sql",
+      "schema": "schemas/contract_get.json",
+      "ai": { "description": "Retrieves the full details of a contract by its identifier." }
+    },
+    "contracts.milestones.list": {
+      "permission": "contracts.view_contract",
+      "sql": "queries/milestones_list.sql",
+      "schema": "schemas/milestones_list.json",
+      "ai": { "description": "Lists the billing milestones associated with a contract." }
+    }
+  },
+  "commands": {
+    "contracts.contracts.create": {
+      "permission": "contracts.add_contract",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_contract"
+      },
+      "emit": [
+        "contracts.contract.created"
+      ],
+      "ai": { "description": "Creates a new contract with customer, amounts, and renewal conditions." }
+    },
+    "contracts.contracts.activate": {
+      "permission": "contracts.activate_contract",
+      "transaction": true,
+      "sql": [
+        "commands/contract_activate.sql"
+      ],
+      "schema": "schemas/contract_activate.json",
+      "emit": [
+        "contracts.contract.activated"
+      ],
+      "ai": { "description": "Activates a draft contract to bring it into force." }
+    },
+    "contracts.contracts.suspend": {
+      "permission": "contracts.terminate_contract",
+      "transaction": true,
+      "sql": [
+        "commands/contract_suspend.sql"
+      ],
+      "schema": "schemas/contract_suspend.json",
+      "emit": [
+        "contracts.contract.suspended"
+      ],
+      "ai": { "description": "Temporarily suspends an active contract." }
+    },
+    "contracts.contracts.resume": {
+      "permission": "contracts.activate_contract",
+      "transaction": true,
+      "sql": [
+        "commands/contract_resume.sql"
+      ],
+      "schema": "schemas/contract_resume.json",
+      "emit": [
+        "contracts.contract.resumed"
+      ],
+      "ai": { "description": "Resumes a previously suspended contract." }
+    },
+    "contracts.contracts.terminate": {
+      "permission": "contracts.terminate_contract",
+      "transaction": true,
+      "sql": [
+        "commands/contract_terminate.sql"
+      ],
+      "schema": "schemas/contract_terminate.json",
+      "emit": [
+        "contracts.contract.terminated"
+      ],
+      "ai": { "description": "Permanently terminates an active or suspended contract (destructive)." }
+    },
+    "contracts.contracts.expire_old": {
+      "permission": "contracts.terminate_contract",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "expire_old_contracts"
+      },
+      "emit": [
+        "contracts.contract.expired"
+      ],
+      "ai": { "description": "Marks all contracts whose end date has passed as expired." }
+    },
+    "contracts.milestones.add": {
+      "permission": "contracts.add_contract",
+      "transaction": true,
+      "sql": [
+        "commands/milestone_add.sql"
+      ],
+      "schema": "schemas/milestone_add.json",
+      "emit": [
+        "contracts.milestone.added"
+      ],
+      "ai": { "description": "Adds a billing milestone to an existing contract." }
+    },
+    "contracts.milestones.mark_invoiced": {
+      "permission": "contracts.add_contract",
+      "transaction": true,
+      "sql": [
+        "commands/milestone_mark_invoiced.sql"
+      ],
+      "schema": "schemas/milestone_mark_invoiced.json",
+      "emit": [
+        "contracts.milestone.invoiced"
+      ],
+      "ai": { "description": "Marks a billing milestone as already invoiced." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/contracts.esm.js"
+  }
+}

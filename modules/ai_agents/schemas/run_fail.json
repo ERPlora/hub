@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai_agents.runs.fail",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "error_message"],
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "error_message": { "type": "string" }
+  }
+}

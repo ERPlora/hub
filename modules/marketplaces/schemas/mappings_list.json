@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "marketplaces.mappings.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "connection_id": { "type": "string", "default": "" },
+    "sync_status": {
+      "type": "string",
+      "enum": ["", "synced", "error", "pending"],
+      "default": ""
+    },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 }
+  }
+}

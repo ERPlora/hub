@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "manufacturing_orders.orders.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["", "draft", "released", "in_progress", "completed", "cancelled"],
+      "default": ""
+    },
+    "product_ref": { "type": "string", "default": "", "maxLength": 255 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+  }
+}

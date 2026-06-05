@@ -1,0 +1,136 @@
+{
+  "id": "accounting",
+  "name": "Accounting",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages the chart of accounts and journal entries: list accounts and entries, post or cancel entries, and generate trial balance reports.",
+    "keywords": ["accounting", "journal", "entry", "ledger", "account", "trial balance", "finance"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "accounting.view_account",
+    "accounting.manage_account",
+    "accounting.post_entry",
+    "accounting.view_report"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": [
+      "accounting.view_account",
+      "accounting.manage_account",
+      "accounting.post_entry",
+      "accounting.view_report"
+    ],
+    "employee": [
+      "accounting.view_account",
+      "accounting.view_report"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "accounts",
+      "label": "Chart of Accounts",
+      "icon": "calculator-outline",
+      "component": "erp-accounting-accounts"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "accounting.accounts.list": {
+      "permission": "accounting.view_account",
+      "sql": "queries/accounts_list.sql",
+      "ai": { "description": "Lists all accounts in the chart of accounts." }
+    },
+    "accounting.entries.list": {
+      "permission": "accounting.view_account",
+      "sql": "queries/entries_list.sql",
+      "ai": { "description": "Lists recorded journal entries." }
+    },
+    "accounting.entries.get": {
+      "permission": "accounting.view_account",
+      "sql": "queries/entry_get.sql",
+      "ai": { "description": "Gets the full detail of a specific journal entry." }
+    },
+    "accounting.lines.by_entry": {
+      "permission": "accounting.view_account",
+      "sql": "queries/lines_by_entry.sql",
+      "ai": { "description": "Gets the debit/credit lines belonging to a journal entry." }
+    },
+    "accounting.reports.trial_balance": {
+      "permission": "accounting.view_report",
+      "sql": "queries/trial_balance.sql",
+      "ai": { "description": "Generates the trial balance report with running balances per account." }
+    }
+  },
+  "commands": {
+    "accounting.accounts.create": {
+      "permission": "accounting.manage_account",
+      "transaction": true,
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_account"
+      },
+      "schema": "schemas/account_create.json",
+      "sql": [
+        "commands/account_create.sql"
+      ],
+      "emit": [
+        "accounting.account.created"
+      ],
+      "ai": { "description": "Creates a new account in the chart of accounts." }
+    },
+    "accounting.entries.create": {
+      "permission": "accounting.post_entry",
+      "transaction": true,
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_entry"
+      },
+      "schema": "schemas/entry_create.json",
+      "emit": [
+        "accounting.entry.created"
+      ],
+      "ai": { "description": "Creates a new journal entry in draft status." }
+    },
+    "accounting.entries.post": {
+      "permission": "accounting.post_entry",
+      "transaction": true,
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "post_entry"
+      },
+      "schema": "schemas/entry_post.json",
+      "emit": [
+        "accounting.entry.posted"
+      ],
+      "ai": { "description": "Posts (confirms) a draft journal entry, making it permanent in the ledger." }
+    },
+    "accounting.entries.cancel": {
+      "permission": "accounting.post_entry",
+      "transaction": true,
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "cancel_entry"
+      },
+      "schema": "schemas/entry_cancel.json",
+      "emit": [
+        "accounting.entry.cancelled"
+      ],
+      "ai": { "description": "Cancels a journal entry, reversing its effect on account balances (destructive)." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/accounting.esm.js"
+  }
+}

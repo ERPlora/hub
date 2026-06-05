@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "customer_portal.sessions.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "account_id": { "type": "string", "default": "" },
+    "active_only": { "type": "integer", "enum": [0, 1], "default": 1 }
+  }
+}

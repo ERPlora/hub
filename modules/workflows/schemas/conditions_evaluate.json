@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "workflows.conditions.evaluate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["conditions", "context"],
+  "properties": {
+    "conditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field", "op"],
+        "properties": {
+          "field": { "type": "string" },
+          "op": {
+            "type": "string",
+            "enum": ["eq", "ne", "gt", "gte", "lt", "lte", "in", "nin", "contains", "exists", "truthy", "falsy"]
+          },
+          "value": {}
+        }
+      }
+    },
+    "context": { "type": "object" }
+  }
+}

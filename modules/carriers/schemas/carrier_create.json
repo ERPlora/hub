@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "carriers.carriers.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "name", "provider"],
+  "properties": {
+    "code": { "type": "string", "minLength": 1, "maxLength": 50 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "provider": {
+      "type": "string",
+      "enum": ["seur", "mrw", "gls", "dhl", "ups", "correos", "nacex", "zeleris", "custom"]
+    },
+    "service_types": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "supports_pickup": { "type": "boolean", "default": true },
+    "supports_tracking": { "type": "boolean", "default": true },
+    "max_weight_kg": { "type": ["number", "null"], "minimum": 0, "default": null },
+    "max_dimensions": {
+      "type": ["object", "null"],
+      "default": null,
+      "properties": {
+        "length_cm": { "type": "number", "minimum": 0 },
+        "width_cm": { "type": "number", "minimum": 0 },
+        "height_cm": { "type": "number", "minimum": 0 }
+      }
+    },
+    "account_credentials_hash": { "type": "string", "default": "", "maxLength": 255 }
+  }
+}

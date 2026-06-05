@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "picking_packing.packages.create",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "pick_list_ref": { "type": "string", "default": "", "maxLength": 100 },
+    "weight_kg": { "type": "number", "minimum": 0, "default": 0 },
+    "carrier": { "type": "string", "default": "", "maxLength": 100 }
+  }
+}

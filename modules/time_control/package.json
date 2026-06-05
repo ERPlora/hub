@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-time_control",
+  "private": true,
+  "version": "2.0.8",
+  "type": "module",
+  "description": "Módulo time_control (manifest declarativo + Web Components Stencil): control horario de empleados con geolocalización y geofencing, fichajes (clock in/out), centros de trabajo y resúmenes diarios. Cumple la Ley española de registro de jornada (RDL 8/2019). Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

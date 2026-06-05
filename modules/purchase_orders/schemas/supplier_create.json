@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "purchase_orders.suppliers.create payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "tax_id": { "type": "string", "default": "" },
+    "email": { "type": "string", "default": "" },
+    "phone": { "type": "string", "default": "" },
+    "address": { "type": "string", "default": "" },
+    "notes": { "type": "string", "default": "" }
+  }
+}

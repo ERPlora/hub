@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "online_store.products.publish",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["product_id"],
+  "properties": {
+    "product_id": { "type": "string", "minLength": 1 }
+  }
+}

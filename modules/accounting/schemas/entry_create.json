@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "accounting.entries.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entry_date", "lines"],
+  "properties": {
+    "entry_date": { "type": "string", "format": "date" },
+    "reference": { "type": "string", "default": "", "maxLength": 100 },
+    "description": { "type": "string", "default": "" },
+    "lines": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["account_id"],
+        "properties": {
+          "account_id": { "type": "string", "minLength": 1 },
+          "debit": { "type": ["number", "string"], "default": 0 },
+          "credit": { "type": ["number", "string"], "default": 0 },
+          "description": { "type": "string", "default": "" }
+        }
+      }
+    }
+  }
+}

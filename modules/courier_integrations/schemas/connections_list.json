@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "courier_integrations.connections.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "active_only": { "type": "integer", "enum": [0, 1], "default": 1 },
+    "courier_code": {
+      "type": "string",
+      "enum": ["", "seur", "mrw", "gls", "dhl", "ups", "correos", "nacex"],
+      "default": ""
+    }
+  }
+}

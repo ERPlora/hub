@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "project_billing.contracts.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "project_ref": { "type": "string", "default": "" },
+    "status": {
+      "type": "string",
+      "enum": ["", "draft", "active", "completed", "cancelled"],
+      "default": ""
+    },
+    "billing_type": {
+      "type": "string",
+      "enum": ["", "fixed_price", "time_and_material", "milestone", "retainer"],
+      "default": ""
+    },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+  }
+}

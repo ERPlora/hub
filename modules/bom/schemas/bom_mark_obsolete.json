@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bom.boms.mark_obsolete",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bom_id"],
+  "properties": {
+    "bom_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "default": "", "maxLength": 500 }
+  }
+}

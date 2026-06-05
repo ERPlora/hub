@@ -1,0 +1,110 @@
+{
+  "id": "setup",
+  "name": "Setup Wizard",
+  "version": "0.1.0",
+  "agent": {
+    "description": "Guides the initial system configuration wizard: start, skip, complete, or fail the onboarding setup process, and apply predefined configuration templates.",
+    "keywords": ["setup", "wizard", "onboarding", "configuration", "template", "initial", "install"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "setup.run_setup"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [],
+    "employee": []
+  },
+  "navigation": [
+    {
+      "id": "wizard",
+      "label": "Asistente",
+      "icon": "rocket-outline",
+      "component": "erp-setup-wizard"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "setup.state.get": {
+      "permission": "setup.run_setup",
+      "sql": "queries/state_get.sql",
+      "ai": { "description": "Retrieves the current state of the initial setup wizard" }
+    }
+  },
+  "commands": {
+    "setup.state.start": {
+      "permission": "setup.run_setup",
+      "transaction": true,
+      "sql": [
+        "commands/state_start.sql"
+      ],
+      "schema": "schemas/state_start.json",
+      "emit": [
+        "setup.started"
+      ],
+      "ai": { "description": "Starts the initial system configuration process" }
+    },
+    "setup.state.skip": {
+      "permission": "setup.run_setup",
+      "transaction": true,
+      "sql": [
+        "commands/state_skip.sql"
+      ],
+      "schema": "schemas/state_skip.json",
+      "emit": [
+        "setup.skipped"
+      ],
+      "ai": { "description": "Skips the initial setup wizard without completing it" }
+    },
+    "setup.state.complete": {
+      "permission": "setup.run_setup",
+      "transaction": true,
+      "sql": [
+        "commands/state_complete.sql"
+      ],
+      "schema": "schemas/state_complete.json",
+      "emit": [
+        "setup.completed"
+      ],
+      "ai": { "description": "Marks the initial setup process as completed" }
+    },
+    "setup.state.fail": {
+      "permission": "setup.run_setup",
+      "transaction": true,
+      "sql": [
+        "commands/state_fail.sql"
+      ],
+      "schema": "schemas/state_fail.json",
+      "emit": [
+        "setup.failed"
+      ],
+      "ai": { "description": "Records a failure in the initial setup process" }
+    },
+    "setup.template.apply": {
+      "permission": "setup.run_setup",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "apply_template"
+      },
+      "schema": "schemas/template_apply.json",
+      "emit": [
+        "setup.completed",
+        "setup.failed"
+      ],
+      "ai": { "description": "Applies a predefined configuration template to accelerate the initial setup process" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/setup.esm.js"
+  }
+}

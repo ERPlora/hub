@@ -1,0 +1,189 @@
+{
+  "id": "online_store",
+  "name": "Online Store",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages the public online store: publish and unpublish products, manage categories, update stock levels, configure the store, and maintain CMS pages.",
+    "keywords": ["store", "catalog", "product", "publish", "category", "cms", "page", "stock", "online"]
+  },
+  "icon": "storefront-outline",
+  "description": "Public storefront: catalog of published products, categories and CMS pages.",
+  "depends_on": [],
+  "permissions": [
+    "online_store.view_store",
+    "online_store.manage_store",
+    "online_store.publish_product"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "online_store.view_store",
+      "online_store.manage_store",
+      "online_store.publish_product"
+    ],
+    "employee": [
+      "online_store.view_store"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "products",
+      "label": "Catalog",
+      "icon": "storefront-outline",
+      "component": "erp-online-store-products"
+    },
+    {
+      "id": "pages",
+      "label": "Pages",
+      "icon": "document-text-outline",
+      "component": "erp-online-store-pages"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "online_store.config.get": {
+      "permission": "online_store.view_store",
+      "sql": "queries/config_get.sql",
+      "ai": { "description": "Retrieves the current configuration of the online store." }
+    },
+    "online_store.products.list": {
+      "permission": "online_store.view_store",
+      "sql": "queries/products_list.sql",
+      "ai": { "description": "Lists products in the online store catalog." }
+    },
+    "online_store.products.get": {
+      "permission": "online_store.view_store",
+      "sql": "queries/product_get.sql",
+      "ai": { "description": "Retrieves the details of an online store product by its ID." }
+    },
+    "online_store.categories.list": {
+      "permission": "online_store.view_store",
+      "sql": "queries/categories_list.sql",
+      "ai": { "description": "Lists product categories in the online store." }
+    },
+    "online_store.pages.list": {
+      "permission": "online_store.view_store",
+      "sql": "queries/pages_list.sql",
+      "ai": { "description": "Lists CMS pages published in the online store." }
+    }
+  },
+  "commands": {
+    "online_store.config.update": {
+      "permission": "online_store.manage_store",
+      "transaction": true,
+      "sql": [
+        "commands/config_update.sql"
+      ],
+      "schema": "schemas/config_update.json",
+      "emit": [
+        "online_store.config.updated"
+      ],
+      "ai": { "description": "Updates the general configuration of the online store." }
+    },
+    "online_store.products.create": {
+      "permission": "online_store.manage_store",
+      "transaction": true,
+      "sql": [
+        "commands/product_create.sql"
+      ],
+      "schema": "schemas/product_create.json",
+      "emit": [
+        "online_store.product.created"
+      ],
+      "ai": { "description": "Creates a new product in the online store catalog." }
+    },
+    "online_store.products.publish": {
+      "permission": "online_store.publish_product",
+      "transaction": true,
+      "sql": [
+        "commands/product_publish.sql"
+      ],
+      "schema": "schemas/product_publish.json",
+      "emit": [
+        "online_store.product.published"
+      ],
+      "ai": { "description": "Publishes a product so it becomes visible in the online store." }
+    },
+    "online_store.products.unpublish": {
+      "permission": "online_store.publish_product",
+      "transaction": true,
+      "sql": [
+        "commands/product_unpublish.sql"
+      ],
+      "schema": "schemas/product_publish.json",
+      "emit": [
+        "online_store.product.unpublished"
+      ],
+      "ai": { "description": "Unpublishes a product to hide it from the online store." }
+    },
+    "online_store.products.update_stock": {
+      "permission": "online_store.manage_store",
+      "transaction": true,
+      "sql": [
+        "commands/product_update_stock.sql"
+      ],
+      "schema": "schemas/product_update_stock.json",
+      "emit": [
+        "online_store.product.stock_updated"
+      ],
+      "ai": { "description": "Updates the available stock of a product in the online store." }
+    },
+    "online_store.products.delete": {
+      "permission": "online_store.manage_store",
+      "transaction": true,
+      "sql": [
+        "commands/product_delete.sql"
+      ],
+      "schema": "schemas/product_delete.json",
+      "emit": [
+        "online_store.product.deleted"
+      ],
+      "ai": { "description": "Deletes a product from the online store catalog (destructive)." }
+    },
+    "online_store.categories.create": {
+      "permission": "online_store.manage_store",
+      "transaction": true,
+      "sql": [
+        "commands/category_create.sql"
+      ],
+      "schema": "schemas/category_create.json",
+      "emit": [
+        "online_store.category.created"
+      ],
+      "ai": { "description": "Creates a new product category in the online store." }
+    },
+    "online_store.pages.create": {
+      "permission": "online_store.manage_store",
+      "transaction": true,
+      "sql": [
+        "commands/page_create.sql"
+      ],
+      "schema": "schemas/page_create.json",
+      "emit": [
+        "online_store.page.created"
+      ],
+      "ai": { "description": "Creates a new CMS page in the online store." }
+    },
+    "online_store.pages.publish": {
+      "permission": "online_store.manage_store",
+      "transaction": true,
+      "sql": [
+        "commands/page_publish.sql"
+      ],
+      "schema": "schemas/page_publish.json",
+      "emit": [
+        "online_store.page.published"
+      ],
+      "ai": { "description": "Publishes a CMS page so it becomes visible in the online store." }
+    }
+  },
+  "ui": {
+    "entry": "dist/online_store.esm.js"
+  }
+}

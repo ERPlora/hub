@@ -1,0 +1,149 @@
+{
+  "id": "activities",
+  "name": "Activities",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages activities and reminders: list, create, reassign, complete or cancel activities, add reminders, and retrieve activity statistics.",
+    "keywords": ["activity", "task", "reminder", "timeline", "assignment", "follow-up"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "activities.view_activity",
+    "activities.add_activity",
+    "activities.manage_activity"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "activities.view_activity",
+      "activities.add_activity",
+      "activities.manage_activity"
+    ],
+    "employee": [
+      "activities.view_activity",
+      "activities.add_activity",
+      "activities.manage_activity"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "timeline",
+      "label": "Timeline",
+      "icon": "time-outline",
+      "component": "erp-activities-timeline"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "activities.activities.list": {
+      "permission": "activities.view_activity",
+      "sql": "queries/activities_list.sql",
+      "schema": "schemas/activities_list.json",
+      "ai": { "description": "Lists recorded activities with their status and assignment." }
+    },
+    "activities.activities.get": {
+      "permission": "activities.view_activity",
+      "sql": "queries/activity_get.sql",
+      "schema": "schemas/activity_get.json",
+      "ai": { "description": "Gets the full detail of a specific activity." }
+    },
+    "activities.activities.pending_today": {
+      "permission": "activities.view_activity",
+      "sql": "queries/activities_pending_today.sql",
+      "schema": "schemas/activities_pending_today.json",
+      "ai": { "description": "Lists activities that are pending for today." }
+    },
+    "activities.reminders.list": {
+      "permission": "activities.view_activity",
+      "sql": "queries/reminders_list.sql",
+      "schema": "schemas/reminders_list.json",
+      "ai": { "description": "Lists reminders associated with activities." }
+    }
+  },
+  "commands": {
+    "activities.activities.create": {
+      "permission": "activities.add_activity",
+      "transaction": true,
+      "sql": [
+        "commands/activity_create.sql"
+      ],
+      "schema": "schemas/activity_create.json",
+      "emit": [
+        "activities.activity.created"
+      ],
+      "ai": { "description": "Creates a new activity assigned to a user or entity." }
+    },
+    "activities.activities.reassign": {
+      "permission": "activities.manage_activity",
+      "transaction": true,
+      "sql": [
+        "commands/activity_reassign.sql"
+      ],
+      "schema": "schemas/activity_reassign.json",
+      "emit": [
+        "activities.activity.reassigned"
+      ],
+      "ai": { "description": "Reassigns an activity to a different user." }
+    },
+    "activities.reminders.add": {
+      "permission": "activities.add_activity",
+      "transaction": true,
+      "sql": [
+        "commands/reminder_add.sql"
+      ],
+      "schema": "schemas/reminder_add.json",
+      "emit": [
+        "activities.reminder.added"
+      ],
+      "ai": { "description": "Adds a reminder to an existing activity." }
+    },
+    "activities.activities.complete": {
+      "permission": "activities.manage_activity",
+      "schema": "schemas/activity_complete.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "mark_completed"
+      },
+      "emit": [
+        "activities.activity.completed"
+      ],
+      "ai": { "description": "Marks an activity as completed." }
+    },
+    "activities.activities.cancel": {
+      "permission": "activities.manage_activity",
+      "schema": "schemas/activity_cancel.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "cancel_activity"
+      },
+      "emit": [
+        "activities.activity.cancelled"
+      ],
+      "ai": { "description": "Cancels a pending activity (destructive)." }
+    },
+    "activities.activities.stats": {
+      "permission": "activities.view_activity",
+      "schema": "schemas/activity_stats.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "get_activity_stats"
+      },
+      "ai": { "description": "Gets aggregated activity statistics broken down by status and user." }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/activities.esm.js"
+  }
+}

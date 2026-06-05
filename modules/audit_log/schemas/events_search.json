@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "audit_log.events.search",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["q"],
+  "properties": {
+    "q": { "type": "string", "minLength": 1 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 }
+  }
+}

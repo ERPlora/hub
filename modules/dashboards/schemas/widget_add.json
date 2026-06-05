@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dashboards.widgets.add",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dashboard_id", "widget_type", "title"],
+  "properties": {
+    "dashboard_id": { "type": "string", "minLength": 1 },
+    "widget_type": {
+      "type": "string",
+      "enum": ["kpi_card", "line_chart", "bar_chart", "pie_chart", "table", "gauge", "map"]
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "position_x": { "type": "integer", "minimum": 0, "default": 0 },
+    "position_y": { "type": "integer", "minimum": 0, "default": 0 },
+    "width": { "type": "integer", "minimum": 1, "default": 4 },
+    "height": { "type": "integer", "minimum": 1, "default": 3 },
+    "config": { "type": ["object", "array", "null"], "default": null }
+  }
+}

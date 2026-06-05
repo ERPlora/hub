@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-locations",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo locations (manifest declarativo + Web Components Stencil): almacenes, zonas, bins y posiciones de stock para picking, packing y recuentos periódicos. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "uber_eats.orders.cancel",
+  "description": "Cancela un pedido no entregado y anexa el motivo a customer_notes. Handler WASM: cancel_order.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["order_id"],
+  "properties": {
+    "order_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "default": "" }
+  }
+}

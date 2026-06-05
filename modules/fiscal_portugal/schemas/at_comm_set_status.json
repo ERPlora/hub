@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_portugal.at_comm.set_status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["comm_id", "new_status"],
+  "properties": {
+    "comm_id": { "type": "string", "minLength": 1 },
+    "new_status": {
+      "type": "string",
+      "enum": ["submitted", "accepted", "rejected"]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "attendance.settings.update",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "require_photo": { "type": ["boolean", "null"], "default": null },
+    "allow_manual_entry": { "type": ["boolean", "null"], "default": null },
+    "late_threshold_minutes": { "type": ["integer", "null"], "minimum": 0, "default": null },
+    "early_departure_minutes": { "type": ["integer", "null"], "minimum": 0, "default": null },
+    "auto_clock_out_hours": { "type": ["integer", "null"], "minimum": 0, "default": null }
+  }
+}

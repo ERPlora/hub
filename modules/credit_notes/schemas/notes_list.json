@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "credit_notes.notes.list params",
+  "type": "object",
+  "properties": {
+    "direction": {
+      "type": "string",
+      "description": "Filtro por dirección; vacío = todas.",
+      "enum": ["", "issued_to_customer", "received_from_supplier"],
+      "default": ""
+    },
+    "status": {
+      "type": "string",
+      "description": "Filtro por estado; vacío = todos.",
+      "enum": ["", "draft", "issued", "applied", "cancelled"],
+      "default": ""
+    },
+    "counterparty_name": {
+      "type": "string",
+      "description": "Búsqueda parcial por nombre de contraparte; vacío = sin filtro.",
+      "default": ""
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500,
+      "default": 50
+    }
+  },
+  "additionalProperties": false
+}

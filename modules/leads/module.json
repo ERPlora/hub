@@ -1,0 +1,172 @@
+{
+  "id": "leads",
+  "name": "Leads",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages sales leads through the pipeline: capture, qualify, disqualify, convert to customer, and track lead sources.",
+    "keywords": ["lead", "prospect", "sales", "pipeline", "qualify", "convert", "crm", "opportunity"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "leads.view_lead",
+    "leads.add_lead",
+    "leads.qualify_lead",
+    "leads.convert_lead"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "leads.view_lead",
+      "leads.add_lead",
+      "leads.qualify_lead",
+      "leads.convert_lead"
+    ],
+    "employee": [
+      "leads.view_lead",
+      "leads.add_lead"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Leads",
+      "icon": "funnel-outline",
+      "component": "erp-leads-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "leads.leads.list": {
+      "permission": "leads.view_lead",
+      "sql": "queries/leads_list.sql",
+      "schema": "schemas/leads_list.json",
+      "ai": { "description": "Lists leads with their current status and acquisition source" }
+    },
+    "leads.leads.get": {
+      "permission": "leads.view_lead",
+      "sql": "queries/lead_get.sql",
+      "schema": "schemas/lead_get.json",
+      "ai": { "description": "Retrieves the full detail of a lead by its identifier" }
+    },
+    "leads.sources.list": {
+      "permission": "leads.view_lead",
+      "sql": "queries/sources_list.sql",
+      "ai": { "description": "Lists the available lead acquisition sources" }
+    }
+  },
+  "commands": {
+    "leads.sources.create": {
+      "permission": "leads.add_lead",
+      "transaction": true,
+      "sql": [
+        "commands/source_create.sql"
+      ],
+      "schema": "schemas/source_create.json",
+      "emit": [
+        "leads.source.created"
+      ],
+      "ai": { "description": "Creates a new lead acquisition source" }
+    },
+    "leads.leads.create": {
+      "permission": "leads.add_lead",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_lead"
+      },
+      "schema": "schemas/lead_create.json",
+      "emit": [
+        "leads.lead.created"
+      ],
+      "ai": { "description": "Creates a new lead with contact details and acquisition source" }
+    },
+    "leads.leads.mark_contacted": {
+      "permission": "leads.add_lead",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "mark_contacted"
+      },
+      "schema": "schemas/lead_id.json",
+      "emit": [
+        "leads.lead.contacted"
+      ],
+      "ai": { "description": "Marks a lead as contacted by the sales team" }
+    },
+    "leads.leads.qualify": {
+      "permission": "leads.qualify_lead",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "qualify_lead"
+      },
+      "schema": "schemas/lead_qualify.json",
+      "emit": [
+        "leads.lead.qualified"
+      ],
+      "ai": { "description": "Qualifies a lead as a valid sales opportunity" }
+    },
+    "leads.leads.unqualify": {
+      "permission": "leads.qualify_lead",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "unqualify_lead"
+      },
+      "schema": "schemas/lead_reason.json",
+      "emit": [
+        "leads.lead.unqualified"
+      ],
+      "ai": { "description": "Disqualifies a lead with a reason indicating it is not a valid opportunity" }
+    },
+    "leads.leads.convert": {
+      "permission": "leads.convert_lead",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "convert_lead"
+      },
+      "emit": [
+        "leads.lead.converted"
+      ],
+      "ai": { "description": "Converts a lead into a customer or sales opportunity" }
+    },
+    "leads.leads.mark_lost": {
+      "permission": "leads.qualify_lead",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "mark_lost"
+      },
+      "schema": "schemas/lead_reason.json",
+      "emit": [
+        "leads.lead.lost"
+      ],
+      "ai": { "description": "Marks a lead as lost with a reason" }
+    },
+    "leads._insert_lead": {
+      "permission": "leads.add_lead",
+      "sql": [
+        "commands/_insert_lead.sql"
+      ]
+    },
+    "leads._set_status": {
+      "permission": "leads.add_lead",
+      "sql": [
+        "commands/_set_status.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/leads.esm.js"
+  }
+}

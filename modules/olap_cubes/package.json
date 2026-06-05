@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-olap_cubes",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo olap_cubes (manifest declarativo + Web Components Stencil): definición de cubos multidimensionales (dimensiones + medidas + filtros), ejecución de consultas agregadas y caché de slices. El CRUD de cubos es SQL declarativo; la agregación in-memory, el contador de nº de consulta y la gestión de caché con TTL van a un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

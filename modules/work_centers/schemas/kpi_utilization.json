@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "work_centers.kpi.utilization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["work_center_id", "period_start", "period_end"],
+  "properties": {
+    "work_center_id": { "type": "string", "minLength": 1 },
+    "period_start": { "type": "string", "minLength": 1 },
+    "period_end": { "type": "string", "minLength": 1 }
+  }
+}

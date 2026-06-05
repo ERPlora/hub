@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "setup.template.apply",
+  "description": "Payload del asistente: plantilla de sector + respuestas de negocio. La orquestación (instalar módulos, sembrar IVA/categorías/productos, identidad de negocio) la ejecuta el handler WASM — ver WASM-TODO.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["template_key"],
+  "properties": {
+    "template_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50,
+      "description": "Clave de la plantilla registrada (hairdresser|barbershop|bar_restaurant|pizzeria|kebab|...)."
+    },
+    "stock_control": { "type": "boolean", "default": true },
+    "online_booking": { "type": "boolean", "default": false },
+    "has_tables": { "type": "boolean", "default": false },
+    "has_delivery": { "type": "boolean", "default": false },
+    "business_name": { "type": "string", "default": "", "maxLength": 255 },
+    "business_address": { "type": "string", "default": "", "maxLength": 500 },
+    "business_tax_id": { "type": "string", "default": "", "maxLength": 50 },
+    "invites": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["email", "role"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string", "enum": ["admin", "manager", "employee"] }
+        }
+      }
+    }
+  }
+}

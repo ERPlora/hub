@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_germany.xrechnung.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["supplier_ust_id", "customer_leitweg_id", "total_netto", "total_steuer"],
+  "properties": {
+    "invoice_ref": { "type": "string", "maxLength": 100, "default": "" },
+    "supplier_ust_id": { "type": "string", "pattern": "^DE[0-9]{9}$", "maxLength": 20 },
+    "customer_leitweg_id": { "type": "string", "minLength": 1, "maxLength": 60 },
+    "total_netto": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$" },
+    "total_steuer": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$" }
+  }
+}

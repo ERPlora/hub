@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rules_triggers.rules.update",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rule_id"],
+  "properties": {
+    "rule_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "description": { "type": "string" },
+    "priority": { "type": "integer" },
+    "stop_on_match": { "type": "boolean" },
+    "is_active": { "type": "boolean" },
+    "trigger_id": { "type": ["string", "null"] },
+    "conditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field", "op"],
+        "properties": {
+          "field": { "type": "string", "minLength": 1 },
+          "op": {
+            "type": "string",
+            "enum": ["eq", "ne", "gt", "gte", "lt", "lte", "in", "nin", "contains", "exists", "truthy", "falsy"]
+          },
+          "value": {}
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string", "minLength": 1 },
+          "params": { "type": "object", "default": {} }
+        }
+      }
+    }
+  }
+}

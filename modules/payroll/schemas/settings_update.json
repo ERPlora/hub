@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "payroll.settings.update",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "default_pay_period": {
+      "type": "string",
+      "enum": ["weekly", "biweekly", "monthly"],
+      "default": "monthly"
+    },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 10, "default": "EUR" },
+    "overtime_multiplier": { "type": "number", "minimum": 0, "default": 1.5 },
+    "night_shift_multiplier": { "type": "number", "minimum": 0, "default": 1.25 },
+    "holiday_multiplier": { "type": "number", "minimum": 0, "default": 2.0 },
+    "social_security_rate": { "type": "number", "minimum": 0, "maximum": 100, "default": 6.35 },
+    "income_tax_rate": { "type": "number", "minimum": 0, "maximum": 100, "default": 15.0 },
+    "auto_calculate_deductions": { "type": "boolean", "default": true }
+  }
+}

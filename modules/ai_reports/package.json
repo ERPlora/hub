@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-ai_reports",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo ai_reports (manifest declarativo + Web Components Stencil): plantillas de prompt reutilizables y un registro auditado de peticiones de informe respaldadas por LLM (prompt, respuesta, tokens, coste, ciclo de vida). El ciclo de vida y el contador atómico viven en un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

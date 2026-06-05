@@ -1,0 +1,173 @@
+{
+  "id": "manufacturing_orders",
+  "name": "Manufacturing Orders",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages manufacturing orders: create, release, start, complete, and cancel production orders while tracking material consumption and output quantities.",
+    "keywords": ["manufacturing", "production", "work-order", "bom", "materials", "consumption", "factory"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "manufacturing_orders.view_mo",
+    "manufacturing_orders.add_mo",
+    "manufacturing_orders.release_mo",
+    "manufacturing_orders.complete_mo"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "manufacturing_orders.view_mo",
+      "manufacturing_orders.add_mo",
+      "manufacturing_orders.release_mo",
+      "manufacturing_orders.complete_mo"
+    ],
+    "employee": [
+      "manufacturing_orders.view_mo"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Manufacturing Orders",
+      "icon": "construct-outline",
+      "component": "erp-manufacturing-orders-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "manufacturing_orders.orders.list": {
+      "permission": "manufacturing_orders.view_mo",
+      "sql": "queries/orders_list.sql",
+      "schema": "schemas/orders_list.json",
+      "ai": { "description": "Lists manufacturing orders with their current status and progress." }
+    },
+    "manufacturing_orders.orders.get": {
+      "permission": "manufacturing_orders.view_mo",
+      "sql": "queries/order_get.sql",
+      "schema": "schemas/order_get.json",
+      "ai": { "description": "Returns the full details of a manufacturing order by its identifier." }
+    },
+    "manufacturing_orders.materials.list": {
+      "permission": "manufacturing_orders.view_mo",
+      "sql": "queries/materials_list.sql",
+      "schema": "schemas/materials_list.json",
+      "ai": { "description": "Lists the required and consumed materials for a manufacturing order." }
+    }
+  },
+  "commands": {
+    "manufacturing_orders.orders.create": {
+      "permission": "manufacturing_orders.add_mo",
+      "schema": "schemas/create_mo.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_mo"
+      },
+      "emit": [
+        "manufacturing_orders.mo.created"
+      ],
+      "ai": { "description": "Creates a new manufacturing order with materials and target production quantity." }
+    },
+    "manufacturing_orders.orders.release": {
+      "permission": "manufacturing_orders.release_mo",
+      "transaction": true,
+      "sql": [
+        "commands/order_release.sql"
+      ],
+      "schema": "schemas/order_release.json",
+      "emit": [
+        "manufacturing_orders.mo.released"
+      ],
+      "ai": { "description": "Releases a manufacturing order so it can begin execution on the shop floor." }
+    },
+    "manufacturing_orders.orders.start": {
+      "permission": "manufacturing_orders.release_mo",
+      "transaction": true,
+      "sql": [
+        "commands/order_start.sql"
+      ],
+      "schema": "schemas/order_start.json",
+      "emit": [
+        "manufacturing_orders.mo.started"
+      ],
+      "ai": { "description": "Starts production on a manufacturing order, marking it as in-progress." }
+    },
+    "manufacturing_orders.orders.complete": {
+      "permission": "manufacturing_orders.complete_mo",
+      "transaction": true,
+      "sql": [
+        "commands/order_complete.sql"
+      ],
+      "schema": "schemas/order_complete.json",
+      "emit": [
+        "manufacturing_orders.mo.completed"
+      ],
+      "ai": { "description": "Completes a manufacturing order by recording produced units and updating stock." }
+    },
+    "manufacturing_orders.orders.cancel": {
+      "permission": "manufacturing_orders.release_mo",
+      "transaction": true,
+      "sql": [
+        "commands/order_cancel.sql"
+      ],
+      "schema": "schemas/order_cancel.json",
+      "emit": [
+        "manufacturing_orders.mo.cancelled"
+      ],
+      "ai": { "description": "Cancels a manufacturing order before it is completed (destructive)." }
+    },
+    "manufacturing_orders.materials.record_consumption": {
+      "permission": "manufacturing_orders.release_mo",
+      "schema": "schemas/record_consumption.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "record_consumption"
+      },
+      "emit": [
+        "manufacturing_orders.material.consumed"
+      ],
+      "ai": { "description": "Records actual material consumption during execution of a manufacturing order." }
+    },
+    "manufacturing_orders.orders.summary": {
+      "permission": "manufacturing_orders.view_mo",
+      "schema": "schemas/get_mo_summary.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "get_mo_summary"
+      },
+      "ai": { "description": "Returns an aggregated summary of manufacturing order status and performance metrics." }
+    },
+    "manufacturing_orders._insert_order": {
+      "permission": "manufacturing_orders.add_mo",
+      "sql": [
+        "commands/_insert_order.sql"
+      ]
+    },
+    "manufacturing_orders._insert_material": {
+      "permission": "manufacturing_orders.add_mo",
+      "sql": [
+        "commands/_insert_material.sql"
+      ]
+    },
+    "manufacturing_orders._set_material_consumption": {
+      "permission": "manufacturing_orders.release_mo",
+      "sql": [
+        "commands/_set_material_consumption.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/manufacturing_orders.esm.js"
+  }
+}

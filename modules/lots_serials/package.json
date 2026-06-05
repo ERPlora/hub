@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-lots_serials",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo lots_serials (manifest declarativo + Web Components Stencil): lotes de producción con trazabilidad (intake/caducidad/recall) y números de serie por unidad (ciclo in_stock→sold→returned/scrapped). La lógica de movimientos de cantidad y recall va a WASM (Tier 2). Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

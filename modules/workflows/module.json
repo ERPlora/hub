@@ -1,0 +1,170 @@
+{
+  "id": "workflows",
+  "name": "Workflows",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages automated workflows: create, update, activate, deactivate, and execute workflows with their steps and conditions, and inspect execution run history.",
+    "keywords": ["workflow", "automation", "trigger", "run", "condition", "step", "process"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "workflows.view_wf",
+    "workflows.manage_wf",
+    "workflows.execute_wf"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "workflows.view_wf",
+      "workflows.manage_wf",
+      "workflows.execute_wf"
+    ],
+    "employee": [
+      "workflows.view_wf"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Workflows",
+      "icon": "flash-outline",
+      "component": "erp-workflows-list"
+    },
+    {
+      "id": "runs",
+      "label": "Runs",
+      "icon": "time-outline",
+      "component": "erp-workflows-runs"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "workflows.workflows.list": {
+      "permission": "workflows.view_wf",
+      "sql": "queries/workflows_list.sql",
+      "schema": "schemas/workflows_list.json",
+      "ai": { "description": "Lists all workflows defined in the system" }
+    },
+    "workflows.workflows.get": {
+      "permission": "workflows.view_wf",
+      "sql": "queries/workflow_get.sql",
+      "schema": "schemas/workflow_get.json",
+      "ai": { "description": "Retrieves the details of a workflow by its ID" }
+    },
+    "workflows.runs.list": {
+      "permission": "workflows.view_wf",
+      "sql": "queries/runs_list.sql",
+      "schema": "schemas/runs_list.json",
+      "ai": { "description": "Lists the execution run history of workflows" }
+    },
+    "workflows.runs.get": {
+      "permission": "workflows.view_wf",
+      "sql": "queries/run_get.sql",
+      "schema": "schemas/run_get.json",
+      "ai": { "description": "Retrieves the details of a workflow execution run by its ID" }
+    },
+    "workflows.steps.list": {
+      "permission": "workflows.view_wf",
+      "sql": "queries/steps_list.sql",
+      "schema": "schemas/steps_list.json",
+      "ai": { "description": "Lists the steps defined in a workflow" }
+    }
+  },
+  "commands": {
+    "workflows.workflows.create": {
+      "permission": "workflows.manage_wf",
+      "transaction": true,
+      "sql": [
+        "commands/workflow_create.sql"
+      ],
+      "schema": "schemas/workflow_create.json",
+      "emit": [
+        "workflows.workflow.created"
+      ],
+      "ai": { "description": "Creates a new workflow with its steps and conditions" }
+    },
+    "workflows.workflows.update": {
+      "permission": "workflows.manage_wf",
+      "transaction": true,
+      "sql": [
+        "commands/workflow_update.sql"
+      ],
+      "schema": "schemas/workflow_update.json",
+      "emit": [
+        "workflows.workflow.updated"
+      ],
+      "ai": { "description": "Updates the definition of an existing workflow" }
+    },
+    "workflows.workflows.activate": {
+      "permission": "workflows.manage_wf",
+      "transaction": true,
+      "sql": [
+        "commands/workflow_activate.sql"
+      ],
+      "schema": "schemas/workflow_activate.json",
+      "emit": [
+        "workflows.workflow.activated"
+      ],
+      "ai": { "description": "Activates a workflow so it can be triggered and executed" }
+    },
+    "workflows.workflows.deactivate": {
+      "permission": "workflows.manage_wf",
+      "transaction": true,
+      "sql": [
+        "commands/workflow_deactivate.sql"
+      ],
+      "schema": "schemas/workflow_deactivate.json",
+      "emit": [
+        "workflows.workflow.deactivated"
+      ],
+      "ai": { "description": "Deactivates a workflow so it stops being executed" }
+    },
+    "workflows.workflows.delete": {
+      "permission": "workflows.manage_wf",
+      "transaction": true,
+      "sql": [
+        "commands/workflow_delete.sql"
+      ],
+      "schema": "schemas/workflow_delete.json",
+      "emit": [
+        "workflows.workflow.deleted"
+      ],
+      "ai": { "description": "Soft-deletes a workflow while preserving its execution run history" }
+    },
+    "workflows.workflows.execute": {
+      "permission": "workflows.execute_wf",
+      "schema": "schemas/workflow_execute.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "execute_workflow"
+      },
+      "emit": [
+        "workflows.run.completed"
+      ],
+      "ai": { "description": "Manually or programmatically triggers the execution of a workflow" }
+    },
+    "workflows.conditions.evaluate": {
+      "permission": "workflows.view_wf",
+      "schema": "schemas/conditions_evaluate.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "evaluate_conditions"
+      },
+      "ai": { "description": "Evaluates the conditions of a workflow against a given data set" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/workflows.esm.js"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kitchen_orders.settings.update",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "auto_print_tickets": { "type": ["integer", "null"], "enum": [0, 1, null], "default": null },
+    "show_prep_time": { "type": ["integer", "null"], "enum": [0, 1, null], "default": null },
+    "alert_threshold_minutes": { "type": ["integer", "null"], "minimum": 0, "default": null },
+    "use_rounds": { "type": ["integer", "null"], "enum": [0, 1, null], "default": null },
+    "auto_fire_on_round": { "type": ["integer", "null"], "enum": [0, 1, null], "default": null },
+    "default_order_type": {
+      "type": ["string", "null"],
+      "enum": ["dine_in", "takeaway", "delivery", null],
+      "default": null
+    },
+    "sound_on_new_order": { "type": ["integer", "null"], "enum": [0, 1, null], "default": null }
+  }
+}

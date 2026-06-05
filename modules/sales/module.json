@@ -2,7 +2,10 @@
   "id": "sales",
   "name": "Sales & POS",
   "version": "2.4.9",
-  "manifest_kind": "declarative",
+  "agent": {
+    "description": "Manages sales and point-of-sale operations: list and inspect sales, complete new sales transactions, void sales, configure payment methods, and retrieve sales statistics.",
+    "keywords": ["sale", "pos", "payment", "transaction", "receipt", "void", "revenue", "checkout"]
+  },
   "depends_on": ["customers", "inventory"],
   "permissions": [
     "sales.view_sale", "sales.add_sale", "sales.change_sale", "sales.delete_sale",
@@ -22,20 +25,21 @@
   ],
   "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
   "queries": {
-    "sales.list":            { "permission": "sales.view_sale", "sql": "queries/list.sql" },
-    "sales.get":             { "permission": "sales.view_sale", "sql": "queries/get.sql" },
-    "sales.lines":           { "permission": "sales.view_sale", "sql": "queries/lines.sql" },
-    "sales.stats":           { "permission": "sales.view_reports", "sql": "queries/stats.sql" },
-    "sales.payment_methods": { "permission": "sales.view_paymentmethod", "sql": "queries/payment_methods.sql" }
+    "sales.list":            { "permission": "sales.view_sale", "sql": "queries/list.sql", "ai": { "description": "Lists sales records registered in the system" } },
+    "sales.get":             { "permission": "sales.view_sale", "sql": "queries/get.sql", "ai": { "description": "Retrieves the full detail of a sale by its identifier" } },
+    "sales.lines":           { "permission": "sales.view_sale", "sql": "queries/lines.sql", "ai": { "description": "Lists the product lines (items) belonging to a sale" } },
+    "sales.stats":           { "permission": "sales.view_reports", "sql": "queries/stats.sql", "ai": { "description": "Returns aggregated sales statistics and metrics" } },
+    "sales.payment_methods": { "permission": "sales.view_paymentmethod", "sql": "queries/payment_methods.sql", "ai": { "description": "Lists the available payment methods" } }
   },
   "commands": {
     "sales.complete_sale": {
       "permission": "sales.add_sale",
       "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "complete_sale" },
-      "schema": "schemas/complete_sale.json"
+      "schema": "schemas/complete_sale.json",
+      "ai": { "description": "Completes and records a sale with its line items and payment" }
     },
-    "sales.void": { "permission": "sales.void_sale", "transaction": true, "sql": ["commands/void.sql"], "emit": ["sale.voided"] },
-    "sales.create_payment_method": { "permission": "sales.add_paymentmethod", "transaction": true, "sql": ["commands/create_payment_method.sql"] },
+    "sales.void": { "permission": "sales.void_sale", "transaction": true, "sql": ["commands/void.sql"], "emit": ["sale.voided"], "ai": { "description": "Voids an existing sale and emits the corresponding event (destructive)" } },
+    "sales.create_payment_method": { "permission": "sales.add_paymentmethod", "transaction": true, "sql": ["commands/create_payment_method.sql"], "ai": { "description": "Creates a new payment method available for sales" } },
     "sales._bump_counter": { "permission": "sales.add_sale", "sql": ["commands/_bump_counter.sql"] },
     "sales._insert_sale":  { "permission": "sales.add_sale", "sql": ["commands/_insert_sale.sql"] },
     "sales._insert_line":  { "permission": "sales.add_sale", "sql": ["commands/_insert_line.sql"] }

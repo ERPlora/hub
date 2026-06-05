@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "courier_integrations.shipments.track",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["shipment_mapping_id"],
+  "properties": {
+    "shipment_mapping_id": { "type": "string", "minLength": 1 }
+  }
+}

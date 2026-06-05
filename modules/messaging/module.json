@@ -1,0 +1,207 @@
+{
+  "id": "messaging",
+  "name": "Messaging",
+  "version": "3.0.1",
+  "agent": {
+    "description": "Manages customer messaging: send individual messages, create and run bulk campaigns, manage message templates, and configure automated message triggers.",
+    "keywords": ["messaging", "sms", "whatsapp", "email", "campaign", "template", "automation", "notification"]
+  },
+  "depends_on": ["customers"],
+  "permissions": [
+    "messaging.view_message",
+    "messaging.send_message",
+    "messaging.view_template",
+    "messaging.add_template",
+    "messaging.change_template",
+    "messaging.delete_template",
+    "messaging.view_campaign",
+    "messaging.add_campaign",
+    "messaging.view_automation",
+    "messaging.add_automation",
+    "messaging.change_automation",
+    "messaging.delete_automation",
+    "messaging.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": [
+      "messaging.view_message",
+      "messaging.send_message",
+      "messaging.view_template",
+      "messaging.add_template",
+      "messaging.change_template",
+      "messaging.view_campaign",
+      "messaging.add_campaign",
+      "messaging.view_automation",
+      "messaging.add_automation",
+      "messaging.change_automation"
+    ],
+    "employee": [
+      "messaging.view_message",
+      "messaging.send_message",
+      "messaging.view_template",
+      "messaging.view_campaign",
+      "messaging.view_automation"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "messages",
+      "label": "Messages",
+      "icon": "chatbubble-outline",
+      "component": "erp-messaging-messages"
+    },
+    {
+      "id": "templates",
+      "label": "Templates",
+      "icon": "document-text-outline",
+      "component": "erp-messaging-templates"
+    },
+    {
+      "id": "campaigns",
+      "label": "Campaigns",
+      "icon": "megaphone-outline",
+      "component": "erp-messaging-campaigns"
+    },
+    {
+      "id": "automations",
+      "label": "Automations",
+      "icon": "flash-outline",
+      "component": "erp-messaging-automations"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "messaging.templates.list": {
+      "permission": "messaging.view_template",
+      "sql": "queries/templates_list.sql",
+      "schema": "schemas/templates_list.json",
+      "ai": { "description": "Lists available message templates for use in individual sends and campaigns." }
+    },
+    "messaging.messages.list": {
+      "permission": "messaging.view_message",
+      "sql": "queries/messages_list.sql",
+      "schema": "schemas/messages_list.json",
+      "ai": { "description": "Lists the history of messages sent to customers with their delivery status." }
+    },
+    "messaging.campaigns.list": {
+      "permission": "messaging.view_campaign",
+      "sql": "queries/campaigns_list.sql",
+      "schema": "schemas/campaigns_list.json",
+      "ai": { "description": "Lists bulk messaging campaigns with their status and send metrics." }
+    },
+    "messaging.automations.list": {
+      "permission": "messaging.view_automation",
+      "sql": "queries/automations_list.sql",
+      "schema": "schemas/automations_list.json",
+      "ai": { "description": "Lists configured messaging automations with their triggers and active/inactive status." }
+    },
+    "messaging.settings.get": {
+      "permission": "messaging.manage_settings",
+      "sql": "queries/settings_get.sql",
+      "schema": "schemas/settings_get.json",
+      "ai": { "description": "Returns the messaging channel and provider configuration for the hub." }
+    }
+  },
+  "commands": {
+    "messaging.templates.create": {
+      "permission": "messaging.add_template",
+      "transaction": true,
+      "sql": ["commands/template_create.sql"],
+      "schema": "schemas/template_create.json",
+      "emit": ["messaging.template.created"],
+      "ai": { "description": "Creates a new message template with customizable content and variables." }
+    },
+    "messaging.templates.update": {
+      "permission": "messaging.change_template",
+      "transaction": true,
+      "sql": ["commands/template_update.sql"],
+      "schema": "schemas/template_update.json",
+      "emit": ["messaging.template.updated"],
+      "ai": { "description": "Updates the content or configuration of an existing message template." }
+    },
+    "messaging.templates.delete": {
+      "permission": "messaging.delete_template",
+      "transaction": true,
+      "sql": ["commands/template_delete.sql"],
+      "schema": "schemas/template_delete.json",
+      "emit": ["messaging.template.deleted"],
+      "ai": { "description": "Permanently deletes a message template from the system (destructive)." }
+    },
+    "messaging.automations.create": {
+      "permission": "messaging.add_automation",
+      "transaction": true,
+      "sql": ["commands/automation_create.sql"],
+      "schema": "schemas/automation_create.json",
+      "emit": ["messaging.automation.created"],
+      "ai": { "description": "Creates a messaging automation linked to a business event or condition trigger." }
+    },
+    "messaging.automations.update": {
+      "permission": "messaging.change_automation",
+      "transaction": true,
+      "sql": ["commands/automation_update.sql"],
+      "schema": "schemas/automation_update.json",
+      "emit": ["messaging.automation.updated"],
+      "ai": { "description": "Updates the configuration or trigger conditions of an existing messaging automation." }
+    },
+    "messaging.automations.delete": {
+      "permission": "messaging.delete_automation",
+      "transaction": true,
+      "sql": ["commands/automation_delete.sql"],
+      "schema": "schemas/automation_delete.json",
+      "emit": ["messaging.automation.deleted"],
+      "ai": { "description": "Deletes a messaging automation, disabling all its triggers (destructive)." }
+    },
+    "messaging.campaigns.create": {
+      "permission": "messaging.add_campaign",
+      "transaction": true,
+      "sql": ["commands/campaign_create.sql"],
+      "schema": "schemas/campaign_create.json",
+      "emit": ["messaging.campaign.created"],
+      "ai": { "description": "Creates a new bulk messaging campaign with a recipient segment and template." }
+    },
+    "messaging.campaigns.cancel": {
+      "permission": "messaging.add_campaign",
+      "transaction": true,
+      "sql": ["commands/campaign_cancel.sql"],
+      "schema": "schemas/campaign_cancel.json",
+      "emit": ["messaging.campaign.cancelled"],
+      "ai": { "description": "Cancels a messaging campaign, stopping all pending sends (destructive)." }
+    },
+    "messaging.messages.send": {
+      "permission": "messaging.send_message",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "send_message"
+      },
+      "schema": "schemas/message_send.json",
+      "emit": ["messaging.message.sent"],
+      "ai": { "description": "Sends an individual message to a customer via the specified channel and template." }
+    },
+    "messaging.campaigns.send": {
+      "permission": "messaging.send_message",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "send_campaign"
+      },
+      "schema": "schemas/campaign_send.json",
+      "emit": ["messaging.campaign.completed"],
+      "ai": { "description": "Executes bulk sending of a campaign to all its configured recipients." }
+    }
+  },
+  "events": {
+    "listen": [
+      "customers.created",
+      "sales.completed"
+    ]
+  },
+  "ui": {
+    "entry": "dist/messaging.esm.js"
+  }
+}

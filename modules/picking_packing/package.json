@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-picking_packing",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo picking_packing (manifest declarativo + Web Components Stencil): pick lists (preparación de almacén asignada a operario, líneas por producto/ubicación/lote) y paquetes (ciclo open→sealed→shipped→delivered). La lógica de contadores, batch de líneas y máquina de estados vive en WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

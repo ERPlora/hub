@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "payroll.concepts.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "type"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "type": { "type": "string", "enum": ["earning", "deduction"] },
+    "is_percentage": { "type": "boolean", "default": false },
+    "amount": { "type": "number", "minimum": 0, "default": 0 },
+    "percentage": { "type": "number", "minimum": 0, "maximum": 100, "default": 0 },
+    "is_taxable": { "type": "boolean", "default": true },
+    "sort_order": { "type": "integer", "minimum": 0, "default": 0 }
+  }
+}

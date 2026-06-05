@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "olap_cubes.cubes.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "name", "source_table", "dimensions", "measures"],
+  "properties": {
+    "code": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "description": { "type": "string", "default": "", "maxLength": 2000 },
+    "source_table": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field"],
+        "properties": {
+          "field": { "type": "string", "minLength": 1 },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "measures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field"],
+        "properties": {
+          "field": { "type": "string", "minLength": 1 },
+          "label": { "type": "string" },
+          "agg": {
+            "type": "string",
+            "enum": ["sum", "avg", "count", "max", "min"],
+            "default": "sum"
+          }
+        }
+      }
+    },
+    "filters": { "type": "object", "default": {} }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "time_control.records.get",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["clock_record_id"],
+  "properties": {
+    "clock_record_id": { "type": "string", "minLength": 1 }
+  }
+}

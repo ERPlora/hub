@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "stripe.connections.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "account_id"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "account_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "publishable_key": { "type": "string", "default": "", "maxLength": 255 },
+    "country": { "type": "string", "minLength": 2, "maxLength": 2, "default": "ES" },
+    "default_currency": { "type": "string", "minLength": 3, "maxLength": 3, "default": "EUR" },
+    "is_test_mode": { "type": "boolean", "default": true }
+  }
+}

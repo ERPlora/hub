@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "multi_warehouse.transfers.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_warehouse_id", "destination_warehouse_id", "lines"],
+  "properties": {
+    "source_warehouse_id": { "type": "string", "minLength": 1 },
+    "destination_warehouse_id": { "type": "string", "minLength": 1 },
+    "carrier": { "type": "string", "default": "", "maxLength": 100 },
+    "tracking_ref": { "type": "string", "default": "", "maxLength": 100 },
+    "notes": { "type": "string", "default": "" },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["product_ref", "quantity_requested"],
+        "properties": {
+          "product_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "quantity_requested": { "type": "number", "exclusiveMinimum": 0 },
+          "lot_ref": { "type": "string", "default": "", "maxLength": 100 }
+        }
+      }
+    }
+  }
+}

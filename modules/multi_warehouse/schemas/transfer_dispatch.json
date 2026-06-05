@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "multi_warehouse.transfers.dispatch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["transfer_id", "dispatched_lines"],
+  "properties": {
+    "transfer_id": { "type": "string", "minLength": 1 },
+    "dispatched_lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["line_id", "quantity_dispatched"],
+        "properties": {
+          "line_id": { "type": "string", "minLength": 1 },
+          "quantity_dispatched": { "type": "number", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

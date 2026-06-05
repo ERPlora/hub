@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bom.components.add",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bom_id", "component_ref", "quantity"],
+  "properties": {
+    "bom_id": { "type": "string", "minLength": 1 },
+    "component_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "quantity": { "type": "number", "exclusiveMinimum": 0 },
+    "unit": { "type": "string", "default": "each", "maxLength": 20 },
+    "scrap_pct": { "type": "number", "minimum": 0, "maximum": 100, "default": 0 },
+    "is_optional": { "type": "boolean", "default": false },
+    "sub_bom_id": { "type": ["string", "null"], "default": null }
+  }
+}

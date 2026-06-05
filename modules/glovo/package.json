@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-glovo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo glovo (manifest declarativo + Web Components Stencil): conector a Glovo Partners — tiendas, pedidos entrantes de delivery, sync de menú/catálogo y mapeo de productos. La importación idempotente de pedidos, el contador atómico de número y los upserts de sync viven en un handler WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

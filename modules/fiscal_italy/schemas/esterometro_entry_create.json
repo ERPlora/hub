@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_italy.esterometro.entry.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "period_year",
+    "period_month",
+    "transaction_type",
+    "counterparty_country",
+    "counterparty_vat_id",
+    "total_amount",
+    "transaction_date"
+  ],
+  "properties": {
+    "period_year": { "type": "integer", "minimum": 2000 },
+    "period_month": { "type": "integer", "minimum": 1, "maximum": 12 },
+    "transaction_type": { "type": "string", "enum": ["sale", "purchase"] },
+    "counterparty_country": { "type": "string", "minLength": 2, "maxLength": 2 },
+    "counterparty_vat_id": { "type": "string", "minLength": 1, "maxLength": 50 },
+    "total_amount": { "type": "number", "minimum": 0 },
+    "transaction_date": { "type": "string", "format": "date" },
+    "document_ref": { "type": "string", "default": "", "maxLength": 100 }
+  }
+}

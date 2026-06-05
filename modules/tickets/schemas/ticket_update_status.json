@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tickets.tickets.update_status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ticket_id", "new_status"],
+  "properties": {
+    "ticket_id": { "type": "string", "minLength": 1 },
+    "new_status": {
+      "type": "string",
+      "enum": ["open", "in_progress", "waiting_customer", "resolved", "closed", "cancelled"]
+    }
+  }
+}

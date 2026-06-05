@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fixed_assets.depreciations.run_monthly",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["month"],
+  "properties": {
+    "month": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+  }
+}

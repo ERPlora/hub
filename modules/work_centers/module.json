@@ -1,0 +1,137 @@
+{
+  "id": "work_centers",
+  "name": "Work Centers",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages production work centers: list, create, deactivate centers, log and end production events, and calculate utilization and OEE KPIs.",
+    "keywords": ["work center", "production", "oee", "utilization", "event", "manufacturing", "kpi"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "work_centers.view_wc",
+    "work_centers.manage_wc",
+    "work_centers.log_event"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "work_centers.view_wc",
+      "work_centers.manage_wc",
+      "work_centers.log_event"
+    ],
+    "employee": [
+      "work_centers.view_wc",
+      "work_centers.log_event"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Work Centers",
+      "icon": "cog-outline",
+      "component": "erp-work-centers-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "work_centers.centers.list": {
+      "permission": "work_centers.view_wc",
+      "sql": "queries/centers_list.sql",
+      "ai": { "description": "Lists all available work centers" }
+    },
+    "work_centers.centers.get": {
+      "permission": "work_centers.view_wc",
+      "sql": "queries/center_get.sql",
+      "ai": { "description": "Retrieves the details of a work center by its ID" }
+    },
+    "work_centers.events.list": {
+      "permission": "work_centers.view_wc",
+      "sql": "queries/events_list.sql",
+      "ai": { "description": "Lists production events logged for work centers" }
+    }
+  },
+  "commands": {
+    "work_centers.centers.create": {
+      "permission": "work_centers.manage_wc",
+      "transaction": true,
+      "sql": [
+        "commands/center_create.sql"
+      ],
+      "schema": "schemas/center_create.json",
+      "emit": [
+        "work_centers.center.created"
+      ],
+      "ai": { "description": "Creates a new work center" }
+    },
+    "work_centers.centers.deactivate": {
+      "permission": "work_centers.manage_wc",
+      "transaction": true,
+      "sql": [
+        "commands/center_deactivate.sql"
+      ],
+      "schema": "schemas/center_deactivate.json",
+      "emit": [
+        "work_centers.center.deactivated"
+      ],
+      "ai": { "description": "Deactivates an existing work center" }
+    },
+    "work_centers.events.log": {
+      "permission": "work_centers.log_event",
+      "schema": "schemas/event_log.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "log_event"
+      },
+      "emit": [
+        "work_centers.event.logged"
+      ],
+      "ai": { "description": "Logs a new production event on a work center" }
+    },
+    "work_centers.events.end": {
+      "permission": "work_centers.log_event",
+      "schema": "schemas/event_end.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "end_event"
+      },
+      "emit": [
+        "work_centers.event.ended"
+      ],
+      "ai": { "description": "Ends an active production event on a work center" }
+    },
+    "work_centers.kpi.utilization": {
+      "permission": "work_centers.view_wc",
+      "schema": "schemas/kpi_utilization.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "get_utilization"
+      },
+      "ai": { "description": "Calculates the utilization percentage of a work center for a given time period" }
+    },
+    "work_centers.kpi.oee": {
+      "permission": "work_centers.view_wc",
+      "schema": "schemas/kpi_oee.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "get_oee"
+      },
+      "ai": { "description": "Calculates the Overall Equipment Effectiveness (OEE) for a work center" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/work_centers.esm.js"
+  }
+}

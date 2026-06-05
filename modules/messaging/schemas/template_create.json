@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "messaging.templates.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "channel", "body"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "channel": {
+      "type": "string",
+      "enum": ["whatsapp", "sms", "email", "all"],
+      "default": "all"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["appointment_reminder", "booking_confirmation", "receipt", "marketing", "custom"],
+      "default": "custom"
+    },
+    "subject": { "type": "string", "default": "", "maxLength": 255 },
+    "body": { "type": "string", "minLength": 1 }
+  }
+}

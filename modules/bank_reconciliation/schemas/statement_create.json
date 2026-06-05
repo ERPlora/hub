@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bank_reconciliation.statements.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bank_account_ref"],
+  "properties": {
+    "bank_account_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "statement_number": { "type": "string", "default": "", "maxLength": 100 },
+    "statement_date": { "type": ["string", "null"], "format": "date", "default": null },
+    "period_start": { "type": ["string", "null"], "format": "date", "default": null },
+    "period_end": { "type": ["string", "null"], "format": "date", "default": null },
+    "opening_balance": { "type": "number", "default": 0 },
+    "closing_balance": { "type": "number", "default": 0 },
+    "notes": { "type": "string", "default": "", "maxLength": 2000 },
+    "lines": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["amount"],
+        "properties": {
+          "transaction_date": { "type": ["string", "null"], "format": "date", "default": null },
+          "amount": { "type": "number" },
+          "description": { "type": "string", "default": "", "maxLength": 500 },
+          "counterparty": { "type": "string", "default": "", "maxLength": 255 },
+          "reference": { "type": "string", "default": "", "maxLength": 100 }
+        }
+      }
+    }
+  }
+}

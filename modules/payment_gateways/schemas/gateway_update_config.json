@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "payment_gateways.gateways.update_config params",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["gateway_id", "config"],
+  "properties": {
+    "gateway_id": { "type": "string", "minLength": 1 },
+    "config": { "type": "string", "description": "JSON serializado de config del proveedor (reemplaza el blob entero)." }
+  }
+}

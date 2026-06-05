@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "marketplaces.connections.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "platform": {
+      "type": "string",
+      "enum": ["", "amazon", "ebay", "aliexpress", "etsy", "other"],
+      "default": ""
+    },
+    "active_only": { "type": "integer", "enum": [0, 1], "default": 1 }
+  }
+}

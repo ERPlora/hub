@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "picking_packing.picks.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["", "draft", "in_progress", "completed", "cancelled"],
+      "default": ""
+    },
+    "assigned_to": { "type": "string", "default": "", "maxLength": 100 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+  }
+}

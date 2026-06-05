@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "timesheets.approvals.approve",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approval_id"],
+  "properties": {
+    "approval_id": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "online_booking.bookings.complete",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["booking_id"],
+  "properties": {
+    "booking_id": { "type": "string", "minLength": 1 }
+  }
+}

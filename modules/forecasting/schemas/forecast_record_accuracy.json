@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "forecasting.forecasts.record_accuracy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["forecast_id", "actual_values"],
+  "properties": {
+    "forecast_id": { "type": "string", "minLength": 1 },
+    "actual_values": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "Dict ISO period_start (YYYY-MM-DD) -> valor real numérico.",
+      "additionalProperties": { "type": "number" }
+    }
+  }
+}

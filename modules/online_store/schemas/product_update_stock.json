@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "online_store.products.update_stock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["product_id", "new_stock"],
+  "properties": {
+    "product_id": { "type": "string", "minLength": 1 },
+    "new_stock": { "type": "integer", "minimum": 0 }
+  }
+}

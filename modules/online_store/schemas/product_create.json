@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "online_store.products.create",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "slug", "price"],
+  "properties": {
+    "product_ref": { "type": "string", "default": "", "maxLength": 100 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "slug": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "price": { "type": "number", "minimum": 0 },
+    "stock_quantity": { "type": "integer", "minimum": 0, "default": 0 },
+    "description": { "type": "string", "default": "" }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "activities.activities.stats",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "period_days": { "type": "integer", "minimum": 1, "default": 30 },
+    "assigned_to": { "type": "string", "default": "", "maxLength": 100 }
+  }
+}

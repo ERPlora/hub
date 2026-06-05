@@ -1,0 +1,150 @@
+{
+  "id": "bom",
+  "name": "BOM",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages Bills of Materials (BOM): create, approve, clone, and explode multi-level component trees for manufactured products.",
+    "keywords": ["bom", "bill of materials", "components", "manufacturing", "production", "assembly"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "bom.view_bom",
+    "bom.manage_bom",
+    "bom.approve_bom"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "bom.view_bom",
+      "bom.manage_bom",
+      "bom.approve_bom"
+    ],
+    "employee": [
+      "bom.view_bom"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "BOMs",
+      "icon": "albums-outline",
+      "component": "erp-bom-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "bom.boms.list": {
+      "permission": "bom.view_bom",
+      "sql": "queries/boms_list.sql",
+      "ai": { "description": "Lists all registered Bills of Materials (BOMs)" }
+    },
+    "bom.boms.get": {
+      "permission": "bom.view_bom",
+      "sql": "queries/bom_get.sql",
+      "ai": { "description": "Retrieves the full detail of a specific Bill of Materials" }
+    },
+    "bom.components.list": {
+      "permission": "bom.view_bom",
+      "sql": "queries/components_list.sql",
+      "ai": { "description": "Lists components associated with a Bill of Materials" }
+    }
+  },
+  "commands": {
+    "bom.boms.create": {
+      "permission": "bom.manage_bom",
+      "transaction": true,
+      "sql": [
+        "commands/bom_create.sql"
+      ],
+      "schema": "schemas/bom_create.json",
+      "emit": [
+        "bom.bom.created"
+      ],
+      "ai": { "description": "Creates a new Bill of Materials (BOM) for a manufactured product" }
+    },
+    "bom.components.add": {
+      "permission": "bom.manage_bom",
+      "transaction": true,
+      "sql": [
+        "commands/component_add.sql"
+      ],
+      "schema": "schemas/component_add.json",
+      "emit": [
+        "bom.component.added"
+      ],
+      "ai": { "description": "Adds a component or raw material to a Bill of Materials" }
+    },
+    "bom.boms.approve": {
+      "permission": "bom.approve_bom",
+      "transaction": true,
+      "sql": [
+        "commands/bom_approve.sql"
+      ],
+      "schema": "schemas/bom_approve.json",
+      "emit": [
+        "bom.bom.approved"
+      ],
+      "ai": { "description": "Approves a Bill of Materials so it can be used in production" }
+    },
+    "bom.boms.mark_obsolete": {
+      "permission": "bom.approve_bom",
+      "transaction": true,
+      "sql": [
+        "commands/bom_mark_obsolete.sql"
+      ],
+      "schema": "schemas/bom_mark_obsolete.json",
+      "emit": [
+        "bom.bom.obsoleted"
+      ],
+      "ai": { "description": "Marks a Bill of Materials as obsolete, retiring it from active use" }
+    },
+    "bom.boms.set_default": {
+      "permission": "bom.manage_bom",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "set_as_default"
+      },
+      "schema": "schemas/bom_set_default.json",
+      "emit": [
+        "bom.bom.default_changed"
+      ],
+      "ai": { "description": "Sets a Bill of Materials as the default one for a product" }
+    },
+    "bom.boms.explode": {
+      "permission": "bom.view_bom",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "explode_bom"
+      },
+      "schema": "schemas/bom_explode.json",
+      "ai": { "description": "Recursively explodes a Bill of Materials showing the full tree of sub-components" }
+    },
+    "bom.boms.clone": {
+      "permission": "bom.manage_bom",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "clone_bom"
+      },
+      "schema": "schemas/bom_clone.json",
+      "emit": [
+        "bom.bom.cloned"
+      ],
+      "ai": { "description": "Clones an existing Bill of Materials, creating an editable copy" }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/bom.esm.js"
+  }
+}

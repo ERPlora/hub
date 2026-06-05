@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-pipeline",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo pipeline (manifest declarativo + Web Component Stencil): embudos de venta configurables tipo CRM con etapas personalizadas y seguimiento de deals (alta, movimiento entre etapas con auto-cierre won/lost, métricas de conversión). El CRUD plano va en SQL declarativo; la lógica de batch/transición/agregación va en WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

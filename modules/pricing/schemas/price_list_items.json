@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pricing.price_lists.items params",
+  "type": "object",
+  "properties": {
+    "price_list_id": {
+      "type": "string",
+      "description": "ID de la lista de precios cuyos items se listan."
+    }
+  },
+  "required": ["price_list_id"],
+  "additionalProperties": false
+}

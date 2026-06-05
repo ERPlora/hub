@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "opportunities.opportunities.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "stage": {
+      "type": "string",
+      "enum": ["", "prospecting", "qualification", "proposal", "negotiation", "won", "lost"],
+      "default": ""
+    },
+    "assigned_to": { "type": "string", "default": "" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+  }
+}

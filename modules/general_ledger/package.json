@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-general_ledger",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo general_ledger (manifest declarativo + Web Components Stencil): plan contable extendido, centros de coste, periodos fiscales, libro de asientos con partida doble y balance de comprobación. La lógica contable (invariant de cuadre, contra-asientos, contador atómico) va a WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

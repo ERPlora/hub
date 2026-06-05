@@ -1,0 +1,233 @@
+{
+  "id": "fiscal_germany",
+  "name": "Fiscal Germany",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Handles German fiscal compliance: creates and submits XRechnung e-invoices, generates ZUGFeRD PDF/A-3 invoices, and produces GoBD-compliant accounting export files.",
+    "keywords": ["xrechnung", "zugferd", "gobd", "germany", "fiscal", "e-invoice", "pdf-a3"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "fiscal_germany.view_fiscal_de",
+    "fiscal_germany.submit_xrechnung",
+    "fiscal_germany.create_zugferd"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "fiscal_germany.view_fiscal_de",
+      "fiscal_germany.submit_xrechnung",
+      "fiscal_germany.create_zugferd"
+    ],
+    "employee": [
+      "fiscal_germany.view_fiscal_de"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "xrechnung",
+      "label": "XRechnung",
+      "icon": "shield-checkmark-outline",
+      "component": "erp-fiscal-germany-xrechnung"
+    },
+    {
+      "id": "zugferd",
+      "label": "ZUGFeRD",
+      "icon": "shield-checkmark-outline",
+      "component": "erp-fiscal-germany-zugferd"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "fiscal_germany.config.get": {
+      "permission": "fiscal_germany.view_fiscal_de",
+      "sql": "queries/config_get.sql",
+      "schema": "schemas/config_get.json",
+      "ai": { "description": "Retrieves the German fiscal configuration for the hub." }
+    },
+    "fiscal_germany.xrechnung.list": {
+      "permission": "fiscal_germany.view_fiscal_de",
+      "sql": "queries/xrechnung_list.sql",
+      "schema": "schemas/xrechnung_list.json",
+      "ai": { "description": "Lists generated XRechnung e-invoices." }
+    },
+    "fiscal_germany.xrechnung.get": {
+      "permission": "fiscal_germany.view_fiscal_de",
+      "sql": "queries/xrechnung_get.sql",
+      "schema": "schemas/xrechnung_id.json",
+      "ai": { "description": "Retrieves the details of an XRechnung invoice by its ID." }
+    },
+    "fiscal_germany.zugferd.list": {
+      "permission": "fiscal_germany.view_fiscal_de",
+      "sql": "queries/zugferd_list.sql",
+      "schema": "schemas/zugferd_list.json",
+      "ai": { "description": "Lists generated ZUGFeRD invoices." }
+    },
+    "fiscal_germany.zugferd.get": {
+      "permission": "fiscal_germany.view_fiscal_de",
+      "sql": "queries/zugferd_get.sql",
+      "schema": "schemas/zugferd_id.json",
+      "ai": { "description": "Retrieves the details of a ZUGFeRD invoice by its ID." }
+    },
+    "fiscal_germany.gobd.list": {
+      "permission": "fiscal_germany.view_fiscal_de",
+      "sql": "queries/gobd_list.sql",
+      "schema": "schemas/gobd_list.json",
+      "ai": { "description": "Lists generated GoBD export files for German fiscal compliance." }
+    }
+  },
+  "commands": {
+    "fiscal_germany.config.upsert": {
+      "permission": "fiscal_germany.submit_xrechnung",
+      "schema": "schemas/config_upsert.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "upsert_config"
+      },
+      "emit": [
+        "fiscal_germany.config.updated"
+      ],
+      "ai": { "description": "Creates or updates the German fiscal configuration for the hub." }
+    },
+    "fiscal_germany.xrechnung.create": {
+      "permission": "fiscal_germany.submit_xrechnung",
+      "schema": "schemas/xrechnung_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_xrechnung"
+      },
+      "emit": [
+        "fiscal_germany.xrechnung.created"
+      ],
+      "ai": { "description": "Creates a new XRechnung electronic invoice from an existing invoice." }
+    },
+    "fiscal_germany.xrechnung.generate_xml": {
+      "permission": "fiscal_germany.submit_xrechnung",
+      "schema": "schemas/xrechnung_id.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "generate_xrechnung_xml"
+      },
+      "ai": { "description": "Generates the XML file of an XRechnung invoice ready for submission." }
+    },
+    "fiscal_germany.xrechnung.validate": {
+      "permission": "fiscal_germany.submit_xrechnung",
+      "schema": "schemas/xrechnung_id.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "validate_xrechnung"
+      },
+      "emit": [
+        "fiscal_germany.xrechnung.validated"
+      ],
+      "ai": { "description": "Validates an XRechnung invoice against the European EN 16931 standard." }
+    },
+    "fiscal_germany.xrechnung.submit": {
+      "permission": "fiscal_germany.submit_xrechnung",
+      "schema": "schemas/xrechnung_id.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "submit_xrechnung"
+      },
+      "emit": [
+        "fiscal_germany.xrechnung.submitted"
+      ],
+      "ai": { "description": "Submits an XRechnung invoice to the German public-sector e-invoicing platform." }
+    },
+    "fiscal_germany.zugferd.create": {
+      "permission": "fiscal_germany.create_zugferd",
+      "schema": "schemas/zugferd_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_zugferd"
+      },
+      "emit": [
+        "fiscal_germany.zugferd.created"
+      ],
+      "ai": { "description": "Creates a new ZUGFeRD invoice with structured data embedded in a PDF." }
+    },
+    "fiscal_germany.zugferd.generate_pdf": {
+      "permission": "fiscal_germany.create_zugferd",
+      "schema": "schemas/zugferd_id.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "generate_zugferd_pdf"
+      },
+      "ai": { "description": "Generates the PDF/A-3 file of a ZUGFeRD invoice with embedded XML." }
+    },
+    "fiscal_germany.gobd.generate": {
+      "permission": "fiscal_germany.view_fiscal_de",
+      "schema": "schemas/gobd_generate.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "generate_gobd_export"
+      },
+      "emit": [
+        "fiscal_germany.gobd.generated"
+      ],
+      "ai": { "description": "Generates a GoBD-compliant export of accounting records for German fiscal audit." }
+    },
+    "fiscal_germany._insert_config": {
+      "permission": "fiscal_germany.submit_xrechnung",
+      "sql": [
+        "commands/_insert_config.sql"
+      ]
+    },
+    "fiscal_germany._update_config": {
+      "permission": "fiscal_germany.submit_xrechnung",
+      "sql": [
+        "commands/_update_config.sql"
+      ]
+    },
+    "fiscal_germany._insert_xrechnung": {
+      "permission": "fiscal_germany.submit_xrechnung",
+      "sql": [
+        "commands/_insert_xrechnung.sql"
+      ]
+    },
+    "fiscal_germany._update_xrechnung": {
+      "permission": "fiscal_germany.submit_xrechnung",
+      "sql": [
+        "commands/_update_xrechnung.sql"
+      ]
+    },
+    "fiscal_germany._insert_zugferd": {
+      "permission": "fiscal_germany.create_zugferd",
+      "sql": [
+        "commands/_insert_zugferd.sql"
+      ]
+    },
+    "fiscal_germany._update_zugferd": {
+      "permission": "fiscal_germany.create_zugferd",
+      "sql": [
+        "commands/_update_zugferd.sql"
+      ]
+    },
+    "fiscal_germany._insert_gobd": {
+      "permission": "fiscal_germany.view_fiscal_de",
+      "sql": [
+        "commands/_insert_gobd.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/fiscal_germany.esm.js"
+  }
+}

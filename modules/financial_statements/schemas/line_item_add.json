@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "financial_statements.templates.add_line",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["template_id", "section", "item_code", "item_label"],
+  "properties": {
+    "template_id": { "type": "string", "minLength": 1 },
+    "section": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "item_code": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "item_label": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "item_order": { "type": "integer", "default": 0 },
+    "account_codes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "sign": { "type": "integer", "enum": [1, -1], "default": 1 },
+    "is_total": { "type": "boolean", "default": false }
+  }
+}

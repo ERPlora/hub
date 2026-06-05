@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "workflows.workflows.execute",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workflow_id"],
+  "properties": {
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "input_data": { "type": "object", "default": {} }
+  }
+}

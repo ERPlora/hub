@@ -5,30 +5,883 @@
  * It contains typing information for all components that exist in this project.
  */
 import { HTMLStencilElement, JSXBase } from "@stencil/core/internal";
+import { DataTableAction, DataTableColumn } from "./_shared/ui/components/data-table/data-table";
+export { DataTableAction, DataTableColumn } from "./_shared/ui/components/data-table/data-table";
 export namespace Components {
+    interface DataTable {
+        /**
+          * Acciones por fila (botones).
+          * @default []
+         */
+        "actions": DataTableAction[];
+        /**
+          * Columnas a renderizar.
+          * @default []
+         */
+        "columns": DataTableColumn[];
+        /**
+          * Mensaje cuando no hay filas.
+          * @default 'Sin resultados'
+         */
+        "emptyMessage": string;
+        /**
+          * Filas por página.
+          * @default 10
+         */
+        "pageSize": number;
+        /**
+          * Campo usado como key estable de fila.
+          * @default 'id'
+         */
+        "rowKeyField": string;
+        /**
+          * Filas (objetos planos).
+          * @default []
+         */
+        "rows": Record<string, unknown>[];
+        /**
+          * Campos sobre los que filtra el buscador. Vacío = sin buscador.
+          * @default []
+         */
+        "searchKeys": string[];
+        /**
+          * Placeholder del buscador.
+          * @default 'Buscar…'
+         */
+        "searchPlaceholder": string;
+    }
+    interface ErpAccountingAccounts {
+    }
+    interface ErpActivitiesTimeline {
+    }
+    interface ErpAiAgentsAgents {
+    }
+    interface ErpAiAgentsRuns {
+    }
+    interface ErpAiPredictionsModels {
+    }
+    interface ErpAiPredictionsPredictions {
+    }
+    interface ErpAiReportsRequests {
+    }
+    interface ErpAiReportsTemplates {
+    }
+    interface ErpAiSetupWizardSessions {
+    }
+    interface ErpAppointmentsList {
+    }
+    interface ErpAssistantChat {
+    }
+    interface ErpAssistantLogs {
+    }
+    interface ErpAttendanceRecords {
+    }
+    interface ErpAttendanceSettings {
+    }
+    interface ErpAuditLogEvents {
+    }
+    interface ErpAuditLogReports {
+    }
+    interface ErpBankReconciliationMatches {
+    }
+    interface ErpBankReconciliationStatements {
+    }
+    interface ErpBankingAccounts {
+    }
+    interface ErpBankingTransactions {
+    }
+    interface ErpBomList {
+    }
+    interface ErpCarriersList {
+    }
+    interface ErpCarriersShipments {
+    }
+    interface ErpCartCheckoutCarts {
+    }
+    interface ErpCartCheckoutOrders {
+    }
+    interface ErpCashflowForecastingProjections {
+    }
+    interface ErpCashflowForecastingScenarios {
+    }
     interface ErpCashregisterDashboard {
     }
+    interface ErpCollectionsList {
+    }
+    interface ErpCommissionsAdjustments {
+    }
+    interface ErpCommissionsPayouts {
+    }
+    interface ErpCommissionsRules {
+    }
+    interface ErpCommissionsTransactions {
+    }
+    interface ErpCommunicationsInbox {
+    }
+    interface ErpCommunicationsTemplates {
+    }
+    interface ErpContractsList {
+    }
+    interface ErpCourierIntegrationsConnections {
+    }
+    interface ErpCourierIntegrationsLogs {
+    }
+    interface ErpCreditNotesList {
+    }
+    interface ErpCreditRiskAlerts {
+    }
+    interface ErpCreditRiskCustomers {
+    }
+    interface ErpCustomerPortalAccounts {
+    }
+    interface ErpCustomerPortalSessions {
+    }
     interface ErpCustomersList {
+    }
+    interface ErpDashboardsList {
+    }
+    interface ErpDeliveryDrivers {
+    }
+    interface ErpDeliveryOrders {
+    }
+    interface ErpDeliveryZones {
+    }
+    interface ErpEmailMarketingCampaigns {
+    }
+    interface ErpEmailMarketingLists {
+    }
+    interface ErpExpensesCategories {
+    }
+    interface ErpExpensesList {
+    }
+    interface ErpFinancialStatementsReports {
+    }
+    interface ErpFinancialStatementsTemplates {
+    }
+    interface ErpFiscalFranceChorus {
+    }
+    interface ErpFiscalFranceFacturx {
+    }
+    interface ErpFiscalGermanyXrechnung {
+    }
+    interface ErpFiscalGermanyZugferd {
+    }
+    interface ErpFiscalItalyEsterometro {
+    }
+    interface ErpFiscalItalyFatturapa {
+    }
+    interface ErpFiscalPortugalComunicacao {
+    }
+    interface ErpFiscalPortugalSaft {
+    }
+    interface ErpFiscalRomaniaEfactura {
+    }
+    interface ErpFiscalRomaniaEtransport {
+    }
+    interface ErpFixedAssetsAssets {
+    }
+    interface ErpFixedAssetsDepreciations {
+    }
+    interface ErpForecastingForecasts {
+    }
+    interface ErpForecastingModels {
+    }
+    interface ErpGanttProjects {
+    }
+    interface ErpGanttTimeline {
+    }
+    interface ErpGeneralLedgerChart {
+    }
+    interface ErpGeneralLedgerLedger {
+    }
+    interface ErpGeneralLedgerReports {
+    }
+    interface ErpGlovoOrders {
+    }
+    interface ErpGlovoStores {
     }
     interface ErpInventoryProducts {
     }
     interface ErpInvoiceList {
     }
+    interface ErpInvoiceSeriesList {
+    }
+    interface ErpKitchenDisplay {
+    }
+    interface ErpKitchenOrdersActive {
+    }
+    interface ErpKitchenOrdersStations {
+    }
+    interface ErpKpisAlerts {
+    }
+    interface ErpKpisList {
+    }
+    interface ErpLeadsList {
+    }
+    interface ErpLeaveRequests {
+    }
+    interface ErpLeaveTypes {
+    }
+    interface ErpLocationsBins {
+    }
+    interface ErpLocationsZones {
+    }
+    interface ErpLotsSerialsLots {
+    }
+    interface ErpLotsSerialsSerials {
+    }
+    interface ErpManufacturingOrdersList {
+    }
+    interface ErpMarketplacesConnections {
+    }
+    interface ErpMarketplacesSyncs {
+    }
+    interface ErpMessagingAutomations {
+    }
+    interface ErpMessagingCampaigns {
+    }
+    interface ErpMessagingMessages {
+    }
+    interface ErpMessagingTemplates {
+    }
+    interface ErpMrpRequirements {
+    }
+    interface ErpMrpRuns {
+    }
+    interface ErpMultiWarehouseList {
+    }
+    interface ErpMultiWarehouseTransfers {
+    }
+    interface ErpNotesBoard {
+    }
+    interface ErpOlapCubesCubes {
+    }
+    interface ErpOlapCubesQueries {
+    }
+    interface ErpOnlineBookingList {
+    }
+    interface ErpOnlineBookingSettings {
+    }
+    interface ErpOnlineStorePages {
+    }
+    interface ErpOnlineStoreProducts {
+    }
+    interface ErpOpportunitiesList {
+    }
+    interface ErpOrdersPipeline {
+    }
+    interface ErpPaymentGatewaysGateways {
+    }
+    interface ErpPaymentsList {
+    }
+    interface ErpPayrollConcepts {
+    }
+    interface ErpPayrollPayslips {
+    }
+    interface ErpPickingPackingPackages {
+    }
+    interface ErpPickingPackingPicks {
+    }
+    interface ErpPipelineBoards {
+    }
+    interface ErpPricingLists {
+    }
+    interface ErpProjectBillingContracts {
+    }
+    interface ErpProjectBillingInvoices {
+    }
+    interface ErpProjectCostingProjects {
+    }
+    interface ErpProjectCostingReports {
+    }
+    interface ErpPurchaseOrdersList {
+    }
+    interface ErpPurchaseOrdersSuppliers {
+    }
+    interface ErpQuotesList {
+    }
+    interface ErpReportsList {
+    }
+    interface ErpReportsRuns {
+    }
+    interface ErpReservationsAvailability {
+    }
+    interface ErpReservationsList {
+    }
+    interface ErpReservationsWaitlist {
+    }
+    interface ErpRulesTriggersRules {
+    }
+    interface ErpRulesTriggersTriggers {
+    }
     interface ErpSalesList {
     }
+    interface ErpSchedulesHours {
+    }
+    interface ErpSepaRemittancesList {
+    }
+    interface ErpSepaRemittancesMandates {
+    }
+    interface ErpServicesList {
+    }
+    interface ErpSetupWizard {
+    }
+    interface ErpStaffMembers {
+    }
+    interface ErpStaffRoles {
+    }
+    interface ErpStaffTimeOff {
+    }
+    interface ErpStockSyncConflicts {
+    }
+    interface ErpStockSyncRuns {
+    }
+    interface ErpStripeConnections {
+    }
+    interface ErpStripeEvents {
+    }
+    interface ErpSubscriptionsList {
+    }
+    interface ErpSubscriptionsPlans {
+    }
+    interface ErpSupplierInvoicesList {
+    }
+    interface ErpTablesFloorPlan {
+    }
+    interface ErpTasksList {
+    }
+    interface ErpTasksProjects {
+    }
+    interface ErpTaxesRates {
+    }
+    interface ErpTicketsList {
+    }
+    interface ErpTicketsSla {
+    }
+    interface ErpTimeControlRecords {
+    }
+    interface ErpTimeControlWorkplaces {
+    }
+    interface ErpTimesheetsApprovals {
+    }
+    interface ErpTimesheetsEntries {
+    }
+    interface ErpTimesheetsRates {
+    }
+    interface ErpTimesheetsSettings {
+    }
+    interface ErpTraceabilityEvents {
+    }
+    interface ErpTrainingPrograms {
+    }
+    interface ErpTrainingSkills {
+    }
+    interface ErpUberEatsOrders {
+    }
+    interface ErpUberEatsRestaurants {
+    }
+    interface ErpVerifactuContingency {
+    }
+    interface ErpVerifactuEvents {
+    }
+    interface ErpVerifactuRecords {
+    }
+    interface ErpVerifactuSettings {
+    }
+    interface ErpWhatsappInboxInbox {
+    }
+    interface ErpWhatsappInboxRequests {
+    }
+    interface ErpWhatsappInboxTemplates {
+    }
+    interface ErpWorkCentersList {
+    }
+    interface ErpWorkflowsList {
+    }
+    interface ErpWorkflowsRuns {
+    }
+    interface ErpWorkforcePlanningCalendar {
+    }
+    interface ErpWorkforcePlanningCoverage {
+    }
+    interface ErpWorkforcePlanningLocations {
+    }
+    interface ErpWorkforcePlanningPlanning {
+    }
+    interface ErpWorkforcePlanningShifts {
+    }
+}
+export interface DataTableCustomEvent<T> extends CustomEvent<T> {
+    detail: T;
+    target: HTMLDataTableElement;
 }
 declare global {
+    interface HTMLDataTableElementEventMap {
+        "rowAction": { actionId: string; row: Record<string, unknown> };
+    }
+    interface HTMLDataTableElement extends Components.DataTable, HTMLStencilElement {
+        addEventListener<K extends keyof HTMLDataTableElementEventMap>(type: K, listener: (this: HTMLDataTableElement, ev: DataTableCustomEvent<HTMLDataTableElementEventMap[K]>) => any, options?: boolean | AddEventListenerOptions): void;
+        addEventListener<K extends keyof DocumentEventMap>(type: K, listener: (this: Document, ev: DocumentEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+        addEventListener<K extends keyof HTMLElementEventMap>(type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+        addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+        removeEventListener<K extends keyof HTMLDataTableElementEventMap>(type: K, listener: (this: HTMLDataTableElement, ev: DataTableCustomEvent<HTMLDataTableElementEventMap[K]>) => any, options?: boolean | EventListenerOptions): void;
+        removeEventListener<K extends keyof DocumentEventMap>(type: K, listener: (this: Document, ev: DocumentEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+        removeEventListener<K extends keyof HTMLElementEventMap>(type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+        removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+    }
+    var HTMLDataTableElement: {
+        prototype: HTMLDataTableElement;
+        new (): HTMLDataTableElement;
+    };
+    interface HTMLErpAccountingAccountsElement extends Components.ErpAccountingAccounts, HTMLStencilElement {
+    }
+    var HTMLErpAccountingAccountsElement: {
+        prototype: HTMLErpAccountingAccountsElement;
+        new (): HTMLErpAccountingAccountsElement;
+    };
+    interface HTMLErpActivitiesTimelineElement extends Components.ErpActivitiesTimeline, HTMLStencilElement {
+    }
+    var HTMLErpActivitiesTimelineElement: {
+        prototype: HTMLErpActivitiesTimelineElement;
+        new (): HTMLErpActivitiesTimelineElement;
+    };
+    interface HTMLErpAiAgentsAgentsElement extends Components.ErpAiAgentsAgents, HTMLStencilElement {
+    }
+    var HTMLErpAiAgentsAgentsElement: {
+        prototype: HTMLErpAiAgentsAgentsElement;
+        new (): HTMLErpAiAgentsAgentsElement;
+    };
+    interface HTMLErpAiAgentsRunsElement extends Components.ErpAiAgentsRuns, HTMLStencilElement {
+    }
+    var HTMLErpAiAgentsRunsElement: {
+        prototype: HTMLErpAiAgentsRunsElement;
+        new (): HTMLErpAiAgentsRunsElement;
+    };
+    interface HTMLErpAiPredictionsModelsElement extends Components.ErpAiPredictionsModels, HTMLStencilElement {
+    }
+    var HTMLErpAiPredictionsModelsElement: {
+        prototype: HTMLErpAiPredictionsModelsElement;
+        new (): HTMLErpAiPredictionsModelsElement;
+    };
+    interface HTMLErpAiPredictionsPredictionsElement extends Components.ErpAiPredictionsPredictions, HTMLStencilElement {
+    }
+    var HTMLErpAiPredictionsPredictionsElement: {
+        prototype: HTMLErpAiPredictionsPredictionsElement;
+        new (): HTMLErpAiPredictionsPredictionsElement;
+    };
+    interface HTMLErpAiReportsRequestsElement extends Components.ErpAiReportsRequests, HTMLStencilElement {
+    }
+    var HTMLErpAiReportsRequestsElement: {
+        prototype: HTMLErpAiReportsRequestsElement;
+        new (): HTMLErpAiReportsRequestsElement;
+    };
+    interface HTMLErpAiReportsTemplatesElement extends Components.ErpAiReportsTemplates, HTMLStencilElement {
+    }
+    var HTMLErpAiReportsTemplatesElement: {
+        prototype: HTMLErpAiReportsTemplatesElement;
+        new (): HTMLErpAiReportsTemplatesElement;
+    };
+    interface HTMLErpAiSetupWizardSessionsElement extends Components.ErpAiSetupWizardSessions, HTMLStencilElement {
+    }
+    var HTMLErpAiSetupWizardSessionsElement: {
+        prototype: HTMLErpAiSetupWizardSessionsElement;
+        new (): HTMLErpAiSetupWizardSessionsElement;
+    };
+    interface HTMLErpAppointmentsListElement extends Components.ErpAppointmentsList, HTMLStencilElement {
+    }
+    var HTMLErpAppointmentsListElement: {
+        prototype: HTMLErpAppointmentsListElement;
+        new (): HTMLErpAppointmentsListElement;
+    };
+    interface HTMLErpAssistantChatElement extends Components.ErpAssistantChat, HTMLStencilElement {
+    }
+    var HTMLErpAssistantChatElement: {
+        prototype: HTMLErpAssistantChatElement;
+        new (): HTMLErpAssistantChatElement;
+    };
+    interface HTMLErpAssistantLogsElement extends Components.ErpAssistantLogs, HTMLStencilElement {
+    }
+    var HTMLErpAssistantLogsElement: {
+        prototype: HTMLErpAssistantLogsElement;
+        new (): HTMLErpAssistantLogsElement;
+    };
+    interface HTMLErpAttendanceRecordsElement extends Components.ErpAttendanceRecords, HTMLStencilElement {
+    }
+    var HTMLErpAttendanceRecordsElement: {
+        prototype: HTMLErpAttendanceRecordsElement;
+        new (): HTMLErpAttendanceRecordsElement;
+    };
+    interface HTMLErpAttendanceSettingsElement extends Components.ErpAttendanceSettings, HTMLStencilElement {
+    }
+    var HTMLErpAttendanceSettingsElement: {
+        prototype: HTMLErpAttendanceSettingsElement;
+        new (): HTMLErpAttendanceSettingsElement;
+    };
+    interface HTMLErpAuditLogEventsElement extends Components.ErpAuditLogEvents, HTMLStencilElement {
+    }
+    var HTMLErpAuditLogEventsElement: {
+        prototype: HTMLErpAuditLogEventsElement;
+        new (): HTMLErpAuditLogEventsElement;
+    };
+    interface HTMLErpAuditLogReportsElement extends Components.ErpAuditLogReports, HTMLStencilElement {
+    }
+    var HTMLErpAuditLogReportsElement: {
+        prototype: HTMLErpAuditLogReportsElement;
+        new (): HTMLErpAuditLogReportsElement;
+    };
+    interface HTMLErpBankReconciliationMatchesElement extends Components.ErpBankReconciliationMatches, HTMLStencilElement {
+    }
+    var HTMLErpBankReconciliationMatchesElement: {
+        prototype: HTMLErpBankReconciliationMatchesElement;
+        new (): HTMLErpBankReconciliationMatchesElement;
+    };
+    interface HTMLErpBankReconciliationStatementsElement extends Components.ErpBankReconciliationStatements, HTMLStencilElement {
+    }
+    var HTMLErpBankReconciliationStatementsElement: {
+        prototype: HTMLErpBankReconciliationStatementsElement;
+        new (): HTMLErpBankReconciliationStatementsElement;
+    };
+    interface HTMLErpBankingAccountsElement extends Components.ErpBankingAccounts, HTMLStencilElement {
+    }
+    var HTMLErpBankingAccountsElement: {
+        prototype: HTMLErpBankingAccountsElement;
+        new (): HTMLErpBankingAccountsElement;
+    };
+    interface HTMLErpBankingTransactionsElement extends Components.ErpBankingTransactions, HTMLStencilElement {
+    }
+    var HTMLErpBankingTransactionsElement: {
+        prototype: HTMLErpBankingTransactionsElement;
+        new (): HTMLErpBankingTransactionsElement;
+    };
+    interface HTMLErpBomListElement extends Components.ErpBomList, HTMLStencilElement {
+    }
+    var HTMLErpBomListElement: {
+        prototype: HTMLErpBomListElement;
+        new (): HTMLErpBomListElement;
+    };
+    interface HTMLErpCarriersListElement extends Components.ErpCarriersList, HTMLStencilElement {
+    }
+    var HTMLErpCarriersListElement: {
+        prototype: HTMLErpCarriersListElement;
+        new (): HTMLErpCarriersListElement;
+    };
+    interface HTMLErpCarriersShipmentsElement extends Components.ErpCarriersShipments, HTMLStencilElement {
+    }
+    var HTMLErpCarriersShipmentsElement: {
+        prototype: HTMLErpCarriersShipmentsElement;
+        new (): HTMLErpCarriersShipmentsElement;
+    };
+    interface HTMLErpCartCheckoutCartsElement extends Components.ErpCartCheckoutCarts, HTMLStencilElement {
+    }
+    var HTMLErpCartCheckoutCartsElement: {
+        prototype: HTMLErpCartCheckoutCartsElement;
+        new (): HTMLErpCartCheckoutCartsElement;
+    };
+    interface HTMLErpCartCheckoutOrdersElement extends Components.ErpCartCheckoutOrders, HTMLStencilElement {
+    }
+    var HTMLErpCartCheckoutOrdersElement: {
+        prototype: HTMLErpCartCheckoutOrdersElement;
+        new (): HTMLErpCartCheckoutOrdersElement;
+    };
+    interface HTMLErpCashflowForecastingProjectionsElement extends Components.ErpCashflowForecastingProjections, HTMLStencilElement {
+    }
+    var HTMLErpCashflowForecastingProjectionsElement: {
+        prototype: HTMLErpCashflowForecastingProjectionsElement;
+        new (): HTMLErpCashflowForecastingProjectionsElement;
+    };
+    interface HTMLErpCashflowForecastingScenariosElement extends Components.ErpCashflowForecastingScenarios, HTMLStencilElement {
+    }
+    var HTMLErpCashflowForecastingScenariosElement: {
+        prototype: HTMLErpCashflowForecastingScenariosElement;
+        new (): HTMLErpCashflowForecastingScenariosElement;
+    };
     interface HTMLErpCashregisterDashboardElement extends Components.ErpCashregisterDashboard, HTMLStencilElement {
     }
     var HTMLErpCashregisterDashboardElement: {
         prototype: HTMLErpCashregisterDashboardElement;
         new (): HTMLErpCashregisterDashboardElement;
     };
+    interface HTMLErpCollectionsListElement extends Components.ErpCollectionsList, HTMLStencilElement {
+    }
+    var HTMLErpCollectionsListElement: {
+        prototype: HTMLErpCollectionsListElement;
+        new (): HTMLErpCollectionsListElement;
+    };
+    interface HTMLErpCommissionsAdjustmentsElement extends Components.ErpCommissionsAdjustments, HTMLStencilElement {
+    }
+    var HTMLErpCommissionsAdjustmentsElement: {
+        prototype: HTMLErpCommissionsAdjustmentsElement;
+        new (): HTMLErpCommissionsAdjustmentsElement;
+    };
+    interface HTMLErpCommissionsPayoutsElement extends Components.ErpCommissionsPayouts, HTMLStencilElement {
+    }
+    var HTMLErpCommissionsPayoutsElement: {
+        prototype: HTMLErpCommissionsPayoutsElement;
+        new (): HTMLErpCommissionsPayoutsElement;
+    };
+    interface HTMLErpCommissionsRulesElement extends Components.ErpCommissionsRules, HTMLStencilElement {
+    }
+    var HTMLErpCommissionsRulesElement: {
+        prototype: HTMLErpCommissionsRulesElement;
+        new (): HTMLErpCommissionsRulesElement;
+    };
+    interface HTMLErpCommissionsTransactionsElement extends Components.ErpCommissionsTransactions, HTMLStencilElement {
+    }
+    var HTMLErpCommissionsTransactionsElement: {
+        prototype: HTMLErpCommissionsTransactionsElement;
+        new (): HTMLErpCommissionsTransactionsElement;
+    };
+    interface HTMLErpCommunicationsInboxElement extends Components.ErpCommunicationsInbox, HTMLStencilElement {
+    }
+    var HTMLErpCommunicationsInboxElement: {
+        prototype: HTMLErpCommunicationsInboxElement;
+        new (): HTMLErpCommunicationsInboxElement;
+    };
+    interface HTMLErpCommunicationsTemplatesElement extends Components.ErpCommunicationsTemplates, HTMLStencilElement {
+    }
+    var HTMLErpCommunicationsTemplatesElement: {
+        prototype: HTMLErpCommunicationsTemplatesElement;
+        new (): HTMLErpCommunicationsTemplatesElement;
+    };
+    interface HTMLErpContractsListElement extends Components.ErpContractsList, HTMLStencilElement {
+    }
+    var HTMLErpContractsListElement: {
+        prototype: HTMLErpContractsListElement;
+        new (): HTMLErpContractsListElement;
+    };
+    interface HTMLErpCourierIntegrationsConnectionsElement extends Components.ErpCourierIntegrationsConnections, HTMLStencilElement {
+    }
+    var HTMLErpCourierIntegrationsConnectionsElement: {
+        prototype: HTMLErpCourierIntegrationsConnectionsElement;
+        new (): HTMLErpCourierIntegrationsConnectionsElement;
+    };
+    interface HTMLErpCourierIntegrationsLogsElement extends Components.ErpCourierIntegrationsLogs, HTMLStencilElement {
+    }
+    var HTMLErpCourierIntegrationsLogsElement: {
+        prototype: HTMLErpCourierIntegrationsLogsElement;
+        new (): HTMLErpCourierIntegrationsLogsElement;
+    };
+    interface HTMLErpCreditNotesListElement extends Components.ErpCreditNotesList, HTMLStencilElement {
+    }
+    var HTMLErpCreditNotesListElement: {
+        prototype: HTMLErpCreditNotesListElement;
+        new (): HTMLErpCreditNotesListElement;
+    };
+    interface HTMLErpCreditRiskAlertsElement extends Components.ErpCreditRiskAlerts, HTMLStencilElement {
+    }
+    var HTMLErpCreditRiskAlertsElement: {
+        prototype: HTMLErpCreditRiskAlertsElement;
+        new (): HTMLErpCreditRiskAlertsElement;
+    };
+    interface HTMLErpCreditRiskCustomersElement extends Components.ErpCreditRiskCustomers, HTMLStencilElement {
+    }
+    var HTMLErpCreditRiskCustomersElement: {
+        prototype: HTMLErpCreditRiskCustomersElement;
+        new (): HTMLErpCreditRiskCustomersElement;
+    };
+    interface HTMLErpCustomerPortalAccountsElement extends Components.ErpCustomerPortalAccounts, HTMLStencilElement {
+    }
+    var HTMLErpCustomerPortalAccountsElement: {
+        prototype: HTMLErpCustomerPortalAccountsElement;
+        new (): HTMLErpCustomerPortalAccountsElement;
+    };
+    interface HTMLErpCustomerPortalSessionsElement extends Components.ErpCustomerPortalSessions, HTMLStencilElement {
+    }
+    var HTMLErpCustomerPortalSessionsElement: {
+        prototype: HTMLErpCustomerPortalSessionsElement;
+        new (): HTMLErpCustomerPortalSessionsElement;
+    };
     interface HTMLErpCustomersListElement extends Components.ErpCustomersList, HTMLStencilElement {
     }
     var HTMLErpCustomersListElement: {
         prototype: HTMLErpCustomersListElement;
         new (): HTMLErpCustomersListElement;
+    };
+    interface HTMLErpDashboardsListElement extends Components.ErpDashboardsList, HTMLStencilElement {
+    }
+    var HTMLErpDashboardsListElement: {
+        prototype: HTMLErpDashboardsListElement;
+        new (): HTMLErpDashboardsListElement;
+    };
+    interface HTMLErpDeliveryDriversElement extends Components.ErpDeliveryDrivers, HTMLStencilElement {
+    }
+    var HTMLErpDeliveryDriversElement: {
+        prototype: HTMLErpDeliveryDriversElement;
+        new (): HTMLErpDeliveryDriversElement;
+    };
+    interface HTMLErpDeliveryOrdersElement extends Components.ErpDeliveryOrders, HTMLStencilElement {
+    }
+    var HTMLErpDeliveryOrdersElement: {
+        prototype: HTMLErpDeliveryOrdersElement;
+        new (): HTMLErpDeliveryOrdersElement;
+    };
+    interface HTMLErpDeliveryZonesElement extends Components.ErpDeliveryZones, HTMLStencilElement {
+    }
+    var HTMLErpDeliveryZonesElement: {
+        prototype: HTMLErpDeliveryZonesElement;
+        new (): HTMLErpDeliveryZonesElement;
+    };
+    interface HTMLErpEmailMarketingCampaignsElement extends Components.ErpEmailMarketingCampaigns, HTMLStencilElement {
+    }
+    var HTMLErpEmailMarketingCampaignsElement: {
+        prototype: HTMLErpEmailMarketingCampaignsElement;
+        new (): HTMLErpEmailMarketingCampaignsElement;
+    };
+    interface HTMLErpEmailMarketingListsElement extends Components.ErpEmailMarketingLists, HTMLStencilElement {
+    }
+    var HTMLErpEmailMarketingListsElement: {
+        prototype: HTMLErpEmailMarketingListsElement;
+        new (): HTMLErpEmailMarketingListsElement;
+    };
+    interface HTMLErpExpensesCategoriesElement extends Components.ErpExpensesCategories, HTMLStencilElement {
+    }
+    var HTMLErpExpensesCategoriesElement: {
+        prototype: HTMLErpExpensesCategoriesElement;
+        new (): HTMLErpExpensesCategoriesElement;
+    };
+    interface HTMLErpExpensesListElement extends Components.ErpExpensesList, HTMLStencilElement {
+    }
+    var HTMLErpExpensesListElement: {
+        prototype: HTMLErpExpensesListElement;
+        new (): HTMLErpExpensesListElement;
+    };
+    interface HTMLErpFinancialStatementsReportsElement extends Components.ErpFinancialStatementsReports, HTMLStencilElement {
+    }
+    var HTMLErpFinancialStatementsReportsElement: {
+        prototype: HTMLErpFinancialStatementsReportsElement;
+        new (): HTMLErpFinancialStatementsReportsElement;
+    };
+    interface HTMLErpFinancialStatementsTemplatesElement extends Components.ErpFinancialStatementsTemplates, HTMLStencilElement {
+    }
+    var HTMLErpFinancialStatementsTemplatesElement: {
+        prototype: HTMLErpFinancialStatementsTemplatesElement;
+        new (): HTMLErpFinancialStatementsTemplatesElement;
+    };
+    interface HTMLErpFiscalFranceChorusElement extends Components.ErpFiscalFranceChorus, HTMLStencilElement {
+    }
+    var HTMLErpFiscalFranceChorusElement: {
+        prototype: HTMLErpFiscalFranceChorusElement;
+        new (): HTMLErpFiscalFranceChorusElement;
+    };
+    interface HTMLErpFiscalFranceFacturxElement extends Components.ErpFiscalFranceFacturx, HTMLStencilElement {
+    }
+    var HTMLErpFiscalFranceFacturxElement: {
+        prototype: HTMLErpFiscalFranceFacturxElement;
+        new (): HTMLErpFiscalFranceFacturxElement;
+    };
+    interface HTMLErpFiscalGermanyXrechnungElement extends Components.ErpFiscalGermanyXrechnung, HTMLStencilElement {
+    }
+    var HTMLErpFiscalGermanyXrechnungElement: {
+        prototype: HTMLErpFiscalGermanyXrechnungElement;
+        new (): HTMLErpFiscalGermanyXrechnungElement;
+    };
+    interface HTMLErpFiscalGermanyZugferdElement extends Components.ErpFiscalGermanyZugferd, HTMLStencilElement {
+    }
+    var HTMLErpFiscalGermanyZugferdElement: {
+        prototype: HTMLErpFiscalGermanyZugferdElement;
+        new (): HTMLErpFiscalGermanyZugferdElement;
+    };
+    interface HTMLErpFiscalItalyEsterometroElement extends Components.ErpFiscalItalyEsterometro, HTMLStencilElement {
+    }
+    var HTMLErpFiscalItalyEsterometroElement: {
+        prototype: HTMLErpFiscalItalyEsterometroElement;
+        new (): HTMLErpFiscalItalyEsterometroElement;
+    };
+    interface HTMLErpFiscalItalyFatturapaElement extends Components.ErpFiscalItalyFatturapa, HTMLStencilElement {
+    }
+    var HTMLErpFiscalItalyFatturapaElement: {
+        prototype: HTMLErpFiscalItalyFatturapaElement;
+        new (): HTMLErpFiscalItalyFatturapaElement;
+    };
+    interface HTMLErpFiscalPortugalComunicacaoElement extends Components.ErpFiscalPortugalComunicacao, HTMLStencilElement {
+    }
+    var HTMLErpFiscalPortugalComunicacaoElement: {
+        prototype: HTMLErpFiscalPortugalComunicacaoElement;
+        new (): HTMLErpFiscalPortugalComunicacaoElement;
+    };
+    interface HTMLErpFiscalPortugalSaftElement extends Components.ErpFiscalPortugalSaft, HTMLStencilElement {
+    }
+    var HTMLErpFiscalPortugalSaftElement: {
+        prototype: HTMLErpFiscalPortugalSaftElement;
+        new (): HTMLErpFiscalPortugalSaftElement;
+    };
+    interface HTMLErpFiscalRomaniaEfacturaElement extends Components.ErpFiscalRomaniaEfactura, HTMLStencilElement {
+    }
+    var HTMLErpFiscalRomaniaEfacturaElement: {
+        prototype: HTMLErpFiscalRomaniaEfacturaElement;
+        new (): HTMLErpFiscalRomaniaEfacturaElement;
+    };
+    interface HTMLErpFiscalRomaniaEtransportElement extends Components.ErpFiscalRomaniaEtransport, HTMLStencilElement {
+    }
+    var HTMLErpFiscalRomaniaEtransportElement: {
+        prototype: HTMLErpFiscalRomaniaEtransportElement;
+        new (): HTMLErpFiscalRomaniaEtransportElement;
+    };
+    interface HTMLErpFixedAssetsAssetsElement extends Components.ErpFixedAssetsAssets, HTMLStencilElement {
+    }
+    var HTMLErpFixedAssetsAssetsElement: {
+        prototype: HTMLErpFixedAssetsAssetsElement;
+        new (): HTMLErpFixedAssetsAssetsElement;
+    };
+    interface HTMLErpFixedAssetsDepreciationsElement extends Components.ErpFixedAssetsDepreciations, HTMLStencilElement {
+    }
+    var HTMLErpFixedAssetsDepreciationsElement: {
+        prototype: HTMLErpFixedAssetsDepreciationsElement;
+        new (): HTMLErpFixedAssetsDepreciationsElement;
+    };
+    interface HTMLErpForecastingForecastsElement extends Components.ErpForecastingForecasts, HTMLStencilElement {
+    }
+    var HTMLErpForecastingForecastsElement: {
+        prototype: HTMLErpForecastingForecastsElement;
+        new (): HTMLErpForecastingForecastsElement;
+    };
+    interface HTMLErpForecastingModelsElement extends Components.ErpForecastingModels, HTMLStencilElement {
+    }
+    var HTMLErpForecastingModelsElement: {
+        prototype: HTMLErpForecastingModelsElement;
+        new (): HTMLErpForecastingModelsElement;
+    };
+    interface HTMLErpGanttProjectsElement extends Components.ErpGanttProjects, HTMLStencilElement {
+    }
+    var HTMLErpGanttProjectsElement: {
+        prototype: HTMLErpGanttProjectsElement;
+        new (): HTMLErpGanttProjectsElement;
+    };
+    interface HTMLErpGanttTimelineElement extends Components.ErpGanttTimeline, HTMLStencilElement {
+    }
+    var HTMLErpGanttTimelineElement: {
+        prototype: HTMLErpGanttTimelineElement;
+        new (): HTMLErpGanttTimelineElement;
+    };
+    interface HTMLErpGeneralLedgerChartElement extends Components.ErpGeneralLedgerChart, HTMLStencilElement {
+    }
+    var HTMLErpGeneralLedgerChartElement: {
+        prototype: HTMLErpGeneralLedgerChartElement;
+        new (): HTMLErpGeneralLedgerChartElement;
+    };
+    interface HTMLErpGeneralLedgerLedgerElement extends Components.ErpGeneralLedgerLedger, HTMLStencilElement {
+    }
+    var HTMLErpGeneralLedgerLedgerElement: {
+        prototype: HTMLErpGeneralLedgerLedgerElement;
+        new (): HTMLErpGeneralLedgerLedgerElement;
+    };
+    interface HTMLErpGeneralLedgerReportsElement extends Components.ErpGeneralLedgerReports, HTMLStencilElement {
+    }
+    var HTMLErpGeneralLedgerReportsElement: {
+        prototype: HTMLErpGeneralLedgerReportsElement;
+        new (): HTMLErpGeneralLedgerReportsElement;
+    };
+    interface HTMLErpGlovoOrdersElement extends Components.ErpGlovoOrders, HTMLStencilElement {
+    }
+    var HTMLErpGlovoOrdersElement: {
+        prototype: HTMLErpGlovoOrdersElement;
+        new (): HTMLErpGlovoOrdersElement;
+    };
+    interface HTMLErpGlovoStoresElement extends Components.ErpGlovoStores, HTMLStencilElement {
+    }
+    var HTMLErpGlovoStoresElement: {
+        prototype: HTMLErpGlovoStoresElement;
+        new (): HTMLErpGlovoStoresElement;
     };
     interface HTMLErpInventoryProductsElement extends Components.ErpInventoryProducts, HTMLStencilElement {
     }
@@ -42,48 +895,1592 @@ declare global {
         prototype: HTMLErpInvoiceListElement;
         new (): HTMLErpInvoiceListElement;
     };
+    interface HTMLErpInvoiceSeriesListElement extends Components.ErpInvoiceSeriesList, HTMLStencilElement {
+    }
+    var HTMLErpInvoiceSeriesListElement: {
+        prototype: HTMLErpInvoiceSeriesListElement;
+        new (): HTMLErpInvoiceSeriesListElement;
+    };
+    interface HTMLErpKitchenDisplayElement extends Components.ErpKitchenDisplay, HTMLStencilElement {
+    }
+    var HTMLErpKitchenDisplayElement: {
+        prototype: HTMLErpKitchenDisplayElement;
+        new (): HTMLErpKitchenDisplayElement;
+    };
+    interface HTMLErpKitchenOrdersActiveElement extends Components.ErpKitchenOrdersActive, HTMLStencilElement {
+    }
+    var HTMLErpKitchenOrdersActiveElement: {
+        prototype: HTMLErpKitchenOrdersActiveElement;
+        new (): HTMLErpKitchenOrdersActiveElement;
+    };
+    interface HTMLErpKitchenOrdersStationsElement extends Components.ErpKitchenOrdersStations, HTMLStencilElement {
+    }
+    var HTMLErpKitchenOrdersStationsElement: {
+        prototype: HTMLErpKitchenOrdersStationsElement;
+        new (): HTMLErpKitchenOrdersStationsElement;
+    };
+    interface HTMLErpKpisAlertsElement extends Components.ErpKpisAlerts, HTMLStencilElement {
+    }
+    var HTMLErpKpisAlertsElement: {
+        prototype: HTMLErpKpisAlertsElement;
+        new (): HTMLErpKpisAlertsElement;
+    };
+    interface HTMLErpKpisListElement extends Components.ErpKpisList, HTMLStencilElement {
+    }
+    var HTMLErpKpisListElement: {
+        prototype: HTMLErpKpisListElement;
+        new (): HTMLErpKpisListElement;
+    };
+    interface HTMLErpLeadsListElement extends Components.ErpLeadsList, HTMLStencilElement {
+    }
+    var HTMLErpLeadsListElement: {
+        prototype: HTMLErpLeadsListElement;
+        new (): HTMLErpLeadsListElement;
+    };
+    interface HTMLErpLeaveRequestsElement extends Components.ErpLeaveRequests, HTMLStencilElement {
+    }
+    var HTMLErpLeaveRequestsElement: {
+        prototype: HTMLErpLeaveRequestsElement;
+        new (): HTMLErpLeaveRequestsElement;
+    };
+    interface HTMLErpLeaveTypesElement extends Components.ErpLeaveTypes, HTMLStencilElement {
+    }
+    var HTMLErpLeaveTypesElement: {
+        prototype: HTMLErpLeaveTypesElement;
+        new (): HTMLErpLeaveTypesElement;
+    };
+    interface HTMLErpLocationsBinsElement extends Components.ErpLocationsBins, HTMLStencilElement {
+    }
+    var HTMLErpLocationsBinsElement: {
+        prototype: HTMLErpLocationsBinsElement;
+        new (): HTMLErpLocationsBinsElement;
+    };
+    interface HTMLErpLocationsZonesElement extends Components.ErpLocationsZones, HTMLStencilElement {
+    }
+    var HTMLErpLocationsZonesElement: {
+        prototype: HTMLErpLocationsZonesElement;
+        new (): HTMLErpLocationsZonesElement;
+    };
+    interface HTMLErpLotsSerialsLotsElement extends Components.ErpLotsSerialsLots, HTMLStencilElement {
+    }
+    var HTMLErpLotsSerialsLotsElement: {
+        prototype: HTMLErpLotsSerialsLotsElement;
+        new (): HTMLErpLotsSerialsLotsElement;
+    };
+    interface HTMLErpLotsSerialsSerialsElement extends Components.ErpLotsSerialsSerials, HTMLStencilElement {
+    }
+    var HTMLErpLotsSerialsSerialsElement: {
+        prototype: HTMLErpLotsSerialsSerialsElement;
+        new (): HTMLErpLotsSerialsSerialsElement;
+    };
+    interface HTMLErpManufacturingOrdersListElement extends Components.ErpManufacturingOrdersList, HTMLStencilElement {
+    }
+    var HTMLErpManufacturingOrdersListElement: {
+        prototype: HTMLErpManufacturingOrdersListElement;
+        new (): HTMLErpManufacturingOrdersListElement;
+    };
+    interface HTMLErpMarketplacesConnectionsElement extends Components.ErpMarketplacesConnections, HTMLStencilElement {
+    }
+    var HTMLErpMarketplacesConnectionsElement: {
+        prototype: HTMLErpMarketplacesConnectionsElement;
+        new (): HTMLErpMarketplacesConnectionsElement;
+    };
+    interface HTMLErpMarketplacesSyncsElement extends Components.ErpMarketplacesSyncs, HTMLStencilElement {
+    }
+    var HTMLErpMarketplacesSyncsElement: {
+        prototype: HTMLErpMarketplacesSyncsElement;
+        new (): HTMLErpMarketplacesSyncsElement;
+    };
+    interface HTMLErpMessagingAutomationsElement extends Components.ErpMessagingAutomations, HTMLStencilElement {
+    }
+    var HTMLErpMessagingAutomationsElement: {
+        prototype: HTMLErpMessagingAutomationsElement;
+        new (): HTMLErpMessagingAutomationsElement;
+    };
+    interface HTMLErpMessagingCampaignsElement extends Components.ErpMessagingCampaigns, HTMLStencilElement {
+    }
+    var HTMLErpMessagingCampaignsElement: {
+        prototype: HTMLErpMessagingCampaignsElement;
+        new (): HTMLErpMessagingCampaignsElement;
+    };
+    interface HTMLErpMessagingMessagesElement extends Components.ErpMessagingMessages, HTMLStencilElement {
+    }
+    var HTMLErpMessagingMessagesElement: {
+        prototype: HTMLErpMessagingMessagesElement;
+        new (): HTMLErpMessagingMessagesElement;
+    };
+    interface HTMLErpMessagingTemplatesElement extends Components.ErpMessagingTemplates, HTMLStencilElement {
+    }
+    var HTMLErpMessagingTemplatesElement: {
+        prototype: HTMLErpMessagingTemplatesElement;
+        new (): HTMLErpMessagingTemplatesElement;
+    };
+    interface HTMLErpMrpRequirementsElement extends Components.ErpMrpRequirements, HTMLStencilElement {
+    }
+    var HTMLErpMrpRequirementsElement: {
+        prototype: HTMLErpMrpRequirementsElement;
+        new (): HTMLErpMrpRequirementsElement;
+    };
+    interface HTMLErpMrpRunsElement extends Components.ErpMrpRuns, HTMLStencilElement {
+    }
+    var HTMLErpMrpRunsElement: {
+        prototype: HTMLErpMrpRunsElement;
+        new (): HTMLErpMrpRunsElement;
+    };
+    interface HTMLErpMultiWarehouseListElement extends Components.ErpMultiWarehouseList, HTMLStencilElement {
+    }
+    var HTMLErpMultiWarehouseListElement: {
+        prototype: HTMLErpMultiWarehouseListElement;
+        new (): HTMLErpMultiWarehouseListElement;
+    };
+    interface HTMLErpMultiWarehouseTransfersElement extends Components.ErpMultiWarehouseTransfers, HTMLStencilElement {
+    }
+    var HTMLErpMultiWarehouseTransfersElement: {
+        prototype: HTMLErpMultiWarehouseTransfersElement;
+        new (): HTMLErpMultiWarehouseTransfersElement;
+    };
+    interface HTMLErpNotesBoardElement extends Components.ErpNotesBoard, HTMLStencilElement {
+    }
+    var HTMLErpNotesBoardElement: {
+        prototype: HTMLErpNotesBoardElement;
+        new (): HTMLErpNotesBoardElement;
+    };
+    interface HTMLErpOlapCubesCubesElement extends Components.ErpOlapCubesCubes, HTMLStencilElement {
+    }
+    var HTMLErpOlapCubesCubesElement: {
+        prototype: HTMLErpOlapCubesCubesElement;
+        new (): HTMLErpOlapCubesCubesElement;
+    };
+    interface HTMLErpOlapCubesQueriesElement extends Components.ErpOlapCubesQueries, HTMLStencilElement {
+    }
+    var HTMLErpOlapCubesQueriesElement: {
+        prototype: HTMLErpOlapCubesQueriesElement;
+        new (): HTMLErpOlapCubesQueriesElement;
+    };
+    interface HTMLErpOnlineBookingListElement extends Components.ErpOnlineBookingList, HTMLStencilElement {
+    }
+    var HTMLErpOnlineBookingListElement: {
+        prototype: HTMLErpOnlineBookingListElement;
+        new (): HTMLErpOnlineBookingListElement;
+    };
+    interface HTMLErpOnlineBookingSettingsElement extends Components.ErpOnlineBookingSettings, HTMLStencilElement {
+    }
+    var HTMLErpOnlineBookingSettingsElement: {
+        prototype: HTMLErpOnlineBookingSettingsElement;
+        new (): HTMLErpOnlineBookingSettingsElement;
+    };
+    interface HTMLErpOnlineStorePagesElement extends Components.ErpOnlineStorePages, HTMLStencilElement {
+    }
+    var HTMLErpOnlineStorePagesElement: {
+        prototype: HTMLErpOnlineStorePagesElement;
+        new (): HTMLErpOnlineStorePagesElement;
+    };
+    interface HTMLErpOnlineStoreProductsElement extends Components.ErpOnlineStoreProducts, HTMLStencilElement {
+    }
+    var HTMLErpOnlineStoreProductsElement: {
+        prototype: HTMLErpOnlineStoreProductsElement;
+        new (): HTMLErpOnlineStoreProductsElement;
+    };
+    interface HTMLErpOpportunitiesListElement extends Components.ErpOpportunitiesList, HTMLStencilElement {
+    }
+    var HTMLErpOpportunitiesListElement: {
+        prototype: HTMLErpOpportunitiesListElement;
+        new (): HTMLErpOpportunitiesListElement;
+    };
+    interface HTMLErpOrdersPipelineElement extends Components.ErpOrdersPipeline, HTMLStencilElement {
+    }
+    var HTMLErpOrdersPipelineElement: {
+        prototype: HTMLErpOrdersPipelineElement;
+        new (): HTMLErpOrdersPipelineElement;
+    };
+    interface HTMLErpPaymentGatewaysGatewaysElement extends Components.ErpPaymentGatewaysGateways, HTMLStencilElement {
+    }
+    var HTMLErpPaymentGatewaysGatewaysElement: {
+        prototype: HTMLErpPaymentGatewaysGatewaysElement;
+        new (): HTMLErpPaymentGatewaysGatewaysElement;
+    };
+    interface HTMLErpPaymentsListElement extends Components.ErpPaymentsList, HTMLStencilElement {
+    }
+    var HTMLErpPaymentsListElement: {
+        prototype: HTMLErpPaymentsListElement;
+        new (): HTMLErpPaymentsListElement;
+    };
+    interface HTMLErpPayrollConceptsElement extends Components.ErpPayrollConcepts, HTMLStencilElement {
+    }
+    var HTMLErpPayrollConceptsElement: {
+        prototype: HTMLErpPayrollConceptsElement;
+        new (): HTMLErpPayrollConceptsElement;
+    };
+    interface HTMLErpPayrollPayslipsElement extends Components.ErpPayrollPayslips, HTMLStencilElement {
+    }
+    var HTMLErpPayrollPayslipsElement: {
+        prototype: HTMLErpPayrollPayslipsElement;
+        new (): HTMLErpPayrollPayslipsElement;
+    };
+    interface HTMLErpPickingPackingPackagesElement extends Components.ErpPickingPackingPackages, HTMLStencilElement {
+    }
+    var HTMLErpPickingPackingPackagesElement: {
+        prototype: HTMLErpPickingPackingPackagesElement;
+        new (): HTMLErpPickingPackingPackagesElement;
+    };
+    interface HTMLErpPickingPackingPicksElement extends Components.ErpPickingPackingPicks, HTMLStencilElement {
+    }
+    var HTMLErpPickingPackingPicksElement: {
+        prototype: HTMLErpPickingPackingPicksElement;
+        new (): HTMLErpPickingPackingPicksElement;
+    };
+    interface HTMLErpPipelineBoardsElement extends Components.ErpPipelineBoards, HTMLStencilElement {
+    }
+    var HTMLErpPipelineBoardsElement: {
+        prototype: HTMLErpPipelineBoardsElement;
+        new (): HTMLErpPipelineBoardsElement;
+    };
+    interface HTMLErpPricingListsElement extends Components.ErpPricingLists, HTMLStencilElement {
+    }
+    var HTMLErpPricingListsElement: {
+        prototype: HTMLErpPricingListsElement;
+        new (): HTMLErpPricingListsElement;
+    };
+    interface HTMLErpProjectBillingContractsElement extends Components.ErpProjectBillingContracts, HTMLStencilElement {
+    }
+    var HTMLErpProjectBillingContractsElement: {
+        prototype: HTMLErpProjectBillingContractsElement;
+        new (): HTMLErpProjectBillingContractsElement;
+    };
+    interface HTMLErpProjectBillingInvoicesElement extends Components.ErpProjectBillingInvoices, HTMLStencilElement {
+    }
+    var HTMLErpProjectBillingInvoicesElement: {
+        prototype: HTMLErpProjectBillingInvoicesElement;
+        new (): HTMLErpProjectBillingInvoicesElement;
+    };
+    interface HTMLErpProjectCostingProjectsElement extends Components.ErpProjectCostingProjects, HTMLStencilElement {
+    }
+    var HTMLErpProjectCostingProjectsElement: {
+        prototype: HTMLErpProjectCostingProjectsElement;
+        new (): HTMLErpProjectCostingProjectsElement;
+    };
+    interface HTMLErpProjectCostingReportsElement extends Components.ErpProjectCostingReports, HTMLStencilElement {
+    }
+    var HTMLErpProjectCostingReportsElement: {
+        prototype: HTMLErpProjectCostingReportsElement;
+        new (): HTMLErpProjectCostingReportsElement;
+    };
+    interface HTMLErpPurchaseOrdersListElement extends Components.ErpPurchaseOrdersList, HTMLStencilElement {
+    }
+    var HTMLErpPurchaseOrdersListElement: {
+        prototype: HTMLErpPurchaseOrdersListElement;
+        new (): HTMLErpPurchaseOrdersListElement;
+    };
+    interface HTMLErpPurchaseOrdersSuppliersElement extends Components.ErpPurchaseOrdersSuppliers, HTMLStencilElement {
+    }
+    var HTMLErpPurchaseOrdersSuppliersElement: {
+        prototype: HTMLErpPurchaseOrdersSuppliersElement;
+        new (): HTMLErpPurchaseOrdersSuppliersElement;
+    };
+    interface HTMLErpQuotesListElement extends Components.ErpQuotesList, HTMLStencilElement {
+    }
+    var HTMLErpQuotesListElement: {
+        prototype: HTMLErpQuotesListElement;
+        new (): HTMLErpQuotesListElement;
+    };
+    interface HTMLErpReportsListElement extends Components.ErpReportsList, HTMLStencilElement {
+    }
+    var HTMLErpReportsListElement: {
+        prototype: HTMLErpReportsListElement;
+        new (): HTMLErpReportsListElement;
+    };
+    interface HTMLErpReportsRunsElement extends Components.ErpReportsRuns, HTMLStencilElement {
+    }
+    var HTMLErpReportsRunsElement: {
+        prototype: HTMLErpReportsRunsElement;
+        new (): HTMLErpReportsRunsElement;
+    };
+    interface HTMLErpReservationsAvailabilityElement extends Components.ErpReservationsAvailability, HTMLStencilElement {
+    }
+    var HTMLErpReservationsAvailabilityElement: {
+        prototype: HTMLErpReservationsAvailabilityElement;
+        new (): HTMLErpReservationsAvailabilityElement;
+    };
+    interface HTMLErpReservationsListElement extends Components.ErpReservationsList, HTMLStencilElement {
+    }
+    var HTMLErpReservationsListElement: {
+        prototype: HTMLErpReservationsListElement;
+        new (): HTMLErpReservationsListElement;
+    };
+    interface HTMLErpReservationsWaitlistElement extends Components.ErpReservationsWaitlist, HTMLStencilElement {
+    }
+    var HTMLErpReservationsWaitlistElement: {
+        prototype: HTMLErpReservationsWaitlistElement;
+        new (): HTMLErpReservationsWaitlistElement;
+    };
+    interface HTMLErpRulesTriggersRulesElement extends Components.ErpRulesTriggersRules, HTMLStencilElement {
+    }
+    var HTMLErpRulesTriggersRulesElement: {
+        prototype: HTMLErpRulesTriggersRulesElement;
+        new (): HTMLErpRulesTriggersRulesElement;
+    };
+    interface HTMLErpRulesTriggersTriggersElement extends Components.ErpRulesTriggersTriggers, HTMLStencilElement {
+    }
+    var HTMLErpRulesTriggersTriggersElement: {
+        prototype: HTMLErpRulesTriggersTriggersElement;
+        new (): HTMLErpRulesTriggersTriggersElement;
+    };
     interface HTMLErpSalesListElement extends Components.ErpSalesList, HTMLStencilElement {
     }
     var HTMLErpSalesListElement: {
         prototype: HTMLErpSalesListElement;
         new (): HTMLErpSalesListElement;
     };
+    interface HTMLErpSchedulesHoursElement extends Components.ErpSchedulesHours, HTMLStencilElement {
+    }
+    var HTMLErpSchedulesHoursElement: {
+        prototype: HTMLErpSchedulesHoursElement;
+        new (): HTMLErpSchedulesHoursElement;
+    };
+    interface HTMLErpSepaRemittancesListElement extends Components.ErpSepaRemittancesList, HTMLStencilElement {
+    }
+    var HTMLErpSepaRemittancesListElement: {
+        prototype: HTMLErpSepaRemittancesListElement;
+        new (): HTMLErpSepaRemittancesListElement;
+    };
+    interface HTMLErpSepaRemittancesMandatesElement extends Components.ErpSepaRemittancesMandates, HTMLStencilElement {
+    }
+    var HTMLErpSepaRemittancesMandatesElement: {
+        prototype: HTMLErpSepaRemittancesMandatesElement;
+        new (): HTMLErpSepaRemittancesMandatesElement;
+    };
+    interface HTMLErpServicesListElement extends Components.ErpServicesList, HTMLStencilElement {
+    }
+    var HTMLErpServicesListElement: {
+        prototype: HTMLErpServicesListElement;
+        new (): HTMLErpServicesListElement;
+    };
+    interface HTMLErpSetupWizardElement extends Components.ErpSetupWizard, HTMLStencilElement {
+    }
+    var HTMLErpSetupWizardElement: {
+        prototype: HTMLErpSetupWizardElement;
+        new (): HTMLErpSetupWizardElement;
+    };
+    interface HTMLErpStaffMembersElement extends Components.ErpStaffMembers, HTMLStencilElement {
+    }
+    var HTMLErpStaffMembersElement: {
+        prototype: HTMLErpStaffMembersElement;
+        new (): HTMLErpStaffMembersElement;
+    };
+    interface HTMLErpStaffRolesElement extends Components.ErpStaffRoles, HTMLStencilElement {
+    }
+    var HTMLErpStaffRolesElement: {
+        prototype: HTMLErpStaffRolesElement;
+        new (): HTMLErpStaffRolesElement;
+    };
+    interface HTMLErpStaffTimeOffElement extends Components.ErpStaffTimeOff, HTMLStencilElement {
+    }
+    var HTMLErpStaffTimeOffElement: {
+        prototype: HTMLErpStaffTimeOffElement;
+        new (): HTMLErpStaffTimeOffElement;
+    };
+    interface HTMLErpStockSyncConflictsElement extends Components.ErpStockSyncConflicts, HTMLStencilElement {
+    }
+    var HTMLErpStockSyncConflictsElement: {
+        prototype: HTMLErpStockSyncConflictsElement;
+        new (): HTMLErpStockSyncConflictsElement;
+    };
+    interface HTMLErpStockSyncRunsElement extends Components.ErpStockSyncRuns, HTMLStencilElement {
+    }
+    var HTMLErpStockSyncRunsElement: {
+        prototype: HTMLErpStockSyncRunsElement;
+        new (): HTMLErpStockSyncRunsElement;
+    };
+    interface HTMLErpStripeConnectionsElement extends Components.ErpStripeConnections, HTMLStencilElement {
+    }
+    var HTMLErpStripeConnectionsElement: {
+        prototype: HTMLErpStripeConnectionsElement;
+        new (): HTMLErpStripeConnectionsElement;
+    };
+    interface HTMLErpStripeEventsElement extends Components.ErpStripeEvents, HTMLStencilElement {
+    }
+    var HTMLErpStripeEventsElement: {
+        prototype: HTMLErpStripeEventsElement;
+        new (): HTMLErpStripeEventsElement;
+    };
+    interface HTMLErpSubscriptionsListElement extends Components.ErpSubscriptionsList, HTMLStencilElement {
+    }
+    var HTMLErpSubscriptionsListElement: {
+        prototype: HTMLErpSubscriptionsListElement;
+        new (): HTMLErpSubscriptionsListElement;
+    };
+    interface HTMLErpSubscriptionsPlansElement extends Components.ErpSubscriptionsPlans, HTMLStencilElement {
+    }
+    var HTMLErpSubscriptionsPlansElement: {
+        prototype: HTMLErpSubscriptionsPlansElement;
+        new (): HTMLErpSubscriptionsPlansElement;
+    };
+    interface HTMLErpSupplierInvoicesListElement extends Components.ErpSupplierInvoicesList, HTMLStencilElement {
+    }
+    var HTMLErpSupplierInvoicesListElement: {
+        prototype: HTMLErpSupplierInvoicesListElement;
+        new (): HTMLErpSupplierInvoicesListElement;
+    };
+    interface HTMLErpTablesFloorPlanElement extends Components.ErpTablesFloorPlan, HTMLStencilElement {
+    }
+    var HTMLErpTablesFloorPlanElement: {
+        prototype: HTMLErpTablesFloorPlanElement;
+        new (): HTMLErpTablesFloorPlanElement;
+    };
+    interface HTMLErpTasksListElement extends Components.ErpTasksList, HTMLStencilElement {
+    }
+    var HTMLErpTasksListElement: {
+        prototype: HTMLErpTasksListElement;
+        new (): HTMLErpTasksListElement;
+    };
+    interface HTMLErpTasksProjectsElement extends Components.ErpTasksProjects, HTMLStencilElement {
+    }
+    var HTMLErpTasksProjectsElement: {
+        prototype: HTMLErpTasksProjectsElement;
+        new (): HTMLErpTasksProjectsElement;
+    };
+    interface HTMLErpTaxesRatesElement extends Components.ErpTaxesRates, HTMLStencilElement {
+    }
+    var HTMLErpTaxesRatesElement: {
+        prototype: HTMLErpTaxesRatesElement;
+        new (): HTMLErpTaxesRatesElement;
+    };
+    interface HTMLErpTicketsListElement extends Components.ErpTicketsList, HTMLStencilElement {
+    }
+    var HTMLErpTicketsListElement: {
+        prototype: HTMLErpTicketsListElement;
+        new (): HTMLErpTicketsListElement;
+    };
+    interface HTMLErpTicketsSlaElement extends Components.ErpTicketsSla, HTMLStencilElement {
+    }
+    var HTMLErpTicketsSlaElement: {
+        prototype: HTMLErpTicketsSlaElement;
+        new (): HTMLErpTicketsSlaElement;
+    };
+    interface HTMLErpTimeControlRecordsElement extends Components.ErpTimeControlRecords, HTMLStencilElement {
+    }
+    var HTMLErpTimeControlRecordsElement: {
+        prototype: HTMLErpTimeControlRecordsElement;
+        new (): HTMLErpTimeControlRecordsElement;
+    };
+    interface HTMLErpTimeControlWorkplacesElement extends Components.ErpTimeControlWorkplaces, HTMLStencilElement {
+    }
+    var HTMLErpTimeControlWorkplacesElement: {
+        prototype: HTMLErpTimeControlWorkplacesElement;
+        new (): HTMLErpTimeControlWorkplacesElement;
+    };
+    interface HTMLErpTimesheetsApprovalsElement extends Components.ErpTimesheetsApprovals, HTMLStencilElement {
+    }
+    var HTMLErpTimesheetsApprovalsElement: {
+        prototype: HTMLErpTimesheetsApprovalsElement;
+        new (): HTMLErpTimesheetsApprovalsElement;
+    };
+    interface HTMLErpTimesheetsEntriesElement extends Components.ErpTimesheetsEntries, HTMLStencilElement {
+    }
+    var HTMLErpTimesheetsEntriesElement: {
+        prototype: HTMLErpTimesheetsEntriesElement;
+        new (): HTMLErpTimesheetsEntriesElement;
+    };
+    interface HTMLErpTimesheetsRatesElement extends Components.ErpTimesheetsRates, HTMLStencilElement {
+    }
+    var HTMLErpTimesheetsRatesElement: {
+        prototype: HTMLErpTimesheetsRatesElement;
+        new (): HTMLErpTimesheetsRatesElement;
+    };
+    interface HTMLErpTimesheetsSettingsElement extends Components.ErpTimesheetsSettings, HTMLStencilElement {
+    }
+    var HTMLErpTimesheetsSettingsElement: {
+        prototype: HTMLErpTimesheetsSettingsElement;
+        new (): HTMLErpTimesheetsSettingsElement;
+    };
+    interface HTMLErpTraceabilityEventsElement extends Components.ErpTraceabilityEvents, HTMLStencilElement {
+    }
+    var HTMLErpTraceabilityEventsElement: {
+        prototype: HTMLErpTraceabilityEventsElement;
+        new (): HTMLErpTraceabilityEventsElement;
+    };
+    interface HTMLErpTrainingProgramsElement extends Components.ErpTrainingPrograms, HTMLStencilElement {
+    }
+    var HTMLErpTrainingProgramsElement: {
+        prototype: HTMLErpTrainingProgramsElement;
+        new (): HTMLErpTrainingProgramsElement;
+    };
+    interface HTMLErpTrainingSkillsElement extends Components.ErpTrainingSkills, HTMLStencilElement {
+    }
+    var HTMLErpTrainingSkillsElement: {
+        prototype: HTMLErpTrainingSkillsElement;
+        new (): HTMLErpTrainingSkillsElement;
+    };
+    interface HTMLErpUberEatsOrdersElement extends Components.ErpUberEatsOrders, HTMLStencilElement {
+    }
+    var HTMLErpUberEatsOrdersElement: {
+        prototype: HTMLErpUberEatsOrdersElement;
+        new (): HTMLErpUberEatsOrdersElement;
+    };
+    interface HTMLErpUberEatsRestaurantsElement extends Components.ErpUberEatsRestaurants, HTMLStencilElement {
+    }
+    var HTMLErpUberEatsRestaurantsElement: {
+        prototype: HTMLErpUberEatsRestaurantsElement;
+        new (): HTMLErpUberEatsRestaurantsElement;
+    };
+    interface HTMLErpVerifactuContingencyElement extends Components.ErpVerifactuContingency, HTMLStencilElement {
+    }
+    var HTMLErpVerifactuContingencyElement: {
+        prototype: HTMLErpVerifactuContingencyElement;
+        new (): HTMLErpVerifactuContingencyElement;
+    };
+    interface HTMLErpVerifactuEventsElement extends Components.ErpVerifactuEvents, HTMLStencilElement {
+    }
+    var HTMLErpVerifactuEventsElement: {
+        prototype: HTMLErpVerifactuEventsElement;
+        new (): HTMLErpVerifactuEventsElement;
+    };
+    interface HTMLErpVerifactuRecordsElement extends Components.ErpVerifactuRecords, HTMLStencilElement {
+    }
+    var HTMLErpVerifactuRecordsElement: {
+        prototype: HTMLErpVerifactuRecordsElement;
+        new (): HTMLErpVerifactuRecordsElement;
+    };
+    interface HTMLErpVerifactuSettingsElement extends Components.ErpVerifactuSettings, HTMLStencilElement {
+    }
+    var HTMLErpVerifactuSettingsElement: {
+        prototype: HTMLErpVerifactuSettingsElement;
+        new (): HTMLErpVerifactuSettingsElement;
+    };
+    interface HTMLErpWhatsappInboxInboxElement extends Components.ErpWhatsappInboxInbox, HTMLStencilElement {
+    }
+    var HTMLErpWhatsappInboxInboxElement: {
+        prototype: HTMLErpWhatsappInboxInboxElement;
+        new (): HTMLErpWhatsappInboxInboxElement;
+    };
+    interface HTMLErpWhatsappInboxRequestsElement extends Components.ErpWhatsappInboxRequests, HTMLStencilElement {
+    }
+    var HTMLErpWhatsappInboxRequestsElement: {
+        prototype: HTMLErpWhatsappInboxRequestsElement;
+        new (): HTMLErpWhatsappInboxRequestsElement;
+    };
+    interface HTMLErpWhatsappInboxTemplatesElement extends Components.ErpWhatsappInboxTemplates, HTMLStencilElement {
+    }
+    var HTMLErpWhatsappInboxTemplatesElement: {
+        prototype: HTMLErpWhatsappInboxTemplatesElement;
+        new (): HTMLErpWhatsappInboxTemplatesElement;
+    };
+    interface HTMLErpWorkCentersListElement extends Components.ErpWorkCentersList, HTMLStencilElement {
+    }
+    var HTMLErpWorkCentersListElement: {
+        prototype: HTMLErpWorkCentersListElement;
+        new (): HTMLErpWorkCentersListElement;
+    };
+    interface HTMLErpWorkflowsListElement extends Components.ErpWorkflowsList, HTMLStencilElement {
+    }
+    var HTMLErpWorkflowsListElement: {
+        prototype: HTMLErpWorkflowsListElement;
+        new (): HTMLErpWorkflowsListElement;
+    };
+    interface HTMLErpWorkflowsRunsElement extends Components.ErpWorkflowsRuns, HTMLStencilElement {
+    }
+    var HTMLErpWorkflowsRunsElement: {
+        prototype: HTMLErpWorkflowsRunsElement;
+        new (): HTMLErpWorkflowsRunsElement;
+    };
+    interface HTMLErpWorkforcePlanningCalendarElement extends Components.ErpWorkforcePlanningCalendar, HTMLStencilElement {
+    }
+    var HTMLErpWorkforcePlanningCalendarElement: {
+        prototype: HTMLErpWorkforcePlanningCalendarElement;
+        new (): HTMLErpWorkforcePlanningCalendarElement;
+    };
+    interface HTMLErpWorkforcePlanningCoverageElement extends Components.ErpWorkforcePlanningCoverage, HTMLStencilElement {
+    }
+    var HTMLErpWorkforcePlanningCoverageElement: {
+        prototype: HTMLErpWorkforcePlanningCoverageElement;
+        new (): HTMLErpWorkforcePlanningCoverageElement;
+    };
+    interface HTMLErpWorkforcePlanningLocationsElement extends Components.ErpWorkforcePlanningLocations, HTMLStencilElement {
+    }
+    var HTMLErpWorkforcePlanningLocationsElement: {
+        prototype: HTMLErpWorkforcePlanningLocationsElement;
+        new (): HTMLErpWorkforcePlanningLocationsElement;
+    };
+    interface HTMLErpWorkforcePlanningPlanningElement extends Components.ErpWorkforcePlanningPlanning, HTMLStencilElement {
+    }
+    var HTMLErpWorkforcePlanningPlanningElement: {
+        prototype: HTMLErpWorkforcePlanningPlanningElement;
+        new (): HTMLErpWorkforcePlanningPlanningElement;
+    };
+    interface HTMLErpWorkforcePlanningShiftsElement extends Components.ErpWorkforcePlanningShifts, HTMLStencilElement {
+    }
+    var HTMLErpWorkforcePlanningShiftsElement: {
+        prototype: HTMLErpWorkforcePlanningShiftsElement;
+        new (): HTMLErpWorkforcePlanningShiftsElement;
+    };
     interface HTMLElementTagNameMap {
+        "data-table": HTMLDataTableElement;
+        "erp-accounting-accounts": HTMLErpAccountingAccountsElement;
+        "erp-activities-timeline": HTMLErpActivitiesTimelineElement;
+        "erp-ai-agents-agents": HTMLErpAiAgentsAgentsElement;
+        "erp-ai-agents-runs": HTMLErpAiAgentsRunsElement;
+        "erp-ai-predictions-models": HTMLErpAiPredictionsModelsElement;
+        "erp-ai-predictions-predictions": HTMLErpAiPredictionsPredictionsElement;
+        "erp-ai-reports-requests": HTMLErpAiReportsRequestsElement;
+        "erp-ai-reports-templates": HTMLErpAiReportsTemplatesElement;
+        "erp-ai-setup-wizard-sessions": HTMLErpAiSetupWizardSessionsElement;
+        "erp-appointments-list": HTMLErpAppointmentsListElement;
+        "erp-assistant-chat": HTMLErpAssistantChatElement;
+        "erp-assistant-logs": HTMLErpAssistantLogsElement;
+        "erp-attendance-records": HTMLErpAttendanceRecordsElement;
+        "erp-attendance-settings": HTMLErpAttendanceSettingsElement;
+        "erp-audit-log-events": HTMLErpAuditLogEventsElement;
+        "erp-audit-log-reports": HTMLErpAuditLogReportsElement;
+        "erp-bank-reconciliation-matches": HTMLErpBankReconciliationMatchesElement;
+        "erp-bank-reconciliation-statements": HTMLErpBankReconciliationStatementsElement;
+        "erp-banking-accounts": HTMLErpBankingAccountsElement;
+        "erp-banking-transactions": HTMLErpBankingTransactionsElement;
+        "erp-bom-list": HTMLErpBomListElement;
+        "erp-carriers-list": HTMLErpCarriersListElement;
+        "erp-carriers-shipments": HTMLErpCarriersShipmentsElement;
+        "erp-cart-checkout-carts": HTMLErpCartCheckoutCartsElement;
+        "erp-cart-checkout-orders": HTMLErpCartCheckoutOrdersElement;
+        "erp-cashflow-forecasting-projections": HTMLErpCashflowForecastingProjectionsElement;
+        "erp-cashflow-forecasting-scenarios": HTMLErpCashflowForecastingScenariosElement;
         "erp-cashregister-dashboard": HTMLErpCashregisterDashboardElement;
+        "erp-collections-list": HTMLErpCollectionsListElement;
+        "erp-commissions-adjustments": HTMLErpCommissionsAdjustmentsElement;
+        "erp-commissions-payouts": HTMLErpCommissionsPayoutsElement;
+        "erp-commissions-rules": HTMLErpCommissionsRulesElement;
+        "erp-commissions-transactions": HTMLErpCommissionsTransactionsElement;
+        "erp-communications-inbox": HTMLErpCommunicationsInboxElement;
+        "erp-communications-templates": HTMLErpCommunicationsTemplatesElement;
+        "erp-contracts-list": HTMLErpContractsListElement;
+        "erp-courier-integrations-connections": HTMLErpCourierIntegrationsConnectionsElement;
+        "erp-courier-integrations-logs": HTMLErpCourierIntegrationsLogsElement;
+        "erp-credit-notes-list": HTMLErpCreditNotesListElement;
+        "erp-credit-risk-alerts": HTMLErpCreditRiskAlertsElement;
+        "erp-credit-risk-customers": HTMLErpCreditRiskCustomersElement;
+        "erp-customer-portal-accounts": HTMLErpCustomerPortalAccountsElement;
+        "erp-customer-portal-sessions": HTMLErpCustomerPortalSessionsElement;
         "erp-customers-list": HTMLErpCustomersListElement;
+        "erp-dashboards-list": HTMLErpDashboardsListElement;
+        "erp-delivery-drivers": HTMLErpDeliveryDriversElement;
+        "erp-delivery-orders": HTMLErpDeliveryOrdersElement;
+        "erp-delivery-zones": HTMLErpDeliveryZonesElement;
+        "erp-email-marketing-campaigns": HTMLErpEmailMarketingCampaignsElement;
+        "erp-email-marketing-lists": HTMLErpEmailMarketingListsElement;
+        "erp-expenses-categories": HTMLErpExpensesCategoriesElement;
+        "erp-expenses-list": HTMLErpExpensesListElement;
+        "erp-financial-statements-reports": HTMLErpFinancialStatementsReportsElement;
+        "erp-financial-statements-templates": HTMLErpFinancialStatementsTemplatesElement;
+        "erp-fiscal-france-chorus": HTMLErpFiscalFranceChorusElement;
+        "erp-fiscal-france-facturx": HTMLErpFiscalFranceFacturxElement;
+        "erp-fiscal-germany-xrechnung": HTMLErpFiscalGermanyXrechnungElement;
+        "erp-fiscal-germany-zugferd": HTMLErpFiscalGermanyZugferdElement;
+        "erp-fiscal-italy-esterometro": HTMLErpFiscalItalyEsterometroElement;
+        "erp-fiscal-italy-fatturapa": HTMLErpFiscalItalyFatturapaElement;
+        "erp-fiscal-portugal-comunicacao": HTMLErpFiscalPortugalComunicacaoElement;
+        "erp-fiscal-portugal-saft": HTMLErpFiscalPortugalSaftElement;
+        "erp-fiscal-romania-efactura": HTMLErpFiscalRomaniaEfacturaElement;
+        "erp-fiscal-romania-etransport": HTMLErpFiscalRomaniaEtransportElement;
+        "erp-fixed-assets-assets": HTMLErpFixedAssetsAssetsElement;
+        "erp-fixed-assets-depreciations": HTMLErpFixedAssetsDepreciationsElement;
+        "erp-forecasting-forecasts": HTMLErpForecastingForecastsElement;
+        "erp-forecasting-models": HTMLErpForecastingModelsElement;
+        "erp-gantt-projects": HTMLErpGanttProjectsElement;
+        "erp-gantt-timeline": HTMLErpGanttTimelineElement;
+        "erp-general-ledger-chart": HTMLErpGeneralLedgerChartElement;
+        "erp-general-ledger-ledger": HTMLErpGeneralLedgerLedgerElement;
+        "erp-general-ledger-reports": HTMLErpGeneralLedgerReportsElement;
+        "erp-glovo-orders": HTMLErpGlovoOrdersElement;
+        "erp-glovo-stores": HTMLErpGlovoStoresElement;
         "erp-inventory-products": HTMLErpInventoryProductsElement;
         "erp-invoice-list": HTMLErpInvoiceListElement;
+        "erp-invoice-series-list": HTMLErpInvoiceSeriesListElement;
+        "erp-kitchen-display": HTMLErpKitchenDisplayElement;
+        "erp-kitchen-orders-active": HTMLErpKitchenOrdersActiveElement;
+        "erp-kitchen-orders-stations": HTMLErpKitchenOrdersStationsElement;
+        "erp-kpis-alerts": HTMLErpKpisAlertsElement;
+        "erp-kpis-list": HTMLErpKpisListElement;
+        "erp-leads-list": HTMLErpLeadsListElement;
+        "erp-leave-requests": HTMLErpLeaveRequestsElement;
+        "erp-leave-types": HTMLErpLeaveTypesElement;
+        "erp-locations-bins": HTMLErpLocationsBinsElement;
+        "erp-locations-zones": HTMLErpLocationsZonesElement;
+        "erp-lots-serials-lots": HTMLErpLotsSerialsLotsElement;
+        "erp-lots-serials-serials": HTMLErpLotsSerialsSerialsElement;
+        "erp-manufacturing-orders-list": HTMLErpManufacturingOrdersListElement;
+        "erp-marketplaces-connections": HTMLErpMarketplacesConnectionsElement;
+        "erp-marketplaces-syncs": HTMLErpMarketplacesSyncsElement;
+        "erp-messaging-automations": HTMLErpMessagingAutomationsElement;
+        "erp-messaging-campaigns": HTMLErpMessagingCampaignsElement;
+        "erp-messaging-messages": HTMLErpMessagingMessagesElement;
+        "erp-messaging-templates": HTMLErpMessagingTemplatesElement;
+        "erp-mrp-requirements": HTMLErpMrpRequirementsElement;
+        "erp-mrp-runs": HTMLErpMrpRunsElement;
+        "erp-multi-warehouse-list": HTMLErpMultiWarehouseListElement;
+        "erp-multi-warehouse-transfers": HTMLErpMultiWarehouseTransfersElement;
+        "erp-notes-board": HTMLErpNotesBoardElement;
+        "erp-olap-cubes-cubes": HTMLErpOlapCubesCubesElement;
+        "erp-olap-cubes-queries": HTMLErpOlapCubesQueriesElement;
+        "erp-online-booking-list": HTMLErpOnlineBookingListElement;
+        "erp-online-booking-settings": HTMLErpOnlineBookingSettingsElement;
+        "erp-online-store-pages": HTMLErpOnlineStorePagesElement;
+        "erp-online-store-products": HTMLErpOnlineStoreProductsElement;
+        "erp-opportunities-list": HTMLErpOpportunitiesListElement;
+        "erp-orders-pipeline": HTMLErpOrdersPipelineElement;
+        "erp-payment-gateways-gateways": HTMLErpPaymentGatewaysGatewaysElement;
+        "erp-payments-list": HTMLErpPaymentsListElement;
+        "erp-payroll-concepts": HTMLErpPayrollConceptsElement;
+        "erp-payroll-payslips": HTMLErpPayrollPayslipsElement;
+        "erp-picking-packing-packages": HTMLErpPickingPackingPackagesElement;
+        "erp-picking-packing-picks": HTMLErpPickingPackingPicksElement;
+        "erp-pipeline-boards": HTMLErpPipelineBoardsElement;
+        "erp-pricing-lists": HTMLErpPricingListsElement;
+        "erp-project-billing-contracts": HTMLErpProjectBillingContractsElement;
+        "erp-project-billing-invoices": HTMLErpProjectBillingInvoicesElement;
+        "erp-project-costing-projects": HTMLErpProjectCostingProjectsElement;
+        "erp-project-costing-reports": HTMLErpProjectCostingReportsElement;
+        "erp-purchase-orders-list": HTMLErpPurchaseOrdersListElement;
+        "erp-purchase-orders-suppliers": HTMLErpPurchaseOrdersSuppliersElement;
+        "erp-quotes-list": HTMLErpQuotesListElement;
+        "erp-reports-list": HTMLErpReportsListElement;
+        "erp-reports-runs": HTMLErpReportsRunsElement;
+        "erp-reservations-availability": HTMLErpReservationsAvailabilityElement;
+        "erp-reservations-list": HTMLErpReservationsListElement;
+        "erp-reservations-waitlist": HTMLErpReservationsWaitlistElement;
+        "erp-rules-triggers-rules": HTMLErpRulesTriggersRulesElement;
+        "erp-rules-triggers-triggers": HTMLErpRulesTriggersTriggersElement;
         "erp-sales-list": HTMLErpSalesListElement;
+        "erp-schedules-hours": HTMLErpSchedulesHoursElement;
+        "erp-sepa-remittances-list": HTMLErpSepaRemittancesListElement;
+        "erp-sepa-remittances-mandates": HTMLErpSepaRemittancesMandatesElement;
+        "erp-services-list": HTMLErpServicesListElement;
+        "erp-setup-wizard": HTMLErpSetupWizardElement;
+        "erp-staff-members": HTMLErpStaffMembersElement;
+        "erp-staff-roles": HTMLErpStaffRolesElement;
+        "erp-staff-time-off": HTMLErpStaffTimeOffElement;
+        "erp-stock-sync-conflicts": HTMLErpStockSyncConflictsElement;
+        "erp-stock-sync-runs": HTMLErpStockSyncRunsElement;
+        "erp-stripe-connections": HTMLErpStripeConnectionsElement;
+        "erp-stripe-events": HTMLErpStripeEventsElement;
+        "erp-subscriptions-list": HTMLErpSubscriptionsListElement;
+        "erp-subscriptions-plans": HTMLErpSubscriptionsPlansElement;
+        "erp-supplier-invoices-list": HTMLErpSupplierInvoicesListElement;
+        "erp-tables-floor-plan": HTMLErpTablesFloorPlanElement;
+        "erp-tasks-list": HTMLErpTasksListElement;
+        "erp-tasks-projects": HTMLErpTasksProjectsElement;
+        "erp-taxes-rates": HTMLErpTaxesRatesElement;
+        "erp-tickets-list": HTMLErpTicketsListElement;
+        "erp-tickets-sla": HTMLErpTicketsSlaElement;
+        "erp-time-control-records": HTMLErpTimeControlRecordsElement;
+        "erp-time-control-workplaces": HTMLErpTimeControlWorkplacesElement;
+        "erp-timesheets-approvals": HTMLErpTimesheetsApprovalsElement;
+        "erp-timesheets-entries": HTMLErpTimesheetsEntriesElement;
+        "erp-timesheets-rates": HTMLErpTimesheetsRatesElement;
+        "erp-timesheets-settings": HTMLErpTimesheetsSettingsElement;
+        "erp-traceability-events": HTMLErpTraceabilityEventsElement;
+        "erp-training-programs": HTMLErpTrainingProgramsElement;
+        "erp-training-skills": HTMLErpTrainingSkillsElement;
+        "erp-uber-eats-orders": HTMLErpUberEatsOrdersElement;
+        "erp-uber-eats-restaurants": HTMLErpUberEatsRestaurantsElement;
+        "erp-verifactu-contingency": HTMLErpVerifactuContingencyElement;
+        "erp-verifactu-events": HTMLErpVerifactuEventsElement;
+        "erp-verifactu-records": HTMLErpVerifactuRecordsElement;
+        "erp-verifactu-settings": HTMLErpVerifactuSettingsElement;
+        "erp-whatsapp-inbox-inbox": HTMLErpWhatsappInboxInboxElement;
+        "erp-whatsapp-inbox-requests": HTMLErpWhatsappInboxRequestsElement;
+        "erp-whatsapp-inbox-templates": HTMLErpWhatsappInboxTemplatesElement;
+        "erp-work-centers-list": HTMLErpWorkCentersListElement;
+        "erp-workflows-list": HTMLErpWorkflowsListElement;
+        "erp-workflows-runs": HTMLErpWorkflowsRunsElement;
+        "erp-workforce-planning-calendar": HTMLErpWorkforcePlanningCalendarElement;
+        "erp-workforce-planning-coverage": HTMLErpWorkforcePlanningCoverageElement;
+        "erp-workforce-planning-locations": HTMLErpWorkforcePlanningLocationsElement;
+        "erp-workforce-planning-planning": HTMLErpWorkforcePlanningPlanningElement;
+        "erp-workforce-planning-shifts": HTMLErpWorkforcePlanningShiftsElement;
     }
 }
 declare namespace LocalJSX {
+    interface DataTable {
+        /**
+          * Acciones por fila (botones).
+          * @default []
+         */
+        "actions"?: DataTableAction[];
+        /**
+          * Columnas a renderizar.
+          * @default []
+         */
+        "columns"?: DataTableColumn[];
+        /**
+          * Mensaje cuando no hay filas.
+          * @default 'Sin resultados'
+         */
+        "emptyMessage"?: string;
+        /**
+          * Click en un botón de acción de fila.
+         */
+        "onRowAction"?: (event: DataTableCustomEvent<{ actionId: string; row: Record<string, unknown> }>) => void;
+        /**
+          * Filas por página.
+          * @default 10
+         */
+        "pageSize"?: number;
+        /**
+          * Campo usado como key estable de fila.
+          * @default 'id'
+         */
+        "rowKeyField"?: string;
+        /**
+          * Filas (objetos planos).
+          * @default []
+         */
+        "rows"?: Record<string, unknown>[];
+        /**
+          * Campos sobre los que filtra el buscador. Vacío = sin buscador.
+          * @default []
+         */
+        "searchKeys"?: string[];
+        /**
+          * Placeholder del buscador.
+          * @default 'Buscar…'
+         */
+        "searchPlaceholder"?: string;
+    }
+    interface ErpAccountingAccounts {
+    }
+    interface ErpActivitiesTimeline {
+    }
+    interface ErpAiAgentsAgents {
+    }
+    interface ErpAiAgentsRuns {
+    }
+    interface ErpAiPredictionsModels {
+    }
+    interface ErpAiPredictionsPredictions {
+    }
+    interface ErpAiReportsRequests {
+    }
+    interface ErpAiReportsTemplates {
+    }
+    interface ErpAiSetupWizardSessions {
+    }
+    interface ErpAppointmentsList {
+    }
+    interface ErpAssistantChat {
+    }
+    interface ErpAssistantLogs {
+    }
+    interface ErpAttendanceRecords {
+    }
+    interface ErpAttendanceSettings {
+    }
+    interface ErpAuditLogEvents {
+    }
+    interface ErpAuditLogReports {
+    }
+    interface ErpBankReconciliationMatches {
+    }
+    interface ErpBankReconciliationStatements {
+    }
+    interface ErpBankingAccounts {
+    }
+    interface ErpBankingTransactions {
+    }
+    interface ErpBomList {
+    }
+    interface ErpCarriersList {
+    }
+    interface ErpCarriersShipments {
+    }
+    interface ErpCartCheckoutCarts {
+    }
+    interface ErpCartCheckoutOrders {
+    }
+    interface ErpCashflowForecastingProjections {
+    }
+    interface ErpCashflowForecastingScenarios {
+    }
     interface ErpCashregisterDashboard {
     }
+    interface ErpCollectionsList {
+    }
+    interface ErpCommissionsAdjustments {
+    }
+    interface ErpCommissionsPayouts {
+    }
+    interface ErpCommissionsRules {
+    }
+    interface ErpCommissionsTransactions {
+    }
+    interface ErpCommunicationsInbox {
+    }
+    interface ErpCommunicationsTemplates {
+    }
+    interface ErpContractsList {
+    }
+    interface ErpCourierIntegrationsConnections {
+    }
+    interface ErpCourierIntegrationsLogs {
+    }
+    interface ErpCreditNotesList {
+    }
+    interface ErpCreditRiskAlerts {
+    }
+    interface ErpCreditRiskCustomers {
+    }
+    interface ErpCustomerPortalAccounts {
+    }
+    interface ErpCustomerPortalSessions {
+    }
     interface ErpCustomersList {
+    }
+    interface ErpDashboardsList {
+    }
+    interface ErpDeliveryDrivers {
+    }
+    interface ErpDeliveryOrders {
+    }
+    interface ErpDeliveryZones {
+    }
+    interface ErpEmailMarketingCampaigns {
+    }
+    interface ErpEmailMarketingLists {
+    }
+    interface ErpExpensesCategories {
+    }
+    interface ErpExpensesList {
+    }
+    interface ErpFinancialStatementsReports {
+    }
+    interface ErpFinancialStatementsTemplates {
+    }
+    interface ErpFiscalFranceChorus {
+    }
+    interface ErpFiscalFranceFacturx {
+    }
+    interface ErpFiscalGermanyXrechnung {
+    }
+    interface ErpFiscalGermanyZugferd {
+    }
+    interface ErpFiscalItalyEsterometro {
+    }
+    interface ErpFiscalItalyFatturapa {
+    }
+    interface ErpFiscalPortugalComunicacao {
+    }
+    interface ErpFiscalPortugalSaft {
+    }
+    interface ErpFiscalRomaniaEfactura {
+    }
+    interface ErpFiscalRomaniaEtransport {
+    }
+    interface ErpFixedAssetsAssets {
+    }
+    interface ErpFixedAssetsDepreciations {
+    }
+    interface ErpForecastingForecasts {
+    }
+    interface ErpForecastingModels {
+    }
+    interface ErpGanttProjects {
+    }
+    interface ErpGanttTimeline {
+    }
+    interface ErpGeneralLedgerChart {
+    }
+    interface ErpGeneralLedgerLedger {
+    }
+    interface ErpGeneralLedgerReports {
+    }
+    interface ErpGlovoOrders {
+    }
+    interface ErpGlovoStores {
     }
     interface ErpInventoryProducts {
     }
     interface ErpInvoiceList {
     }
+    interface ErpInvoiceSeriesList {
+    }
+    interface ErpKitchenDisplay {
+    }
+    interface ErpKitchenOrdersActive {
+    }
+    interface ErpKitchenOrdersStations {
+    }
+    interface ErpKpisAlerts {
+    }
+    interface ErpKpisList {
+    }
+    interface ErpLeadsList {
+    }
+    interface ErpLeaveRequests {
+    }
+    interface ErpLeaveTypes {
+    }
+    interface ErpLocationsBins {
+    }
+    interface ErpLocationsZones {
+    }
+    interface ErpLotsSerialsLots {
+    }
+    interface ErpLotsSerialsSerials {
+    }
+    interface ErpManufacturingOrdersList {
+    }
+    interface ErpMarketplacesConnections {
+    }
+    interface ErpMarketplacesSyncs {
+    }
+    interface ErpMessagingAutomations {
+    }
+    interface ErpMessagingCampaigns {
+    }
+    interface ErpMessagingMessages {
+    }
+    interface ErpMessagingTemplates {
+    }
+    interface ErpMrpRequirements {
+    }
+    interface ErpMrpRuns {
+    }
+    interface ErpMultiWarehouseList {
+    }
+    interface ErpMultiWarehouseTransfers {
+    }
+    interface ErpNotesBoard {
+    }
+    interface ErpOlapCubesCubes {
+    }
+    interface ErpOlapCubesQueries {
+    }
+    interface ErpOnlineBookingList {
+    }
+    interface ErpOnlineBookingSettings {
+    }
+    interface ErpOnlineStorePages {
+    }
+    interface ErpOnlineStoreProducts {
+    }
+    interface ErpOpportunitiesList {
+    }
+    interface ErpOrdersPipeline {
+    }
+    interface ErpPaymentGatewaysGateways {
+    }
+    interface ErpPaymentsList {
+    }
+    interface ErpPayrollConcepts {
+    }
+    interface ErpPayrollPayslips {
+    }
+    interface ErpPickingPackingPackages {
+    }
+    interface ErpPickingPackingPicks {
+    }
+    interface ErpPipelineBoards {
+    }
+    interface ErpPricingLists {
+    }
+    interface ErpProjectBillingContracts {
+    }
+    interface ErpProjectBillingInvoices {
+    }
+    interface ErpProjectCostingProjects {
+    }
+    interface ErpProjectCostingReports {
+    }
+    interface ErpPurchaseOrdersList {
+    }
+    interface ErpPurchaseOrdersSuppliers {
+    }
+    interface ErpQuotesList {
+    }
+    interface ErpReportsList {
+    }
+    interface ErpReportsRuns {
+    }
+    interface ErpReservationsAvailability {
+    }
+    interface ErpReservationsList {
+    }
+    interface ErpReservationsWaitlist {
+    }
+    interface ErpRulesTriggersRules {
+    }
+    interface ErpRulesTriggersTriggers {
+    }
     interface ErpSalesList {
     }
+    interface ErpSchedulesHours {
+    }
+    interface ErpSepaRemittancesList {
+    }
+    interface ErpSepaRemittancesMandates {
+    }
+    interface ErpServicesList {
+    }
+    interface ErpSetupWizard {
+    }
+    interface ErpStaffMembers {
+    }
+    interface ErpStaffRoles {
+    }
+    interface ErpStaffTimeOff {
+    }
+    interface ErpStockSyncConflicts {
+    }
+    interface ErpStockSyncRuns {
+    }
+    interface ErpStripeConnections {
+    }
+    interface ErpStripeEvents {
+    }
+    interface ErpSubscriptionsList {
+    }
+    interface ErpSubscriptionsPlans {
+    }
+    interface ErpSupplierInvoicesList {
+    }
+    interface ErpTablesFloorPlan {
+    }
+    interface ErpTasksList {
+    }
+    interface ErpTasksProjects {
+    }
+    interface ErpTaxesRates {
+    }
+    interface ErpTicketsList {
+    }
+    interface ErpTicketsSla {
+    }
+    interface ErpTimeControlRecords {
+    }
+    interface ErpTimeControlWorkplaces {
+    }
+    interface ErpTimesheetsApprovals {
+    }
+    interface ErpTimesheetsEntries {
+    }
+    interface ErpTimesheetsRates {
+    }
+    interface ErpTimesheetsSettings {
+    }
+    interface ErpTraceabilityEvents {
+    }
+    interface ErpTrainingPrograms {
+    }
+    interface ErpTrainingSkills {
+    }
+    interface ErpUberEatsOrders {
+    }
+    interface ErpUberEatsRestaurants {
+    }
+    interface ErpVerifactuContingency {
+    }
+    interface ErpVerifactuEvents {
+    }
+    interface ErpVerifactuRecords {
+    }
+    interface ErpVerifactuSettings {
+    }
+    interface ErpWhatsappInboxInbox {
+    }
+    interface ErpWhatsappInboxRequests {
+    }
+    interface ErpWhatsappInboxTemplates {
+    }
+    interface ErpWorkCentersList {
+    }
+    interface ErpWorkflowsList {
+    }
+    interface ErpWorkflowsRuns {
+    }
+    interface ErpWorkforcePlanningCalendar {
+    }
+    interface ErpWorkforcePlanningCoverage {
+    }
+    interface ErpWorkforcePlanningLocations {
+    }
+    interface ErpWorkforcePlanningPlanning {
+    }
+    interface ErpWorkforcePlanningShifts {
+    }
+
+    interface DataTableAttributes {
+        "rowKeyField": string;
+        "pageSize": number;
+        "emptyMessage": string;
+        "searchPlaceholder": string;
+    }
+
     interface IntrinsicElements {
+        "data-table": Omit<DataTable, keyof DataTableAttributes> & { [K in keyof DataTable & keyof DataTableAttributes]?: DataTable[K] } & { [K in keyof DataTable & keyof DataTableAttributes as `attr:${K}`]?: DataTableAttributes[K] } & { [K in keyof DataTable & keyof DataTableAttributes as `prop:${K}`]?: DataTable[K] };
+        "erp-accounting-accounts": ErpAccountingAccounts;
+        "erp-activities-timeline": ErpActivitiesTimeline;
+        "erp-ai-agents-agents": ErpAiAgentsAgents;
+        "erp-ai-agents-runs": ErpAiAgentsRuns;
+        "erp-ai-predictions-models": ErpAiPredictionsModels;
+        "erp-ai-predictions-predictions": ErpAiPredictionsPredictions;
+        "erp-ai-reports-requests": ErpAiReportsRequests;
+        "erp-ai-reports-templates": ErpAiReportsTemplates;
+        "erp-ai-setup-wizard-sessions": ErpAiSetupWizardSessions;
+        "erp-appointments-list": ErpAppointmentsList;
+        "erp-assistant-chat": ErpAssistantChat;
+        "erp-assistant-logs": ErpAssistantLogs;
+        "erp-attendance-records": ErpAttendanceRecords;
+        "erp-attendance-settings": ErpAttendanceSettings;
+        "erp-audit-log-events": ErpAuditLogEvents;
+        "erp-audit-log-reports": ErpAuditLogReports;
+        "erp-bank-reconciliation-matches": ErpBankReconciliationMatches;
+        "erp-bank-reconciliation-statements": ErpBankReconciliationStatements;
+        "erp-banking-accounts": ErpBankingAccounts;
+        "erp-banking-transactions": ErpBankingTransactions;
+        "erp-bom-list": ErpBomList;
+        "erp-carriers-list": ErpCarriersList;
+        "erp-carriers-shipments": ErpCarriersShipments;
+        "erp-cart-checkout-carts": ErpCartCheckoutCarts;
+        "erp-cart-checkout-orders": ErpCartCheckoutOrders;
+        "erp-cashflow-forecasting-projections": ErpCashflowForecastingProjections;
+        "erp-cashflow-forecasting-scenarios": ErpCashflowForecastingScenarios;
         "erp-cashregister-dashboard": ErpCashregisterDashboard;
+        "erp-collections-list": ErpCollectionsList;
+        "erp-commissions-adjustments": ErpCommissionsAdjustments;
+        "erp-commissions-payouts": ErpCommissionsPayouts;
+        "erp-commissions-rules": ErpCommissionsRules;
+        "erp-commissions-transactions": ErpCommissionsTransactions;
+        "erp-communications-inbox": ErpCommunicationsInbox;
+        "erp-communications-templates": ErpCommunicationsTemplates;
+        "erp-contracts-list": ErpContractsList;
+        "erp-courier-integrations-connections": ErpCourierIntegrationsConnections;
+        "erp-courier-integrations-logs": ErpCourierIntegrationsLogs;
+        "erp-credit-notes-list": ErpCreditNotesList;
+        "erp-credit-risk-alerts": ErpCreditRiskAlerts;
+        "erp-credit-risk-customers": ErpCreditRiskCustomers;
+        "erp-customer-portal-accounts": ErpCustomerPortalAccounts;
+        "erp-customer-portal-sessions": ErpCustomerPortalSessions;
         "erp-customers-list": ErpCustomersList;
+        "erp-dashboards-list": ErpDashboardsList;
+        "erp-delivery-drivers": ErpDeliveryDrivers;
+        "erp-delivery-orders": ErpDeliveryOrders;
+        "erp-delivery-zones": ErpDeliveryZones;
+        "erp-email-marketing-campaigns": ErpEmailMarketingCampaigns;
+        "erp-email-marketing-lists": ErpEmailMarketingLists;
+        "erp-expenses-categories": ErpExpensesCategories;
+        "erp-expenses-list": ErpExpensesList;
+        "erp-financial-statements-reports": ErpFinancialStatementsReports;
+        "erp-financial-statements-templates": ErpFinancialStatementsTemplates;
+        "erp-fiscal-france-chorus": ErpFiscalFranceChorus;
+        "erp-fiscal-france-facturx": ErpFiscalFranceFacturx;
+        "erp-fiscal-germany-xrechnung": ErpFiscalGermanyXrechnung;
+        "erp-fiscal-germany-zugferd": ErpFiscalGermanyZugferd;
+        "erp-fiscal-italy-esterometro": ErpFiscalItalyEsterometro;
+        "erp-fiscal-italy-fatturapa": ErpFiscalItalyFatturapa;
+        "erp-fiscal-portugal-comunicacao": ErpFiscalPortugalComunicacao;
+        "erp-fiscal-portugal-saft": ErpFiscalPortugalSaft;
+        "erp-fiscal-romania-efactura": ErpFiscalRomaniaEfactura;
+        "erp-fiscal-romania-etransport": ErpFiscalRomaniaEtransport;
+        "erp-fixed-assets-assets": ErpFixedAssetsAssets;
+        "erp-fixed-assets-depreciations": ErpFixedAssetsDepreciations;
+        "erp-forecasting-forecasts": ErpForecastingForecasts;
+        "erp-forecasting-models": ErpForecastingModels;
+        "erp-gantt-projects": ErpGanttProjects;
+        "erp-gantt-timeline": ErpGanttTimeline;
+        "erp-general-ledger-chart": ErpGeneralLedgerChart;
+        "erp-general-ledger-ledger": ErpGeneralLedgerLedger;
+        "erp-general-ledger-reports": ErpGeneralLedgerReports;
+        "erp-glovo-orders": ErpGlovoOrders;
+        "erp-glovo-stores": ErpGlovoStores;
         "erp-inventory-products": ErpInventoryProducts;
         "erp-invoice-list": ErpInvoiceList;
+        "erp-invoice-series-list": ErpInvoiceSeriesList;
+        "erp-kitchen-display": ErpKitchenDisplay;
+        "erp-kitchen-orders-active": ErpKitchenOrdersActive;
+        "erp-kitchen-orders-stations": ErpKitchenOrdersStations;
+        "erp-kpis-alerts": ErpKpisAlerts;
+        "erp-kpis-list": ErpKpisList;
+        "erp-leads-list": ErpLeadsList;
+        "erp-leave-requests": ErpLeaveRequests;
+        "erp-leave-types": ErpLeaveTypes;
+        "erp-locations-bins": ErpLocationsBins;
+        "erp-locations-zones": ErpLocationsZones;
+        "erp-lots-serials-lots": ErpLotsSerialsLots;
+        "erp-lots-serials-serials": ErpLotsSerialsSerials;
+        "erp-manufacturing-orders-list": ErpManufacturingOrdersList;
+        "erp-marketplaces-connections": ErpMarketplacesConnections;
+        "erp-marketplaces-syncs": ErpMarketplacesSyncs;
+        "erp-messaging-automations": ErpMessagingAutomations;
+        "erp-messaging-campaigns": ErpMessagingCampaigns;
+        "erp-messaging-messages": ErpMessagingMessages;
+        "erp-messaging-templates": ErpMessagingTemplates;
+        "erp-mrp-requirements": ErpMrpRequirements;
+        "erp-mrp-runs": ErpMrpRuns;
+        "erp-multi-warehouse-list": ErpMultiWarehouseList;
+        "erp-multi-warehouse-transfers": ErpMultiWarehouseTransfers;
+        "erp-notes-board": ErpNotesBoard;
+        "erp-olap-cubes-cubes": ErpOlapCubesCubes;
+        "erp-olap-cubes-queries": ErpOlapCubesQueries;
+        "erp-online-booking-list": ErpOnlineBookingList;
+        "erp-online-booking-settings": ErpOnlineBookingSettings;
+        "erp-online-store-pages": ErpOnlineStorePages;
+        "erp-online-store-products": ErpOnlineStoreProducts;
+        "erp-opportunities-list": ErpOpportunitiesList;
+        "erp-orders-pipeline": ErpOrdersPipeline;
+        "erp-payment-gateways-gateways": ErpPaymentGatewaysGateways;
+        "erp-payments-list": ErpPaymentsList;
+        "erp-payroll-concepts": ErpPayrollConcepts;
+        "erp-payroll-payslips": ErpPayrollPayslips;
+        "erp-picking-packing-packages": ErpPickingPackingPackages;
+        "erp-picking-packing-picks": ErpPickingPackingPicks;
+        "erp-pipeline-boards": ErpPipelineBoards;
+        "erp-pricing-lists": ErpPricingLists;
+        "erp-project-billing-contracts": ErpProjectBillingContracts;
+        "erp-project-billing-invoices": ErpProjectBillingInvoices;
+        "erp-project-costing-projects": ErpProjectCostingProjects;
+        "erp-project-costing-reports": ErpProjectCostingReports;
+        "erp-purchase-orders-list": ErpPurchaseOrdersList;
+        "erp-purchase-orders-suppliers": ErpPurchaseOrdersSuppliers;
+        "erp-quotes-list": ErpQuotesList;
+        "erp-reports-list": ErpReportsList;
+        "erp-reports-runs": ErpReportsRuns;
+        "erp-reservations-availability": ErpReservationsAvailability;
+        "erp-reservations-list": ErpReservationsList;
+        "erp-reservations-waitlist": ErpReservationsWaitlist;
+        "erp-rules-triggers-rules": ErpRulesTriggersRules;
+        "erp-rules-triggers-triggers": ErpRulesTriggersTriggers;
         "erp-sales-list": ErpSalesList;
+        "erp-schedules-hours": ErpSchedulesHours;
+        "erp-sepa-remittances-list": ErpSepaRemittancesList;
+        "erp-sepa-remittances-mandates": ErpSepaRemittancesMandates;
+        "erp-services-list": ErpServicesList;
+        "erp-setup-wizard": ErpSetupWizard;
+        "erp-staff-members": ErpStaffMembers;
+        "erp-staff-roles": ErpStaffRoles;
+        "erp-staff-time-off": ErpStaffTimeOff;
+        "erp-stock-sync-conflicts": ErpStockSyncConflicts;
+        "erp-stock-sync-runs": ErpStockSyncRuns;
+        "erp-stripe-connections": ErpStripeConnections;
+        "erp-stripe-events": ErpStripeEvents;
+        "erp-subscriptions-list": ErpSubscriptionsList;
+        "erp-subscriptions-plans": ErpSubscriptionsPlans;
+        "erp-supplier-invoices-list": ErpSupplierInvoicesList;
+        "erp-tables-floor-plan": ErpTablesFloorPlan;
+        "erp-tasks-list": ErpTasksList;
+        "erp-tasks-projects": ErpTasksProjects;
+        "erp-taxes-rates": ErpTaxesRates;
+        "erp-tickets-list": ErpTicketsList;
+        "erp-tickets-sla": ErpTicketsSla;
+        "erp-time-control-records": ErpTimeControlRecords;
+        "erp-time-control-workplaces": ErpTimeControlWorkplaces;
+        "erp-timesheets-approvals": ErpTimesheetsApprovals;
+        "erp-timesheets-entries": ErpTimesheetsEntries;
+        "erp-timesheets-rates": ErpTimesheetsRates;
+        "erp-timesheets-settings": ErpTimesheetsSettings;
+        "erp-traceability-events": ErpTraceabilityEvents;
+        "erp-training-programs": ErpTrainingPrograms;
+        "erp-training-skills": ErpTrainingSkills;
+        "erp-uber-eats-orders": ErpUberEatsOrders;
+        "erp-uber-eats-restaurants": ErpUberEatsRestaurants;
+        "erp-verifactu-contingency": ErpVerifactuContingency;
+        "erp-verifactu-events": ErpVerifactuEvents;
+        "erp-verifactu-records": ErpVerifactuRecords;
+        "erp-verifactu-settings": ErpVerifactuSettings;
+        "erp-whatsapp-inbox-inbox": ErpWhatsappInboxInbox;
+        "erp-whatsapp-inbox-requests": ErpWhatsappInboxRequests;
+        "erp-whatsapp-inbox-templates": ErpWhatsappInboxTemplates;
+        "erp-work-centers-list": ErpWorkCentersList;
+        "erp-workflows-list": ErpWorkflowsList;
+        "erp-workflows-runs": ErpWorkflowsRuns;
+        "erp-workforce-planning-calendar": ErpWorkforcePlanningCalendar;
+        "erp-workforce-planning-coverage": ErpWorkforcePlanningCoverage;
+        "erp-workforce-planning-locations": ErpWorkforcePlanningLocations;
+        "erp-workforce-planning-planning": ErpWorkforcePlanningPlanning;
+        "erp-workforce-planning-shifts": ErpWorkforcePlanningShifts;
     }
 }
 export { LocalJSX as JSX };
 declare module "@stencil/core" {
     export namespace JSX {
         interface IntrinsicElements {
+            "data-table": LocalJSX.IntrinsicElements["data-table"] & JSXBase.HTMLAttributes<HTMLDataTableElement>;
+            "erp-accounting-accounts": LocalJSX.IntrinsicElements["erp-accounting-accounts"] & JSXBase.HTMLAttributes<HTMLErpAccountingAccountsElement>;
+            "erp-activities-timeline": LocalJSX.IntrinsicElements["erp-activities-timeline"] & JSXBase.HTMLAttributes<HTMLErpActivitiesTimelineElement>;
+            "erp-ai-agents-agents": LocalJSX.IntrinsicElements["erp-ai-agents-agents"] & JSXBase.HTMLAttributes<HTMLErpAiAgentsAgentsElement>;
+            "erp-ai-agents-runs": LocalJSX.IntrinsicElements["erp-ai-agents-runs"] & JSXBase.HTMLAttributes<HTMLErpAiAgentsRunsElement>;
+            "erp-ai-predictions-models": LocalJSX.IntrinsicElements["erp-ai-predictions-models"] & JSXBase.HTMLAttributes<HTMLErpAiPredictionsModelsElement>;
+            "erp-ai-predictions-predictions": LocalJSX.IntrinsicElements["erp-ai-predictions-predictions"] & JSXBase.HTMLAttributes<HTMLErpAiPredictionsPredictionsElement>;
+            "erp-ai-reports-requests": LocalJSX.IntrinsicElements["erp-ai-reports-requests"] & JSXBase.HTMLAttributes<HTMLErpAiReportsRequestsElement>;
+            "erp-ai-reports-templates": LocalJSX.IntrinsicElements["erp-ai-reports-templates"] & JSXBase.HTMLAttributes<HTMLErpAiReportsTemplatesElement>;
+            "erp-ai-setup-wizard-sessions": LocalJSX.IntrinsicElements["erp-ai-setup-wizard-sessions"] & JSXBase.HTMLAttributes<HTMLErpAiSetupWizardSessionsElement>;
+            "erp-appointments-list": LocalJSX.IntrinsicElements["erp-appointments-list"] & JSXBase.HTMLAttributes<HTMLErpAppointmentsListElement>;
+            "erp-assistant-chat": LocalJSX.IntrinsicElements["erp-assistant-chat"] & JSXBase.HTMLAttributes<HTMLErpAssistantChatElement>;
+            "erp-assistant-logs": LocalJSX.IntrinsicElements["erp-assistant-logs"] & JSXBase.HTMLAttributes<HTMLErpAssistantLogsElement>;
+            "erp-attendance-records": LocalJSX.IntrinsicElements["erp-attendance-records"] & JSXBase.HTMLAttributes<HTMLErpAttendanceRecordsElement>;
+            "erp-attendance-settings": LocalJSX.IntrinsicElements["erp-attendance-settings"] & JSXBase.HTMLAttributes<HTMLErpAttendanceSettingsElement>;
+            "erp-audit-log-events": LocalJSX.IntrinsicElements["erp-audit-log-events"] & JSXBase.HTMLAttributes<HTMLErpAuditLogEventsElement>;
+            "erp-audit-log-reports": LocalJSX.IntrinsicElements["erp-audit-log-reports"] & JSXBase.HTMLAttributes<HTMLErpAuditLogReportsElement>;
+            "erp-bank-reconciliation-matches": LocalJSX.IntrinsicElements["erp-bank-reconciliation-matches"] & JSXBase.HTMLAttributes<HTMLErpBankReconciliationMatchesElement>;
+            "erp-bank-reconciliation-statements": LocalJSX.IntrinsicElements["erp-bank-reconciliation-statements"] & JSXBase.HTMLAttributes<HTMLErpBankReconciliationStatementsElement>;
+            "erp-banking-accounts": LocalJSX.IntrinsicElements["erp-banking-accounts"] & JSXBase.HTMLAttributes<HTMLErpBankingAccountsElement>;
+            "erp-banking-transactions": LocalJSX.IntrinsicElements["erp-banking-transactions"] & JSXBase.HTMLAttributes<HTMLErpBankingTransactionsElement>;
+            "erp-bom-list": LocalJSX.IntrinsicElements["erp-bom-list"] & JSXBase.HTMLAttributes<HTMLErpBomListElement>;
+            "erp-carriers-list": LocalJSX.IntrinsicElements["erp-carriers-list"] & JSXBase.HTMLAttributes<HTMLErpCarriersListElement>;
+            "erp-carriers-shipments": LocalJSX.IntrinsicElements["erp-carriers-shipments"] & JSXBase.HTMLAttributes<HTMLErpCarriersShipmentsElement>;
+            "erp-cart-checkout-carts": LocalJSX.IntrinsicElements["erp-cart-checkout-carts"] & JSXBase.HTMLAttributes<HTMLErpCartCheckoutCartsElement>;
+            "erp-cart-checkout-orders": LocalJSX.IntrinsicElements["erp-cart-checkout-orders"] & JSXBase.HTMLAttributes<HTMLErpCartCheckoutOrdersElement>;
+            "erp-cashflow-forecasting-projections": LocalJSX.IntrinsicElements["erp-cashflow-forecasting-projections"] & JSXBase.HTMLAttributes<HTMLErpCashflowForecastingProjectionsElement>;
+            "erp-cashflow-forecasting-scenarios": LocalJSX.IntrinsicElements["erp-cashflow-forecasting-scenarios"] & JSXBase.HTMLAttributes<HTMLErpCashflowForecastingScenariosElement>;
             "erp-cashregister-dashboard": LocalJSX.IntrinsicElements["erp-cashregister-dashboard"] & JSXBase.HTMLAttributes<HTMLErpCashregisterDashboardElement>;
+            "erp-collections-list": LocalJSX.IntrinsicElements["erp-collections-list"] & JSXBase.HTMLAttributes<HTMLErpCollectionsListElement>;
+            "erp-commissions-adjustments": LocalJSX.IntrinsicElements["erp-commissions-adjustments"] & JSXBase.HTMLAttributes<HTMLErpCommissionsAdjustmentsElement>;
+            "erp-commissions-payouts": LocalJSX.IntrinsicElements["erp-commissions-payouts"] & JSXBase.HTMLAttributes<HTMLErpCommissionsPayoutsElement>;
+            "erp-commissions-rules": LocalJSX.IntrinsicElements["erp-commissions-rules"] & JSXBase.HTMLAttributes<HTMLErpCommissionsRulesElement>;
+            "erp-commissions-transactions": LocalJSX.IntrinsicElements["erp-commissions-transactions"] & JSXBase.HTMLAttributes<HTMLErpCommissionsTransactionsElement>;
+            "erp-communications-inbox": LocalJSX.IntrinsicElements["erp-communications-inbox"] & JSXBase.HTMLAttributes<HTMLErpCommunicationsInboxElement>;
+            "erp-communications-templates": LocalJSX.IntrinsicElements["erp-communications-templates"] & JSXBase.HTMLAttributes<HTMLErpCommunicationsTemplatesElement>;
+            "erp-contracts-list": LocalJSX.IntrinsicElements["erp-contracts-list"] & JSXBase.HTMLAttributes<HTMLErpContractsListElement>;
+            "erp-courier-integrations-connections": LocalJSX.IntrinsicElements["erp-courier-integrations-connections"] & JSXBase.HTMLAttributes<HTMLErpCourierIntegrationsConnectionsElement>;
+            "erp-courier-integrations-logs": LocalJSX.IntrinsicElements["erp-courier-integrations-logs"] & JSXBase.HTMLAttributes<HTMLErpCourierIntegrationsLogsElement>;
+            "erp-credit-notes-list": LocalJSX.IntrinsicElements["erp-credit-notes-list"] & JSXBase.HTMLAttributes<HTMLErpCreditNotesListElement>;
+            "erp-credit-risk-alerts": LocalJSX.IntrinsicElements["erp-credit-risk-alerts"] & JSXBase.HTMLAttributes<HTMLErpCreditRiskAlertsElement>;
+            "erp-credit-risk-customers": LocalJSX.IntrinsicElements["erp-credit-risk-customers"] & JSXBase.HTMLAttributes<HTMLErpCreditRiskCustomersElement>;
+            "erp-customer-portal-accounts": LocalJSX.IntrinsicElements["erp-customer-portal-accounts"] & JSXBase.HTMLAttributes<HTMLErpCustomerPortalAccountsElement>;
+            "erp-customer-portal-sessions": LocalJSX.IntrinsicElements["erp-customer-portal-sessions"] & JSXBase.HTMLAttributes<HTMLErpCustomerPortalSessionsElement>;
             "erp-customers-list": LocalJSX.IntrinsicElements["erp-customers-list"] & JSXBase.HTMLAttributes<HTMLErpCustomersListElement>;
+            "erp-dashboards-list": LocalJSX.IntrinsicElements["erp-dashboards-list"] & JSXBase.HTMLAttributes<HTMLErpDashboardsListElement>;
+            "erp-delivery-drivers": LocalJSX.IntrinsicElements["erp-delivery-drivers"] & JSXBase.HTMLAttributes<HTMLErpDeliveryDriversElement>;
+            "erp-delivery-orders": LocalJSX.IntrinsicElements["erp-delivery-orders"] & JSXBase.HTMLAttributes<HTMLErpDeliveryOrdersElement>;
+            "erp-delivery-zones": LocalJSX.IntrinsicElements["erp-delivery-zones"] & JSXBase.HTMLAttributes<HTMLErpDeliveryZonesElement>;
+            "erp-email-marketing-campaigns": LocalJSX.IntrinsicElements["erp-email-marketing-campaigns"] & JSXBase.HTMLAttributes<HTMLErpEmailMarketingCampaignsElement>;
+            "erp-email-marketing-lists": LocalJSX.IntrinsicElements["erp-email-marketing-lists"] & JSXBase.HTMLAttributes<HTMLErpEmailMarketingListsElement>;
+            "erp-expenses-categories": LocalJSX.IntrinsicElements["erp-expenses-categories"] & JSXBase.HTMLAttributes<HTMLErpExpensesCategoriesElement>;
+            "erp-expenses-list": LocalJSX.IntrinsicElements["erp-expenses-list"] & JSXBase.HTMLAttributes<HTMLErpExpensesListElement>;
+            "erp-financial-statements-reports": LocalJSX.IntrinsicElements["erp-financial-statements-reports"] & JSXBase.HTMLAttributes<HTMLErpFinancialStatementsReportsElement>;
+            "erp-financial-statements-templates": LocalJSX.IntrinsicElements["erp-financial-statements-templates"] & JSXBase.HTMLAttributes<HTMLErpFinancialStatementsTemplatesElement>;
+            "erp-fiscal-france-chorus": LocalJSX.IntrinsicElements["erp-fiscal-france-chorus"] & JSXBase.HTMLAttributes<HTMLErpFiscalFranceChorusElement>;
+            "erp-fiscal-france-facturx": LocalJSX.IntrinsicElements["erp-fiscal-france-facturx"] & JSXBase.HTMLAttributes<HTMLErpFiscalFranceFacturxElement>;
+            "erp-fiscal-germany-xrechnung": LocalJSX.IntrinsicElements["erp-fiscal-germany-xrechnung"] & JSXBase.HTMLAttributes<HTMLErpFiscalGermanyXrechnungElement>;
+            "erp-fiscal-germany-zugferd": LocalJSX.IntrinsicElements["erp-fiscal-germany-zugferd"] & JSXBase.HTMLAttributes<HTMLErpFiscalGermanyZugferdElement>;
+            "erp-fiscal-italy-esterometro": LocalJSX.IntrinsicElements["erp-fiscal-italy-esterometro"] & JSXBase.HTMLAttributes<HTMLErpFiscalItalyEsterometroElement>;
+            "erp-fiscal-italy-fatturapa": LocalJSX.IntrinsicElements["erp-fiscal-italy-fatturapa"] & JSXBase.HTMLAttributes<HTMLErpFiscalItalyFatturapaElement>;
+            "erp-fiscal-portugal-comunicacao": LocalJSX.IntrinsicElements["erp-fiscal-portugal-comunicacao"] & JSXBase.HTMLAttributes<HTMLErpFiscalPortugalComunicacaoElement>;
+            "erp-fiscal-portugal-saft": LocalJSX.IntrinsicElements["erp-fiscal-portugal-saft"] & JSXBase.HTMLAttributes<HTMLErpFiscalPortugalSaftElement>;
+            "erp-fiscal-romania-efactura": LocalJSX.IntrinsicElements["erp-fiscal-romania-efactura"] & JSXBase.HTMLAttributes<HTMLErpFiscalRomaniaEfacturaElement>;
+            "erp-fiscal-romania-etransport": LocalJSX.IntrinsicElements["erp-fiscal-romania-etransport"] & JSXBase.HTMLAttributes<HTMLErpFiscalRomaniaEtransportElement>;
+            "erp-fixed-assets-assets": LocalJSX.IntrinsicElements["erp-fixed-assets-assets"] & JSXBase.HTMLAttributes<HTMLErpFixedAssetsAssetsElement>;
+            "erp-fixed-assets-depreciations": LocalJSX.IntrinsicElements["erp-fixed-assets-depreciations"] & JSXBase.HTMLAttributes<HTMLErpFixedAssetsDepreciationsElement>;
+            "erp-forecasting-forecasts": LocalJSX.IntrinsicElements["erp-forecasting-forecasts"] & JSXBase.HTMLAttributes<HTMLErpForecastingForecastsElement>;
+            "erp-forecasting-models": LocalJSX.IntrinsicElements["erp-forecasting-models"] & JSXBase.HTMLAttributes<HTMLErpForecastingModelsElement>;
+            "erp-gantt-projects": LocalJSX.IntrinsicElements["erp-gantt-projects"] & JSXBase.HTMLAttributes<HTMLErpGanttProjectsElement>;
+            "erp-gantt-timeline": LocalJSX.IntrinsicElements["erp-gantt-timeline"] & JSXBase.HTMLAttributes<HTMLErpGanttTimelineElement>;
+            "erp-general-ledger-chart": LocalJSX.IntrinsicElements["erp-general-ledger-chart"] & JSXBase.HTMLAttributes<HTMLErpGeneralLedgerChartElement>;
+            "erp-general-ledger-ledger": LocalJSX.IntrinsicElements["erp-general-ledger-ledger"] & JSXBase.HTMLAttributes<HTMLErpGeneralLedgerLedgerElement>;
+            "erp-general-ledger-reports": LocalJSX.IntrinsicElements["erp-general-ledger-reports"] & JSXBase.HTMLAttributes<HTMLErpGeneralLedgerReportsElement>;
+            "erp-glovo-orders": LocalJSX.IntrinsicElements["erp-glovo-orders"] & JSXBase.HTMLAttributes<HTMLErpGlovoOrdersElement>;
+            "erp-glovo-stores": LocalJSX.IntrinsicElements["erp-glovo-stores"] & JSXBase.HTMLAttributes<HTMLErpGlovoStoresElement>;
             "erp-inventory-products": LocalJSX.IntrinsicElements["erp-inventory-products"] & JSXBase.HTMLAttributes<HTMLErpInventoryProductsElement>;
             "erp-invoice-list": LocalJSX.IntrinsicElements["erp-invoice-list"] & JSXBase.HTMLAttributes<HTMLErpInvoiceListElement>;
+            "erp-invoice-series-list": LocalJSX.IntrinsicElements["erp-invoice-series-list"] & JSXBase.HTMLAttributes<HTMLErpInvoiceSeriesListElement>;
+            "erp-kitchen-display": LocalJSX.IntrinsicElements["erp-kitchen-display"] & JSXBase.HTMLAttributes<HTMLErpKitchenDisplayElement>;
+            "erp-kitchen-orders-active": LocalJSX.IntrinsicElements["erp-kitchen-orders-active"] & JSXBase.HTMLAttributes<HTMLErpKitchenOrdersActiveElement>;
+            "erp-kitchen-orders-stations": LocalJSX.IntrinsicElements["erp-kitchen-orders-stations"] & JSXBase.HTMLAttributes<HTMLErpKitchenOrdersStationsElement>;
+            "erp-kpis-alerts": LocalJSX.IntrinsicElements["erp-kpis-alerts"] & JSXBase.HTMLAttributes<HTMLErpKpisAlertsElement>;
+            "erp-kpis-list": LocalJSX.IntrinsicElements["erp-kpis-list"] & JSXBase.HTMLAttributes<HTMLErpKpisListElement>;
+            "erp-leads-list": LocalJSX.IntrinsicElements["erp-leads-list"] & JSXBase.HTMLAttributes<HTMLErpLeadsListElement>;
+            "erp-leave-requests": LocalJSX.IntrinsicElements["erp-leave-requests"] & JSXBase.HTMLAttributes<HTMLErpLeaveRequestsElement>;
+            "erp-leave-types": LocalJSX.IntrinsicElements["erp-leave-types"] & JSXBase.HTMLAttributes<HTMLErpLeaveTypesElement>;
+            "erp-locations-bins": LocalJSX.IntrinsicElements["erp-locations-bins"] & JSXBase.HTMLAttributes<HTMLErpLocationsBinsElement>;
+            "erp-locations-zones": LocalJSX.IntrinsicElements["erp-locations-zones"] & JSXBase.HTMLAttributes<HTMLErpLocationsZonesElement>;
+            "erp-lots-serials-lots": LocalJSX.IntrinsicElements["erp-lots-serials-lots"] & JSXBase.HTMLAttributes<HTMLErpLotsSerialsLotsElement>;
+            "erp-lots-serials-serials": LocalJSX.IntrinsicElements["erp-lots-serials-serials"] & JSXBase.HTMLAttributes<HTMLErpLotsSerialsSerialsElement>;
+            "erp-manufacturing-orders-list": LocalJSX.IntrinsicElements["erp-manufacturing-orders-list"] & JSXBase.HTMLAttributes<HTMLErpManufacturingOrdersListElement>;
+            "erp-marketplaces-connections": LocalJSX.IntrinsicElements["erp-marketplaces-connections"] & JSXBase.HTMLAttributes<HTMLErpMarketplacesConnectionsElement>;
+            "erp-marketplaces-syncs": LocalJSX.IntrinsicElements["erp-marketplaces-syncs"] & JSXBase.HTMLAttributes<HTMLErpMarketplacesSyncsElement>;
+            "erp-messaging-automations": LocalJSX.IntrinsicElements["erp-messaging-automations"] & JSXBase.HTMLAttributes<HTMLErpMessagingAutomationsElement>;
+            "erp-messaging-campaigns": LocalJSX.IntrinsicElements["erp-messaging-campaigns"] & JSXBase.HTMLAttributes<HTMLErpMessagingCampaignsElement>;
+            "erp-messaging-messages": LocalJSX.IntrinsicElements["erp-messaging-messages"] & JSXBase.HTMLAttributes<HTMLErpMessagingMessagesElement>;
+            "erp-messaging-templates": LocalJSX.IntrinsicElements["erp-messaging-templates"] & JSXBase.HTMLAttributes<HTMLErpMessagingTemplatesElement>;
+            "erp-mrp-requirements": LocalJSX.IntrinsicElements["erp-mrp-requirements"] & JSXBase.HTMLAttributes<HTMLErpMrpRequirementsElement>;
+            "erp-mrp-runs": LocalJSX.IntrinsicElements["erp-mrp-runs"] & JSXBase.HTMLAttributes<HTMLErpMrpRunsElement>;
+            "erp-multi-warehouse-list": LocalJSX.IntrinsicElements["erp-multi-warehouse-list"] & JSXBase.HTMLAttributes<HTMLErpMultiWarehouseListElement>;
+            "erp-multi-warehouse-transfers": LocalJSX.IntrinsicElements["erp-multi-warehouse-transfers"] & JSXBase.HTMLAttributes<HTMLErpMultiWarehouseTransfersElement>;
+            "erp-notes-board": LocalJSX.IntrinsicElements["erp-notes-board"] & JSXBase.HTMLAttributes<HTMLErpNotesBoardElement>;
+            "erp-olap-cubes-cubes": LocalJSX.IntrinsicElements["erp-olap-cubes-cubes"] & JSXBase.HTMLAttributes<HTMLErpOlapCubesCubesElement>;
+            "erp-olap-cubes-queries": LocalJSX.IntrinsicElements["erp-olap-cubes-queries"] & JSXBase.HTMLAttributes<HTMLErpOlapCubesQueriesElement>;
+            "erp-online-booking-list": LocalJSX.IntrinsicElements["erp-online-booking-list"] & JSXBase.HTMLAttributes<HTMLErpOnlineBookingListElement>;
+            "erp-online-booking-settings": LocalJSX.IntrinsicElements["erp-online-booking-settings"] & JSXBase.HTMLAttributes<HTMLErpOnlineBookingSettingsElement>;
+            "erp-online-store-pages": LocalJSX.IntrinsicElements["erp-online-store-pages"] & JSXBase.HTMLAttributes<HTMLErpOnlineStorePagesElement>;
+            "erp-online-store-products": LocalJSX.IntrinsicElements["erp-online-store-products"] & JSXBase.HTMLAttributes<HTMLErpOnlineStoreProductsElement>;
+            "erp-opportunities-list": LocalJSX.IntrinsicElements["erp-opportunities-list"] & JSXBase.HTMLAttributes<HTMLErpOpportunitiesListElement>;
+            "erp-orders-pipeline": LocalJSX.IntrinsicElements["erp-orders-pipeline"] & JSXBase.HTMLAttributes<HTMLErpOrdersPipelineElement>;
+            "erp-payment-gateways-gateways": LocalJSX.IntrinsicElements["erp-payment-gateways-gateways"] & JSXBase.HTMLAttributes<HTMLErpPaymentGatewaysGatewaysElement>;
+            "erp-payments-list": LocalJSX.IntrinsicElements["erp-payments-list"] & JSXBase.HTMLAttributes<HTMLErpPaymentsListElement>;
+            "erp-payroll-concepts": LocalJSX.IntrinsicElements["erp-payroll-concepts"] & JSXBase.HTMLAttributes<HTMLErpPayrollConceptsElement>;
+            "erp-payroll-payslips": LocalJSX.IntrinsicElements["erp-payroll-payslips"] & JSXBase.HTMLAttributes<HTMLErpPayrollPayslipsElement>;
+            "erp-picking-packing-packages": LocalJSX.IntrinsicElements["erp-picking-packing-packages"] & JSXBase.HTMLAttributes<HTMLErpPickingPackingPackagesElement>;
+            "erp-picking-packing-picks": LocalJSX.IntrinsicElements["erp-picking-packing-picks"] & JSXBase.HTMLAttributes<HTMLErpPickingPackingPicksElement>;
+            "erp-pipeline-boards": LocalJSX.IntrinsicElements["erp-pipeline-boards"] & JSXBase.HTMLAttributes<HTMLErpPipelineBoardsElement>;
+            "erp-pricing-lists": LocalJSX.IntrinsicElements["erp-pricing-lists"] & JSXBase.HTMLAttributes<HTMLErpPricingListsElement>;
+            "erp-project-billing-contracts": LocalJSX.IntrinsicElements["erp-project-billing-contracts"] & JSXBase.HTMLAttributes<HTMLErpProjectBillingContractsElement>;
+            "erp-project-billing-invoices": LocalJSX.IntrinsicElements["erp-project-billing-invoices"] & JSXBase.HTMLAttributes<HTMLErpProjectBillingInvoicesElement>;
+            "erp-project-costing-projects": LocalJSX.IntrinsicElements["erp-project-costing-projects"] & JSXBase.HTMLAttributes<HTMLErpProjectCostingProjectsElement>;
+            "erp-project-costing-reports": LocalJSX.IntrinsicElements["erp-project-costing-reports"] & JSXBase.HTMLAttributes<HTMLErpProjectCostingReportsElement>;
+            "erp-purchase-orders-list": LocalJSX.IntrinsicElements["erp-purchase-orders-list"] & JSXBase.HTMLAttributes<HTMLErpPurchaseOrdersListElement>;
+            "erp-purchase-orders-suppliers": LocalJSX.IntrinsicElements["erp-purchase-orders-suppliers"] & JSXBase.HTMLAttributes<HTMLErpPurchaseOrdersSuppliersElement>;
+            "erp-quotes-list": LocalJSX.IntrinsicElements["erp-quotes-list"] & JSXBase.HTMLAttributes<HTMLErpQuotesListElement>;
+            "erp-reports-list": LocalJSX.IntrinsicElements["erp-reports-list"] & JSXBase.HTMLAttributes<HTMLErpReportsListElement>;
+            "erp-reports-runs": LocalJSX.IntrinsicElements["erp-reports-runs"] & JSXBase.HTMLAttributes<HTMLErpReportsRunsElement>;
+            "erp-reservations-availability": LocalJSX.IntrinsicElements["erp-reservations-availability"] & JSXBase.HTMLAttributes<HTMLErpReservationsAvailabilityElement>;
+            "erp-reservations-list": LocalJSX.IntrinsicElements["erp-reservations-list"] & JSXBase.HTMLAttributes<HTMLErpReservationsListElement>;
+            "erp-reservations-waitlist": LocalJSX.IntrinsicElements["erp-reservations-waitlist"] & JSXBase.HTMLAttributes<HTMLErpReservationsWaitlistElement>;
+            "erp-rules-triggers-rules": LocalJSX.IntrinsicElements["erp-rules-triggers-rules"] & JSXBase.HTMLAttributes<HTMLErpRulesTriggersRulesElement>;
+            "erp-rules-triggers-triggers": LocalJSX.IntrinsicElements["erp-rules-triggers-triggers"] & JSXBase.HTMLAttributes<HTMLErpRulesTriggersTriggersElement>;
             "erp-sales-list": LocalJSX.IntrinsicElements["erp-sales-list"] & JSXBase.HTMLAttributes<HTMLErpSalesListElement>;
+            "erp-schedules-hours": LocalJSX.IntrinsicElements["erp-schedules-hours"] & JSXBase.HTMLAttributes<HTMLErpSchedulesHoursElement>;
+            "erp-sepa-remittances-list": LocalJSX.IntrinsicElements["erp-sepa-remittances-list"] & JSXBase.HTMLAttributes<HTMLErpSepaRemittancesListElement>;
+            "erp-sepa-remittances-mandates": LocalJSX.IntrinsicElements["erp-sepa-remittances-mandates"] & JSXBase.HTMLAttributes<HTMLErpSepaRemittancesMandatesElement>;
+            "erp-services-list": LocalJSX.IntrinsicElements["erp-services-list"] & JSXBase.HTMLAttributes<HTMLErpServicesListElement>;
+            "erp-setup-wizard": LocalJSX.IntrinsicElements["erp-setup-wizard"] & JSXBase.HTMLAttributes<HTMLErpSetupWizardElement>;
+            "erp-staff-members": LocalJSX.IntrinsicElements["erp-staff-members"] & JSXBase.HTMLAttributes<HTMLErpStaffMembersElement>;
+            "erp-staff-roles": LocalJSX.IntrinsicElements["erp-staff-roles"] & JSXBase.HTMLAttributes<HTMLErpStaffRolesElement>;
+            "erp-staff-time-off": LocalJSX.IntrinsicElements["erp-staff-time-off"] & JSXBase.HTMLAttributes<HTMLErpStaffTimeOffElement>;
+            "erp-stock-sync-conflicts": LocalJSX.IntrinsicElements["erp-stock-sync-conflicts"] & JSXBase.HTMLAttributes<HTMLErpStockSyncConflictsElement>;
+            "erp-stock-sync-runs": LocalJSX.IntrinsicElements["erp-stock-sync-runs"] & JSXBase.HTMLAttributes<HTMLErpStockSyncRunsElement>;
+            "erp-stripe-connections": LocalJSX.IntrinsicElements["erp-stripe-connections"] & JSXBase.HTMLAttributes<HTMLErpStripeConnectionsElement>;
+            "erp-stripe-events": LocalJSX.IntrinsicElements["erp-stripe-events"] & JSXBase.HTMLAttributes<HTMLErpStripeEventsElement>;
+            "erp-subscriptions-list": LocalJSX.IntrinsicElements["erp-subscriptions-list"] & JSXBase.HTMLAttributes<HTMLErpSubscriptionsListElement>;
+            "erp-subscriptions-plans": LocalJSX.IntrinsicElements["erp-subscriptions-plans"] & JSXBase.HTMLAttributes<HTMLErpSubscriptionsPlansElement>;
+            "erp-supplier-invoices-list": LocalJSX.IntrinsicElements["erp-supplier-invoices-list"] & JSXBase.HTMLAttributes<HTMLErpSupplierInvoicesListElement>;
+            "erp-tables-floor-plan": LocalJSX.IntrinsicElements["erp-tables-floor-plan"] & JSXBase.HTMLAttributes<HTMLErpTablesFloorPlanElement>;
+            "erp-tasks-list": LocalJSX.IntrinsicElements["erp-tasks-list"] & JSXBase.HTMLAttributes<HTMLErpTasksListElement>;
+            "erp-tasks-projects": LocalJSX.IntrinsicElements["erp-tasks-projects"] & JSXBase.HTMLAttributes<HTMLErpTasksProjectsElement>;
+            "erp-taxes-rates": LocalJSX.IntrinsicElements["erp-taxes-rates"] & JSXBase.HTMLAttributes<HTMLErpTaxesRatesElement>;
+            "erp-tickets-list": LocalJSX.IntrinsicElements["erp-tickets-list"] & JSXBase.HTMLAttributes<HTMLErpTicketsListElement>;
+            "erp-tickets-sla": LocalJSX.IntrinsicElements["erp-tickets-sla"] & JSXBase.HTMLAttributes<HTMLErpTicketsSlaElement>;
+            "erp-time-control-records": LocalJSX.IntrinsicElements["erp-time-control-records"] & JSXBase.HTMLAttributes<HTMLErpTimeControlRecordsElement>;
+            "erp-time-control-workplaces": LocalJSX.IntrinsicElements["erp-time-control-workplaces"] & JSXBase.HTMLAttributes<HTMLErpTimeControlWorkplacesElement>;
+            "erp-timesheets-approvals": LocalJSX.IntrinsicElements["erp-timesheets-approvals"] & JSXBase.HTMLAttributes<HTMLErpTimesheetsApprovalsElement>;
+            "erp-timesheets-entries": LocalJSX.IntrinsicElements["erp-timesheets-entries"] & JSXBase.HTMLAttributes<HTMLErpTimesheetsEntriesElement>;
+            "erp-timesheets-rates": LocalJSX.IntrinsicElements["erp-timesheets-rates"] & JSXBase.HTMLAttributes<HTMLErpTimesheetsRatesElement>;
+            "erp-timesheets-settings": LocalJSX.IntrinsicElements["erp-timesheets-settings"] & JSXBase.HTMLAttributes<HTMLErpTimesheetsSettingsElement>;
+            "erp-traceability-events": LocalJSX.IntrinsicElements["erp-traceability-events"] & JSXBase.HTMLAttributes<HTMLErpTraceabilityEventsElement>;
+            "erp-training-programs": LocalJSX.IntrinsicElements["erp-training-programs"] & JSXBase.HTMLAttributes<HTMLErpTrainingProgramsElement>;
+            "erp-training-skills": LocalJSX.IntrinsicElements["erp-training-skills"] & JSXBase.HTMLAttributes<HTMLErpTrainingSkillsElement>;
+            "erp-uber-eats-orders": LocalJSX.IntrinsicElements["erp-uber-eats-orders"] & JSXBase.HTMLAttributes<HTMLErpUberEatsOrdersElement>;
+            "erp-uber-eats-restaurants": LocalJSX.IntrinsicElements["erp-uber-eats-restaurants"] & JSXBase.HTMLAttributes<HTMLErpUberEatsRestaurantsElement>;
+            "erp-verifactu-contingency": LocalJSX.IntrinsicElements["erp-verifactu-contingency"] & JSXBase.HTMLAttributes<HTMLErpVerifactuContingencyElement>;
+            "erp-verifactu-events": LocalJSX.IntrinsicElements["erp-verifactu-events"] & JSXBase.HTMLAttributes<HTMLErpVerifactuEventsElement>;
+            "erp-verifactu-records": LocalJSX.IntrinsicElements["erp-verifactu-records"] & JSXBase.HTMLAttributes<HTMLErpVerifactuRecordsElement>;
+            "erp-verifactu-settings": LocalJSX.IntrinsicElements["erp-verifactu-settings"] & JSXBase.HTMLAttributes<HTMLErpVerifactuSettingsElement>;
+            "erp-whatsapp-inbox-inbox": LocalJSX.IntrinsicElements["erp-whatsapp-inbox-inbox"] & JSXBase.HTMLAttributes<HTMLErpWhatsappInboxInboxElement>;
+            "erp-whatsapp-inbox-requests": LocalJSX.IntrinsicElements["erp-whatsapp-inbox-requests"] & JSXBase.HTMLAttributes<HTMLErpWhatsappInboxRequestsElement>;
+            "erp-whatsapp-inbox-templates": LocalJSX.IntrinsicElements["erp-whatsapp-inbox-templates"] & JSXBase.HTMLAttributes<HTMLErpWhatsappInboxTemplatesElement>;
+            "erp-work-centers-list": LocalJSX.IntrinsicElements["erp-work-centers-list"] & JSXBase.HTMLAttributes<HTMLErpWorkCentersListElement>;
+            "erp-workflows-list": LocalJSX.IntrinsicElements["erp-workflows-list"] & JSXBase.HTMLAttributes<HTMLErpWorkflowsListElement>;
+            "erp-workflows-runs": LocalJSX.IntrinsicElements["erp-workflows-runs"] & JSXBase.HTMLAttributes<HTMLErpWorkflowsRunsElement>;
+            "erp-workforce-planning-calendar": LocalJSX.IntrinsicElements["erp-workforce-planning-calendar"] & JSXBase.HTMLAttributes<HTMLErpWorkforcePlanningCalendarElement>;
+            "erp-workforce-planning-coverage": LocalJSX.IntrinsicElements["erp-workforce-planning-coverage"] & JSXBase.HTMLAttributes<HTMLErpWorkforcePlanningCoverageElement>;
+            "erp-workforce-planning-locations": LocalJSX.IntrinsicElements["erp-workforce-planning-locations"] & JSXBase.HTMLAttributes<HTMLErpWorkforcePlanningLocationsElement>;
+            "erp-workforce-planning-planning": LocalJSX.IntrinsicElements["erp-workforce-planning-planning"] & JSXBase.HTMLAttributes<HTMLErpWorkforcePlanningPlanningElement>;
+            "erp-workforce-planning-shifts": LocalJSX.IntrinsicElements["erp-workforce-planning-shifts"] & JSXBase.HTMLAttributes<HTMLErpWorkforcePlanningShiftsElement>;
         }
     }
 }

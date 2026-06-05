@@ -1,0 +1,222 @@
+{
+  "id": "project_billing",
+  "name": "Project Billing",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages project billing contracts, milestones, time entries, and invoices: create contracts, track milestones and logged hours, generate invoices, and record payments.",
+    "keywords": ["project billing", "contract", "milestone", "time entry", "invoice", "billing", "project", "payment"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "project_billing.view_pb",
+    "project_billing.manage_pb",
+    "project_billing.invoice"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "project_billing.view_pb",
+      "project_billing.manage_pb",
+      "project_billing.invoice"
+    ],
+    "employee": [
+      "project_billing.view_pb"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "contracts",
+      "label": "Contracts",
+      "icon": "receipt-outline",
+      "component": "erp-project-billing-contracts"
+    },
+    {
+      "id": "invoices",
+      "label": "Invoices",
+      "icon": "receipt-outline",
+      "component": "erp-project-billing-invoices"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "project_billing.contracts.list": {
+      "permission": "project_billing.view_pb",
+      "sql": "queries/contracts_list.sql",
+      "schema": "schemas/contracts_list.json",
+      "ai": { "description": "Lists project billing contracts with their current status." }
+    },
+    "project_billing.contracts.get": {
+      "permission": "project_billing.view_pb",
+      "sql": "queries/contract_get.sql",
+      "schema": "schemas/contract_get.json",
+      "ai": { "description": "Retrieves the full detail of a specific project contract." }
+    },
+    "project_billing.milestones.list": {
+      "permission": "project_billing.view_pb",
+      "sql": "queries/milestones_list.sql",
+      "schema": "schemas/milestones_list.json",
+      "ai": { "description": "Lists the billing milestones of a contract with their payment status." }
+    },
+    "project_billing.time_entries.list": {
+      "permission": "project_billing.view_pb",
+      "sql": "queries/time_entries_list.sql",
+      "schema": "schemas/time_entries_list.json",
+      "ai": { "description": "Lists time entries logged against a contract or project." }
+    },
+    "project_billing.invoices.list": {
+      "permission": "project_billing.view_pb",
+      "sql": "queries/invoices_list.sql",
+      "schema": "schemas/invoices_list.json",
+      "ai": { "description": "Lists invoices generated for project contracts." }
+    },
+    "project_billing.invoices.get": {
+      "permission": "project_billing.view_pb",
+      "sql": "queries/invoice_get.sql",
+      "schema": "schemas/invoice_get.json",
+      "ai": { "description": "Retrieves the full detail of a project invoice including its lines and amounts." }
+    }
+  },
+  "commands": {
+    "project_billing.contracts.create": {
+      "permission": "project_billing.manage_pb",
+      "schema": "schemas/contract_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_contract"
+      },
+      "emit": [
+        "project_billing.contract.created"
+      ],
+      "ai": { "description": "Creates a new project contract with billing type and payment terms." }
+    },
+    "project_billing.contracts.activate": {
+      "permission": "project_billing.manage_pb",
+      "transaction": true,
+      "sql": [
+        "commands/contract_activate.sql"
+      ],
+      "schema": "schemas/contract_activate.json",
+      "emit": [
+        "project_billing.contract.activated"
+      ],
+      "ai": { "description": "Activates a project contract allowing time and milestone tracking to begin." }
+    },
+    "project_billing.contracts.close": {
+      "permission": "project_billing.manage_pb",
+      "transaction": true,
+      "sql": [
+        "commands/contract_close.sql"
+      ],
+      "schema": "schemas/contract_close.json",
+      "emit": [
+        "project_billing.contract.closed"
+      ],
+      "ai": { "description": "Closes a project contract finalising all associated billing." }
+    },
+    "project_billing.milestones.add": {
+      "permission": "project_billing.manage_pb",
+      "transaction": true,
+      "sql": [
+        "commands/milestone_add.sql"
+      ],
+      "schema": "schemas/milestone_add.json",
+      "emit": [
+        "project_billing.milestone.added"
+      ],
+      "ai": { "description": "Adds a billing milestone to a contract with an amount and expected date." }
+    },
+    "project_billing.milestones.mark_completed": {
+      "permission": "project_billing.manage_pb",
+      "transaction": true,
+      "sql": [
+        "commands/milestone_mark_completed.sql"
+      ],
+      "schema": "schemas/milestone_mark_completed.json",
+      "emit": [
+        "project_billing.milestone.completed"
+      ],
+      "ai": { "description": "Marks a milestone as completed, enabling it to be included in an invoice." }
+    },
+    "project_billing.time_entries.log": {
+      "permission": "project_billing.manage_pb",
+      "transaction": true,
+      "sql": [
+        "commands/time_log.sql"
+      ],
+      "schema": "schemas/time_log.json",
+      "emit": [
+        "project_billing.time.logged"
+      ],
+      "ai": { "description": "Logs hours worked on a project contract for future billing." }
+    },
+    "project_billing.invoices.generate": {
+      "permission": "project_billing.invoice",
+      "schema": "schemas/invoice_generate.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "generate_invoice"
+      },
+      "emit": [
+        "project_billing.invoice.generated"
+      ],
+      "ai": { "description": "Generates an invoice from completed milestones or accumulated time on a contract." }
+    },
+    "project_billing.invoices.mark_sent": {
+      "permission": "project_billing.invoice",
+      "transaction": true,
+      "sql": [
+        "commands/invoice_mark_sent.sql"
+      ],
+      "schema": "schemas/invoice_mark_sent.json",
+      "emit": [
+        "project_billing.invoice.sent"
+      ],
+      "ai": { "description": "Marks a project invoice as sent to the client." }
+    },
+    "project_billing.invoices.mark_paid": {
+      "permission": "project_billing.invoice",
+      "schema": "schemas/invoice_mark_paid.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "mark_invoice_paid"
+      },
+      "emit": [
+        "project_billing.invoice.paid"
+      ],
+      "ai": { "description": "Records payment of a project invoice and updates its status to paid." }
+    },
+    "project_billing._insert_invoice": {
+      "permission": "project_billing.invoice",
+      "sql": [
+        "commands/_insert_invoice.sql"
+      ]
+    },
+    "project_billing._set_milestone_status": {
+      "permission": "project_billing.invoice",
+      "sql": [
+        "commands/_set_milestone_status.sql"
+      ]
+    },
+    "project_billing._mark_time_invoiced": {
+      "permission": "project_billing.invoice",
+      "sql": [
+        "commands/_mark_time_invoiced.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/project_billing.esm.js"
+  }
+}

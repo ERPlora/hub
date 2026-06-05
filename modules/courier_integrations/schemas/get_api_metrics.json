@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "courier_integrations.metrics.get",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["connection_id"],
+  "properties": {
+    "connection_id": { "type": "string", "minLength": 1 },
+    "period_days": { "type": "integer", "minimum": 1, "default": 7 }
+  }
+}

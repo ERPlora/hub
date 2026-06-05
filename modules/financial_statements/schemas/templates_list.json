@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "financial_statements.templates.list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "report_type": {
+      "type": "string",
+      "enum": ["", "balance_sheet", "profit_loss", "cash_flow", "custom"],
+      "default": ""
+    },
+    "active_only": { "type": "integer", "enum": [0, 1], "default": 1 }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bank_reconciliation.matches.auto_match",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["statement_id", "candidate_entries"],
+  "properties": {
+    "statement_id": { "type": "string", "minLength": 1 },
+    "tolerance_days": { "type": "integer", "minimum": 0, "default": 2 },
+    "candidate_entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "amount"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "amount": { "type": "number" },
+          "date": { "type": ["string", "null"], "format": "date", "default": null }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "id": "payroll",
+  "name": "Payroll",
+  "version": "2.1.6",
+  "agent": {
+    "description": "Manages employee payroll: calculate payslips, manage pay concepts (earnings and deductions), approve payslips, and configure payroll settings.",
+    "keywords": ["payroll", "payslip", "salary", "deduction", "employee", "concept", "calculate"]
+  },
+  "depends_on": ["staff"],
+  "permissions": [
+    "payroll.view_payslip",
+    "payroll.add_payslip",
+    "payroll.change_payslip",
+    "payroll.delete_payslip",
+    "payroll.approve_payslip",
+    "payroll.view_reports",
+    "payroll.manage_settings",
+    "payroll.calculate"
+  ],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": [
+      "payroll.view_payslip",
+      "payroll.add_payslip",
+      "payroll.change_payslip",
+      "payroll.approve_payslip",
+      "payroll.view_reports",
+      "payroll.manage_settings",
+      "payroll.calculate"
+    ],
+    "employee": ["payroll.view_payslip"]
+  },
+  "navigation": [
+    {
+      "id": "payslips",
+      "label": "Payslips",
+      "icon": "document-text-outline",
+      "component": "erp-payroll-payslips"
+    },
+    {
+      "id": "concepts",
+      "label": "Concepts",
+      "icon": "list-outline",
+      "component": "erp-payroll-concepts"
+    }
+  ],
+  "migrations": {
+    "sqlite": ["migrations/sqlite/001_init.sql"]
+  },
+  "queries": {
+    "payroll.payslips.list": {
+      "permission": "payroll.view_payslip",
+      "sql": "queries/payslips_list.sql",
+      "schema": "schemas/payslips_list.json",
+      "ai": { "description": "Lists payslips for the period with their status and associated employee." }
+    },
+    "payroll.payslips.get": {
+      "permission": "payroll.view_payslip",
+      "sql": "queries/payslip_get.sql",
+      "schema": "schemas/payslip_get.json",
+      "ai": { "description": "Retrieves the full details of a single payslip by its ID." }
+    },
+    "payroll.payslips.lines": {
+      "permission": "payroll.view_payslip",
+      "sql": "queries/payslip_lines.sql",
+      "schema": "schemas/payslip_lines.json",
+      "ai": { "description": "Lists the line items (earnings and deductions) that make up a payslip." }
+    },
+    "payroll.concepts.list": {
+      "permission": "payroll.view_payslip",
+      "sql": "queries/concepts_list.sql",
+      "schema": "schemas/concepts_list.json",
+      "ai": { "description": "Lists configured payroll concepts (base salary, overtime, deductions, etc.)." }
+    },
+    "payroll.settings.get": {
+      "permission": "payroll.manage_settings",
+      "sql": "queries/settings_get.sql",
+      "ai": { "description": "Retrieves the current configuration of the payroll module." }
+    }
+  },
+  "commands": {
+    "payroll.payslips.create": {
+      "permission": "payroll.add_payslip",
+      "transaction": true,
+      "sql": ["commands/payslip_create.sql"],
+      "schema": "schemas/payslip_create.json",
+      "emit": ["payroll.payslip.created"],
+      "ai": { "description": "Creates a new payslip for an employee for the specified pay period." }
+    },
+    "payroll.payslips.delete": {
+      "permission": "payroll.delete_payslip",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "delete_payslip"
+      },
+      "schema": "schemas/payslip_delete.json",
+      "emit": ["payroll.payslip.deleted"],
+      "ai": { "description": "Deletes a draft payslip that has not yet been approved (destructive)." }
+    },
+    "payroll.payslips.approve": {
+      "permission": "payroll.approve_payslip",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "approve_payslip"
+      },
+      "schema": "schemas/payslip_approve.json",
+      "emit": ["payroll.payslip.approved"],
+      "ai": { "description": "Approves a payslip, validating amounts and authorising payment." }
+    },
+    "payroll.concepts.create": {
+      "permission": "payroll.change_payslip",
+      "transaction": true,
+      "sql": ["commands/concept_create.sql"],
+      "schema": "schemas/concept_create.json",
+      "emit": ["payroll.concept.created"],
+      "ai": { "description": "Creates a new reusable payroll concept (earning or deduction)." }
+    },
+    "payroll.settings.update": {
+      "permission": "payroll.manage_settings",
+      "transaction": true,
+      "sql": ["commands/settings_upsert.sql"],
+      "schema": "schemas/settings_update.json",
+      "emit": ["payroll.settings.updated"],
+      "ai": { "description": "Updates payroll module settings such as pay periods, social security, and income tax rates." }
+    },
+    "payroll.calculate": {
+      "permission": "payroll.calculate",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "calculate_payslip"
+      },
+      "schema": "schemas/calculate.json",
+      "emit": ["payroll.payslip.created"],
+      "ai": { "description": "Automatically calculates payslip amounts by applying configured concepts, withholdings, and taxes." }
+    }
+  },
+  "events": {
+    "listen": ["staff.member_updated"]
+  },
+  "ui": {
+    "entry": "dist/payroll.esm.js"
+  }
+}

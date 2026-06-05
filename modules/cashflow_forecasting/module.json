@@ -1,0 +1,163 @@
+{
+  "id": "cashflow_forecasting",
+  "name": "Cash Flow Forecasting",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Projects and analyzes future cash flow: create and compare scenarios, run projections, calculate break-even points, and review period-by-period data.",
+    "keywords": ["cash flow", "forecast", "projection", "scenario", "break-even", "financial planning"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "cashflow_forecasting.view_cf",
+    "cashflow_forecasting.manage_cf",
+    "cashflow_forecasting.run_cf"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "cashflow_forecasting.view_cf",
+      "cashflow_forecasting.manage_cf",
+      "cashflow_forecasting.run_cf"
+    ],
+    "employee": [
+      "cashflow_forecasting.view_cf"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "scenarios",
+      "label": "Scenarios",
+      "icon": "trending-up-outline",
+      "component": "erp-cashflow-forecasting-scenarios"
+    },
+    {
+      "id": "projections",
+      "label": "Projections",
+      "icon": "trending-up-outline",
+      "component": "erp-cashflow-forecasting-projections"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "cashflow_forecasting.scenarios.list": {
+      "permission": "cashflow_forecasting.view_cf",
+      "sql": "queries/scenarios_list.sql",
+      "ai": { "description": "Lists all cash flow forecast scenarios" }
+    },
+    "cashflow_forecasting.scenarios.get": {
+      "permission": "cashflow_forecasting.view_cf",
+      "sql": "queries/scenario_get.sql",
+      "ai": { "description": "Returns the details of a specific cash flow forecast scenario" }
+    },
+    "cashflow_forecasting.projections.list": {
+      "permission": "cashflow_forecasting.view_cf",
+      "sql": "queries/projections_list.sql",
+      "ai": { "description": "Lists the generated cash flow projections" }
+    },
+    "cashflow_forecasting.projections.get": {
+      "permission": "cashflow_forecasting.view_cf",
+      "sql": "queries/projection_get.sql",
+      "ai": { "description": "Returns the details of a cash flow projection including its data points" }
+    },
+    "cashflow_forecasting.points.list": {
+      "permission": "cashflow_forecasting.view_cf",
+      "sql": "queries/points_list.sql",
+      "ai": { "description": "Lists the periodic data points of a cash flow projection" }
+    }
+  },
+  "commands": {
+    "cashflow_forecasting.scenarios.create": {
+      "permission": "cashflow_forecasting.manage_cf",
+      "transaction": true,
+      "sql": [
+        "commands/scenario_create.sql"
+      ],
+      "schema": "schemas/scenario_create.json",
+      "emit": [
+        "cashflow_forecasting.scenario.created"
+      ],
+      "ai": { "description": "Creates a new cash flow forecast scenario" }
+    },
+    "cashflow_forecasting.scenarios.update": {
+      "permission": "cashflow_forecasting.manage_cf",
+      "transaction": true,
+      "sql": [
+        "commands/scenario_update.sql"
+      ],
+      "schema": "schemas/scenario_update.json",
+      "emit": [
+        "cashflow_forecasting.scenario.updated"
+      ],
+      "ai": { "description": "Updates the parameters of an existing cash flow forecast scenario" }
+    },
+    "cashflow_forecasting.scenarios.deactivate": {
+      "permission": "cashflow_forecasting.manage_cf",
+      "transaction": true,
+      "sql": [
+        "commands/scenario_deactivate.sql"
+      ],
+      "schema": "schemas/scenario_deactivate.json",
+      "emit": [
+        "cashflow_forecasting.scenario.deactivated"
+      ],
+      "ai": { "description": "Deactivates a forecast scenario so it is excluded from new projections" }
+    },
+    "cashflow_forecasting.projections.run": {
+      "permission": "cashflow_forecasting.run_cf",
+      "schema": "schemas/run_projection.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "run_projection"
+      },
+      "emit": [
+        "cashflow_forecasting.projection.completed"
+      ],
+      "ai": { "description": "Runs a cash flow projection for a given scenario and time period" }
+    },
+    "cashflow_forecasting.scenarios.compare": {
+      "permission": "cashflow_forecasting.view_cf",
+      "schema": "schemas/compare_scenarios.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "compare_scenarios"
+      },
+      "ai": { "description": "Compares the projections of two or more cash flow scenarios side by side" }
+    },
+    "cashflow_forecasting.scenarios.break_even": {
+      "permission": "cashflow_forecasting.view_cf",
+      "schema": "schemas/break_even.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "get_break_even_point"
+      },
+      "ai": { "description": "Calculates the break-even point for a given cash flow scenario" }
+    },
+    "cashflow_forecasting._insert_projection": {
+      "permission": "cashflow_forecasting.run_cf",
+      "sql": [
+        "commands/_insert_projection.sql"
+      ]
+    },
+    "cashflow_forecasting._insert_point": {
+      "permission": "cashflow_forecasting.run_cf",
+      "sql": [
+        "commands/_insert_point.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ui": {
+    "entry": "dist/cashflow_forecasting.esm.js"
+  }
+}

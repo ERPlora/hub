@@ -1,0 +1,10 @@
+{
+  "name": "@erplora/module-customer_portal",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Módulo customer_portal (manifest declarativo + Web Components Stencil): portal self-service para clientes finales del hub — invitaciones, cuentas y sesiones autenticadas. La lógica de hashing/tokens/expiración va a WASM. Se compila con @erplora/module-cli.",
+  "dependencies": {
+    "@stencil/core": "^4.20.0"
+  }
+}

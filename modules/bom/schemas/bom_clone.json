@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bom.boms.clone",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_bom_id", "new_code", "new_version"],
+  "properties": {
+    "source_bom_id": { "type": "string", "minLength": 1 },
+    "new_code": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "new_version": { "type": "string", "minLength": 1, "maxLength": 50 }
+  }
+}

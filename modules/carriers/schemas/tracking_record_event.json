@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "carriers.tracking.record_event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["shipment_id", "event_code"],
+  "properties": {
+    "shipment_id": { "type": "string", "minLength": 1 },
+    "event_code": { "type": "string", "minLength": 1, "maxLength": 50 },
+    "description": { "type": "string", "default": "", "maxLength": 500 },
+    "location": { "type": "string", "default": "", "maxLength": 200 },
+    "occurred_at": { "type": ["string", "null"], "format": "date-time", "default": null },
+    "raw_data": { "type": ["object", "null"], "default": null }
+  }
+}

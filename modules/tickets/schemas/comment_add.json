@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tickets.comments.add",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ticket_id", "comment_text", "author_ref"],
+  "properties": {
+    "ticket_id": { "type": "string", "minLength": 1 },
+    "comment_text": { "type": "string", "minLength": 1 },
+    "author_ref": { "type": "string", "minLength": 1 },
+    "is_internal": { "type": "boolean", "default": false }
+  }
+}

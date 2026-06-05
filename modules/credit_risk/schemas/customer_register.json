@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "credit_risk.customers.register",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["customer_ref", "customer_name"],
+  "properties": {
+    "customer_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "customer_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "credit_limit": { "type": "number", "minimum": 0, "default": 0 },
+    "payment_terms_days": { "type": "integer", "minimum": 0, "default": 30 }
+  }
+}

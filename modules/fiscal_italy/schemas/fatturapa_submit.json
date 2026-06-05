@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fiscal_italy.fatturapa.submit_to_sdi",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fatturapa_id"],
+  "properties": {
+    "fatturapa_id": { "type": "string", "minLength": 1 }
+  }
+}

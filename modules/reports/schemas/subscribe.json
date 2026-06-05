@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reports.subscriptions.subscribe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_id", "subscriber_ref"],
+  "properties": {
+    "report_id": { "type": "string", "minLength": 1 },
+    "subscriber_ref": { "type": "string", "minLength": 1 },
+    "frequency": {
+      "type": "string",
+      "enum": ["daily", "weekly", "monthly"],
+      "default": "weekly"
+    },
+    "delivery_method": {
+      "type": "string",
+      "enum": ["email", "webhook"],
+      "default": "email"
+    }
+  }
+}

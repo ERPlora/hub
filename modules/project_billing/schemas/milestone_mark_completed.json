@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "project_billing.milestones.mark_completed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["milestone_id"],
+  "properties": {
+    "milestone_id": { "type": "string", "minLength": 1 }
+  }
+}

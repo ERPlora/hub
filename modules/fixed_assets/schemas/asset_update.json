@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fixed_assets.assets.update",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["asset_id"],
+  "properties": {
+    "asset_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "maxLength": 255 },
+    "description": { "type": "string" },
+    "asset_category": { "type": "string", "maxLength": 100 },
+    "acquisition_date": { "type": ["string", "null"], "format": "date" },
+    "acquisition_cost": { "type": "number", "minimum": 0 },
+    "useful_life_years": { "type": "integer", "minimum": 0 },
+    "depreciation_method": {
+      "type": "string",
+      "enum": ["linear", "declining", "units_of_production"]
+    },
+    "residual_value": { "type": "number", "minimum": 0 },
+    "status": {
+      "type": "string",
+      "enum": ["active", "disposed", "written_off", "in_maintenance"]
+    },
+    "location_ref": { "type": "string", "maxLength": 100 },
+    "supplier_ref": { "type": "string", "maxLength": 100 }
+  }
+}
