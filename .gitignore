@@ -4,6 +4,9 @@ dist/
 *.tsbuildinfo
 package-lock.json
 
+# Stencil compiler output (intermediate build artifact; el bundle final va a dist/)
+.stencil-out/
+
 # Rust
 target/
 
