@@ -47,21 +47,26 @@ for (const id of moduleIds) {
   const manifestPath = join(modulesRoot, id, 'module.json');
   if (!existsSync(manifestPath)) continue;
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  const entryTag = manifest.navigation?.[0]?.component;
-  if (!entryTag) {
-    console.warn(`⚠ ${id}: navigation[0].component ausente; salto`);
+  // Un módulo puede declarar VARIAS vistas de navegación, cada una con su propio
+  // component. El bundle ui.entry debe incluir TODAS (no solo navigation[0]), o las
+  // vistas secundarias serían custom elements no definidos en runtime (nav muerta).
+  const tags = [...new Set((manifest.navigation ?? []).map((n) => n.component).filter(Boolean))];
+  if (!tags.length) {
+    console.warn(`⚠ ${id}: navigation[].component ausente; salto`);
     continue;
   }
-  // El custom element transpilado vive en .stencil-out/<tag>.js y se auto-define.
-  const celPath = join(stencilOut, `${entryTag}.js`);
-  if (!existsSync(celPath)) {
-    console.warn(`⚠ ${id}: no encuentro ${entryTag}.js en .stencil-out (¿@Component tag correcto?)`);
+  // Cada custom element transpilado vive en .stencil-out/<tag>.js y se auto-define al importarse.
+  const missing = tags.filter((t) => !existsSync(join(stencilOut, `${t}.js`)));
+  if (missing.length) {
+    console.warn(`⚠ ${id}: no encuentro en .stencil-out: ${missing.join(', ')} (¿@Component tag correcto?)`);
     continue;
   }
   const outfile = join(modulesRoot, id, manifest.ui.entry);
   mkdirSync(dirname(outfile), { recursive: true });
+  // Entry sintético que importa (efecto secundario → auto-define) cada componente de nav.
+  const entryContents = tags.map((t) => `import './${t}.js';`).join('\n');
   await esbuild({
-    entryPoints: [celPath],
+    stdin: { contents: entryContents, resolveDir: stencilOut, sourcefile: `${id}.entry.js`, loader: 'js' },
     bundle: true,
     format: 'esm',
     outfile,
@@ -71,5 +76,5 @@ for (const id of moduleIds) {
     legalComments: 'none',
   });
   const kb = (readFileSync(outfile).length / 1024).toFixed(1);
-  console.log(`✓ ${id} → ${manifest.ui.entry} (${kb} KB, <${entryTag}> auto-define)`);
+  console.log(`✓ ${id} → ${manifest.ui.entry} (${kb} KB, ${tags.map((t) => `<${t}>`).join(' ')} auto-define)`);
 }
