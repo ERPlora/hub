@@ -1,14 +1,13 @@
 # hub-next — Arquitectura
 
-> **Documento de diseño (greenfield).** Define la próxima generación del Hub de
+> **Documento de diseño.** Define el Hub de
 > ERPlora: **Ionic React + Rust/Axum + Tauri + módulos declarativos (module.json) +
 > WASM + SDK**, con **SQLite en local** y **PostgreSQL/Aurora en cloud**.
 >
-> **hub-next reemplazará** al Hub actual (`hub/`, FastAPI + hotframe) de forma
-> progresiva. Mientras dure la migración, ambos conviven.
+> **hub-next ES el Hub de ERPlora.**
 >
-> Fuentes: visión [erplora_arquitectura_modular_ionic_rust_tauri.md](../erplora_arquitectura_modular_ionic_rust_tauri.md),
-> diseño AI/RAG [PLAN-ASISTENTE-RAG.md](../PLAN-ASISTENTE-RAG.md), mapa del monorepo
+> Fuentes: visión [erplora_arquitectura_modular_ionic_rust_tauri.md](../docs/arquitectura/erplora_arquitectura_modular_ionic_rust_tauri.md),
+> diseño AI/RAG [PLAN-ASISTENTE-RAG.md](../docs/arquitectura/PLAN-ASISTENTE-RAG.md), mapa del monorepo
 > [CLAUDE.md](../CLAUDE.md).
 >
 > **Estado:** propuesta + scaffolding inicial (`apps/web` Ionic React, primer módulo
@@ -17,18 +16,12 @@
 
 ---
 
-## 0. Propósito y aviso sobre el nombre "hub-next"
+## 0. Propósito
 
 Este documento describe **qué** queremos construir y **por qué**, reconciliando la
 visión técnica (Rust/Ionic/Tauri/module.json) con la **realidad de producción** de
 ERPlora (Cloud Portal en Django, marketplace, billing Stripe, provisioning AWS,
 contrato S3 + SHA256, auth, asistente AI con RAG).
-
-> ⚠️ **Colisión de nombre.** El término *"hub-next"* ya se usó históricamente para el
-> **Hub actual** (una iteración Django → FastAPI que hoy es `hub/`). Quedan referencias
-> archivadas en migraciones de Cloud y docs de AWS. En ESTE documento, **"hub-next" = la
-> nueva generación basada en Rust** descrita aquí. Cuando alcance paridad, `hub-next/`
-> pasará a ser el `hub/` canónico.
 
 ---
 
@@ -89,7 +82,7 @@ cloud); **`web-pwa` ⟹ cloud** (forzado).
 | Pieza | Qué es | Tecnología | ¿Cambia? |
 |-------|--------|-----------|----------|
 | **Cloud Portal** | `erplora.com`: landing, dashboard, **marketplace**, **billing Stripe**, **provisioning** (boto3 → ECS+Aurora), **proxy AI** | Django 6 + Datastar | **NO** |
-| **hub-next (modo cloud)** | El **runtime del tenant** en ECS. Sirve la app Ionic y ejecuta módulos. **Reemplaza al contenedor FastAPI/hotframe actual** | Rust + Axum | **SÍ** |
+| **hub-next (modo cloud)** | El **runtime del tenant** en ECS. Sirve la app Ionic y ejecuta módulos | Rust + Axum | **SÍ** |
 | **hub-next (modo local)** | El mismo runtime **embebido** en un shell Tauri (desktop/móvil), offline-first con SQLite. El shell Tauri también puede actuar como **cliente del modo cloud** (datos en Aurora, hardware local vía `invoke`) — los ejes backend/shell son ortogonales (§1) | Rust + Tauri | Nuevo |
 
 > El Cloud Portal **orquesta y cobra**; hub-next **ejecuta** el negocio del tenant. El
@@ -172,8 +165,7 @@ tools). Igual que la política actual con `module.py`.
 ### 2.6 El sync Git del Cloud lee `module.json` (formato único)
 
 **Decisión (2026-06-01): no hay formato legacy.** Todos los módulos son declarativos
-(`module.json`); los ~100 módulos `module.py` (Python) se reescriben, no se mantienen.
-El sync Git del Cloud lee **solo `module.json`**:
+(`module.json`). El sync Git del Cloud lee **solo `module.json`**:
 
 - Se eliminó el discriminador `manifest_kind` (modelo, schema, parser TS/Rust) y todo el
   parser Python del Cloud (`parse_module_py`/`parse_ai_context_py`/`_extract_ast_value`).
@@ -502,8 +494,7 @@ arbitraria ni exponer secretos.
 
 ### 5.6 Puntos de extensión y paridad de framework (a no perder)
 
-El hub actual (hotframe) tiene mecanismos que los módulos usan hoy y que hub-next debe
-ofrecer en equivalente declarativo/WASM (si no, hay regresión):
+El modelo de módulos debe ofrecer estos mecanismos en equivalente declarativo/WASM:
 
 - **Slots** (inserción de UI entre módulos, p. ej. un módulo añade un widget al dashboard de
   otro) → el manifest declara `slots` que provee/consume; el shell los compone.
@@ -535,10 +526,10 @@ seguro. Pero **rompe** en lo que un ERP real necesita a diario:
 | **PDF / Excel** | ❌ | Capacidad host `render.pdf`/`render.xlsx` (Tier 1) |
 | **Cross-módulo** | ⚠️ solo vía eventos | Host functions (query/command de otros) |
 
-**Ergonomía vs `module.py` actual.** Hoy un módulo Python tiene poder total (SQLAlchemy,
-servicios, hooks, PDF/Excel). El puro declarativo es un retroceso brutal. El híbrido
-recupera ese poder **dentro de un sandbox** y con **contratos** (permisos namespaced,
-schemas), ganando portabilidad y seguridad.
+**Ergonomía.** Un módulo con poder de código arbitrario (SQLAlchemy, servicios, hooks,
+PDF/Excel) tiene poder total, pero el puro declarativo es un retroceso brutal frente a eso.
+El híbrido recupera ese poder **dentro de un sandbox** y con **contratos** (permisos
+namespaced, schemas), ganando portabilidad y seguridad.
 
 **Recomendación (confirmada): modelo HÍBRIDO.** No puro-declarativo (incapaz de
 batch/reporting/integraciones/PDF); no seguir en Python (ata el runtime a Python, sin
@@ -549,10 +540,10 @@ sandbox, sin modelo unificado local/cloud).
 (`bulk_create_products`/`receive_stock` iterando arrays en una transacción) **ya son
 código** hoy. Ninguno es expresable en SQL declarativo.
 
-> 🔀 **Fork de red (verificado en código).** El sandbox WASM **no tiene red**. **Hoy** los
-> módulos tienen **red libre in-process, sin sandbox**: `communications` (SMTP/IMAP a host
-> arbitrario), `whatsapp_inbox` (Meta Graph), `verifactu` (AEAT vía `httpx` + mTLS PKCS#12),
-> credenciales **cifradas en BD** (Fernet) y descifradas en memoria. En WASM eso desaparece.
+> 🔀 **Fork de red.** El sandbox WASM **no tiene red**. Varios módulos necesitan red saliente:
+> `communications` (SMTP/IMAP a host arbitrario), `whatsapp_inbox` (Meta Graph), `verifactu`
+> (AEAT vía mTLS PKCS#12), con credenciales **cifradas** y descifradas en memoria. En WASM eso
+> no está disponible directamente.
 > ✅ **Decisión — Opción A** para integraciones genéricas de terceros: capacidad
 > **`http.fetch` mediada por el host** (allowlist + credenciales inyectadas + auditoría;
 > contrato en §5.5). **Opción B (nativo first-party)** para lo crítico-fiscal
@@ -661,7 +652,7 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
 - **En local NO hay WebSocket**: `invoke` (IPC directo) + Tauri events.
 
 > **Decisión: cloud = HTTP (RPC) + WebSocket (solo eventos).** WS-only queda como
-> alternativa (un canal, como el hotframe actual `/ws/_live`), pero no por defecto.
+> alternativa (todo por un solo canal), pero no por defecto.
 
 ### 7.6 Garantía: cambiar de IPC a HTTP/WS no requiere nada adicional
 
@@ -686,8 +677,7 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
 > events (local)**, el WC **vuelve a hacer la query** afectada y se repinta.
 
 - Es el modelo natural del SDK (§7.1): `erplora.on(evento, …)` → `erplora.query(…)` → render.
-- **Sustituye al LiveComponent** (render-en-servidor + morphdom del hub actual): hub-next
-  **no** recrea el server-render — la UI es cliente (Lit) y el servidor solo emite eventos
+- **No hay render en servidor**: la UI es cliente (Lit) y el servidor solo emite eventos
   y responde queries/commands.
 - **Granularidad**: los eventos llevan el mínimo (`{ name, payload }`); el WC decide qué
   re-consultar. Evita empujar estado completo por el socket.
@@ -1000,33 +990,26 @@ cambios. Instalación desde el marketplace real (`source/s3_source` + `cloud-cli
 (`render.pdf`/`render.xlsx`, `http.fetch` mediado §5.5); CLI completo + firma; `ai_tools` +
 `search_docs` (pgvector cloud + degradación local §9.5).
 
-### Fase 6 — Migración
-Coexistencia con el hub hotframe y conversión progresiva de los 137 módulos (§13).
+### Fase 6 — Cierre
+Conversión de módulos **completada** (99 módulos declarativos en `hub-next/modules/`).
+Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 
 ---
 
-## 13. Estrategia de migración desde el hub hotframe (alto nivel)
+## 13. Trabajo pendiente de plataforma (alto nivel)
 
-> ✅ **Decisión: migración gradual, POS-first, manteniendo la agrupación actual.** No es un
-> *big-bang*. Se empieza por los módulos **necesarios para el POS** y se avanza al resto poco
-> a poco, **conservando la agrupación de módulos actual** (la misma clasificación/grupos del
-> catálogo de hoy; la clasificación sigue viviendo en el Cloud Portal, §2.4).
+> La **conversión de módulos** está **hecha**: los 99 módulos viven en `hub-next/modules/`
+> (declarativos, 2026-06-02). Lo que **queda** es implementar los handlers **Rust→WASM Tier 2**
+> (documentados en los `WASM-TODO.md` por módulo) y la **reubicación del Bridge** (§2.7).
 
-- **Coexistencia**: `hub/` sigue en producción mientras hub-next alcanza paridad por módulo.
-- **Orden (POS-first)**: primero `core` + el **conjunto mínimo del POS** (p. ej. `inventory`,
-  `sales`/`pos`, `invoice`/`verifactu`, `customers`), que es el primer flujo end-to-end
-  (Tauri, impresión en red, primary/satellite §2.7/§2.7b); luego el resto **por grupos**,
-  respetando la agrupación existente.
-- **Qué se reescribe a qué**: CRUD → declarativo; lógica/engines (invoice/sales) → WASM;
-  PDF/Excel → capacidad host; integraciones → `http.fetch` mediado o nativo; UI Jinja/Live → WC (Lit).
-- **Criterios de paridad**: tests por módulo, paridad de permisos (cada acción UI/API tiene
-  su command/query con el mismo permiso), paridad de `ai_tools`.
-- **Contrato marketplace intacto**: el Portal no distingue (descarga zip + SHA256); el
-  formato interno del zip cambia, pero la ruta S3 y la integridad no.
 - **Reubicación del Bridge (§2.7)**: el `bridge/` **no** se retira — se convierte en componente de
   hardware compartido (**sidecar** en Tauri | **standalone opcional** para `cloud + web-PWA`).
   Migrar su lógica (registro/watchdog/cola/routing de impresión) al shell Tauri y empaquetarla
   como sidecar; mantener el standalone para el combo navegador. Resolver multi-dispositivo (§2.7b).
+- **Agrupación de módulos**: se conserva la misma clasificación/grupos del catálogo; la
+  clasificación vive en el Cloud Portal, no en el `module.json` (§2.4).
+- **Contrato marketplace intacto**: el Portal descarga el zip + verifica SHA256; la ruta S3 y la
+  integridad no cambian.
 
 ---
 
@@ -1036,7 +1019,8 @@ Coexistencia con el hub hotframe y conversión progresiva de los 137 módulos (�
 |------|--------|
 | **Multi-tenancy** | ✅ **Decidido**: BD por **organización** compartida entre hubs; `hub_id` por fila, scope inyectado por el runtime (§2.5). No es `tenant_id`. |
 | **IDs de fila** | ✅ **Decidido**: datos del hub (Aurora por-org + SQLite local) con **PK numérica**; **UUID solo en el Cloud Portal** (`hub_id`, org). Migración local→cloud **remapea** IDs (§2.5). |
-| **Transporte cloud** | ✅ **Decidido**: HTTP (RPC) + WS (eventos) (§7.5). WS-only como alternativa. |
+| **Transporte cloud** | ✅ **Decidido**: HTTP (RPC) + canal de push dedicado (§7.5). WS-only descartado como default. |
+| **Canal de eventos (push)** | 🔶 **Abierto**: **WS (actual) vs SSE** para el push servidor→cliente. El push es **unidireccional** (los envíos van por HTTP) ⇒ SSE encaja: da **reconexión + Last-Event-ID gratis** (ayuda con el idle timeout del ALB), mantiene **HTTP estándar** (criterio §7.5) y es el formato natural para el **futuro streaming del assistant**. Plan: implementar **ambos** y elegir por situación; al hacerlo, **unificar la forma del JSON del evento** (`name` server vs `event` cliente — hoy desalineado) entre WS y SSE. |
 | **Red saliente de módulos** | ✅ **Decidido (Opción A)**: `http.fetch` mediado (allowlist + creds inyectadas + auditoría §5.5) para terceros; **B (nativo)** para fiscal. |
 | **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware compartido (sidecar en Tauri \| standalone opcional para `cloud + web-PWA`), §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
 | **Modelo de módulos** | ✅ **Decidido**: híbrido (declarativo + WASM + SDK). |
@@ -1052,7 +1036,7 @@ Coexistencia con el hub hotframe y conversión progresiva de los 137 módulos (�
 | **UI de módulos (Lit vs Stencil)** | ✅ **Recomendado Lit** (§3.1, default 2026; no necesitamos wrappers multi-framework). Confirmar con PoC de ambos en Fase 0. |
 | **Guest WASM lenguaje** | Rust-only (recomendado, WASM pequeño/rápido) vs multi-lenguaje (JS/Go/Python vía Extism, baja la barrera de autoría). |
 | **Impresión / primary-satellite** | ✅ Impresoras de red por terminal; hardware vía shell Tauri (sidecar) o Bridge standalone opcional (§2.7). Abierto: descubrimiento primary↔satellite y promoción si cae el primario (§2.7b). |
-| **Relación con el producto actual** | ✅ Reemplazo progresivo **POS-first**, manteniendo la agrupación actual (§13). |
+| **Agrupación de módulos** | ✅ Se conserva la clasificación/grupos del catálogo (vive en el Cloud Portal, §2.4/§13). |
 | **Esfuerzo total** | Cambio de plataforma completo; plan de recursos/tiempo realista. |
 
 **Riesgos concretos a vigilar:**
@@ -1090,7 +1074,7 @@ Impresión/hardware = vía shell Tauri (Bridge como sidecar) o Bridge standalone
 Primary/Satellite = varios terminales del mismo hub; cobrar/imprimir solo el primario
 Migración = gradual, POS-first, manteniendo la agrupación actual de módulos
 Cloud Portal (Django) = marketplace + billing + provisioning + proxy AI (no cambia)
-hub-next = el runtime del tenant que reemplaza al hub hotframe
+hub-next = el runtime del tenant
 ```
 
 > ERPlora no instala código backend arbitrario: instala **capacidades declarativas** (y

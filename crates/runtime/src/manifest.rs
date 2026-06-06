@@ -66,10 +66,59 @@ pub struct QueryDef {
     pub sql: String,
     #[serde(default)]
     pub schema: Option<String>,
+    /// Si está presente, la query es **paginada/lista**: el runtime envuelve el SELECT base
+    /// como subconsulta y compone búsqueda + filtro por columna + orden (whitelist) +
+    /// LIMIT/OFFSET, devolviendo `{rows,total,limit,offset}`. ARQUITECTURA.md §4, §8.2.
+    #[serde(default)]
+    pub list: Option<ListSpec>,
     /// Si está presente, expone esta query al asistente como tool (nivel 2). El permiso y el
     /// schema se heredan de la propia query, no se redeclaran. ARQUITECTURA.md §9.2.
     #[serde(default)]
     pub ai: Option<AiTool>,
+}
+
+/// Contrato declarativo de una query de lista (`list` en `module.json`). Espejo de
+/// `$defs/listSpec` en `schemas/module.schema.json`. El runtime lo consume en `queries.rs`
+/// para componer el SQL paginado. ARQUITECTURA.md §4, §8.2.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ListSpec {
+    /// Columnas sobre las que aplica el buscador global (LIKE).
+    #[serde(default)]
+    pub search: Vec<String>,
+    /// Whitelist de columnas ordenables (anti-inyección: solo estas se interpolan en ORDER BY).
+    #[serde(default)]
+    pub sort: Vec<String>,
+    /// Columna de orden por defecto (debe estar en `sort`).
+    #[serde(default)]
+    pub default_sort: Option<String>,
+    /// Dirección por defecto (`asc`/`desc`).
+    #[serde(default)]
+    pub default_dir: Option<String>,
+    /// Filtros por columna (orden determinista para SQL estable → `BTreeMap`).
+    #[serde(default)]
+    pub filters: std::collections::BTreeMap<String, FilterSpec>,
+    /// Tamaño de página por defecto si el llamador no envía `limit`.
+    #[serde(default = "default_page_size")]
+    pub page_size: u64,
+}
+
+fn default_page_size() -> u64 {
+    50
+}
+
+/// Operador de un filtro por columna.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct FilterSpec {
+    pub op: FilterOp,
+}
+
+/// Tipos de filtro soportados. `eq`: igualdad. `like`: subcadena. `range`: rango (from/to).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FilterOp {
+    Eq,
+    Like,
+    Range,
 }
 
 /// Bloque `ai` inline de una operación: la descripción legible (en inglés) que ve el LLM.

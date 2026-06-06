@@ -20,6 +20,227 @@ export interface Notification {
   message: string;
 }
 
+// ── Queries de lista (paginadas) — contrato del motor de listas del runtime (§4, §8.2) ──────
+
+/** Rango para un filtro `range` (números o fechas ISO). Campos vacíos = sin límite por ese lado. */
+export interface RangeFilter {
+  from?: unknown;
+  to?: unknown;
+}
+
+/** Parámetros de una query de lista. `queryPage` los aplana a `f_<col>` / `f_<col>_from/_to`. */
+export interface ListParams {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  sort?: string;
+  dir?: 'asc' | 'desc';
+  /** `col -> valor` (eq/like) o `col -> {from,to}` (range). Valores vacíos/null se omiten. */
+  filters?: Record<string, unknown>;
+  /** Params de **contexto obligatorios** que la query base referencia con su nombre crudo
+   *  (p.ej. una sub-lista de hijos: `{ params: { bom_id } }` → bindea `:bom_id`). Se pasan
+   *  verbatim al wire, sin prefijo `f_`. */
+  params?: Record<string, unknown>;
+}
+
+/** Forma de `data` de una query de lista: la página + el total filtrado (para el pager). */
+export interface Page<T = unknown> {
+  rows: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** ¿Es un valor "vacío" que debe omitirse como filtro? (null/undefined/''). */
+function isEmpty(v: unknown): boolean {
+  return v === null || v === undefined || v === '';
+}
+
+/** Aplana `ListParams` a los params del wire que entiende el runtime (`f_col`, `f_col_from`…). */
+export function buildListParams(p: ListParams): Record<string, unknown> {
+  // Params de contexto verbatim (p.ej. :bom_id de una sub-lista); el resto se aplana encima.
+  const out: Record<string, unknown> = { ...(p.params ?? {}) };
+  if (p.limit != null) out.limit = p.limit;
+  if (p.offset != null) out.offset = p.offset;
+  if (!isEmpty(p.search)) out.search = p.search;
+  if (p.sort) out.sort = p.sort;
+  if (p.dir) out.dir = p.dir;
+  for (const [col, val] of Object.entries(p.filters ?? {})) {
+    if (val !== null && typeof val === 'object' && ('from' in val || 'to' in val)) {
+      const r = val as RangeFilter;
+      if (!isEmpty(r.from)) out[`f_${col}_from`] = r.from;
+      if (!isEmpty(r.to)) out[`f_${col}_to`] = r.to;
+    } else if (!isEmpty(val)) {
+      out[`f_${col}`] = val;
+    }
+  }
+  return out;
+}
+
+// ── Controlador de listas (estado + re-consulta al runtime) ─────────────────────────────────
+// (movido desde modules/_shared/ui/list-controller.ts) Agnóstico de framework: lo usan TODOS los
+// CRUD para alimentar `<data-table serverSide>` sin reimplementar el estado en cada vista. La vista
+// pasa un `onChange` que fuerza repintado (en Stencil: incrementar un @State) y lee
+// `rows/total/loading/error/state` en render. Solo usa `queryPage` del cliente, que aplana los
+// filtros a `f_<col>` y devuelve `{rows,total,limit,offset}`.
+
+/** Forma de una página de lista. Alias de `Page`, para los consumidores del controlador. */
+export type ListPage<T = unknown> = Page<T>;
+
+/** Subconjunto del cliente SDK que necesita el controlador (inyectable para tests). */
+export interface ListClient {
+  queryPage<R = unknown>(name: string, params: ListParams): Promise<Page<R>>;
+}
+
+export interface ListControllerOptions {
+  /** Filas por página (default 50). */
+  pageSize?: number;
+  /** Orden inicial. */
+  sort?: string;
+  dir?: 'asc' | 'desc';
+  /** Filtros iniciales (`col -> valor` o `col -> {from,to}`). */
+  filters?: Record<string, unknown>;
+  /** Params de contexto obligatorios iniciales (sub-listas: `{ bom_id }`). */
+  context?: Record<string, unknown>;
+}
+
+export interface ListControllerState {
+  page: number; // 0-based
+  pageSize: number;
+  search: string;
+  sort?: string;
+  dir: 'asc' | 'desc';
+  filters: Record<string, unknown>;
+  /** Params de contexto obligatorios (sub-lista de hijos de un padre seleccionado). */
+  context: Record<string, unknown>;
+}
+
+export class ListController<T = Record<string, unknown>> {
+  rows: T[] = [];
+  total = 0;
+  loading = false;
+  error = '';
+  readonly state: ListControllerState;
+  /** Descarta respuestas obsoletas si llegan fuera de orden (race de cargas concurrentes). */
+  private seq = 0;
+
+  constructor(
+    private readonly client: ListClient,
+    private readonly queryName: string,
+    private readonly onChange: () => void = () => {},
+    opts: ListControllerOptions = {},
+  ) {
+    this.state = {
+      page: 0,
+      pageSize: opts.pageSize ?? 50,
+      search: '',
+      sort: opts.sort,
+      dir: opts.dir ?? 'asc',
+      filters: { ...(opts.filters ?? {}) },
+      context: { ...(opts.context ?? {}) },
+    };
+  }
+
+  /** Nº de páginas según el total del servidor (mínimo 1). */
+  get pageCount(): number {
+    return Math.max(1, Math.ceil(this.total / this.state.pageSize));
+  }
+
+  /** (Re)carga la página actual desde el servidor. */
+  async load(): Promise<void> {
+    const s = this.state;
+    const mySeq = ++this.seq;
+    this.loading = true;
+    this.error = '';
+    this.onChange();
+    try {
+      const page = await this.client.queryPage<T>(this.queryName, {
+        limit: s.pageSize,
+        offset: s.page * s.pageSize,
+        search: s.search,
+        sort: s.sort,
+        dir: s.dir,
+        filters: s.filters,
+        params: s.context,
+      });
+      if (mySeq !== this.seq) return; // llegó una carga más reciente
+      this.rows = page.rows ?? [];
+      this.total = page.total ?? this.rows.length;
+    } catch (e) {
+      if (mySeq !== this.seq) return;
+      this.rows = [];
+      this.total = 0;
+      this.error = e instanceof Error ? e.message : 'Error cargando datos';
+    } finally {
+      if (mySeq === this.seq) {
+        this.loading = false;
+        this.onChange();
+      }
+    }
+  }
+
+  setPage(page: number): void {
+    this.state.page = Math.max(0, page);
+    void this.load();
+  }
+
+  setSort(sort: string, dir: 'asc' | 'desc'): void {
+    this.state.sort = sort;
+    this.state.dir = dir;
+    this.state.page = 0;
+    void this.load();
+  }
+
+  setSearch(search: string): void {
+    this.state.search = search;
+    this.state.page = 0;
+    void this.load();
+  }
+
+  /** Aplica/quita un filtro de columna; valores vacíos lo eliminan. Vuelve a la página 0. */
+  setFilter(col: string, value: unknown): void {
+    if (isEmpty(value)) {
+      delete this.state.filters[col];
+    } else if (typeof value === 'object' && value !== null) {
+      // Rango parcial {from}/{to}: fusiona con lo existente para no perder el otro extremo.
+      const prev = (this.state.filters[col] as Record<string, unknown>) ?? {};
+      const merged = { ...prev, ...(value as Record<string, unknown>) };
+      const cleaned = Object.fromEntries(Object.entries(merged).filter(([, v]) => !isEmpty(v)));
+      if (Object.keys(cleaned).length === 0) delete this.state.filters[col];
+      else this.state.filters[col] = cleaned;
+    } else {
+      this.state.filters[col] = value;
+    }
+    this.state.page = 0;
+    void this.load();
+  }
+
+  /** Fija/actualiza los params de contexto obligatorios (p.ej. al seleccionar el padre).
+   *  Vuelve a la página 0 y recarga. Pasa `{}` o keys con valor vacío para limpiar. */
+  setContext(context: Record<string, unknown>): void {
+    this.state.context = { ...context };
+    this.state.page = 0;
+    void this.load();
+  }
+
+  reset(): void {
+    this.state.page = 0;
+    this.state.search = '';
+    this.state.filters = {};
+    void this.load();
+  }
+}
+
+/** Fábrica del controlador de lista (azúcar sobre `new ListController`). */
+export function createListController<T = Record<string, unknown>>(
+  client: ListClient,
+  queryName: string,
+  onChange: () => void = () => {},
+  opts: ListControllerOptions = {},
+): ListController<T> {
+  return new ListController<T>(client, queryName, onChange, opts);
+}
+
 /** Error de una llamada al runtime, con el `code` que devuelve el server. */
 export class ErploraError extends Error {
   constructor(
@@ -44,6 +265,23 @@ function unwrap(env: Envelope): unknown {
     throw new ErploraError(e?.code ?? 'error', e?.message ?? 'unknown error');
   }
   return env.data;
+}
+
+/**
+ * Compat de queries de lista: si `data` es una página `{rows:[…],total:number}`, devuelve solo
+ * `rows`. Así una vista antigua que use `query()` sigue recibiendo el array aunque a su query se
+ * le añada un bloque `list`. `queryPage()` NO pasa por aquí (necesita el total).
+ */
+function unwrapPage(data: unknown): unknown {
+  if (
+    data !== null &&
+    typeof data === 'object' &&
+    Array.isArray((data as { rows?: unknown }).rows) &&
+    typeof (data as { total?: unknown }).total === 'number'
+  ) {
+    return (data as { rows: unknown[] }).rows;
+  }
+  return data;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -214,8 +452,21 @@ export class ErploraClient {
     } = {},
   ) {}
 
+  /**
+   * Query genérica. Compat: si la query es de **lista** (`{rows,total,…}`), desenvuelve y entrega
+   * solo `rows`, para que una vista antigua que aún use `query()` no se rompa al añadir un bloque
+   * `list` a su query. Para paginar de verdad (total/página) usa `queryPage`.
+   */
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T> {
-    return this.transport.query(name, params) as Promise<T>;
+    return this.transport.query(name, params).then(unwrapPage) as Promise<T>;
+  }
+  /**
+   * Ejecuta una **query de lista** (paginada): aplana `ListParams` y devuelve la página
+   * `{rows,total,limit,offset}`. Úsala con `createListController` para el `<data-table>`.
+   */
+  async queryPage<T = unknown>(name: string, params: ListParams = {}): Promise<Page<T>> {
+    const data = (await this.transport.query(name, buildListParams(params))) as Page<T>;
+    return data;
   }
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T> {
     return this.transport.command(name, payload) as Promise<T>;

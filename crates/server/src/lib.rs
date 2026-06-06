@@ -137,9 +137,18 @@ async fn uninstall_module(State(st): State<AppState>, Path(id): Path<String>) ->
 async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<QueryReq>) -> Response {
     let ctx = auth::context_from_headers(&headers);
     let rt = st.runtime.lock().await;
-    match rt.execute_query(&req.name, &req.params, &ctx).await {
-        Ok(rows) => Json(json!({ "ok": true, "data": rows })).into_response(),
-        Err(e) => err_response(e),
+    // Queries de lista (con bloque `list`) devuelven `{rows,total,limit,offset}` para el pager;
+    // el resto devuelve el array de filas tal cual (compat con get/stats/settings).
+    if rt.is_list_query(&req.name) {
+        match rt.execute_query_page(&req.name, &req.params, &ctx).await {
+            Ok(page) => Json(json!({ "ok": true, "data": page })).into_response(),
+            Err(e) => err_response(e),
+        }
+    } else {
+        match rt.execute_query(&req.name, &req.params, &ctx).await {
+            Ok(rows) => Json(json!({ "ok": true, "data": rows })).into_response(),
+            Err(e) => err_response(e),
+        }
     }
 }
 

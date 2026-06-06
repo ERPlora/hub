@@ -10,7 +10,11 @@ overrides:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.2
+        version: 25.9.2
 
   apps/web:
     dependencies:
@@ -44,7 +48,7 @@ importers:
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.0.0
-        version: 4.3.0(vite@6.4.2(jiti@2.7.0)(lightningcss@1.32.0))
+        version: 4.3.0(vite@6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0))
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.29
@@ -59,7 +63,7 @@ importers:
         version: 5.3.3
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.2(jiti@2.7.0)(lightningcss@1.32.0))
+        version: 4.7.0(vite@6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0))
       tailwindcss:
         specifier: ^4.0.0
         version: 4.3.0
@@ -68,19 +72,577 @@ importers:
         version: 5.9.3
       vite:
         specifier: ^6.0.0
-        version: 6.4.2(jiti@2.7.0)(lightningcss@1.32.0)
+        version: 6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0)
+
+  modules/accounting:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/activities:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/ai_agents:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/ai_predictions:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/ai_reports:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/ai_setup_wizard:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/appointments:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/assistant:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/attendance:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/audit_log:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/bank_reconciliation:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/banking:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/bom:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/carriers:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/cart_checkout:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/cashflow_forecasting:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/collections:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/commissions:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/communications:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/contracts:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/courier_integrations:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/credit_notes:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/credit_risk:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/customer_portal:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/dashboards:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/delivery:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/email_marketing:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/expenses:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/financial_statements:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/fiscal_france:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/fiscal_germany:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/fiscal_italy:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/fiscal_portugal:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/fiscal_romania:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/fixed_assets:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/forecasting:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/gantt:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/general_ledger:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/glovo:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
 
   modules/inventory:
     dependencies:
-      lit:
-        specifier: ^3.2.0
-        version: 3.3.3
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/invoice_series:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/kitchen:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/kitchen_orders:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/kpis:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/leads:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/leave:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/locations:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/lots_serials:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/manufacturing_orders:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/marketplaces:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/messaging:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/mrp:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/multi_warehouse:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
 
   modules/notes:
     dependencies:
-      lit:
-        specifier: ^3.2.0
-        version: 3.3.3
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/olap_cubes:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/online_booking:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/online_store:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/opportunities:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/orders:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/payment_gateways:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/payments:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/payroll:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/picking_packing:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/pipeline:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/pricing:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/project_billing:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/project_costing:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/purchase_orders:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/quotes:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/reports:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/reservations:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/rules_triggers:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/schedules:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/sepa_remittances:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/services:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/setup:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/staff:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/stock_sync:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/stripe:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/subscriptions:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/supplier_invoices:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/tables:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/tasks:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/taxes:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/tickets:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/time_control:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/timesheets:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/traceability:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/training:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/uber_eats:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/verifactu:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/whatsapp_inbox:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/work_centers:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/workflows:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
+
+  modules/workforce_planning:
+    dependencies:
+      '@stencil/core':
+        specifier: ^4.20.0
+        version: 4.43.5
 
   packages/module-cli:
     dependencies:
@@ -91,6 +653,13 @@ importers:
   packages/module-sdk: {}
 
   packages/module-stencil:
+    dependencies:
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../module-sdk
+      '@erplora/module-ui':
+        specifier: workspace:*
+        version: link:../module-ui
     devDependencies:
       '@stencil/core':
         specifier: ^4.22.0
@@ -101,27 +670,11 @@ importers:
 
   packages/module-types: {}
 
-  packages/ui:
-    dependencies:
-      lucide-react:
-        specifier: ^0.460.0
-        version: 0.460.0(react@18.3.1)
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
+  packages/module-ui:
     devDependencies:
-      '@types/react':
-        specifier: ^18.3.12
-        version: 18.3.29
-      '@types/react-dom':
-        specifier: ^18.3.1
-        version: 18.3.7(@types/react@18.3.29)
-      typescript:
-        specifier: ^5.6.0
-        version: 5.9.3
+      '@stencil/core':
+        specifier: ^4.22.0
+        version: 4.43.5
 
 packages:
 
@@ -552,12 +1105,6 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@lit-labs/ssr-dom-shim@1.6.0':
-    resolution: {integrity: sha512-VHb0ALPMTlgKjM6yIxxoQNnpKyUKLD04VzeQdsiXkMqkvYlAHxq9glGLmgbb889/1GsohSOAjvQYoiBppXFqrQ==}
-
-  '@lit/reactive-element@2.1.2':
-    resolution: {integrity: sha512-pbCDiVMnne1lYUIaYNN5wrwQXDtHaYtg7YEFPeW+hws6U47WeFvISGUWekPGKWOP1ygrs0ef0o1VJMk1exos5A==}
-
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
 
@@ -884,6 +1431,9 @@ packages:
   '@types/history@4.7.11':
     resolution: {integrity: sha512-qjDJRrmvBMiTx+jyLxvLfJU7UznFuokDv4f3WRuriHKERccVpFU+8XMQUAbDzoiJCsmexxRExQeMwwCdamSKDA==}
 
+  '@types/node@25.9.2':
+    resolution: {integrity: sha512-G05zqtJhcDLb8uslf5EjCxXg9G1KQxiV8OS0R26IC//Eoyitzqe8z37I7cqvnZlrlSfgocQRfSn/AHBZJJFyGw==}
+
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
 
@@ -900,9 +1450,6 @@ packages:
 
   '@types/react@18.3.29':
     resolution: {integrity: sha512-ch0qJdr2JY0r04NXSprbK6TXOgnaJ1Tz23fm5W+z0/CBah6BSBc3n96h7K9GOtwh0HrilNWHIBzE1Ko4Dcw/Wg==}
-
-  '@types/trusted-types@2.0.7':
-    resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
 
   '@vitejs/plugin-react@4.7.0':
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
@@ -1083,26 +1630,12 @@ packages:
     resolution: {integrity: sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ==}
     engines: {node: '>= 12.0.0'}
 
-  lit-element@4.2.2:
-    resolution: {integrity: sha512-aFKhNToWxoyhkNDmWZwEva2SlQia+jfG0fjIWV//YeTaWrVnOxD89dPKfigCUspXFmjzOEUQpOkejH5Ly6sG0w==}
-
-  lit-html@3.3.3:
-    resolution: {integrity: sha512-el8M6jK2o3RXBnrSHX3ZKrsN8zEV63pSExTO1wYJz7QndGYZ8353e2a5PPX+qHe2aGayfnchQmkAojaWAREOIA==}
-
-  lit@3.3.3:
-    resolution: {integrity: sha512-fycuvZg/hkpozL00lm1pEJH5nN/lr9ZXd6mJI2HSN4+Bzc+LDNdEApJ6HFbPkdFNHLvOplIIuJvxkS4XUxqirw==}
-
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
-
-  lucide-react@0.460.0:
-    resolution: {integrity: sha512-BVtq/DykVeIvRTJvRAgCsOwaGL8Un3Bxh8MbDxMhEWlZay3T4IpEKDEpwt5KZ0KJMHzgm6jrltxlT5eXOWXDHg==}
-    peerDependencies:
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0-rc
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -1214,6 +1747,9 @@ packages:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
     hasBin: true
+
+  undici-types@7.24.6:
+    resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
 
   update-browserslist-db@1.2.3:
     resolution: {integrity: sha512-Js0m9cx+qOgDxo0eMiFGEueWztz+d4+M3rGlmKPT+T4IS/jP4ylw3Nwpu6cpTTP8R1MAC1kF4VbdLt3ARf209w==}
@@ -1578,12 +2114,6 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@lit-labs/ssr-dom-shim@1.6.0': {}
-
-  '@lit/reactive-element@2.1.2':
-    dependencies:
-      '@lit-labs/ssr-dom-shim': 1.6.0
-
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
   '@rollup/rollup-android-arm-eabi@4.60.4':
@@ -1792,12 +2322,12 @@ snapshots:
       '@tailwindcss/oxide-win32-arm64-msvc': 4.3.0
       '@tailwindcss/oxide-win32-x64-msvc': 4.3.0
 
-  '@tailwindcss/vite@4.3.0(vite@6.4.2(jiti@2.7.0)(lightningcss@1.32.0))':
+  '@tailwindcss/vite@4.3.0(vite@6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0))':
     dependencies:
       '@tailwindcss/node': 4.3.0
       '@tailwindcss/oxide': 4.3.0
       tailwindcss: 4.3.0
-      vite: 6.4.2(jiti@2.7.0)(lightningcss@1.32.0)
+      vite: 6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0)
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -1824,6 +2354,10 @@ snapshots:
 
   '@types/history@4.7.11': {}
 
+  '@types/node@25.9.2':
+    dependencies:
+      undici-types: 7.24.6
+
   '@types/prop-types@15.7.15': {}
 
   '@types/react-dom@18.3.7(@types/react@18.3.29)':
@@ -1846,9 +2380,7 @@ snapshots:
       '@types/prop-types': 15.7.15
       csstype: 3.2.3
 
-  '@types/trusted-types@2.0.7': {}
-
-  '@vitejs/plugin-react@4.7.0(vite@6.4.2(jiti@2.7.0)(lightningcss@1.32.0))':
+  '@vitejs/plugin-react@4.7.0(vite@6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.7)
@@ -1856,7 +2388,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 6.4.2(jiti@2.7.0)(lightningcss@1.32.0)
+      vite: 6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -2035,22 +2567,6 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.32.0
       lightningcss-win32-x64-msvc: 1.32.0
 
-  lit-element@4.2.2:
-    dependencies:
-      '@lit-labs/ssr-dom-shim': 1.6.0
-      '@lit/reactive-element': 2.1.2
-      lit-html: 3.3.3
-
-  lit-html@3.3.3:
-    dependencies:
-      '@types/trusted-types': 2.0.7
-
-  lit@3.3.3:
-    dependencies:
-      '@lit/reactive-element': 2.1.2
-      lit-element: 4.2.2
-      lit-html: 3.3.3
-
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
@@ -2058,10 +2574,6 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
-
-  lucide-react@0.460.0(react@18.3.1):
-    dependencies:
-      react: 18.3.1
 
   magic-string@0.30.21:
     dependencies:
@@ -2195,6 +2707,8 @@ snapshots:
 
   typescript@5.9.3: {}
 
+  undici-types@7.24.6: {}
+
   update-browserslist-db@1.2.3(browserslist@4.28.2):
     dependencies:
       browserslist: 4.28.2
@@ -2203,7 +2717,7 @@ snapshots:
 
   value-equal@1.0.1: {}
 
-  vite@6.4.2(jiti@2.7.0)(lightningcss@1.32.0):
+  vite@6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.4)
@@ -2212,6 +2726,7 @@ snapshots:
       rollup: 4.60.4
       tinyglobby: 0.2.17
     optionalDependencies:
+      '@types/node': 25.9.2
       fsevents: 2.3.3
       jiti: 2.7.0
       lightningcss: 1.32.0

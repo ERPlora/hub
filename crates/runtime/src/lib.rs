@@ -89,8 +89,27 @@ impl Runtime {
     }
 
     /// Ejecuta una query declarativa (solo si su módulo está activo) y devuelve filas JSON.
+    /// Para queries de lista devuelve solo las filas de la página (compat); usa
+    /// [`Runtime::execute_query_page`] si necesitas el total para paginar.
     pub async fn execute_query(&self, name: &str, params: &Params, ctx: &RequestContext) -> Result<Vec<Json>> {
         queries::execute(self.db.as_ref(), &self.registry, name, params, ctx).await
+    }
+
+    /// Ejecuta una query devolviendo la página completa (`rows` + `total` + `limit`/`offset`).
+    /// Lo usa el server para queries de lista; el total alimenta el pager del `<data-table>`.
+    pub async fn execute_query_page(
+        &self,
+        name: &str,
+        params: &Params,
+        ctx: &RequestContext,
+    ) -> Result<queries::QueryPage> {
+        queries::execute_page(self.db.as_ref(), &self.registry, name, params, ctx).await
+    }
+
+    /// ¿La query (de un módulo activo) declara bloque `list` (es paginada)? Lo usa el server
+    /// para decidir la forma del `data` que devuelve por el wire.
+    pub fn is_list_query(&self, name: &str) -> bool {
+        self.registry.get_query(name).map(|q| q.def.list.is_some()).unwrap_or(false)
     }
 
     /// Ejecuta un command declarativo (solo si su módulo está activo) + emite sus eventos.

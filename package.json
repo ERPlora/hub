@@ -19,5 +19,8 @@
     "verify": "pnpm -F @erplora/web verify",
     "dev": "pnpm -F @erplora/web dev",
     "build:modules": "pnpm -F @erplora/module-stencil build"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2"
   }
 }

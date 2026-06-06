@@ -7,6 +7,10 @@
   "scripts": {
     "build": "node build-all.mjs"
   },
+  "dependencies": {
+    "@erplora/module-sdk": "workspace:*",
+    "@erplora/module-ui": "workspace:*"
+  },
   "devDependencies": {
     "@stencil/core": "^4.22.0",
     "esbuild": "^0.24.0"

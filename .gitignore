@@ -16,6 +16,6 @@ target/
 .DS_Store
 
 # Módulos de negocio: viven en sus propios repos, no se versionan en el hub.
-# Excepción: modules/_shared/ es infra UI compartida del hub (motor DataTable, etc.).
+# La infra UI compartida (DataTable, list-controller) vive en packages/module-ui y
+# packages/module-sdk; modules/ ya no contiene nada versionado.
 modules/*
-!modules/_shared/

@@ -12,8 +12,8 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "preview": "vite preview",
-    "snapshot": "node sync-modules.mjs && vite build && node snapshot.mjs",
-    "verify": "node sync-modules.mjs && vite build && node snapshot.mjs"
+    "snapshot": "node sync-modules.mjs && VITE_CLOUD_API_URL= vite build && node snapshot.mjs",
+    "verify": "node sync-modules.mjs && VITE_CLOUD_API_URL= vite build && node snapshot.mjs"
   },
   "dependencies": {
     "@erplora/module-types": "workspace:*",

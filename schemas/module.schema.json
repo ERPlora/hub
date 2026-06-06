@@ -91,6 +91,7 @@
           "permission": { "type": "string" },
           "sql": { "type": "string" },
           "schema": { "type": "string" },
+          "list": { "$ref": "#/$defs/listSpec" },
           "ai": { "$ref": "#/$defs/aiTool" }
         }
       }
@@ -154,6 +155,42 @@
     }
   },
   "$defs": {
+    "listSpec": {
+      "type": "object",
+      "description": "Marca la query como paginada/lista. Cuando está presente, el runtime envuelve el SELECT base como subconsulta y compone: búsqueda global (LIKE sobre `search`), filtro por columna (`filters`), orden por whitelist (`sort`, interpolado y anti-inyección) y LIMIT/OFFSET; devuelve `{rows,total,limit,offset}` en `data` (ARQUITECTURA.md §4, §8.2). El SQL base NO debe llevar su propio ORDER BY/LIMIT ni `;` final.",
+      "additionalProperties": false,
+      "properties": {
+        "search": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Columnas (de la proyección base) sobre las que aplica el buscador global con LIKE."
+        },
+        "sort": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Whitelist de columnas ordenables. SOLO estas se interpolan en ORDER BY (anti-inyección); cualquier `sort` recibido fuera de la lista cae al `default_sort`."
+        },
+        "default_sort": { "type": "string", "description": "Columna de orden por defecto (debe estar en `sort`)." },
+        "default_dir": { "type": "string", "enum": ["asc", "desc"], "default": "asc" },
+        "filters": {
+          "type": "object",
+          "description": "Filtros por columna. Clave = columna de la proyección base; valor = operador. El runtime los bindea con centinela IS NULL (filtro ausente = sin filtrar).",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op"],
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": ["eq", "like", "range"],
+                "description": "eq: igualdad (`:f_col`). like: subcadena (`:f_col`). range: rango por `:f_col_from`/`:f_col_to` (números o fechas ISO)."
+              }
+            }
+          }
+        },
+        "page_size": { "type": "integer", "default": 50, "description": "Tamaño de página por defecto si el llamador no envía `limit`." }
+      }
+    },
     "aiTool": {
       "type": "object",
       "description": "Expone esta operación (query/command) al asistente de IA como tool. permission, schema (input) y sql se HEREDAN de la operación — no se redeclaran aquí; solo la descripción legible. Una operación sin bloque `ai` no se expone a la IA (sigue disponible para la UI). ARQUITECTURA.md §9.2.",

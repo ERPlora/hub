@@ -119,7 +119,10 @@ try {
 
   // 4) MÓDULO: WC Lit cargado en runtime (de-risk #1).
   await goto('/m/inventory'); await sleep(1200);
-  const wc = JSON.parse(await evaluate(`(() => { const el = document.querySelector('erp-inventory-products'); const items = el?.shadowRoot ? el.shadowRoot.querySelectorAll('li').length : 0; return JSON.stringify({ mounted: !!el, hasShadow: !!el?.shadowRoot, items }); })()`));
+  // hasTable: el WC del módulo renderizó el <data-table> compartido (@erplora/module-ui) en su
+  // shadow root. Es la señal real de de-risk #1 (WC dinámico montado + renderizado bajo CSP); NO
+  // contamos filas porque sin backend la tabla está vacía y el data-table usa <td>, no <li>.
+  const wc = JSON.parse(await evaluate(`(() => { const el = document.querySelector('erp-inventory-products'); const sr = el?.shadowRoot; return JSON.stringify({ mounted: !!el, hasShadow: !!sr, hasTable: !!sr?.querySelector('data-table') }); })()`));
   await shot('05-module-inventory');
 
   // 5) resto de vistas de primer nivel.
@@ -143,11 +146,11 @@ try {
   console.log('WC módulo →', JSON.stringify(wc));
   console.log('violaciones CSP de SCRIPT:', scriptViolations.length, '| de estilo (toleradas):', styleViolations.length);
   scriptViolations.forEach((v) => console.log('   SCRIPT-CSP:', v));
-  await writeFile(join(SHOTS, 'VERDICT.json'), JSON.stringify({ ok: scriptViolations.length === 0 && wc.mounted && wc.items >= 1, wc, scriptViolations: scriptViolations.length, styleViolations: styleViolations.length }, null, 2));
+  await writeFile(join(SHOTS, 'VERDICT.json'), JSON.stringify({ ok: scriptViolations.length === 0 && wc.mounted && wc.hasShadow && wc.hasTable, wc, scriptViolations: scriptViolations.length, styleViolations: styleViolations.length }, null, 2));
 
   cleanup();
-  const ok = scriptViolations.length === 0 && wc.mounted && wc.items >= 1;
-  console.log(ok ? '\n✓ ÉXITO: app navegable, WC Lit dinámico montado, 0 violaciones de script-CSP. Snapshots en apps/web/snapshots/.' : '\n✗ Revisar VERDICT.json');
+  const ok = scriptViolations.length === 0 && wc.mounted && wc.hasShadow && wc.hasTable;
+  console.log(ok ? '\n✓ ÉXITO: app navegable, WC de módulo montado + <data-table> renderizado, 0 violaciones de script-CSP. Snapshots en apps/web/snapshots/.' : '\n✗ Revisar VERDICT.json');
   process.exit(ok ? 0 : 1);
 } catch (e) {
   console.error('✗ error:', e.message); cleanup(); process.exit(1);

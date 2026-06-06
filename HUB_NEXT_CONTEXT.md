@@ -19,11 +19,7 @@ tenant que sustituira progresivamente al hub actual.
 - `ARQUITECTURA.md`: decisiones de arquitectura. Si hay conflicto, gana este
   documento frente a docs antiguas.
 - `apps/web/README.md`: validacion de la shell web, CSP y Web Components.
-- `../hub/`: comportamiento funcional actual. Antes de implementar cualquier
-  funcionalidad que no sea solo visual, revisar como lo resuelve el hub actual y
-  replicar contrato/comportamiento cuando aplique.
-- `../Erpolra Ui/uploads/`: referencia visual y de producto. El `prompt.txt`
-  habla de DaisyUI, pero para `hub-next` la regla actual es **Ionic primero**.
+- Reglas de UI vigentes: **Ionic primero** (ver "Reglas de UI actuales" abajo).
 
 ## Reglas de UI actuales
 
@@ -74,11 +70,7 @@ tenant que sustituira progresivamente al hub actual.
 
 ## Referencia visual
 
-Usar `../Erpolra Ui/uploads` como referencia de lenguaje visual y pantallas:
-
-- `screencapture-04-demo-erplora-*.png`: vistas del Hub/demo actual.
-- `screencapture-erplora-dashboard-*.png`: Portal cloud y patrones de dashboard.
-- `erplora.css` y `logo.css`: tokens de marca y logo CSS antiguos.
+Lenguaje visual y patrones de marca: ver el Cloud Portal (`../cloud/`) y `apps/web`.
 
 La referencia visual no obliga a copiar implementacion. En hub-next se traduce a
 Ionic: listas, items, selects, toggles, cards, modals y segmentos nativos.
