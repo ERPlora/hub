@@ -1,6 +1,0 @@
-{ "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "invoice_series.series.list params", "type": "object", "additionalProperties": false,
-  "properties": {
-    "document_type": { "type": "string", "enum": ["", "invoice", "credit_note", "proforma", "receipt", "quote"], "default": "" },
-    "country_code": { "type": "string", "default": "" },
-    "active_only": { "type": "integer", "enum": [0, 1], "default": 1 } } }

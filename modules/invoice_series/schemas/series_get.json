@@ -1,4 +1,0 @@
-{ "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "invoice_series series_id param", "type": "object", "additionalProperties": false,
-  "required": ["series_id"],
-  "properties": { "series_id": { "type": "string" } } }

@@ -1,8 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "services.services.list params",
-  "description": "Lista de servicios activos del hub (queries/services_list.sql). El scope hub_id lo inyecta el runtime (§2.5); no se pasa en el payload. La query no toma filtros propios — búsqueda/filtro/orden se resuelven en UI/SDK.",
-  "type": "object",
-  "properties": {},
-  "additionalProperties": false
-}

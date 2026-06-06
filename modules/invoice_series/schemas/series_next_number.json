@@ -1,6 +1,0 @@
-{ "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "invoice_series.series.next_number payload", "type": "object", "additionalProperties": false,
-  "required": ["series_id"],
-  "properties": {
-    "series_id": { "type": "string" },
-    "document_ref": { "type": "string", "maxLength": 255, "default": "" } } }

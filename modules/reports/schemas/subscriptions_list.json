@@ -1,9 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "reports.subscriptions.list",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "report_id": { "type": "string", "default": "" }
-  }
-}

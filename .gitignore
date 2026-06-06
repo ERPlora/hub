@@ -6,9 +6,12 @@ package-lock.json
 
 # Stencil compiler output (intermediate build artifact; el bundle final va a dist/)
 .stencil-out/
+# Stencil internal build cache (logs/diagnósticos; nunca debe commitearse)
+.stencil/
 
 # Rust
 target/
 
 # OS / tmp
 .DS_Store
+modules/

@@ -1,9 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "communications.scheduled.list",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "status": { "type": "string", "enum": ["", "pending", "sent", "failed", "cancelled"], "default": "pending" }
-  }
-}

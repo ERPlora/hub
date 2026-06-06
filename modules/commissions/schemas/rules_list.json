@@ -1,9 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "commissions.rules.list",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "only_active": { "type": "string", "enum": ["0", "1"], "default": "1" }
-  }
-}
