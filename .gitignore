@@ -14,4 +14,8 @@ target/
 
 # OS / tmp
 .DS_Store
-modules/
+
+# Módulos de negocio: viven en sus propios repos, no se versionan en el hub.
+# Excepción: modules/_shared/ es infra UI compartida del hub (motor DataTable, etc.).
+modules/*
+!modules/_shared/
