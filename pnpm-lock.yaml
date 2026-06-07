@@ -27,6 +27,9 @@ importers:
       '@erplora/module-types':
         specifier: workspace:*
         version: link:../../packages/module-types
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
       '@ionic/react':
         specifier: ^8.8.8
         version: 8.8.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -80,85 +83,7 @@ importers:
         specifier: ^6.0.0
         version: 6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0)
 
-  modules/accounting:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/activities:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/ai_agents:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/ai_predictions:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/ai_reports:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/ai_setup_wizard:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
   modules/appointments:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/assistant:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/attendance:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/audit_log:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/bank_reconciliation:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/banking:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/bom:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/carriers:
     dependencies:
       '@stencil/core':
         specifier: ^4.20.0
@@ -170,155 +95,17 @@ importers:
         specifier: ^4.20.0
         version: 4.43.5
 
-  modules/cashflow_forecasting:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/collections:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/commissions:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/communications:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/contracts:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/courier_integrations:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/credit_notes:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/credit_risk:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/customer_portal:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/dashboards:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/delivery:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/email_marketing:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/expenses:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/financial_statements:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/fiscal_france:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/fiscal_germany:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/fiscal_italy:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/fiscal_portugal:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/fiscal_romania:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/fixed_assets:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/forecasting:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/gantt:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/general_ledger:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/glovo:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
   modules/inventory:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/invoice_series:
     dependencies:
@@ -338,91 +125,7 @@ importers:
         specifier: ^4.20.0
         version: 4.43.5
 
-  modules/kpis:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/leads:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/leave:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/locations:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/lots_serials:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/manufacturing_orders:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/marketplaces:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/messaging:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/mrp:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/multi_warehouse:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/notes:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/olap_cubes:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
   modules/online_booking:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/online_store:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/opportunities:
     dependencies:
       '@stencil/core':
         specifier: ^4.20.0
@@ -446,55 +149,7 @@ importers:
         specifier: ^4.20.0
         version: 4.43.5
 
-  modules/payroll:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/picking_packing:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/pipeline:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
   modules/pricing:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/project_billing:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/project_costing:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/purchase_orders:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/quotes:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/reports:
     dependencies:
       '@stencil/core':
         specifier: ^4.20.0
@@ -506,19 +161,7 @@ importers:
         specifier: ^4.20.0
         version: 4.43.5
 
-  modules/rules_triggers:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
   modules/schedules:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/sepa_remittances:
     dependencies:
       '@stencil/core':
         specifier: ^4.20.0
@@ -530,37 +173,7 @@ importers:
         specifier: ^4.20.0
         version: 4.43.5
 
-  modules/setup:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
   modules/staff:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/stock_sync:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/stripe:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/subscriptions:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/supplier_invoices:
     dependencies:
       '@stencil/core':
         specifier: ^4.20.0
@@ -590,36 +203,6 @@ importers:
         specifier: ^4.20.0
         version: 4.43.5
 
-  modules/time_control:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/timesheets:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/traceability:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/training:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/uber_eats:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
   modules/verifactu:
     dependencies:
       '@stencil/core':
@@ -627,24 +210,6 @@ importers:
         version: 4.43.5
 
   modules/whatsapp_inbox:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/work_centers:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/workflows:
-    dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
-
-  modules/workforce_planning:
     dependencies:
       '@stencil/core':
         specifier: ^4.20.0
@@ -715,6 +280,19 @@ importers:
       '@stencil/core':
         specifier: ^4.22.0
         version: 4.43.5
+
+  packages/outfitkit:
+    dependencies:
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
+    devDependencies:
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0)
 
 packages:
 
@@ -1145,6 +723,12 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
+  '@lit-labs/ssr-dom-shim@1.6.0':
+    resolution: {integrity: sha512-VHb0ALPMTlgKjM6yIxxoQNnpKyUKLD04VzeQdsiXkMqkvYlAHxq9glGLmgbb889/1GsohSOAjvQYoiBppXFqrQ==}
+
+  '@lit/reactive-element@2.1.2':
+    resolution: {integrity: sha512-pbCDiVMnne1lYUIaYNN5wrwQXDtHaYtg7YEFPeW+hws6U47WeFvISGUWekPGKWOP1ygrs0ef0o1VJMk1exos5A==}
+
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
 
@@ -1494,6 +1078,9 @@ packages:
   '@types/react@18.3.29':
     resolution: {integrity: sha512-ch0qJdr2JY0r04NXSprbK6TXOgnaJ1Tz23fm5W+z0/CBah6BSBc3n96h7K9GOtwh0HrilNWHIBzE1Ko4Dcw/Wg==}
 
+  '@types/trusted-types@2.0.7':
+    resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
+
   '@vitejs/plugin-react@4.7.0':
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
     engines: {node: ^14.18.0 || >=16.0.0}
@@ -1683,6 +1270,15 @@ packages:
   lightningcss@1.32.0:
     resolution: {integrity: sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ==}
     engines: {node: '>= 12.0.0'}
+
+  lit-element@4.2.2:
+    resolution: {integrity: sha512-aFKhNToWxoyhkNDmWZwEva2SlQia+jfG0fjIWV//YeTaWrVnOxD89dPKfigCUspXFmjzOEUQpOkejH5Ly6sG0w==}
+
+  lit-html@3.3.3:
+    resolution: {integrity: sha512-el8M6jK2o3RXBnrSHX3ZKrsN8zEV63pSExTO1wYJz7QndGYZ8353e2a5PPX+qHe2aGayfnchQmkAojaWAREOIA==}
+
+  lit@3.3.3:
+    resolution: {integrity: sha512-fycuvZg/hkpozL00lm1pEJH5nN/lr9ZXd6mJI2HSN4+Bzc+LDNdEApJ6HFbPkdFNHLvOplIIuJvxkS4XUxqirw==}
 
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
@@ -2178,6 +1774,12 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@lit-labs/ssr-dom-shim@1.6.0': {}
+
+  '@lit/reactive-element@2.1.2':
+    dependencies:
+      '@lit-labs/ssr-dom-shim': 1.6.0
+
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
   '@rollup/rollup-android-arm-eabi@4.60.4':
@@ -2450,6 +2052,8 @@ snapshots:
       '@types/prop-types': 15.7.15
       csstype: 3.2.3
 
+  '@types/trusted-types@2.0.7': {}
+
   '@vitejs/plugin-react@4.7.0(vite@6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0))':
     dependencies:
       '@babel/core': 7.29.7
@@ -2644,6 +2248,22 @@ snapshots:
       lightningcss-linux-x64-musl: 1.32.0
       lightningcss-win32-arm64-msvc: 1.32.0
       lightningcss-win32-x64-msvc: 1.32.0
+
+  lit-element@4.2.2:
+    dependencies:
+      '@lit-labs/ssr-dom-shim': 1.6.0
+      '@lit/reactive-element': 2.1.2
+      lit-html: 3.3.3
+
+  lit-html@3.3.3:
+    dependencies:
+      '@types/trusted-types': 2.0.7
+
+  lit@3.3.3:
+    dependencies:
+      '@lit/reactive-element': 2.1.2
+      lit-element: 4.2.2
+      lit-html: 3.3.3
 
   loose-envify@1.4.0:
     dependencies:

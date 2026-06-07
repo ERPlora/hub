@@ -1,4 +1,4 @@
-# BACKLOG — hub-next (Fase 1: POS + AI)
+# BACKLOG — hub (Fase 1: POS + AI)
 
 Espejo legible del trabajo pendiente. La fuente única de seguimiento es el **GitHub Project**;
 este fichero se actualiza desde él. Plan completo en `ARQUITECTURA.md` + el plan maestro.
@@ -12,7 +12,7 @@ este fichero se actualiza desde él. Plan completo en `ARQUITECTURA.md` + el pla
 - ✅ `Manifest` del runtime parsea `agent`/`ai_context`/`ai` (la IA ya es legible por el runtime).
 
 ## Workstream A — Repos & subida ordenada
-- [ ] `P0` `[IA]` Higiene `.gitignore` + commits del core por área (no uno gigante) → push `hub-next`.
+- [ ] `P0` `[IA]` Higiene `.gitignore` + commits del core por área (no uno gigante) → push `hub`.
 - [ ] `P1` `[TÚ decide]` Distribución de `guest-sdk` + `module-stencil` para repos por módulo
       (registry privado vs git submódulo vs vendoring) — **bloquea el split**.
 - [ ] `P1` `[IA automatiza]` Script de split de los módulos POS a `ERPlora-module-<id>` (+ release workflow).

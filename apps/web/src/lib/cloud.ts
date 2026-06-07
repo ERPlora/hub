@@ -1,4 +1,4 @@
-// Cliente del Cloud Portal. hub-next NUNCA habla con LLMs directamente; auth/marketplace/
+// Cliente del Cloud Portal. hub NUNCA habla con LLMs directamente; auth/marketplace/
 // billing van por aquí (ARQUITECTURA.md §2.1–2.3). Si el Cloud no es accesible (sandbox),
 // las llamadas lanzan y la capa de auth degrada a modo demo.
 import { config } from './config';
@@ -56,7 +56,7 @@ async function get<T>(path: string, timeoutMs = 8000): Promise<T> {
   try {
     const res = await fetch(`${config.cloudApiUrl}${path}`, {
       headers: {
-        'X-Client-Type': 'hub-next',
+        'X-Client-Type': 'hub',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(config.hubId ? { 'X-Hub-Id': config.hubId } : {}),
       },
@@ -139,7 +139,7 @@ async function post<T>(path: string, body: unknown, timeoutMs = 8000): Promise<T
   try {
     const res = await fetch(`${config.cloudApiUrl}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub-next' },
+      headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub' },
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });

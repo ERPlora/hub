@@ -1,11 +1,10 @@
-// Navegación del shell. Cada ítem mapea a una ruta + un icono de react-icons.
-import type { IconType } from 'react-icons';
+// Navegación del Hub. Cada ítem mapea a una ruta + un icono de react-icons.
+// El tipo NavSection lo define el shell compartido (@erplora/dashboard-shell); aquí sólo
+// están los DATOS específicos del Hub, que se inyectan en <DashboardShell menu={NAV}>.
 import {
   LuLayoutDashboard, LuUsers, LuFileText, LuStore, LuCpu, LuSettings,
 } from 'react-icons/lu';
-
-export interface NavItem { path: string; label: string; Icon: IconType; }
-export interface NavSection { label: string; items: NavItem[]; }
+import type { NavSection } from '@erplora/dashboard-shell';
 
 export const NAV: NavSection[] = [
   {

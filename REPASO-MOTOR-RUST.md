@@ -1,11 +1,11 @@
-# Repaso del motor Rust de hub-next (tracker de estudio)
+# Repaso del motor Rust de hub (tracker de estudio)
 
 Documento vivo para recorrer **todo el Rust de `crates/`** en orden, un fichero a la
 vez: un concepto → lo entiendo → lo probamos → siguiente. Lo escribe Ioan; el asistente
 explica y marca progreso. Marca `[x]` cuando un fichero queda entendido y probado.
 
 > Estado verificado contra el repo (2026-06-01): workspace compila, **95/95 tests verdes**,
-> 0 fallos (2 `ignored` = Extism real). El `README.md`/`CLAUDE.md` de hub-next están
+> 0 fallos (2 `ignored` = Extism real). El `README.md`/`CLAUDE.md` de hub están
 > **desfasados** (dicen "Rust sin compilar" y "Lit"): la fuente de verdad es el código.
 
 ---
@@ -89,7 +89,7 @@ y al final la *lógica compleja* (WASM).
 ## Cómo arrancar y probar (referencia)
 
 ```bash
-cd /Users/ioan.beilic/workspace/code/ERPlora/hub-next
+cd /Users/ioan.beilic/workspace/code/ERPlora/hub
 rm -f /tmp/erplora-dev.db
 HUB_SQLITE_PATH=/tmp/erplora-dev.db \
 HUB_MODULES_DIR=$PWD/modules \

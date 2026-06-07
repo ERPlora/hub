@@ -1,4 +1,4 @@
-// Capa de autenticación de hub-next (cliente). Modela el flujo real (ARQUITECTURA.md §2.9):
+// Capa de autenticación de hub (cliente). Modela el flujo real (ARQUITECTURA.md §2.9):
 //   1) 1er login email+password (online) → marca dispositivo de confianza → PIN
 //   2) dispositivo de confianza → login por PIN (local/offline a futuro)
 //   3) usuarios cloud y usuarios solo-locales

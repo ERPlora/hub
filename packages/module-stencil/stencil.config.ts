@@ -1,6 +1,6 @@
 import { Config } from '@stencil/core';
 
-// Compilador Stencil COMPARTIDO de todos los módulos hub-next.
+// Compilador Stencil COMPARTIDO de todos los módulos hub.
 // Escanea modules/<id>/ui/**/*.tsx (cada @Component) y emite custom elements
 // tree-shakables que se AUTO-DEFINEN al importarse. build-all.mjs luego
 // esbuild-empaqueta el/los componente(s) de cada módulo en un único

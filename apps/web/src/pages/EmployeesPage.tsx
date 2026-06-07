@@ -3,7 +3,7 @@ import { useHistory } from 'react-router-dom';
 import { IonButton, IonIcon } from '@ionic/react';
 import { peopleOutline, personCircleOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import { LuPencil, LuTrash2, LuUser } from 'react-icons/lu';
-import { PageScaffold } from '../components/PageScaffold';
+import { PageScaffold } from '@erplora/dashboard-shell';
 import { PageTabBar, type PageTabBarItem } from '../components/PageTabBar';
 import { DataTable, type DataTableColumn } from '../components/DataTable';
 import { Badge } from '../components/Badge';

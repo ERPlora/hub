@@ -17,7 +17,8 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client"],
     "paths": {
-      "@erplora/module-types": ["../../packages/module-types/src/index.ts"]
+      "@erplora/module-types": ["../../packages/module-types/src/index.ts"],
+      "@erplora/dashboard-shell": ["../../packages/dashboard-shell/src/index.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

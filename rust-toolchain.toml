@@ -1,4 +1,4 @@
-# Toolchain pin para hub-next (Rust). El target wasm32 es para los guests WASM (Tier 2).
+# Toolchain pin para hub (Rust). El target wasm32 es para los guests WASM (Tier 2).
 [toolchain]
 channel = "stable"
 targets = ["wasm32-unknown-unknown"]

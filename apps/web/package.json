@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Shell web de hub-next: Vite + React + TypeScript + Ionic React + Tailwind + react-icons (sin Capacitor; runtime nativo = Tauri). Carga Web Components de módulos en runtime.",
+  "description": "Shell web de hub: Vite + React + TypeScript + Ionic React + Tailwind + react-icons (sin Capacitor; runtime nativo = Tauri). Carga Web Components de módulos en runtime.",
   "scripts": {
     "sync-modules": "node sync-modules.mjs",
     "predev": "node sync-modules.mjs",
@@ -16,7 +16,9 @@
     "verify": "node sync-modules.mjs && VITE_CLOUD_API_URL= vite build && node snapshot.mjs"
   },
   "dependencies": {
+    "@erplora/dashboard-shell": "workspace:*",
     "@erplora/module-types": "workspace:*",
+    "@erplora/outfitkit": "workspace:*",
     "@ionic/react": "^8.8.8",
     "@ionic/react-router": "^8.8.8",
     "ionicons": "^8.0.13",

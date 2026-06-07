@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-// App web de hub-next: Vite + React + Tailwind v4 + Ionic React. SIN Capacitor (el runtime
+// App web de hub: Vite + React + Tailwind v4 + Ionic React. SIN Capacitor (el runtime
 // nativo es Tauri). Los Web Components de los módulos se cargan en runtime con import()
 // dinámico desde /modules/** (copiados a public/ por sync-modules.mjs). ARQUITECTURA.md §1, §3.1.
 export default defineConfig({

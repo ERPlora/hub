@@ -1,8 +1,8 @@
-# hub-next — contexto de trabajo para UI
+# hub — contexto de trabajo para UI
 
 ## Qué es
 
-`hub-next` es la nueva generación del Hub de ERPlora. La UI es una shell
+`hub` es la nueva generación del Hub de ERPlora. La UI es una shell
 **Ionic React 8 + Vite + TypeScript + Tailwind v4**, sin Capacitor. La misma shell
 debe servir para cloud y para Tauri. Los módulos se cargan en runtime como Web
 Components, actualmente con **Lit**.
@@ -10,7 +10,7 @@ Components, actualmente con **Lit**.
 El producto que representa ERPlora es un ERP modular para pymes y autonomos:
 TPV, inventario, facturacion, agenda/reservas, empleados, marketplace,
 billing, sistema y asistente AI. El Cloud Portal Django sigue existiendo para
-marketplace, billing, provisioning y proxy AI. `hub-next` es el runtime/UI del
+marketplace, billing, provisioning y proxy AI. `hub` es el runtime/UI del
 tenant que sustituira progresivamente al hub actual.
 
 ## Fuentes de verdad
@@ -66,18 +66,18 @@ tenant que sustituira progresivamente al hub actual.
 - El `bridge/` no se elimina: sidecar de hardware en Tauri, o standalone opcional
   para `cloud + web-PWA` (§2.7).
 - AI y embeddings siempre pasan por el proxy del Cloud Portal, no directo desde
-  hub-next.
+  hub.
 
 ## Referencia visual
 
 Lenguaje visual y patrones de marca: ver el Cloud Portal (`../cloud/`) y `apps/web`.
 
-La referencia visual no obliga a copiar implementacion. En hub-next se traduce a
+La referencia visual no obliga a copiar implementacion. En hub se traduce a
 Ionic: listas, items, selects, toggles, cards, modals y segmentos nativos.
 
 ## Comandos de verificacion
 
-Desde la raiz de `hub-next`:
+Desde la raiz de `hub`:
 
 ```sh
 pnpm -F @erplora/web typecheck

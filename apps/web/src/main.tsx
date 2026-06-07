@@ -12,6 +12,16 @@ import '@ionic/react/css/padding.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/palettes/dark.class.css';
 
+// OutfitKit: registra los Web Components (Lit) que EXTIENDEN Ionic — hoy `ok-data-table`, usado por
+// los listados de los módulos. Import por efecto secundario (se auto-registra con `define`, idempotente).
+// Los módulos Lit también lo traen en su bundle auto-contenido; aquí lo dejamos disponible a nivel de
+// shell. Ver MIGRACION-OUTFITKIT/02.
+import '@erplora/outfitkit/ok-data-table';
+
+// Chrome del dashboard compartido (menú lateral, cabecera, avatar). Antes que styles.css
+// para que las personalizaciones de la app puedan ganar en empates de especificidad.
+import '@erplora/dashboard-shell/styles.css';
+
 import './styles.css';
 import './theme/ionic-theme.css';
 

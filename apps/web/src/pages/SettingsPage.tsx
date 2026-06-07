@@ -12,7 +12,7 @@ import {
   LuTicket,
   LuWalletCards,
 } from 'react-icons/lu';
-import { PageScaffold } from '../components/PageScaffold';
+import { PageScaffold } from '@erplora/dashboard-shell';
 import { PagePanel } from '../components/PagePanel';
 import { PageTabBar, type PageTabBarItem } from '../components/PageTabBar';
 import {

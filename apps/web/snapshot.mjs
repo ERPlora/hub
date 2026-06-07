@@ -1,4 +1,4 @@
-// Snapshots + verificación CSP de hub-next/apps/web contra el BUILD DE PRODUCCIÓN (dist/),
+// Snapshots + verificación CSP de hub/apps/web contra el BUILD DE PRODUCCIÓN (dist/),
 // servido con CSP (script-src 'self' estricto; style-src permite inline por Tailwind/inline
 // styles). Usa Chrome headless vía DevTools Protocol (sin deps npm). ARQUITECTURA.md §12.
 //
@@ -119,10 +119,10 @@ try {
 
   // 4) MÓDULO: WC Lit cargado en runtime (de-risk #1).
   await goto('/m/inventory'); await sleep(1200);
-  // hasTable: el WC del módulo renderizó el <data-table> compartido (@erplora/module-ui) en su
-  // shadow root. Es la señal real de de-risk #1 (WC dinámico montado + renderizado bajo CSP); NO
-  // contamos filas porque sin backend la tabla está vacía y el data-table usa <td>, no <li>.
-  const wc = JSON.parse(await evaluate(`(() => { const el = document.querySelector('erp-inventory-products'); const sr = el?.shadowRoot; return JSON.stringify({ mounted: !!el, hasShadow: !!sr, hasTable: !!sr?.querySelector('data-table') }); })()`));
+  // hasTable: el WC del módulo (Lit) renderizó el <ok-data-table> compartido (@erplora/outfitkit) en
+  // su shadow root. Es la señal real de de-risk #1 (WC dinámico montado + renderizado bajo CSP); NO
+  // contamos filas porque sin backend la tabla está vacía y ok-data-table usa <td>, no <li>.
+  const wc = JSON.parse(await evaluate(`(() => { const el = document.querySelector('erp-inventory-products'); const sr = el?.shadowRoot; return JSON.stringify({ mounted: !!el, hasShadow: !!sr, hasTable: !!sr?.querySelector('ok-data-table') }); })()`));
   await shot('05-module-inventory');
 
   // 5) resto de vistas de primer nivel.
@@ -150,7 +150,7 @@ try {
 
   cleanup();
   const ok = scriptViolations.length === 0 && wc.mounted && wc.hasShadow && wc.hasTable;
-  console.log(ok ? '\n✓ ÉXITO: app navegable, WC de módulo montado + <data-table> renderizado, 0 violaciones de script-CSP. Snapshots en apps/web/snapshots/.' : '\n✗ Revisar VERDICT.json');
+  console.log(ok ? '\n✓ ÉXITO: app navegable, WC de módulo (Lit) montado + <ok-data-table> renderizado, 0 violaciones de script-CSP. Snapshots en apps/web/snapshots/.' : '\n✗ Revisar VERDICT.json');
   process.exit(ok ? 0 : 1);
 } catch (e) {
   console.error('✗ error:', e.message); cleanup(); process.exit(1);

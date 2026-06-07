@@ -1,4 +1,4 @@
-//! erplora-vector — embedded vector store for hub-next RAG.
+//! erplora-vector — embedded vector store for hub RAG.
 //!
 //! In cloud the RAG corpus lives in Postgres/Aurora with pgvector (`embedding
 //! vector(1536)` + HNSW index, see ARQUITECTURA.md §9.4). Locally the hub runs on

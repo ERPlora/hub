@@ -9,7 +9,7 @@ import {
   LuDatabaseBackup, LuScrollText, LuDownload,
 } from 'react-icons/lu';
 import type { IconType } from 'react-icons';
-import { PageScaffold } from '../components/PageScaffold';
+import { PageScaffold } from '@erplora/dashboard-shell';
 import { PagePanel } from '../components/PagePanel';
 import { PageTabBar, type PageTabBarItem } from '../components/PageTabBar';
 import { useToast } from '../lib/toast';

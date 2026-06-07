@@ -1,6 +1,6 @@
 import { Component, Prop, State, Event, EventEmitter, h } from '@stencil/core';
 
-// data-table — DataTable reutilizable de hub-next (Stencil), construido con elementos Ionic.
+// data-table — DataTable reutilizable de hub (Stencil), construido con elementos Ionic.
 // Lo usan TODOS los CRUD de los módulos. El WC nunca toca la BD.
 //
 // DOS MODOS:

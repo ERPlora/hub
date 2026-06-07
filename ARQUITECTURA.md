@@ -1,10 +1,10 @@
-# hub-next — Arquitectura
+# hub — Arquitectura
 
 > **Documento de diseño.** Define el Hub de
 > ERPlora: **Ionic React + Rust/Axum + Tauri + módulos declarativos (module.json) +
 > WASM + SDK**, con **SQLite en local** y **PostgreSQL/Aurora en cloud**.
 >
-> **hub-next ES el Hub de ERPlora.**
+> **hub ES el Hub de ERPlora.**
 >
 > Fuentes: visión [erplora_arquitectura_modular_ionic_rust_tauri.md](../docs/arquitectura/erplora_arquitectura_modular_ionic_rust_tauri.md),
 > diseño AI/RAG [PLAN-ASISTENTE-RAG.md](../docs/arquitectura/PLAN-ASISTENTE-RAG.md), mapa del monorepo
@@ -27,7 +27,7 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 
 ## 1. Visión: "un solo modelo mental" — dos ejes ortogonales
 
-hub-next es **una sola app base** (misma UI, mismo modelo de módulos, mismo runtime). Lo que
+hub es **una sola app base** (misma UI, mismo modelo de módulos, mismo runtime). Lo que
 varía se reduce a **dos ejes independientes** — *no* una "topología" única. Confundirlos (atar
 Tauri↔local↔SQLite y navegador↔cloud↔Aurora en un solo interruptor) es el error que esta sección
 corrige:
@@ -82,24 +82,24 @@ cloud); **`web-pwa` ⟹ cloud** (forzado).
 | Pieza | Qué es | Tecnología | ¿Cambia? |
 |-------|--------|-----------|----------|
 | **Cloud Portal** | `erplora.com`: landing, dashboard, **marketplace**, **billing Stripe**, **provisioning** (boto3 → ECS+Aurora), **proxy AI** | Django 6 + Datastar | **NO** |
-| **hub-next (modo cloud)** | El **runtime del tenant** en ECS. Sirve la app Ionic y ejecuta módulos | Rust + Axum | **SÍ** |
-| **hub-next (modo local)** | El mismo runtime **embebido** en un shell Tauri (desktop/móvil), offline-first con SQLite. El shell Tauri también puede actuar como **cliente del modo cloud** (datos en Aurora, hardware local vía `invoke`) — los ejes backend/shell son ortogonales (§1) | Rust + Tauri | Nuevo |
+| **hub (modo cloud)** | El **runtime del tenant** en ECS. Sirve la app Ionic y ejecuta módulos | Rust + Axum | **SÍ** |
+| **hub (modo local)** | El mismo runtime **embebido** en un shell Tauri (desktop/móvil), offline-first con SQLite. El shell Tauri también puede actuar como **cliente del modo cloud** (datos en Aurora, hardware local vía `invoke`) — los ejes backend/shell son ortogonales (§1) | Rust + Tauri | Nuevo |
 
-> El Cloud Portal **orquesta y cobra**; hub-next **ejecuta** el negocio del tenant. El
-> "Axum cloud" de la visión es hub-next en modo cloud, **no** el Portal.
+> El Cloud Portal **orquesta y cobra**; hub **ejecuta** el negocio del tenant. El
+> "Axum cloud" de la visión es hub en modo cloud, **no** el Portal.
 
 ### 2.2 La instalación de módulos pasa por el marketplace del Cloud Portal
 
 La visión describe un `/api/modules/install` contra un "registry" genérico. En ERPlora
 hay un **marketplace con compra, entitlement y reparto de ingresos** (Stripe Connect).
-hub-next respeta ese contrato:
+hub respeta ese contrato:
 
 1. El admin instala desde el marketplace.
-2. hub-next pide al **Cloud Portal** la instalación → el Portal valida **compra/
+2. hub pide al **Cloud Portal** la instalación → el Portal valida **compra/
    suscripción** y devuelve la **URL S3 firmada** + metadatos (versión, SHA256).
-3. hub-next descarga el zip, **verifica SHA256**, descomprime, valida manifest, resuelve
+3. hub descarga el zip, **verifica SHA256**, descomprime, valida manifest, resuelve
    dependencias, aplica migraciones, registra capacidades, monta UI.
-4. hub-next reporta estado al Portal (instalado/activo/error).
+4. hub reporta estado al Portal (instalado/activo/error).
 
 **Contrato S3 fijo** (producción, no se cambia): ruta inmutable `modules/{module_id}/v{version}.zip`,
 integridad por `ModuleVersion.sha256`, README extraído a `s3://erplora-docs/...`.
@@ -107,7 +107,7 @@ integridad por `ModuleVersion.sha256`, README extraído a `s3://erplora-docs/...
 ### 2.3 Autenticación Hub ↔ Cloud (verificado en código)
 
 > ⚠️ El root `CLAUDE.md` dice que "se eliminó el token de máquina"; **el código actual NO
-> lo ha eliminado**. Hoy conviven **tres credenciales** y hub-next debe replicarlas igual.
+> lo ha eliminado**. Hoy conviven **tres credenciales** y hub debe replicarlas igual.
 
 1. **Token de aplicación del hub (`cloud_api_token`)** — *el "token del primer login"*. Se
    **genera al registrar el hub** (`Hub.save()` → `secrets.token_hex(32)`, devuelto al
@@ -121,7 +121,7 @@ integridad por `ModuleVersion.sha256`, README extraído a `s3://erplora-docs/...
    (reintento en 401). Autoriza contra membresía de org (`IsHubMember`/`IsHubAdmin`).
 3. **`X-Webhook-Secret`** (== `CLOUD_WEBHOOK_SECRET`) + `X-Hub-Id` para M2M de fondo.
 
-> **hub-next replica esto tal cual**: en el registro/primer contacto obtiene su
+> **hub replica esto tal cual**: en el registro/primer contacto obtiene su
 > `cloud_api_token`, lo usa para el bootstrap, y luego usa el JWT del usuario.
 > *(Pendiente menor: alinear el root `CLAUDE.md`, desactualizado.)*
 
@@ -146,7 +146,7 @@ tools). Igual que la política actual con `module.py`.
   `is_deleted`/`deleted_at` + auditoría `created_by`/`updated_by`); un `HubQuery` añade
   `WHERE hub_id = :hub_id` (y excluye borrados) en **cada lectura automáticamente**; el
   `hub_id` se resuelve por dependencia (`settings.HUB_ID` en ECS single-hub → sesión →
-  `HubConfig`). **El runtime de hub-next debe ofrecer el mismo automatismo**: el autor del
+  `HubConfig`). **El runtime de hub debe ofrecer el mismo automatismo**: el autor del
   módulo nunca filtra `hub_id` a mano.
 - **Topología confirmada**: **un contenedor ECS por hub**, BD **por organización**
   (`Organization.database_name`, p. ej. `org_abc123…`) compartida por los hubs de la org.
@@ -199,7 +199,7 @@ tools). Igual que la política actual con `module.py`.
 USB y Bluetooth **se descartan**: exigen drivers + mantenimiento por dispositivo/SO que no compensa.
 La red es además el caso más simple (un socket TCP, trivial en Rust) y el más estable; en `single +
 Tauri` el runtime abre el socket al puerto 9100 directamente. El Bridge actual
-(`bridge/…/protocol.py`) soporta USB/BT, pero **hub-next no los expone**. Consecuencia para `cloud +
+(`bridge/…/protocol.py`) soporta USB/BT, pero **hub no los expone**. Consecuencia para `cloud +
 web-PWA`: como el navegador no abre TCP crudo, **imprimir requiere el Bridge** (sidecar Tauri o
 standalone) o una impresora **ePOS-HTTP**; no hay atajo WebUSB/WebBluetooth porque el hardware es
 de red.
@@ -226,7 +226,7 @@ SO/navegador como teclado.
 ### 2.7b Hubs primario y satélites (multi-terminal de un mismo hub)
 
 > Nuevo requisito. Un mismo punto de venta puede tener **varios terminales** (instancias de
-> hub-next) trabajando a la vez. Se introduce un rol de instancia:
+> hub) trabajando a la vez. Se introduce un rol de instancia:
 
 - Un hub se puede marcar como **primario (primary)** y los demás como **satélites (satellite)**.
 - **Acciones privilegiadas restringidas al primario**: cobrar, imprimir tique, cerrar caja,
@@ -283,7 +283,7 @@ Flujo:
 - **Usuarios solo-locales**: existen **únicamente en el hub** (no en el cloud); útiles para
   personal de tienda que nunca necesita el portal.
 
-**Implicaciones para hub-next**:
+**Implicaciones para hub**:
 - El runtime mantiene una **tabla local de usuarios/roles/PIN** (equivalente al `LocalUser`
   actual) + el vínculo opcional con la identidad cloud.
 - El **gate de permisos es local** (mismo gate para UI, API y AI tools, §9.2); la pertenencia
@@ -751,7 +751,7 @@ El adapter se elige y configura **en el boot** desde variables de entorno/config
 contratado y del modelo "una Aurora compartida por org / un contenedor ECS por hub": el
 límite real es agregado (`Σ pools de los hubs de la org ≤ conexiones de su Aurora`). El
 Cloud Portal ya gestionaba esto con la app FastAPI; **a revisar cómo se traslada a
-hub-next** (probablemente env inyectada por el provisioning + clamp/fail-fast al boot,
+hub** (probablemente env inyectada por el provisioning + clamp/fail-fast al boot,
 y `acquire_timeout`/`max_lifetime`/`idle_timeout` fijos por ser operacionales, no de plan).
 Pendiente, no bloquea la Fase 0/1.
 
@@ -852,7 +852,7 @@ módulos). El `keywords` opcional de `agent` permite un pre-filtro léxico barat
 > tool-assembly (router + assembler), el registro de embeddings de módulos al instalar, y la
 > búsqueda en query-time. La infra vectorial (`erplora-vector` local / pgvector cloud) ya existe.
 
-### 9.3 El hub-next NUNCA habla con LLMs directamente
+### 9.3 El hub NUNCA habla con LLMs directamente
 
 **Embeddings** (ingesta + pregunta) y **generación** van por el **proxy del Cloud Portal**,
 medido en `AssistantUsage` (`POST /api/v1/hub/device/assistant/embeddings/` + orquestador
@@ -899,13 +899,13 @@ nuevos/cambiados (dedup por hash).
 
 ---
 
-## 11. Estructura de carpetas de `hub-next/` (objetivo, no se crea ahora)
+## 11. Estructura de carpetas de `hub/` (objetivo, no se crea ahora)
 
 > `schemas/` se sube a nivel raíz porque el JSON Schema del manifest es el **contrato
 > compartido** por Rust (validación), TS (codegen) y el CLI (validate).
 
 ```
-hub-next/
+hub/
 ├─ ARQUITECTURA.md
 ├─ crates/
 │  ├─ server/                 # Axum: sirve Ionic + /api/query|command (HTTP) + /ws (eventos) + assets
@@ -991,14 +991,14 @@ cambios. Instalación desde el marketplace real (`source/s3_source` + `cloud-cli
 `search_docs` (pgvector cloud + degradación local §9.5).
 
 ### Fase 6 — Cierre
-Conversión de módulos **completada** (99 módulos declarativos en `hub-next/modules/`).
+Conversión de módulos **completada** (99 módulos declarativos en `hub/modules/`).
 Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 
 ---
 
 ## 13. Trabajo pendiente de plataforma (alto nivel)
 
-> La **conversión de módulos** está **hecha**: los 99 módulos viven en `hub-next/modules/`
+> La **conversión de módulos** está **hecha**: los 99 módulos viven en `hub/modules/`
 > (declarativos, 2026-06-02). Lo que **queda** es implementar los handlers **Rust→WASM Tier 2**
 > (documentados en los `WASM-TODO.md` por módulo) y la **reubicación del Bridge** (§2.7).
 
@@ -1074,7 +1074,7 @@ Impresión/hardware = vía shell Tauri (Bridge como sidecar) o Bridge standalone
 Primary/Satellite = varios terminales del mismo hub; cobrar/imprimir solo el primario
 Migración = gradual, POS-first, manteniendo la agrupación actual de módulos
 Cloud Portal (Django) = marketplace + billing + provisioning + proxy AI (no cambia)
-hub-next = el runtime del tenant
+hub = el runtime del tenant
 ```
 
 > ERPlora no instala código backend arbitrario: instala **capacidades declarativas** (y

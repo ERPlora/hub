@@ -1,4 +1,4 @@
-//! erplora-db — database abstraction for hub-next (ARQUITECTURA.md §8).
+//! erplora-db — database abstraction for hub (ARQUITECTURA.md §8).
 //!
 //! Single engine **sqlx** with two pools behind the same [`DatabaseAdapter`] trait:
 //! - [`SqliteAdapter`] — `SqlitePool` (local / Tauri, single-user).

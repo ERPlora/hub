@@ -1,4 +1,4 @@
-# Workspace Rust de hub-next (ARQUITECTURA.md §4, §11).
+# Workspace Rust de hub (ARQUITECTURA.md §4, §11).
 # Implementados: erplora-{db, runtime, server, cloud-client, vector, source, installer}.
 # Stubs: guest-sdk, wasm-host, sync.
 [workspace]

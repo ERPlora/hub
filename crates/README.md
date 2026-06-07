@@ -1,4 +1,4 @@
-# crates/ — runtime Rust de hub-next
+# crates/ — runtime Rust de hub
 
 Workspace Cargo. El **runtime es la autoridad** (ARQUITECTURA.md §4): valida permisos,
 tenant (`hub_id`) y payload, y ejecuta queries/commands declarados por los módulos. Rust

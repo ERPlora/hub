@@ -9,7 +9,7 @@ import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
-const ROOT = join(HERE, '../..');               // hub-next/
+const ROOT = join(HERE, '../..');               // hub/
 const API_PORT = 8802, WEB_PORT = 4400, DBG = 9444;
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const SHOTS = join(HERE, 'snapshots');

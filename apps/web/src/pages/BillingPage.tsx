@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
 import { receiptOutline, refreshOutline, cardOutline } from 'ionicons/icons';
 import { LuDownload, LuFileText, LuCreditCard } from 'react-icons/lu';
-import { PageScaffold } from '../components/PageScaffold';
+import { PageScaffold } from '@erplora/dashboard-shell';
 import { PageTabBar, type PageTabBarItem } from '../components/PageTabBar';
 import { DataTable, type DataTableColumn } from '../components/DataTable';
 import { Badge, type BadgeTone } from '../components/Badge';
@@ -148,7 +148,7 @@ async function downloadInvoice(id: number) {
   const token = getAccessToken();
   try {
     const res = await fetch(`${config.cloudApiUrl}/api/v1/billing/invoices/${id}/download/`, {
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'X-Client-Type': 'hub-next' },
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'X-Client-Type': 'hub' },
     });
     if (!res.ok) throw new Error(String(res.status));
     const blob = await res.blob();

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://erplora.com/schemas/envelope.schema.json",
-  "title": "ERPlora hub-next wire envelope",
+  "title": "ERPlora hub wire envelope",
   "description": "Formato agnóstico al transporte (IPC/HTTP/WS). ARQUITECTURA.md §7.6.",
   "oneOf": [
     {

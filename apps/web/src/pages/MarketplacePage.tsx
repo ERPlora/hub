@@ -5,7 +5,7 @@ import {
   LuBox, LuShoppingCart, LuUsers, LuFileText, LuTruck, LuCalendarCheck, LuMessageSquare, LuChartBar,
 } from 'react-icons/lu';
 import type { IconType } from 'react-icons';
-import { PageScaffold } from '../components/PageScaffold';
+import { PageScaffold } from '@erplora/dashboard-shell';
 import { PageTabBar, type PageTabBarItem } from '../components/PageTabBar';
 import { DataTable, type DataTableColumn } from '../components/DataTable';
 import { Badge } from '../components/Badge';

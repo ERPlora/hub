@@ -5,7 +5,7 @@ import {
   IonCard, IonCardContent, IonList, IonItem, IonInput, IonSelect, IonSelectOption,
   IonToggle, IonButton,
 } from '@ionic/react';
-import { PageScaffold } from '../components/PageScaffold';
+import { PageScaffold } from '@erplora/dashboard-shell';
 import { useToast } from '../lib/toast';
 
 const ROLES = ['Administrador', 'Encargado', 'Cajero', 'Almacén'];

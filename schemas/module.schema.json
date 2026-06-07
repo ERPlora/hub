@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://erplora.com/schemas/module.schema.json",
-  "title": "ERPlora hub-next module manifest",
+  "title": "ERPlora hub module manifest",
   "description": "Contrato técnico de un módulo (module.json). La clasificación de marketplace (sectors/business_types/pricing) NO va aquí — vive en el Cloud Portal (ARQUITECTURA.md §2.4).",
   "type": "object",
   "required": ["id", "name", "version"],

@@ -1,5 +1,5 @@
 import type { IconType } from 'react-icons';
-import { PageScaffold } from '../components/PageScaffold';
+import { PageScaffold } from '@erplora/dashboard-shell';
 
 export function PlaceholderPage({ Icon, title, message }: { Icon: IconType; title: string; message: string }) {
   return (

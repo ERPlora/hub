@@ -1,6 +1,6 @@
 # apps/web
 
-Shell web de hub-next: **Vite + React + TypeScript + @ionic/react**, **sin Capacitor**
+Shell web de hub: **Vite + React + TypeScript + @ionic/react**, **sin Capacitor**
 (el runtime nativo es **Tauri**, §1/§3 del doc). Construye el menú desde los `module.json`
 de los módulos instalados y **carga sus Web Components (Lit) en runtime** con `import()`
 dinámico. Será la UI tanto en cloud (servida por `crates/server`) como en local (Tauri).
@@ -8,7 +8,7 @@ dinámico. Será la UI tanto en cloud (servida por `crates/server`) como en loca
 ## De-risk #1 (riesgo nº1 del doc) — VALIDADO: WC dinámico + Ionic bajo CSP estricta
 
 ```sh
-# desde la raíz de hub-next/
+# desde la raíz de hub/
 pnpm install
 pnpm -F @erplora/module-cli build:inventory   # compila el WC del módulo (CSP-safe)
 pnpm -F @erplora/web dev                        # Vite dev (http://localhost:5173)

@@ -1,6 +1,13 @@
 /* Estilos globales reutilizables. El tema base de Ionic vive en theme/ionic-theme.css;
-   las clases de aqui estandarizan personalizaciones repetibles sobre componentes Ionic. */
+   las clases de aqui estandarizan personalizaciones repetibles sobre componentes Ionic.
+   La chrome del dashboard (menú lateral, cabecera, avatar) vive en
+   @erplora/dashboard-shell/styles.css; aqui solo quedan los globales de la app y las
+   clases especificas de paginas. */
 @import "tailwindcss";
+
+/* Tailwind v4 ignora node_modules: registramos explicitamente las fuentes del shell
+   compartido para que se generen sus utilidades (p. ej. `sm:inline-flex` de la cabecera). */
+@source "../../../packages/dashboard-shell/src";
 
 html, body, #root { height: 100%; }
 
@@ -39,16 +46,6 @@ ion-toolbar {
   --border-width: 0;
 }
 
-/* Menú overflow del header en mobile (acciones secundarias colapsadas). */
-.erplora-overflow-popover {
-  --width: 220px;
-  --max-width: 80vw;
-}
-.erplora-overflow-popover ion-item {
-  --min-height: 48px;
-  font-size: 14px;
-}
-
 /* PageTabBar: igualar la métrica de IonTabs (el segment md por defecto es mas
    grande/bold/UPPERCASE). El font-size y text-transform del host se heredan al
    label dentro del shadow; el ion-icon va en light DOM, asi que se targetea directo. */
@@ -62,121 +59,6 @@ ion-footer ion-segment-button ion-icon {
   font-size: 22px;
 }
 
-.erplora-avatar {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border-radius: 999px;
-  background: #d9ccff;
-  color: #7058bf;
-  font-size: 14px;
-  font-weight: 800;
-  overflow: hidden;
-}
-/* Foto de perfil: llena el circulo manteniendo proporcion. */
-.erplora-avatar img {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  object-fit: cover;
-}
-
-/* Menu de cuenta (footer del side menu). */
-.erplora-account-popover {
-  --width: 220px;
-}
-.erplora-account-popover ion-item {
-  --min-height: 48px;
-  font-size: 14px;
-}
-
-/* ===== ion-menu · estilos con tokens de Ionic =====
-   Los colores salen SIEMPRE de las variables --ion-* → el mismo CSS sirve para
-   modo claro y oscuro (.ion-palette-dark) y respeta el accent (Blue/Orange).
-   La densidad tiene dos modos: NORMAL (por defecto) y COMPACTO (.erplora-compact
-   en <html>, activado desde el toggle del modal de Apariencia). */
-ion-menu[content-id="main"] {
-  --width: 256px;
-  --max-width: 80vw;
-}
-
-/* Fondo del menú = superficie blanca (no el lienzo gris). Toolbar a juego. */
-ion-menu ion-content { --background: var(--ion-item-background); --padding-top: 4px; }
-ion-menu ion-header ion-toolbar { --background: var(--ion-item-background); }
-ion-menu ion-footer ion-toolbar { --background: var(--ion-item-background); }
-
-/* Segment Hub/Cloud de la cabecera del menú. */
-ion-menu ion-header ion-segment {
-  background: var(--ion-color-step-100);
-  border-radius: 10px;
-  padding: 3px;
-}
-ion-menu ion-header ion-segment-button {
-  --border-radius: 8px;
-  --indicator-color: var(--ion-background-color);
-  --color: var(--ion-color-medium);
-  --color-checked: var(--ion-text-color);
-  min-height: 30px;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-.erplora-logo-pad { padding: 14px 16px 6px; }
-
-.erplora-nav-list { padding: 8px 12px 16px; margin: 0; background: transparent; }
-
-.erplora-section-label {
-  color: var(--ion-color-medium);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin: 18px 8px 6px;
-}
-
-.erplora-nav-item {
-  --background: transparent;
-  --background-hover: var(--ion-color-step-100);
-  --background-hover-opacity: 1;
-  --color: var(--ion-color-medium);
-  --min-height: 42px;
-  --border-radius: 8px;
-  --padding-start: 12px;
-  --inner-padding-end: 12px;
-  margin: 2px 0;
-  font-weight: 500;
-}
-.erplora-nav-item ion-label { font-size: 14.5px; font-weight: 500; }
-.erplora-nav-item svg { width: 20px; height: 20px; }
-
-/* Activo: fondo primario translúcido + barra lateral, todo derivado del accent. */
-.erplora-nav-item-active {
-  --background: rgba(var(--ion-color-primary-rgb), 0.12);
-  --color: var(--ion-color-primary);
-  position: relative;
-  font-weight: 600;
-}
-.erplora-nav-item-active ion-label { color: var(--ion-color-primary); font-weight: 600; }
-.erplora-nav-item-active svg { color: var(--ion-color-primary); stroke: var(--ion-color-primary); }
-.erplora-nav-item-active::before {
-  content: '';
-  position: absolute;
-  left: -12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 18px;
-  border-radius: 0 3px 3px 0;
-  background: var(--ion-color-primary);
-}
-
-/* En oscuro, un pelín más de presencia en el fondo del activo (mismo accent). */
-.ion-palette-dark .erplora-nav-item-active {
-  --background: rgba(var(--ion-color-primary-rgb), 0.18);
-}
-
 /* ===== Modo COMPACTO: densidad reducida en TODA la app (toggle Apariencia) =====
    La clase va en <html>. Baja la escala tipográfica base (Ionic dimensiona texto
    y muchos controles en rem/em) → encoge toda la app; el DataTable además consume
@@ -186,28 +68,6 @@ html.erplora-compact body { font-size: 14px; }
 /* Items y toolbars un punto más bajos en compacto. */
 .erplora-compact ion-item { --min-height: 40px; }
 .erplora-compact ion-toolbar { --min-height: 48px; }
-
-.erplora-compact ion-menu[content-id="main"] { --width: 248px; }
-.erplora-compact ion-menu ion-content { --padding-top: 2px; }
-.erplora-compact ion-menu ion-header ion-segment { border-radius: 8px; padding: 2px; }
-.erplora-compact ion-menu ion-header ion-segment-button {
-  --border-radius: 6px;
-  min-height: 26px;
-  font-size: 13px;
-}
-.erplora-compact .erplora-logo-pad { padding: 10px 14px 4px; }
-.erplora-compact .erplora-nav-list { padding: 4px 10px 12px; }
-.erplora-compact .erplora-section-label { font-size: 10px; margin: 12px 8px 3px; }
-.erplora-compact .erplora-nav-item {
-  --min-height: 36px;
-  --border-radius: 7px;
-  --padding-start: 10px;
-  --inner-padding-end: 10px;
-  margin: 1px 0;
-}
-.erplora-compact .erplora-nav-item ion-label { font-size: 13.5px; }
-.erplora-compact .erplora-nav-item svg { width: 18px; height: 18px; }
-.erplora-compact .erplora-nav-item-active::before { left: -10px; height: 16px; }
 
 .erplora-kpi-icon {
   display: grid;

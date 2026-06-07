@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { IonCard, IonCardContent, IonSpinner } from '@ionic/react';
-import { PageScaffold } from '../components/PageScaffold';
+import { PageScaffold } from '@erplora/dashboard-shell';
 import { loadMenu, loadComponent, type MenuEntry } from '../module-loader';
 
 export function ModuleView() {
