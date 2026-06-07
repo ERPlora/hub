@@ -1,8 +1,8 @@
 {
-  "name": "erplora-hub-next",
+  "name": "erplora-hub",
   "private": true,
   "version": "0.0.0",
-  "description": "ERPlora hub-next — monorepo. JS/TS via pnpm workspaces (pnpm-workspace.yaml); Rust crates via Cargo workspace (Cargo.toml).",
+  "description": "ERPlora hub — monorepo. JS/TS via pnpm workspaces (pnpm-workspace.yaml); Rust crates via Cargo workspace (Cargo.toml).",
   "type": "module",
   "packageManager": "pnpm@10.0.0",
   "pnpm": {
@@ -21,6 +21,7 @@
     "build:modules": "pnpm -F @erplora/module-stencil build"
   },
   "devDependencies": {
-    "@types/node": "^25.9.2"
+    "@types/node": "^25.9.2",
+    "ts-morph": "^28.0.0"
   }
 }

@@ -1,4 +1,4 @@
-# hub-next
+# hub
 
 Próxima generación del Hub de ERPlora: **Ionic React + Rust/Axum + Tauri + módulos
 declarativos (`module.json`) + WASM + SDK**, SQLite (local) / Postgres-Aurora (cloud).
