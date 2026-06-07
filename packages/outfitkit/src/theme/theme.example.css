@@ -1,0 +1,41 @@
+/* OutfitKit — tokens de tema (PLANTILLA). Cópialo a tu style.css y ajústalo.
+ *
+ * OutfitKit NO define valores por defecto: aquí decides de dónde salen. La opción más
+ * cómoda es heredarlos de Ionic (--ion-*), con lo que el tema claro/oscuro del shell se
+ * aplica solo. Si NO usas Ionic (p.ej. landing Django sin Ionic), pon valores propios.
+ *
+ * Cada token --ok-* tiene fallback interno a --ion-* y a un hex, así que puedes definir
+ * solo los que quieras cambiar; el resto degradan con sensatez. */
+
+:root {
+  /* Heredar de Ionic (recomendado si hay Ionic cargado) */
+  --ok-primary: var(--ion-color-primary);
+  --ok-primary-contrast: var(--ion-color-primary-contrast);
+  --ok-bg: var(--ion-background-color);
+  --ok-surface: var(--ion-card-background);
+  --ok-text: var(--ion-text-color);
+  --ok-border: rgba(var(--ion-text-color-rgb), 0.12);
+
+  /* Geometría / tipografía */
+  --ok-radius: 12px;
+  --ok-spacing: 1rem;
+  --ok-container-max: 1140px;
+  --ok-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Ejemplo SIN Ionic (descomenta y pon tu marca):
+:root {
+  --ok-primary: #1496d6;
+  --ok-primary-contrast: #ffffff;
+  --ok-bg: #ffffff;
+  --ok-surface: #ffffff;
+  --ok-text: #18181b;
+  --ok-border: rgba(24, 24, 27, 0.12);
+}
+:root.dark, :root[data-theme="dark"] {
+  --ok-bg: #09090b;
+  --ok-surface: #18181b;
+  --ok-text: #fafafa;
+  --ok-border: rgba(250, 250, 250, 0.14);
+}
+*/
