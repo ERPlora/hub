@@ -18,10 +18,9 @@
     "build:inventory": "pnpm -F @erplora/module-cli build:inventory",
     "verify": "pnpm -F @erplora/web verify",
     "dev": "pnpm -F @erplora/web dev",
-    "build:modules": "pnpm -F @erplora/module-stencil build"
+    "build:modules": "pnpm -F @erplora/module-cli build:all"
   },
   "devDependencies": {
-    "@types/node": "^25.9.2",
-    "ts-morph": "^28.0.0"
+    "@types/node": "^25.9.2"
   }
 }

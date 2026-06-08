@@ -9,7 +9,8 @@
   },
   "scripts": {
     "build:inventory": "node src/cli.mjs build ../../modules/inventory",
-    "validate:inventory": "node src/cli.mjs validate ../../modules/inventory"
+    "validate:inventory": "node src/cli.mjs validate ../../modules/inventory",
+    "build:all": "node src/build-all.mjs"
   },
   "dependencies": {
     "esbuild": "^0.24.0"

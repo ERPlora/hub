@@ -24,7 +24,7 @@ y al final la *lógica compleja* (WASM).
 
 ## Decisiones de contexto (fijadas con Ioan)
 
-- **UI = Stencil** (migrando desde Lit). Razón: escala mejor a módulos grandes.
+- **UI = Lit** (migrado desde Stencil, 2026-06-07). UI compartida en `@erplora/outfitkit`.
   **Cada módulo es una mini-aplicación frontend completa**, equivalente a una *app de
   Django*: su propio dominio, sus tablas, sus vistas. Nada se renderiza en backend.
 - **DataTable = componente principal y reutilizable del Hub.** Existe ya como componente

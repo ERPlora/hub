@@ -991,15 +991,17 @@ cambios. Instalación desde el marketplace real (`source/s3_source` + `cloud-cli
 `search_docs` (pgvector cloud + degradación local §9.5).
 
 ### Fase 6 — Cierre
-Conversión de módulos **completada** (99 módulos declarativos en `hub/modules/`).
+Conversión de módulos **completada** (99 módulos declarativos; source en `ERPlora/modules/<id>/`,
+cada uno su propio repo git — `hub/modules/` es solo para instalados en runtime).
 Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 
 ---
 
 ## 13. Trabajo pendiente de plataforma (alto nivel)
 
-> La **conversión de módulos** está **hecha**: los 99 módulos viven en `hub/modules/`
-> (declarativos, 2026-06-02). Lo que **queda** es implementar los handlers **Rust→WASM Tier 2**
+> La **conversión de módulos** está **hecha**: los 99 módulos son declarativos (2026-06-02); el
+> source vive en `ERPlora/modules/<id>/` (cada uno su propio repo git; `hub/modules/` = instalados).
+> Lo que **queda** es implementar los handlers **Rust→WASM Tier 2**
 > (documentados en los `WASM-TODO.md` por módulo) y la **reubicación del Bridge** (§2.7).
 
 - **Reubicación del Bridge (§2.7)**: el `bridge/` **no** se retira — se convierte en componente de

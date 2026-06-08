@@ -9,10 +9,21 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MODULES_SRC = join(HERE, '../../modules');
+// Source-of-truth de los módulos: carpeta organizativa en el ROOT del monorepo
+// (ERPlora/modules/<id>/, cada uno su propio repo git). hub/modules/ se reserva para
+// los módulos INSTALADOS en runtime; el shell de dev lee el source desde el root.
+const MODULES_SRC = join(HERE, '../../../modules');
 const PUBLIC_DST = join(HERE, 'public/modules');
 
-const MODULES = ['inventory'];
+// Lote POS (Stencil→Lit, 2026-06-07): los módulos que el shell de desarrollo carga en runtime.
+// En prod esto no existe (el runtime sirve los módulos del marketplace) — aquí es el puente del dev.
+const MODULES = [
+  'appointments', 'cart_checkout', 'cash_register', 'customers', 'inventory',
+  'invoice', 'invoice_series', 'kitchen', 'kitchen_orders', 'online_booking',
+  'orders', 'payment_gateways', 'payments', 'pricing', 'reservations',
+  'sales', 'schedules', 'services', 'staff', 'tables',
+  'tasks', 'taxes', 'tickets', 'verifactu', 'whatsapp_inbox',
+];
 
 for (const id of MODULES) {
   const src = join(MODULES_SRC, id);

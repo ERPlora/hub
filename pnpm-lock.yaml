@@ -15,9 +15,6 @@ importers:
       '@types/node':
         specifier: ^25.9.2
         version: 25.9.2
-      ts-morph:
-        specifier: ^28.0.0
-        version: 28.0.0
 
   apps/web:
     dependencies:
@@ -85,15 +82,51 @@ importers:
 
   modules/appointments:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/cart_checkout:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
+
+  modules/cash_register:
+    dependencies:
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
+
+  modules/customers:
+    dependencies:
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/inventory:
     dependencies:
@@ -107,113 +140,245 @@ importers:
         specifier: ^3.2.0
         version: 3.3.3
 
+  modules/invoice:
+    dependencies:
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
+
   modules/invoice_series:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/kitchen:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/kitchen_orders:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/online_booking:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/orders:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/payment_gateways:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/payments:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/pricing:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/reservations:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
+
+  modules/sales:
+    dependencies:
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/schedules:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/services:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/staff:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/tables:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/tasks:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/taxes:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/tickets:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/verifactu:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   modules/whatsapp_inbox:
     dependencies:
-      '@stencil/core':
-        specifier: ^4.20.0
-        version: 4.43.5
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../packages/outfitkit
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.3
 
   packages/dashboard-shell:
     dependencies:
@@ -257,29 +422,7 @@ importers:
 
   packages/module-sdk: {}
 
-  packages/module-stencil:
-    dependencies:
-      '@erplora/module-sdk':
-        specifier: workspace:*
-        version: link:../module-sdk
-      '@erplora/module-ui':
-        specifier: workspace:*
-        version: link:../module-ui
-    devDependencies:
-      '@stencil/core':
-        specifier: ^4.22.0
-        version: 4.43.5
-      esbuild:
-        specifier: ^0.24.0
-        version: 0.24.2
-
   packages/module-types: {}
-
-  packages/module-ui:
-    devDependencies:
-      '@stencil/core':
-        specifier: ^4.22.0
-        version: 4.43.5
 
   packages/outfitkit:
     dependencies:
@@ -1037,9 +1180,6 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
 
-  '@ts-morph/common@0.29.0':
-    resolution: {integrity: sha512-35oUmphHbJvQ/+UTwFNme/t2p3FoKiGJ5auTjjpNTop2dyREspirjMy82PLSC1pnDJ8ah1GU98hwpVt64YXQsg==}
-
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
 
@@ -1087,18 +1227,10 @@ packages:
     peerDependencies:
       vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
 
-  balanced-match@4.0.4:
-    resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
-    engines: {node: 18 || 20 || >=22}
-
   baseline-browser-mapping@2.10.33:
     resolution: {integrity: sha512-bA6+tcSLpz2tIEdDXZPpPTIuxBcC4+w6SieaYyfigIa4h8GlFxbA17v22Vx3JUtuZQj9SgOsnbK+aTBzyDyEuw==}
     engines: {node: '>=6.0.0'}
     hasBin: true
-
-  brace-expansion@5.0.6:
-    resolution: {integrity: sha512-kLpxurY4Z4r9sgMsyG0Z9uzsBlgiU/EFKhj/h91/8yHu0edo7XuixOIH3VcJ8kkxs6/jPzoI6U9Vj3WqbMQ94g==}
-    engines: {node: 18 || 20 || >=22}
 
   browserslist@4.28.2:
     resolution: {integrity: sha512-48xSriZYYg+8qXna9kwqjIVzuQxi+KYWp2+5nCYnYKPTr0LvD89Jqk2Or5ogxz0NUMfIjhh2lIUX/LyX9B4oIg==}
@@ -1107,9 +1239,6 @@ packages:
 
   caniuse-lite@1.0.30001793:
     resolution: {integrity: sha512-iwSsYWaCOoh26cV8NwNRViHlrfUvYsHDfRVcbtmw0Kg6PJIZZXwMkj1442FYLBGkeUf1juAsU3DTfxW579mrPA==}
-
-  code-block-writer@13.0.3:
-    resolution: {integrity: sha512-Oofo0pq3IKnsFtuHqSF7TqBfr71aeyZDVJ0HpmqB7FBM2qEigL0iPONSCZSO9pE9dZTAxANe5XHG9Uy0YMv8cg==}
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
@@ -1290,10 +1419,6 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
-  minimatch@10.2.5:
-    resolution: {integrity: sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==}
-    engines: {node: 18 || 20 || >=22}
-
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
@@ -1309,9 +1434,6 @@ packages:
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
     engines: {node: '>=0.10.0'}
-
-  path-browserify@1.0.1:
-    resolution: {integrity: sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==}
 
   path-to-regexp@1.9.0:
     resolution: {integrity: sha512-xIp7/apCFJuUHdDLWe8O1HIkb0kQrOMb/0u6FXQjemHn/ii5LrIzU6bdECnsiTF/GjZkMEKg1xdiZwNqDYlZ6g==}
@@ -1396,9 +1518,6 @@ packages:
   tinyglobby@0.2.17:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
     engines: {node: '>=12.0.0'}
-
-  ts-morph@28.0.0:
-    resolution: {integrity: sha512-Wp3tnZ2bzwxyTZMtgWVzXDfm7lB1Drz+y9DmmYH/L702PQhPyVrp3pkou3yIz4qjS14GY9kcpmLiOOMvl8oG1g==}
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
@@ -1995,12 +2114,6 @@ snapshots:
       tailwindcss: 4.3.0
       vite: 6.4.2(@types/node@25.9.2)(jiti@2.7.0)(lightningcss@1.32.0)
 
-  '@ts-morph/common@0.29.0':
-    dependencies:
-      minimatch: 10.2.5
-      path-browserify: 1.0.1
-      tinyglobby: 0.2.17
-
   '@types/babel__core@7.20.5':
     dependencies:
       '@babel/parser': 7.29.7
@@ -2066,13 +2179,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  balanced-match@4.0.4: {}
-
   baseline-browser-mapping@2.10.33: {}
-
-  brace-expansion@5.0.6:
-    dependencies:
-      balanced-match: 4.0.4
 
   browserslist@4.28.2:
     dependencies:
@@ -2083,8 +2190,6 @@ snapshots:
       update-browserslist-db: 1.2.3(browserslist@4.28.2)
 
   caniuse-lite@1.0.30001793: {}
-
-  code-block-writer@13.0.3: {}
 
   convert-source-map@2.0.0: {}
 
@@ -2277,10 +2382,6 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  minimatch@10.2.5:
-    dependencies:
-      brace-expansion: 5.0.6
-
   ms@2.1.3: {}
 
   nanoid@3.3.12: {}
@@ -2288,8 +2389,6 @@ snapshots:
   node-releases@2.0.46: {}
 
   object-assign@4.1.1: {}
-
-  path-browserify@1.0.1: {}
 
   path-to-regexp@1.9.0:
     dependencies:
@@ -2406,11 +2505,6 @@ snapshots:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-
-  ts-morph@28.0.0:
-    dependencies:
-      '@ts-morph/common': 0.29.0
-      code-block-writer: 13.0.3
 
   tslib@2.8.1: {}
 
