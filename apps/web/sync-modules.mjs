@@ -9,10 +9,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-// Source-of-truth de los módulos: carpeta organizativa en el ROOT del monorepo
-// (ERPlora/modules/<id>/, cada uno su propio repo git). hub/modules/ se reserva para
-// los módulos INSTALADOS en runtime; el shell de dev lee el source desde el root.
-const MODULES_SRC = join(HERE, '../../../modules');
+// Source-of-truth de los módulos: el workspace de dev del toolkit en el ROOT del monorepo
+// (ERPlora/modules-workspace/modules/<id>/, cada uno su propio repo git, creado/gestionado por
+// @erplora/module-toolkit). hub/modules/ se reserva para los módulos INSTALADOS en runtime.
+const MODULES_SRC = join(HERE, '../../../modules-workspace/modules');
 const PUBLIC_DST = join(HERE, 'public/modules');
 
 // Lote POS (Stencil→Lit, 2026-06-07): los módulos que el shell de desarrollo carga en runtime.

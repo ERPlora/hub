@@ -1,0 +1,266 @@
+{
+  "id": "invoice_series",
+  "name": "Invoice Series",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages invoice numbering series: create, update and deactivate series, set the default series, and allocate sequential invoice numbers.",
+    "keywords": [
+      "invoice",
+      "series",
+      "numbering",
+      "sequence",
+      "billing",
+      "allocation"
+    ]
+  },
+  "depends_on": [],
+  "permissions": [
+    "invoice_series.view_series",
+    "invoice_series.manage_series",
+    "invoice_series.next_number"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "invoice_series.view_series",
+      "invoice_series.manage_series",
+      "invoice_series.next_number"
+    ],
+    "employee": [
+      "invoice_series.view_series",
+      "invoice_series.next_number"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Series",
+      "icon": "bookmark",
+      "component": "erp-invoice-series-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "invoice_series.series.list": {
+      "permission": "invoice_series.view_series",
+      "sql": "queries/series_list.sql",
+      "schema": "schemas/series_list.json",
+      "list": {
+        "search": [
+          "code",
+          "name",
+          "country_code",
+          "region_code"
+        ],
+        "sort": [
+          "id",
+          "code",
+          "name",
+          "document_type",
+          "prefix",
+          "suffix",
+          "format",
+          "country_code",
+          "region_code",
+          "fiscal_year",
+          "current_sequence",
+          "is_default",
+          "is_active",
+          "start_date",
+          "end_date",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "code": {
+            "op": "eq"
+          },
+          "name": {
+            "op": "eq"
+          },
+          "document_type": {
+            "op": "eq"
+          },
+          "prefix": {
+            "op": "eq"
+          },
+          "suffix": {
+            "op": "eq"
+          },
+          "format": {
+            "op": "eq"
+          },
+          "country_code": {
+            "op": "eq"
+          },
+          "region_code": {
+            "op": "eq"
+          },
+          "fiscal_year": {
+            "op": "eq"
+          },
+          "current_sequence": {
+            "op": "eq"
+          },
+          "is_default": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          },
+          "start_date": {
+            "op": "range"
+          },
+          "end_date": {
+            "op": "range"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists all configured invoice numbering series."
+      }
+    },
+    "invoice_series.series.get": {
+      "permission": "invoice_series.view_series",
+      "sql": "queries/series_get.sql",
+      "schema": "schemas/series_get.json",
+      "ai": {
+        "description": "Retrieves the detail of an invoice series by its identifier."
+      }
+    },
+    "invoice_series.series.peek_next": {
+      "permission": "invoice_series.view_series",
+      "sql": "queries/series_peek_next.sql",
+      "schema": "schemas/series_get.json",
+      "ai": {
+        "description": "Previews the next number that would be assigned in a series without consuming it."
+      }
+    },
+    "invoice_series.allocations.list": {
+      "permission": "invoice_series.view_series",
+      "sql": "queries/allocations_list.sql",
+      "schema": "schemas/allocations_list.json",
+      "list": {
+        "search": [
+          "document_number",
+          "document_ref"
+        ],
+        "sort": [
+          "id",
+          "series_id",
+          "document_number",
+          "document_ref",
+          "allocated_at"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "series_id": {
+            "op": "eq"
+          },
+          "document_number": {
+            "op": "eq"
+          },
+          "document_ref": {
+            "op": "eq"
+          },
+          "allocated_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the invoice numbers allocated in a series (allocation history)."
+      }
+    }
+  },
+  "commands": {
+    "invoice_series.series.create": {
+      "permission": "invoice_series.manage_series",
+      "transaction": true,
+      "sql": [
+        "commands/series_create.sql"
+      ],
+      "schema": "schemas/series_create.json",
+      "emit": [
+        "invoice_series.series.created"
+      ],
+      "ai": {
+        "description": "Creates a new invoice series with its prefix and initial number."
+      }
+    },
+    "invoice_series.series.update": {
+      "permission": "invoice_series.manage_series",
+      "transaction": true,
+      "sql": [
+        "commands/series_update.sql"
+      ],
+      "schema": "schemas/series_update.json",
+      "emit": [
+        "invoice_series.series.updated"
+      ],
+      "ai": {
+        "description": "Updates the configuration of an existing invoice series."
+      }
+    },
+    "invoice_series.series.deactivate": {
+      "permission": "invoice_series.manage_series",
+      "transaction": true,
+      "sql": [
+        "commands/series_deactivate.sql"
+      ],
+      "schema": "schemas/series_get.json",
+      "emit": [
+        "invoice_series.series.deactivated"
+      ],
+      "ai": {
+        "description": "Deactivates an invoice series so it cannot be used for new invoices."
+      }
+    },
+    "invoice_series.series.set_default": {
+      "permission": "invoice_series.manage_series",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "set_as_default"
+      },
+      "schema": "schemas/series_get.json",
+      "emit": [
+        "invoice_series.series.default_changed"
+      ],
+      "ai": {
+        "description": "Sets an invoice series as the default series for the hub."
+      }
+    },
+    "invoice_series.series.next_number": {
+      "permission": "invoice_series.next_number",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "get_next_number"
+      },
+      "schema": "schemas/series_next_number.json",
+      "emit": [
+        "invoice_series.number.allocated"
+      ],
+      "ai": {
+        "description": "Allocates and reserves the next sequential number in an invoice series."
+      }
+    }
+  },
+  "ui": {
+    "entry": "dist/invoice_series.esm.js"
+  }
+}

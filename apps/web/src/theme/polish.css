@@ -1,0 +1,186 @@
+/* Capa de pulido visual del Hub — refina componentes Ionic vía sus CSS vars + mínimos globales.
+   Estética moderna (Linear/Vercel/Notion): elevación suave, radios, tipografía cuidada, densidad
+   cómoda. Autocontenido: promovible a un tema de OutfitKit sin cambios. NO toca lógica ni markup. */
+
+/* ── Tipografía ───────────────────────────────────────────────────────────────────────────── */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
+h2 { font-size: 1.15rem; font-weight: 650; letter-spacing: -0.015em; }
+
+/* ── Toolbars / cabeceras (planas, se funden con el lienzo) ───────────────────────────────── */
+ion-header {
+  --background: var(--ion-background-color);
+  box-shadow: none;
+}
+ion-header.header-collapse-condense-inactive,
+ion-header::after { display: none; }
+ion-toolbar {
+  --border-width: 0;
+  --border-color: transparent;
+  --min-height: 60px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+}
+ion-title { font-weight: 650; letter-spacing: -0.01em; font-size: 1.0625rem; }
+
+/* ── Cards: radio + elevación suave + hover en cards clicables ────────────────────────────── */
+ion-card {
+  border-radius: var(--ok-radius);
+  box-shadow: var(--ok-shadow-sm);
+  border: 1px solid var(--ion-border-color);
+}
+ion-card[button] {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+ion-card[button]:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ok-shadow-md);
+  border-color: rgba(var(--ion-color-primary-rgb), 0.35);
+}
+ion-card-header { padding-bottom: 6px; }
+ion-card-title { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.025em; }
+ion-card-subtitle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--ion-color-medium);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+ion-card-subtitle ion-icon { font-size: 1rem; opacity: 0.7; }
+
+/* ── Listas con superficie (inset): tarjeta redonda con sombra, no borde duro ─────────────── */
+ion-list {
+  background: transparent;
+  padding: 0;
+}
+ion-list.list-inset {
+  margin: 16px 0;
+  border-radius: var(--ok-radius);
+  box-shadow: var(--ok-shadow-sm);
+  border: 1px solid var(--ion-border-color);
+  overflow: hidden;
+}
+ion-list-header {
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ion-color-medium);
+  min-height: 40px;
+  --color: var(--ion-color-medium);
+}
+ion-item {
+  --min-height: 52px;
+  --padding-start: 16px;
+  --inner-padding-end: 12px;
+  --background-hover: var(--ion-color-step-50);
+  --background-hover-opacity: 1;
+}
+ion-item h3 { font-weight: 600; }
+ion-note { font-size: 0.875rem; }
+
+/* ── Botones: radio, peso, sin mayúsculas ni sombra dura ──────────────────────────────────── */
+ion-button {
+  --border-radius: 10px;
+  --box-shadow: none;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  height: 40px;
+}
+ion-button[fill="clear"] { --color: var(--ion-text-color); }
+
+/* ── Badges: pill refinado ────────────────────────────────────────────────────────────────── */
+ion-badge {
+  --padding-start: 9px;
+  --padding-end: 9px;
+  --padding-top: 5px;
+  --padding-bottom: 5px;
+  border-radius: var(--ok-radius-pill);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+}
+
+/* ── Segment (tabs de footer): moderno, sin mayúsculas ────────────────────────────────────── */
+ion-footer { box-shadow: none; }
+ion-footer ion-toolbar { --border-width: 0; }
+ion-segment { --background: transparent; padding: 4px; gap: 4px; }
+ion-segment-button {
+  --indicator-color: transparent;
+  --color: var(--ion-color-medium);
+  --color-checked: var(--ion-color-primary);
+  --border-radius: 10px;
+  min-height: 46px;
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+ion-segment-button::part(indicator-background) { border-radius: 10px; }
+
+/* ── Inputs Ionic ─────────────────────────────────────────────────────────────────────────── */
+ion-input,
+ion-select,
+ion-textarea,
+ion-searchbar {
+  --border-radius: 10px;
+}
+
+/* ── Menú lateral: superficie atenuada, ítems con pastilla y activo de marca ──────────────── */
+ion-menu {
+  --background: var(--ok-surface-muted);
+  border-right: 1px solid var(--ion-border-color);
+}
+ion-menu ion-header,
+ion-menu ion-content,
+ion-menu ion-toolbar {
+  --background: var(--ok-surface-muted);
+  --ion-background-color: var(--ok-surface-muted);
+}
+ion-menu ion-list { background: transparent; }
+ion-menu ion-item {
+  --background: transparent;
+  --background-hover: rgba(var(--ion-text-color-rgb), 0.05);
+  --border-radius: 10px;
+  --min-height: 44px;
+  margin: 2px 6px;
+  font-weight: 500;
+}
+ion-menu ion-item[color="light"] {
+  --background: rgba(var(--ion-color-primary-rgb), 0.12);
+  --color: var(--ion-color-primary);
+  font-weight: 600;
+}
+ion-menu ion-item ion-icon { color: inherit; }
+
+/* ── ok-data-table (OutfitKit): alinea sus tokens con el theme del Hub ────────────────────── */
+ok-data-table {
+  --ok-radius: var(--ok-radius);
+  --ok-surface: var(--ion-card-background);
+  --ok-surface-2: var(--ion-color-step-50);
+  --ok-text: var(--ion-text-color);
+  --ok-muted: var(--ion-color-medium);
+  --ok-border: var(--ion-border-color);
+  display: block;
+  border-radius: var(--ok-radius);
+  box-shadow: var(--ok-shadow-sm);
+  overflow: hidden;
+}
+
+/* ── Scrollbar fino moderno ───────────────────────────────────────────────────────────────── */
+* { scrollbar-width: thin; scrollbar-color: rgba(var(--ion-text-color-rgb), 0.22) transparent; }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--ion-text-color-rgb), 0.18);
+  border-radius: var(--ok-radius-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(var(--ion-text-color-rgb), 0.3); background-clip: content-box; }

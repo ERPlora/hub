@@ -1,0 +1,374 @@
+{
+  "id": "verifactu",
+  "name": "VeriFactu",
+  "version": "1.1.5",
+  "agent": {
+    "description": "Handles Spanish VeriFactu fiscal compliance: generate, sign, and transmit invoice records to the AEAT, manage the contingency queue, and validate the billing chain integrity.",
+    "keywords": [
+      "verifactu",
+      "fiscal",
+      "spain",
+      "aeat",
+      "invoice",
+      "tax compliance",
+      "billing chain",
+      "contingency"
+    ]
+  },
+  "depends_on": [
+    "invoice"
+  ],
+  "permissions": [
+    "verifactu.view_verifactu",
+    "verifactu.manage_verifactu",
+    "verifactu.configure_verifactu",
+    "verifactu.transmit_verifactu"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "verifactu.view_verifactu",
+      "verifactu.manage_verifactu",
+      "verifactu.transmit_verifactu"
+    ],
+    "employee": [
+      "verifactu.view_verifactu"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "records",
+      "label": "Records",
+      "icon": "document-text-outline",
+      "component": "erp-verifactu-records"
+    },
+    {
+      "id": "contingency",
+      "label": "Contingency",
+      "icon": "warning-outline",
+      "component": "erp-verifactu-contingency"
+    },
+    {
+      "id": "events",
+      "label": "Events",
+      "icon": "time-outline",
+      "component": "erp-verifactu-events"
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "settings-outline",
+      "component": "erp-verifactu-settings"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "verifactu.config.get": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/config_get.sql",
+      "schema": "schemas/config_get.json",
+      "ai": {
+        "description": "Retrieves the VeriFactu configuration for the hub (certificate, environment, issuer NIF)."
+      }
+    },
+    "verifactu.records.list": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/records_list.sql",
+      "schema": "schemas/records_list.json",
+      "list": {
+        "search": [
+          "sequence_number",
+          "invoice_number",
+          "issuer_name"
+        ],
+        "sort": [
+          "id",
+          "sequence_number",
+          "invoice_number",
+          "invoice_date",
+          "record_type",
+          "invoice_type",
+          "issuer_nif",
+          "issuer_name",
+          "base_amount",
+          "tax_amount",
+          "total_amount",
+          "status",
+          "transmission_timestamp",
+          "retry_count",
+          "aeat_csv",
+          "generation_timestamp"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "sequence_number": {
+            "op": "eq"
+          },
+          "invoice_number": {
+            "op": "eq"
+          },
+          "invoice_date": {
+            "op": "range"
+          },
+          "record_type": {
+            "op": "eq"
+          },
+          "invoice_type": {
+            "op": "eq"
+          },
+          "issuer_nif": {
+            "op": "eq"
+          },
+          "issuer_name": {
+            "op": "eq"
+          },
+          "base_amount": {
+            "op": "range"
+          },
+          "tax_amount": {
+            "op": "range"
+          },
+          "total_amount": {
+            "op": "range"
+          },
+          "status": {
+            "op": "eq"
+          },
+          "transmission_timestamp": {
+            "op": "eq"
+          },
+          "retry_count": {
+            "op": "range"
+          },
+          "aeat_csv": {
+            "op": "eq"
+          },
+          "generation_timestamp": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists billing records submitted to VeriFactu with their transmission status."
+      }
+    },
+    "verifactu.records.get": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/record_get.sql",
+      "schema": "schemas/record_get.json",
+      "ai": {
+        "description": "Retrieves the full detail of a specific VeriFactu billing record."
+      }
+    },
+    "verifactu.contingency.list": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/contingency_list.sql",
+      "schema": "schemas/contingency_list.json",
+      "list": {
+        "sort": [
+          "id",
+          "record_id",
+          "priority",
+          "queued_at",
+          "attempts",
+          "last_attempt_at",
+          "last_error",
+          "next_attempt_at",
+          "status"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "record_id": {
+            "op": "eq"
+          },
+          "priority": {
+            "op": "eq"
+          },
+          "queued_at": {
+            "op": "range"
+          },
+          "attempts": {
+            "op": "eq"
+          },
+          "last_attempt_at": {
+            "op": "range"
+          },
+          "last_error": {
+            "op": "eq"
+          },
+          "next_attempt_at": {
+            "op": "range"
+          },
+          "status": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists VeriFactu records held in the contingency queue pending retransmission."
+      }
+    },
+    "verifactu.events.list": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/events_list.sql",
+      "schema": "schemas/events_list.json",
+      "list": {
+        "sort": [
+          "id",
+          "record_id",
+          "event_type",
+          "severity",
+          "message",
+          "details",
+          "timestamp"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "record_id": {
+            "op": "eq"
+          },
+          "event_type": {
+            "op": "eq"
+          },
+          "severity": {
+            "op": "eq"
+          },
+          "message": {
+            "op": "eq"
+          },
+          "details": {
+            "op": "eq"
+          },
+          "timestamp": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the history of communication events with the AEAT via VeriFactu."
+      }
+    }
+  },
+  "commands": {
+    "verifactu.config.save": {
+      "permission": "verifactu.configure_verifactu",
+      "transaction": true,
+      "sql": [
+        "commands/config_save.sql"
+      ],
+      "schema": "schemas/config_save.json",
+      "emit": [
+        "verifactu.config.changed"
+      ],
+      "ai": {
+        "description": "Saves the VeriFactu configuration (certificate, environment, issuer NIF)."
+      }
+    },
+    "verifactu.contingency.retry": {
+      "permission": "verifactu.manage_verifactu",
+      "transaction": true,
+      "sql": [
+        "commands/contingency_retry.sql"
+      ],
+      "schema": "schemas/contingency_retry.json",
+      "emit": [
+        "verifactu.contingency.retried"
+      ],
+      "ai": {
+        "description": "Retries transmission of a contingency record to the AEAT."
+      }
+    },
+    "verifactu.contingency.cancel": {
+      "permission": "verifactu.manage_verifactu",
+      "transaction": true,
+      "sql": [
+        "commands/contingency_cancel.sql"
+      ],
+      "schema": "schemas/contingency_cancel.json",
+      "emit": [
+        "verifactu.contingency.cancelled"
+      ],
+      "ai": {
+        "description": "Cancels a contingency record, discarding its retransmission (destructive)."
+      }
+    },
+    "verifactu.records.create": {
+      "permission": "verifactu.manage_verifactu",
+      "schema": "schemas/record_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_record"
+      },
+      "emit": [
+        "verifactu.record.created"
+      ],
+      "ai": {
+        "description": "Generates and signs a new VeriFactu billing record from an invoice."
+      }
+    },
+    "verifactu.records.transmit": {
+      "permission": "verifactu.transmit_verifactu",
+      "schema": "schemas/record_transmit.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "transmit_record"
+      },
+      "emit": [
+        "verifactu.record.transmitted"
+      ],
+      "ai": {
+        "description": "Transmits a signed billing record to the AEAT via VeriFactu."
+      }
+    },
+    "verifactu.contingency.process": {
+      "permission": "verifactu.manage_verifactu",
+      "schema": "schemas/contingency_process.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "process_contingency_queue"
+      },
+      "emit": [
+        "verifactu.contingency.processed"
+      ],
+      "ai": {
+        "description": "Processes the contingency queue by retransmitting all pending records to the AEAT."
+      }
+    },
+    "verifactu.chain.validate": {
+      "permission": "verifactu.view_verifactu",
+      "schema": "schemas/chain_validate.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "validate_chain"
+      },
+      "ai": {
+        "description": "Validates the integrity of the VeriFactu billing chain."
+      }
+    }
+  },
+  "events": {
+    "listen": [
+      "invoice.created",
+      "invoice.cancelled"
+    ]
+  },
+  "ui": {
+    "entry": "dist/verifactu.esm.js"
+  }
+}

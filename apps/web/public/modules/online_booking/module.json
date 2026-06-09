@@ -1,0 +1,251 @@
+{
+  "id": "online_booking",
+  "name": "Online Booking",
+  "version": "1.1.3",
+  "agent": {
+    "description": "Manages online customer bookings: create, confirm, cancel, complete and track no-shows, and configure booking settings.",
+    "keywords": [
+      "booking",
+      "reservation",
+      "appointment",
+      "confirm",
+      "cancel",
+      "schedule",
+      "online"
+    ]
+  },
+  "depends_on": [
+    "customers"
+  ],
+  "permissions": [
+    "online_booking.view_booking",
+    "online_booking.change_booking",
+    "online_booking.delete_booking",
+    "online_booking.confirm_booking",
+    "online_booking.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "online_booking.view_booking",
+      "online_booking.change_booking",
+      "online_booking.confirm_booking"
+    ],
+    "employee": [
+      "online_booking.view_booking"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "bookings",
+      "label": "Bookings",
+      "icon": "calendar-outline",
+      "component": "erp-online-booking-list"
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "settings-outline",
+      "component": "erp-online-booking-settings"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "online_booking.bookings.list": {
+      "permission": "online_booking.view_booking",
+      "sql": "queries/bookings_list.sql",
+      "list": {
+        "search": [
+          "booking_reference",
+          "customer_name",
+          "customer_email",
+          "customer_phone",
+          "service_name",
+          "staff_name"
+        ],
+        "sort": [
+          "id",
+          "booking_reference",
+          "customer_name",
+          "customer_email",
+          "customer_phone",
+          "service_name",
+          "staff_name",
+          "booking_date",
+          "booking_time",
+          "duration_minutes",
+          "status",
+          "booking_type",
+          "notes"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "booking_reference": {
+            "op": "eq"
+          },
+          "customer_name": {
+            "op": "eq"
+          },
+          "customer_email": {
+            "op": "eq"
+          },
+          "customer_phone": {
+            "op": "eq"
+          },
+          "service_name": {
+            "op": "eq"
+          },
+          "staff_name": {
+            "op": "eq"
+          },
+          "booking_date": {
+            "op": "range"
+          },
+          "booking_time": {
+            "op": "eq"
+          },
+          "duration_minutes": {
+            "op": "eq"
+          },
+          "status": {
+            "op": "eq"
+          },
+          "booking_type": {
+            "op": "eq"
+          },
+          "notes": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists all online bookings in the hub."
+      }
+    },
+    "online_booking.bookings.get": {
+      "permission": "online_booking.view_booking",
+      "sql": "queries/booking_get.sql",
+      "ai": {
+        "description": "Retrieves the details of an online booking by its ID."
+      }
+    },
+    "online_booking.settings.get": {
+      "permission": "online_booking.view_booking",
+      "sql": "queries/settings_get.sql",
+      "ai": {
+        "description": "Retrieves the current configuration of the online booking module."
+      }
+    }
+  },
+  "commands": {
+    "online_booking.bookings.create": {
+      "permission": "online_booking.change_booking",
+      "transaction": true,
+      "sql": [
+        "commands/booking_create.sql"
+      ],
+      "schema": "schemas/booking_create.json",
+      "emit": [
+        "online_booking.booking.created"
+      ],
+      "ai": {
+        "description": "Creates a new online booking for a customer."
+      }
+    },
+    "online_booking.bookings.confirm": {
+      "permission": "online_booking.confirm_booking",
+      "transaction": true,
+      "sql": [
+        "commands/booking_confirm.sql"
+      ],
+      "schema": "schemas/booking_confirm.json",
+      "emit": [
+        "online_booking.booking.confirmed"
+      ],
+      "ai": {
+        "description": "Confirms a pending online booking awaiting approval."
+      }
+    },
+    "online_booking.bookings.cancel": {
+      "permission": "online_booking.change_booking",
+      "transaction": true,
+      "sql": [
+        "commands/booking_cancel.sql"
+      ],
+      "schema": "schemas/booking_cancel.json",
+      "emit": [
+        "online_booking.booking.cancelled"
+      ],
+      "ai": {
+        "description": "Cancels an existing online booking."
+      }
+    },
+    "online_booking.bookings.complete": {
+      "permission": "online_booking.change_booking",
+      "transaction": true,
+      "sql": [
+        "commands/booking_complete.sql"
+      ],
+      "schema": "schemas/booking_complete.json",
+      "emit": [
+        "online_booking.booking.completed"
+      ],
+      "ai": {
+        "description": "Marks a booking as completed after the service has been delivered."
+      }
+    },
+    "online_booking.bookings.no_show": {
+      "permission": "online_booking.change_booking",
+      "transaction": true,
+      "sql": [
+        "commands/booking_no_show.sql"
+      ],
+      "schema": "schemas/booking_no_show.json",
+      "emit": [
+        "online_booking.booking.no_show"
+      ],
+      "ai": {
+        "description": "Records that the customer did not show up for their booking."
+      }
+    },
+    "online_booking.bookings.delete": {
+      "permission": "online_booking.delete_booking",
+      "transaction": true,
+      "sql": [
+        "commands/booking_delete.sql"
+      ],
+      "schema": "schemas/booking_delete.json",
+      "emit": [
+        "online_booking.booking.deleted"
+      ],
+      "ai": {
+        "description": "Permanently deletes an online booking from the system (destructive)."
+      }
+    },
+    "online_booking.settings.upsert": {
+      "permission": "online_booking.manage_settings",
+      "transaction": true,
+      "sql": [
+        "commands/settings_upsert.sql"
+      ],
+      "schema": "schemas/settings_upsert.json",
+      "emit": [
+        "online_booking.settings.updated"
+      ],
+      "ai": {
+        "description": "Creates or updates the configuration of the online booking module."
+      }
+    }
+  },
+  "ui": {
+    "entry": "dist/online_booking.esm.js"
+  }
+}

@@ -2,24 +2,24 @@
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "jsx": "react-jsx",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    "jsx": "preserve",
     "types": ["vite/client"],
     "paths": {
-      "@erplora/module-types": ["../../packages/module-types/src/index.ts"],
-      "@erplora/dashboard-shell": ["../../packages/dashboard-shell/src/index.ts"]
+      "@/*": ["./src/*"],
+      "@erplora/module-types": ["../../packages/module-types/src/index.ts"]
     }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts", "env.d.ts"]
 }

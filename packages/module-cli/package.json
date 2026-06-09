@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "CLI de módulos (build/validate/pack/sign/publish). Hoy: build + validate reales.",
+  "description": "DEPRECADO — ver DEPRECATED.md. Reemplazado por @erplora/module-toolkit (ERPlora/module-toolkit). Sus scripts ya no resuelven tras mover los módulos fuera del workspace.",
   "bin": {
     "erplora-module": "src/cli.mjs"
   },

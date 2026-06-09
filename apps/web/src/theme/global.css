@@ -1,0 +1,9 @@
+/* Globales de la app. El tema de marca (variables --ion-*) vive en theme/variables.css.
+   Base de componentes = Ionic; aquí solo Tailwind + globales mínimos. */
+@import "tailwindcss";
+
+html,
+body,
+#app {
+  height: 100%;
+}

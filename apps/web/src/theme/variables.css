@@ -1,0 +1,89 @@
+/* Tema de marca ERPlora — API oficial de Ionic (--ion-*). Dark por .ion-palette-dark.
+   Estética Linear/Vercel/Notion: lienzo neutro, superficies blancas separadas por elevación
+   suave, marca solo como acento. Los refinamientos por componente viven en polish.css. */
+
+:root {
+  /* ── Marca (primary) ── */
+  --ion-color-primary: #1496d6;
+  --ion-color-primary-rgb: 20, 150, 214;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #1284bc;
+  --ion-color-primary-tint: #2ca1da;
+
+  /* ── Lienzo neutro ── */
+  --ion-background-color: #f6f7f9;
+  --ion-background-color-rgb: 246, 247, 249;
+  --ion-text-color: #1a1c20;
+  --ion-text-color-rgb: 26, 28, 32;
+
+  /* Texto atenuado (labels, subtítulos) */
+  --ion-color-medium: #6b7280;
+  --ion-color-medium-rgb: 107, 114, 128;
+  --ion-color-medium-shade: #5e636f;
+  --ion-color-medium-tint: #797f8b;
+
+  /* Header/cards/items se funden con el lienzo (sin barras pesadas) */
+  --ion-toolbar-background: var(--ion-background-color);
+  --ion-item-background: #ffffff;
+  --ion-card-background: #ffffff;
+  --ion-border-color: #e7e9ee;
+
+  --ion-font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Escala de pasos (grises) — completa para sombras/superficies coherentes */
+  --ion-color-step-50: #f3f4f6;
+  --ion-color-step-100: #eceef1;
+  --ion-color-step-150: #e3e5ea;
+  --ion-color-step-200: #d8dbe1;
+  --ion-color-step-250: #cdd1d8;
+  --ion-color-step-300: #c0c4cd;
+  --ion-color-step-500: #8b8f99;
+  --ion-color-step-700: #4a4e57;
+  --ion-color-step-850: #2a2d33;
+
+  /* ── Tokens de diseño propios (los usa polish.css; mismo nombre que un futuro tema OutfitKit) ── */
+  --ok-radius: 14px;
+  --ok-radius-sm: 10px;
+  --ok-radius-pill: 999px;
+  --ok-shadow-xs: 0 1px 2px rgba(17, 24, 39, 0.05);
+  --ok-shadow-sm: 0 1px 3px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(17, 24, 39, 0.04);
+  --ok-shadow-md: 0 6px 20px rgba(17, 24, 39, 0.08), 0 2px 6px rgba(17, 24, 39, 0.04);
+  --ok-surface-muted: var(--ion-color-step-50);
+}
+
+/* Dark neutro (zinc), coherente con el light. */
+:root.ion-palette-dark {
+  --ion-background-color: #0b0c0e;
+  --ion-background-color-rgb: 11, 12, 14;
+  --ion-text-color: #f4f5f7;
+  --ion-text-color-rgb: 244, 245, 247;
+
+  --ion-color-medium: #9aa0ac;
+  --ion-color-medium-rgb: 154, 160, 172;
+
+  --ion-toolbar-background: var(--ion-background-color);
+  --ion-item-background: #16181c;
+  --ion-card-background: #16181c;
+  --ion-border-color: #26282e;
+
+  --ion-color-step-50: #16181c;
+  --ion-color-step-100: #1d2025;
+  --ion-color-step-150: #26282e;
+  --ion-color-step-200: #2f323a;
+  --ion-color-step-250: #383b44;
+  --ion-color-step-300: #41454f;
+  --ion-color-step-500: #6b7280;
+  --ion-color-step-700: #aab0bc;
+  --ion-color-step-850: #d7dae0;
+
+  --ion-color-primary: #2aa6e4;
+  --ion-color-primary-rgb: 42, 166, 228;
+  --ion-color-primary-shade: #2592c9;
+  --ion-color-primary-tint: #3fafe7;
+
+  --ok-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ok-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --ok-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --ok-surface-muted: #101216;
+}

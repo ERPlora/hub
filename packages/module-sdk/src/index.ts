@@ -197,6 +197,13 @@ export class ListController<T = Record<string, unknown>> {
     void this.load();
   }
 
+  /** Cambia el nº de filas por página y recarga desde la página 0. */
+  setPageSize(pageSize: number): void {
+    this.state.pageSize = Math.max(1, pageSize);
+    this.state.page = 0;
+    void this.load();
+  }
+
   /** Aplica/quita un filtro de columna; valores vacíos lo eliminan. Vuelve a la página 0. */
   setFilter(col: string, value: unknown): void {
     if (isEmpty(value)) {

@@ -1,0 +1,410 @@
+{
+  "id": "tasks",
+  "name": "Tasks",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages internal staff tasks and projects: create, assign, update status, complete tasks, add comments, and organise tasks into projects.",
+    "keywords": [
+      "task",
+      "project",
+      "assignment",
+      "todo",
+      "priority",
+      "subtask",
+      "comment",
+      "staff"
+    ]
+  },
+  "depends_on": [],
+  "permissions": [
+    "tasks.view_task",
+    "tasks.add_task",
+    "tasks.manage_task"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "tasks.view_task",
+      "tasks.add_task",
+      "tasks.manage_task"
+    ],
+    "employee": [
+      "tasks.view_task",
+      "tasks.add_task",
+      "tasks.manage_task"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "all",
+      "label": "Tasks",
+      "icon": "checkbox-outline",
+      "component": "erp-tasks-list"
+    },
+    {
+      "id": "projects",
+      "label": "Projects",
+      "icon": "folder-outline",
+      "component": "erp-tasks-projects"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "tasks.tasks.list": {
+      "permission": "tasks.view_task",
+      "sql": "queries/tasks_list.sql",
+      "schema": "schemas/tasks_list.json",
+      "list": {
+        "search": [
+          "task_number",
+          "title",
+          "description",
+          "assigned_to_ref",
+          "created_by_ref"
+        ],
+        "sort": [
+          "id",
+          "task_number",
+          "title",
+          "description",
+          "project_id",
+          "status",
+          "priority",
+          "assigned_to_ref",
+          "created_by_ref",
+          "due_date",
+          "completed_at",
+          "parent_task_id",
+          "tags",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "task_number": {
+            "op": "eq"
+          },
+          "title": {
+            "op": "eq"
+          },
+          "description": {
+            "op": "eq"
+          },
+          "project_id": {
+            "op": "eq"
+          },
+          "status": {
+            "op": "eq"
+          },
+          "priority": {
+            "op": "eq"
+          },
+          "assigned_to_ref": {
+            "op": "eq"
+          },
+          "created_by_ref": {
+            "op": "eq"
+          },
+          "due_date": {
+            "op": "range"
+          },
+          "completed_at": {
+            "op": "range"
+          },
+          "parent_task_id": {
+            "op": "eq"
+          },
+          "tags": {
+            "op": "eq"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists all tasks in the hub with their status, priority, and assignee"
+      }
+    },
+    "tasks.tasks.get": {
+      "permission": "tasks.view_task",
+      "sql": "queries/task_get.sql",
+      "schema": "schemas/task_get.json",
+      "ai": {
+        "description": "Gets the full details of a task by its identifier"
+      }
+    },
+    "tasks.tasks.subtasks": {
+      "permission": "tasks.view_task",
+      "sql": "queries/subtasks_list.sql",
+      "schema": "schemas/subtasks_list.json",
+      "list": {
+        "search": [
+          "task_number",
+          "title",
+          "description",
+          "assigned_to_ref",
+          "created_by_ref"
+        ],
+        "sort": [
+          "id",
+          "task_number",
+          "title",
+          "description",
+          "project_id",
+          "status",
+          "priority",
+          "assigned_to_ref",
+          "created_by_ref",
+          "due_date",
+          "completed_at",
+          "parent_task_id",
+          "tags",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "task_number": {
+            "op": "eq"
+          },
+          "title": {
+            "op": "eq"
+          },
+          "description": {
+            "op": "eq"
+          },
+          "project_id": {
+            "op": "eq"
+          },
+          "status": {
+            "op": "eq"
+          },
+          "priority": {
+            "op": "eq"
+          },
+          "assigned_to_ref": {
+            "op": "eq"
+          },
+          "created_by_ref": {
+            "op": "eq"
+          },
+          "due_date": {
+            "op": "range"
+          },
+          "completed_at": {
+            "op": "range"
+          },
+          "parent_task_id": {
+            "op": "eq"
+          },
+          "tags": {
+            "op": "eq"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the subtasks associated with a parent task"
+      }
+    },
+    "tasks.tasks.comments": {
+      "permission": "tasks.view_task",
+      "sql": "queries/comments_list.sql",
+      "schema": "schemas/comments_list.json",
+      "list": {
+        "search": [
+          "author_ref"
+        ],
+        "sort": [
+          "id",
+          "task_id",
+          "author_ref",
+          "comment",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "task_id": {
+            "op": "eq"
+          },
+          "author_ref": {
+            "op": "eq"
+          },
+          "comment": {
+            "op": "eq"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the comments in a task's discussion thread"
+      }
+    },
+    "tasks.tasks.my": {
+      "permission": "tasks.view_task",
+      "sql": "queries/my_tasks.sql",
+      "schema": "schemas/my_tasks.json",
+      "ai": {
+        "description": "Lists tasks assigned to the current user"
+      }
+    },
+    "tasks.projects.list": {
+      "permission": "tasks.view_task",
+      "sql": "queries/projects_list.sql",
+      "schema": "schemas/projects_list.json",
+      "list": {
+        "search": [
+          "code",
+          "name",
+          "owner_ref"
+        ],
+        "sort": [
+          "id",
+          "code",
+          "name",
+          "color",
+          "is_active",
+          "owner_ref",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "code": {
+            "op": "eq"
+          },
+          "name": {
+            "op": "eq"
+          },
+          "color": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          },
+          "owner_ref": {
+            "op": "eq"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists all existing task projects"
+      }
+    }
+  },
+  "commands": {
+    "tasks.tasks.create": {
+      "permission": "tasks.add_task",
+      "schema": "schemas/create_task.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_task"
+      },
+      "emit": [
+        "tasks.task.created"
+      ],
+      "ai": {
+        "description": "Creates a new internal task with assignee, priority, and due date"
+      }
+    },
+    "tasks.tasks.update_status": {
+      "permission": "tasks.manage_task",
+      "schema": "schemas/update_status.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "update_status"
+      },
+      "emit": [
+        "tasks.task.status_changed"
+      ],
+      "ai": {
+        "description": "Changes the status of a task (todo, in_progress, blocked, done, cancelled)"
+      }
+    },
+    "tasks.tasks.complete": {
+      "permission": "tasks.manage_task",
+      "schema": "schemas/complete_task.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "complete_task"
+      },
+      "emit": [
+        "tasks.task.completed"
+      ],
+      "ai": {
+        "description": "Marks a task as completed and records the completion date"
+      }
+    },
+    "tasks.tasks.assign": {
+      "permission": "tasks.manage_task",
+      "transaction": true,
+      "sql": [
+        "commands/assign_task.sql"
+      ],
+      "schema": "schemas/assign_task.json",
+      "emit": [
+        "tasks.task.assigned"
+      ],
+      "ai": {
+        "description": "Assigns or reassigns a task to a team member"
+      }
+    },
+    "tasks.tasks.add_comment": {
+      "permission": "tasks.add_task",
+      "transaction": true,
+      "sql": [
+        "commands/add_comment.sql"
+      ],
+      "schema": "schemas/add_comment.json",
+      "emit": [
+        "tasks.comment.added"
+      ],
+      "ai": {
+        "description": "Adds a comment to a task's discussion thread"
+      }
+    },
+    "tasks.projects.create": {
+      "permission": "tasks.add_task",
+      "transaction": true,
+      "sql": [
+        "commands/create_project.sql"
+      ],
+      "schema": "schemas/create_project.json",
+      "emit": [
+        "tasks.project.created"
+      ],
+      "ai": {
+        "description": "Creates a new project to group related tasks"
+      }
+    }
+  },
+  "events": {
+    "listen": []
+  },
+  "ai_context": "Module: Tasks (id: tasks). Internal back-office to-do for staff operations: tasks with assignees, priorities (low/medium/high/urgent), due dates, optional projects, subtasks and threaded comments. Separate from any customer-facing ticketing. Models: TaskProject, Task, TaskComment, TaskCounter. task_number is auto-generated per hub as TSK-YYYYMMDD-NNNN. Status flow: todo/in_progress/blocked/done/cancelled (done stamps completed_at). Queries: tasks.tasks.list, tasks.tasks.get, tasks.tasks.subtasks, tasks.tasks.comments, tasks.tasks.my, tasks.projects.list. Commands: tasks.tasks.create, tasks.tasks.update_status, tasks.tasks.complete, tasks.tasks.assign, tasks.tasks.add_comment, tasks.projects.create.",
+  "ui": {
+    "entry": "dist/tasks.esm.js"
+  }
+}

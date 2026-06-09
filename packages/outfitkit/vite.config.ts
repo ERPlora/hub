@@ -32,10 +32,12 @@ export default defineConfig({
       entry: {
         index: resolve(__dirname, 'src/index.ts'),
         outfitkit: resolve(__dirname, 'src/cdn.ts'),
-        // Helper de registro idempotente como entry propio → un módulo puede importar
-        // `@erplora/outfitkit/define` sin arrastrar el barrel (que auto-registra todos los ok-*).
+        // Helper de registro idempotente (lo usan los módulos para registrar su propio WC).
         define: resolve(__dirname, 'src/base/define.ts'),
+        // Compuestos / dashboard. Construido SOBRE Ionic (ion-* nativos registrados por el host);
+        // ya NO envuelve primitivos ok-* (esos los da Ionic directamente).
         'ok-data-table': resolve(__dirname, 'src/components/ok-data-table/ok-data-table.ts'),
+        // Landing chrome
         'ok-navbar': resolve(__dirname, 'src/components/ok-navbar/ok-navbar.ts'),
         'ok-footer': resolve(__dirname, 'src/components/ok-footer/ok-footer.ts'),
         'ok-container': resolve(__dirname, 'src/components/ok-container/ok-container.ts'),
