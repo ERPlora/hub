@@ -15,6 +15,7 @@ use serde_json::Value as Json;
 pub mod commands;
 pub mod errors;
 pub mod events;
+pub mod identity;
 pub mod installer;
 pub mod loader;
 pub mod manifest;
@@ -119,10 +120,48 @@ impl Runtime {
         commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx).await
     }
 
-    /// Crea las tablas de sistema del runtime (outbox de eventos). Idempotente; el server la llama
-    /// al arrancar para cubrir el caso de hub vacío (sin módulos aún).
+    /// Crea las tablas de sistema del runtime (outbox de eventos + identidad de usuarios/sesiones).
+    /// Idempotente; el server la llama al arrancar para cubrir el caso de hub vacío (sin módulos).
     pub async fn ensure_system_tables(&self) -> Result<()> {
-        outbox::ensure_tables(self.db.as_ref()).await
+        outbox::ensure_tables(self.db.as_ref()).await?;
+        identity::ensure_tables(self.db.as_ref()).await
+    }
+
+    // ── Identidad local (usuarios/PIN/sesiones; §2.9). La autoridad de permisos es local. ──
+
+    /// Crea un usuario local (`pin` vacío = sin PIN). Devuelve su id.
+    pub async fn create_user(&self, name: &str, pin: &str, role: &str, cloud_user_id: Option<&str>) -> Result<String> {
+        identity::create_user(self.db.as_ref(), name, pin, role, cloud_user_id).await
+    }
+
+    /// Verifica el PIN de un usuario por nombre. `Some(user)` si encaja.
+    pub async fn verify_pin(&self, name: &str, pin: &str) -> Result<Option<identity::HubUser>> {
+        identity::verify_pin(self.db.as_ref(), name, pin).await
+    }
+
+    /// Resuelve (o provisiona) el `hub_user` vinculado a una identidad cloud (mapeo del JWT).
+    pub async fn get_or_link_cloud_user(&self, cloud_user_id: &str, default_name: &str, default_role: &str) -> Result<identity::HubUser> {
+        identity::get_or_link_cloud_user(self.db.as_ref(), cloud_user_id, default_name, default_role).await
+    }
+
+    /// Abre una sesión server-side para `user_id`; devuelve el token opaco.
+    pub async fn create_session(&self, user_id: &str, ttl_secs: i64) -> Result<String> {
+        identity::create_session(self.db.as_ref(), user_id, ttl_secs).await
+    }
+
+    /// Resuelve una sesión válida a su `hub_user` activo (o `None`).
+    pub async fn resolve_session(&self, token: &str) -> Result<Option<identity::HubUser>> {
+        identity::resolve_session(self.db.as_ref(), token).await
+    }
+
+    /// Cierra una sesión (logout).
+    pub async fn delete_session(&self, token: &str) -> Result<()> {
+        identity::delete_session(self.db.as_ref(), token).await
+    }
+
+    /// Permisos efectivos del `role` (unión de `role_permissions` de los módulos activos).
+    pub fn permissions_for_role(&self, role: &str) -> std::collections::HashSet<String> {
+        identity::permissions_for_role(&self.registry, role)
     }
 
     /// Un ciclo del relay de eventos: entrega los eventos vencidos del outbox a sus listeners.

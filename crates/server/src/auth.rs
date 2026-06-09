@@ -1,57 +1,66 @@
 //! Autenticación de la petición → `RequestContext` (ARQUITECTURA.md §2.3, §2.5, §2.9).
 //!
 //! Dos modos (`HubConfig::auth_mode`):
-//!  - **Dev**: confía en `X-Hub-Id` + `X-User-Id` + `X-Permissions` que pone el frontend tras el
-//!    login. Para desarrollo local sin Cloud.
-//!  - **Jwt**: **verifica** el access JWT del usuario (RS256) contra la clave pública del Cloud
-//!    (`cloud_client::verify_user_jwt`). El `user_id` sale del token verificado (no del header,
-//!    spoofable) y el `hub_id` del **config de despliegue** (1 contenedor = 1 hub, tampoco del
-//!    header). La autoridad final de permisos sigue siendo el runtime.
+//!  - **Dev**: confía en `X-Hub-Id` + `X-User-Id` + `X-Permissions` que pone el frontend. Para
+//!    desarrollo local sin Cloud.
+//!  - **Session** (modelo real, §2.9): la **autoridad de identidad/permisos es LOCAL**. El login
+//!    (PIN local o JWT de usuario cloud — ver handlers en `lib.rs`) abre una **sesión server-side**
+//!    (`hub_session`) y devuelve un token opaco; cada petición lo manda en `X-Hub-Session` y aquí se
+//!    resuelve a un `hub_user` y a los **permisos de su rol** (`role_permissions` de los módulos
+//!    activos). El `hub_id` viene del **config de despliegue** (no del header, no spoofable).
 //!
-//! ⚠️ **Permisos por usuario — decisión de arquitectura PENDIENTE (columna del humano).** El JWT de
-//! Cloud lleva solo identidad (`user_id` + `exp`), **no** permisos ni roles. Hasta decidir la fuente
-//! (claim nuevo en el token, modelo de roles local del hub, o consulta a Cloud), el modo Jwt concede
-//! `["*"]` al usuario autenticado — **igual que hoy** (Dev también concede `*`), sin regresión: lo
-//! que esta capa añade es **identidad verificada** + `hub_id` no spoofable, no el gate de permisos.
+//! El JWT de usuario (RS256) es solo el **adaptador de login cloud** (`cloud_client::verify_user_jwt`
+//! en el handler de login): prueba *quién* es el usuario cloud → se mapea a un `hub_user` local
+//! (`get_or_link_cloud_user`) → se abre sesión. Nunca es la fuente de permisos.
 use axum::http::HeaderMap;
-use erplora_runtime::RequestContext;
+use erplora_runtime::{RequestContext, Runtime};
 
 use crate::state::{AuthMode, HubConfig};
 
 const DEFAULT_HUB: &str = "local";
 const DEFAULT_USER: &str = "local";
 
-/// Error de autenticación (modo Jwt). Se mapea a `401 Unauthorized` en los handlers.
+/// Error de autenticación. Se mapea a `401 Unauthorized` en los handlers.
 #[derive(Debug)]
 pub enum AuthError {
-    MissingToken,
+    MissingSession,
     Invalid(String),
 }
 
 impl AuthError {
     pub fn message(&self) -> String {
         match self {
-            AuthError::MissingToken => "falta Authorization: Bearer".to_string(),
-            AuthError::Invalid(e) => format!("token inválido: {e}"),
+            AuthError::MissingSession => "falta sesión (cabecera X-Hub-Session)".to_string(),
+            AuthError::Invalid(e) => format!("no autenticado: {e}"),
         }
     }
 }
 
+/// Token de sesión del hub (cabecera `X-Hub-Session`), si viene.
+pub fn session_token(headers: &HeaderMap) -> Option<String> {
+    header(headers, "x-hub-session")
+}
+
 /// Autentica la petición y construye el `RequestContext` según el modo configurado.
-pub fn authenticate(headers: &HeaderMap, config: &HubConfig) -> Result<RequestContext, AuthError> {
+/// - `Dev`: confía en cabeceras (`X-User-Id`/`X-Permissions`).
+/// - `Session`: resuelve la sesión server-side → `hub_user` → permisos del rol (autoridad local).
+pub async fn authenticate(
+    headers: &HeaderMap,
+    config: &HubConfig,
+    rt: &Runtime,
+) -> Result<RequestContext, AuthError> {
     match config.auth_mode {
         AuthMode::Dev => Ok(context_from_headers(headers)),
-        AuthMode::Jwt => {
-            let pem = config
-                .jwt_public_key
-                .as_deref()
-                .ok_or_else(|| AuthError::Invalid("modo jwt sin clave pública configurada".into()))?;
-            let token = bearer(headers).ok_or(AuthError::MissingToken)?;
-            let claims = cloud_client::verify_user_jwt(&token, pem)
-                .map_err(|e| AuthError::Invalid(e.to_string()))?;
-            // Identidad verificada del token; hub_id del despliegue (no del header). Permisos
-            // diferidos a `*` (ver nota del módulo) — la decisión de scoping es del humano.
-            Ok(RequestContext::new(config.hub_id.clone(), claims.user_id_str(), vec!["*".to_string()]))
+        AuthMode::Session => {
+            let token = session_token(headers).ok_or(AuthError::MissingSession)?;
+            let user = rt
+                .resolve_session(&token)
+                .await
+                .map_err(|e| AuthError::Invalid(e.to_string()))?
+                .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
+            // hub_id del despliegue (no spoofable); user_id + permisos de la identidad LOCAL.
+            let perms = rt.permissions_for_role(&user.role);
+            Ok(RequestContext::new(config.hub_id.clone(), user.id, perms))
         }
     }
 }

@@ -49,6 +49,9 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules/:id/uninstall", post(uninstall_module))
         .route("/api/query", post(query))
         .route("/api/command", post(command))
+        .route("/api/auth/pin", post(auth_pin))
+        .route("/api/auth/cloud", post(auth_cloud))
+        .route("/api/auth/logout", post(auth_logout))
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
         .route("/ws", get(ws_upgrade))
         .with_state(state)
@@ -141,6 +144,8 @@ async fn assistant_chat_stream(
     headers: HeaderMap,
     Json(frontend): Json<Value>,
 ) -> Response {
+    // El Bearer del usuario cloud se reenvía a Cloud (proxy del LLM); la sesión del hub da el
+    // contexto/permisos para ensamblar las tools (gate = mismas que la UI).
     let Some(auth) = auth::user_auth(&headers, &st.config.hub_id) else {
         return (
             StatusCode::UNAUTHORIZED,
@@ -148,15 +153,12 @@ async fn assistant_chat_stream(
         )
             .into_response();
     };
-    // Verifica la identidad (en modo Jwt valida la firma del token; en Dev confía en cabeceras).
-    let ctx = match auth::authenticate(&headers, &st.config) {
-        Ok(c) => c,
-        Err(e) => return unauthorized(e),
-    };
-
-    // Ensambla las tools permitidas para este usuario (gate = mismas que la UI).
     let tools = {
         let rt = st.runtime.lock().await;
+        let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
+            Ok(c) => c,
+            Err(e) => return unauthorized(e),
+        };
         assistant::assemble_tools(rt.registry(), &ctx)
     };
     let body = assistant::build_cloud_body(&frontend, tools);
@@ -331,11 +333,11 @@ async fn uninstall_module(State(st): State<AppState>, Path(id): Path<String>) ->
 }
 
 async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<QueryReq>) -> Response {
-    let ctx = match auth::authenticate(&headers, &st.config) {
+    let rt = st.runtime.lock().await;
+    let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
-    let rt = st.runtime.lock().await;
     // Queries de lista (con bloque `list`) devuelven `{rows,total,limit,offset}` para el pager;
     // el resto devuelve el array de filas tal cual (compat con get/stats/settings).
     if rt.is_list_query(&req.name) {
@@ -352,13 +354,100 @@ async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Q
 }
 
 async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<CommandReq>) -> Response {
-    let ctx = match auth::authenticate(&headers, &st.config) {
+    let rt = st.runtime.lock().await;
+    let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
-    let rt = st.runtime.lock().await;
     match rt.execute_command(&req.name, &req.payload, &ctx).await {
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),
+        Err(e) => err_response(e),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct PinReq {
+    name: String,
+    pin: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CloudLoginReq {
+    #[serde(default)]
+    name: Option<String>,
+}
+
+/// Login local por **PIN** → abre sesión. Body `{name, pin}` → `{ok, token, user}` (401 si falla).
+async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Response {
+    let rt = st.runtime.lock().await;
+    match rt.verify_pin(&req.name, &req.pin).await {
+        Ok(Some(user)) => mint_session(&rt, user).await,
+        Ok(None) => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
+        )
+            .into_response(),
+        Err(e) => err_response(e),
+    }
+}
+
+/// Login de **usuario cloud**: verifica el JWT (RS256) y lo mapea a un `hub_user` local (lo
+/// provisiona si es la primera vez), abriendo sesión. Header `Authorization: Bearer <access>`;
+/// body opcional `{name}`. → `{ok, token, user}`.
+async fn auth_cloud(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<CloudLoginReq>>,
+) -> Response {
+    let Some(token) = auth::bearer(&headers) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "falta Authorization: Bearer" })),
+        )
+            .into_response();
+    };
+    let Some(pem) = st.config.jwt_public_key.as_deref() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({ "ok": false, "error": "login cloud no disponible (sin clave pública)" })),
+        )
+            .into_response();
+    };
+    let claims = match cloud_client::verify_user_jwt(&token, pem) {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "ok": false, "error": format!("token inválido: {e}") })),
+            )
+                .into_response()
+        }
+    };
+    let cloud_user_id = claims.user_id_str();
+    let name = body.and_then(|b| b.0.name).unwrap_or_else(|| format!("user:{cloud_user_id}"));
+    // Rol por defecto al provisionar un usuario cloud nuevo (bootstrap). Decisión de política —
+    // configurable por entorno; ajustable luego por un admin del hub.
+    let default_role = std::env::var("HUB_DEFAULT_ROLE").unwrap_or_else(|_| "admin".into());
+    let rt = st.runtime.lock().await;
+    match rt.get_or_link_cloud_user(&cloud_user_id, &name, &default_role).await {
+        Ok(user) => mint_session(&rt, user).await,
+        Err(e) => err_response(e),
+    }
+}
+
+/// Cierra la sesión del header `X-Hub-Session` (logout).
+async fn auth_logout(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    if let Some(token) = auth::session_token(&headers) {
+        let rt = st.runtime.lock().await;
+        let _ = rt.delete_session(&token).await;
+    }
+    Json(json!({ "ok": true })).into_response()
+}
+
+/// Abre una sesión para `user` y devuelve `{ok, token, user}`.
+async fn mint_session(rt: &erplora_runtime::Runtime, user: erplora_runtime::identity::HubUser) -> Response {
+    match rt.create_session(&user.id, erplora_runtime::identity::DEFAULT_SESSION_TTL_SECS).await {
+        Ok(token) => Json(json!({ "ok": true, "token": token, "user": user })).into_response(),
         Err(e) => err_response(e),
     }
 }

@@ -27,14 +27,15 @@ impl EventSink for BroadcastSink {
     }
 }
 
-/// Modo de autenticación del server (ARQUITECTURA.md §2.3):
+/// Modo de autenticación del server (ARQUITECTURA.md §2.3/§2.9):
 ///  - `Dev`: confía en cabeceras `X-User-Id`/`X-Permissions` (desarrollo local, sin Cloud).
-///  - `Jwt`: **verifica** el access JWT del usuario (RS256) contra la clave pública del Cloud;
-///    `user_id` sale del token (no del header). Se activa con `HUB_AUTH=jwt`.
+///  - `Session`: identidad LOCAL real. El login (PIN o JWT cloud) abre una **sesión server-side**
+///    (`hub_session`); cada petición lleva `X-Hub-Session` y el runtime resuelve el `hub_user` y
+///    sus permisos por rol. Se activa con `HUB_AUTH=session`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AuthMode {
     Dev,
-    Jwt,
+    Session,
 }
 
 /// Configuración de despliegue del hub (ARQUITECTURA.md §2.3; decisiones del humano):
@@ -65,7 +66,7 @@ impl HubConfig {
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("erplora-modules"));
         let auth_mode = match std::env::var("HUB_AUTH").as_deref() {
-            Ok("jwt") => AuthMode::Jwt,
+            Ok("session") => AuthMode::Session,
             _ => AuthMode::Dev,
         };
         // Inyección directa de la clave (PEM) por entorno; si no, `main` la trae del Cloud.

@@ -40,16 +40,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Configuración de despliegue + resolución de auth. En modo `HUB_AUTH=jwt` se exige la clave
-    // pública del Cloud (env `HUB_JWT_PUBLIC_KEY` o fetch de `/api/v1/auth/public-key/`); si no se
-    // puede obtener, se ABORTA el arranque (no se degrada en silencio a confiar en cabeceras).
+    // Configuración de despliegue + resolución de auth. En modo `HUB_AUTH=session` el login local
+    // por PIN no necesita Cloud; la clave pública RSA solo hace falta para el **login cloud**
+    // (`/api/auth/cloud`). Se intenta obtener (env `HUB_JWT_PUBLIC_KEY` o `/api/v1/auth/public-key/`)
+    // y, si no se logra, se sigue arrancando: el login cloud quedará no disponible (PIN sí funciona).
     let mut config = HubConfig::from_env();
-    if config.auth_mode == AuthMode::Jwt && config.jwt_public_key.is_none() {
+    if config.auth_mode == AuthMode::Session && config.jwt_public_key.is_none() {
         config.jwt_public_key = fetch_jwt_public_key(&config.cloud_base_url).await;
         if config.jwt_public_key.is_none() {
-            return Err("HUB_AUTH=jwt pero no se pudo obtener la clave pública del Cloud \
-                        (define HUB_JWT_PUBLIC_KEY o asegura el acceso a /api/v1/auth/public-key/)"
-                .into());
+            eprintln!("auth: sin clave pública del Cloud → login cloud no disponible (PIN sí)");
         }
     }
     eprintln!("auth: modo {:?}", config.auth_mode);
