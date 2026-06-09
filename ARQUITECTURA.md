@@ -546,60 +546,39 @@ Crate `runtime` (submódulos): `manifest`, `loader`, `registry`, `installer`, `m
 11. Emitir module.installed → el frontend refresca el menú
 ```
 
-### 4.1 Entrega de eventos — Outbox transaccional (decisión 2026-06-09)
+### 4.1 Entrega y fiabilidad de eventos — Outbox transaccional (decisión 2026-06-09, implementado)
 
-El runtime entrega eventos a sus listeners con garantía **at-least-once**, **100% asíncrona**
-(no inline). Tablas de sistema del runtime: `_event_outbox` y `_event_delivery` (las crea el
-runtime, no un módulo).
+**Problema (estado anterior):** los listeners de un evento corrían *después* del commit del command
+emisor y **fuera** de su transacción (dispatch recursivo y síncrono). Sin outbox, retry ni
+dead-letter: si un listener fallaba tras commitear (p.ej. `invoice.create_from_sale`), quedaba una
+**venta sin factura** y nadie lo reintentaba.
 
-1. **Escritura atómica**: al ejecutar un command, sus eventos `emit` (y, en Tier 2, los que
-   devuelve el handler) se **INSERTAN en `_event_outbox` dentro de la MISMA transacción** que el
-   SQL del command. Si el command commitea, el evento existe sí o sí; si revierte, no hay evento.
-   Por eso los commands `transaction:false` también se envuelven en transacción.
-2. **Relay** (background en `erplora-server`, poll ~1s + arranque): lee filas `pending` vencidas,
-   resuelve los listeners **actuales** de módulos activos y ejecuta cada uno con `execute_command`.
-   Los eventos en cascada que emitan esos listeners → nuevas filas de outbox.
-3. **Idempotencia a nivel runtime** vía `_event_delivery (event_id, listener_command)`: el marcador
-   de entrega se inserta en la **misma transacción** que los efectos del listener → **exactly-once**
-   aunque el proceso se reinicie. Los módulos **no** necesitan ser idempotentes.
-4. Fallo de un listener → `attempts++`, backoff exponencial; tras `MAX_ATTEMPTS` → `dead`
-   (dead-letter). Guarda de profundidad de cascada (`MAX_EVENT_DEPTH`).
-5. La notificación al **WS** (`EventSink`) es **inline tras commit** pero **efímera** (solo UI en
-   vivo); la entrega DURABLE a listeners es la del outbox.
+**Decisión (implementada + verificada):** el bus de eventos pasa a **transactional outbox**, con
+entrega **100% asíncrona por relay** y garantía **at-least-once**. Tablas de sistema del runtime
+(SQLite + Postgres, las crea el runtime, no un módulo): `_event_outbox` y `_event_delivery`.
 
-> Esto **sustituye** al antiguo dispatch síncrono recursivo (listeners tras commit, sin retry).
-> Código: `crates/runtime/src/outbox.rs`, `commands.rs` (`execute_at`/`execute_wasm` + `extra_ops`),
-> `events.rs` (`notify_sink`), relay en `crates/server/src/main.rs`.
+1. **Escritura atómica.** Al ejecutar un command, sus eventos `emit` (y, en Tier 2, los que devuelve
+   el handler) se **INSERTAN en `_event_outbox` dentro de la MISMA transacción** que el SQL del
+   command. Si commitea, el evento existe sí o sí; si revierte, no hay evento. Los commands
+   `transaction:false` pasan a **envolverse en transacción**. El `dispatch` inline tras el commit se
+   retira.
+2. **Relay.** Tarea en background (`erplora-server`, poll ~1s + arranque): lee filas `pending`
+   vencidas (FIFO), resuelve los listeners **actuales** de módulos activos (`registry.listeners_for`)
+   y ejecuta cada uno. Éxito → `delivered`; fallo → `attempts++` + backoff exponencial en
+   `next_attempt_at`; tras `MAX_ATTEMPTS` → `dead` (dead-letter). Los eventos en cascada que emitan
+   los listeners → nuevas filas de outbox; guarda de profundidad `MAX_EVENT_DEPTH`.
+3. **Idempotencia (exactly-once).** Un listener puede reintentarse; el marcador
+   **`_event_delivery (event_id, listener_command)`** se inserta en la **misma transacción** que los
+   efectos del listener → nunca corre dos veces aunque el proceso reinicie. Los handlers de módulo
+   **no cambian** (idempotencia a nivel runtime).
+4. **WS inline efímero.** La notificación al `EventSink` (push a la UI, §7.7) se mantiene inline tras
+   commit pero efímera; la entrega DURABLE a listeners es la del outbox.
 
-### 4.1 Entrega y fiabilidad de eventos — transactional outbox (decidido 2026-06-09)
-
-**Problema (estado anterior):** los listeners de un evento corrían *después* del commit del
-command emisor y **fuera** de su transacción (`commands::execute_at` → `events::dispatch` →
-`execute_at` del listener, recursivo y síncrono). Sin outbox, retry ni dead-letter: si un
-listener fallaba tras commitear (p.ej. `invoice.create_from_sale`), quedaba una **venta sin
-factura** y nadie lo reintentaba.
-
-**Decisión:** el bus de eventos pasa a **transactional outbox** con entrega **100% asíncrona por
-relay** y garantía **at-least-once**:
-
-1. **Escritura atómica.** Al ejecutar un command, sus eventos se **insertan en `_event_outbox`
-   DENTRO de la misma transacción** que el SQL del command (Tier 2 WASM: junto a `tx_ops`;
-   Tier 0/1: en la transacción del command — los `transaction:false` pasan a envolverse). Si el
-   command commitea, el evento queda persistido sí o sí; si revierte, no hay evento. El
-   `dispatch` inline tras el commit se retira.
-2. **Relay.** Una tarea en background (en `crates/server`) lee `_event_outbox`
-   (`status='pending' AND next_attempt_at<=now`, FIFO), resuelve los listeners actuales
-   (`registry.listeners_for`) y ejecuta cada uno. Éxito → `delivered`; fallo → `attempts++` +
-   backoff exponencial en `next_attempt_at`; tras N intentos → `dead` (dead-letter).
-3. **Idempotencia (at-least-once).** Un listener puede ejecutarse >1 vez (reintento/reinicio). Se
-   garantiza con una tabla **`_event_delivery (event_id, listener_command)`** en el runtime: el
-   relay registra cada entrega y **salta duplicados**. Los handlers de módulo **no cambian**.
-4. **WS sigue inline.** La notificación al `EventSink` (push a la UI, §7.7) se mantiene inline y
-   efímera; la entrega DURABLE a listeners es la del outbox.
-
-Tablas de sistema del runtime (SQLite + Postgres): `_event_outbox` (id, hub_id, event_name,
-payload, depth, status, attempts, next_attempt_at, last_error, created_at, delivered_at) y
-`_event_delivery` (event_id, listener_command, delivered_at). **Implementación Rust pendiente.**
+> Sustituye al antiguo dispatch síncrono recursivo. Código: `crates/runtime/src/outbox.rs`,
+> `commands.rs` (`execute_at`/`execute_wasm` + `extra_ops`), `events.rs` (`notify_sink`), relay en
+> `crates/server/src/main.rs`. **Verificado:** test de runtime (emisor NO corre listener inline →
+> `pending` → relay entrega 1 vez → idempotente) + E2E vivo HTTP (command emite → `_event_outbox`
+> `pending` → relay → `delivered`).
 
 ---
 
