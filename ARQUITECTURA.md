@@ -465,14 +465,18 @@ vendor portal como el resto de la clasificación, §2.4):
 2. El hub **cachea** token + clave pública y los **verifica OFFLINE**
    (`crates/cloud-client/src/entitlement.rs::verify_entitlement`), de modo que opera sin red dentro de la
    ventana de gracia (coherente con el offline-first, §2.8).
-3. Sin token válido ni cacheado → **pantalla de login/activación**: el shell arranca pero **no monta el
-   runtime de negocio**. Con token válido → monta **solo** los módulos del entitlement.
+3. Sin token válido ni cacheado → **pantalla de login/activación** (`apps/web/src/views/ActivationPage.vue`):
+   el shell arranca pero **no monta el runtime de negocio**. Con token válido → monta **solo** los
+   módulos del entitlement. El cableado del frontend vive en `apps/web/src/lib/entitlement.ts`
+   (resuelve en boot/login: comando Tauri si lo hay, si no el endpoint Cloud), `lib/module-loader.ts`
+   (filtra los instalados a los entitled) y el guard del `router`.
 4. Glue Tauri: `apps/tauri/src-tauri` (comando `validate_entitlement`). *(El crate aún no está en el
    workspace Cargo: requiere toolchain Tauri v2 + el `dist` de `apps/web`.)*
 
 **Estado**: Fase 1 implementada y verificada (campo `tier` + migración + backfill, servicio/endpoint de
 entitlement firmado, gating por `deployment_mode`, `entitlement()` + verificación offline en
-`cloud-client`, scaffold de `apps/tauri`).
+`cloud-client`, scaffold de `apps/tauri`, y **gate cableado en el frontend** `apps/web` — boot/login →
+filtro de módulos + pantalla de activación; typecheck + build verdes).
 
 **Fase 2 (diferida — decisión explícita: no complicar la Fase 1)**:
 - **Compra in-app de módulos `standard`** desde la app Tauri (deep-link al checkout Stripe del Cloud)
@@ -1229,6 +1233,13 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 > Lo que **queda** es implementar los handlers **Rust→WASM Tier 2**
 > (documentados en los `WASM-TODO.md` por módulo) y la **reubicación del Bridge** (§2.7).
 
+- **Módulo `warehouse` (WMS avanzado) — a futuro (decisión 2026-06-09).** El **stock básico** vive
+  y se queda **dentro de `inventory`** (producto y existencias son un solo agregado: `product.stock`
+  + `inventory.stock.*`). La **gestión avanzada de almacén** (multi-almacén/ubicaciones,
+  transferencias, lotes/caducidad, números de serie, bins, recuentos cíclicos, valoración FIFO/medio)
+  irá en un **módulo `warehouse` SEPARADO que DEPENDE de `inventory`**: llama sus contratos públicos
+  (`inventory.products.*`) y escucha sus eventos, **nunca** toca el `product.stock` privado. No se
+  implementa ahora; se construye cuando aparezca demanda real (manufactura/distribución).
 - **Reubicación del Bridge (§2.7)**: el `bridge/` **no** se retira — se convierte en componente de
   hardware compartido (**sidecar** en Tauri | **standalone opcional** para `cloud + web-PWA`).
   Migrar su lógica (registro/watchdog/cola/routing de impresión) al shell Tauri y empaquetarla
