@@ -198,8 +198,8 @@ tools). Igual que la política actual con `module.py`.
 **Transportes de impresora** — ✅ **Decidido: SOLO RED (TCP/IP ESC/POS, puerto 9100) — 100% LAN.**
 USB y Bluetooth **se descartan**: exigen drivers + mantenimiento por dispositivo/SO que no compensa.
 La red es además el caso más simple (un socket TCP, trivial en Rust) y el más estable; en `single +
-Tauri` el runtime abre el socket al puerto 9100 directamente. El Bridge actual
-(`bridge/…/protocol.py`) soporta USB/BT, pero **hub no los expone**. Consecuencia para `cloud +
+Tauri` el runtime abre el socket al puerto 9100 directamente. El Bridge es **red-only por
+construcción**: el crate `crates/peripherals` no incluye USB ni Bluetooth. Consecuencia para `cloud +
 web-PWA`: como el navegador no abre TCP crudo, **imprimir requiere el Bridge** (sidecar Tauri o
 standalone) o una impresora **ePOS-HTTP**; no hay atajo WebUSB/WebBluetooth porque el hardware es
 de red.
@@ -222,6 +222,53 @@ SO/navegador como teclado.
 > El escenario **`cloud + web-PWA` + hardware físico** ya **no** queda fuera de alcance: se cubre
 > con el **Bridge standalone opcional**. El POS en navegador es un combo de primera clase (§1),
 > no una excepción.
+
+#### 2.7.1 Estado de implementación (2026-06-09) — el Bridge ya es **Rust** (fuente de verdad)
+
+> ✅ **Decisiones finales** (columna del humano: lenguaje, estructura, naming, empaquetado, CI).
+> Esta sub-sección es lo que debe consultar cualquiera para saber cómo funciona el Bridge hoy.
+
+- **Lenguaje y código único.** El Bridge se reescribió de Python/Kotlin/Ionic a **Rust**. La lógica
+  vive una sola vez en el crate compartido **`hub/crates/peripherals`** (red-only, ESC/POS sobre
+  TCP:9100), con módulos `protocol · discovery · escpos · drawer · queue · registry`. *Por qué Rust:*
+  la decisión **red-only** elimina lo único que hacía fuertes a Python/Kotlin (drivers USB/serial/HID);
+  con solo red, el Bridge es un socket TCP + un server WS, trivial en Rust, y se comparte con el shell
+  Tauri.
+- **Dos entregas, un crate:**
+  - **Standalone** `hub/apps/bridge` — binario **Axum** que expone `GET /status` + `WS /ws` en
+    `localhost:12321`. Es el del combo **`cloud + web-PWA`**.
+  - **Sidecar Tauri** `hub/apps/tauri` — registrará handlers **`invoke`** que llaman al mismo crate
+    (sin WS, sin proceso aparte). Es el de los combos **Tauri**.
+- **Contrato WS estable.** Mismo JSON que consume el frontend (`bridge.js`/cliente del Hub). Se
+  **dejan de exponer** USB/BT y el escáner (`barcode`/`toggle_keyboard`): el escáner HID lo maneja el
+  SO/navegador como teclado. `printer_id` es siempre `network:{ip}:{port}`.
+- **Android.** App **Kotlin fina** (foreground service) en `bridge/ERPlora-Bridge-android`, recortada
+  a red-only. Un servicio de fondo en Android exige JVM; **comparte el protocolo JSON, no el código**.
+- **Borrados (Fase 1, mínimo ruido):** `bridge/ERPlora-Bridge-desktop` (Python) y `bridge/ERPloraKiosk`
+  (Ionic/Capacitor — redundante con PWA + Tauri). **Sin Python, sin Ionic/Capacitor.**
+- **Plataformas distribuidas:** **Windows + Linux + Android**. **macOS = solo desarrollo local**
+  (`cargo build`), no se distribuye (se quitó de la web `/bridge/` del Cloud).
+- **Empaquetado (v1):** **binarios sueltos** (`erplora-bridge.exe`, `erplora-bridge-linux`). Instalador
+  (.msi/.deb) + **bandeja del sistema** + **autostart** + **firma de código** quedan como pulido
+  posterior.
+- **CI / release (GitHub Actions):**
+  - Desktop → `hub/.github/workflows/bridge-release.yml`: matrix Windows+Linux. Push a `main`/`develop`
+    publica en `s3://erplora-downloads/bridge/latest/`; tag `v*` publica en `bridge/v{tag}/` y refresca
+    `latest/`. Auth AWS por **OIDC** (rol `github-actions-deploy`). **Acción pendiente (infra):** ampliar
+    el *trust policy* del rol a `repo:ERPlora/hub:*` (vive en `aws/`, Terraform) — hasta entonces el job
+    `upload-s3` falla.
+  - Android → su propio repo (`build.yml`): APK/AAB **firmado** → mismo bucket, con claves AWS estáticas.
+- **Descarga desde el Cloud (siempre la última):** `GET /bridge/download/<platform>/`
+  (`cloud/apps/public/bridge`) redirige a `bridge/latest/<fichero>` en S3. El CI rellena ese `latest/`.
+- **Detección en el Hub (PWA):** `hub/apps/web/src/lib/bridge-client.ts` — `detectBridge()` sondea
+  `localhost:12321/status`; `bridgeDownloadUrl()` apunta al Cloud. `SystemPage.vue` muestra estado real
+  (Conectado/Desconectado + versión) y los botones de descarga (Windows/Linux/Android).
+- **Mixed-content:** una PWA `https://` puede llamar a `http://localhost:12321` porque los navegadores
+  tratan `localhost`/`127.0.0.1` como **origen seguro** (exento del bloqueo). **iOS/Safari queda fuera
+  de alcance** (no se soporta el Bridge ahí; en iOS solo Tauri o impresora ePOS-HTTP).
+- **Pendiente:** trust OIDC a `ERPlora/hub`; instalador+bandeja+autostart+firma; **transporte de
+  hardware en el `module-sdk`** para que los módulos impriman/abran cajón desde la UI; multi-terminal
+  **primario↔satélite** (§2.7b).
 
 ### 2.7b Hubs primario y satélites (multi-terminal de un mismo hub)
 
