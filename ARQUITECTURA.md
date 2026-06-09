@@ -53,7 +53,7 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 4. **Login de usuario real contra Cloud** — `POST /api/v1/auth/login/` + `GET /api/v1/auth/me/`;
    tokens en `localStorage` (`erplora.access`/`erplora.refresh`); **interceptor refresh-en-401** con
    rotación de ambos tokens y un reintento (`POST /api/v1/auth/refresh/`); `X-Hub-Id` en todas. El
-   **fallback demo** queda SOLO tras `VITE_DEMO=1` (producción falla duro). Contrato en §2.3.
+   **fallback demo** queda SOLO tras `VITE_DEMO=1` (producción falla duro). Contrato en §2.3. **Server-side:** el runtime verifica el JWT (RS256 + exp) contra la clave pública del Cloud (`HUB_AUTH=jwt`; `user_id` del token, `hub_id` del despliegue; sin/mal token → 401). **PENDIENTE (tu columna):** el JWT lleva solo identidad, **no permisos** → el *scoping fino de permisos por usuario* en el hub (claim nuevo, modelo de roles local, o consulta a Cloud) está sin decidir; hoy el usuario autenticado recibe `*`.
 
 5. **Instalación de módulos por el marketplace (API real de Cloud)** — flujo: `GET
    /api/v1/marketplace/modules/{id}/versions/` (sha256) → `GET .../download/?version=` (zip binario) →
@@ -424,11 +424,13 @@ los entitlements para descargar módulos):
   `apps/auth/users/services.py::create_user`, reutilizando
   `organizations.services.lifecycle.create_organization`.)*
 - **Un hub por dispositivo**: cada instalación Tauri (desktop/Android) registra **su propio `hub_id`**
-  bajo la organización del usuario, por **identidad de dispositivo** (p. ej. cabecera `X-Device-Id`
-  persistida en el dispositivo). Dos máquinas del mismo usuario = **dos hubs** que **comparten la BD de
-  la org**. Esto habilita el multi-terminal primary/satélite (§2.7b) de forma natural. *(Cambia el
-  get-or-create por `org + deployment_mode` actual, que colapsaba todos los dispositivos en un único
-  hub.)*
+  bajo la organización del usuario, por **identidad de dispositivo**. El shell Tauri genera y persiste
+  un id estable por instalación en `app_data_dir` y lo expone por el comando `device_context`
+  (`apps/tauri/src-tauri/src/lib.rs`); el frontend lo lee (`apps/web/src/lib/device.ts`) y lo manda en
+  el login como `X-Client-Type` + **`X-Device-Id`**. El Cloud hace get-or-create por `(org, device_id)`
+  (`_register_hub`), con fallback legacy por `(org, deployment_mode)` para clientes sin device-id. Dos
+  máquinas del mismo usuario = **dos hubs** que **comparten la BD de la org** → habilita el
+  multi-terminal primary/satélite (§2.7b) de forma natural.
 - **Requisito único para usar el hub local = tener cuenta** (la app no se compra, §2.10).
 
 ### 2.10 App Tauri **gratuita** y entitlement por tiers de módulo (decisión 2026-06-09)
