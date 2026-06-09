@@ -15,39 +15,222 @@
 //!   POST /api/command {name, payload}
 //!   GET  /ws                                 stream de eventos (solo push)
 
+use axum::body::Body;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
+pub mod assistant;
 pub mod auth;
-pub mod state;
+pub mod ingest;
+pub mod install;
 pub mod session;
+pub mod state;
 
-pub use state::{AppState, WsEvent};
+pub use state::{AppState, HubConfig, WsEvent};
 
 /// Construye el router con todas las rutas montadas sobre `state`.
 pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
+        .route("/api/hub/context", get(hub_context))
         .route("/api/navigation", get(navigation))
         .route("/api/modules", get(list_modules))
         .route("/api/modules/install", post(install_module))
+        .route("/api/modules/request-install", post(request_install))
         .route("/api/modules/:id/activate", post(activate_module))
         .route("/api/modules/:id/deactivate", post(deactivate_module))
         .route("/api/modules/:id/uninstall", post(uninstall_module))
         .route("/api/query", post(query))
         .route("/api/command", post(command))
+        .route("/api/assistant/chat/stream", post(assistant_chat_stream))
         .route("/ws", get(ws_upgrade))
         .with_state(state)
 }
 
 async fn healthz() -> &'static str {
     "ok"
+}
+
+/// GET /api/hub/context — el `hub_id` inyectado por el despliegue (env `HUB_ID`) + el usuario
+/// activo (hoy `null`; el frontend resuelve la sesión por separado). Contrato del frontend.
+async fn hub_context(State(st): State<AppState>) -> Response {
+    Json(json!({ "hub_id": st.config.hub_id, "user": Value::Null })).into_response()
+}
+
+#[derive(Deserialize)]
+struct RequestInstallReq {
+    module_id: String,
+    #[serde(default)]
+    version: String,
+}
+
+/// POST /api/modules/request-install — flujo real Cloud→descarga→runtime (ARQUITECTURA.md §2.2).
+/// Auth = JWT del usuario + `X-Hub-Id` de las cabeceras. Tras instalar, emite el evento
+/// `module.installed` por `/ws` y prepara la ingestión de embeddings (vía Cloud, pendiente §9.3).
+async fn request_install(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RequestInstallReq>,
+) -> Response {
+    let Some(auth) = auth::user_auth(&headers, &st.config.hub_id) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "falta Authorization: Bearer" })),
+        )
+            .into_response();
+    };
+
+    let mut rt = st.runtime.lock().await;
+    let result = install::install_from_cloud(
+        &st.http,
+        &st.config.cloud_base_url,
+        &st.config.module_cache,
+        &auth,
+        &mut rt,
+        &req.module_id,
+        &req.version,
+    )
+    .await;
+
+    match result {
+        Ok(installed) => {
+            // Ingestión de embeddings (§9): recoge el texto agéntico del módulo. La obtención
+            // del vector va vía el proxy del Cloud (pendiente de cableado, §9.3) — aquí solo se
+            // recolecta y se registra; NO se llama a ningún proveedor de embeddings localmente.
+            let chunks = ingest::collect_chunks(rt.registry(), &installed.module_id);
+            if !chunks.is_empty() {
+                tracing::info!(
+                    module_id = %installed.module_id,
+                    chunks = chunks.len(),
+                    "ingestión de embeddings recolectada (wired to Cloud, pending)"
+                );
+            }
+            drop(rt);
+
+            // Evento WS con la forma exacta del contrato del frontend.
+            st.broadcast(json!({ "type": "module.installed", "module_id": installed.module_id }));
+
+            Json(json!({
+                "ok": true,
+                "module_id": installed.module_id,
+                "version": installed.version,
+                "status": "installed",
+            }))
+            .into_response()
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "ok": false, "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+/// POST /api/assistant/chat/stream — proxy SSE hacia el Cloud (ARQUITECTURA.md §9.3).
+/// Reenvía el `Authorization: Bearer` + `X-Hub-Id` entrantes; ensambla las tools permitidas
+/// (§9.2) y traduce el stream del Cloud al contrato del frontend (`token`/`done`).
+async fn assistant_chat_stream(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(frontend): Json<Value>,
+) -> Response {
+    let Some(auth) = auth::user_auth(&headers, &st.config.hub_id) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "falta Authorization: Bearer" })),
+        )
+            .into_response();
+    };
+
+    // Ensambla las tools permitidas para este usuario (gate = mismas que la UI).
+    let tools = {
+        let rt = st.runtime.lock().await;
+        let ctx = auth::context_from_headers(&headers);
+        assistant::assemble_tools(rt.registry(), &ctx)
+    };
+    let body = assistant::build_cloud_body(&frontend, tools);
+
+    // Construye la petición al Cloud (POST, Bearer + X-Hub-Id) y abre el stream.
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let req = cloud.assistant_chat_stream(&auth);
+    let mut r = st.http.post(&req.url).json(&body);
+    for (k, v) in &req.headers {
+        r = r.header(*k, v);
+    }
+
+    let upstream = match r.send().await.and_then(|resp| resp.error_for_status()) {
+        Ok(resp) => resp,
+        Err(e) => {
+            // Devuelve un único frame de error en el propio stream SSE.
+            let frame = assistant::sse(&json!({ "type": "error", "error": e.to_string() }));
+            return sse_response(Body::from(frame));
+        }
+    };
+
+    // Re-streamea: parte el cuerpo del Cloud en líneas SSE y las traduce al contrato frontend.
+    // Un buffer mantiene líneas partidas entre chunks de red.
+    let mut buf = String::new();
+    let mut byte_stream = upstream.bytes_stream();
+
+    let translated = futures_util::stream::poll_fn(move |cx| {
+        use std::task::Poll;
+        loop {
+            // Vacía líneas completas ya bufferizadas.
+            if let Some(idx) = buf.find('\n') {
+                let line: String = buf.drain(..=idx).collect();
+                let line = line.trim_end_matches(['\r', '\n']);
+                if let Some(frame) = assistant::translate_sse_line(line) {
+                    return Poll::Ready(Some(Ok::<_, std::io::Error>(bytes_from(frame))));
+                }
+                continue;
+            }
+            // Pide más bytes al Cloud.
+            match byte_stream.poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok(chunk))) => {
+                    buf.push_str(&String::from_utf8_lossy(&chunk));
+                }
+                Poll::Ready(Some(Err(e))) => {
+                    let frame = assistant::sse(&json!({ "type": "error", "error": e.to_string() }));
+                    return Poll::Ready(Some(Ok(bytes_from(frame))));
+                }
+                Poll::Ready(None) => {
+                    // Fin del stream del Cloud: procesa cualquier resto + cierra.
+                    if !buf.is_empty() {
+                        let rest = std::mem::take(&mut buf);
+                        if let Some(frame) = assistant::translate_sse_line(rest.trim()) {
+                            return Poll::Ready(Some(Ok(bytes_from(frame))));
+                        }
+                    }
+                    return Poll::Ready(None);
+                }
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+    });
+
+    sse_response(Body::from_stream(translated))
+}
+
+fn bytes_from(s: String) -> axum::body::Bytes {
+    axum::body::Bytes::from(s.into_bytes())
+}
+
+/// Envuelve un cuerpo como respuesta SSE (`text/event-stream`, sin buffering del proxy).
+fn sse_response(body: Body) -> Response {
+    Response::builder()
+        .header(header::CONTENT_TYPE, "text/event-stream")
+        .header(header::CACHE_CONTROL, "no-cache")
+        .header("X-Accel-Buffering", "no")
+        .body(body)
+        .unwrap()
+        .into_response()
 }
 
 #[derive(Deserialize)]

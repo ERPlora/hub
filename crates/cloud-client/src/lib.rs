@@ -85,13 +85,83 @@ impl CloudClient {
         self.get("/api/v1/marketplace/modules/", auth)
     }
 
-    /// Solicita la instalación/entitlement de un módulo → el Portal devuelve la URL S3 firmada
-    /// + sha256 (ese parseo es `InstallGrant`). §2.2.
+    /// **Flujo real de instalación, paso 1** — lista las versiones activas de un módulo.
+    /// `GET /api/v1/marketplace/modules/{module_id}/versions/` (verificado contra
+    /// `cloud/apps/public/modules/api_views.py::versions`). La respuesta es un array JSON
+    /// (`ModuleVersionSerializer`): `version`, `changelog`, `is_active`, `file_size_bytes`,
+    /// `created_at`. El `sha256` se parsea si el Cloud lo expone (ver `ModuleVersion`). §2.2.
+    pub fn versions(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
+        self.get(&format!("/api/v1/marketplace/modules/{module_id}/versions/"), auth)
+    }
+
+    /// **Flujo real de instalación, paso 2** — descarga el ZIP binario de una versión.
+    /// `GET /api/v1/marketplace/modules/{module_id}/download/?version={version}` (FileResponse,
+    /// verificado en `api_views.py::download`). §2.2.
+    pub fn download(&self, auth: &Auth, module_id: &str, version: &str) -> PreparedRequest {
+        self.get(
+            &format!("/api/v1/marketplace/modules/{module_id}/download/?version={version}"),
+            auth,
+        )
+    }
+
+    /// **Flujo real de instalación, paso 3** — registra la instalación en el Cloud.
+    /// `POST /api/v1/marketplace/modules/{module_id}/mark_installed/` con body
+    /// `{"version":"…"}` (verificado en `api_views.py::mark_installed`). §2.2.
+    pub fn mark_installed(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/marketplace/modules/{module_id}/mark_installed/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// Stream SSE del asistente vía el proxy del Cloud (§9.3 — el Hub nunca habla con el LLM
+    /// directamente). `POST /api/v1/hub/device/assistant/chat/stream/` con el JWT del usuario
+    /// + `X-Hub-Id`. El body lo construye el llamador (server) a partir del payload del frontend.
+    pub fn assistant_chat_stream(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/assistant/chat/stream/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **DEPRECADO** — apuntaba a un endpoint ficticio `…/versions/{version}/install/` que
+    /// **no existe** en el Cloud. Usa el flujo real [`CloudClient::versions`] +
+    /// [`CloudClient::download`] + [`CloudClient::mark_installed`]. Se mantiene solo para no
+    /// romper a `erplora-installer` (que lo migrará por separado).
+    #[deprecated(note = "endpoint ficticio; usar versions()/download()/mark_installed()")]
     pub fn request_install(&self, auth: &Auth, module_id: &str, version: &str) -> PreparedRequest {
         self.get(
             &format!("/api/v1/marketplace/modules/{module_id}/versions/{version}/install/"),
             auth,
         )
+    }
+}
+
+/// Una versión de módulo tal como la devuelve el endpoint `versions/` del Cloud
+/// (`ModuleVersionSerializer`). El `sha256` es **opcional**: el serializer público actual
+/// (`cloud/apps/public/modules/serializers.py`) **no** lo incluye todavía — vive en el modelo
+/// `ModuleVersion.sha256` y sí se expone en el endpoint de sync. Se parsea si está presente
+/// para verificar integridad; si falta, el llamador debe decidir su política (ver server).
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct ModuleVersion {
+    pub version: String,
+    #[serde(default)]
+    pub changelog: String,
+    #[serde(default)]
+    pub is_active: bool,
+    #[serde(default)]
+    pub file_size_bytes: u64,
+    /// SHA256 hex esperado del ZIP. `None` si el Cloud no lo expone en este endpoint.
+    #[serde(default)]
+    pub sha256: Option<String>,
+}
+
+impl ModuleVersion {
+    /// Parsea la lista JSON del endpoint `versions/`.
+    pub fn parse_list(json: &str) -> Result<Vec<ModuleVersion>, serde_json::Error> {
+        serde_json::from_str(json)
     }
 }
 
@@ -140,6 +210,46 @@ mod tests {
         assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/modules/");
         assert!(r.headers.contains(&("Authorization", "Bearer abc".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn real_install_flow_paths() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::UserJwt { hub_id: "h1".into(), access: "abc".into() };
+
+        let v = c.versions(&auth, "inventory");
+        assert_eq!(v.method, "GET");
+        assert_eq!(v.url, "https://erplora.com/api/v1/marketplace/modules/inventory/versions/");
+
+        let d = c.download(&auth, "inventory", "1.0.0");
+        assert_eq!(d.url, "https://erplora.com/api/v1/marketplace/modules/inventory/download/?version=1.0.0");
+
+        let m = c.mark_installed(&auth, "inventory");
+        assert_eq!(m.method, "POST");
+        assert_eq!(m.url, "https://erplora.com/api/v1/marketplace/modules/inventory/mark_installed/");
+
+        let s = c.assistant_chat_stream(&auth);
+        assert_eq!(s.method, "POST");
+        assert_eq!(s.url, "https://erplora.com/api/v1/hub/device/assistant/chat/stream/");
+        assert!(s.headers.contains(&("Authorization", "Bearer abc".to_string())));
+        assert!(s.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn module_version_list_parses_with_and_without_sha() {
+        // El serializer público actual NO trae sha256 → debe parsear igualmente (None).
+        let body = r#"[{"version":"1.0.0","changelog":"init","is_active":true,
+            "file_size_bytes":1234,"created_at":"2026-01-01T00:00:00Z"}]"#;
+        let vs = ModuleVersion::parse_list(body).unwrap();
+        assert_eq!(vs.len(), 1);
+        assert_eq!(vs[0].version, "1.0.0");
+        assert!(vs[0].is_active);
+        assert_eq!(vs[0].sha256, None);
+
+        // Si el Cloud lo expone, se captura.
+        let with_sha = r#"[{"version":"2.0.0","sha256":"deadbeef"}]"#;
+        let vs = ModuleVersion::parse_list(with_sha).unwrap();
+        assert_eq!(vs[0].sha256.as_deref(), Some("deadbeef"));
     }
 
     #[test]

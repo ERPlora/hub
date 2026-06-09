@@ -8,12 +8,22 @@ license.workspace = true
 [dependencies]
 erplora-runtime = { path = "../runtime" }
 erplora-db = { path = "../db" }
+# Cliente del Cloud Portal: construye las peticiones (versions/ download/ mark_installed/ +
+# assistant stream) y verifica SHA256. `source` aporta el verify+unzip seguro (anti zip-slip).
+cloud_client = { package = "erplora-cloud-client", path = "../cloud-client" }
+source = { package = "erplora-source", path = "../source" }
+# Vector store local (RAG): ingestión de descripciones `ai:`/`agent` al instalar un módulo.
+erplora-vector = { path = "../vector" }
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync"] }
 tower = "0.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+thiserror = "1"
 tracing = "0.1"
+# Cliente HTTP async (rustls): descarga de módulos + proxy SSE del asistente hacia el Cloud.
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+futures-util = "0.3"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

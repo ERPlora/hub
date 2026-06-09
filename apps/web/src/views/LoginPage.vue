@@ -291,6 +291,7 @@ import {
 } from 'ionicons/icons';
 import { setUser } from '../lib/session';
 import { cloudLogin, setTokens } from '../lib/cloud';
+import { config } from '../lib/config';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -416,7 +417,9 @@ async function submitEmail(): Promise<void> {
   } catch {
     // TODO: cablear cloud.ts login real cuando el Cloud esté accesible desde el hub.
     // Por ahora, en modo demo/sandbox usamos credenciales ficticias para probar el flujo.
-    if ((import.meta.env.VITE_DEMO ?? '1') === '1') {
+    // Fallback demo SOLO con VITE_DEMO=1 (config.demo). En prod (sin la flag) el login falla
+    // duro y mostramos el error real — nunca creamos una sesión ficticia.
+    if (config.demo) {
       setUser({ id: 'u1', name: emailVal.value || 'Demo Owner', email: emailVal.value || 'demo@erplora.com' });
       if (trust.value) {
         const userEntry: TrustedUser = {

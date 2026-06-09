@@ -14,6 +14,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@erplora/module-sdk": "workspace:*",
     "@erplora/module-types": "workspace:*",
     "@erplora/outfitkit": "workspace:*",
     "@ionic/core": "^8.8.8",

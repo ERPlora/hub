@@ -48,25 +48,94 @@ export function clearTokens(): void {
 export function getAccessToken(): string | null {
   try { return localStorage.getItem(TOKENS.access); } catch { return null; }
 }
+function getRefreshToken(): string | null {
+  try { return localStorage.getItem(TOKENS.refresh); } catch { return null; }
+}
+
+// --- Refresh-on-401 (rotación de tokens del usuario activo) ------------------
+// Contrato Cloud: POST /api/v1/auth/refresh/ {refresh} → {access, refresh}. En un 401
+// refrescamos UNA vez, rotamos AMBOS tokens y reintentamos la llamada original. Si el
+// refresh falla, limpiamos la sesión y mandamos a /login (sesión expirada de verdad).
+
+/** Hook de fin de sesión. El shell lo registra para limpiar estado reactivo + redirigir. */
+let onSessionExpired: (() => void) | null = null;
+export function setOnSessionExpired(fn: () => void): void {
+  onSessionExpired = fn;
+}
+
+/** Limpia tokens, avisa al shell y, por defecto, redirige a /login. */
+function expireSession(): void {
+  clearTokens();
+  if (onSessionExpired) {
+    onSessionExpired();
+  } else if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    window.location.assign('/login');
+  }
+}
+
+/** Evita refresh-storms: si ya hay un refresh en vuelo, las demás llamadas lo esperan. */
+let refreshing: Promise<string | null> | null = null;
+
+/** Intenta refrescar el access token. Rota AMBOS tokens. Devuelve el nuevo access o null. */
+async function refreshTokens(): Promise<string | null> {
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    const refresh = getRefreshToken();
+    if (!refresh) return null;
+    try {
+      const res = await fetch(`${config.cloudApiUrl}/api/v1/auth/refresh/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub' },
+        body: JSON.stringify({ refresh }),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { access?: string; refresh?: string };
+      if (!data.access) return null;
+      // Rota ambos: el access nuevo y el refresh nuevo (rotating refresh tokens del Cloud).
+      setTokens(data.access, data.refresh ?? refresh);
+      return data.access;
+    } catch {
+      return null;
+    }
+  })();
+  try {
+    return await refreshing;
+  } finally {
+    refreshing = null;
+  }
+}
+
+/** `fetch` con auth + reintento único en 401 vía refresh. Base de get/post. */
+async function authedFetch(path: string, init: RequestInit, timeoutMs = 8000): Promise<Response> {
+  const doFetch = (token: string | null): Promise<Response> => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const headers: Record<string, string> = {
+      'X-Client-Type': 'hub',
+      ...((init.headers as Record<string, string>) ?? {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(config.hubId ? { 'X-Hub-Id': config.hubId } : {}),
+    };
+    return fetch(`${config.cloudApiUrl}${path}`, { ...init, headers, signal: ctrl.signal })
+      .finally(() => clearTimeout(t));
+  };
+
+  let res = await doFetch(getAccessToken());
+  if (res.status === 401) {
+    const fresh = await refreshTokens();
+    if (fresh) {
+      res = await doFetch(fresh); // reintento único con el token rotado
+    } else {
+      expireSession();
+    }
+  }
+  return res;
+}
 
 async function get<T>(path: string, timeoutMs = 8000): Promise<T> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  const token = getAccessToken();
-  try {
-    const res = await fetch(`${config.cloudApiUrl}${path}`, {
-      headers: {
-        'X-Client-Type': 'hub',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(config.hubId ? { 'X-Hub-Id': config.hubId } : {}),
-      },
-      signal: ctrl.signal,
-    });
-    if (!res.ok) throw new Error(`cloud ${path} → ${res.status}`);
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(t);
-  }
+  const res = await authedFetch(path, { method: 'GET' }, timeoutMs);
+  if (!res.ok) throw new Error(`cloud ${path} → ${res.status}`);
+  return (await res.json()) as T;
 }
 
 // --- Billing: facturas y suscripciones (datos reales del Cloud) -------------

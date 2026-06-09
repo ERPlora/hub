@@ -18,7 +18,8 @@
     "types": ["vite/client"],
     "paths": {
       "@/*": ["./src/*"],
-      "@erplora/module-types": ["../../packages/module-types/src/index.ts"]
+      "@erplora/module-types": ["../../packages/module-types/src/index.ts"],
+      "@erplora/module-sdk": ["../../packages/module-sdk/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts", "env.d.ts"]

@@ -8,6 +8,9 @@ import {
 
 import App from './App.vue';
 import { router } from './router';
+import { getClient, clientInjectionKey, bootHubContext } from './lib/runtime';
+import { setOnSessionExpired } from './lib/cloud';
+import { logout } from './lib/session';
 
 // Los componentes de OutfitKit (ok-data-table, etc.) usan ion-icon POR NOMBRE ('pencil', 'trash',
 // 'chevron-back'…). En @ionic/vue los iconos por nombre hay que registrarlos con addIcons (no se
@@ -44,4 +47,20 @@ import './theme/global.css';
 
 const app = createApp(App).use(IonicVue).use(router);
 
-router.isReady().then(() => app.mount('#app'));
+// Cliente del runtime local (Axum) inyectado en todo el árbol (provide/inject). Las vistas y
+// ModuleView lo consumen para hablar con el runtime (query/command/eventos WS). lib/runtime.ts.
+app.provide(clientInjectionKey, getClient());
+
+// Si un refresh falla (sesión expirada de verdad), cloud.ts ya limpió los tokens; aquí
+// limpiamos el estado reactivo del usuario y mandamos a /login vía el router del shell.
+setOnSessionExpired(() => {
+  logout();
+  void router.replace('/login');
+});
+
+// Resuelve el hub_id desde el runtime (`GET /api/hub/context`) ANTES de montar, para que
+// X-Hub-Id esté disponible en la primera llamada. No bloquea si el runtime no responde
+// (deja el fallback VITE_HUB_ID). Decisión del humano (2): hub_id inyectado, sin picker.
+void bootHubContext().finally(() => {
+  router.isReady().then(() => app.mount('#app'));
+});

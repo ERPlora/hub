@@ -20,14 +20,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { inject, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonButtons, IonMenuButton, IonTitle, IonContent, IonSpinner,
 } from '@ionic/vue';
 import { loadMenu, loadComponent, type MenuEntry } from '../lib/module-loader';
+import { clientInjectionKey, getClient } from '../lib/runtime';
 
 const route = useRoute();
+// Cliente del runtime inyectado en el boot (provide en main.ts); fallback al singleton.
+const client = inject(clientInjectionKey) ?? getClient();
 const outlet = ref<HTMLDivElement | null>(null);
 const status = ref<'loading' | 'ready' | 'error'>('loading');
 const moduleId = ref<string>(String(route.params.moduleId ?? ''));
@@ -44,7 +47,11 @@ async function mount(id: string): Promise<void> {
     const tag = await loadComponent(entry);
     if (outlet.value) {
       outlet.value.innerHTML = '';
-      outlet.value.appendChild(document.createElement(tag));
+      const el = document.createElement(tag) as HTMLElement & { client?: unknown };
+      // Inyecta el cliente del runtime ANTES de append: el WC (Lit) lo recibe en su
+      // primer render y lo usa para query/command/eventos. WC → SDK → Rust (ARQUITECTURA.md §7.5).
+      el.client = client;
+      outlet.value.appendChild(el);
     }
     status.value = 'ready';
   } catch {

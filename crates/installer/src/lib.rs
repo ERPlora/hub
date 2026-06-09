@@ -102,6 +102,10 @@ impl<'a> Installer<'a> {
         version: &str,
     ) -> Result<InstallOutcome, InstallError> {
         // (1) Cloud: construir la petición de instalación (URL + cabeceras de Auth).
+        // NOTA: `request_install` está DEPRECADO (endpoint ficticio). El flujo real vive ahora
+        // en `erplora-server` (versions/ → download/ → mark_installed/). Este crate orquestador
+        // se migrará por separado; se silencia el warning para mantener el build sin avisos.
+        #[allow(deprecated)]
         let req: PreparedRequest = self.cloud.request_install(auth, module_id, version);
 
         // (2) Transporte: pedir el grant JSON al Portal.

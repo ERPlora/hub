@@ -18,6 +18,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
       '@erplora/module-types':
         specifier: workspace:*
         version: link:../../packages/module-types

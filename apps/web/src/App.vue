@@ -47,6 +47,25 @@
               </ion-item>
             </ion-menu-toggle>
           </ion-list>
+
+          <!-- Módulos instalados (dinámico): se rellena del runtime y se refresca al instalar. -->
+          <ion-list v-if="moduleNav.length" lines="none" class="nav-list">
+            <ion-list-header class="nav-section-label">Módulos</ion-list-header>
+            <ion-menu-toggle v-for="m in moduleNav" :key="m.path" :auto-hide="false">
+              <ion-item
+                button
+                class="nav-item"
+                :class="{ selected: isActive(m.path) }"
+                :router-link="m.path"
+                router-direction="root"
+                :detail="false"
+                :aria-current="isActive(m.path) ? 'page' : undefined"
+              >
+                <ion-icon slot="start" class="nav-icon" :icon="m.icon" />
+                <ion-label class="nav-label">{{ m.label }}</ion-label>
+              </ion-item>
+            </ion-menu-toggle>
+          </ion-list>
         </ion-content>
 
         <!-- Tarjeta de usuario: avatar de iniciales + nombre/email + logout. -->
@@ -76,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonApp, IonSplitPane, IonMenu, IonMenuToggle, IonHeader, IonToolbar, IonButtons,
@@ -89,6 +108,7 @@ import {
   chevronBackOutline, chevronForwardOutline,
 } from 'ionicons/icons';
 import { user, isAuthed, logout } from './lib/session';
+import { moduleNav, refreshModuleNav } from './lib/nav';
 
 interface NavItem { path: string; label: string; icon: string }
 interface NavSection { title: string; items: NavItem[] }
@@ -129,6 +149,15 @@ const initials = computed<string>(() => {
     return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
   }
   return (user.value?.email?.[0] ?? '?').toUpperCase();
+});
+
+// Carga la nav de módulos instalados al entrar con sesión (y al loguearse). MarketplacePage la
+// refresca también al recibir el evento WS `module.installed` (lib/nav.refreshModuleNav).
+onMounted(() => {
+  if (isAuthed.value) void refreshModuleNav();
+});
+watch(isAuthed, (authed) => {
+  if (authed) void refreshModuleNav();
 });
 
 function goHome(): void {

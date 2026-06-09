@@ -111,3 +111,52 @@ async fn unknown_query_is_404() {
     let resp = make_app().await.oneshot(post("/api/query", json!({ "name": "nope.q" }))).await.unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn hub_context_returns_configured_hub_id() {
+    use erplora_server::HubConfig;
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let rt = Runtime::new(Box::new(db));
+    let cfg = HubConfig {
+        hub_id: "hub-xyz".into(),
+        cloud_base_url: "https://erplora.com".into(),
+        module_cache: std::env::temp_dir().join("erplora-test-cache"),
+    };
+    let app = app(AppState::with_config(rt, cfg));
+    let resp = app
+        .oneshot(Request::builder().uri("/api/hub/context").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let j = body_json(resp).await;
+    assert_eq!(j["hub_id"], json!("hub-xyz"));
+    assert_eq!(j["user"], Value::Null);
+}
+
+#[tokio::test]
+async fn request_install_without_bearer_is_401() {
+    // Sin `Authorization: Bearer`, el flujo de instalación se rechaza antes de tocar el Cloud.
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/modules/request-install")
+        .header("content-type", "application/json")
+        .header("x-hub-id", "h1")
+        .body(Body::from(json!({ "module_id": "inventory", "version": "1.0.0" }).to_string()))
+        .unwrap();
+    let resp = make_app().await.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(body_json(resp).await["ok"], json!(false));
+}
+
+#[tokio::test]
+async fn assistant_stream_without_bearer_is_401() {
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/assistant/chat/stream")
+        .header("content-type", "application/json")
+        .header("x-hub-id", "h1")
+        .body(Body::from(json!({ "messages": [{ "role": "user", "content": "hi" }] }).to_string()))
+        .unwrap();
+    let resp = make_app().await.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}

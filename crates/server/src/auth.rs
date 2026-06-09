@@ -21,3 +21,21 @@ pub fn context_from_headers(headers: &HeaderMap) -> RequestContext {
 fn header(headers: &HeaderMap, name: &str) -> Option<String> {
     headers.get(name).and_then(|v| v.to_str().ok()).map(|s| s.to_string())
 }
+
+/// Extrae el token Bearer del header `Authorization`, si existe.
+pub fn bearer(headers: &HeaderMap) -> Option<String> {
+    header(headers, "authorization")
+        .and_then(|h| h.strip_prefix("Bearer ").map(|t| t.trim().to_string()))
+}
+
+/// `X-Hub-Id` de la petición, con fallback al `hub_id` de despliegue (config).
+pub fn hub_id(headers: &HeaderMap, fallback: &str) -> String {
+    header(headers, "x-hub-id").unwrap_or_else(|| fallback.to_string())
+}
+
+/// Construye la credencial `Auth::UserJwt` (Bearer + `X-Hub-Id`) para hablar con el Cloud
+/// en nombre del usuario activo (ARQUITECTURA.md §2.3). `None` si no hay JWT en la petición.
+pub fn user_auth(headers: &HeaderMap, fallback_hub: &str) -> Option<cloud_client::Auth> {
+    let access = bearer(headers)?;
+    Some(cloud_client::Auth::UserJwt { hub_id: hub_id(headers, fallback_hub), access })
+}
