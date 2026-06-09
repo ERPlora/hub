@@ -1,14 +1,62 @@
-//! Extracción del contexto de petición desde las cabeceras (ARQUITECTURA.md §2.3, §2.5, §2.9).
+//! Autenticación de la petición → `RequestContext` (ARQUITECTURA.md §2.3, §2.5, §2.9).
 //!
-//! Hoy: confía en `X-Hub-Id` + `X-User-Id` + `X-Permissions` que pone el frontend tras el
-//! login. Cuando exista `erplora-cloud-client`, aquí se validará el JWT del usuario / el
-//! `X-Hub-Token` de máquina contra el Cloud Portal. La autoridad de permisos ya es del runtime.
+//! Dos modos (`HubConfig::auth_mode`):
+//!  - **Dev**: confía en `X-Hub-Id` + `X-User-Id` + `X-Permissions` que pone el frontend tras el
+//!    login. Para desarrollo local sin Cloud.
+//!  - **Jwt**: **verifica** el access JWT del usuario (RS256) contra la clave pública del Cloud
+//!    (`cloud_client::verify_user_jwt`). El `user_id` sale del token verificado (no del header,
+//!    spoofable) y el `hub_id` del **config de despliegue** (1 contenedor = 1 hub, tampoco del
+//!    header). La autoridad final de permisos sigue siendo el runtime.
+//!
+//! ⚠️ **Permisos por usuario — decisión de arquitectura PENDIENTE (columna del humano).** El JWT de
+//! Cloud lleva solo identidad (`user_id` + `exp`), **no** permisos ni roles. Hasta decidir la fuente
+//! (claim nuevo en el token, modelo de roles local del hub, o consulta a Cloud), el modo Jwt concede
+//! `["*"]` al usuario autenticado — **igual que hoy** (Dev también concede `*`), sin regresión: lo
+//! que esta capa añade es **identidad verificada** + `hub_id` no spoofable, no el gate de permisos.
 use axum::http::HeaderMap;
 use erplora_runtime::RequestContext;
+
+use crate::state::{AuthMode, HubConfig};
 
 const DEFAULT_HUB: &str = "local";
 const DEFAULT_USER: &str = "local";
 
+/// Error de autenticación (modo Jwt). Se mapea a `401 Unauthorized` en los handlers.
+#[derive(Debug)]
+pub enum AuthError {
+    MissingToken,
+    Invalid(String),
+}
+
+impl AuthError {
+    pub fn message(&self) -> String {
+        match self {
+            AuthError::MissingToken => "falta Authorization: Bearer".to_string(),
+            AuthError::Invalid(e) => format!("token inválido: {e}"),
+        }
+    }
+}
+
+/// Autentica la petición y construye el `RequestContext` según el modo configurado.
+pub fn authenticate(headers: &HeaderMap, config: &HubConfig) -> Result<RequestContext, AuthError> {
+    match config.auth_mode {
+        AuthMode::Dev => Ok(context_from_headers(headers)),
+        AuthMode::Jwt => {
+            let pem = config
+                .jwt_public_key
+                .as_deref()
+                .ok_or_else(|| AuthError::Invalid("modo jwt sin clave pública configurada".into()))?;
+            let token = bearer(headers).ok_or(AuthError::MissingToken)?;
+            let claims = cloud_client::verify_user_jwt(&token, pem)
+                .map_err(|e| AuthError::Invalid(e.to_string()))?;
+            // Identidad verificada del token; hub_id del despliegue (no del header). Permisos
+            // diferidos a `*` (ver nota del módulo) — la decisión de scoping es del humano.
+            Ok(RequestContext::new(config.hub_id.clone(), claims.user_id_str(), vec!["*".to_string()]))
+        }
+    }
+}
+
+/// Modo Dev: confía en las cabeceras que pone el frontend (sin verificación). Solo desarrollo.
 pub fn context_from_headers(headers: &HeaderMap) -> RequestContext {
     let hub = header(headers, "x-hub-id").unwrap_or_else(|| DEFAULT_HUB.to_string());
     let user = header(headers, "x-user-id").unwrap_or_else(|| DEFAULT_USER.to_string());

@@ -33,7 +33,7 @@ pub mod install;
 pub mod session;
 pub mod state;
 
-pub use state::{AppState, HubConfig, WsEvent};
+pub use state::{AppState, AuthMode, HubConfig, WsEvent};
 
 /// Construye el router con todas las rutas montadas sobre `state`.
 pub fn app(state: AppState) -> Router {
@@ -148,11 +148,15 @@ async fn assistant_chat_stream(
         )
             .into_response();
     };
+    // Verifica la identidad (en modo Jwt valida la firma del token; en Dev confía en cabeceras).
+    let ctx = match auth::authenticate(&headers, &st.config) {
+        Ok(c) => c,
+        Err(e) => return unauthorized(e),
+    };
 
     // Ensambla las tools permitidas para este usuario (gate = mismas que la UI).
     let tools = {
         let rt = st.runtime.lock().await;
-        let ctx = auth::context_from_headers(&headers);
         assistant::assemble_tools(rt.registry(), &ctx)
     };
     let body = assistant::build_cloud_body(&frontend, tools);
@@ -265,6 +269,15 @@ fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     (status, Json(body)).into_response()
 }
 
+/// `401` uniforme para fallos de autenticación (modo Jwt: token ausente/ inválido).
+fn unauthorized(e: auth::AuthError) -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({ "ok": false, "error": e.message() })),
+    )
+        .into_response()
+}
+
 async fn navigation(State(st): State<AppState>) -> Response {
     let rt = st.runtime.lock().await;
     let items: Vec<Value> = rt
@@ -318,7 +331,10 @@ async fn uninstall_module(State(st): State<AppState>, Path(id): Path<String>) ->
 }
 
 async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<QueryReq>) -> Response {
-    let ctx = auth::context_from_headers(&headers);
+    let ctx = match auth::authenticate(&headers, &st.config) {
+        Ok(c) => c,
+        Err(e) => return unauthorized(e),
+    };
     let rt = st.runtime.lock().await;
     // Queries de lista (con bloque `list`) devuelven `{rows,total,limit,offset}` para el pager;
     // el resto devuelve el array de filas tal cual (compat con get/stats/settings).
@@ -336,7 +352,10 @@ async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Q
 }
 
 async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<CommandReq>) -> Response {
-    let ctx = auth::context_from_headers(&headers);
+    let ctx = match auth::authenticate(&headers, &st.config) {
+        Ok(c) => c,
+        Err(e) => return unauthorized(e),
+    };
     let rt = st.runtime.lock().await;
     match rt.execute_command(&req.name, &req.payload, &ctx).await {
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),

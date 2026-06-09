@@ -12,9 +12,15 @@
 
 use serde::Deserialize;
 
+pub mod entitlement;
 pub mod integrity;
+pub mod user_jwt;
 
+pub use entitlement::{
+    verify_entitlement, EntitledModule, EntitlementClaims, EntitlementError, EntitlementResponse,
+};
 pub use integrity::{verify_sha256, IntegrityError};
+pub use user_jwt::{verify_user_jwt, UserClaims, UserJwtError};
 
 /// Credenciales con las que firmar una petición al Cloud.
 #[derive(Debug, Clone)]
@@ -83,6 +89,24 @@ impl CloudClient {
     /// Lista de módulos del marketplace para el hub (con JWT de usuario). §2.2.
     pub fn marketplace_modules(&self, auth: &Auth) -> PreparedRequest {
         self.get("/api/v1/marketplace/modules/", auth)
+    }
+
+    /// **Gate de arranque de la app Tauri** — entitlement firmado de módulos del hub
+    /// (con JWT de usuario). `GET /api/v1/hub/device/entitlement/`. La respuesta es un
+    /// [`EntitlementResponse`]; su `token` se verifica offline con
+    /// [`verify_entitlement`] contra la clave pública del Cloud. Ver `entitlement.rs`.
+    pub fn entitlement(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/entitlement/", auth)
+    }
+
+    /// Clave pública RSA del Cloud (para verificar el token de entitlement offline).
+    /// `GET /api/v1/auth/public-key/`. Sin auth (endpoint público).
+    pub fn public_key(&self) -> PreparedRequest {
+        PreparedRequest {
+            method: "GET",
+            url: format!("{}/api/v1/auth/public-key/", self.base_url),
+            headers: vec![],
+        }
     }
 
     /// **Flujo real de instalación, paso 1** — lista las versiones activas de un módulo.

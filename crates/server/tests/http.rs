@@ -121,6 +121,8 @@ async fn hub_context_returns_configured_hub_id() {
         hub_id: "hub-xyz".into(),
         cloud_base_url: "https://erplora.com".into(),
         module_cache: std::env::temp_dir().join("erplora-test-cache"),
+        auth_mode: erplora_server::AuthMode::Dev,
+        jwt_public_key: None,
     };
     let app = app(AppState::with_config(rt, cfg));
     let resp = app

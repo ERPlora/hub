@@ -27,15 +27,29 @@ impl EventSink for BroadcastSink {
     }
 }
 
+/// Modo de autenticación del server (ARQUITECTURA.md §2.3):
+///  - `Dev`: confía en cabeceras `X-User-Id`/`X-Permissions` (desarrollo local, sin Cloud).
+///  - `Jwt`: **verifica** el access JWT del usuario (RS256) contra la clave pública del Cloud;
+///    `user_id` sale del token (no del header). Se activa con `HUB_AUTH=jwt`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AuthMode {
+    Dev,
+    Jwt,
+}
+
 /// Configuración de despliegue del hub (ARQUITECTURA.md §2.3; decisiones del humano):
 ///  - `hub_id`: lo inyecta el despliegue vía env `HUB_ID` (sin selector de hub).
 ///  - `cloud_base_url`: el Cloud Portal contra el que se resuelven marketplace + asistente.
 ///  - `module_cache`: raíz local donde `erplora-source` descomprime los módulos descargados.
+///  - `auth_mode` + `jwt_public_key`: ver [`AuthMode`]. La clave pública (PEM) la resuelve
+///    `main` al arrancar (env `HUB_JWT_PUBLIC_KEY` o `GET /api/v1/auth/public-key/` del Cloud).
 #[derive(Clone, Debug)]
 pub struct HubConfig {
     pub hub_id: String,
     pub cloud_base_url: String,
     pub module_cache: PathBuf,
+    pub auth_mode: AuthMode,
+    pub jwt_public_key: Option<String>,
 }
 
 /// UUID fijo de desarrollo si no se inyecta `HUB_ID` (decisión tomada — flag para humano).
@@ -50,7 +64,13 @@ impl HubConfig {
         let module_cache = std::env::var("HUB_MODULE_CACHE")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("erplora-modules"));
-        Self { hub_id, cloud_base_url, module_cache }
+        let auth_mode = match std::env::var("HUB_AUTH").as_deref() {
+            Ok("jwt") => AuthMode::Jwt,
+            _ => AuthMode::Dev,
+        };
+        // Inyección directa de la clave (PEM) por entorno; si no, `main` la trae del Cloud.
+        let jwt_public_key = std::env::var("HUB_JWT_PUBLIC_KEY").ok().filter(|s| !s.trim().is_empty());
+        Self { hub_id, cloud_base_url, module_cache, auth_mode, jwt_public_key }
     }
 }
 

@@ -5,7 +5,19 @@ use std::path::PathBuf;
 
 use erplora_db::SqliteAdapter;
 use erplora_runtime::Runtime;
-use erplora_server::{app, AppState};
+use erplora_server::{app, AppState, AuthMode, HubConfig};
+
+/// Trae la clave pública RSA del Cloud (`GET /api/v1/auth/public-key/` → `{public_key, algorithm}`)
+/// para verificar los JWT de usuario offline. `None` si el Cloud no responde o no la trae.
+async fn fetch_jwt_public_key(cloud_base_url: &str) -> Option<String> {
+    let url = format!("{}/api/v1/auth/public-key/", cloud_base_url.trim_end_matches('/'));
+    let resp = reqwest::Client::new().get(&url).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let v: serde_json::Value = resp.json().await.ok()?;
+    v.get("public_key").and_then(|k| k.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string())
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,7 +40,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let state = AppState::new(runtime);
+    // Configuración de despliegue + resolución de auth. En modo `HUB_AUTH=jwt` se exige la clave
+    // pública del Cloud (env `HUB_JWT_PUBLIC_KEY` o fetch de `/api/v1/auth/public-key/`); si no se
+    // puede obtener, se ABORTA el arranque (no se degrada en silencio a confiar en cabeceras).
+    let mut config = HubConfig::from_env();
+    if config.auth_mode == AuthMode::Jwt && config.jwt_public_key.is_none() {
+        config.jwt_public_key = fetch_jwt_public_key(&config.cloud_base_url).await;
+        if config.jwt_public_key.is_none() {
+            return Err("HUB_AUTH=jwt pero no se pudo obtener la clave pública del Cloud \
+                        (define HUB_JWT_PUBLIC_KEY o asegura el acceso a /api/v1/auth/public-key/)"
+                .into());
+        }
+    }
+    eprintln!("auth: modo {:?}", config.auth_mode);
+    let state = AppState::with_config(runtime, config);
 
     // Tablas de sistema del runtime (outbox de eventos) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
