@@ -25,6 +25,64 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 
 ---
 
+## 0bis. Decisiones finales del proyecto (2026-06-09) — **fuente de verdad**
+
+> Resumen canónico de las decisiones tomadas por el humano y ya **implementadas + verificadas**.
+> Consúltese esto primero para saber "cómo tiene que funcionar". Cada punto enlaza con la sección
+> que lo detalla y con los ficheros/endpoints reales. `[✓ verificado]` = probado E2E en este repo.
+
+1. **UI / shell unificado Cloud↔Hub** — mismo esqueleto Ionic canónico (`ion-app > ion-split-pane
+   content-id="main" when="lg" > ion-menu (sidebar: brand+nav por secciones+tarjeta de usuario) +
+   ion-router-outlet#main`). Componentes **Ionic (`ion-*`)**; OutfitKit (`ok-*`) **solo para huecos**
+   (p. ej. `ok-data-table`). `apps/web` = Vue 3 + Ionic Vue + Vite. Rail colapsable por CSS. Dark por
+   `.ion-palette-dark`. Detalle de UI en §3.1/§7.7. `[✓ verificado]`
+
+2. **Camino de datos (Eje A) — local-first, config-driven** — `apps/web` habla con el runtime vía
+   `ErploraClient` (`@erplora/module-sdk`, `HttpWsTransport`) → **`erplora-server` (Axum)** en
+   `VITE_RUNTIME_URL` (def `http://127.0.0.1:8787`) → **SQLite**; la misma config apunta luego al
+   modo `cloud` (Aurora) sin tocar módulos (§7.6). `ModuleView` **inyecta el cliente** en el Web
+   Component del módulo (`wc.client`) para que llame `client.query/command`. Endpoints del runtime:
+   `POST /api/query`, `POST /api/command`, `GET /api/navigation`, `GET /api/modules`, `GET /ws`.
+   `[✓ verificado: query/command ejecutan SQL real con scoping hub_id]`
+
+3. **`hub_id` inyectado por despliegue (1 contenedor = 1 hub)** — el server lee `HUB_ID` del entorno
+   y lo expone en **`GET /api/hub/context` → `{hub_id, user}`**; `apps/web` lo resuelve al arrancar
+   (`bootHubContext`) y lo envía como **`X-Hub-Id`** en toda llamada. **No hay selector de hub.** Liga
+   con la tenancy de §2.5. `[✓ verificado]`
+
+4. **Login de usuario real contra Cloud** — `POST /api/v1/auth/login/` + `GET /api/v1/auth/me/`;
+   tokens en `localStorage` (`erplora.access`/`erplora.refresh`); **interceptor refresh-en-401** con
+   rotación de ambos tokens y un reintento (`POST /api/v1/auth/refresh/`); `X-Hub-Id` en todas. El
+   **fallback demo** queda SOLO tras `VITE_DEMO=1` (producción falla duro). Contrato en §2.3.
+
+5. **Instalación de módulos por el marketplace (API real de Cloud)** — flujo: `GET
+   /api/v1/marketplace/modules/{id}/versions/` (sha256) → `GET .../download/?version=` (zip binario) →
+   **verificar SHA256** → unzip seguro (anti zip-slip) → `install_from_dir` → `POST .../mark_installed/`.
+   En el Hub lo orquesta **`POST /api/modules/request-install {module_id, version}`** (cloud-client +
+   source + installer) y emite WS `{"type":"module.installed","module_id"}` → el shell refresca el menú.
+   Detalle/contrato en §2.2. **⚠️ Pendiente (Cloud):** `ModuleVersionSerializer` no expone `sha256` por
+   `versions/` (solo el endpoint sync) → hoy, si falta, se instala SIN verificación de integridad;
+   **arreglar en Cloud** (añadir `sha256` al serializer) para cumplir el contrato §2.2.
+
+6. **El asistente AI es un MÓDULO INSTALABLE, no una página del shell** — se instala desde el
+   marketplace y se carga como Web Component vía `ModuleView`, igual que cualquier módulo (aparece en la
+   sección "Módulos" dinámica del shell). **No** es una ruta horneada. Su WC alcanza el LLM de Cloud por
+   una **capacidad de host**: `POST /api/assistant/chat/stream` del runtime, que hace de **proxy SSE**
+   hacia Cloud (`/api/v1/hub/device/assistant/chat/stream/`, reenvía `Authorization: Bearer` + `X-Hub-Id`)
+   con **ensamblado de tools por permiso** (solo queries/commands con bloque `ai:` que el usuario puede
+   ejecutar, §9.2). El Hub nunca habla con el LLM directo (§9.3); embeddings/RAG por el proxy de Cloud
+   (§9.4/§9.6). La UI de chat de referencia quedó en `apps/web/src/parked/AssistantChat.vue`.
+
+7. **Modelo de eventos del runtime = Outbox transaccional (entrega asíncrona at-least-once)** — ver
+   §4 y §5.4 (actualizados). En corto: el command emisor **solo persiste** cada evento en `_event_outbox`
+   **dentro de su misma transacción** (escritura atómica); los listeners NO corren inline — los entrega un
+   **relay** en background (`erplora-server`, poll 1s) con backoff + dead-letter. **Idempotencia a nivel
+   runtime** vía `_event_delivery (event_id, listener_command)` (exactly-once sin que los módulos sean
+   idempotentes). La notificación al WS es inline pero **efímera** (solo UI en vivo). `[✓ verificado:
+   command emite → 'pending' → relay → 'delivered']`
+
+---
+
 ## 1. Visión: "un solo modelo mental" — dos ejes ortogonales
 
 hub es **una sola app base** (misma UI, mismo modelo de módulos, mismo runtime). Lo que
@@ -349,6 +407,78 @@ los entitlements para descargar módulos):
   (JWT + `X-Hub-Id`) y usa `invoke` para hardware local. El `cloud_api_token` vive en ECS, no en
   el dispositivo. → el "origen de la credencial de máquina" depende del **Eje A**, no de que sea Tauri.
 
+### 2.9b Tenencia: organización por usuario y un hub por dispositivo (decisión 2026-06-09)
+
+> Aclara el vínculo **hub↔usuario↔organización** para la app gratuita, coherente con §2.5
+> (BD por organización, compartida por varios hubs). **No** se añade `Hub.owner` FK: la tenencia
+> sigue siendo por organización.
+
+- **La organización es la frontera de datos** (§2.5): **una BD por organización** (hoy SQLite local;
+  en el futuro una **Aurora en la nube vendida vía Cloud-proxy**, nunca expuesta directamente — el
+  Cloud hace de proxy). **Varios hubs comparten la BD de su organización**, discriminados por `hub_id`
+  por fila. Por eso el vínculo natural es hub→organización, no hub→usuario.
+- **Org por defecto al crear la cuenta**: cuando un usuario **crea su cuenta** se le crea una
+  **organización personal por defecto** (editable después: nombre, datos fiscales…). No se espera al
+  primer arranque del hub. *(Hoy se crea de forma perezosa en el primer login desde Tauri —
+  `_register_hub` en `cloud/apps/auth/users/api/serializers.py`; la decisión lo adelanta al signup —
+  `apps/auth/users/services.py::create_user`, reutilizando
+  `organizations.services.lifecycle.create_organization`.)*
+- **Un hub por dispositivo**: cada instalación Tauri (desktop/Android) registra **su propio `hub_id`**
+  bajo la organización del usuario, por **identidad de dispositivo** (p. ej. cabecera `X-Device-Id`
+  persistida en el dispositivo). Dos máquinas del mismo usuario = **dos hubs** que **comparten la BD de
+  la org**. Esto habilita el multi-terminal primary/satélite (§2.7b) de forma natural. *(Cambia el
+  get-or-create por `org + deployment_mode` actual, que colapsaba todos los dispositivos en un único
+  hub.)*
+- **Requisito único para usar el hub local = tener cuenta** (la app no se compra, §2.10).
+
+### 2.10 App Tauri **gratuita** y entitlement por tiers de módulo (decisión 2026-06-09)
+
+> Sustituye la idea de una "licencia standalone de pago". La app de escritorio/Android **no se vende**:
+> es la **versión ligera** (gratis, publicitaria) para captar clientes; el upsell es **subir a cloud**
+> (donde está el multidevice). Lo que abre funcionalidad es un **entitlement por tiers de módulo**.
+
+**Tiers de módulo** (`Module.tier` en el Cloud, `cloud/apps/public/modules/models.py`; se edita en el
+vendor portal como el resto de la clasificación, §2.4):
+
+| Tier | Qué es | Local (Tauri gratis) | Cloud (ECS/Aurora) |
+|------|--------|----------------------|--------------------|
+| `basic` | Núcleo POS + **compliance** (operar y cumplir normativa vigente) | **Gratis** | **Gratis** |
+| `standard` | Funcionalidad extra que **sí corre en local** | **Suscripción**, comprada desde la propia app (Fase 2) | **Gratis** (incluida en el plan cloud) |
+| `premium` | Módulos con **API a cloud** que nos cuestan dinero (asistente, WhatsApp…) | **No disponible** (solo-cloud) | **De pago** (compra/suscripción) |
+
+**Dos ejes independientes** (clave, no confundir):
+- **Disponibilidad** = `tier` + `deployment_mode`: `premium` es **solo-cloud**; `basic`/`standard`
+  corren en ambos.
+- **Pago** = `module_type` (`free`/`one_time`/`subscription`): los `free` no requieren compra; los de
+  pago sí — con una **excepción de bundle**: `standard` va **incluido gratis en hubs cloud**.
+- **Fuente única de verdad**: `is_module_entitled(hub, module)` en
+  `cloud/apps/public/modules/entitlement.py`, reutilizada por el permiso de descarga
+  (`CanDownloadModule`) y por el listado del marketplace (los hubs locales no ven `premium`).
+
+**Gate de arranque (la app pregunta "¿qué puedo montar?")**:
+1. Tras el login del usuario, el hub pide `GET /api/v1/hub/device/entitlement/` (user-JWT + `X-Hub-Id`,
+   permiso `IsHubMember`). El Cloud devuelve un **token firmado RS256** con el **mismo par de claves que
+   el JWT de usuario** (`settings.PRIVATE_KEY/PUBLIC_KEY`; pública en `/api/v1/auth/public-key/`), con la
+   lista de módulos permitidos + `exp` (24 h) y `grace_until` (gracia offline, 7 d).
+2. El hub **cachea** token + clave pública y los **verifica OFFLINE**
+   (`crates/cloud-client/src/entitlement.rs::verify_entitlement`), de modo que opera sin red dentro de la
+   ventana de gracia (coherente con el offline-first, §2.8).
+3. Sin token válido ni cacheado → **pantalla de login/activación**: el shell arranca pero **no monta el
+   runtime de negocio**. Con token válido → monta **solo** los módulos del entitlement.
+4. Glue Tauri: `apps/tauri/src-tauri` (comando `validate_entitlement`). *(El crate aún no está en el
+   workspace Cargo: requiere toolchain Tauri v2 + el `dist` de `apps/web`.)*
+
+**Estado**: Fase 1 implementada y verificada (campo `tier` + migración + backfill, servicio/endpoint de
+entitlement firmado, gating por `deployment_mode`, `entitlement()` + verificación offline en
+`cloud-client`, scaffold de `apps/tauri`).
+
+**Fase 2 (diferida — decisión explícita: no complicar la Fase 1)**:
+- **Compra in-app de módulos `standard`** desde la app Tauri (deep-link al checkout Stripe del Cloud)
+  ejecutándose en local; al volver, re-`entitlement()`.
+- **Eje `requires_cloud`** como flag separado de `tier` (hoy se deriva: `premium ⇒ solo-cloud`).
+- **Clasificación por "tipo de hub"**: registrar el tipo de hub y casar tipo↔módulos de pago, si
+  compensa frente a la simplicidad de `tier + deployment_mode`.
+
 ---
 
 ## 3. Stack y decisiones de tecnología
@@ -415,6 +545,36 @@ Crate `runtime` (submódulos): `manifest`, `loader`, `registry`, `installer`, `m
 10. (RAG) Indexar README/ai_context del módulo a su versión (§9)
 11. Emitir module.installed → el frontend refresca el menú
 ```
+
+### 4.1 Entrega y fiabilidad de eventos — transactional outbox (decidido 2026-06-09)
+
+**Problema (estado anterior):** los listeners de un evento corrían *después* del commit del
+command emisor y **fuera** de su transacción (`commands::execute_at` → `events::dispatch` →
+`execute_at` del listener, recursivo y síncrono). Sin outbox, retry ni dead-letter: si un
+listener fallaba tras commitear (p.ej. `invoice.create_from_sale`), quedaba una **venta sin
+factura** y nadie lo reintentaba.
+
+**Decisión:** el bus de eventos pasa a **transactional outbox** con entrega **100% asíncrona por
+relay** y garantía **at-least-once**:
+
+1. **Escritura atómica.** Al ejecutar un command, sus eventos se **insertan en `_event_outbox`
+   DENTRO de la misma transacción** que el SQL del command (Tier 2 WASM: junto a `tx_ops`;
+   Tier 0/1: en la transacción del command — los `transaction:false` pasan a envolverse). Si el
+   command commitea, el evento queda persistido sí o sí; si revierte, no hay evento. El
+   `dispatch` inline tras el commit se retira.
+2. **Relay.** Una tarea en background (en `crates/server`) lee `_event_outbox`
+   (`status='pending' AND next_attempt_at<=now`, FIFO), resuelve los listeners actuales
+   (`registry.listeners_for`) y ejecuta cada uno. Éxito → `delivered`; fallo → `attempts++` +
+   backoff exponencial en `next_attempt_at`; tras N intentos → `dead` (dead-letter).
+3. **Idempotencia (at-least-once).** Un listener puede ejecutarse >1 vez (reintento/reinicio). Se
+   garantiza con una tabla **`_event_delivery (event_id, listener_command)`** en el runtime: el
+   relay registra cada entrega y **salta duplicados**. Los handlers de módulo **no cambian**.
+4. **WS sigue inline.** La notificación al `EventSink` (push a la UI, §7.7) se mantiene inline y
+   efímera; la entrega DURABLE a listeners es la del outbox.
+
+Tablas de sistema del runtime (SQLite + Postgres): `_event_outbox` (id, hub_id, event_name,
+payload, depth, status, attempts, next_attempt_at, last_error, created_at, delivered_at) y
+`_event_delivery` (event_id, listener_command, delivered_at). **Implementación Rust pendiente.**
 
 ---
 
@@ -1070,6 +1230,8 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 | **IDs de fila** | ✅ **Decidido**: datos del hub (Aurora por-org + SQLite local) con **PK numérica**; **UUID solo en el Cloud Portal** (`hub_id`, org). Migración local→cloud **remapea** IDs (§2.5). |
 | **Transporte cloud** | ✅ **Decidido**: HTTP (RPC) + canal de push dedicado (§7.5). WS-only descartado como default. |
 | **Canal de eventos (push)** | 🔶 **Abierto**: **WS (actual) vs SSE** para el push servidor→cliente. El push es **unidireccional** (los envíos van por HTTP) ⇒ SSE encaja: da **reconexión + Last-Event-ID gratis** (ayuda con el idle timeout del ALB), mantiene **HTTP estándar** (criterio §7.5) y es el formato natural para el **futuro streaming del assistant**. Plan: implementar **ambos** y elegir por situación; al hacerlo, **unificar la forma del JSON del evento** (`name` server vs `event` cliente — hoy desalineado) entre WS y SSE. |
+| **Entrega/fiabilidad de eventos** | ✅ **Decidido (2026-06-09)**: **transactional outbox** — escritura atómica en `_event_outbox`, **relay asíncrono** at-least-once con backoff + dead-letter, idempotencia vía `_event_delivery` (§4.1). Sustituye el dispatch inline. Implementación Rust pendiente. |
+| **Documentos de venta / POS** | ✅ **Decidido (2026-06-09)**: tiquet/factura = **FORMATO** de render (`ok-receipt` 80mm / `ok-invoice` A4 en OutfitKit), no módulo; `sales` = libro mayor; pantallas POS **seleccionables** por el negocio; impresión térmica por bridge ESC/POS (§15). |
 | **Red saliente de módulos** | ✅ **Decidido (Opción A)**: `http.fetch` mediado (allowlist + creds inyectadas + auditoría §5.5) para terceros; **B (nativo)** para fiscal. |
 | **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware compartido (sidecar en Tauri \| standalone opcional para `cloud + web-PWA`), §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
 | **Modelo de módulos** | ✅ **Decidido**: híbrido (declarativo + WASM + SDK). |
@@ -1103,6 +1265,62 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 
 ---
 
+## 15. Ventas, documentos de venta y POS (decisiones 2026-06-09)
+
+Consolidación de cómo se vende y cómo salen los comprobantes. **Vinculante.**
+
+### 15.1 `sales` es el libro mayor de ventas
+Toda venta —de cualquier canal— se materializa con **`sales.complete_sale`** (Tier 2 WASM), que
+calcula líneas/impuestos/total, inserta venta+líneas en una transacción y emite
+**`sale.completed`**. `sales_sale` lleva `channel` + `source_module` (texto libre) para trazar el
+origen. Escuchan `sale.completed`: `inventory` (stock), `customers`, `cash_register`,
+`kitchen_orders`; e **`invoice`** crea el documento fiscal (F1/F2/R1) y `verifactu` el registro
+AEAT. La fiabilidad de esa cadena la da el **outbox (§4.1)**.
+
+### 15.2 Canales de venta (todos → `sales`)
+| Canal | Estado | Entra a `sales` por |
+|-------|--------|---------------------|
+| Mostrador táctil | pantalla a construir (`erp-pos-touch`) | UI → `complete_sale` |
+| Retail escáner/teclado | pantalla a construir (`erp-pos-desktop`) | UI → `complete_sale` |
+| WhatsApp | **existe** (`whatsapp_inbox`) | conversación → request (IA) → `fulfill` → `orders`/`sales` |
+| Teléfono / B2B | **existe** | `orders.create` → `complete` → `link_to_sale` |
+| Restauración / mesas | parcial | `tables`+`kitchen_orders` → cobro `complete_sale` (`channel='table'`) |
+| Carta pública + email | **futuro (no existe)** | catálogo público; pedido por WhatsApp/email |
+
+**No hay e-commerce ni checkout online.** `cart_checkout` es **carrito interno / tickets
+aparcados** del POS, no una tienda pública.
+
+### 15.3 Tiquet vs factura = FORMATO de render, no módulo
+El comprobante es un **formato de presentación**, no un módulo nuevo:
+- **Tiquet 80mm** → `ok-receipt`; **factura A4** → `ok-invoice` (ambos en **OutfitKit**,
+  presentacionales y aislados: reciben un JSON `ReceiptData`/`InvoiceData` y lo pintan; reusan
+  `ok-qr`). No hablan con el backend.
+- La **semántica fiscal** ya vive en `invoice` (F2 = tiquet/simplificada, F1 = completa, R1 =
+  rectificativa). "No todos dan tiquet / unos sacan A4" se resuelve **instalando o no
+  `invoice`/`verifactu`** + un ajuste de formato. (Excepción consciente a "el dominio vive en los
+  módulos": estos dos renderers son **genéricos** y viven en OutfitKit.)
+
+### 15.4 Mismo dato, dos rutas de impresión
+Un **único contrato** (`ReceiptData`/`InvoiceData`) alimenta:
+- **Tiquet 80mm físico → bridge (ESC/POS)** por `document_type` (`crates/peripherals`,
+  `erplora_print`). `ok-receipt` (HTML) se usa para **previsualización/PDF**, no para la térmica.
+- **Factura A4 física / PDF → `ok-invoice` (HTML)** vía `window.print()` / WeasyPrint (Cloud).
+
+### 15.5 Pantallas de venta seleccionables por el negocio
+El POS no es una sola pantalla: el negocio **elige la que encaja con su negocio**
+(`erp-pos-touch` táctil de mostrador, `erp-pos-desktop` con escáner/teclado; futura de
+restaurante). Son **componentes separados**, todos llaman al mismo `complete_sale`. La elección
+vive en `sales_settings.pos_layout`.
+
+### 15.6 Configuración del POS (`sales_settings`)
+La config singleton de `sales` (una fila por `hub_id`) se cablea con `sales.settings.get` +
+`sales.settings.update`. Campos de formato: `pos_layout` (`touch|desktop`),
+`default_document_format` (`ticket|invoice`), `auto_invoice_with_tax_id` (cliente con NIF →
+factura A4). El **override por venta** se registra en `document_type` de la propia venta (atómico
+con ella; viaja en `sale.completed` para que `invoice` emita F1/F2).
+
+---
+
 ## Resumen mental
 
 ```
@@ -1115,6 +1333,8 @@ SDK TS = puente para la UI (IpcTransport local / HttpWsTransport cloud)
 Offline/online = local offline (SQLite) / cloud solo online; sin sync de negocio (Fase 1)
 Login = email+password online (setup) → dispositivo de confianza → PIN (offline a futuro)
 Reactividad = evento (WS/Tauri) → el WC re-consulta (no server-render)
+Eventos = transactional outbox (escritura atómica + relay async at-least-once + _event_delivery); WS solo push UI (§4.1)
+Venta = sales (libro mayor) → sale.completed; tiquet/factura = FORMATO (ok-receipt/ok-invoice), no módulo; pantallas POS seleccionables (§15)
 RAG = solo conocimiento (docs); vector en cloud (pgvector), degradado en local
 AI = embeddings + generación SIEMPRE por el proxy del Cloud Portal (medido)
 Red de módulos = http.fetch mediado por el host (Opción A) / nativo para fiscal
