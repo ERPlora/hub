@@ -53,7 +53,7 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 4. **Login de usuario real contra Cloud** — `POST /api/v1/auth/login/` + `GET /api/v1/auth/me/`;
    tokens en `localStorage` (`erplora.access`/`erplora.refresh`); **interceptor refresh-en-401** con
    rotación de ambos tokens y un reintento (`POST /api/v1/auth/refresh/`); `X-Hub-Id` en todas. El
-   **fallback demo** queda SOLO tras `VITE_DEMO=1` (producción falla duro). Contrato en §2.3. **Server-side:** el runtime verifica el JWT (RS256 + exp) contra la clave pública del Cloud (`HUB_AUTH=jwt`; `user_id` del token, `hub_id` del despliegue; sin/mal token → 401). **PENDIENTE (tu columna):** el JWT lleva solo identidad, **no permisos** → el *scoping fino de permisos por usuario* en el hub (claim nuevo, modelo de roles local, o consulta a Cloud) está sin decidir; hoy el usuario autenticado recibe `*`.
+   **fallback demo** queda SOLO tras `VITE_DEMO=1` (producción falla duro). Contrato en §2.3. **Server-side (modelo decidido + implementado, §2.9):** la autoridad de identidad/permisos es **local**. Login por **PIN** o por **JWT de usuario cloud** (verificado RS256 → mapeado a un `hub_user` local) abre una **sesión server-side** (`HUB_AUTH=session`); cada petición lleva `X-Hub-Session` y el runtime resuelve `hub_user` → **permisos del rol** (`role_permissions` de los módulos activos). `hub_id` del despliegue. Verificado vivo: gate por rol real (employee `list`→200, `create`→403). Pendiente menor: argon2id para el PIN; gestión de usuarios/roles (UI admin); credencial de dispositivo de confianza (§14).
 
 5. **Instalación de módulos por el marketplace (API real de Cloud)** — flujo: `GET
    /api/v1/marketplace/modules/{id}/versions/` (sha256) → `GET .../download/?version=` (zip binario) →
