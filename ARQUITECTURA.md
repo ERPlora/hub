@@ -528,7 +528,7 @@ execute_query("inventory.products.list", params)
 ```
 
 Crate `runtime` (submódulos): `manifest`, `loader`, `registry`, `installer`, `migrations`,
-`permissions`, `commands`, `queries`, `events`, `ui`, `wasm`, `errors`.
+`permissions`, `commands`, `queries`, `events`, `outbox`, `ui`, `wasm`, `errors`.
 
 **Pipeline de instalación** (reconciliado con §2.2):
 
@@ -545,6 +545,31 @@ Crate `runtime` (submódulos): `manifest`, `loader`, `registry`, `installer`, `m
 10. (RAG) Indexar README/ai_context del módulo a su versión (§9)
 11. Emitir module.installed → el frontend refresca el menú
 ```
+
+### 4.1 Entrega de eventos — Outbox transaccional (decisión 2026-06-09)
+
+El runtime entrega eventos a sus listeners con garantía **at-least-once**, **100% asíncrona**
+(no inline). Tablas de sistema del runtime: `_event_outbox` y `_event_delivery` (las crea el
+runtime, no un módulo).
+
+1. **Escritura atómica**: al ejecutar un command, sus eventos `emit` (y, en Tier 2, los que
+   devuelve el handler) se **INSERTAN en `_event_outbox` dentro de la MISMA transacción** que el
+   SQL del command. Si el command commitea, el evento existe sí o sí; si revierte, no hay evento.
+   Por eso los commands `transaction:false` también se envuelven en transacción.
+2. **Relay** (background en `erplora-server`, poll ~1s + arranque): lee filas `pending` vencidas,
+   resuelve los listeners **actuales** de módulos activos y ejecuta cada uno con `execute_command`.
+   Los eventos en cascada que emitan esos listeners → nuevas filas de outbox.
+3. **Idempotencia a nivel runtime** vía `_event_delivery (event_id, listener_command)`: el marcador
+   de entrega se inserta en la **misma transacción** que los efectos del listener → **exactly-once**
+   aunque el proceso se reinicie. Los módulos **no** necesitan ser idempotentes.
+4. Fallo de un listener → `attempts++`, backoff exponencial; tras `MAX_ATTEMPTS` → `dead`
+   (dead-letter). Guarda de profundidad de cascada (`MAX_EVENT_DEPTH`).
+5. La notificación al **WS** (`EventSink`) es **inline tras commit** pero **efímera** (solo UI en
+   vivo); la entrega DURABLE a listeners es la del outbox.
+
+> Esto **sustituye** al antiguo dispatch síncrono recursivo (listeners tras commit, sin retry).
+> Código: `crates/runtime/src/outbox.rs`, `commands.rs` (`execute_at`/`execute_wasm` + `extra_ops`),
+> `events.rs` (`notify_sink`), relay en `crates/server/src/main.rs`.
 
 ### 4.1 Entrega y fiabilidad de eventos — transactional outbox (decidido 2026-06-09)
 
@@ -672,6 +697,11 @@ de otros módulos** (con permisos) vía host functions, sin importar su código.
 > handler de `pos.sale.completed` **carga la venta, itera líneas, aplica `allow_negative_stock`,
 > clampa a cero y cascada** a otros módulos. La forma declarativa solo sirve para fan-out
 > trivial; cualquier handler con lógica es **Tier 2 (WASM)**. Refuerza el modelo híbrido (§6).
+
+> **Entrega de eventos (decisión 2026-06-09):** el fan-out a listeners es **asíncrono y durable**
+> vía el **Outbox transaccional** del runtime (§4.1), no una llamada inline. El emisor solo persiste
+> el evento en su misma transacción; un relay lo entrega at-least-once con idempotencia exactly-once
+> (`_event_delivery`). Aplica tanto al fan-out declarativo como a la cascada de handlers Tier 2.
 
 ### 5.5 Capacidades del host (Tier 1) — incl. `http.fetch` mediado (Opción A, decidida)
 
@@ -1064,6 +1094,13 @@ módulos). El `keywords` opcional de `agent` permite un pre-filtro léxico barat
 **Embeddings** (ingesta + pregunta) y **generación** van por el **proxy del Cloud Portal**,
 medido en `AssistantUsage` (`POST /api/v1/hub/device/assistant/embeddings/` + orquestador
 two-step multi-provider, cuotas por hub/mes).
+
+> **El asistente se entrega como MÓDULO INSTALABLE (decisión 2026-06-09).** No es una página del
+> shell: se instala desde el marketplace y se carga como Web Component vía `ModuleView`. Su WC
+> alcanza a Cloud por una **capacidad de host** del runtime: `POST /api/assistant/chat/stream`
+> (proxy SSE → `/api/v1/hub/device/assistant/chat/stream/`, reenvía `Bearer` + `X-Hub-Id`), con
+> **ensamblado de tools por permiso** (queries/commands con bloque `ai:` que el usuario puede
+> ejecutar). Así se mantiene "el hub nunca habla con el LLM directamente". Ver §0bis (punto 6).
 
 ### 9.4 Base vectorial: SOLO cloud (pgvector)
 
