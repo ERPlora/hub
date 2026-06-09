@@ -133,32 +133,109 @@ ion-searchbar {
   --border-radius: 10px;
 }
 
-/* ── Menú lateral: superficie atenuada, ítems con pastilla y activo de marca ──────────────── */
-ion-menu {
+/* ── Shell / menú lateral — mismo lenguaje visual que el dashboard de Cloud ────────────────── */
+/* (clases .nav-*, .sidebar-*, .brand-* adaptadas de cloud/static/css/dashboard-shell.css;
+   markup en App.vue. Targetean light DOM, por eso van como CSS global, no scoped.) */
+
+/* Split-pane: ancho cómodo; .rail (escritorio, icon-only) lo estrecha. */
+ion-split-pane {
+  --side-min-width: 232px;
+  --side-max-width: 248px;
+  --side-width: 240px;
+}
+ion-split-pane.rail {
+  --side-min-width: 68px;
+  --side-max-width: 68px;
+  --side-width: 68px;
+}
+
+ion-menu.dash-menu {
   --background: var(--ok-surface-muted);
+  --width: 280px; /* ancho del drawer en móvil */
   border-right: 1px solid var(--ion-border-color);
 }
-ion-menu ion-header,
-ion-menu ion-content,
-ion-menu ion-toolbar {
+ion-menu.dash-menu ion-header,
+ion-menu.dash-menu ion-content,
+ion-menu.dash-menu ion-toolbar {
   --background: var(--ok-surface-muted);
   --ion-background-color: var(--ok-surface-muted);
 }
-ion-menu ion-list { background: transparent; }
-ion-menu ion-item {
+ion-menu.dash-menu ion-content.sidebar-content { --background: var(--ok-surface-muted); }
+
+/* Brand (logo + wordmark) */
+.brand-toolbar { --min-height: 60px; }
+.brand-link {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  padding-inline-start: 8px; text-decoration: none; color: inherit;
+  cursor: pointer; min-width: 0;
+}
+
+/* Lista de navegación */
+.nav-list { background: transparent; padding: 0.25rem 0; }
+.nav-section-label {
+  font-size: 0.68rem; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase;
+  color: color-mix(in oklab, var(--ion-text-color) 50%, transparent);
+  min-height: 1.9rem; padding-inline: 1rem; margin-top: 0.35rem;
+  --color: color-mix(in oklab, var(--ion-text-color) 50%, transparent);
+}
+.nav-item {
   --background: transparent;
-  --background-hover: rgba(var(--ion-text-color-rgb), 0.05);
-  --border-radius: 10px;
-  --min-height: 44px;
-  margin: 2px 6px;
+  --background-hover: color-mix(in oklab, var(--ion-text-color) 6%, transparent);
+  --background-hover-opacity: 1;
+  --color: color-mix(in oklab, var(--ion-text-color) 78%, transparent);
+  --border-radius: 9px;
+  --min-height: 42px;
+  --padding-start: 0.7rem;
+  --inner-padding-end: 0.5rem;
+  margin: 1px 8px;
+  font-size: 0.9rem;
   font-weight: 500;
 }
-ion-menu ion-item[color="light"] {
-  --background: rgba(var(--ion-color-primary-rgb), 0.12);
+.nav-item.selected {
+  --background: color-mix(in oklab, var(--ion-color-primary) 13%, transparent);
   --color: var(--ion-color-primary);
   font-weight: 600;
 }
-ion-menu ion-item ion-icon { color: inherit; }
+.nav-item.selected::part(native) {
+  box-shadow: inset 3px 0 0 var(--ion-color-primary);
+}
+.nav-icon { flex: none; opacity: 0.9; margin-inline-end: 0.7rem; color: inherit; }
+
+/* Footer: tarjeta de usuario (avatar iniciales + nombre/email + logout) */
+.sidebar-foot { --background: var(--ok-surface-muted); }
+.sidebar-user {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 0.6rem 0.7rem;
+}
+.sidebar-user-avatar {
+  width: 34px; height: 34px; border-radius: 999px; flex: none;
+  display: grid; place-items: center; font-weight: 700; font-size: 0.72rem;
+  background: color-mix(in oklab, var(--ion-color-primary) 18%, transparent);
+  color: var(--ion-color-primary);
+}
+.sidebar-user-meta { min-width: 0; flex: 1; }
+.sidebar-user-name {
+  font-size: 0.85rem; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sidebar-user-email {
+  font-size: 0.72rem; color: color-mix(in oklab, var(--ion-text-color) 55%, transparent);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sidebar-foot ion-button { --color: var(--ion-color-medium); height: 34px; }
+
+/* ── Rail colapsado (escritorio, icon-only) ───────────────────────────────────────────────── */
+.rail-toggle { display: none; }            /* el toggle solo aparece en escritorio */
+@media (min-width: 992px) { .rail-toggle { display: inline-flex; } }
+ion-split-pane.rail .erp-wordmark,
+ion-split-pane.rail .nav-label,
+ion-split-pane.rail .nav-section-label,
+ion-split-pane.rail .sidebar-user-meta { display: none; }
+ion-split-pane.rail .brand-link { padding-inline-start: 0; justify-content: center; width: 100%; }
+ion-split-pane.rail .nav-item { --padding-start: 0; --inner-padding-end: 0; }
+ion-split-pane.rail .nav-item::part(native) { justify-content: center; }
+ion-split-pane.rail .nav-icon { margin-inline-end: 0; }
+ion-split-pane.rail .sidebar-user { justify-content: center; }
 
 /* ── ok-data-table (OutfitKit): alinea sus tokens con el theme del Hub ────────────────────── */
 ok-data-table {

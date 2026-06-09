@@ -1,0 +1,171 @@
+/* Tokens del logo mapeados al tema Ionic del Hub (Cloud los define en otra hoja).
+   --ink/--brand alimentan los módulos+hub; --font-display el wordmark. Autocontenido. */
+.erp-logo,
+.erp-lockup,
+.erp-wordmark {
+  --ink: var(--ion-text-color);
+  --brand: var(--ion-color-primary);
+  --font-display: var(--ion-font-family);
+}
+
+/* ============================================================
+   ERPlora · Logo Component
+   ─────────────────────────────────────────────────────────────
+   Hub central + 8 módulos + 2 vectores diagonales · 100% CSS.
+   La marca propia de ERPlora — no genérica, no reutilizable
+   fuera del producto.
+
+   Estructura · 9 elementos en orden de rejilla (NW → SE):
+     <div class="erp-logo">
+       <i class="erp-nw"></i><i class="erp-n"></i><i class="erp-ne"></i>
+       <i class="erp-w"></i><i class="erp-hub"></i><i class="erp-e"></i>
+       <i class="erp-sw"></i><i class="erp-s"></i><i class="erp-se"></i>
+     </div>
+
+   Lockup con wordmark:
+     <span class="erp-lockup">
+       <div class="erp-logo">…</div>
+       <span class="erp-wordmark">erplora</span>
+     </span>
+
+   Tamaño · variable --u (1px = 72px total). Modificadores:
+     .erp-logo.xs   ≈ 16px (favicon)
+     .erp-logo.sm   ≈ 32px
+     .erp-logo.md   ≈ 56px  (default)
+     .erp-logo.lg   ≈ 96px
+     .erp-logo.xl   ≈ 144px
+
+   Consume tokens del tema activo:
+     --ink         · color de los módulos en tinta
+     --brand       · color del hub + mitad accent de NE/SW
+   ============================================================ */
+
+.erp-logo {
+  /* unit: 0.78px ≈ 56px total mark size */
+  --u: 0.78px;
+  --erp-mark: var(--ink);
+  --erp-accent: var(--brand);
+
+  /* ── Paleta modular (V5) ──
+     El AZUL es exclusivo del hub central (la plataforma). Los 8
+     módulos toman rojo / verde / amarillo (los módulos de negocio
+     que se instalan). Valores fijos del logo, no semánticos del
+     tema, para que la marca sea estable. */
+  --erp-red:    #ef4444;
+  --erp-green:  #10b981;
+  --erp-yellow: #f59e0b;
+
+  position: relative;
+  display: inline-block;
+  width: calc(72 * var(--u));
+  height: calc(72 * var(--u));
+  flex: none;
+  vertical-align: middle;
+}
+
+.erp-logo > i {
+  position: absolute;
+  display: block;
+  box-sizing: border-box;
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+  background: var(--erp-mark);
+  border-radius: calc(2 * var(--u));
+}
+
+/* ── Module positions + colores (V5) ── */
+.erp-logo > .erp-nw { left: calc(6  * var(--u)); top: calc(6  * var(--u)); background: var(--erp-red);    }
+.erp-logo > .erp-n  { left: calc(30 * var(--u)); top: calc(6  * var(--u)); background: var(--erp-green);  }
+.erp-logo > .erp-w  { left: calc(6  * var(--u)); top: calc(30 * var(--u)); background: var(--erp-green);  }
+.erp-logo > .erp-e  { left: calc(54 * var(--u)); top: calc(30 * var(--u)); background: var(--erp-red);    }
+.erp-logo > .erp-s  { left: calc(30 * var(--u)); top: calc(54 * var(--u)); background: var(--erp-red);    }
+.erp-logo > .erp-se { left: calc(54 * var(--u)); top: calc(54 * var(--u)); background: var(--erp-green);  }
+
+/* ── Central hub · 2× module size, accent color ── */
+.erp-logo > .erp-hub {
+  left:   calc(24 * var(--u));
+  top:    calc(24 * var(--u));
+  width:  calc(24 * var(--u));
+  height: calc(24 * var(--u));
+  background: var(--erp-accent);
+  border-radius: calc(4 * var(--u));
+}
+
+/* ── NE and SW corners (V5) ──
+   Antes eran cuadrados diagonal-split (mitad tinta / mitad accent).
+   En V5 son módulos sólidos como el resto, en amarillo, para que el
+   ritmo modular sea uniforme y el azul quede solo en el hub.
+*/
+.erp-logo > .erp-ne {
+  left: calc(54 * var(--u));
+  top:  calc(6  * var(--u));
+  background: var(--erp-yellow);
+}
+.erp-logo > .erp-sw {
+  left: calc(6  * var(--u));
+  top:  calc(54 * var(--u));
+  background: var(--erp-yellow);
+}
+
+/* ── Size presets ──
+   Each preset tunes --u so the total mark width matches the label.
+*/
+.erp-logo.xs { --u: 0.222px; }   /* 16px */
+.erp-logo.sm { --u: 0.444px; }   /* 32px */
+.erp-logo.md { --u: 0.778px; }   /* 56px · default */
+.erp-logo.lg { --u: 1.333px; }   /* 96px */
+.erp-logo.xl { --u: 2.000px; }   /* 144px */
+
+/* ── Mono override ──
+   On surfaces where color isn't available (single-ink prints,
+   stamps, tiny favicons), collapse the whole palette to currentColor
+   so the mark reproduces in one ink.
+*/
+.erp-logo.mono {
+  --erp-mark: currentColor;
+  --erp-accent: currentColor;
+  --erp-red: currentColor;
+  --erp-green: currentColor;
+  --erp-yellow: currentColor;
+}
+
+/* ── Wordmark ──
+   Pairs with the mark. Uses the active theme's display font.
+*/
+.erp-wordmark {
+  font-family: var(--font-display);
+  font-weight: var(--weight-semibold, 600);
+  font-size: var(--text-2xl, 24px);
+  line-height: 1;
+  letter-spacing: var(--tracking-tighter, -0.025em);
+  color: var(--ink);
+}
+
+/* Wordmark size variants tied to logo size */
+.erp-lockup.xs .erp-wordmark { font-size: var(--text-sm, 12.5px); }
+.erp-lockup.sm .erp-wordmark { font-size: var(--text-lg, 16px); }
+.erp-lockup.md .erp-wordmark { font-size: var(--text-2xl, 24px); }
+.erp-lockup.lg .erp-wordmark { font-size: var(--text-3xl, 32px); }
+.erp-lockup.xl .erp-wordmark { font-size: var(--text-4xl, 44px); }
+
+/* ── Lockup container ── */
+.erp-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  vertical-align: middle;
+}
+.erp-lockup.vertical {
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  align-items: center;
+}
+
+/* ── Cascading size to inner logo ──
+   When you size a lockup, both the mark and the wordmark scale.
+*/
+.erp-lockup.xs > .erp-logo { --u: 0.222px; }
+.erp-lockup.sm > .erp-logo { --u: 0.444px; }
+.erp-lockup.md > .erp-logo { --u: 0.778px; }
+.erp-lockup.lg > .erp-logo { --u: 1.333px; }
+.erp-lockup.xl > .erp-logo { --u: 2.000px; }

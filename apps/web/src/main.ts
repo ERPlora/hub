@@ -36,8 +36,9 @@ import { registerOutfitkitIonicDeps } from './lib/ionic-wc';
 
 registerOutfitkitIonicDeps();
 
-// Tema de marca (--ion-*) + pulido visual + globales (Tailwind).
+// Tema de marca (--ion-*) + logo de marca (rejilla CSS) + pulido visual + globales (Tailwind).
 import './theme/variables.css';
+import './theme/erplora-logo.css';
 import './theme/polish.css';
 import './theme/global.css';
 
