@@ -38,4 +38,6 @@ export function setUser(u: SessionUser | null): void {
 
 export function logout(): void {
   setUser(null);
+  // Olvida el entitlement resuelto: el próximo login lo recalcula para el hub activo.
+  void import('./entitlement').then((m) => m.resetEntitlement());
 }

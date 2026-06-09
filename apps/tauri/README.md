@@ -1,4 +1,4 @@
-# apps/tauri (STUB)
+# apps/tauri (scaffold parcial)
 
 Empaquetado **desktop/móvil** (Tauri v2) del mismo shell + runtime Rust. ARQUITECTURA.md §1, §3.
 
@@ -8,6 +8,30 @@ marketplace/AI/primer-login (§2.8).
 
 **Pendiente**: requiere toolchain Rust + Tauri CLI. De-risk #2 del §12 (Tauri `invoke` y
 Axum llamando al *mismo* `runtime`).
+
+## Gate de arranque por entitlement (la app Tauri es GRATIS)
+
+Ya scaffoldeado en `src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/lib.rs`). La app de
+escritorio/Android **no se compra**: es la versión ligera (basic + compliance) para captar
+clientes. Lo que desbloquea módulos es un **entitlement por tiers** servido por el Cloud.
+
+Flujo (`src/lib.rs::EntitlementGate`):
+
+1. El frontend (`apps/web`), tras el login, llama a `invoke('validate_entitlement', { hubId, accessToken })`.
+2. El gate pide al Cloud la clave pública (`/api/v1/auth/public-key/`) + el token firmado
+   (`/api/v1/hub/device/entitlement/`), lo **verifica** (`erplora-cloud-client::verify_entitlement`,
+   RS256) y lo **cachea** en `app_data_dir` (`entitlement.jwt` + `cloud_public_key.pem`).
+3. **Sin red**: verifica el token cacheado **offline** y sigue dentro de la ventana de gracia
+   (`grace_until`, lo emite el Cloud — `cloud/apps/public/modules/entitlement.py`).
+4. Devuelve `GateOutcome`: `unlocked { modules, deployment_mode, offline }` → el frontend monta
+   SOLO esos módulos; o `needs_activation { reason }` → pantalla de login/activación, sin negocio.
+
+`HUB_CLOUD_API_URL` sobreescribe la base del Cloud (por defecto `https://erplora.com`).
+
+> **No está en `members` del workspace raíz** (necesita el toolchain Tauri v2 + el `dist` de
+> `apps/web`). Cuando se estabilice el arranque, añadir `"apps/tauri/src-tauri"` a `members` en
+> `../../Cargo.toml`. La lógica criptográfica/gracia (verificable hoy con `cargo test -p
+> erplora-cloud-client`) vive en `crates/cloud-client/src/entitlement.rs`.
 
 ## Hardware local = sidecar de `erplora-peripherals` (§2.7)
 

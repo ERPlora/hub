@@ -6,6 +6,8 @@
 // public/ por sync-modules.mjs).
 import type { ModuleManifest, NavigationItem } from '@erplora/module-types';
 
+import { isModuleEntitled } from './entitlement';
+
 export interface MenuEntry {
   moduleId: string;
   nav: NavigationItem;
@@ -21,6 +23,8 @@ export async function loadMenu(): Promise<MenuEntry[]> {
   for (const url of INSTALLED_MODULES) {
     const res = await fetch(url);
     const manifest = (await res.json()) as ModuleManifest;
+    // Gate por entitlement (§2.10): solo se montan los módulos a los que el hub tiene derecho.
+    if (!isModuleEntitled(manifest.id)) continue;
     const base = url.replace(/\/module\.json$/, '');
     for (const nav of manifest.navigation ?? []) {
       entries.push({ moduleId: manifest.id, nav, entryUrl: `${base}/${manifest.ui.entry}` });

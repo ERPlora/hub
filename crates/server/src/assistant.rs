@@ -62,7 +62,11 @@ fn tool_def(name: &str, description: &str, kind: &str) -> Value {
 ///
 /// `input` toma el contenido del último mensaje de `role: user`; el historial completo se
 /// reenvía como `messages` para que el Cloud lo use si su orquestador lo soporta.
-pub fn build_cloud_body(frontend: &Value, tools: Vec<Value>) -> Value {
+///
+/// `user` es el id del usuario LOCAL activo (de la sesión del hub). Se manda como **metadata**
+/// para coste/auditoría — NO para permisos (el gate es local + el coste se mide por hub). Permite
+/// que un cajero solo-local (sin cuenta cloud) use el asistente vía el token de máquina del hub.
+pub fn build_cloud_body(frontend: &Value, tools: Vec<Value>, user: Option<&str>) -> Value {
     let messages = frontend.get("messages").cloned().unwrap_or_else(|| json!([]));
     let last_user = messages
         .as_array()
@@ -75,11 +79,15 @@ pub fn build_cloud_body(frontend: &Value, tools: Vec<Value>) -> Value {
         .unwrap_or("")
         .to_string();
 
-    json!({
+    let mut body = json!({
         "input": last_user,
         "messages": messages,
         "tools": tools,
-    })
+    });
+    if let Some(u) = user.filter(|u| !u.is_empty()) {
+        body["user"] = json!(u);
+    }
+    body
 }
 
 /// Traduce **una línea** SSE del Cloud (`data: …`) al frame del frontend.
@@ -139,7 +147,7 @@ mod tests {
             {"role":"user","content":"crea una venta"}
         ]});
         let tools = vec![json!({"name":"pos.sale.create"})];
-        let body = build_cloud_body(&fe, tools);
+        let body = build_cloud_body(&fe, tools, None);
         assert_eq!(body["input"], "crea una venta");
         assert_eq!(body["tools"][0]["name"], "pos.sale.create");
         assert_eq!(body["messages"].as_array().unwrap().len(), 3);

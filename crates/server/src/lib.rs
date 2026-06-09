@@ -44,6 +44,9 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules", get(list_modules))
         .route("/api/modules/install", post(install_module))
         .route("/api/modules/request-install", post(request_install))
+        // Proxies hub-scoped al Cloud (el token de máquina se queda en el runtime, no en el navegador)
+        .route("/api/entitlement", get(proxy_entitlement))
+        .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
         .route("/api/modules/:id/activate", post(activate_module))
         .route("/api/modules/:id/deactivate", post(deactivate_module))
         .route("/api/modules/:id/uninstall", post(uninstall_module))
@@ -82,10 +85,11 @@ async fn request_install(
     headers: HeaderMap,
     Json(req): Json<RequestInstallReq>,
 ) -> Response {
-    let Some(auth) = auth::user_auth(&headers, &st.config.hub_id) else {
+    // Hub-scoped: token de máquina si el hub está enrolado; si no, JWT del usuario.
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st.config) else {
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "ok": false, "error": "falta Authorization: Bearer" })),
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
         )
             .into_response();
     };
@@ -136,6 +140,48 @@ async fn request_install(
     }
 }
 
+/// GET hub-scoped al Cloud con la credencial de máquina (o JWT de usuario como fallback) y
+/// devuelve el JSON tal cual. El **secreto de máquina nunca sale al navegador**: el web llama a
+/// estas rutas del runtime y es el runtime quien firma la petición al Cloud.
+async fn proxy_cloud_get(st: &AppState, headers: &HeaderMap, req: cloud_client::PreparedRequest) -> Response {
+    let Some(auth) = auth::hub_scoped_auth(headers, &st.config) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
+        )
+            .into_response();
+    };
+    let mut r = st.http.get(&req.url);
+    for (k, v) in auth.headers() {
+        r = r.header(k, v);
+    }
+    match r.send().await {
+        Ok(resp) => {
+            let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            match resp.bytes().await {
+                Ok(body) => (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response(),
+                Err(e) => (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": e.to_string() }))).into_response(),
+            }
+        }
+        Err(e) => (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": e.to_string() }))).into_response(),
+    }
+}
+
+/// GET /api/entitlement — entitlement firmado del hub (proxy de `/api/v1/hub/device/entitlement/`).
+async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    // `entitlement(auth)` solo usa `auth` para las cabeceras; las reescribe `proxy_cloud_get`.
+    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    proxy_cloud_get(&st, &headers, cloud.entitlement(&placeholder)).await
+}
+
+/// GET /api/marketplace/catalog — catálogo del marketplace (proxy de `/api/v1/marketplace/modules/`).
+async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    proxy_cloud_get(&st, &headers, cloud.marketplace_modules(&placeholder)).await
+}
+
 /// POST /api/assistant/chat/stream — proxy SSE hacia el Cloud (ARQUITECTURA.md §9.3).
 /// Reenvía el `Authorization: Bearer` + `X-Hub-Id` entrantes; ensambla las tools permitidas
 /// (§9.2) y traduce el stream del Cloud al contrato del frontend (`token`/`done`).
@@ -144,24 +190,26 @@ async fn assistant_chat_stream(
     headers: HeaderMap,
     Json(frontend): Json<Value>,
 ) -> Response {
-    // El Bearer del usuario cloud se reenvía a Cloud (proxy del LLM); la sesión del hub da el
-    // contexto/permisos para ensamblar las tools (gate = mismas que la UI).
-    let Some(auth) = auth::user_auth(&headers, &st.config.hub_id) else {
+    // Credencial hub-scoped: token de máquina del hub si está enrolado; si no, el JWT del usuario.
+    // Así un cajero solo-local (sesión por PIN, sin JWT cloud) también usa el asistente.
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st.config) else {
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "ok": false, "error": "falta Authorization: Bearer" })),
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
         )
             .into_response();
     };
-    let tools = {
+    // La sesión LOCAL del hub da el contexto/permisos para ensamblar las tools (gate = el de la UI)
+    // y el id del usuario activo, que se manda como metadata de coste/auditoría (no permisos).
+    let (tools, active_user) = {
         let rt = st.runtime.lock().await;
         let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
             Ok(c) => c,
             Err(e) => return unauthorized(e),
         };
-        assistant::assemble_tools(rt.registry(), &ctx)
+        (assistant::assemble_tools(rt.registry(), &ctx), ctx.user_id.clone())
     };
-    let body = assistant::build_cloud_body(&frontend, tools);
+    let body = assistant::build_cloud_body(&frontend, tools, Some(&active_user));
 
     // Construye la petición al Cloud (POST, Bearer + X-Hub-Id) y abre el stream.
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);

@@ -109,6 +109,7 @@ import {
 } from 'ionicons/icons';
 import { user, isAuthed, logout } from './lib/session';
 import { moduleNav, refreshModuleNav } from './lib/nav';
+import { resolveEntitlement, needsActivation } from './lib/entitlement';
 
 interface NavItem { path: string; label: string; icon: string }
 interface NavSection { title: string; items: NavItem[] }
@@ -151,13 +152,22 @@ const initials = computed<string>(() => {
   return (user.value?.email?.[0] ?? '?').toUpperCase();
 });
 
-// Carga la nav de módulos instalados al entrar con sesión (y al loguearse). MarketplacePage la
-// refresca también al recibir el evento WS `module.installed` (lib/nav.refreshModuleNav).
+// Resuelve el entitlement (§2.10) ANTES de pintar la nav de módulos: solo se montan los que el
+// hub puede usar. MarketplacePage refresca la nav al recibir el evento WS `module.installed`.
+async function gateAndRefresh(): Promise<void> {
+  await resolveEntitlement();
+  await refreshModuleNav();
+}
 onMounted(() => {
-  if (isAuthed.value) void refreshModuleNav();
+  if (isAuthed.value) void gateAndRefresh();
 });
 watch(isAuthed, (authed) => {
-  if (authed) void refreshModuleNav();
+  if (authed) void gateAndRefresh();
+});
+// Si el entitlement resulta `needs_activation` (Tauri offline sin token cacheado, hub sin
+// derecho…), saca al usuario del negocio → pantalla de activación.
+watch(needsActivation, (needs) => {
+  if (needs && route.name !== 'activation') void router.replace('/activation');
 });
 
 function goHome(): void {

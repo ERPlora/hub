@@ -123,6 +123,7 @@ async fn hub_context_returns_configured_hub_id() {
         module_cache: std::env::temp_dir().join("erplora-test-cache"),
         auth_mode: erplora_server::AuthMode::Dev,
         jwt_public_key: None,
+        cloud_api_token: None,
     };
     let app = app(AppState::with_config(rt, cfg));
     let resp = app

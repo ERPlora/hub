@@ -99,6 +99,28 @@ impl CloudClient {
         self.get("/api/v1/hub/device/entitlement/", auth)
     }
 
+    /// **Enrolamiento del dispositivo** — el runtime obtiene su credencial de máquina
+    /// (`cloud_api_token`) una sola vez. `GET /api/v1/hub/device/enroll/` con el JWT de un
+    /// **owner/admin** de la org del hub (`IsHubAdmin`) + `X-Hub-Id`. La respuesta es
+    /// [`EnrollGrant`] (`hub_id` + `cloud_api_token`); el runtime la persiste de forma segura
+    /// y a partir de ahí usa [`Auth::HubToken`] (`X-Hub-Token`) para llamadas hub-scoped sin
+    /// usuario logueado (marketplace, entitlement…). §2.3.
+    pub fn enroll(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/enroll/", auth)
+    }
+
+    /// **Rotación** de la credencial de máquina — `POST /api/v1/hub/device/enroll/` (mismo endpoint,
+    /// `IsHubAdmin`). El Cloud genera un `cloud_api_token` **nuevo** (invalida el anterior) y lo
+    /// devuelve como [`EnrollGrant`]; el runtime lo re-persiste. Usar deliberadamente (compromiso de
+    /// credencial / rotación periódica): un hub en ECS necesita redeploy para tomar el nuevo env. §2.3.
+    pub fn enroll_rotate(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/enroll/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
     /// Clave pública RSA del Cloud (para verificar el token de entitlement offline).
     /// `GET /api/v1/auth/public-key/`. Sin auth (endpoint público).
     pub fn public_key(&self) -> PreparedRequest {
@@ -208,6 +230,20 @@ impl InstallGrant {
     /// Verifica que `bytes` (el zip descargado) coincide con el `sha256` esperado.
     pub fn verify(&self, bytes: &[u8]) -> Result<(), IntegrityError> {
         verify_sha256(bytes, &self.sha256)
+    }
+}
+
+/// Respuesta de [`CloudClient::enroll`]: la credencial de máquina del hub. §2.3.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct EnrollGrant {
+    pub hub_id: String,
+    /// Token de aplicación del hub para el header `X-Hub-Token` (contexto máquina).
+    pub cloud_api_token: String,
+}
+
+impl EnrollGrant {
+    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
     }
 }
 

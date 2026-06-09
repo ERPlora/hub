@@ -51,6 +51,13 @@ pub struct HubConfig {
     pub module_cache: PathBuf,
     pub auth_mode: AuthMode,
     pub jwt_public_key: Option<String>,
+    /// Credencial de **máquina** del hub (`cloud_api_token`), enviada como `X-Hub-Token` para
+    /// hablar con el Cloud en endpoints hub-scoped (marketplace, entitlement, asistente, install)
+    /// **sin** usuario logueado. La inyecta el despliegue (env `HUB_CLOUD_API_TOKEN`, ECS) o la
+    /// persiste el shell Tauri tras enrolar (`GET /api/v1/hub/device/enroll/`). Es un **secreto**:
+    /// vive solo aquí (runtime), nunca en el navegador. `None` en dev/local sin enrolar → se cae al
+    /// JWT del usuario activo. Ver ARQUITECTURA.md §2.3.
+    pub cloud_api_token: Option<String>,
 }
 
 /// UUID fijo de desarrollo si no se inyecta `HUB_ID` (decisión tomada — flag para humano).
@@ -71,7 +78,10 @@ impl HubConfig {
         };
         // Inyección directa de la clave (PEM) por entorno; si no, `main` la trae del Cloud.
         let jwt_public_key = std::env::var("HUB_JWT_PUBLIC_KEY").ok().filter(|s| !s.trim().is_empty());
-        Self { hub_id, cloud_base_url, module_cache, auth_mode, jwt_public_key }
+        // Token de máquina (ECS lo inyecta como `HUB_CLOUD_API_TOKEN`; Tauri lo setea tras enrolar).
+        let cloud_api_token =
+            std::env::var("HUB_CLOUD_API_TOKEN").ok().filter(|s| !s.trim().is_empty());
+        Self { hub_id, cloud_base_url, module_cache, auth_mode, jwt_public_key, cloud_api_token }
     }
 }
 

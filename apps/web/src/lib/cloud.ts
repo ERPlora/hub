@@ -2,6 +2,7 @@
 // billing van por aquí (ARQUITECTURA.md §2.1–2.3). Si el Cloud no es accesible (sandbox),
 // las llamadas lanzan y la capa de auth degrada a modo demo.
 import { config } from './config';
+import { loginHeaders } from './device';
 
 export interface CloudUser {
   id: string;
@@ -138,6 +139,56 @@ async function get<T>(path: string, timeoutMs = 8000): Promise<T> {
   return (await res.json()) as T;
 }
 
+// --- Llamadas hub-scoped vía el RUNTIME local (no directas al Cloud) ---------
+// marketplace + entitlement los firma el RUNTIME con el token de MÁQUINA del hub (X-Hub-Token),
+// que es un secreto y NO debe vivir en el navegador. El web pega al runtime local; el runtime
+// añade la credencial y proxea al Cloud. Reenviamos el JWT del usuario como FALLBACK para dev /
+// Tauri sin enrolar (el runtime prefiere su token de máquina cuando lo tiene). RUNTIME_URL se
+// define aquí (no se importa de ./runtime) para no crear un ciclo de módulos.
+const RUNTIME_URL: string =
+  (import.meta.env.VITE_RUNTIME_URL as string | undefined) ?? 'http://127.0.0.1:8787';
+
+async function runtimeGet<T>(path: string, timeoutMs = 8000): Promise<T> {
+  const call = (token: string | null): Promise<Response> => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    return fetch(`${RUNTIME_URL}${path}`, { headers, signal: ctrl.signal }).finally(() =>
+      clearTimeout(t),
+    );
+  };
+  let res = await call(getAccessToken());
+  if (res.status === 401) {
+    const fresh = await refreshTokens();
+    if (fresh) res = await call(fresh);
+  }
+  if (!res.ok) throw new Error(`runtime ${path} → ${res.status}`);
+  return (await res.json()) as T;
+}
+
+// --- Entitlement de módulos (gate de arranque, ARQUITECTURA.md §2.10) -------
+// Camino WEB (online): pide directamente el endpoint del Cloud. El camino TAURI usa el
+// comando `validate_entitlement` (caché offline + gracia) — ver lib/entitlement.ts.
+export interface EntitledModuleInfo {
+  moduleId: string;
+  tier: string;
+  version: string;
+}
+
+/** Lista de módulos que ESTE hub puede montar (según deployment_mode + compras de la org).
+ *  Vía el runtime local (firma con el token de máquina del hub). */
+export async function cloudEntitlement(): Promise<{ modules: EntitledModuleInfo[] }> {
+  const data = await runtimeGet<{ modules?: Array<{ module_id?: string; tier?: string; version?: string }> }>(
+    '/api/entitlement',
+  );
+  const modules = (data.modules ?? []).map((m) => ({
+    moduleId: String(m.module_id ?? ''),
+    tier: String(m.tier ?? 'basic'),
+    version: String(m.version ?? ''),
+  }));
+  return { modules };
+}
+
 // --- Billing: facturas y suscripciones (datos reales del Cloud) -------------
 // Contrato: cloud/config/urls.py → /api/v1/billing/{invoices,subscriptions}/
 // Schemas: InvoiceList / Subscription (cloud/ERPlora Cloud API.yaml).
@@ -202,13 +253,18 @@ export async function cloudSubscriptions(): Promise<CloudSubscription[]> {
   }));
 }
 
-async function post<T>(path: string, body: unknown, timeoutMs = 8000): Promise<T> {
+async function post<T>(
+  path: string,
+  body: unknown,
+  timeoutMs = 8000,
+  extraHeaders: Record<string, string> = {},
+): Promise<T> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(`${config.cloudApiUrl}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub' },
+      headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub', ...extraHeaders },
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
@@ -221,7 +277,14 @@ async function post<T>(path: string, body: unknown, timeoutMs = 8000): Promise<T
 
 /** Login email+password contra el Cloud (primer setup / dispositivo no confiable). */
 export async function cloudLogin(email: string, password: string): Promise<LoginResult> {
-  const tokens = await post<{ access: string; refresh: string }>('/api/v1/auth/login/', { email, password });
+  // En Tauri esto añade X-Client-Type: hub-desktop|hub-local + X-Device-Id para que el Cloud
+  // cree/resuelva el hub de ESTE dispositivo (ARQUITECTURA.md §2.9b). En web pura va como 'hub'.
+  const tokens = await post<{ access: string; refresh: string }>(
+    '/api/v1/auth/login/',
+    { email, password },
+    8000,
+    await loginHeaders(),
+  );
   const me = await meRequest(tokens.access);
   return { access: tokens.access, refresh: tokens.refresh, user: me, firstTime: false };
 }
@@ -239,11 +302,10 @@ function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudMarketpl
   };
 }
 
-/** Catálogo del Marketplace desde el Cloud Portal. En demo degrada a datos locales. */
+/** Catálogo del Marketplace vía el runtime local (firma con el token de máquina del hub, que
+ *  proxea a Cloud `/api/v1/marketplace/modules/`). En demo degrada a datos locales. */
 export async function cloudMarketplaceModules(): Promise<CloudMarketplaceModule[]> {
-  // Contrato del hub actual: apps/marketplace/api.py expone este proxy y el proxy
-  // consulta Cloud en /api/v1/marketplace/modules/.
-  const data = await get<unknown>('/api/v1/modules/marketplace/catalog/');
+  const data = await runtimeGet<unknown>('/api/marketplace/catalog');
   const items = Array.isArray(data)
     ? data
     : Array.isArray((data as { results?: unknown[] }).results)

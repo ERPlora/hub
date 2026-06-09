@@ -262,11 +262,10 @@
     },
     "orders.link_to_sale": {
       "permission": "orders.change_order",
-      "handler": {
-        "type": "wasm",
-        "file": "dist/handler.wasm",
-        "function": "link_to_sale"
-      },
+      "transaction": true,
+      "sql": [
+        "commands/link_to_sale.sql"
+      ],
       "ai": {
         "description": "Links an order to a completed sale in the sales module."
       }
@@ -274,7 +273,7 @@
   },
   "events": {
     "listen": {
-      "sales.after_checkout": {
+      "sale.completed": {
         "command": "orders.link_to_sale"
       }
     }

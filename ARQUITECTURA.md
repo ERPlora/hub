@@ -164,24 +164,29 @@ integridad por `ModuleVersion.sha256`, README extraído a `s3://erplora-docs/...
 
 ### 2.3 Autenticación Hub ↔ Cloud (verificado en código)
 
-> ⚠️ El root `CLAUDE.md` dice que "se eliminó el token de máquina"; **el código actual NO
-> lo ha eliminado**. Hoy conviven **tres credenciales** y hub debe replicarlas igual.
+> El token de máquina **no se eliminó: se cableó** (ADR-0003, 2026-06-10) como identidad de la
+> propia máquina del hub para las llamadas **hub-scoped**. Conviven **tres credenciales**, cada
+> una para su plano.
 
-1. **Token de aplicación del hub (`cloud_api_token`)** — *el "token del primer login"*. Se
-   **genera al registrar el hub** (`Hub.save()` → `secrets.token_hex(32)`, devuelto al
-   wizard de setup), guardado **cifrado** en Cloud (`Hub.cloud_api_token`). Viaja como
-   header **`X-Hub-Token`** + `X-Hub-Id`. Se usa para el **bootstrap del hub**
-   (`GET /api/hubs/{hub_id}/bootstrap/`, validado con `secrets.compare_digest`) y contexto
-   máquina (`IsHubMachine`).
-2. **JWT del usuario activo** — llamadas iniciadas por un usuario: `Authorization:
-   Bearer <access>` + `X-Hub-Id`. Persistido en el hub (`HubConfig.hub_jwt` +
-   `hub_refresh_token`) y en memoria (`jwt_holder`); refresh en `POST /api/v1/auth/refresh/`
-   (reintento en 401). Autoriza contra membresía de org (`IsHubMember`/`IsHubAdmin`).
-3. **`X-Webhook-Secret`** (== `CLOUD_WEBHOOK_SECRET`) + `X-Hub-Id` para M2M de fondo.
-
-> **hub replica esto tal cual**: en el registro/primer contacto obtiene su
-> `cloud_api_token`, lo usa para el bootstrap, y luego usa el JWT del usuario.
-> *(Pendiente menor: alinear el root `CLAUDE.md`, desactualizado.)*
+1. **Token de máquina del hub (`cloud_api_token`)** — identidad de la **propia máquina**. Se
+   **genera al crear el hub** (`Hub.save()` → `secrets.token_hex(32)`), guardado **cifrado** en
+   Cloud (`Hub.cloud_api_token`), validado con `compare_digest` (`IsHubMachine`). Viaja como
+   header **`X-Hub-Token`** + `X-Hub-Id`. Es la credencial **por defecto de todo lo hub-scoped**:
+   marketplace (browse/versions/download/mark_installed), entitlement, install, asistente,
+   métricas — endpoints ampliados a `IsHubMember | IsHubMachine`. Necesario porque el día a día
+   es sesión local/PIN (con usuarios solo-locales) y offline-first: casi nunca hay un JWT cloud
+   fresco, pero el hub debe poder hablar con Cloud **a sí mismo**.
+   - **Es un secreto del hub**: vive solo en el runtime Rust (`HubConfig.cloud_api_token`), **nunca
+     en el navegador**. El web pega a rutas proxy del runtime (`/api/entitlement`,
+     `/api/marketplace/catalog`) y el runtime firma hacia Cloud (`auth::hub_scoped_auth`).
+   - **Entrega:** env `HUB_CLOUD_API_TOKEN` (ECS); `GET /api/v1/hub/device/enroll/`
+     (owner/admin) para Tauri/local. Un hub pertenece siempre a una **organización**.
+2. **JWT del usuario activo** — **solo** llamadas atribuidas a usuario: compra, checkout, billing,
+   reviews. `Authorization: Bearer <access>` + `X-Hub-Id`; refresh en `POST /api/v1/auth/refresh/`
+   (reintento en 401). Autoriza contra membresía de org (`IsHubMember`/`IsHubAdmin`). También es el
+   **fallback** hub-scoped si el hub aún no está enrolado (dev/local).
+3. **`X-Webhook-Secret`** (== `CLOUD_WEBHOOK_SECRET`) + `X-Hub-Id` para M2M de fondo
+   (`IsInternalCaller`).
 
 ### 2.4 La clasificación del marketplace NO vive en el módulo
 
