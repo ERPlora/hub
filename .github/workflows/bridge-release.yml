@@ -1,0 +1,129 @@
+# ==============================================================================
+# ERPlora Bridge (desktop, Rust) — Build & Upload to S3
+# ==============================================================================
+#
+# El bridge standalone (`apps/bridge`, binario `erplora-bridge`) sobre el crate
+# `crates/peripherals`. Red-only ESC/POS (ARQUITECTURA.md §2.7).
+#
+# Pipeline:
+#   push main/develop ─► build (Windows + Linux) ─► S3 bridge/latest/
+#   push tag v*        ─► build (Windows + Linux) ─► S3 bridge/v{version}/ + latest/
+#
+# S3 layout (mismo bucket/prefijo que el Android y que espera el Cloud
+#   `apps/public/bridge/views.py`):
+#   s3://erplora-downloads/bridge/
+#   ├── latest/
+#   │   ├── erplora-bridge.exe      (Windows x64)
+#   │   └── erplora-bridge-linux    (Linux x86_64, binario estático-ish)
+#   └── v{version}/...
+#
+# macOS NO se construye aquí: es solo para desarrollo local (`cargo build`),
+# no se distribuye.
+#
+# AWS auth: OIDC (rol github-actions-deploy), igual que los repos cloud y aws.
+# El rol debe confiar también en este repo (ERPlora/hub) — ver §nota al final.
+# ==============================================================================
+
+name: Build Bridge Desktop
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+    name: Build ${{ matrix.out_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            out_name: erplora-bridge.exe
+            bin_path: target/release/erplora-bridge.exe
+          - os: ubuntu-latest
+            out_name: erplora-bridge-linux
+            bin_path: target/release/erplora-bridge
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+
+      - name: Build release binary
+        run: cargo build --release -p erplora-bridge
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "${{ matrix.bin_path }}" "dist/${{ matrix.out_name }}"
+          ls -la dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-${{ matrix.out_name }}
+          path: dist/${{ matrix.out_name }}
+
+  upload-s3:
+    name: Upload to S3
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::363427305647:role/github-actions-deploy
+          aws-region: eu-west-1
+
+      - name: Upload to S3
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="latest"
+          fi
+
+          for f in erplora-bridge.exe erplora-bridge-linux; do
+            if [ -f "artifacts/$f" ]; then
+              aws s3 cp "artifacts/$f" "s3://erplora-downloads/bridge/${VERSION}/$f"
+            fi
+          done
+
+          # En tag push, además refresca latest/.
+          if [[ "$VERSION" != "latest" ]]; then
+            for f in erplora-bridge.exe erplora-bridge-linux; do
+              aws s3 cp "s3://erplora-downloads/bridge/${VERSION}/$f" \
+                "s3://erplora-downloads/bridge/latest/$f" 2>/dev/null || true
+            done
+          fi
+
+          echo "Subido a s3://erplora-downloads/bridge/${VERSION}/"
+
+# ==============================================================================
+# NOTA (one-time, fuera de este repo): el rol IAM `github-actions-deploy` debe
+# incluir este repo en su trust policy OIDC. Hoy confía en ERPlora/cloud y
+# ERPlora/aws; añadir la condition para `repo:ERPlora/hub:*`. Vive en aws/ (Terraform).
+# ==============================================================================

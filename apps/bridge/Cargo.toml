@@ -1,0 +1,23 @@
+# erplora-bridge — bridge de hardware standalone (combo `cloud + web-PWA`). ARQUITECTURA.md §2.7.
+# Servidor Axum `GET /status` + `WS /ws` sobre `erplora-peripherals`. Reemplaza al Bridge Python.
+[package]
+name = "erplora-bridge"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "erplora-bridge"
+path = "src/main.rs"
+
+[dependencies]
+erplora-peripherals = { path = "../../crates/peripherals" }
+axum = { version = "0.7", features = ["ws"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Pendiente de fase de implementación: `tray-icon` (bandeja del sistema) — no añadido aún para
+# mantener el esqueleto compilando headless sin dependencias gráficas.

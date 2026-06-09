@@ -35,15 +35,26 @@
           <ion-card-content>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
               <h3 style="margin: 0; font-weight: 600">Conexión Bridge</h3>
-              <ion-badge color="medium">Desconectado</ion-badge>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <ion-badge :color="bridge.online ? 'success' : 'medium'">
+                  {{ bridge.online ? 'Conectado' : 'Desconectado' }}
+                </ion-badge>
+                <ion-button fill="clear" size="small" aria-label="Recomprobar" @click="refreshBridge">
+                  <ion-icon slot="icon-only" :icon="refreshOutline" />
+                </ion-button>
+              </div>
             </div>
-            <p style="margin: 0 0 12px; font-size: 13px; opacity: 0.65">
+            <p v-if="bridge.online" style="margin: 0 0 12px; font-size: 13px; opacity: 0.65">
+              Bridge está corriendo en este equipo<span v-if="bridge.version"> · v{{ bridge.version }}</span>.
+              Tus impresoras, cajón y escáneres se gestionan desde aquí.
+            </p>
+            <p v-else style="margin: 0 0 12px; font-size: 13px; opacity: 0.65">
               El cliente Bridge no está corriendo en este equipo. Vincula un Bridge
               abajo para gestionar el hardware — tus impresoras, cajón y escáneres
               aparecerán aquí.
             </p>
 
-            <ol style="margin: 0 0 16px; padding-left: 0; list-style: none; display: flex; gap: 12px; flex-wrap: wrap">
+            <ol v-if="!bridge.online" style="margin: 0 0 16px; padding-left: 0; list-style: none; display: flex; gap: 12px; flex-wrap: wrap">
               <li v-for="(s, i) in bridgeSteps" :key="s" style="display: flex; align-items: center; gap: 6px">
                 <ion-badge :color="i === 0 ? 'primary' : 'medium'" style="min-width: 22px; text-align: center">
                   {{ i + 1 }}
@@ -52,7 +63,7 @@
               </li>
             </ol>
 
-            <div>
+            <div v-if="!bridge.online">
               <div style="font-weight: 600; margin-bottom: 4px">Descargar ERPlora Bridge</div>
               <p style="margin: 0 0 12px; font-size: 13px; opacity: 0.65">
                 Bridge es una pequeña app nativa que conecta este hub con tus
@@ -63,7 +74,7 @@
                   v-for="os in BRIDGE_OS"
                   :key="os.label"
                   fill="outline"
-                  @click="handleBridgeDownload(os.label)"
+                  @click="handleBridgeDownload(os)"
                 >
                   <ion-icon slot="start" :icon="os.icon" />
                   {{ os.label }}
@@ -184,7 +195,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import {
   IonPage, IonHeader, IonToolbar, IonButtons, IonMenuButton, IonTitle, IonContent,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
@@ -194,8 +205,9 @@ import {
 import {
   pulseOutline, hardwareChipOutline, serverOutline, flashOutline,
   refreshOutline, checkmarkCircleOutline, cloudUploadOutline,
-  downloadOutline, documentTextOutline, desktopOutline, logoApple, terminalOutline,
+  downloadOutline, documentTextOutline, desktopOutline, terminalOutline, phonePortraitOutline,
 } from 'ionicons/icons';
+import { detectBridge, bridgeDownloadUrl, type BridgePlatform, type BridgeStatus } from '../lib/bridge-client';
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -212,6 +224,7 @@ interface Metric {
 interface BridgeOs {
   label: string;
   icon: string;
+  platform: BridgePlatform;
 }
 
 interface Backup {
@@ -231,6 +244,9 @@ const tab = ref<Tab>('resources');
 const toastMessage = ref('');
 const toastOpen = ref(false);
 
+// Estado real del Bridge local (detección por GET localhost:12321/status).
+const bridge = ref<BridgeStatus>({ online: false });
+
 // ── Static demo data (fiel al original) ─────────────────────────
 
 const METRICS: Metric[] = [
@@ -242,10 +258,11 @@ const METRICS: Metric[] = [
 
 const bridgeSteps: string[] = ['Descargar', 'Instalar', 'Vincular', 'Configurar'];
 
+// macOS fuera (solo desarrollo local). El Cloud sirve Windows/Linux/Android.
 const BRIDGE_OS: BridgeOs[] = [
-  { label: 'Windows', icon: desktopOutline },
-  { label: 'macOS',   icon: logoApple      },
-  { label: 'Linux',   icon: terminalOutline },
+  { label: 'Windows', icon: desktopOutline,       platform: 'windows' },
+  { label: 'Linux',   icon: terminalOutline,      platform: 'linux'   },
+  { label: 'Android', icon: phonePortraitOutline, platform: 'android' },
 ];
 
 const BACKUPS: Backup[] = [
@@ -269,9 +286,17 @@ function showToast(message: string): void {
   toastOpen.value = true;
 }
 
-function handleBridgeDownload(os: string): void {
-  showToast(`Descargando Bridge para ${os}…`);
+function handleBridgeDownload(os: BridgeOs): void {
+  showToast(`Descargando Bridge para ${os.label}…`);
+  // El Cloud redirige a S3 latest; abrimos en una pestaña nueva para no perder el hub.
+  window.open(bridgeDownloadUrl(os.platform), '_blank', 'noopener');
 }
+
+async function refreshBridge(): Promise<void> {
+  bridge.value = await detectBridge();
+}
+
+onMounted(refreshBridge);
 
 function handleCheckUpdates(): void {
   showToast('Buscando actualizaciones…');

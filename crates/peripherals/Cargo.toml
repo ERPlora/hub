@@ -1,0 +1,18 @@
+# erplora-peripherals — lógica de hardware POS reutilizable (red-only, ESC/POS sobre TCP:9100).
+# Consumido por el bridge standalone (apps/bridge) y, a futuro, por el sidecar Tauri (apps/tauri).
+# ARQUITECTURA.md §2.7. Esqueleto: tipos + firmas; la implementación real es fase siguiente.
+[package]
+name = "erplora-peripherals"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["rt", "net", "time", "sync", "macros", "io-util"] }
+tracing = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+mdns-sd = "0.11"
+oem_cp = "2"          # codificación cp437 para escpos::text
