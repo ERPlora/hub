@@ -22,6 +22,9 @@ const ENSURE_HUB_MODULE: &str = "CREATE TABLE IF NOT EXISTS hub_module (\
 pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, dir: &Path) -> Result<String> {
     let manifest = Manifest::load(dir)?;
 
+    // Tablas de sistema del runtime (outbox de eventos): necesarias en cuanto un command emita.
+    crate::outbox::ensure_tables(db).await?;
+
     if registry.is_installed(&manifest.id) {
         // Reinstalar = volver a registrar capacidades (p. ej. tras update). Limpiamos antes.
         registry.remove_module(&manifest.id);

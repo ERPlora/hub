@@ -1,32 +1,15 @@
-//! Bus de eventos en proceso. Al emitir un evento: (1) notifica al `EventSink` (→ WS) y
-//! (2) ejecuta los commands suscritos de **módulos activos**. ARQUITECTURA.md §4, §5.4.
-use erplora_db::{DatabaseAdapter, Params};
+//! Notificación de eventos al observador externo (WS) — **efímera**, para UI en vivo.
+//! La entrega DURABLE a los listeners de cada evento la hace el relay desde `_event_outbox`
+//! (ver `outbox.rs`): at-least-once, con backoff y dead-letter. ARQUITECTURA.md §4, §5.4.
+use erplora_db::Params;
 
-use crate::commands;
-use crate::errors::Result;
-use crate::registry::{Registry, RequestContext};
+use crate::registry::Registry;
 
-/// Despacha un evento: notifica observadores y ejecuta cada command suscrito (módulos activos).
-///
-/// `dispatch` and `commands::execute_at` are mutually recursive (a command emits events, an
-/// event runs subscribed commands), so the returned future is boxed to break the infinite
-/// async type recursion.
-pub fn dispatch<'a>(
-    db: &'a dyn DatabaseAdapter,
-    registry: &'a Registry,
-    event: &'a str,
-    payload: &'a Params,
-    ctx: &'a RequestContext,
-    depth: u32,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
-    Box::pin(async move {
-        // Observadores externos (p. ej. el WS del server).
-        if let Some(sink) = &registry.event_sink {
-            sink.emit(event, &serde_json::Value::Object(payload.clone()));
-        }
-        for command in registry.listeners_for(event) {
-            commands::execute_at(db, registry, &command, payload, ctx, depth).await?;
-        }
-        Ok(())
-    })
+/// Notifica al `EventSink` (→ WebSocket) que se emitió un evento. No garantiza entrega ni
+/// dispara listeners: es solo para que la UI reaccione en vivo. Se llama **tras** el commit
+/// del command emisor (o de cada entrega del relay), nunca antes.
+pub fn notify_sink(registry: &Registry, event: &str, payload: &Params) {
+    if let Some(sink) = &registry.event_sink {
+        sink.emit(event, &serde_json::Value::Object(payload.clone()));
+    }
 }

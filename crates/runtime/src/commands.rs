@@ -6,6 +6,7 @@ use serde_json::{json, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
 use crate::events;
+use crate::outbox;
 use crate::permissions;
 use crate::registry::{RegisteredCommand, Registry, RequestContext};
 
@@ -18,8 +19,9 @@ pub(crate) const MAX_EVENT_DEPTH: u32 = 16;
 /// dividir la operación. ARQUITECTURA.md §5.3.
 pub(crate) const NEW_IDS_BATCH: usize = 256;
 
-/// Ejecuta `name(payload)` con el contexto dado. Aplica permiso, ejecuta SQL (en transacción
-/// si está declarada) y emite los eventos resultantes.
+/// Ejecuta `name(payload)` con el contexto dado. Aplica permiso, ejecuta el SQL **y persiste
+/// los eventos emitidos en el outbox dentro de la MISMA transacción** (entrega at-least-once
+/// asíncrona; los listeners los corre el relay, ver `outbox.rs`). ARQUITECTURA.md §4/§5.4.
 pub async fn execute(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
@@ -27,9 +29,12 @@ pub async fn execute(
     payload: &Params,
     ctx: &RequestContext,
 ) -> Result<Json> {
-    execute_at(db, registry, name, payload, ctx, 0).await
+    execute_at(db, registry, name, payload, ctx, 0, &[]).await
 }
 
+/// Como [`execute`] pero a profundidad `depth` (cascada) y con `extra_ops` añadidos a la
+/// transacción del command. El relay usa `extra_ops` para insertar el marcador de entrega
+/// (`_event_delivery`) atómicamente con los efectos del listener (idempotencia, §5.4).
 pub(crate) async fn execute_at(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
@@ -37,6 +42,7 @@ pub(crate) async fn execute_at(
     payload: &Params,
     ctx: &RequestContext,
     depth: u32,
+    extra_ops: &[(String, Params)],
 ) -> Result<Json> {
     if depth > MAX_EVENT_DEPTH {
         return Err(RuntimeError::EventLoop);
@@ -51,7 +57,7 @@ pub(crate) async fn execute_at(
 
     // ── Tier 2: handler WASM ────────────────────────────────────────────────
     if let Some(bytes) = &cmd.wasm {
-        return execute_wasm(db, registry, cmd, payload, ctx, depth, bytes).await;
+        return execute_wasm(db, registry, cmd, payload, ctx, depth, bytes, extra_ops).await;
     }
 
     // ── Tier 0/1: SQL declarativo ───────────────────────────────────────────
@@ -62,19 +68,22 @@ pub(crate) async fn execute_at(
 
     let bound = crate::system_params(payload, ctx);
 
-    if cmd.def.transaction {
-        let ops: Vec<(String, Params)> =
-            cmd.sql.iter().map(|sql| (sql.clone(), bound.clone())).collect();
-        db.execute_tx(&ops).await?;
-    } else {
-        for sql in &cmd.sql {
-            db.execute(sql, &bound).await?;
-        }
-    }
-
-    // Emite eventos declarados; los payloads de evento llevan los params del command.
+    // SQL del command + INSERT en `_event_outbox` por cada evento emitido + `extra_ops` →
+    // UNA transacción. Si commitea, los eventos quedan persistidos; si revierte, no hay evento.
+    // (Decisión del humano #3: los commands `transaction:false` también se envuelven en tx para
+    // garantizar la escritura atómica del outbox.)
+    let mut ops: Vec<(String, Params)> =
+        cmd.sql.iter().map(|sql| (sql.clone(), bound.clone())).collect();
     for event in &cmd.def.emit {
-        events::dispatch(db, registry, event, &bound, ctx, depth + 1).await?;
+        ops.push(outbox::insert_op(ctx, event, &bound, depth + 1));
+    }
+    ops.extend_from_slice(extra_ops);
+    db.execute_tx(&ops).await?;
+
+    // Notificación al WS (UI en vivo), tras commit y solo si commiteó. Efímera; la entrega
+    // durable a listeners la hace el relay desde el outbox.
+    for event in &cmd.def.emit {
+        events::notify_sink(registry, event, &bound);
     }
 
     Ok(json!({ "ok": true }))
@@ -90,6 +99,7 @@ async fn execute_wasm(
     ctx: &RequestContext,
     depth: u32,
     bytes: &[u8],
+    extra_ops: &[(String, Params)],
 ) -> Result<Json> {
     let handler = cmd
         .def
@@ -132,24 +142,39 @@ async fn execute_wasm(
         }
     }
 
-    // Todas las intenciones + el emit del command original van en UNA transacción.
-    db.execute_tx(&tx_ops).await?;
-
-    // Eventos declarados por el command + eventos devueltos por el handler.
+    // Las intenciones + los INSERT de outbox (eventos declarados por el command + eventos
+    // devueltos por el handler) + `extra_ops` (marcador de entrega del relay) → UNA transacción.
     let declared_payload = crate::system_params(payload, ctx);
     for event in &cmd.def.emit {
-        events::dispatch(db, registry, event, &declared_payload, ctx, depth + 1).await?;
+        tx_ops.push(outbox::insert_op(ctx, event, &declared_payload, depth + 1));
     }
-    for ev in &output.events {
-        let payload = match &ev.payload {
-            Json::Object(map) => map.clone(),
-            other => {
-                let mut m = Params::new();
-                m.insert("value".into(), other.clone());
-                m
-            }
-        };
-        events::dispatch(db, registry, &ev.name, &payload, ctx, depth + 1).await?;
+    let handler_events: Vec<(String, Params)> = output
+        .events
+        .iter()
+        .map(|ev| {
+            let payload = match &ev.payload {
+                Json::Object(map) => map.clone(),
+                other => {
+                    let mut m = Params::new();
+                    m.insert("value".into(), other.clone());
+                    m
+                }
+            };
+            (ev.name.clone(), payload)
+        })
+        .collect();
+    for (name, payload) in &handler_events {
+        tx_ops.push(outbox::insert_op(ctx, name, payload, depth + 1));
+    }
+    tx_ops.extend_from_slice(extra_ops);
+    db.execute_tx(&tx_ops).await?;
+
+    // Notificación al WS (UI en vivo) tras commit; entrega durable a listeners = relay.
+    for event in &cmd.def.emit {
+        events::notify_sink(registry, event, &declared_payload);
+    }
+    for (name, payload) in &handler_events {
+        events::notify_sink(registry, name, payload);
     }
 
     Ok(json!({ "ok": true, "operations": output.operations.len() }))

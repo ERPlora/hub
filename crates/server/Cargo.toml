@@ -15,7 +15,7 @@ source = { package = "erplora-source", path = "../source" }
 # Vector store local (RAG): ingestión de descripciones `ai:`/`agent` al instalar un módulo.
 erplora-vector = { path = "../vector" }
 axum = { version = "0.7", features = ["ws"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
 tower = "0.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -29,6 +29,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let state = AppState::new(runtime);
+
+    // Tablas de sistema del runtime (outbox de eventos) — para el caso de hub vacío sin módulos.
+    state.runtime.lock().await.ensure_system_tables().await?;
+
+    // Relay de eventos: entrega at-least-once asíncrona de los eventos del outbox a sus listeners
+    // (ARQUITECTURA.md §5.4). Poll cada 1s; las filas con fallo se reprograman con backoff. Para
+    // 1–30 usuarios por hub, tomar el lock del runtime por ciclo es suficiente (§7.5).
+    {
+        let runtime = state.runtime.clone();
+        tokio::spawn(async move {
+            loop {
+                {
+                    let rt = runtime.lock().await;
+                    if let Err(e) = rt.process_outbox().await {
+                        eprintln!("relay outbox: {e}");
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            }
+        });
+    }
+
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     eprintln!("erplora-server escuchando en http://{bind}");
     axum::serve(listener, app(state)).await?;

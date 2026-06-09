@@ -128,6 +128,8 @@ async fn sale_decrements_stock_via_event() {
     rt.execute_command("sales.complete_sale", &params(json!({
         "items": [{ "product_id": pid, "product_name": "Café", "price": 1.21, "quantity": 3, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
+    // Entrega asíncrona: el relay procesa sale.completed → inventory.stock.decrease.
+    rt.drain_outbox().await.unwrap();
 
     let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": pid})), &ctx).await.unwrap();
     assert_eq!(p[0]["stock"].as_f64().unwrap(), 7.0, "el evento sale.completed debe descontar stock");
@@ -153,6 +155,8 @@ async fn sale_records_customer_purchase_via_event() {
         "customer_id": cid, "customer_name": "Cliente",
         "items": [{ "product_name": "X", "price": 50.0, "quantity": 1, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
+    // Entrega asíncrona: el relay procesa sale.completed → customers.record_purchase.
+    rt.drain_outbox().await.unwrap();
 
     let c = rt.execute_query("customers.get", &params(json!({"customer_id": cid})), &ctx).await.unwrap();
     assert_eq!(c[0]["lifecycle_stage"], json!("first_purchase"));

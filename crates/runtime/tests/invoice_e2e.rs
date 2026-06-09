@@ -116,6 +116,8 @@ async fn auto_f2_on_sale_completed() {
         "customer_name": "Bar Manolo", "tax_included": false,
         "items": [{ "product_name": "Café", "price": 2.0, "quantity": 3, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
+    // Entrega asíncrona: el relay procesa sale.completed → invoice.create_from_sale.
+    rt.drain_outbox().await.unwrap();
 
     // invoice escuchó sale.completed → F2 TICKET con la línea de la venta.
     let invs = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap();

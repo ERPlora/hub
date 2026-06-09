@@ -122,6 +122,8 @@ async fn sale_completed_records_cash_movement() {
         "tax_included": false,
         "items": [{ "product_name": "X", "price": 30.0, "quantity": 1, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
+    // Entrega asíncrona: el relay procesa sale.completed → cash_register.record_sale.
+    rt.drain_outbox().await.unwrap();
 
     let movs = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &ctx).await.unwrap();
     assert_eq!(movs.len(), 1, "la venta debe registrar 1 movimiento de caja");

@@ -19,6 +19,7 @@ pub mod installer;
 pub mod loader;
 pub mod manifest;
 pub mod migrations;
+pub mod outbox;
 pub mod permissions;
 pub mod queries;
 pub mod registry;
@@ -112,9 +113,27 @@ impl Runtime {
         self.registry.get_query(name).map(|q| q.def.list.is_some()).unwrap_or(false)
     }
 
-    /// Ejecuta un command declarativo (solo si su módulo está activo) + emite sus eventos.
+    /// Ejecuta un command declarativo (solo si su módulo está activo). Los eventos emitidos se
+    /// persisten en el outbox en la misma transacción; sus listeners los entrega el relay (§5.4).
     pub async fn execute_command(&self, name: &str, payload: &Params, ctx: &RequestContext) -> Result<Json> {
         commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx).await
+    }
+
+    /// Crea las tablas de sistema del runtime (outbox de eventos). Idempotente; el server la llama
+    /// al arrancar para cubrir el caso de hub vacío (sin módulos aún).
+    pub async fn ensure_system_tables(&self) -> Result<()> {
+        outbox::ensure_tables(self.db.as_ref()).await
+    }
+
+    /// Un ciclo del relay de eventos: entrega los eventos vencidos del outbox a sus listeners.
+    /// Lo llama el bucle de background del server. Devuelve cuántas filas tomó (0 = nada vencido).
+    pub async fn process_outbox(&self) -> Result<usize> {
+        outbox::process_once(self.db.as_ref(), &self.registry).await
+    }
+
+    /// Drena el outbox hasta vaciarlo (cascada incluida). Útil al arrancar y en tests.
+    pub async fn drain_outbox(&self) -> Result<usize> {
+        outbox::drain(self.db.as_ref(), &self.registry).await
     }
 
     /// Menú dinámico de los módulos **activos** (lo consume el shell). ARQUITECTURA.md §7.7.
