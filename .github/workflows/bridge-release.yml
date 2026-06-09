@@ -80,6 +80,9 @@ jobs:
   upload-s3:
     name: Upload to S3
     needs: [build]
+    # El rol OIDC `github-actions-deploy` solo confía en `ERPlora/hub` en `main` (y tags por
+    # extensión vía el patrón de subs). `develop` compila pero NO publica ("develop never deploys").
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # OIDC
@@ -123,7 +126,9 @@ jobs:
           echo "Subido a s3://erplora-downloads/bridge/${VERSION}/"
 
 # ==============================================================================
-# NOTA (one-time, fuera de este repo): el rol IAM `github-actions-deploy` debe
-# incluir este repo en su trust policy OIDC. Hoy confía en ERPlora/cloud y
-# ERPlora/aws; añadir la condition para `repo:ERPlora/hub:*`. Vive en aws/ (Terraform).
+# Trust OIDC (rol `github-actions-deploy`, en aws/terraform/github_actions_oidc.tf):
+#   - `repo:ERPlora/hub:ref:refs/heads/main`  → YA presente (push a main publica).
+#   - `repo:ERPlora/hub:ref:refs/tags/v*`     → AÑADIR para publicar versiones por tag
+#     (mismo patrón que ya tiene ERPlora/ux). El rol ya tiene S3 vía AdministratorAccess.
+# `develop` compila pero NO publica (gate `if` arriba); coherente con "develop never deploys".
 # ==============================================================================
