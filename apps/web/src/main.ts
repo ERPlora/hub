@@ -11,6 +11,7 @@ import { router } from './router';
 import { getClient, clientInjectionKey, bootHubContext } from './lib/runtime';
 import { setOnSessionExpired } from './lib/cloud';
 import { logout } from './lib/session';
+import { bootPrintOnSale } from './lib/print-on-sale';
 
 // Los componentes de OutfitKit (ok-data-table, etc.) usan ion-icon POR NOMBRE ('pencil', 'trash',
 // 'chevron-back'…). En @ionic/vue los iconos por nombre hay que registrarlos con addIcons (no se
@@ -50,6 +51,14 @@ const app = createApp(App).use(IonicVue).use(router);
 // Cliente del runtime local (Axum) inyectado en todo el árbol (provide/inject). Las vistas y
 // ModuleView lo consumen para hablar con el runtime (query/command/eventos WS). lib/runtime.ts.
 app.provide(clientInjectionKey, getClient());
+
+// Los Web Components de módulo (Lit) leen el cliente de `globalThis.erplora` (datos por
+// .query/.command, hardware por .peripherals). El shell es el ÚNICO dueño de la conexión al
+// Bridge — los módulos nunca lo abren ellos mismos (ARQUITECTURA.md §2.7).
+(globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = getClient();
+
+// Auto-impresión del ticket al cerrar venta (escucha `sale.completed` en el shell, no en sales).
+bootPrintOnSale(getClient());
 
 // Si un refresh falla (sesión expirada de verdad), cloud.ts ya limpió los tokens; aquí
 // limpiamos el estado reactivo del usuario y mandamos a /login vía el router del shell.
