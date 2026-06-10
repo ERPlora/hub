@@ -451,13 +451,27 @@ export class IpcTransport implements ErploraTransport {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class ErploraClient {
+  private bridge?: BridgeTransport;
+
   constructor(
     private readonly transport: ErploraTransport,
     private readonly opts: {
       permissions?: () => ReadonlySet<string>;
       notifier?: (n: Notification) => void;
     } = {},
-  ) {}
+    bridge?: BridgeTransport,
+  ) {
+    this.bridge = bridge;
+  }
+
+  /**
+   * Hardware local (impresoras de red / cajón) — el módulo llama AQUÍ, nunca al Bridge directo.
+   * El shell decide el transporte (ws-localhost en web-PWA, invoke en Tauri); el módulo ni se
+   * entera. Igual que el WC nunca toca la BD, tampoco toca el Bridge (ARQUITECTURA.md §2.7).
+   */
+  get peripherals(): BridgeTransport {
+    return (this.bridge ??= new BridgeClient());
+  }
 
   /**
    * Query genérica. Compat: si la query es de **lista** (`{rows,total,…}`), desenvuelve y entrega
@@ -508,9 +522,11 @@ export function createClient(
 ): ErploraClient {
   if (kind === 'ipc') {
     if (!deps.tauri) throw new Error('IpcTransport requiere el bridge de Tauri');
-    return new ErploraClient(new IpcTransport(deps.tauri), clientOpts);
+    // Datos por invoke + hardware por invoke (el shell Tauri ES el bridge, §2.7).
+    return new ErploraClient(new IpcTransport(deps.tauri), clientOpts, new IpcBridgeTransport(deps.tauri));
   }
-  return new ErploraClient(new HttpWsTransport(deps.http), clientOpts);
+  // Datos por HTTP+WS + hardware por WS-localhost (el Bridge standalone, §2.7).
+  return new ErploraClient(new HttpWsTransport(deps.http), clientOpts, new BridgeClient());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -551,11 +567,27 @@ export interface BridgeStatus {
 }
 
 /**
- * Cliente del Bridge local. Detección por `GET /status` y comandos por WebSocket
- * (un comando → primer evento esperado). Mismo contrato JSON que el binario Rust
- * `apps/bridge` y `bridge.js`.
+ * Transporte de hardware (periféricos) — abstracción intercambiable, igual que `ErploraTransport`
+ * para los datos. El shell elige la implementación según Axis B (web-PWA → `WsBridgeTransport`
+ * sobre `ws://localhost`; Tauri → `IpcBridgeTransport` sobre `invoke`). Los módulos consumen esto
+ * vía `erplora.peripherals`, sin conocer el transporte.
  */
-export class BridgeClient {
+export interface BridgeTransport {
+  detect(timeoutMs?: number): Promise<BridgeStatus>;
+  discoverPrinters(): Promise<BridgePrinter[]>;
+  getDevices(): Promise<BridgeDevice[]>;
+  print(printerId: string, documentType: string, data: Record<string, unknown>, jobId?: string): Promise<void>;
+  testPrint(printerId: string): Promise<void>;
+  openDrawer(printerId: string, pin?: number): Promise<void>;
+  setDeviceRole(mac: string, role: string): Promise<BridgeDevice[]>;
+}
+
+/**
+ * Transporte de hardware por **WebSocket** (combo web-PWA). Detección por `GET /status` y
+ * comandos por WS (un comando → primer evento esperado). Mismo contrato JSON que el binario Rust
+ * `apps/bridge` y `bridge.js`. `BridgeClient` es un alias histórico de `WsBridgeTransport`.
+ */
+export class BridgeClient implements BridgeTransport {
   private readonly base: string;
   private readonly wsUrl: string;
 
@@ -667,5 +699,55 @@ export class BridgeClient {
   async setDeviceRole(mac: string, role: string): Promise<BridgeDevice[]> {
     const r = await this.request({ action: 'set_device_role', mac, role }, ['devices']);
     return (r.devices as BridgeDevice[]) ?? [];
+  }
+}
+
+/** Alias semántico del transporte de hardware por WebSocket (combo web-PWA). */
+export { BridgeClient as WsBridgeTransport };
+
+/**
+ * Transporte de hardware por Tauri **invoke** (combos Tauri). El shell Tauri delega en el crate
+ * `erplora-peripherals` (apps/tauri/README §2.7.1); no hay servidor localhost ni WS. Mismos
+ * métodos que `WsBridgeTransport`, así que el módulo no distingue el transporte.
+ */
+export class IpcBridgeTransport implements BridgeTransport {
+  constructor(private readonly tauri: TauriBridge) {}
+
+  async detect(): Promise<BridgeStatus> {
+    try {
+      const v = (await this.tauri.invoke('erplora_bridge_status', {})) as { version?: string };
+      return { online: true, version: v?.version };
+    } catch {
+      return { online: false };
+    }
+  }
+
+  discoverPrinters(): Promise<BridgePrinter[]> {
+    return this.tauri.invoke('erplora_discover_printers', {}) as Promise<BridgePrinter[]>;
+  }
+
+  getDevices(): Promise<BridgeDevice[]> {
+    return this.tauri.invoke('erplora_get_devices', {}) as Promise<BridgeDevice[]>;
+  }
+
+  async print(
+    printerId: string,
+    documentType: string,
+    data: Record<string, unknown>,
+    jobId?: string,
+  ): Promise<void> {
+    await this.tauri.invoke('erplora_print', { printerId, documentType, data, jobId: jobId ?? null });
+  }
+
+  async testPrint(printerId: string): Promise<void> {
+    await this.tauri.invoke('erplora_test_print', { printerId });
+  }
+
+  async openDrawer(printerId: string, pin = 2): Promise<void> {
+    await this.tauri.invoke('erplora_open_drawer', { printerId, pin });
+  }
+
+  setDeviceRole(mac: string, role: string): Promise<BridgeDevice[]> {
+    return this.tauri.invoke('erplora_set_device_role', { mac, role }) as Promise<BridgeDevice[]>;
   }
 }
