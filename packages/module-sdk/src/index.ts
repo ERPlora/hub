@@ -512,3 +512,160 @@ export function createClient(
   }
   return new ErploraClient(new HttpWsTransport(deps.http), clientOpts);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bridge de hardware local (impresoras de red / cajón). Canal SEPARADO del
+// transporte de datos (ARQUITECTURA.md §2.7): el navegador no abre TCP a la
+// impresora, el Bridge sí. La PWA habla con el Bridge en localhost:12321
+// (GET /status + WS /ws). En el shell Tauri esto será `invoke` (pendiente).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const BRIDGE_DEFAULT_PORT = 12321;
+
+/** Impresora descubierta por el Bridge (`network:{ip}:{port}`). */
+export interface BridgePrinter {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  paper_width: number;
+  mac?: string;
+}
+
+/** Dispositivo del registro persistente del Bridge (con su rol asignado). */
+export interface BridgeDevice {
+  mac: string;
+  ip: string;
+  port: number;
+  name: string;
+  role?: string | null;
+  type: string;
+  first_seen: string;
+  last_seen: string;
+  status: string;
+}
+
+export interface BridgeStatus {
+  online: boolean;
+  version?: string;
+}
+
+/**
+ * Cliente del Bridge local. Detección por `GET /status` y comandos por WebSocket
+ * (un comando → primer evento esperado). Mismo contrato JSON que el binario Rust
+ * `apps/bridge` y `bridge.js`.
+ */
+export class BridgeClient {
+  private readonly base: string;
+  private readonly wsUrl: string;
+
+  constructor(host: string = `localhost:${BRIDGE_DEFAULT_PORT}`) {
+    this.base = `http://${host}`;
+    this.wsUrl = `ws://${host}/ws`;
+  }
+
+  /** ¿Está el Bridge corriendo en este equipo? `GET /status` con timeout corto. */
+  async detect(timeoutMs = 800): Promise<BridgeStatus> {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${this.base}/status`, { signal: ctrl.signal });
+      if (!res.ok) return { online: false };
+      const b = (await res.json()) as { ok?: boolean; version?: string };
+      return { online: b.ok === true, version: b.version };
+    } catch {
+      return { online: false };
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  /** Abre el WS, envía una acción y resuelve con el primer evento de `resolveOn`. */
+  private request(
+    action: Record<string, unknown>,
+    resolveOn: string[],
+    rejectOn: string[] = ['error'],
+    timeoutMs = 20000,
+  ): Promise<Record<string, unknown>> {
+    return new Promise((resolve, reject) => {
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(this.wsUrl);
+      } catch (e) {
+        reject(e as Error);
+        return;
+      }
+      const done = (fn: () => void) => {
+        clearTimeout(timer);
+        try {
+          ws.close();
+        } catch {
+          /* noop */
+        }
+        fn();
+      };
+      const timer = setTimeout(() => done(() => reject(new Error('bridge timeout'))), timeoutMs);
+      ws.onmessage = (ev: MessageEvent) => {
+        let msg: Record<string, unknown>;
+        try {
+          msg = JSON.parse(String(ev.data));
+        } catch {
+          return;
+        }
+        const event = msg.event as string;
+        if (rejectOn.includes(event)) {
+          done(() => reject(new Error((msg.error as string) || (msg.message as string) || event)));
+        } else if (resolveOn.includes(event)) {
+          done(() => resolve(msg));
+        }
+      };
+      ws.onerror = () => done(() => reject(new Error('bridge ws error')));
+      ws.onopen = () => ws.send(JSON.stringify(action));
+    });
+  }
+
+  /** Re-escanea la red (subred 9100 + mDNS) y devuelve las impresoras. */
+  async discoverPrinters(): Promise<BridgePrinter[]> {
+    const r = await this.request({ action: 'discover_printers' }, ['printers']);
+    return (r.printers as BridgePrinter[]) ?? [];
+  }
+
+  /** Dispositivos del registro (con sus roles). */
+  async getDevices(): Promise<BridgeDevice[]> {
+    const r = await this.request({ action: 'get_devices' }, ['devices']);
+    return (r.devices as BridgeDevice[]) ?? [];
+  }
+
+  /** Página de prueba en la impresora indicada. */
+  async testPrint(printerId: string): Promise<void> {
+    await this.request({ action: 'test_print', printer_id: printerId }, ['print_complete'], [
+      'error',
+      'print_error',
+    ]);
+  }
+
+  /** Imprime un documento (`document_type` + `data`); el Bridge renderiza el ESC/POS. */
+  async print(
+    printerId: string,
+    documentType: string,
+    data: Record<string, unknown>,
+    jobId?: string,
+  ): Promise<void> {
+    await this.request(
+      { action: 'print', printer_id: printerId, document_type: documentType, data, job_id: jobId ?? null },
+      ['print_complete'],
+      ['error', 'print_error'],
+    );
+  }
+
+  /** Abre el cajón por el kick ESC/POS de la impresora. */
+  async openDrawer(printerId: string, pin = 2): Promise<void> {
+    await this.request({ action: 'open_drawer', printer_id: printerId, pin }, ['drawer_opened']);
+  }
+
+  /** Asigna un rol (receipt/kitchen/bar/label) a un dispositivo y devuelve el registro. */
+  async setDeviceRole(mac: string, role: string): Promise<BridgeDevice[]> {
+    const r = await this.request({ action: 'set_device_role', mac, role }, ['devices']);
+    return (r.devices as BridgeDevice[]) ?? [];
+  }
+}

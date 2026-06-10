@@ -1,13 +1,21 @@
-# apps/tauri (scaffold parcial)
+# apps/tauri
 
 Empaquetado **desktop/móvil** (Tauri v2) del mismo shell + runtime Rust. ARQUITECTURA.md §1, §3.
 
-Expondrá `erplora_query`/`erplora_command` por `invoke` (IPC) + Tauri events (push) →
-delegando en `crates/runtime`. DB local = SQLite (`HUB_SQLITE_PATH`, §8). Sin red salvo
-marketplace/AI/primer-login (§2.8).
+Arranca el **runtime embebido** (`erplora_server::serve` en un hilo tokio dedicado, loopback
+`127.0.0.1:8787`) y expone por `invoke` el gate de arranque + identidad de dispositivo/máquina
+(`validate_entitlement`, `device_context`, `enroll_device`, `rotate_machine_token`). DB local =
+SQLite en `app_data_dir`. Sin red salvo marketplace/AI/primer-login (§2.8).
 
-**Pendiente**: requiere toolchain Rust + Tauri CLI. De-risk #2 del §12 (Tauri `invoke` y
-Axum llamando al *mismo* `runtime`).
+**Estado**: **compila** — `crates/cloud-client/src/entitlement.rs` (RS256 offline) + `src-tauri/`
+(gate + keychain del SO para el token de máquina). Es **miembro del workspace raíz**;
+`cargo check -p erplora-tauri` pasa en verde.
+
+**Para construir el binario** (`cargo tauri build`):
+1. Toolchain Tauri v2 + WebView del SO (macOS WKWebView / Windows WebView2 / Linux webkit2gtk).
+2. Frontend: `pnpm -F @erplora/web build` (genera el `dist` que referencia `tauri.conf.json`).
+3. Iconos de bundle completos: hay `icons/icon.png` (suficiente para `cargo check`/dev); para el
+   bundle final generar el set con `cargo tauri icon icons/icon.png` (`.icns`/`.ico`/PNGs).
 
 ## Gate de arranque por entitlement (la app Tauri es GRATIS)
 

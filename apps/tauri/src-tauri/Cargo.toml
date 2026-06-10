@@ -1,8 +1,8 @@
 # apps/tauri — empaquetado desktop/Android (Tauri v2) de la app GRATUITA.
 #
-# NO está en `members` del workspace raíz todavía: requiere el toolchain Tauri v2 y el
-# `dist` del frontend (`apps/web`), igual que indica el README. Cuando se estabilice el
-# arranque (§11 / de-risk #2), añadir "apps/tauri/src-tauri" a `members` en `../../../Cargo.toml`.
+# Miembro del workspace raíz (`../../../Cargo.toml`). Compilarlo requiere el toolchain Tauri v2
+# (WebView del SO) y el `dist` del frontend (`apps/web` → `pnpm -F @erplora/web build`).
+
 [package]
 name = "erplora-tauri"
 edition = "2021"
@@ -20,9 +20,23 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 erplora-cloud-client = { path = "../../../crates/cloud-client" }
+# Runtime del hub **embebido in-process** (§11): el shell arranca el mismo `erplora-server` (Axum)
+# que en cloud, sobre SQLite local, y el webview le habla por loopback (127.0.0.1:8787) igual que
+# en web. Arrastra runtime+db+axum. NO compilado aquí (apps/tauri fuera del workspace).
+erplora-server = { path = "../../../crates/server" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 uuid = { version = "1", features = ["v4"] }
+
+# Keychain del SO para el token de máquina del hub (secreto). SOLO desktop: el crate `keyring`
+# no tiene backend en Android, y `sync-secret-service` arrastra dbus/zbus que no compilan para
+# Android → se declara target-específica (no-android). En Android se usa el fichero 0600 dentro
+# del sandbox por-app. Ver `src/lib.rs::persist_machine_token`. Features (keyring 3.x):
+# macOS=apple-native, Windows=windows-native, Linux=sync-secret-service+crypto-rust (cifrado del
+# transporte D-Bus en Rust puro, sin OpenSSL). NO compilado aquí: apps/tauri está fuera del
+# workspace (necesita toolchain Tauri v2).
+[target.'cfg(not(target_os = "android"))'.dependencies]
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }

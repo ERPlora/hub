@@ -33,7 +33,106 @@ pub mod install;
 pub mod session;
 pub mod state;
 
-pub use state::{AppState, AuthMode, HubConfig, WsEvent};
+pub use state::{AppState, AuthMode, HubConfig, DEV_HUB_ID, WsEvent};
+
+/// Configuración de arranque del runtime **embebible** — la usan el binario (`main.rs`) y el shell
+/// **Tauri in-process** (§11). Envuelve la [`HubConfig`] de despliegue + parámetros de proceso.
+#[derive(Clone, Debug)]
+pub struct ServeConfig {
+    /// Ruta del fichero SQLite (se crea si no existe).
+    pub sqlite_path: String,
+    /// Dirección de escucha. Por defecto `127.0.0.1:8787`.
+    pub bind: String,
+    /// Carpeta opcional de módulos a instalar al arrancar (hub vacío / dev).
+    pub modules_dir: Option<String>,
+    /// Configuración de despliegue (hub_id, Cloud, `auth_mode`, token de máquina…).
+    pub hub: HubConfig,
+}
+
+impl ServeConfig {
+    /// Igual que el binario: `HUB_SQLITE_PATH` / `HUB_BIND` / `HUB_MODULES_DIR` + [`HubConfig::from_env`].
+    pub fn from_env() -> Self {
+        Self {
+            sqlite_path: std::env::var("HUB_SQLITE_PATH").unwrap_or_else(|_| "erplora.db".into()),
+            bind: std::env::var("HUB_BIND").unwrap_or_else(|_| "127.0.0.1:8787".into()),
+            modules_dir: std::env::var("HUB_MODULES_DIR").ok().filter(|s| !s.is_empty()),
+            hub: HubConfig::from_env(),
+        }
+    }
+}
+
+/// Trae la clave pública RSA del Cloud (`GET /api/v1/auth/public-key/`) para verificar los JWT de
+/// usuario offline. `None` si el Cloud no responde o no la trae.
+async fn fetch_jwt_public_key(cloud_base_url: &str) -> Option<String> {
+    let url = format!("{}/api/v1/auth/public-key/", cloud_base_url.trim_end_matches('/'));
+    let resp = reqwest::Client::new().get(&url).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let v: Value = resp.json().await.ok()?;
+    v.get("public_key").and_then(|k| k.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string())
+}
+
+/// Arranca el runtime completo y **sirve Axum** en `cfg.bind` hasta que termina. Punto de entrada
+/// único del binario y del shell Tauri (in-process, §11): abre SQLite, instala los módulos del dir
+/// si se indica, resuelve la clave pública del Cloud si falta, monta el [`AppState`], lanza el
+/// **relay del outbox** (poll 1s + backoff, §5.4) y sirve. La credencial de máquina viaja en
+/// `cfg.hub.cloud_api_token` (Tauri la inyecta desde el keychain; ECS desde el env).
+pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error>> {
+    use erplora_db::SqliteAdapter;
+    use erplora_runtime::Runtime;
+
+    // sqlx-style URL: `sqlite://<path>?mode=rwc` crea el fichero si falta.
+    let db = SqliteAdapter::connect(&format!("sqlite://{}?mode=rwc", cfg.sqlite_path)).await?;
+    let mut runtime = Runtime::new(Box::new(db));
+
+    if let Some(dir) = &cfg.modules_dir {
+        for entry in std::fs::read_dir(dir)? {
+            let path = entry?.path();
+            if path.join("module.json").exists() {
+                match runtime.install_from_dir(&path).await {
+                    Ok(id) => eprintln!("✓ módulo instalado: {id}"),
+                    Err(e) => eprintln!("✗ módulo {}: {e}", path.display()),
+                }
+            }
+        }
+    }
+
+    // En `HUB_AUTH=session` el login cloud necesita la clave pública RSA del Cloud; el PIN no. Si no
+    // se logra traer, se arranca igual (login cloud quedará no disponible).
+    if cfg.hub.auth_mode == AuthMode::Session && cfg.hub.jwt_public_key.is_none() {
+        cfg.hub.jwt_public_key = fetch_jwt_public_key(&cfg.hub.cloud_base_url).await;
+        if cfg.hub.jwt_public_key.is_none() {
+            eprintln!("auth: sin clave pública del Cloud → login cloud no disponible (PIN sí)");
+        }
+    }
+    eprintln!("auth: modo {:?}", cfg.hub.auth_mode);
+
+    let state = AppState::with_config(runtime, cfg.hub);
+    // Tablas de sistema del runtime (outbox) — para el caso de hub vacío sin módulos.
+    state.runtime.lock().await.ensure_system_tables().await?;
+
+    // Relay de eventos: entrega at-least-once asíncrona del outbox a sus listeners (§5.4).
+    {
+        let runtime = state.runtime.clone();
+        tokio::spawn(async move {
+            loop {
+                {
+                    let rt = runtime.lock().await;
+                    if let Err(e) = rt.process_outbox().await {
+                        eprintln!("relay outbox: {e}");
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            }
+        });
+    }
+
+    let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
+    eprintln!("erplora-server escuchando en http://{}", cfg.bind);
+    axum::serve(listener, app(state)).await?;
+    Ok(())
+}
 
 /// Construye el router con todas las rutas montadas sobre `state`.
 pub fn app(state: AppState) -> Router {

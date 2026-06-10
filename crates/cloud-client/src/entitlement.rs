@@ -13,10 +13,11 @@
 //! desactivamos la validación de `exp` de `jsonwebtoken` y comprobamos `grace_until` aquí.
 
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-/// Un módulo al que el hub tiene derecho.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+/// Un módulo al que el hub tiene derecho. `Serialize` además de `Deserialize`: el gate Tauri lo
+/// devuelve al frontend dentro de `GateOutcome` (vía `invoke`).
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct EntitledModule {
     pub module_id: String,
     pub tier: String,

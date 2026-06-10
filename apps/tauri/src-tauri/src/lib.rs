@@ -237,10 +237,41 @@ fn machine_token_path(cache_dir: &std::path::Path) -> PathBuf {
     cache_dir.join(MACHINE_TOKEN_FILE)
 }
 
-/// Persiste el token de máquina con permisos **restrictivos** (0600 en unix): es un secreto del
-/// hub. (Un backend de keychain del SO sería aún mejor, pero requiere el toolchain Tauri v2 para
-/// verificarse; este fichero con permisos de propietario es el endurecimiento mínimo y portable.)
-fn persist_machine_token(cache_dir: &std::path::Path, token: &str) -> Result<(), GateError> {
+// ── Keychain del SO (desktop) ─────────────────────────────────────────────────────────────────
+// El token de máquina es un secreto: en desktop va al **keychain del SO** (macOS Keychain,
+// Windows Credential Manager, Linux Secret Service vía el crate `keyring`). En **Android** el
+// crate `keyring` no tiene backend, así que NO se compila (dep target-específica en Cargo.toml) y
+// se cae al fichero 0600 dentro del sandbox por-app de Android. Una sola entrada por dispositivo
+// (un hub por dispositivo, §2.9b) → cuenta fija.
+#[cfg(not(target_os = "android"))]
+const KEYRING_SERVICE: &str = "com.erplora.hub";
+#[cfg(not(target_os = "android"))]
+const KEYRING_ACCOUNT: &str = "machine-token";
+
+#[cfg(not(target_os = "android"))]
+fn keyring_set(token: &str) -> bool {
+    keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .and_then(|e| e.set_password(token))
+        .is_ok()
+}
+#[cfg(not(target_os = "android"))]
+fn keyring_get() -> Option<String> {
+    let e = keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT).ok()?;
+    let t = e.get_password().ok()?.trim().to_string();
+    (!t.is_empty()).then_some(t)
+}
+#[cfg(target_os = "android")]
+fn keyring_set(_token: &str) -> bool {
+    false
+}
+#[cfg(target_os = "android")]
+fn keyring_get() -> Option<String> {
+    None
+}
+
+/// Escribe el token en un fichero con permisos **restrictivos** (0600 en unix). Fallback cuando el
+/// keychain del SO no está disponible (Android, o Linux sin Secret Service / headless).
+fn persist_token_file(cache_dir: &std::path::Path, token: &str) -> Result<(), GateError> {
     std::fs::create_dir_all(cache_dir).map_err(|e| GateError::Io(e.to_string()))?;
     let path = machine_token_path(cache_dir);
     #[cfg(unix)]
@@ -263,17 +294,43 @@ fn persist_machine_token(cache_dir: &std::path::Path, token: &str) -> Result<(),
     Ok(())
 }
 
-/// Lee el token de máquina persistido, si existe. Lo usará el arranque del **runtime embebido**
-/// para exponerlo como `HUB_CLOUD_API_TOKEN` (que `HubConfig::from_env` lee) — igual que ECS lo
-/// inyecta por env. `None` si el dispositivo aún no está enrolado.
+/// Persiste el token de máquina: **keychain del SO** primero (desktop); si no está disponible,
+/// fichero 0600. Cuando el keychain acepta, **borra** cualquier copia legacy en fichero para no
+/// dejar el secreto en claro.
+fn persist_machine_token(cache_dir: &std::path::Path, token: &str) -> Result<(), GateError> {
+    if keyring_set(token) {
+        let _ = std::fs::remove_file(machine_token_path(cache_dir));
+        return Ok(());
+    }
+    persist_token_file(cache_dir, token)
+}
+
+/// Lee el token de máquina persistido (keychain del SO → fichero), si existe. Lo usará el arranque
+/// del **runtime embebido** para exponerlo como `HUB_CLOUD_API_TOKEN` (que `HubConfig::from_env`
+/// lee) — igual que ECS lo inyecta por env. `None` si el dispositivo aún no está enrolado.
 pub fn load_machine_token(cache_dir: &std::path::Path) -> Option<String> {
-    std::fs::read_to_string(machine_token_path(cache_dir))
+    keyring_get().or_else(|| {
+        std::fs::read_to_string(machine_token_path(cache_dir))
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    })
+}
+
+const HUB_ID_FILE: &str = "hub.id";
+
+/// Lee el `hub_id` (de Cloud) persistido al enrolar. Lo usa el runtime embebido como `X-Hub-Id`
+/// en las llamadas hub-scoped firmadas con el token de máquina. `None` si aún no se enroló.
+pub fn load_hub_id(cache_dir: &std::path::Path) -> Option<String> {
+    std::fs::read_to_string(cache_dir.join(HUB_ID_FILE))
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
 }
 
-/// Pide la credencial de máquina del hub al Cloud (`enroll` o `enroll_rotate`) y la persiste.
+/// Pide la credencial de máquina del hub al Cloud (`enroll` o `enroll_rotate`) y la persiste
+/// (token en keychain; `hub_id` en `app_data_dir` para que el runtime embebido lo use como
+/// `X-Hub-Id`). El [`EnrollGrant`] trae ambos.
 async fn fetch_and_persist_token(
     cache_dir: &std::path::Path,
     hub_id: String,
@@ -286,6 +343,9 @@ async fn fetch_and_persist_token(
     let body = exec(req).await?;
     let grant = EnrollGrant::parse(&body).map_err(|e| GateError::Parse(e.to_string()))?;
     persist_machine_token(cache_dir, &grant.cloud_api_token)?;
+    std::fs::create_dir_all(cache_dir).map_err(|e| GateError::Io(e.to_string()))?;
+    std::fs::write(cache_dir.join(HUB_ID_FILE), &grant.hub_id)
+        .map_err(|e| GateError::Io(e.to_string()))?;
     Ok(grant.hub_id)
 }
 
@@ -319,9 +379,62 @@ async fn rotate_machine_token(
     fetch_and_persist_token(&cache_dir, hub_id, access_token, true).await
 }
 
+/// Construye la config del **runtime embebido** (§11) para este dispositivo: SQLite + caché de
+/// módulos en `app_data_dir`, modo `Session` (identidad local real, login PIN/JWT), y la identidad
+/// de máquina persistida al enrolar (`hub_id` + `cloud_api_token` desde keychain). Si aún no se
+/// enroló, `cloud_api_token` es `None` (las llamadas hub-scoped caen al JWT del usuario reenviado)
+/// y el `hub_id` usa el placeholder de dev hasta el primer enrol.
+fn embedded_serve_config(cache_dir: &std::path::Path) -> erplora_server::ServeConfig {
+    erplora_server::ServeConfig {
+        sqlite_path: cache_dir.join("erplora.db").to_string_lossy().into_owned(),
+        bind: "127.0.0.1:8787".to_string(),
+        modules_dir: None, // los módulos se descargan en runtime desde el marketplace (no horneados)
+        hub: erplora_server::HubConfig {
+            hub_id: load_hub_id(cache_dir).unwrap_or_else(|| erplora_server::DEV_HUB_ID.to_string()),
+            cloud_base_url: base_url(),
+            module_cache: cache_dir.join("modules"),
+            auth_mode: erplora_server::AuthMode::Session,
+            jwt_public_key: None, // `serve()` la trae del Cloud si hay red (login cloud); PIN no la necesita
+            cloud_api_token: load_machine_token(cache_dir),
+        },
+    }
+}
+
+/// Arranca el runtime embebido (`erplora_server::serve`) en un **hilo dedicado con su propio
+/// runtime tokio**, aislado del runtime async de Tauri. El webview le habla por loopback. El token
+/// de máquina se lee al arrancar; un enrol nuevo surte efecto en el siguiente arranque (la primera
+/// sesión usa el JWT del usuario reenviado como fallback).
+fn spawn_embedded_runtime(cache_dir: PathBuf) {
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+            Ok(rt) => rt,
+            Err(e) => {
+                eprintln!("runtime embebido: no se pudo crear tokio: {e}");
+                return;
+            }
+        };
+        rt.block_on(async move {
+            if let Err(e) = erplora_server::serve(embedded_serve_config(&cache_dir)).await {
+                eprintln!("runtime embebido terminó: {e}");
+            }
+        });
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            use tauri::Manager;
+            // Arranca el runtime local ANTES de que el webview lo necesite (login `/api/auth/cloud`,
+            // query/command, entitlement). app_data_dir es la raíz de datos por-instalación.
+            if let Ok(cache_dir) = app.path().app_data_dir() {
+                spawn_embedded_runtime(cache_dir);
+            } else {
+                eprintln!("runtime embebido: no se pudo resolver app_data_dir; no se arranca");
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             validate_entitlement,
             device_context,
