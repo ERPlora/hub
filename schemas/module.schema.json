@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://erplora.com/schemas/module.schema.json",
   "title": "ERPlora hub module manifest",
-  "description": "Contrato técnico de un módulo (module.json). La clasificación de marketplace (sectors/business_types/pricing) NO va aquí — vive en el Cloud Portal (ARQUITECTURA.md §2.4).",
+  "description": "Contrato del módulo (module.json). Incluye el contrato técnico (runtime) + los bloques `marketplace` (clasificación por código) y `billing` (términos comerciales) que SOLO lee el Cloud (ADR-0007). El Hub ignora marketplace/billing.",
   "type": "object",
   "required": ["id", "name", "version"],
   "additionalProperties": false,
@@ -150,6 +150,51 @@
         "entry": {
           "type": "string",
           "description": "Ruta al ESM del Web Component compilado (cargado en runtime por el shell)."
+        }
+      }
+    },
+    "marketplace": {
+      "type": "object",
+      "description": "Clasificación de marketplace por CÓDIGO (ADR-0007). El Cloud VALIDA estos códigos contra su taxonomía (Sector/BusinessType/FunctionalUnit) en el sync; un código desconocido rechaza el sync. Los nombres localizados (ES/EN) viven en Cloud. El Hub ignora este bloque.",
+      "additionalProperties": false,
+      "properties": {
+        "functional_unit": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Código de la unidad funcional primaria." },
+        "sectors": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }, "description": "Códigos de sectores compatibles." },
+        "business_types": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }, "description": "Códigos de tipos de negocio compatibles." }
+      }
+    },
+    "billing": {
+      "type": "object",
+      "description": "Términos comerciales del módulo (ADR-0007). SOLO lo lee el Cloud para crear/actualizar productos en Stripe; el Hub lo ignora. Relevante solo para `tier: premium` (basic/essential son gratis en todo despliegue). Precio único con `interval`+`price`, o multi-tier con `tiers`.",
+      "additionalProperties": false,
+      "properties": {
+        "tier": { "type": "string", "enum": ["basic", "essential", "premium"] },
+        "type": { "type": "string", "enum": ["free", "one_time", "subscription"] },
+        "interval": { "type": "string", "enum": ["month", "year"], "description": "Intervalo de la suscripción de precio único." },
+        "price": { "type": "number", "minimum": 0, "description": "Precio único en EUR (IVA incl.)." },
+        "trial_days": { "type": "integer", "minimum": 0, "default": 15 },
+        "tiers": {
+          "type": "array",
+          "description": "Tiers de pago para módulos premium con API (free + pago con cuota + metered). Si está presente, manda sobre `price`.",
+          "items": {
+            "type": "object",
+            "required": ["slug", "name", "price"],
+            "additionalProperties": false,
+            "properties": {
+              "slug": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "name": { "type": "string" },
+              "price": { "type": "number", "minimum": 0, "description": "EUR/intervalo (IVA incl.). 0 = tier gratis." },
+              "interval": { "type": "string", "enum": ["month", "year"], "default": "month" },
+              "trial_days": { "type": "integer", "minimum": 0 },
+              "metered": { "type": "boolean", "default": false, "description": "Si true, cuota base + overage por uso (Stripe Billing Meters)." },
+              "overage_price": { "type": "number", "minimum": 0, "description": "Precio por unidad de exceso (EUR) si `metered`." },
+              "quota": {
+                "type": "object",
+                "description": "Límites incluidos por métrica `{ metrica: limite }` (p. ej. messages_per_month). Al agotar → bloqueo en Cloud (o overage si metered).",
+                "additionalProperties": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
         }
       }
     }
