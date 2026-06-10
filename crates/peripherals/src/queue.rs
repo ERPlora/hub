@@ -24,7 +24,7 @@ pub struct PrintJob {
 }
 
 /// Resultado de procesar un trabajo (para emitir `print_complete` / `print_error`).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum JobOutcome {
     Completed { job_id: Option<String> },
     Failed { job_id: Option<String>, error: String },
@@ -72,13 +72,15 @@ impl PrintQueue {
         Ok(())
     }
 
-    /// Bucle worker: drena la cola y reintenta según la política; emite `JobOutcome`.
-    pub async fn run(&self) {
+    /// Bucle worker: drena la cola y reintenta según la política; emite cada `JobOutcome` por
+    /// `outcomes` (el consumidor lo mapea a `print_complete` / `print_error`).
+    pub async fn run(&self, outcomes: UnboundedSender<JobOutcome>) {
         while let Some(job) = {
             let mut rx = self.rx.lock().await;
             rx.recv().await
         } {
-            match self.process(job).await {
+            let outcome = self.process(job).await;
+            match &outcome {
                 JobOutcome::Completed { job_id } => {
                     tracing::info!(?job_id, "trabajo de impresión completado");
                 }
@@ -86,6 +88,8 @@ impl PrintQueue {
                     tracing::warn!(?job_id, %error, "trabajo de impresión fallido");
                 }
             }
+            // Si el consumidor se fue, solo se pierde el reporte (no el procesado de la cola).
+            let _ = outcomes.send(outcome);
         }
     }
 
