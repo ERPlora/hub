@@ -128,9 +128,19 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
+    // Frontend estático (build de apps/web): si el despliegue define `HUB_STATIC_DIR`, todo lo
+    // que no matchea API/WS cae al dist (SPA fallback a index.html). En dev (Vite) no se define.
+    let mut router = app(state);
+    if let Some(dir) = std::env::var("HUB_STATIC_DIR").ok().filter(|s| !s.is_empty()) {
+        use tower_http::services::{ServeDir, ServeFile};
+        let index = std::path::Path::new(&dir).join("index.html");
+        router = router.fallback_service(ServeDir::new(&dir).fallback(ServeFile::new(index)));
+        eprintln!("static: sirviendo frontend desde {dir}");
+    }
+
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
     eprintln!("erplora-server escuchando en http://{}", cfg.bind);
-    axum::serve(listener, app(state)).await?;
+    axum::serve(listener, router).await?;
     Ok(())
 }
 
@@ -138,6 +148,8 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
 pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
+        // Alias del contrato de despliegue ECS (healthCheck hace `curl /health`).
+        .route("/health", get(healthz))
         .route("/api/hub/context", get(hub_context))
         .route("/api/navigation", get(navigation))
         .route("/api/modules", get(list_modules))
