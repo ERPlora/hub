@@ -10,9 +10,10 @@
 //!   5. `POST mark_installed/`   → registra la instalación en el Cloud (best-effort).
 //!
 //! Auth = JWT del usuario activo (`Authorization: Bearer`) + `X-Hub-Id` (cabeceras de la
-//! petición entrante). El SHA256 se verifica **si el Cloud lo expone** en `versions/` (hoy el
-//! serializer público no lo trae — ver `cloud_client::ModuleVersion`); si falta, se instala
-//! sin verificación de integridad y se deja registro en el log (decisión — flag para humano).
+//! petición entrante). La verificación SHA256 es **obligatoria y no-saltable** (ADR-0015):
+//! si el Cloud no expone `sha256` en `versions/`, la instalación se **aborta** con
+//! [`InstallError::MissingSha256`] antes de descargar nada (el fix server-side para que el
+//! serializer lo exponga siempre va en el issue pareja de Cloud).
 
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -29,6 +30,10 @@ pub enum InstallError {
     VersionNotFound(String),
     #[error("descarga/integridad: {0}")]
     Source(#[from] SourceError),
+    /// El Cloud no expuso `sha256` para la versión a instalar. ADR-0015: la verificación de
+    /// integridad es obligatoria y no-saltable → se aborta **antes** de descargar el zip.
+    #[error("integridad: el Cloud no expuso sha256 para {module_id}@{version} — instalación abortada (ADR-0015)")]
+    MissingSha256 { module_id: String, version: String },
     #[error("runtime: {0}")]
     Runtime(String),
 }
@@ -112,30 +117,21 @@ fn method(req: &cloud_client::PreparedRequest) -> reqwest::Method {
 
 /// Descarga + verifica + descomprime el módulo en el cache local, devolviendo su carpeta.
 ///
-/// Si el Cloud expuso `sha256` en `versions/`, se construye un `InstallGrant` con ese hash y
-/// `ModuleStore::install` verifica integridad. Si no, se omite la verificación (la descompresión
-/// segura y la validación de `module.json` siguen aplicándose).
+/// `sha` es el SHA256 esperado del zip (ya validado como presente por el llamador, ADR-0015);
+/// `ModuleStore::install` verifica integridad y aborta sin tocar nada si no casa.
 fn acquire(
     store: &ModuleStore,
     module_id: &str,
     version: &ModuleVersion,
+    sha: &str,
     zip_bytes: Vec<u8>,
 ) -> Result<PathBuf, InstallError> {
-    let sha = version.sha256.clone().unwrap_or_default();
     let grant = InstallGrant {
         module_id: module_id.to_string(),
         version: version.version.clone(),
         download_url: format!("mem://{module_id}/{}", version.version),
-        sha256: sha,
+        sha256: sha.to_string(),
     };
-
-    if grant.sha256.is_empty() {
-        tracing::warn!(
-            module_id,
-            version = %version.version,
-            "el Cloud no expuso sha256 en versions/ — se instala SIN verificación de integridad"
-        );
-    }
 
     let fetcher = InMemoryFetcher { bytes: RefCell::new(Some(zip_bytes)) };
     let dir = store.install(&fetcher, &grant)?;
@@ -157,16 +153,27 @@ pub async fn install_from_cloud(
 ) -> Result<Installed, InstallError> {
     let cloud = CloudClient::new(cloud_base_url);
 
-    // (1) Resolver versión contra el Cloud.
+    // (1) Resolver versión contra el Cloud. SHA256 obligatorio (ADR-0015): sin hash esperado
+    //     no hay verificación de integridad posible → abortar ANTES de descargar nada.
     let version = resolve_version(http, &cloud, auth, module_id, requested_version).await?;
+    let sha = version
+        .sha256
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| InstallError::MissingSha256 {
+            module_id: module_id.to_string(),
+            version: version.version.clone(),
+        })?
+        .to_string();
 
     // (2) Descargar el ZIP binario.
     let dl_req = cloud.download(auth, module_id, &version.version);
     let zip_bytes = send_bytes(http, &dl_req).await?;
 
-    // (3) Verificar SHA256 (si disponible) + descomprimir de forma segura + cachear.
+    // (3) Verificar SHA256 (obligatorio) + descomprimir de forma segura + cachear.
     let store = ModuleStore::new(cache_root);
-    let dir = acquire(&store, module_id, &version, zip_bytes)?;
+    let dir = acquire(&store, module_id, &version, &sha, zip_bytes)?;
 
     // (4) Instalar en el runtime (migra, registra, activa).
     let installed_id = runtime
