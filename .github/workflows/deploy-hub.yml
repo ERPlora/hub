@@ -1,0 +1,58 @@
+# Build & push de la imagen del Hub (runtime Rust + frontend) a ECR en cada push a main.
+# Mismo patrón de auth OIDC que cloud/.github/workflows/deploy.yml (rol github-actions-deploy).
+# NOTA: este workflow solo publica la imagen; el rollout de tasks ECS lo hace el Cloud
+# (providers/aws.py registra taskdefs apuntando al repo ECR) — no hay update-service aquí.
+name: Deploy Hub
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hub
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: eu-west-1
+  AWS_ACCOUNT_ID: "363427305647"
+  ECR_REPO: erplora-hub
+
+jobs:
+  build-and-push:
+    name: Build & Push (ECR)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      id-token: write   # OIDC hacia AWS
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::363427305647:role/github-actions-deploy
+          aws-region: eu-west-1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO }}:latest
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
