@@ -1,0 +1,14 @@
+# Contexto de build de la imagen del hub (Dockerfile raíz). Fuera todo lo pesado/irrelevante.
+.git
+.github
+target
+**/target
+node_modules
+**/node_modules
+**/dist
+demos
+docker
+modules
+*.db
+*.db-*
+.DS_Store
