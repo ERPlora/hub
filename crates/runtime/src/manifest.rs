@@ -58,6 +58,25 @@ pub struct Nav {
     #[serde(default)]
     pub icon: Option<String>,
     pub component: String,
+    /// Acciones de topbar de esta pestaña: el shell las pinta en `slot="end"` y al pulsar
+    /// reenvía `module-action` al Web Component montado. El manifest declara el botón;
+    /// el comportamiento vive en el componente del módulo.
+    #[serde(default)]
+    pub actions: Vec<NavAction>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NavAction {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub icon: Option<String>,
+    /// Botón destacado (color primario).
+    #[serde(default)]
+    pub primary: bool,
+    /// Permiso para MOSTRAR el botón (show/hide de UI; Rust revalida siempre el command real).
+    #[serde(default)]
+    pub permission: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

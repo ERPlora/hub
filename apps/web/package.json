@@ -17,6 +17,7 @@
     "@erplora/module-sdk": "workspace:*",
     "@erplora/module-types": "workspace:*",
     "@erplora/outfitkit": "workspace:*",
+    "@iconify/vue": "^5.0.1",
     "@ionic/core": "^8.8.8",
     "@ionic/vue": "^8.8.8",
     "@ionic/vue-router": "^8.8.8",
