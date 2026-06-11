@@ -53,7 +53,9 @@
   ],
   "migrations": {
     "sqlite": [
-      "migrations/sqlite/001_init.sql"
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_reference_counter.sql",
+      "migrations/sqlite/003_status_transition_guards.sql"
     ]
   },
   "queries": {
@@ -150,6 +152,7 @@
       "permission": "online_booking.change_booking",
       "transaction": true,
       "sql": [
+        "commands/_bump_reference.sql",
         "commands/booking_create.sql"
       ],
       "schema": "schemas/booking_create.json",

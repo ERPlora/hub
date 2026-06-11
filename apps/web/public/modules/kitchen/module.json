@@ -1,40 +1,64 @@
 {
   "id": "kitchen",
-  "name": "Kitchen Display",
+  "name": "Kitchen",
   "version": "2.2.4",
   "agent": {
-    "description": "Manages the kitchen display system: configure stations and alerts, and track order status events through the kitchen log.",
+    "description": "Single kitchen module: kitchen display system (KDS), production orders (create, track and transition status from firing to serving), stations with product/category routing, and an audit log of kitchen actions.",
     "keywords": [
       "kitchen",
       "display",
-      "orders",
+      "order",
       "station",
       "kds",
       "cooking",
+      "restaurant",
+      "pos",
+      "food",
+      "ticket",
       "log"
     ]
   },
   "depends_on": [
-    "orders"
+    "tables",
+    "sales",
+    "customers",
+    "inventory"
   ],
   "permissions": [
-    "kitchen.view_kitchensettings",
-    "kitchen.change_kitchensettings",
-    "kitchen.view_kitchenorderlog",
-    "kitchen.manage_settings"
+    "kitchen.view_order",
+    "kitchen.add_order",
+    "kitchen.change_order",
+    "kitchen.delete_order",
+    "kitchen.cancel_order",
+    "kitchen.complete_order",
+    "kitchen.view_history",
+    "kitchen.view_settings",
+    "kitchen.change_settings",
+    "kitchen.manage_settings",
+    "kitchen.view_log"
   ],
   "role_permissions": {
     "admin": [
       "*"
     ],
     "manager": [
-      "kitchen.view_kitchensettings",
-      "kitchen.change_kitchensettings",
-      "kitchen.view_kitchenorderlog"
+      "kitchen.view_order",
+      "kitchen.add_order",
+      "kitchen.change_order",
+      "kitchen.delete_order",
+      "kitchen.cancel_order",
+      "kitchen.complete_order",
+      "kitchen.view_history",
+      "kitchen.view_settings",
+      "kitchen.change_settings",
+      "kitchen.view_log"
     ],
     "employee": [
-      "kitchen.view_kitchensettings",
-      "kitchen.view_kitchenorderlog"
+      "kitchen.view_order",
+      "kitchen.add_order",
+      "kitchen.complete_order",
+      "kitchen.view_settings",
+      "kitchen.view_log"
     ]
   },
   "navigation": [
@@ -43,23 +67,214 @@
       "label": "Display",
       "icon": "tv",
       "component": "erp-kitchen-display"
+    },
+    {
+      "id": "active",
+      "label": "Commands",
+      "icon": "clipboard-outline",
+      "component": "erp-kitchen-orders-active"
+    },
+    {
+      "id": "stations",
+      "label": "Stations",
+      "icon": "flame-outline",
+      "component": "erp-kitchen-orders-stations"
     }
   ],
   "migrations": {
     "sqlite": [
       "migrations/sqlite/001_init.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql"
     ]
   },
   "queries": {
-    "kitchen.settings.get": {
-      "permission": "kitchen.view_kitchensettings",
-      "sql": "queries/settings_get.sql",
+    "kitchen.orders.list": {
+      "permission": "kitchen.view_order",
+      "sql": "queries/orders_list.sql",
+      "schema": "schemas/orders_list.json",
+      "list": {
+        "search": [
+          "order_number",
+          "customer_id",
+          "round_number"
+        ],
+        "sort": [
+          "id",
+          "order_number",
+          "status",
+          "order_type",
+          "priority",
+          "table_id",
+          "sale_id",
+          "customer_id",
+          "waiter_id",
+          "round_number",
+          "notes",
+          "subtotal",
+          "tax",
+          "discount",
+          "total",
+          "fired_at",
+          "ready_at",
+          "served_at",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "order_number": {
+            "op": "eq"
+          },
+          "status": {
+            "op": "eq"
+          },
+          "order_type": {
+            "op": "eq"
+          },
+          "priority": {
+            "op": "eq"
+          },
+          "table_id": {
+            "op": "eq"
+          },
+          "sale_id": {
+            "op": "eq"
+          },
+          "customer_id": {
+            "op": "eq"
+          },
+          "waiter_id": {
+            "op": "eq"
+          },
+          "round_number": {
+            "op": "eq"
+          },
+          "notes": {
+            "op": "eq"
+          },
+          "subtotal": {
+            "op": "range"
+          },
+          "tax": {
+            "op": "range"
+          },
+          "discount": {
+            "op": "range"
+          },
+          "total": {
+            "op": "range"
+          },
+          "fired_at": {
+            "op": "range"
+          },
+          "ready_at": {
+            "op": "range"
+          },
+          "served_at": {
+            "op": "range"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
       "ai": {
-        "description": "Retrieves the current kitchen display settings."
+        "description": "Lists active kitchen orders, optionally filtered by status"
+      }
+    },
+    "kitchen.orders.get": {
+      "permission": "kitchen.view_order",
+      "sql": "queries/order_get.sql",
+      "schema": "schemas/order_get.json",
+      "ai": {
+        "description": "Retrieves the full detail of a kitchen order by its identifier"
+      }
+    },
+    "kitchen.orders.items": {
+      "permission": "kitchen.view_order",
+      "sql": "queries/order_items.sql",
+      "schema": "schemas/order_items.json",
+      "ai": {
+        "description": "Lists the line items of a specific kitchen order"
+      }
+    },
+    "kitchen.stations.list": {
+      "permission": "kitchen.view_order",
+      "sql": "queries/stations_list.sql",
+      "schema": "schemas/stations_list.json",
+      "list": {
+        "search": [
+          "name",
+          "name_es",
+          "description",
+          "printer_name"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "name_es",
+          "description",
+          "color",
+          "icon",
+          "printer_name",
+          "sort_order",
+          "is_active"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "eq"
+          },
+          "name_es": {
+            "op": "eq"
+          },
+          "description": {
+            "op": "eq"
+          },
+          "color": {
+            "op": "eq"
+          },
+          "icon": {
+            "op": "eq"
+          },
+          "printer_name": {
+            "op": "eq"
+          },
+          "sort_order": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the configured kitchen stations"
+      }
+    },
+    "kitchen.stations.pending_counts": {
+      "permission": "kitchen.view_order",
+      "sql": "queries/items_pending_by_station.sql",
+      "schema": "schemas/items_pending_by_station.json",
+      "ai": {
+        "description": "Returns the count of pending items grouped by kitchen station"
+      }
+    },
+    "kitchen.settings.get": {
+      "permission": "kitchen.view_settings",
+      "sql": "queries/settings_get.sql",
+      "schema": "schemas/settings_get.json",
+      "ai": {
+        "description": "Retrieves the current kitchen settings (display and order behaviour)"
       }
     },
     "kitchen.logs.list": {
-      "permission": "kitchen.view_kitchenorderlog",
+      "permission": "kitchen.view_log",
       "sql": "queries/logs_list.sql",
       "schema": "schemas/logs_list.json",
       "list": {
@@ -101,46 +316,223 @@
         "page_size": 50
       },
       "ai": {
-        "description": "Lists the log of order events processed by the kitchen."
+        "description": "Lists the log of order events processed by the kitchen"
       }
     }
   },
   "commands": {
+    "kitchen.orders.create": {
+      "permission": "kitchen.add_order",
+      "schema": "schemas/order_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_order"
+      },
+      "ai": {
+        "description": "Creates a new kitchen order (the handler emits kitchen.order.created)"
+      }
+    },
+    "kitchen.orders.update": {
+      "permission": "kitchen.change_order",
+      "transaction": true,
+      "sql": [
+        "commands/order_update.sql"
+      ],
+      "schema": "schemas/order_update.json",
+      "emit": [
+        "kitchen.order.updated"
+      ],
+      "ai": {
+        "description": "Updates the data of an existing kitchen order"
+      }
+    },
+    "kitchen.orders.set_status": {
+      "permission": "kitchen.change_order",
+      "schema": "schemas/order_set_status.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "update_order_status"
+      },
+      "ai": {
+        "description": "Changes the status of a kitchen order (fire, mark_ready, mark_served, cancel, recall); the handler emits the matching kitchen.order.* event"
+      }
+    },
+    "kitchen.orders.delete": {
+      "permission": "kitchen.delete_order",
+      "schema": "schemas/order_delete.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "delete_order"
+      },
+      "ai": {
+        "description": "Deletes a kitchen order (destructive, guarded: only pending/cancelled and not linked to a sale)"
+      }
+    },
+    "kitchen.orders.create_from_sale": {
+      "permission": "kitchen.add_order",
+      "schema": "schemas/order_create_from_sale.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_order_from_sale"
+      },
+      "ai": {
+        "description": "Creates a kitchen order automatically from a completed sale (event-driven, idempotent per sale)"
+      }
+    },
+    "kitchen.stations.create": {
+      "permission": "kitchen.manage_settings",
+      "transaction": true,
+      "sql": [
+        "commands/station_create.sql"
+      ],
+      "schema": "schemas/station_create.json",
+      "emit": [
+        "kitchen.station.created"
+      ],
+      "ai": {
+        "description": "Creates a new kitchen station"
+      }
+    },
+    "kitchen.stations.update": {
+      "permission": "kitchen.manage_settings",
+      "transaction": true,
+      "sql": [
+        "commands/station_update.sql"
+      ],
+      "schema": "schemas/station_update.json",
+      "emit": [
+        "kitchen.station.updated"
+      ],
+      "ai": {
+        "description": "Updates the data of an existing kitchen station"
+      }
+    },
+    "kitchen.stations.delete": {
+      "permission": "kitchen.manage_settings",
+      "schema": "schemas/station_delete.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "delete_station"
+      },
+      "ai": {
+        "description": "Deletes a kitchen station (destructive, guarded: no active routings nor in-progress items)"
+      }
+    },
+    "kitchen.stations.set_routing": {
+      "permission": "kitchen.manage_settings",
+      "schema": "schemas/set_routing.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "set_routing"
+      },
+      "ai": {
+        "description": "Configures the routing of products and categories to kitchen stations"
+      }
+    },
     "kitchen.settings.update": {
-      "permission": "kitchen.change_kitchensettings",
+      "permission": "kitchen.change_settings",
       "transaction": true,
       "sql": [
         "commands/settings_update.sql"
       ],
       "schema": "schemas/settings_update.json",
+      "emit": [
+        "kitchen.settings.updated"
+      ],
       "ai": {
-        "description": "Updates the kitchen display configuration (stations, alerts, etc.)."
+        "description": "Updates the kitchen settings (display and order behaviour)"
       }
     },
     "kitchen.logs.create": {
-      "permission": "kitchen.view_kitchenorderlog",
+      "permission": "kitchen.view_log",
       "transaction": true,
       "sql": [
         "commands/log_create.sql"
       ],
       "schema": "schemas/log_create.json",
       "ai": {
-        "description": "Records a new order status event in the kitchen log."
+        "description": "Records a new order status event in the kitchen log"
       }
+    },
+    "kitchen._bump_counter": {
+      "permission": "kitchen.add_order",
+      "sql": [
+        "commands/_bump_counter.sql"
+      ]
+    },
+    "kitchen._insert_order": {
+      "permission": "kitchen.add_order",
+      "sql": [
+        "commands/_insert_order.sql"
+      ]
+    },
+    "kitchen._insert_item": {
+      "permission": "kitchen.add_order",
+      "sql": [
+        "commands/_insert_item.sql"
+      ]
+    },
+    "kitchen._set_order_status": {
+      "permission": "kitchen.change_order",
+      "sql": [
+        "commands/_set_order_status.sql"
+      ]
+    },
+    "kitchen._cascade_item_status": {
+      "permission": "kitchen.change_order",
+      "sql": [
+        "commands/_cascade_item_status.sql"
+      ]
+    },
+    "kitchen._product_route_set": {
+      "permission": "kitchen.manage_settings",
+      "sql": [
+        "commands/product_route_set.sql"
+      ]
+    },
+    "kitchen._category_route_set": {
+      "permission": "kitchen.manage_settings",
+      "sql": [
+        "commands/category_route_set.sql"
+      ]
+    },
+    "kitchen._station_soft_delete": {
+      "permission": "kitchen.manage_settings",
+      "sql": [
+        "commands/station_delete.sql"
+      ]
+    },
+    "kitchen._order_soft_delete": {
+      "permission": "kitchen.delete_order",
+      "sql": [
+        "commands/order_delete.sql"
+      ]
     }
   },
   "events": {
     "listen": {
-      "kitchen_orders.order_fired": {
+      "sale.completed": {
+        "command": "kitchen.orders.create_from_sale"
+      },
+      "kitchen.order.fired": {
         "command": "kitchen.logs.create"
       },
-      "kitchen_orders.order_ready": {
+      "kitchen.order.ready": {
         "command": "kitchen.logs.create"
       },
-      "kitchen_orders.order_served": {
+      "kitchen.order.served": {
         "command": "kitchen.logs.create"
       },
-      "kitchen_orders.order_cancelled": {
+      "kitchen.order.recalled": {
+        "command": "kitchen.logs.create"
+      },
+      "kitchen.order.cancelled": {
         "command": "kitchen.logs.create"
       }
     }

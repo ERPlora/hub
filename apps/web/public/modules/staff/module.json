@@ -423,6 +423,36 @@
       "ai": {
         "description": "Updates the general configuration settings for the staff module."
       }
+    },
+    "staff._deactivate_member": {
+      "permission": "staff.delete_staff_member",
+      "sql": [
+        "commands/_deactivate_member.sql"
+      ]
+    },
+    "staff._unset_default_schedules": {
+      "permission": "staff.manage_settings",
+      "sql": [
+        "commands/_unset_default_schedules.sql"
+      ]
+    },
+    "staff._insert_schedule": {
+      "permission": "staff.manage_settings",
+      "sql": [
+        "commands/_insert_schedule.sql"
+      ]
+    },
+    "staff._insert_working_hours": {
+      "permission": "staff.manage_settings",
+      "sql": [
+        "commands/_insert_working_hours.sql"
+      ]
+    },
+    "staff._insert_time_off": {
+      "permission": "staff.manage_time_off",
+      "sql": [
+        "commands/_insert_time_off.sql"
+      ]
     }
   },
   "events": {

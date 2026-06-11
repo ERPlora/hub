@@ -192,6 +192,7 @@
   "commands": {
     "inventory.settings.update": {
       "permission": "inventory.manage_settings",
+      "schema": "schemas/settings_update.json",
       "transaction": true,
       "sql": [
         "commands/settings_update.sql"
@@ -202,6 +203,7 @@
     },
     "inventory.products.create": {
       "permission": "inventory.add_product",
+      "schema": "schemas/product_create.json",
       "transaction": true,
       "sql": [
         "commands/product_create.sql"
@@ -215,6 +217,7 @@
     },
     "inventory.products.update": {
       "permission": "inventory.change_product",
+      "schema": "schemas/product_update.json",
       "transaction": true,
       "sql": [
         "commands/product_update.sql"
@@ -228,6 +231,7 @@
     },
     "inventory.products.delete": {
       "permission": "inventory.delete_product",
+      "schema": "schemas/product_id.json",
       "transaction": true,
       "sql": [
         "commands/product_delete.sql"
@@ -241,6 +245,7 @@
     },
     "inventory.products.bulk_create": {
       "permission": "inventory.add_product",
+      "schema": "schemas/products_bulk_create.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -252,6 +257,7 @@
     },
     "inventory.stock.adjust": {
       "permission": "inventory.change_product",
+      "schema": "schemas/stock_adjust.json",
       "transaction": true,
       "sql": [
         "commands/stock_adjust.sql"
@@ -265,6 +271,7 @@
     },
     "inventory.stock.decrease": {
       "permission": "inventory.change_product",
+      "schema": "schemas/stock_decrease.json",
       "transaction": true,
       "sql": [
         "commands/stock_decrease.sql"
@@ -278,6 +285,7 @@
     },
     "inventory.stock.receive": {
       "permission": "inventory.change_product",
+      "schema": "schemas/stock_receive.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -289,6 +297,7 @@
     },
     "inventory.categories.create": {
       "permission": "inventory.add_category",
+      "schema": "schemas/category_create.json",
       "transaction": true,
       "sql": [
         "commands/category_create.sql"
@@ -299,6 +308,7 @@
     },
     "inventory.categories.update": {
       "permission": "inventory.change_category",
+      "schema": "schemas/category_update.json",
       "transaction": true,
       "sql": [
         "commands/category_update.sql"
@@ -309,6 +319,7 @@
     },
     "inventory.categories.delete": {
       "permission": "inventory.delete_category",
+      "schema": "schemas/category_id.json",
       "transaction": true,
       "sql": [
         "commands/category_delete.sql"

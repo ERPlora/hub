@@ -87,7 +87,8 @@
   ],
   "migrations": {
     "sqlite": [
-      "migrations/sqlite/001_init.sql"
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_gate.sql"
     ]
   },
   "queries": {
@@ -407,6 +408,67 @@
       "ai": {
         "description": "Deletes a table session (destructive, requires delete permission)"
       }
+    },
+    "tables._insert_table": {
+      "permission": "tables.add_table",
+      "sql": [
+        "commands/_bulk_insert_table.sql",
+        "commands/_bulk_insert_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._session_open": {
+      "permission": "tables.add_tablesession",
+      "sql": [
+        "commands/_session_open_insert.sql",
+        "commands/_session_open_occupy.sql",
+        "commands/_session_open_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._session_close": {
+      "permission": "tables.change_tablesession",
+      "sql": [
+        "commands/_session_close_update.sql",
+        "commands/_session_close_free.sql",
+        "commands/_session_close_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._session_transfer": {
+      "permission": "tables.change_tablesession",
+      "sql": [
+        "commands/_session_transfer_close.sql",
+        "commands/_session_transfer_free.sql",
+        "commands/_session_transfer_insert.sql",
+        "commands/_session_transfer_occupy.sql",
+        "commands/_session_transfer_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._session_delete": {
+      "permission": "tables.delete_tablesession",
+      "sql": [
+        "commands/_session_delete_update.sql",
+        "commands/_session_delete_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._zone_delete": {
+      "permission": "tables.delete_zone",
+      "sql": [
+        "commands/_zone_delete_update.sql",
+        "commands/_zone_delete_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._table_delete": {
+      "permission": "tables.delete_table",
+      "sql": [
+        "commands/_table_delete_update.sql",
+        "commands/_table_delete_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
     }
   },
   "ui": {

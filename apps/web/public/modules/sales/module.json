@@ -170,6 +170,13 @@
       "ai": {
         "description": "Retrieves the point-of-sale configuration settings (payment methods allowed, default sell screen, default document format)"
       }
+    },
+    "sales.cart.get": {
+      "permission": "sales.view_sale",
+      "sql": "queries/cart_get.sql",
+      "ai": {
+        "description": "Retrieves the active (in-progress) POS cart of the current employee, if any"
+      }
     }
   },
   "commands": {
@@ -234,6 +241,26 @@
       ],
       "ai": {
         "description": "Updates the point-of-sale configuration settings of the sales module"
+      }
+    },
+    "sales.cart.save": {
+      "permission": "sales.add_sale",
+      "transaction": true,
+      "sql": [
+        "commands/cart_save.sql"
+      ],
+      "ai": {
+        "description": "Saves (upserts) the active POS cart of the current employee so it survives reloads"
+      }
+    },
+    "sales.cart.clear": {
+      "permission": "sales.add_sale",
+      "transaction": true,
+      "sql": [
+        "commands/cart_clear.sql"
+      ],
+      "ai": {
+        "description": "Clears the active POS cart of the current employee"
       }
     },
     "sales.set_document_type": {

@@ -61,7 +61,8 @@
   },
   "migrations": {
     "sqlite": [
-      "migrations/sqlite/001_init.sql"
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_counter.sql"
     ]
   },
   "queries": {
@@ -128,6 +129,20 @@
       "sql": "queries/schedule_timeslots.sql",
       "ai": {
         "description": "Retrieves the available time slots for a given staff schedule."
+      }
+    },
+    "appointments.availability.slots": {
+      "permission": "appointments.view_schedule",
+      "sql": "queries/availability_slots.sql",
+      "ai": {
+        "description": "Returns the free booking slots for a given date (optionally for a specific staff member and duration), crossing schedules, blocked time and existing appointments with the booking-notice settings."
+      }
+    },
+    "appointments.availability.check": {
+      "permission": "appointments.view_schedule",
+      "sql": "queries/availability_check.sql",
+      "ai": {
+        "description": "Checks whether a specific date/time slot is available for booking and returns the reason when it is not (too_soon, too_far, outside_schedule, blocked or overlap)."
       }
     },
     "appointments.blocked_times.list": {
@@ -382,7 +397,7 @@
     },
     "appointments.appointments.bulk_create": {
       "permission": "appointments.add_appointment",
-      "schema": "schemas/appointment_create.json",
+      "schema": "schemas/appointment_bulk_create.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -394,6 +409,7 @@
     },
     "appointments.appointments.bulk_delete": {
       "permission": "appointments.delete_appointment",
+      "schema": "schemas/appointment_bulk_delete.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -405,6 +421,7 @@
     },
     "appointments.recurring.materialize": {
       "permission": "appointments.add_appointment",
+      "schema": "schemas/recurring_materialize.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -413,6 +430,12 @@
       "ai": {
         "description": "Generates concrete appointment instances from a recurring appointment template."
       }
+    },
+    "appointments._bump_counter": {
+      "permission": "appointments.add_appointment",
+      "sql": [
+        "commands/_bump_counter.sql"
+      ]
     },
     "appointments._insert_appointment": {
       "permission": "appointments.add_appointment",
