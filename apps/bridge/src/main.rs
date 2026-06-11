@@ -233,10 +233,27 @@ async fn dispatch(cmd: Command, state: &AppState) -> Option<Event> {
             })
         }
 
-        // No hay evento de ACK en el protocolo; mostramos la notificación de SO (pendiente) y
-        // no respondemos. Por ahora solo se registra.
+        // No hay evento de ACK en el protocolo; mostramos la notificación de SO y no
+        // respondemos (bridge#9). `show()` es bloqueante (DBus/AppKit/WinRT) → spawn_blocking.
+        // Si la plataforma no la soporta (headless, sin DBus…), degradamos a log sin panic.
+        // En el sidecar Tauri esta capacidad la cubre el shell (plugin de notificaciones),
+        // no este binario — ver architecture/bridge/websocket-interface.md.
         Command::SendNotification { title, body } => {
-            tracing::info!(%title, %body, "notificación (OS notification pendiente de implementar)");
+            tokio::task::spawn_blocking(move || {
+                match notify_rust::Notification::new()
+                    .appname("ERPlora Bridge")
+                    .summary(&title)
+                    .body(&body)
+                    .show()
+                {
+                    Ok(_) => tracing::info!(%title, "notificación de SO mostrada"),
+                    Err(e) => tracing::warn!(
+                        %title,
+                        error = %e,
+                        "la plataforma no pudo mostrar la notificación de SO (degradado a log)"
+                    ),
+                }
+            });
             None
         }
 
