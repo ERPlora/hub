@@ -118,12 +118,20 @@ fn spawn_watchdog(state: Arc<AppState>) {
     });
 }
 
-/// `GET /status` — usado por el navegador para detectar el bridge (timeout ~500ms en `bridge.js`).
-async fn status() -> impl IntoResponse {
+/// `GET /status` — usado por el navegador para detectar el bridge (timeout corto en
+/// `apps/web/src/lib/bridge-client.ts`).
+///
+/// Contrato mínimo común Rust↔Android (bridge#10): `{ "ok": true, "version": "<semver>" }` —
+/// es lo único que consume `bridge-client.ts`. El resto de claves son informativas y pueden
+/// variar por plataforma (`service` identifica esta línea; `devices`/`watchdog` espejan los
+/// contadores que ya reporta la app Android).
+async fn status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json(serde_json::json!({
-        "service": "erplora-bridge",
-        "version": VERSION,
         "ok": true,
+        "version": VERSION,
+        "service": "erplora-bridge",
+        "devices": state.registry.get_all().len(),
+        "watchdog": true,
     }))
 }
 
