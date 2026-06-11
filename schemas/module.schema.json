@@ -107,12 +107,14 @@
           "sql": { "type": "array", "items": { "type": "string" } },
           "handler": {
             "type": "object",
-            "required": ["type", "file"],
+            "required": ["type", "function"],
             "properties": {
-              "type": { "type": "string", "enum": ["wasm"] },
+              "type": { "type": "string", "enum": ["wasm", "native"] },
               "file": { "type": "string" },
               "function": { "type": "string" }
-            }
+            },
+            "if": { "properties": { "type": { "const": "wasm" } } },
+            "then": { "required": ["file"] }
           },
           "emit": { "type": "array", "items": { "type": "string" } },
           "ai": { "$ref": "#/$defs/aiTool" }

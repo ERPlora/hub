@@ -23,6 +23,8 @@ pub enum RuntimeError {
     NotImplemented(&'static str),
     #[error("error de handler WASM: {0}")]
     Wasm(String),
+    #[error("error de plugin nativo: {0}")]
+    Native(String),
 }
 
 pub type Result<T> = std::result::Result<T, RuntimeError>;

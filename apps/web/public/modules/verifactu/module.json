@@ -308,8 +308,7 @@
       "permission": "verifactu.manage_verifactu",
       "schema": "schemas/record_create.json",
       "handler": {
-        "type": "wasm",
-        "file": "dist/handler.wasm",
+        "type": "native",
         "function": "create_record"
       },
       "emit": [
@@ -323,8 +322,7 @@
       "permission": "verifactu.transmit_verifactu",
       "schema": "schemas/record_transmit.json",
       "handler": {
-        "type": "wasm",
-        "file": "dist/handler.wasm",
+        "type": "native",
         "function": "transmit_record"
       },
       "emit": [
@@ -338,8 +336,7 @@
       "permission": "verifactu.manage_verifactu",
       "schema": "schemas/contingency_process.json",
       "handler": {
-        "type": "wasm",
-        "file": "dist/handler.wasm",
+        "type": "native",
         "function": "process_contingency_queue"
       },
       "emit": [
@@ -353,20 +350,40 @@
       "permission": "verifactu.view_verifactu",
       "schema": "schemas/chain_validate.json",
       "handler": {
-        "type": "wasm",
-        "file": "dist/handler.wasm",
+        "type": "native",
         "function": "validate_chain"
       },
       "ai": {
         "description": "Validates the integrity of the VeriFactu billing chain."
       }
+    },
+    "verifactu._insert_record": {
+      "permission": "verifactu.manage_verifactu",
+      "sql": [
+        "commands/_insert_record.sql"
+      ]
+    },
+    "verifactu._insert_event": {
+      "permission": "verifactu.manage_verifactu",
+      "sql": [
+        "commands/_insert_event.sql"
+      ]
+    },
+    "verifactu._enqueue_contingency": {
+      "permission": "verifactu.manage_verifactu",
+      "sql": [
+        "commands/_enqueue_contingency.sql"
+      ]
+    },
+    "verifactu._apply_transmission": {
+      "permission": "verifactu.transmit_verifactu",
+      "sql": [
+        "commands/_apply_transmission.sql"
+      ]
     }
   },
   "events": {
-    "listen": [
-      "invoice.created",
-      "invoice.cancelled"
-    ]
+    "listen": {}
   },
   "ui": {
     "entry": "dist/verifactu.esm.js"

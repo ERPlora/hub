@@ -8,6 +8,8 @@ license.workspace = true
 [dependencies]
 erplora-db = { path = "../db" }
 erplora-wasm-host = { path = "../wasm-host" }
+# Traits async del contrato de plugins nativos first-party (ADR-0009, native.rs).
+async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"

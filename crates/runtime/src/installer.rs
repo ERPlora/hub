@@ -58,9 +58,16 @@ pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, dir: &Pa
             sql.push(loader::read_text(dir, rel)?);
         }
         // Tier 2: si el command declara un handler WASM, lee sus bytes del disco.
+        // (Los handlers `native` no llevan fichero: el plugin va horneado en el runtime,
+        // registrado vía `Runtime::register_native` — ADR-0009.)
         let wasm = match &def.handler {
             Some(handler) if handler.kind == "wasm" => {
-                let path = dir.join(&handler.file);
+                let file = handler.file.as_deref().ok_or_else(|| {
+                    RuntimeError::Wasm(format!(
+                        "command `{name}`: handler wasm sin `file` en el manifest"
+                    ))
+                })?;
+                let path = dir.join(file);
                 let bytes = std::fs::read(&path).map_err(|e| {
                     RuntimeError::Io(std::io::Error::new(
                         e.kind(),

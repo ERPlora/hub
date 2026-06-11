@@ -140,26 +140,32 @@ pub struct CommandDef {
     pub sql: Vec<String>,
     #[serde(default)]
     pub emit: Vec<String>,
-    /// Handler de lógica (Tier 2, WASM). Si está presente, el command ejecuta el
-    /// handler en sandbox en vez de su `sql` directo. ARQUITECTURA.md §5.3.
+    /// Handler de lógica: Tier 2 (WASM sandbox) o **plugin nativo first-party**
+    /// (ADR-0009, crate horneado en el runtime). Si está presente, el command ejecuta
+    /// el handler en vez de su `sql` directo. ARQUITECTURA.md §5.3.
     #[serde(default)]
-    pub handler: Option<WasmHandler>,
+    pub handler: Option<HandlerRef>,
     /// Si está presente, expone este command al asistente como tool (nivel 2). El permiso y el
     /// schema se heredan del propio command, no se redeclaran. ARQUITECTURA.md §9.2.
     #[serde(default)]
     pub ai: Option<AiTool>,
 }
 
-/// Referencia a un handler WASM (Tier 2): el fichero `.wasm` del módulo y la
-/// función exportada a invocar. ARQUITECTURA.md §5.3, §9.2.
+/// Referencia al handler de un command. ARQUITECTURA.md §5.3, §9.2.
+///
+/// - `type: "wasm"` — Tier 2: fichero `.wasm` del módulo (`file`) + función exportada.
+/// - `type: "native"` — plugin nativo first-party (ADR-0009): la función vive en un
+///   crate Rust horneado en el runtime, registrado por `module_id` vía
+///   [`crate::Runtime::register_native`]. No lleva `file`.
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct WasmHandler {
-    /// Tipo de handler. Hoy solo `"wasm"`.
+pub struct HandlerRef {
+    /// Tipo de handler: `"wasm"` | `"native"`.
     #[serde(rename = "type")]
     pub kind: String,
-    /// Ruta (relativa a la carpeta del módulo) del `.wasm`.
-    pub file: String,
-    /// Función exportada del guest a invocar.
+    /// Ruta (relativa a la carpeta del módulo) del `.wasm`. Solo para `type: "wasm"`.
+    #[serde(default)]
+    pub file: Option<String>,
+    /// Función del handler a invocar (exportada del guest WASM o del plugin nativo).
     pub function: String,
 }
 

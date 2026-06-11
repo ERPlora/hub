@@ -20,6 +20,7 @@ pub mod installer;
 pub mod loader;
 pub mod manifest;
 pub mod migrations;
+pub mod native;
 pub mod outbox;
 pub mod permissions;
 pub mod queries;
@@ -88,6 +89,13 @@ impl Runtime {
     /// Registra un observador de eventos (el server lo usa para reenviar por WS).
     pub fn set_event_sink(&mut self, sink: Arc<dyn EventSink>) {
         self.registry.event_sink = Some(sink);
+    }
+
+    /// Registra un **plugin nativo first-party** (ADR-0009) para `module_id`. Los commands
+    /// del módulo con `handler.type == "native"` se resuelven contra este motor. Lo llama
+    /// el host (server / shell Tauri) al arrancar; no forma parte de la instalación.
+    pub fn register_native(&mut self, module_id: &str, handler: Arc<dyn native::NativeHandler>) {
+        self.registry.native.insert(module_id.to_string(), handler);
     }
 
     /// Ejecuta una query declarativa (solo si su módulo está activo) y devuelve filas JSON.

@@ -12,6 +12,7 @@ members = [
     "crates/guest-sdk",
     "crates/wasm-host",
     "crates/server",
+    "crates/verifactu",
     "crates/sync",
     "crates/vector",
     "crates/peripherals",

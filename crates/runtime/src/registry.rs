@@ -58,6 +58,9 @@ pub struct Registry {
     pub navigation: Vec<NavEntry>,
     /// Observador opcional de eventos (lo pone el server para el WS).
     pub event_sink: Option<std::sync::Arc<dyn EventSink>>,
+    /// Plugins **nativos first-party** (ADR-0009): `module_id` → motor horneado en el
+    /// runtime. Los registra el host (server/Tauri) al arrancar, no la instalación.
+    pub native: HashMap<String, std::sync::Arc<dyn crate::native::NativeHandler>>,
 }
 
 impl Registry {

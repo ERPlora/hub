@@ -86,6 +86,13 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     let db = SqliteAdapter::connect(&format!("sqlite://{}?mode=rwc", cfg.sqlite_path)).await?;
     let mut runtime = Runtime::new(Box::new(db));
 
+    // Plugins nativos first-party (ADR-0009): motores compliance-crítico horneados en el
+    // runtime. Hoy solo `verifactu` (cadena fiscal + transmisión AEAT TLS-mutua).
+    runtime.register_native(
+        "verifactu",
+        std::sync::Arc::new(erplora_verifactu::VerifactuEngine),
+    );
+
     if let Some(dir) = &cfg.modules_dir {
         for entry in std::fs::read_dir(dir)? {
             let path = entry?.path();
