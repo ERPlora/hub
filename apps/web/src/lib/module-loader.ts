@@ -10,6 +10,8 @@ import { isModuleEntitled } from './entitlement';
 
 export interface MenuEntry {
   moduleId: string;
+  /** Nombre legible del módulo (manifest.name) — para sidebar/título del shell. */
+  moduleName: string;
   nav: NavigationItem;
   entryUrl: string;
 }
@@ -27,7 +29,12 @@ export async function loadMenu(): Promise<MenuEntry[]> {
     if (!isModuleEntitled(manifest.id)) continue;
     const base = url.replace(/\/module\.json$/, '');
     for (const nav of manifest.navigation ?? []) {
-      entries.push({ moduleId: manifest.id, nav, entryUrl: `${base}/${manifest.ui.entry}` });
+      entries.push({
+        moduleId: manifest.id,
+        moduleName: manifest.name,
+        nav,
+        entryUrl: `${base}/${manifest.ui.entry}`,
+      });
     }
   }
   return entries;

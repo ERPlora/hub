@@ -66,11 +66,11 @@
         </ion-list>
         <ion-grid v-else class="ion-no-padding">
           <ion-row>
-            <ion-col v-for="entry in modules" :key="`${entry.moduleId}:${entry.nav.id}`" size="6" size-md="3">
+            <ion-col v-for="entry in modules" :key="entry.moduleId" size="6" size-md="3">
               <ion-card button class="ion-no-margin ion-text-center" @click="router.push(`/m/${entry.moduleId}`)">
                 <ion-card-content>
-                  <ion-icon :icon="moduleIcon(entry)" size="large" />
-                  <p>{{ entry.nav.label }}</p>
+                  <ion-icon :icon="manifestIcon(entry.nav.icon)" size="large" />
+                  <p>{{ entry.moduleName }}</p>
                 </ion-card-content>
               </ion-card>
             </ion-col>
@@ -138,9 +138,9 @@ import {
 import {
   speedometerOutline, gridOutline, pulseOutline, trendingUpOutline, trendingDownOutline,
   receiptOutline, peopleOutline, warningOutline, hardwareChipOutline, addOutline, ellipse,
-  scanOutline, personOutline, documentTextOutline, cubeOutline,
 } from 'ionicons/icons';
 import { loadMenu, type MenuEntry } from '../lib/module-loader';
+import { manifestIcon } from '../lib/icons';
 
 type Tab = 'resumen' | 'apps' | 'actividad';
 type Trend = 'up' | 'down';
@@ -169,17 +169,13 @@ const FEED: FeedItem[] = [
   { primary: 'Factura INV-2026-00018 pagada', sub: '29,99 €', tone: 'success' },
 ];
 
-const MODULE_ICONS: Record<string, string> = {
-  pos: scanOutline, cash: scanOutline, people: peopleOutline, customers: personOutline,
-  invoice: documentTextOutline, document: documentTextOutline, cube: cubeOutline,
-};
-function moduleIcon(entry: MenuEntry): string {
-  return MODULE_ICONS[entry.nav.icon ?? ''] ?? cubeOutline;
-}
-
 onMounted(async () => {
   try {
-    modules.value = await loadMenu();
+    // Una tarjeta por MÓDULO (loadMenu devuelve una entrada por cada navigation[] del manifest).
+    const entries = await loadMenu();
+    const byModule = new Map<string, MenuEntry>();
+    for (const e of entries) if (!byModule.has(e.moduleId)) byModule.set(e.moduleId, e);
+    modules.value = [...byModule.values()];
   } finally {
     loading.value = false;
   }

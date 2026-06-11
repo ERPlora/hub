@@ -6,12 +6,13 @@
 // `refreshModuleNav()` recarga; `bumpNav()` fuerza una recarga (p.ej. tras instalar).
 import { ref } from 'vue';
 import { loadMenu } from './module-loader';
+import { manifestIcon } from './icons';
 
 export interface ModuleNavItem {
   /** Ruta del shell que monta el WC del módulo (`/m/:moduleId`). */
   path: string;
   label: string;
-  /** Nombre del icono ion-icon (los manifests usan iconos por nombre). */
+  /** SVG del icono (resuelto desde el nombre del manifest vía manifestIcon). */
   icon: string;
 }
 
@@ -22,11 +23,20 @@ export const moduleNav = ref<ModuleNavItem[]>([]);
 export async function refreshModuleNav(): Promise<void> {
   try {
     const entries = await loadMenu();
-    moduleNav.value = entries.map((e) => ({
-      path: `/m/${e.moduleId}`,
-      label: e.nav.label,
-      icon: e.nav.icon ?? 'cube-outline',
-    }));
+    // Un item por MÓDULO (no por entrada de navigation[]): las pestañas internas las
+    // pinta ModuleView en su tabbar secundario. Label = nombre del módulo; icono = el
+    // de la primera entrada de navegación.
+    const byModule = new Map<string, ModuleNavItem>();
+    for (const e of entries) {
+      if (!byModule.has(e.moduleId)) {
+        byModule.set(e.moduleId, {
+          path: `/m/${e.moduleId}`,
+          label: e.moduleName,
+          icon: manifestIcon(e.nav.icon),
+        });
+      }
+    }
+    moduleNav.value = [...byModule.values()];
   } catch {
     // Sin runtime/manifests todavía: deja la lista como está (no rompe el shell).
   }

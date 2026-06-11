@@ -16,7 +16,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/marketplace', name: 'marketplace', component: () => import('../views/MarketplacePage.vue'), meta: { auth: true } },
   { path: '/system', name: 'system', component: () => import('../views/SystemPage.vue'), meta: { auth: true } },
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsPage.vue'), meta: { auth: true } },
-  { path: '/m/:moduleId', name: 'module', component: () => import('../views/ModuleView.vue'), meta: { auth: true } },
+  // `:navId?` = pestaña del tabbar secundario (entrada de `navigation[]` del manifest);
+  // sin él, ModuleView abre la primera. Deep-link: /m/inventory/products.
+  { path: '/m/:moduleId/:navId?', name: 'module', component: () => import('../views/ModuleView.vue'), meta: { auth: true } },
   // Pantalla de activación: hay sesión pero el hub no tiene un entitlement válido (§2.10).
   { path: '/activation', name: 'activation', component: () => import('../views/ActivationPage.vue'), meta: { auth: true } },
 ];
