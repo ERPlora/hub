@@ -121,6 +121,18 @@ impl CloudClient {
         }
     }
 
+    /// **Revocación** (kill-switch) de la credencial de máquina — `DELETE /api/v1/hub/device/enroll/`
+    /// (`IsHubAdmin`). Desactiva el token de máquina al instante sin emitir uno nuevo (dispositivo
+    /// perdido/robado); se re-habilita re-enrolando (`enroll_rotate`). Normalmente lo invoca el
+    /// dashboard/admin del owner (revoca un dispositivo que NO tiene a mano), no el propio hub. §2.3.
+    pub fn enroll_revoke(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "DELETE",
+            url: format!("{}/api/v1/hub/device/enroll/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
     /// Clave pública RSA del Cloud (para verificar el token de entitlement offline).
     /// `GET /api/v1/auth/public-key/`. Sin auth (endpoint público).
     pub fn public_key(&self) -> PreparedRequest {

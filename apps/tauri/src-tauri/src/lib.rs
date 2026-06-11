@@ -362,7 +362,9 @@ async fn enroll_device(
     use tauri::Manager;
     let cache_dir: PathBuf =
         app.path().app_data_dir().map_err(|e| GateError::Io(e.to_string()))?;
-    fetch_and_persist_token(&cache_dir, hub_id, access_token, false).await
+    let out = fetch_and_persist_token(&cache_dir, hub_id, access_token, false).await?;
+    apply_persisted_token(&app, &cache_dir); // hot-reload: el runtime usa el token ya, sin reiniciar
+    Ok(out)
 }
 
 /// **Rota** la credencial de máquina (owner/admin): el Cloud genera un token nuevo (invalida el
@@ -376,15 +378,35 @@ async fn rotate_machine_token(
     use tauri::Manager;
     let cache_dir: PathBuf =
         app.path().app_data_dir().map_err(|e| GateError::Io(e.to_string()))?;
-    fetch_and_persist_token(&cache_dir, hub_id, access_token, true).await
+    let out = fetch_and_persist_token(&cache_dir, hub_id, access_token, true).await?;
+    apply_persisted_token(&app, &cache_dir); // hot-reload del token rotado
+    Ok(out)
+}
+
+/// Celda del token de máquina compartida entre el shell Tauri y el runtime embebido (**hot-reload**,
+/// #22). Tras enrolar/rotar, el comando actualiza esta celda y el runtime toma el token nuevo en la
+/// siguiente petición **sin reiniciar la app**. Vive en el estado gestionado de Tauri.
+#[derive(Clone)]
+struct MachineTokenHandle(erplora_server::MachineToken);
+
+/// Actualiza la celda viva con el token recién persistido (keychain→fichero) tras enrolar/rotar.
+fn apply_persisted_token(app: &tauri::AppHandle, cache_dir: &std::path::Path) {
+    use tauri::Manager;
+    if let Some(h) = app.try_state::<MachineTokenHandle>() {
+        if let Ok(mut g) = h.0.write() {
+            *g = load_machine_token(cache_dir);
+        }
+    }
 }
 
 /// Construye la config del **runtime embebido** (§11) para este dispositivo: SQLite + caché de
-/// módulos en `app_data_dir`, modo `Session` (identidad local real, login PIN/JWT), y la identidad
-/// de máquina persistida al enrolar (`hub_id` + `cloud_api_token` desde keychain). Si aún no se
-/// enroló, `cloud_api_token` es `None` (las llamadas hub-scoped caen al JWT del usuario reenviado)
-/// y el `hub_id` usa el placeholder de dev hasta el primer enrol.
-fn embedded_serve_config(cache_dir: &std::path::Path) -> erplora_server::ServeConfig {
+/// módulos en `app_data_dir`, modo `Session` (identidad local real, login PIN/JWT), y la **celda
+/// compartida** del token de máquina (hot-reload). El `hub_id` sale de lo persistido al enrolar
+/// (placeholder de dev hasta el primer enrol).
+fn embedded_serve_config(
+    cache_dir: &std::path::Path,
+    machine_token_cell: erplora_server::MachineToken,
+) -> erplora_server::ServeConfig {
     erplora_server::ServeConfig {
         sqlite_path: cache_dir.join("erplora.db").to_string_lossy().into_owned(),
         bind: "127.0.0.1:8787".to_string(),
@@ -395,16 +417,16 @@ fn embedded_serve_config(cache_dir: &std::path::Path) -> erplora_server::ServeCo
             module_cache: cache_dir.join("modules"),
             auth_mode: erplora_server::AuthMode::Session,
             jwt_public_key: None, // `serve()` la trae del Cloud si hay red (login cloud); PIN no la necesita
-            cloud_api_token: load_machine_token(cache_dir),
+            cloud_api_token: None, // la celda compartida es la fuente del token (hot-reload)
         },
+        machine_token_cell: Some(machine_token_cell),
     }
 }
 
 /// Arranca el runtime embebido (`erplora_server::serve`) en un **hilo dedicado con su propio
 /// runtime tokio**, aislado del runtime async de Tauri. El webview le habla por loopback. El token
-/// de máquina se lee al arrancar; un enrol nuevo surte efecto en el siguiente arranque (la primera
-/// sesión usa el JWT del usuario reenviado como fallback).
-fn spawn_embedded_runtime(cache_dir: PathBuf) {
+/// de máquina vive en la celda compartida: un enrol/rotación lo aplica **en caliente** (#22).
+fn spawn_embedded_runtime(cache_dir: PathBuf, machine_token_cell: erplora_server::MachineToken) {
     std::thread::spawn(move || {
         let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
             Ok(rt) => rt,
@@ -414,7 +436,9 @@ fn spawn_embedded_runtime(cache_dir: PathBuf) {
             }
         };
         rt.block_on(async move {
-            if let Err(e) = erplora_server::serve(embedded_serve_config(&cache_dir)).await {
+            if let Err(e) =
+                erplora_server::serve(embedded_serve_config(&cache_dir, machine_token_cell)).await
+            {
                 eprintln!("runtime embebido terminó: {e}");
             }
         });
@@ -429,7 +453,12 @@ pub fn run() {
             // Arranca el runtime local ANTES de que el webview lo necesite (login `/api/auth/cloud`,
             // query/command, entitlement). app_data_dir es la raíz de datos por-instalación.
             if let Ok(cache_dir) = app.path().app_data_dir() {
-                spawn_embedded_runtime(cache_dir);
+                // Celda compartida del token de máquina: la siembra el keychain/fichero y se
+                // conserva en el estado de Tauri para actualizarla en caliente tras enrolar/rotar.
+                let cell: erplora_server::MachineToken =
+                    std::sync::Arc::new(std::sync::RwLock::new(load_machine_token(&cache_dir)));
+                app.manage(MachineTokenHandle(cell.clone()));
+                spawn_embedded_runtime(cache_dir, cell);
             } else {
                 eprintln!("runtime embebido: no se pudo resolver app_data_dir; no se arranca");
             }

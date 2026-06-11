@@ -15,7 +15,7 @@
 use axum::http::HeaderMap;
 use erplora_runtime::{RequestContext, Runtime};
 
-use crate::state::{AuthMode, HubConfig};
+use crate::state::{AppState, AuthMode, HubConfig};
 
 const DEFAULT_HUB: &str = "local";
 const DEFAULT_USER: &str = "local";
@@ -98,12 +98,12 @@ pub fn user_auth(headers: &HeaderMap, fallback_hub: &str) -> Option<cloud_client
 }
 
 /// Credencial de **máquina** del hub (`Auth::HubToken` = `X-Hub-Token` + `X-Hub-Id`), si el hub
-/// está enrolado (`HubConfig::cloud_api_token`). Es la identidad del propio hub ante el Cloud,
-/// sin usuario. ARQUITECTURA.md §2.3.
-pub fn machine_auth(config: &HubConfig) -> Option<cloud_client::Auth> {
-    config.cloud_api_token.as_ref().map(|token| cloud_client::Auth::HubToken {
-        hub_id: config.hub_id.clone(),
-        token: token.clone(),
+/// está enrolado. Lee el token **vivo** del [`AppState`] (`machine_token`), no la config estática,
+/// para que un enrol/rotación aplique sin reiniciar (§2.3, hot-reload). `None` si no hay token.
+pub fn machine_auth(st: &AppState) -> Option<cloud_client::Auth> {
+    st.machine_token().map(|token| cloud_client::Auth::HubToken {
+        hub_id: st.config.hub_id.clone(),
+        token,
     })
 }
 
@@ -115,6 +115,6 @@ pub fn machine_auth(config: &HubConfig) -> Option<cloud_client::Auth> {
 /// (sesión por PIN, sin JWT cloud) sigue pudiendo navegar el marketplace y refrescar el
 /// entitlement porque el hub se autentica a sí mismo. El secreto de máquina NO viaja al navegador:
 /// estas llamadas las hace el runtime (server-side).
-pub fn hub_scoped_auth(headers: &HeaderMap, config: &HubConfig) -> Option<cloud_client::Auth> {
-    machine_auth(config).or_else(|| user_auth(headers, &config.hub_id))
+pub fn hub_scoped_auth(headers: &HeaderMap, st: &AppState) -> Option<cloud_client::Auth> {
+    machine_auth(st).or_else(|| user_auth(headers, &st.config.hub_id))
 }

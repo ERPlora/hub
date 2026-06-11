@@ -33,7 +33,7 @@ pub mod install;
 pub mod session;
 pub mod state;
 
-pub use state::{AppState, AuthMode, HubConfig, DEV_HUB_ID, WsEvent};
+pub use state::{AppState, AuthMode, HubConfig, MachineToken, DEV_HUB_ID, WsEvent};
 
 /// Configuración de arranque del runtime **embebible** — la usan el binario (`main.rs`) y el shell
 /// **Tauri in-process** (§11). Envuelve la [`HubConfig`] de despliegue + parámetros de proceso.
@@ -47,6 +47,10 @@ pub struct ServeConfig {
     pub modules_dir: Option<String>,
     /// Configuración de despliegue (hub_id, Cloud, `auth_mode`, token de máquina…).
     pub hub: HubConfig,
+    /// Celda **externa** del token de máquina (hot-reload). Si `Some`, el runtime la comparte con
+    /// el shell Tauri, que la actualiza tras enrolar/rotar sin reiniciar la app. Si `None`, el
+    /// runtime crea la suya sembrada con `hub.cloud_api_token` (caso binario/ECS).
+    pub machine_token_cell: Option<state::MachineToken>,
 }
 
 impl ServeConfig {
@@ -57,6 +61,7 @@ impl ServeConfig {
             bind: std::env::var("HUB_BIND").unwrap_or_else(|_| "127.0.0.1:8787".into()),
             modules_dir: std::env::var("HUB_MODULES_DIR").ok().filter(|s| !s.is_empty()),
             hub: HubConfig::from_env(),
+            machine_token_cell: None,
         }
     }
 }
@@ -115,7 +120,11 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     }
     eprintln!("auth: modo {:?}", cfg.hub.auth_mode);
 
-    let state = AppState::with_config(runtime, cfg.hub);
+    // Celda del token de máquina: externa (compartida con el shell Tauri para hot-reload) o propia.
+    let state = match cfg.machine_token_cell.take() {
+        Some(cell) => AppState::with_config_cell(runtime, cfg.hub, cell),
+        None => AppState::with_config(runtime, cfg.hub),
+    };
     // Tablas de sistema del runtime (outbox) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
@@ -192,7 +201,7 @@ async fn request_install(
     Json(req): Json<RequestInstallReq>,
 ) -> Response {
     // Hub-scoped: token de máquina si el hub está enrolado; si no, JWT del usuario.
-    let Some(auth) = auth::hub_scoped_auth(&headers, &st.config) else {
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
@@ -250,7 +259,7 @@ async fn request_install(
 /// devuelve el JSON tal cual. El **secreto de máquina nunca sale al navegador**: el web llama a
 /// estas rutas del runtime y es el runtime quien firma la petición al Cloud.
 async fn proxy_cloud_get(st: &AppState, headers: &HeaderMap, req: cloud_client::PreparedRequest) -> Response {
-    let Some(auth) = auth::hub_scoped_auth(headers, &st.config) else {
+    let Some(auth) = auth::hub_scoped_auth(headers, st) else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
@@ -298,7 +307,7 @@ async fn assistant_chat_stream(
 ) -> Response {
     // Credencial hub-scoped: token de máquina del hub si está enrolado; si no, el JWT del usuario.
     // Así un cajero solo-local (sesión por PIN, sin JWT cloud) también usa el asistente.
-    let Some(auth) = auth::hub_scoped_auth(&headers, &st.config) else {
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),

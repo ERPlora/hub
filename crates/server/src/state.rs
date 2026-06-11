@@ -1,7 +1,7 @@
 //! Estado compartido del server: el runtime (tras un lock), el canal de eventos para WS,
 //! y la configuración de despliegue (hub_id + Cloud Portal + cache de módulos).
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use erplora_runtime::{EventSink, Runtime};
 use serde_json::{json, Value as Json};
@@ -85,6 +85,11 @@ impl HubConfig {
     }
 }
 
+/// Celda compartida del **token de máquina** (`cloud_api_token`). Mutable en vivo: el shell Tauri
+/// la actualiza tras enrolar/rotar y el runtime embebido toma el token nuevo **sin reiniciar la
+/// app** (`auth::machine_auth` la lee en cada petición). En ECS basta el valor inicial del env.
+pub type MachineToken = Arc<RwLock<Option<String>>>;
+
 /// Estado de la app Axum. El runtime no es `Sync` para mutación, así que va tras un `Mutex`;
 /// para 1–30 usuarios por hub (ARQUITECTURA.md §7.5) es más que suficiente.
 #[derive(Clone)]
@@ -92,6 +97,9 @@ pub struct AppState {
     pub runtime: Arc<Mutex<Runtime>>,
     pub events: broadcast::Sender<WsEvent>,
     pub config: HubConfig,
+    /// Token de máquina **vivo** (hot-reload). Se siembra del `config.cloud_api_token` o de una
+    /// celda externa (shell Tauri). Léelo con [`AppState::machine_token`].
+    pub machine_token: MachineToken,
     /// Cliente HTTP async (rustls) compartido para hablar con el Cloud (descargas + proxy SSE).
     pub http: reqwest::Client,
 }
@@ -102,8 +110,16 @@ impl AppState {
         Self::with_config(runtime, HubConfig::from_env())
     }
 
-    /// Variante con config explícita (tests / arranque controlado).
-    pub fn with_config(mut runtime: Runtime, config: HubConfig) -> Self {
+    /// Variante con config explícita (tests / arranque controlado). Crea la celda del token de
+    /// máquina sembrada con `config.cloud_api_token`.
+    pub fn with_config(runtime: Runtime, config: HubConfig) -> Self {
+        let cell = Arc::new(RwLock::new(config.cloud_api_token.clone()));
+        Self::with_config_cell(runtime, config, cell)
+    }
+
+    /// Como [`with_config`](Self::with_config) pero con una **celda de token externa** compartida
+    /// (el shell Tauri la conserva para actualizarla en caliente tras enrolar/rotar).
+    pub fn with_config_cell(mut runtime: Runtime, config: HubConfig, machine_token: MachineToken) -> Self {
         let (tx, _rx) = broadcast::channel::<WsEvent>(256);
         let sink = Arc::new(BroadcastSink { tx: tx.clone() });
         runtime.set_event_sink(sink);
@@ -111,8 +127,14 @@ impl AppState {
             runtime: Arc::new(Mutex::new(runtime)),
             events: tx,
             config,
+            machine_token,
             http: reqwest::Client::new(),
         }
+    }
+
+    /// Lee el token de máquina vivo (clona). `None` si el hub no está enrolado.
+    pub fn machine_token(&self) -> Option<String> {
+        self.machine_token.read().ok().and_then(|g| g.clone())
     }
 
     /// Publica un frame WS crudo (lo usa el flujo de instalación → `module.installed`).
