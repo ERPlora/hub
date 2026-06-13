@@ -1,9 +1,19 @@
 import { defineConfig, type Plugin } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
+import Icons from 'unplugin-icons/vite';
 import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+// Versión de la app, horneada en build → la lee el footer del sidebar vía `__APP_VERSION__`.
+const APP_VERSION = (() => {
+  try {
+    return JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8')).version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 // En dev, Vite se niega a servir JS de /public importado dinámicamente desde el código
 // ("can only be referenced via HTML tags"). Los módulos (WC Lit) se cargan en runtime con
@@ -44,9 +54,35 @@ export default defineConfig({
         },
       },
     }),
+    // Iconos Iconify inline EN BUILD (offline, CSP-safe, sin runtime ni red). Los imports
+    // `~icons/<set>/<name>?raw` se reemplazan por el string SVG del set local (@iconify-json/*).
+    // El shell los consume vía lib/icons.ts → <HubIcon>. Ver lib/icons.ts y components/HubIcon.vue.
+    Icons({ compiler: 'raw' }),
     tailwindcss(),
   ],
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   build: {
     target: 'es2022',
+  },
+  // Dev proxy (mismo origen → sin CORS). El runtime local (Axum :8787) no expone CORS y el Cloud
+  // (erplora.com) tampoco para localhost; con VITE_RUNTIME_URL='' y VITE_CLOUD_API_URL='/cloud'
+  // (ver .env.local) todas las llamadas salen de :5173 y Vite las reenvía:
+  //   /api + /ws → runtime Axum local · /cloud/* → Cloud Portal (reescrito sin el prefijo)
+  server: {
+    proxy: {
+      '/cloud': {
+        target: 'https://erplora.com',
+        changeOrigin: true,
+        // secure:false → no verificar el cert en el proxy dev. Necesario tras proxies de inspección
+        // TLS corporativos (Netskope): Node no confía en su CA (usa su propio bundle, no el llavero).
+        // Solo dev; el tráfico ya pasa por el proxy corporativo de todas formas.
+        secure: false,
+        rewrite: (p) => p.replace(/^\/cloud/, ''),
+      },
+      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      '/ws': { target: 'http://127.0.0.1:8787', changeOrigin: true, ws: true },
+    },
   },
 });

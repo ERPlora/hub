@@ -252,9 +252,12 @@ mod tests {
                 emit,
                 handler: None,
                 ai: None,
+                schema: None,
+                offline: Default::default(),
             },
             sql: vec![sql.to_string()],
             wasm: None,
+            schema: None,
         }
     }
 

@@ -81,6 +81,12 @@
       "migrations/sqlite/001_init.sql"
     ]
   },
+  "sync": [
+    { "table": "inventory_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "inventory_category", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "inventory_product", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "inventory_product_variant", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ],
   "queries": {
     "inventory.products.list": {
       "permission": "inventory.view_product",

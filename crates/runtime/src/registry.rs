@@ -13,12 +13,57 @@ pub enum ModuleStatus {
     Inactive,
 }
 
+/// JSON Schema **compilado** del payload de una query/command. Se compila UNA vez al
+/// instalar el módulo (no por petición) y se cachea aquí; la validación por petición es
+/// solo el `validate` sobre el validador ya compilado (§5.2, hub#27).
+#[derive(Clone)]
+pub struct CompiledSchema(pub std::sync::Arc<jsonschema::Validator>);
+
+impl std::fmt::Debug for CompiledSchema {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("CompiledSchema(..)")
+    }
+}
+
+impl CompiledSchema {
+    /// Compila `schema` (el JSON del fichero `schemas/*.json` del módulo).
+    pub fn compile(schema: &serde_json::Value) -> Result<Self, String> {
+        jsonschema::validator_for(schema)
+            .map(|v| Self(std::sync::Arc::new(v)))
+            .map_err(|e| e.to_string())
+    }
+
+    /// Valida `instance`; `Err` lleva el detalle legible de las violaciones (máx. 5).
+    pub fn validate(&self, instance: &serde_json::Value) -> Result<(), String> {
+        let errors: Vec<String> = self
+            .0
+            .iter_errors(instance)
+            .take(5)
+            .map(|e| {
+                let path = e.instance_path.to_string();
+                if path.is_empty() {
+                    e.to_string()
+                } else {
+                    format!("{path}: {e}")
+                }
+            })
+            .collect();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("; "))
+        }
+    }
+}
+
 /// Una query registrada: su definición + el SQL ya leído de disco + el módulo que la aporta.
 #[derive(Debug, Clone)]
 pub struct RegisteredQuery {
     pub module_id: String,
     pub def: QueryDef,
     pub sql: String,
+    /// JSON Schema del payload, ya compilado al instalar. `None` si la query no declara `schema`.
+    pub schema: Option<CompiledSchema>,
 }
 
 /// Un command registrado: definición + SQLs leídos (en orden) + módulo.
@@ -30,6 +75,8 @@ pub struct RegisteredCommand {
     /// Bytes del `.wasm` del handler Tier 2, ya leídos de disco. `None` si el
     /// command no declara handler (Tier 0/1).
     pub wasm: Option<Vec<u8>>,
+    /// JSON Schema del payload, ya compilado al instalar. `None` si el command no declara `schema`.
+    pub schema: Option<CompiledSchema>,
 }
 
 /// Entrada de menú con el módulo que la aporta.
@@ -105,6 +152,16 @@ impl Registry {
     /// Menú dinámico: entradas de navegación **solo de módulos activos**.
     pub fn active_navigation(&self) -> Vec<&NavEntry> {
         self.navigation.iter().filter(|n| self.is_active(&n.module_id)).collect()
+    }
+
+    /// Tablas sincronizables declaradas por los módulos **activos** (ADR-0031). El runtime las
+    /// convierte en `SyncTable` y se las pasa al motor de sync.
+    pub fn active_sync_tables(&self) -> Vec<&crate::manifest::SyncTableDef> {
+        self.installed
+            .iter()
+            .filter(|m| self.is_active(&m.id))
+            .flat_map(|m| m.sync.iter())
+            .collect()
     }
 
     /// Cambia el estado de un módulo instalado. Devuelve `false` si no existe.

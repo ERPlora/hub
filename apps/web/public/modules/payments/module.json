@@ -44,8 +44,16 @@
   "migrations": {
     "sqlite": [
       "migrations/sqlite/001_init.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql"
     ]
   },
+  "sync": [
+    { "table": "payments_payment_method", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "payments_payment", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "payments_payment_counter", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ],
   "queries": {
     "payments.payments.list": {
       "permission": "payments.view_payment",
@@ -163,9 +171,6 @@
         "function": "create_payment"
       },
       "schema": "schemas/create_payment.json",
-      "emit": [
-        "payments.payment.created"
-      ],
       "ai": {
         "description": "Creates a new payment linked to a pending invoice or document."
       }

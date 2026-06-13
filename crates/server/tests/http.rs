@@ -5,7 +5,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::SqliteAdapter;
 use erplora_runtime::Runtime;
-use erplora_server::{app, AppState};
+use erplora_server::{app, with_static_frontend, AppState};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt; // oneshot
@@ -46,6 +46,37 @@ async fn healthz_ok() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn static_frontend_serves_index_and_keeps_api() {
+    // dir temporal con un index.html (simula el dist/ de Vite).
+    let dir = std::env::temp_dir().join(format!("erplora_static_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.html"), "<!doctype html><title>erplora</title>").unwrap();
+
+    let router = with_static_frontend(make_app().await, dir.to_str().unwrap());
+
+    // Una ruta sin fichero/ni API → fallback SPA al index.html.
+    let resp = router
+        .clone()
+        .oneshot(Request::builder().uri("/dashboard").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    assert!(String::from_utf8_lossy(&bytes).contains("erplora"));
+
+    // /healthz sigue siendo ruta de API (no la pisa el estático).
+    let resp = router
+        .oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(&bytes[..], b"ok");
+
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[tokio::test]
@@ -124,6 +155,7 @@ async fn hub_context_returns_configured_hub_id() {
         auth_mode: erplora_server::AuthMode::Dev,
         jwt_public_key: None,
         cloud_api_token: None,
+        cloud_db_url: None,
     };
     let app = app(AppState::with_config(rt, cfg));
     let resp = app

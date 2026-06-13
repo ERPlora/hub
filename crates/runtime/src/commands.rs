@@ -56,6 +56,14 @@ pub(crate) async fn execute_at(
     // El handler corre bajo el permiso del command que lo invoca (no re-eleva).
     permissions::check(ctx, &cmd.def.permission)?;
 
+    // Validación del payload contra el JSON Schema declarado (compilado al instalar y
+    // cacheado en el Registry): rechaza ANTES de tocar la BD o invocar handlers (hub#27).
+    if let Some(schema) = &cmd.schema {
+        schema
+            .validate(&Json::Object(payload.clone()))
+            .map_err(|detail| RuntimeError::InvalidPayload { name: name.to_string(), detail })?;
+    }
+
     // ── Plugin nativo first-party (ADR-0009) ────────────────────────────────
     if let Some(handler) = &cmd.def.handler {
         if handler.kind == "native" {
@@ -298,6 +306,8 @@ mod tests {
             emit: vec![],
             handler: None,
             ai: None,
+            schema: None,
+            offline: Default::default(),
         }
     }
 
@@ -311,6 +321,7 @@ mod tests {
                 def: cmd_def(),
                 sql: vec!["INSERT INTO x VALUES (1);".to_string()],
                 wasm: None,
+                schema: None,
             },
         );
         reg

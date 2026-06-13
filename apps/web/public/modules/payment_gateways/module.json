@@ -39,6 +39,12 @@
       "label": "Gateways",
       "icon": "card",
       "component": "erp-payment-gateways-gateways"
+    },
+    {
+      "id": "transactions",
+      "label": "Transactions",
+      "icon": "receipt-outline",
+      "component": "erp-payment-gateways-transactions"
     }
   ],
   "migrations": {
@@ -46,6 +52,12 @@
       "migrations/sqlite/001_init.sql"
     ]
   },
+  "sync": [
+    { "table": "payment_gateways_gateway", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "payment_gateways_transaction", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "payment_gateways_refund", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "payment_gateways_counter", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ],
   "queries": {
     "payment_gateways.gateways.list": {
       "permission": "payment_gateways.view_pg",

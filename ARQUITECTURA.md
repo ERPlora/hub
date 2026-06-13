@@ -12,7 +12,7 @@
 >
 > **Estado:** propuesta + scaffolding inicial (`apps/web` Ionic React, primer módulo
 > `modules/inventory` con WC Lit; CSP validada — §14). Última actualización: 2026-05-31
-> (decisiones fijadas: impresoras **solo LAN**, **IDs numéricos** en el hub / UUID solo en Cloud — §2.5, §2.7, §14).
+> (decisiones fijadas: impresoras **solo LAN**, **PK = UUID v4 `TEXT` en todo** el dato de negocio (ADR-0035, sin remapeo) — §2.5, §2.7, §14).
 
 ---
 
@@ -64,11 +64,14 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
    `versions/` (solo el endpoint sync) → hoy, si falta, se instala SIN verificación de integridad;
    **arreglar en Cloud** (añadir `sha256` al serializer) para cumplir el contrato §2.2.
 
-6. **El asistente AI es un MÓDULO INSTALABLE, no una página del shell** — se instala desde el
-   marketplace y se carga como Web Component vía `ModuleView`, igual que cualquier módulo (aparece en la
-   sección "Módulos" dinámica del shell). **No** es una ruta horneada. Su WC alcanza el LLM de Cloud por
-   una **capacidad de host**: `POST /api/assistant/chat/stream` del runtime, que hace de **proxy SSE**
-   hacia Cloud (`/api/v1/hub/device/assistant/chat/stream/`, reenvía `Authorization: Bearer` + `X-Hub-Id`)
+6. **El asistente AI es una CAPACIDAD CORE del Hub, no un módulo de marketplace** (ADR-0033,
+   2026-06-13; supera la decisión 2026-06-09 de "módulo instalable"). Está **siempre presente** por
+   defecto (✨ del topbar): el proxy está **horneado en el binario** (`crates/server/src/assistant.rs`)
+   y el RAG en `apps/ai/knowledge/` — no hay `module.zip`, ni install, ni fila `Module` en el catálogo.
+   Su billing es **propio** (`AssistantTier`/`AssistantUsage`, capa gratis con tope + upgrade), fuera de
+   `ModulePurchase`/`is_module_entitled`. Su WC alcanza el LLM de Cloud por una **capacidad de host**:
+   `POST /api/assistant/chat/stream` del runtime, que hace de **proxy SSE** hacia Cloud
+   (`/api/v1/hub/device/assistant/chat/stream/`, reenvía `Authorization: Bearer` + `X-Hub-Id`)
    con **ensamblado de tools por permiso** (solo queries/commands con bloque `ai:` que el usuario puede
    ejecutar, §9.2). El Hub nunca habla con el LLM directo (§9.3); embeddings/RAG por el proxy de Cloud
    (§9.4/§9.6). La UI de chat de referencia quedó en `apps/web/src/parked/AssistantChat.vue`.
@@ -121,10 +124,12 @@ cloud); **`web-pwa` ⟹ cloud** (forzado).
   para hardware/FS — **independiente del transport de datos**. En `cloud + Tauri` los datos van
   por HTTP+WS y `invoke` se usa **solo** para este canal local (§2.7, §7.5).
 - **DB intercambiable**: `DatabaseAdapter` con backends SQLite y PostgreSQL (§8).
-- **Offline/online (Fase 1)**: el backend **`single` funciona offline** (SQLite del dispositivo)
-  **tras un primer arranque online** (login + provisión + descarga de módulos, §2.8/§2.9); el
-  backend **`cloud` es solo online**. **Sin sync de datos de negocio** entre ambos en esta
-  fase (§2.8).
+- **Offline/sync (modelo decidido, ADR-0031)**: **local-first + sync** en todos los tiers — cada
+  dispositivo opera sobre su **SQLite local como autoridad** y **funciona offline** (tras un primer
+  arranque online: login + provisión + descarga de módulos, §2.8/§2.9). La nube **no reemplaza** lo
+  local, lo **sincroniza**: el tier **Cloud DB** es SQLite local **+ sync** a Aurora (no thin-client),
+  conservando el offline; el **web-PWA/iOS** sí es online-only. El **motor de sync** está **pendiente
+  de diseño (columna humano)**; alcance y conflictos en §2.8.
 - **Rust es la autoridad**: valida permisos, tenant (`hub_id`), payload y ejecuta. La UI
   nunca toca la base de datos.
 
@@ -217,13 +222,14 @@ tools). Igual que la política actual con `module.py`.
   `checksum_sha256` + `manifest` + `version`) y `hub_module_version` (catálogo del Portal).
 - **Local (Tauri/SQLite)**: un solo hub por dispositivo; `hub_id` se mantiene por
   consistencia (un módulo corre igual en local y en cloud).
-- ✅ **IDs de fila (decidido)**: los datos de negocio del hub (Aurora por-org **y** SQLite local)
-  usan **PK numérica autoincremental** (`BIGINT`/`INTEGER`), **no UUID**. El **UUID es exclusivo
-  del Cloud Portal** (identificadores de control: `hub_id`, organización…). Así una fila de negocio
-  lleva **PK numérica** (única dentro del hub) + discriminador **`hub_id` (UUID)** que viene del
-  Cloud. Consecuencia para una futura migración local→cloud (§2.8 / Fase 6): al fusionar un SQLite
-  local en la BD compartida de la org, los IDs numéricos **se remapean** (no se conservan tal cual)
-  y se reescriben las FKs — porque varios hubs comparten secuencia en esa BD.
+- ✅ **IDs de fila (decidido — ADR-0035, supera la PK numérica de ADR-0007/§2.5)**: los datos de
+  negocio del hub (Aurora por-org **y** SQLite local) usan **PK = UUID v4 (`TEXT`) en TODO** — el
+  runtime ya inyecta `:new_id` como UUID v4. **No** hay autoincremental numérico. El `hub_id` (UUID,
+  viene del Cloud) sigue siendo el **discriminador de tenant** por fila. Como el UUID es
+  **globalmente único**, **NO hay remapeo de PKs ni reescritura de FKs** al fusionar local↔cloud:
+  los ids se conservan tal cual aunque varios hubs compartan la BD de la org. El append offline
+  (pedidos creados sin red) **no colisiona** por construcción. *(Esto resuelve el punto abierto del
+  motor de sync que §2.8/ADR-0031 tenían sobre el remapeo de PKs numéricas.)*
 
 ### 2.6 El sync Git del Cloud lee `module.json` (formato único)
 
@@ -352,24 +358,44 @@ SO/navegador como teclado.
 - *Decisión abierta (§14)*: descubrimiento primario↔satélite en LAN, y qué pasa si el primario
   cae (¿se puede promover un satélite?).
 
-### 2.8 Modelo offline (local) vs online (cloud) — alcance de la Fase 1
+### 2.8 Modelo offline = local-first + sync (ADR-0031)
 
-> ✅ **Decisión (Fase 1): NO hay motor de sincronización de datos de negocio entre local
-> y cloud.** Son **dos modos de despliegue** del mismo código, no dos copias de un mismo dato:
-> - **Local (Tauri)**: **funciona offline**. Sus datos viven en el **SQLite del dispositivo**
->   y operan sin internet. Autónomo para el día a día (ventas, caja, inventario).
-> - **Cloud (Axum/Aurora)**: **solo online**. En esta primera fase **no** hay alternativa
->   para que el cloud opere sin internet.
+> ✅ **Decisión (ADR-0031, revisa el thin-client de ADR-0030): local-first + sync.** La nube **no
+> reemplaza** lo local, lo **sincroniza**. Cada dispositivo tiene **SQLite local como autoridad**
+> (Rust valida permisos/tenant/payload antes de escribir, igual que la app gratis) y **funciona
+> offline siempre**. Motivo: con el thin-client (app local → Aurora directa) un usuario de un solo
+> dispositivo que **paga** quedaba **peor** que con la app gratis al perder la red.
 
+**Tres tiers** (detalle de producto en [overview.md](../architecture/hub/overview.md) y
+[MODELO-PLANES-Y-CAPACIDAD](../docs/producto/MODELO-PLANES-Y-CAPACIDAD.md)):
+
+| Tier | Datos | Multi-device | Offline |
+| --- | --- | --- | --- |
+| **Local — gratis** | SQLite local | No | Sí |
+| **Cloud DB — 14,99 €/hub** | SQLite local **+ sync** a Aurora | Sí (sync rápido) | Sí |
+| **Cloud completo — starter/standard** | ECS hub + Aurora | Sí | Nativo=local-first; web-PWA/iOS=online |
+
+- **Topología = estrella, el nodo cloud (ECS/Aurora) es el master** (sin caja-master física → sin
+  SPOF). La convergencia LAN-offline entre cajas de una tienda = fase posterior.
+- **Conflictos = Last-Write-Wins por timestamp con autoridad del servidor** (`now` que el runtime
+  ya inyecta, no el reloj del dispositivo → evita clock-skew). Limpio para **append** (pedidos: el
+  caso del comercial sin cobertura). El **stock** es **hub-scoped** y **se sincroniza como cualquier
+  otra tabla** en fase 1 (ADR-0035, rebaja el "server-autoritativo, no sincronizar" de ADR-0031);
+  límite conocido = LWW ciego entre varios dispositivos offline del **mismo** hub (futuro), y el
+  stock único multi-tienda = futuro (módulo `warehouse`, §13).
 - **Qué SÍ necesita internet incluso en local** (degradan, no rompen el flujo de caja):
   instalación de módulos desde el marketplace, **AI** (embeddings + generación, §9.3) y el
-  **primer login/configuración** (§2.9). Sin red, el negocio sigue operando con lo instalado;
-  esas funciones quedan en espera.
-- **Durabilidad del dato local**: backup **SQLite → S3** (como ya hace el hub actual en
-  planes Lite), **no** un sync bidireccional.
-- **Futuro (fuera de Fase 1)**: un eventual sync local↔cloud (cola de cambios + resolución
-  de conflictos / CRDTs) sería un proyecto aparte. El crate `sync` (§11) queda para **eventos
-  en vivo**, no para replicación de datos de negocio en Fase 1.
+  **primer login/configuración** (§2.9).
+- **Durabilidad del dato local**: además del sync, backup **SQLite → S3** (como ya hace el hub).
+- **PWA web (thin-client a ECS/Aurora) = solo iOS + acceso web, online-only**; `sqlite-wasm`/OPFS
+  para offline en iOS = fase posterior.
+
+> **El motor de sync es columna del humano** (sync local/cloud · offline son núcleo, ver
+> [hub/CLAUDE.md](CLAUDE.md)). Aquí se documenta el **modelo decidido**, no el motor: su diseño e
+> implementación están **pendientes**. Puntos abiertos (transporte por tier DB-to-DB vs replay,
+> stock server-autoritativo, alcance `offline: queue|forbid` por comando, convergencia LAN) en
+> ADR-0031. **Ojo:** el crate `sync` (§11) es el **cliente WS de eventos en vivo**, **no** este
+> motor de datos — serán componentes distintos.
 
 ### 2.9 Login de usuario, dispositivos de confianza y tipos de usuario
 
@@ -1085,12 +1111,15 @@ módulos). El `keywords` opcional de `agent` permite un pre-filtro léxico barat
 medido en `AssistantUsage` (`POST /api/v1/hub/device/assistant/embeddings/` + orquestador
 two-step multi-provider, cuotas por hub/mes).
 
-> **El asistente se entrega como MÓDULO INSTALABLE (decisión 2026-06-09).** No es una página del
-> shell: se instala desde el marketplace y se carga como Web Component vía `ModuleView`. Su WC
-> alcanza a Cloud por una **capacidad de host** del runtime: `POST /api/assistant/chat/stream`
-> (proxy SSE → `/api/v1/hub/device/assistant/chat/stream/`, reenvía `Bearer` + `X-Hub-Id`), con
-> **ensamblado de tools por permiso** (queries/commands con bloque `ai:` que el usuario puede
-> ejecutar). Así se mantiene "el hub nunca habla con el LLM directamente". Ver §0bis (punto 6).
+> **El asistente es una CAPACIDAD CORE del Hub (ADR-0033, 2026-06-13; supera la decisión
+> 2026-06-09 de "módulo instalable").** Siempre presente por defecto (✨ del topbar), con el proxy
+> horneado en el binario (`crates/server/src/assistant.rs`) y el RAG en `apps/ai/knowledge/`; no hay
+> `module.zip`, ni install, ni fila `Module`. Billing propio (`AssistantTier`, fuera de
+> `ModulePurchase`/`is_module_entitled`). Su WC alcanza a Cloud por una **capacidad de host** del
+> runtime: `POST /api/assistant/chat/stream` (proxy SSE → `/api/v1/hub/device/assistant/chat/stream/`,
+> reenvía `Bearer` + `X-Hub-Id`), con **ensamblado de tools por permiso** (queries/commands con bloque
+> `ai:` que el usuario puede ejecutar). Así se mantiene "el hub nunca habla con el LLM directamente".
+> Ver §0bis (punto 6).
 
 ### 9.4 Base vectorial: SOLO cloud (pgvector)
 
@@ -1261,7 +1290,7 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 | Tema | Estado |
 |------|--------|
 | **Multi-tenancy** | ✅ **Decidido**: BD por **organización** compartida entre hubs; `hub_id` por fila, scope inyectado por el runtime (§2.5). No es `tenant_id`. |
-| **IDs de fila** | ✅ **Decidido**: datos del hub (Aurora por-org + SQLite local) con **PK numérica**; **UUID solo en el Cloud Portal** (`hub_id`, org). Migración local→cloud **remapea** IDs (§2.5). |
+| **IDs de fila** | ✅ **Decidido (ADR-0035)**: **PK = UUID v4 (`TEXT`) en TODO** el dato de negocio (Aurora por-org + SQLite local), no autoincremental; `hub_id` (UUID) sigue siendo el discriminador de tenant. UUID globalmente único ⇒ **NO hay remapeo** al fusionar local↔cloud (§2.5). |
 | **Transporte cloud** | ✅ **Decidido**: HTTP (RPC) + canal de push dedicado (§7.5). WS-only descartado como default. |
 | **Canal de eventos (push)** | 🔶 **Abierto**: **WS (actual) vs SSE** para el push servidor→cliente. El push es **unidireccional** (los envíos van por HTTP) ⇒ SSE encaja: da **reconexión + Last-Event-ID gratis** (ayuda con el idle timeout del ALB), mantiene **HTTP estándar** (criterio §7.5) y es el formato natural para el **futuro streaming del assistant**. Plan: implementar **ambos** y elegir por situación; al hacerlo, **unificar la forma del JSON del evento** (`name` server vs `event` cliente — hoy desalineado) entre WS y SSE. |
 | **Entrega/fiabilidad de eventos** | ✅ **Decidido (2026-06-09)**: **transactional outbox** — escritura atómica en `_event_outbox`, **relay asíncrono** at-least-once con backoff + dead-letter, idempotencia vía `_event_delivery` (§4.1). Sustituye el dispatch inline. **Implementado + verificado** (`crates/runtime/src/outbox.rs` + relay en server). |
@@ -1269,7 +1298,7 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 | **Red saliente de módulos** | ✅ **Decidido (Opción A)**: `http.fetch` mediado (allowlist + creds inyectadas + auditoría §5.5) para terceros; **B (nativo)** para fiscal. |
 | **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware compartido (sidecar en Tauri \| standalone opcional para `cloud + web-PWA`), §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
 | **Modelo de módulos** | ✅ **Decidido**: híbrido (declarativo + WASM + SDK). |
-| **Offline/sync** | ✅ **Decidido (Fase 1)**: local offline (SQLite), cloud solo online; sin sync de datos de negocio entre ambos (§2.8). |
+| **Offline/sync** | ✅ **Decidido (ADR-0031)**: **local-first + sync** — SQLite local autoridad en todos los tiers (offline siempre); Cloud DB = local + sync a Aurora (no thin-client); web-PWA/iOS online-only. Motor de sync pendiente (columna humano) (§2.8). |
 | **Login de usuario** | ✅ **Decidido**: 1er login email+password online → dispositivo de confianza → PIN (offline a futuro); usuarios cloud y solo-locales (§2.9). |
 | **Reactividad UI** | ✅ **Decidido**: eventos WS/Tauri → el WC re-consulta (§7.7). Sustituye a LiveComponent. |
 | **ABI WASM** | Extism (recomendado) vs WASI vs propia. Validar en Fase 0. |
@@ -1361,10 +1390,10 @@ con ella; viaja en `sale.completed` para que `invoice` emita F1/F2).
 module.json = contrato del módulo (lo técnico; la clasificación vive en el Cloud Portal)
 WebComponent = pantalla del módulo (Lit; §3.1)
 Rust = autoridad / runtime genérico (execute_command / execute_query)
-SQLite (local) / Postgres-Aurora (cloud) = solo Rust accede; hub_id (UUID) por fila + PK numérica
+SQLite (local) / Postgres-Aurora (cloud) = solo Rust accede; hub_id (UUID) por fila + PK = UUID v4 (TEXT)
 WASM (Extism) = lógica avanzada y batch, en sandbox (sin red/BD libres)
 SDK TS = puente para la UI (IpcTransport local / HttpWsTransport cloud)
-Offline/online = local offline (SQLite) / cloud solo online; sin sync de negocio (Fase 1)
+Offline = local-first + sync (ADR-0031): SQLite local autoridad siempre; Cloud DB sincroniza a Aurora (no thin-client); web-PWA/iOS online. Motor de sync pendiente (columna humano)
 Login = email+password online (setup) → dispositivo de confianza → PIN (offline a futuro)
 Reactividad = evento (WS/Tauri) → el WC re-consulta (no server-render)
 Eventos = transactional outbox (escritura atómica + relay async at-least-once + _event_delivery); WS solo push UI (§4.1)

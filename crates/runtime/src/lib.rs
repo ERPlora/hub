@@ -57,6 +57,46 @@ impl Runtime {
         installer::install(self.db.as_ref(), &mut self.registry, dir).await
     }
 
+    /// Instala todos los módulos de las subcarpetas de `root` (las que tienen `module.json`),
+    /// **resolviendo el orden de `depends_on` por topo-sort** (hub#16): una dependencia se instala
+    /// antes que quien la declara, sin depender del orden del sistema de ficheros. Devuelve los ids
+    /// instalados en el orden aplicado.
+    ///
+    /// **Tolerante** (como el arranque original): un módulo cuyo manifest no carga o cuya
+    /// instalación falla se **omite con log** y NO tumba a los demás (un módulo de terceros roto no
+    /// debe brickear el hub al arrancar). Solo abortan: un `read_dir` fallido (Err) o un **ciclo**
+    /// de `depends_on` (error estructural del conjunto, se reporta y no se instala nada del lote).
+    pub async fn install_all_from_dir(&mut self, root: &Path) -> Result<Vec<String>> {
+        // 1) Carga manifests; un manifest inválido se omite (log), no aborta el lote.
+        let mut found: Vec<(std::path::PathBuf, crate::manifest::Manifest)> = Vec::new();
+        for entry in std::fs::read_dir(root)? {
+            let path = entry?.path();
+            if !path.join("module.json").exists() {
+                continue;
+            }
+            match crate::manifest::Manifest::load(&path) {
+                Ok(manifest) => found.push((path, manifest)),
+                Err(e) => eprintln!("✗ módulo {}: {e}", path.display()),
+            }
+        }
+        // 2) Orden topológico por depends_on (un ciclo sí aborta: error de diseño del conjunto).
+        let pairs: Vec<(String, Vec<String>)> =
+            found.iter().map(|(_, m)| (m.id.clone(), m.depends_on.clone())).collect();
+        let order = installer::install_order(&pairs)?;
+        // 3) Instala en orden; un módulo que falle se omite (log) sin tumbar a los demás.
+        let mut installed = Vec::with_capacity(order.len());
+        for i in order {
+            match self.install_from_dir(&found[i].0).await {
+                Ok(id) => {
+                    eprintln!("✓ módulo instalado: {id}");
+                    installed.push(id);
+                }
+                Err(e) => eprintln!("✗ módulo {}: {e}", found[i].0.display()),
+            }
+        }
+        Ok(installed)
+    }
+
     /// Activa un módulo instalado (sus capacidades vuelven a estar disponibles).
     pub async fn activate(&mut self, module_id: &str) -> Result<()> {
         installer::set_status(self.db.as_ref(), &mut self.registry, module_id, ModuleStatus::Active).await
@@ -152,6 +192,11 @@ impl Runtime {
         identity::get_or_link_cloud_user(self.db.as_ref(), cloud_user_id, default_name, default_role).await
     }
 
+    /// Fija (o cambia) el PIN de un usuario existente por id (alta de PIN tras login cloud).
+    pub async fn set_pin(&self, user_id: &str, pin: &str) -> Result<()> {
+        identity::set_pin(self.db.as_ref(), user_id, pin).await
+    }
+
     /// Abre una sesión server-side para `user_id`; devuelve el token opaco.
     pub async fn create_session(&self, user_id: &str, ttl_secs: i64) -> Result<String> {
         identity::create_session(self.db.as_ref(), user_id, ttl_secs).await
@@ -191,6 +236,34 @@ impl Runtime {
     /// Acceso de solo lectura al registro (introspección / tests).
     pub fn registry(&self) -> &Registry {
         &self.registry
+    }
+
+    /// Ejecuta un ciclo de sync local↔cloud (ADR-0031, **primer borrador**). Reúne las tablas
+    /// sincronizables de los módulos activos, las convierte en `SyncTable` y delega en el motor
+    /// genérico (`erplora-datasync`). `remote` es el backend cloud (Aurora) que aporta el host
+    /// (server) desde `HUB_CLOUD_DB_URL`; el local (SQLite) es la autoridad. Columna del humano:
+    /// el schedule / detección de conectividad / origen del DSN per-tier los decide el humano.
+    pub async fn run_sync(
+        &self,
+        remote: &dyn DatabaseAdapter,
+        hub_id: &str,
+    ) -> Result<erplora_datasync::SyncReport> {
+        let tables: Vec<erplora_datasync::SyncTable> = self
+            .registry
+            .active_sync_tables()
+            .iter()
+            .map(|d| {
+                let pk: Vec<&str> = d.pk.iter().map(String::as_str).collect();
+                let mut t = erplora_datasync::SyncTable::new(&d.table, &pk);
+                t.hub_scoped = d.hub_scoped;
+                t.updated_at = d.updated_at.clone();
+                t
+            })
+            .collect();
+        erplora_datasync::SyncEngine::new(self.db.as_ref(), remote, tables)
+            .sync(hub_id)
+            .await
+            .map_err(|e| crate::errors::RuntimeError::Sync(e.to_string()))
     }
 }
 

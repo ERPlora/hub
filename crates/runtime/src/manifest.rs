@@ -26,12 +26,39 @@ pub struct Manifest {
     pub commands: HashMap<String, CommandDef>,
     #[serde(default)]
     pub events: Events,
+    /// Tablas sincronizables local↔cloud (ADR-0031). Vacío = el módulo no sincroniza.
+    #[serde(default)]
+    pub sync: Vec<SyncTableDef>,
     /// Resumen del módulo para el routing del asistente (nivel 1). ARQUITECTURA.md §9.2b.
     #[serde(default)]
     pub agent: Option<Agent>,
     /// Conocimiento del módulo para RAG (§9.4) — aparcado/en diseño. Se captura tal cual.
     #[serde(default)]
     pub ai_context: Option<serde_json::Value>,
+}
+
+/// Una tabla declarada como sincronizable (bloque `sync` del manifest, ADR-0031). Espejo del
+/// JSON Schema. El runtime la convierte en `erplora_datasync::SyncTable`.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct SyncTableDef {
+    /// Nombre de la tabla (debe existir en ambos lados; lo crean las migraciones).
+    pub table: String,
+    /// Columnas que forman el conflict-target del UPSERT (la PK lógica).
+    pub pk: Vec<String>,
+    /// Si lleva `hub_id`, se filtra por hub en push/pull (tenancy, §2.5). Por defecto `true`.
+    #[serde(default = "default_hub_scoped")]
+    pub hub_scoped: bool,
+    /// Columna de versión para LWW (ISO-8601 TEXT). Por defecto `updated_at`.
+    #[serde(default = "default_updated_at")]
+    pub updated_at: String,
+}
+
+fn default_hub_scoped() -> bool {
+    true
+}
+
+fn default_updated_at() -> String {
+    "updated_at".to_string()
 }
 
 /// Bloque `agent` del manifest: descripción del módulo (en inglés) para el routing del
@@ -157,6 +184,11 @@ pub struct CommandDef {
     pub transaction: bool,
     #[serde(default)]
     pub sql: Vec<String>,
+    /// Ruta (relativa a la carpeta del módulo) del JSON Schema del payload. Si está
+    /// presente, el runtime valida el payload del llamador contra él ANTES de ejecutar
+    /// (se compila una vez al instalar y se cachea en el `Registry`). §5.2, hub#27.
+    #[serde(default)]
+    pub schema: Option<String>,
     #[serde(default)]
     pub emit: Vec<String>,
     /// Handler de lógica: Tier 2 (WASM sandbox) o **plugin nativo first-party**
@@ -168,6 +200,24 @@ pub struct CommandDef {
     /// schema se heredan del propio command, no se redeclaran. ARQUITECTURA.md §9.2.
     #[serde(default)]
     pub ai: Option<AiTool>,
+    /// **BORRADOR (Worker D, sin enforcement).** Política offline del comando — ver
+    /// `architecture/hub/sync-hard-cases.md`. Solo se DECLARA aquí; el runtime **no la aplica
+    /// todavía** (el mecanismo lo decide el humano: ledger de stock / decremento server-autoritativo).
+    /// `queue` (por defecto) = append que se encola y sincroniza al volver la red; `forbid` =
+    /// online-only (fiscal/VeriFactu, decrementos de stock críticos).
+    #[serde(default)]
+    pub offline: OfflinePolicy,
+}
+
+/// **BORRADOR (Worker D).** Política offline declarada por comando. Sin enforcement hoy.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OfflinePolicy {
+    /// Se permite offline: se encola y sincroniza al recuperar la red (append). Por defecto.
+    #[default]
+    Queue,
+    /// No se permite offline: el comando exige red (fiscal/VeriFactu, stock crítico).
+    Forbid,
 }
 
 /// Referencia al handler de un command. ARQUITECTURA.md §5.3, §9.2.

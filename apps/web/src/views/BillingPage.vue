@@ -1,13 +1,6 @@
 <template>
   <ion-page>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-menu-button />
-        </ion-buttons>
-        <ion-title>Billing</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    <AppTopbar :title="t('nav.billing')" />
 
     <ion-content class="ion-padding">
       <!-- Facturas -->
@@ -47,7 +40,7 @@
                   </td>
                   <td class="py-2 px-3 text-right">
                     <ion-button fill="clear" size="small" :aria-label="`Descargar ${inv.number}`" @click="downloadInvoice(inv.id)">
-                      <ion-icon slot="icon-only" :icon="downloadOutline" />
+                      <HubIcon slot="icon-only" name="download-outline" />
                     </ion-button>
                   </td>
                 </tr>
@@ -60,7 +53,7 @@
             <ion-card v-for="inv in invoices" :key="inv.id">
               <ion-card-header>
                 <ion-card-title class="flex items-center gap-2 text-base">
-                  <ion-icon :icon="documentTextOutline" class="text-[color:var(--ion-color-medium)]" />
+                  <HubIcon name="document-text-outline" class="text-[color:var(--ion-color-medium)]" />
                   {{ inv.number }}
                 </ion-card-title>
               </ion-card-header>
@@ -73,7 +66,7 @@
                   Emitida {{ fmtDate(inv.issueDate) }} · Vence {{ fmtDate(inv.dueDate) }}
                 </p>
                 <ion-button fill="clear" size="small" class="mt-2 -ml-2" @click="downloadInvoice(inv.id)">
-                  <ion-icon slot="start" :icon="downloadOutline" />
+                  <HubIcon slot="start" name="download-outline" />
                   Descargar
                 </ion-button>
               </ion-card-content>
@@ -82,7 +75,7 @@
         </template>
 
         <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
-          <ion-icon :icon="receiptOutline" style="font-size: 2.5rem;" />
+          <HubIcon name="receipt-outline" style="font-size: 2.5rem;" />
           <p>No hay facturas</p>
         </div>
       </template>
@@ -131,7 +124,7 @@
             <ion-card v-for="sub in subscriptions" :key="sub.id">
               <ion-card-header>
                 <ion-card-title class="flex items-center gap-2 text-base">
-                  <ion-icon :icon="cardOutline" class="text-[color:var(--ion-color-medium)]" />
+                  <HubIcon name="card-outline" class="text-[color:var(--ion-color-medium)]" />
                   {{ sub.planName }}
                 </ion-card-title>
               </ion-card-header>
@@ -149,7 +142,7 @@
         </template>
 
         <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
-          <ion-icon :icon="refreshOutline" style="font-size: 2.5rem;" />
+          <HubIcon name="refresh-outline" style="font-size: 2.5rem;" />
           <p>No hay suscripciones activas</p>
         </div>
       </template>
@@ -167,15 +160,15 @@
       <ion-toolbar>
         <ion-segment :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="invoices">
-            <ion-icon :icon="receiptOutline" />
+            <HubIcon name="receipt-outline" />
             <ion-label>Facturas</ion-label>
           </ion-segment-button>
           <ion-segment-button value="subscriptions">
-            <ion-icon :icon="refreshOutline" />
+            <HubIcon name="refresh-outline" />
             <ion-label>Suscripciones</ion-label>
           </ion-segment-button>
           <ion-segment-button value="payments">
-            <ion-icon :icon="cardOutline" />
+            <HubIcon name="card-outline" />
             <ion-label>Pagos</ion-label>
           </ion-segment-button>
         </ion-segment>
@@ -186,17 +179,19 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import {
-  IonPage, IonHeader, IonToolbar, IonButtons, IonMenuButton, IonTitle, IonContent,
-  IonFooter, IonSegment, IonSegmentButton, IonLabel, IonIcon, IonBadge,
-  IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSpinner,
+  IonPage, IonToolbar, IonContent,
+  IonFooter, IonSegment, IonSegmentButton, IonLabel,  IonBadge,
+  IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSpinner
 } from '@ionic/vue';
-import {
-  receiptOutline, refreshOutline, cardOutline, downloadOutline, documentTextOutline,
-} from 'ionicons/icons';
+import HubIcon from '../components/HubIcon.vue';
+import AppTopbar from '../components/AppTopbar.vue';
+
+const { t } = useI18n();
 import {
   cloudInvoices, cloudSubscriptions, getAccessToken,
-  type CloudInvoice, type CloudSubscription,
+  type CloudInvoice, type CloudSubscription
 } from '../lib/cloud';
 import { config } from '../lib/config';
 
@@ -232,7 +227,7 @@ const STATUS_LABEL: Record<CloudInvoice['status'], string> = {
   open: 'Abierta',
   paid: 'Pagada',
   void: 'Anulada',
-  uncollectible: 'Incobrable',
+  uncollectible: 'Incobrable'
 };
 
 const STATUS_COLOR: Record<CloudInvoice['status'], string> = {
@@ -240,7 +235,7 @@ const STATUS_COLOR: Record<CloudInvoice['status'], string> = {
   open: 'warning',
   paid: 'success',
   void: 'medium',
-  uncollectible: 'danger',
+  uncollectible: 'danger'
 };
 
 function statusLabel(s: CloudInvoice['status']): string {
@@ -271,8 +266,8 @@ async function downloadInvoice(id: number): Promise<void> {
     const res = await fetch(`${config.cloudApiUrl}/api/v1/billing/invoices/${id}/download/`, {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        'X-Client-Type': 'hub',
-      },
+        'X-Client-Type': 'hub'
+      }
     });
     if (!res.ok) throw new Error(String(res.status));
     const blob = await res.blob();

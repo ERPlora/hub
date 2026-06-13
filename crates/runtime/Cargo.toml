@@ -7,6 +7,9 @@ license.workspace = true
 
 [dependencies]
 erplora-db = { path = "../db" }
+# Motor de sync local↔cloud (ADR-0031, primer borrador). El runtime construye la lista de tablas
+# sincronizables de los módulos activos y delega en este crate genérico.
+erplora-datasync = { path = "../datasync" }
 erplora-wasm-host = { path = "../wasm-host" }
 # Traits async del contrato de plugins nativos first-party (ADR-0009, native.rs).
 async-trait = "0.1"
@@ -16,7 +19,13 @@ thiserror = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 uuid = { version = "1", features = ["v4"] }
 sha2 = "0.10"
+# Validación del payload contra el JSON Schema declarado por cada query/command (§5.2).
+# Sin resolución de $ref externos (offline): los schemas de módulo son autocontenidos.
+jsonschema = { version = "0.33", default-features = false }
 
 [dev-dependencies]
 # Async test harness for the integration tests/example (db + runtime are async now).
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+# Para el test e2e de sync (PgAdapter contra Aurora por túnel) y construir payloads.
+erplora-db = { path = "../db" }
+serde_json = "1"

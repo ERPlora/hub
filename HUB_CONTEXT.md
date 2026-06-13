@@ -61,8 +61,10 @@ tenant que sustituira progresivamente al hub actual.
 - Transport de datos por backend: `cloud` usa HTTP (query/command) + WebSocket (solo
   eventos); `single` usa Tauri `invoke` + events. En cualquier shell Tauri, `invoke`
   es ademas el canal de hardware local (independiente del backend) -> combo `cloud + Tauri`.
-- El backend `single` es offline con SQLite (tras primer login online); `cloud` es
-  online con Postgres/Aurora. En fase 1 no hay sync de negocio entre ambos.
+- Modelo **local-first + sync** (ADR-0031): cada dispositivo opera sobre SQLite local como
+  autoridad y funciona offline (tras primer login online). El tier **Cloud DB** es SQLite local
+  **+ sync** a Aurora (no thin-client); el **web-PWA/iOS** es online-only. El motor de sync está
+  pendiente (columna humano).
 - El `bridge/` no se elimina: sidecar de hardware en Tauri, o standalone opcional
   para `cloud + web-PWA` (§2.7).
 - AI y embeddings siempre pasan por el proxy del Cloud Portal, no directo desde

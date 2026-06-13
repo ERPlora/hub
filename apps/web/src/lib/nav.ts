@@ -6,13 +6,16 @@
 // `refreshModuleNav()` recarga; `bumpNav()` fuerza una recarga (p.ej. tras instalar).
 import { ref } from 'vue';
 import { loadMenu } from './module-loader';
-import { manifestIcon } from './icons';
 
 export interface ModuleNavItem {
   /** Ruta del shell que monta el WC del módulo (`/m/:moduleId`). */
   path: string;
   label: string;
-  /** SVG del icono (resuelto desde el nombre del manifest vía manifestIcon). */
+  /**
+   * Valor para `<HubIcon :name>`: el SVG inline que hornea el módulo (option-b) o, si no lo trae,
+   * el nombre Iconify del manifest. HubIcon (resolveIcon) acepta ambos — NO pre-resolver aquí
+   * (pasar un data-URI ya resuelto haría que HubIcon lo re-resolviese y cayera al fallback).
+   */
   icon: string;
 }
 
@@ -32,7 +35,7 @@ export async function refreshModuleNav(): Promise<void> {
         byModule.set(e.moduleId, {
           path: `/m/${e.moduleId}`,
           label: e.moduleName,
-          icon: manifestIcon(e.nav.icon),
+          icon: e.iconSvg ?? e.nav.icon ?? '',
         });
       }
     }

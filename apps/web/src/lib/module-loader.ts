@@ -14,10 +14,30 @@ export interface MenuEntry {
   moduleName: string;
   nav: NavigationItem;
   entryUrl: string;
+  /**
+   * SVG inline del icono de esta entrada, horneado por el módulo en build (ADR option-b:
+   * `module-toolkit build` resuelve el nombre Iconify de `nav.icon` y escribe `dist/icons.json`).
+   * `undefined` si el módulo no trae ese sidecar; el shell cae a resolver `nav.icon` por nombre
+   * contra su propio registro (lib/icons.ts). Se pasa tal cual a `<HubIcon :name>`.
+   */
+  iconSvg?: string;
 }
 
 const INSTALLED_MODULES = ['/modules/inventory/module.json'];
 const loadedEntries = new Set<string>();
+
+/** Sidecar `dist/icons.json` del módulo (nombre Iconify → SVG inline). `{}` si no lo trae. */
+async function loadIconMap(base: string, entry: string): Promise<Record<string, string>> {
+  // icons.json vive junto al bundle del WC (dist/), lo genera `module-toolkit build`.
+  const distDir = entry.includes('/') ? entry.replace(/\/[^/]+$/, '') : '';
+  try {
+    const res = await fetch(`${base}/${distDir ? `${distDir}/` : ''}icons.json`);
+    if (!res.ok) return {};
+    return (await res.json()) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
 
 /** Lee los manifests y devuelve las entradas de menú (desde `navigation`). */
 export async function loadMenu(): Promise<MenuEntry[]> {
@@ -28,12 +48,14 @@ export async function loadMenu(): Promise<MenuEntry[]> {
     // Gate por entitlement (§2.10): solo se montan los módulos a los que el hub tiene derecho.
     if (!isModuleEntitled(manifest.id)) continue;
     const base = url.replace(/\/module\.json$/, '');
+    const icons = await loadIconMap(base, manifest.ui.entry);
     for (const nav of manifest.navigation ?? []) {
       entries.push({
         moduleId: manifest.id,
         moduleName: manifest.name,
         nav,
         entryUrl: `${base}/${manifest.ui.entry}`,
+        iconSvg: nav.icon ? icons[nav.icon] : undefined,
       });
     }
   }

@@ -2,6 +2,12 @@
   "id": "tasks",
   "name": "Tasks",
   "version": "1.0.0",
+  "sync": [
+    { "table": "tasks_project", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "tasks_task", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "tasks_comment", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "tasks_counter", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at", "note": "LWW risk — revisar humano: contador atómico (hub_id, day) → last_number; Last-Write-Wins puede perder/regresar la secuencia de task_number" }
+  ],
   "agent": {
     "description": "Manages internal staff tasks and projects: create, assign, update status, complete tasks, add comments, and organise tasks into projects.",
     "keywords": [
@@ -320,9 +326,6 @@
         "file": "dist/handler.wasm",
         "function": "create_task"
       },
-      "emit": [
-        "tasks.task.created"
-      ],
       "ai": {
         "description": "Creates a new internal task with assignee, priority, and due date"
       }
@@ -335,9 +338,6 @@
         "file": "dist/handler.wasm",
         "function": "update_status"
       },
-      "emit": [
-        "tasks.task.status_changed"
-      ],
       "ai": {
         "description": "Changes the status of a task (todo, in_progress, blocked, done, cancelled)"
       }
@@ -350,9 +350,6 @@
         "file": "dist/handler.wasm",
         "function": "complete_task"
       },
-      "emit": [
-        "tasks.task.completed"
-      ],
       "ai": {
         "description": "Marks a task as completed and records the completion date"
       }
@@ -398,6 +395,30 @@
       "ai": {
         "description": "Creates a new project to group related tasks"
       }
+    },
+    "tasks._bump_counter": {
+      "permission": "tasks.add_task",
+      "sql": [
+        "commands/_bump_counter.sql"
+      ]
+    },
+    "tasks._insert_task": {
+      "permission": "tasks.add_task",
+      "sql": [
+        "commands/_insert_task.sql"
+      ]
+    },
+    "tasks._set_status": {
+      "permission": "tasks.manage_task",
+      "sql": [
+        "commands/_set_status.sql"
+      ]
+    },
+    "tasks._complete": {
+      "permission": "tasks.manage_task",
+      "sql": [
+        "commands/_complete.sql"
+      ]
     }
   },
   "events": {

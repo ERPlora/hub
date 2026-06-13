@@ -19,7 +19,7 @@
     },
     "icon": {
       "type": "string",
-      "description": "Nombre del icono del módulo (p. ej. ionicon `storefront-outline`)."
+      "description": "Nombre del icono del módulo (set Iconify `ion:`, p. ej. `storefront-outline`). El `module-toolkit build` lo hornea a SVG en `dist/icons.json` y el shell lo pinta vía HubIcon (ADR-0036). Solo el nombre aquí; el SVG no se escribe en el manifest."
     },
     "version": {
       "type": "string",
@@ -65,7 +65,7 @@
         "properties": {
           "id": { "type": "string" },
           "label": { "type": "string" },
-          "icon": { "type": "string" },
+          "icon": { "type": "string", "description": "Nombre del icono de la entrada (set Iconify `ion:`). Horneado a SVG en `dist/icons.json` por el build (ADR-0036)." },
           "component": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$",
@@ -105,6 +105,7 @@
           "permission": { "type": "string" },
           "transaction": { "type": "boolean", "default": false },
           "sql": { "type": "array", "items": { "type": "string" } },
+          "schema": { "type": "string" },
           "handler": {
             "type": "object",
             "required": ["type", "function"],
@@ -117,7 +118,13 @@
             "then": { "required": ["file"] }
           },
           "emit": { "type": "array", "items": { "type": "string" } },
-          "ai": { "$ref": "#/$defs/aiTool" }
+          "ai": { "$ref": "#/$defs/aiTool" },
+          "offline": {
+            "type": "string",
+            "enum": ["queue", "forbid"],
+            "default": "queue",
+            "description": "BORRADOR (Worker D, sin enforcement — ver architecture/hub/sync-hard-cases.md). Política offline del comando: 'queue' (append, se sincroniza al volver la red) | 'forbid' (online-only: fiscal/VeriFactu, stock crítico). El runtime aún NO la aplica."
+          }
         }
       }
     },
@@ -144,6 +151,38 @@
       }
     },
     "scheduled_tasks": { "type": "array", "items": { "type": "object" }, "default": [] },
+    "sync": {
+      "type": "array",
+      "description": "OPCIONAL (ADR-0031). Declara qué tablas del módulo participan en la sincronización local↔cloud. Solo tablas de negocio append-style (cabeceras y líneas), NO contadores/estado interno. Cada item identifica la tabla, su clave primaria y la columna de marca temporal para el delta.",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["table", "pk"],
+        "additionalProperties": false,
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Nombre real de la tabla (tal cual en las migraciones)."
+          },
+          "pk": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "Columna(s) de la clave primaria de la tabla."
+          },
+          "hub_scoped": {
+            "type": "boolean",
+            "default": true,
+            "description": "Si la tabla está discriminada por `hub_id` (contrato de fila §2.5)."
+          },
+          "updated_at": {
+            "type": "string",
+            "default": "updated_at",
+            "description": "Columna de marca temporal usada para el delta de sincronización."
+          }
+        }
+      }
+    },
     "ui": {
       "type": "object",
       "required": ["entry"],

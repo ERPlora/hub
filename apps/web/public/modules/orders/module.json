@@ -55,9 +55,15 @@
   ],
   "migrations": {
     "sqlite": [
-      "migrations/sqlite/001_init.sql"
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_counter_gate.sql"
     ]
   },
+  "sync": [
+    { "table": "orders_order", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "orders_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "orders_note", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ],
   "queries": {
     "orders.orders.list": {
       "permission": "orders.view_order",
@@ -187,9 +193,6 @@
         "file": "dist/handler.wasm",
         "function": "create_order"
       },
-      "emit": [
-        "orders.order_created"
-      ],
       "ai": {
         "description": "Creates a new order with its product lines."
       }
@@ -214,9 +217,6 @@
         "file": "dist/handler.wasm",
         "function": "complete_order"
       },
-      "emit": [
-        "orders.order_completed"
-      ],
       "ai": {
         "description": "Marks an order as completed after delivery or service fulfilment."
       }
@@ -262,13 +262,44 @@
     },
     "orders.link_to_sale": {
       "permission": "orders.change_order",
-      "transaction": true,
-      "sql": [
-        "commands/link_to_sale.sql"
-      ],
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "link_to_sale"
+      },
       "ai": {
         "description": "Links an order to a completed sale in the sales module."
       }
+    },
+    "orders._bump_counter": {
+      "permission": "orders.add_order",
+      "sql": [
+        "commands/_bump_counter.sql"
+      ]
+    },
+    "orders._create_order": {
+      "permission": "orders.add_order",
+      "sql": [
+        "commands/_create_order_insert.sql",
+        "commands/_create_order_assert.sql",
+        "commands/_create_order_note.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "orders._complete": {
+      "permission": "orders.complete_order",
+      "sql": [
+        "commands/_complete_note.sql",
+        "commands/_complete_update.sql",
+        "commands/_complete_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "orders._link_to_sale": {
+      "permission": "orders.change_order",
+      "sql": [
+        "commands/_link_to_sale.sql"
+      ]
     }
   },
   "events": {

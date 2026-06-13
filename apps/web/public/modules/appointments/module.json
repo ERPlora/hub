@@ -65,6 +65,15 @@
       "migrations/sqlite/002_counter.sql"
     ]
   },
+  "sync": [
+    { "table": "appointments_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "appointments_schedule", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "appointments_schedule_timeslot", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "appointments_blocked_time", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "appointments_appointment", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "appointments_history", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "appointments_recurring", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ],
   "queries": {
     "appointments.appointments.list": {
       "permission": "appointments.view_appointment",

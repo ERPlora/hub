@@ -55,7 +55,8 @@
     "sqlite": [
       "migrations/sqlite/001_init.sql",
       "migrations/sqlite/002_reference_counter.sql",
-      "migrations/sqlite/003_status_transition_guards.sql"
+      "migrations/sqlite/003_status_transition_guards.sql",
+      "migrations/sqlite/004_booking_window_guards.sql"
     ]
   },
   "queries": {
@@ -250,5 +251,20 @@
   },
   "ui": {
     "entry": "dist/online_booking.esm.js"
-  }
+  },
+  "sync": [
+    {
+      "table": "online_booking_settings",
+      "pk": ["id"],
+      "hub_scoped": true,
+      "updated_at": "updated_at",
+      "_note": "Settings singleton per hub — LWW risk (concurrent edits clobber), revisar humano."
+    },
+    {
+      "table": "online_booking_booking",
+      "pk": ["id"],
+      "hub_scoped": true,
+      "updated_at": "updated_at"
+    }
+  ]
 }

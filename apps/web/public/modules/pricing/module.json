@@ -45,8 +45,16 @@
   "migrations": {
     "sqlite": [
       "migrations/sqlite/001_init.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql"
     ]
   },
+  "sync": [
+    { "table": "pricing_price_list", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "pricing_price_list_item", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "pricing_discount_rule", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ],
   "queries": {
     "pricing.price_lists.list": {
       "permission": "pricing.view_pricing",
@@ -273,6 +281,12 @@
       "permission": "pricing.manage_pricing",
       "sql": [
         "commands/_unset_default.sql"
+      ]
+    },
+    "pricing._insert_price_list": {
+      "permission": "pricing.manage_pricing",
+      "sql": [
+        "commands/price_list_create.sql"
       ]
     }
   },

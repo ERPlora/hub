@@ -1,17 +1,13 @@
 <template>
   <ion-page>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-buttons slot="start"><ion-menu-button /></ion-buttons>
-        <ion-title>Empleados</ion-title>
-        <ion-buttons slot="end">
-          <ion-button @click="onNew">
-            <ion-icon slot="start" :icon="addOutline" />
-            Nuevo empleado
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
+    <AppTopbar :title="t('nav.employees')">
+      <template #actions>
+        <ion-button @click="onNew">
+          <HubIcon slot="start" name="add-outline" />
+          Nuevo empleado
+        </ion-button>
+      </template>
+    </AppTopbar>
 
     <ion-content class="ion-padding">
       <!-- Staff: tabla con ok-data-table (OutfitKit) -->
@@ -59,15 +55,15 @@
           @ion-change="tab = ($event as CustomEvent<{ value: EmployeeTab }>).detail.value"
         >
           <ion-segment-button value="staff">
-            <ion-icon :icon="peopleOutline" />
+            <HubIcon name="people-outline" />
             <ion-label>Staff</ion-label>
           </ion-segment-button>
           <ion-segment-button value="users">
-            <ion-icon :icon="personCircleOutline" />
+            <HubIcon name="person-circle-outline" />
             <ion-label>Usuarios</ion-label>
           </ion-segment-button>
           <ion-segment-button value="roles">
-            <ion-icon :icon="shieldCheckmarkOutline" />
+            <HubIcon name="shield-checkmark-outline" />
             <ion-label>Roles</ion-label>
           </ion-segment-button>
         </ion-segment>
@@ -79,11 +75,15 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import {
-  IonPage, IonHeader, IonToolbar, IonButtons, IonMenuButton, IonTitle, IonContent,
-  IonButton, IonIcon, IonFooter, IonSegment, IonSegmentButton, IonLabel,
+  IonPage, IonToolbar, IonContent,
+  IonButton,  IonFooter, IonSegment, IonSegmentButton, IonLabel
 } from '@ionic/vue';
-import { addOutline, peopleOutline, personCircleOutline, shieldCheckmarkOutline } from 'ionicons/icons';
+import HubIcon from '../components/HubIcon.vue';
+import AppTopbar from '../components/AppTopbar.vue';
+
+const { t } = useI18n();
 
 // ok-data-table (OutfitKit) está registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
 type Row = Record<string, unknown>;
@@ -150,7 +150,7 @@ const employeeColumns: DataTableColumn[] = [
   { key: 'role', header: 'Rol', filterable: true, filterType: 'select' },
   {
     key: 'status', header: 'Estado', filterable: true, filterType: 'select',
-    render: (r) => badgeCell(String(r.status), r.status === 'Activo' ? 'success' : 'medium'),
+    render: (r) => badgeCell(String(r.status), r.status === 'Activo' ? 'success' : 'medium')
   },
   { key: 'createdAt', header: 'Alta', filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.createdAt)) },
 ];
@@ -182,7 +182,7 @@ const roleColumns: DataTableColumn[] = [
   { key: 'name', header: 'Rol' },
   {
     key: 'scope', header: 'Ámbito', filterable: true, filterType: 'select',
-    render: (r) => badgeCell(String(r.scope), r.scope === 'Sistema' ? 'primary' : 'medium'),
+    render: (r) => badgeCell(String(r.scope), r.scope === 'Sistema' ? 'primary' : 'medium')
   },
   { key: 'members', header: 'Miembros', align: 'center' },
   { key: 'permissions', header: 'Permisos', align: 'center' },

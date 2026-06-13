@@ -2,6 +2,12 @@
   "id": "verifactu",
   "name": "VeriFactu",
   "version": "1.1.5",
+  "sync": [
+    { "table": "verifactu_record", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "verifactu_event", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "verifactu_config", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at", "note": "fiscal — LWW risk, revisar humano: singleton de config/estado por hub, mutable; Last-Write-Wins puede pisar parámetros AEAT/certificado" },
+    { "table": "verifactu_contingencyqueue", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at", "note": "fiscal — LWW risk, revisar humano: cola de estado mutable (status/attempts/next_attempt_at); LWW puede reordenar/duplicar reintentos AEAT" }
+  ],
   "agent": {
     "description": "Handles Spanish VeriFactu fiscal compliance: generate, sign, and transmit invoice records to the AEAT, manage the contingency queue, and validate the billing chain integrity.",
     "keywords": [

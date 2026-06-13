@@ -91,6 +91,18 @@ pub async fn create_user(
     Ok(id)
 }
 
+/// Fija (o cambia) el PIN de un usuario **existente** por id. Lo usa el alta de PIN tras el primer
+/// login cloud (§2.9): el usuario ya está provisionado (sin PIN) y elige su PIN en el dispositivo de
+/// confianza. `pin` vacío borra el PIN (deja el usuario no autenticable por PIN). Idempotente.
+pub async fn set_pin(db: &dyn DatabaseAdapter, user_id: &str, pin: &str) -> Result<()> {
+    let pin_hash = if pin.is_empty() { String::new() } else { hash_pin(pin, &new_id()) };
+    let mut p = Params::new();
+    p.insert("id".into(), json!(user_id));
+    p.insert("pin_hash".into(), json!(pin_hash));
+    db.execute("UPDATE hub_user SET pin_hash = :pin_hash WHERE id = :id", &p).await?;
+    Ok(())
+}
+
 fn row_to_user(row: &serde_json::Value) -> HubUser {
     HubUser {
         id: row["id"].as_str().unwrap_or_default().to_string(),
@@ -242,6 +254,24 @@ mod tests {
         // Sesión caducada no resuelve.
         let expired = create_session(&db, &uid, -10).await.unwrap();
         assert!(resolve_session(&db, &expired).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn set_pin_enables_pin_login_for_existing_user() {
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        ensure_tables(&db).await.unwrap();
+        // Cloud-linked user provisioned without a PIN (first online login).
+        let user = get_or_link_cloud_user(&db, "7", "Ada", "admin").await.unwrap();
+        assert!(verify_pin(&db, "Ada", "4242").await.unwrap().is_none(), "no PIN yet");
+
+        set_pin(&db, &user.id, "4242").await.unwrap();
+        let ok = verify_pin(&db, "Ada", "4242").await.unwrap();
+        assert_eq!(ok.map(|u| u.id), Some(user.id.clone()));
+        assert!(verify_pin(&db, "Ada", "0000").await.unwrap().is_none(), "wrong PIN rejected");
+
+        // Empty PIN clears it again.
+        set_pin(&db, &user.id, "").await.unwrap();
+        assert!(verify_pin(&db, "Ada", "4242").await.unwrap().is_none(), "PIN cleared");
     }
 
     #[tokio::test]

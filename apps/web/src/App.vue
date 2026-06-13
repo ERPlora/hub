@@ -17,21 +17,24 @@
               </a>
             </ion-menu-toggle>
             <ion-buttons slot="end">
+              <!-- DECISIÓN HUMANO PENDIENTE (issue #38 pto 7): el rail-toggle vive aquí (cabecera
+                   del sidebar), NO en la topbar como en Cloud. Se mantiene la ubicación del Hub
+                   hasta que el humano decida; el estado es compartido (lib/shell). -->
               <ion-button
                 class="rail-toggle"
                 fill="clear"
-                :aria-label="railCollapsed ? 'Expandir menú' : 'Colapsar menú'"
+                :aria-label="railCollapsed ? t('topbar.expandMenu') : t('topbar.collapseMenu')"
                 @click="railCollapsed = !railCollapsed"
               >
-                <ion-icon slot="icon-only" :icon="railCollapsed ? chevronForwardOutline : chevronBackOutline" />
+                <HubIcon slot="icon-only" :name="railCollapsed ? 'chevron-forward-outline' : 'chevron-back-outline'" />
               </ion-button>
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
 
         <ion-content class="sidebar-content">
-          <ion-list v-for="section in nav" :key="section.title" lines="none" class="nav-list">
-            <ion-list-header class="nav-section-label">{{ section.title }}</ion-list-header>
+          <ion-list v-for="section in nav" :key="section.titleKey" lines="none" class="nav-list">
+            <ion-list-header class="nav-section-label">{{ t(section.titleKey) }}</ion-list-header>
             <ion-menu-toggle v-for="it in section.items" :key="it.path" :auto-hide="false">
               <ion-item
                 button
@@ -42,15 +45,15 @@
                 :detail="false"
                 :aria-current="isActive(it.path) ? 'page' : undefined"
               >
-                <ion-icon slot="start" class="nav-icon" :icon="it.icon" />
-                <ion-label class="nav-label">{{ it.label }}</ion-label>
+                <HubIcon slot="start" class="nav-icon" :name="it.icon" />
+                <ion-label class="nav-label">{{ t(it.labelKey) }}</ion-label>
               </ion-item>
             </ion-menu-toggle>
           </ion-list>
 
           <!-- Módulos instalados (dinámico): se rellena del runtime y se refresca al instalar. -->
           <ion-list v-if="moduleNav.length" lines="none" class="nav-list">
-            <ion-list-header class="nav-section-label">Módulos</ion-list-header>
+            <ion-list-header class="nav-section-label">{{ t('nav.modules') }}</ion-list-header>
             <ion-menu-toggle v-for="m in moduleNav" :key="m.path" :auto-hide="false">
               <ion-item
                 button
@@ -61,14 +64,16 @@
                 :detail="false"
                 :aria-current="isActive(m.path) ? 'page' : undefined"
               >
-                <ion-icon slot="start" class="nav-icon" :icon="m.icon" />
+                <HubIcon slot="start" class="nav-icon" :name="m.icon" />
                 <ion-label class="nav-label">{{ m.label }}</ion-label>
               </ion-item>
             </ion-menu-toggle>
           </ion-list>
         </ion-content>
 
-        <!-- Tarjeta de usuario: avatar de iniciales + nombre/email + logout. -->
+        <!-- Tarjeta de usuario: avatar + nombre/email + enlace a perfil; fila de acciones
+             (reportar problema + logout) + versión de app. Paridad con el footer del sidebar
+             de Cloud (cloud/.../partials/sidebar.html). -->
         <ion-footer class="ion-no-border sidebar-foot">
           <div class="sidebar-user">
             <div class="sidebar-user-avatar">{{ initials }}</div>
@@ -80,64 +85,96 @@
               class="nav-label"
               fill="clear"
               size="small"
-              aria-label="Cerrar sesión"
+              :aria-label="t('sidebar.profile')"
+              @click="goProfile"
+            >
+              <HubIcon slot="icon-only" name="person-outline" />
+            </ion-button>
+          </div>
+          <div class="sidebar-foot-actions nav-label">
+            <ion-button
+              fill="clear"
+              size="small"
+              :aria-label="t('sidebar.reportProblem')"
+              @click="bugReportOpen = true"
+            >
+              <HubIcon slot="icon-only" name="bug-outline" />
+            </ion-button>
+            <ion-button
+              fill="clear"
+              size="small"
+              :aria-label="t('sidebar.signOut')"
               @click="onLogout"
             >
-              <ion-icon slot="icon-only" :icon="logOutOutline" />
+              <HubIcon slot="icon-only" name="log-out-outline" />
             </ion-button>
+            <span class="sidebar-foot-text ml-auto">v{{ appVersion }}</span>
           </div>
         </ion-footer>
       </ion-menu>
 
       <ion-router-outlet id="main" />
     </ion-split-pane>
+
+    <!-- Drawer del asistente (lo abre el sparkles de la topbar) + modal de reporte de problemas.
+         Hermanos del split-pane: drawer/modal van por encima del shell. Solo con sesión. -->
+    <template v-if="isAuthed">
+      <AssistantDrawer />
+      <BugReportModal v-model:open="bugReportOpen" />
+    </template>
   </ion-app>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import {
   IonApp, IonSplitPane, IonMenu, IonMenuToggle, IonHeader, IonToolbar, IonButtons,
-  IonContent, IonList, IonListHeader, IonItem, IonLabel, IonIcon, IonFooter,
-  IonButton, IonRouterOutlet,
+  IonContent, IonList, IonListHeader, IonItem, IonLabel,  IonFooter,
+  IonButton, IonRouterOutlet
 } from '@ionic/vue';
-import {
-  homeOutline, peopleOutline, cardOutline, storefrontOutline,
-  hardwareChipOutline, settingsOutline, logOutOutline,
-  chevronBackOutline, chevronForwardOutline,
-} from 'ionicons/icons';
+import HubIcon from './components/HubIcon.vue';
+import AssistantDrawer from './components/AssistantDrawer.vue';
+import BugReportModal from './components/BugReportModal.vue';
 import { user, isAuthed, logout } from './lib/session';
 import { moduleNav, refreshModuleNav } from './lib/nav';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
+import { railCollapsed } from './lib/shell';
+import { PROFILE_ROUTE } from './lib/routes';
 
-interface NavItem { path: string; label: string; icon: string }
-interface NavSection { title: string; items: NavItem[] }
+interface NavItem { path: string; labelKey: string; icon: string }
+interface NavSection { titleKey: string; items: NavItem[] }
 
+// Etiquetas de la nav del shell por CLAVE i18n (EN/ES, ver src/i18n). Antes hardcoded en español.
 const nav: NavSection[] = [
   {
-    title: 'General',
+    titleKey: 'nav.general',
     items: [
-      { path: '/dashboard', label: 'Inicio', icon: homeOutline },
-      { path: '/employees', label: 'Empleados', icon: peopleOutline },
-    ],
+      { path: '/dashboard', labelKey: 'nav.home', icon: 'home-outline' },
+      { path: '/employees', labelKey: 'nav.employees', icon: 'people-outline' },
+    ]
   },
   {
-    title: 'Cuenta',
+    titleKey: 'nav.account',
     items: [
-      { path: '/billing', label: 'Facturación', icon: cardOutline },
-      { path: '/marketplace', label: 'Marketplace', icon: storefrontOutline },
-      { path: '/system', label: 'Sistema', icon: hardwareChipOutline },
-      { path: '/settings', label: 'Ajustes', icon: settingsOutline },
-    ],
+      { path: '/billing', labelKey: 'nav.billing', icon: 'card-outline' },
+      { path: '/marketplace', labelKey: 'nav.marketplace', icon: 'storefront-outline' },
+      { path: '/system', labelKey: 'nav.system', icon: 'hardware-chip-outline' },
+      { path: '/settings', labelKey: 'nav.settings', icon: 'settings-outline' },
+    ]
   },
 ];
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 
-// Rail colapsable (solo escritorio): añade .rail al split-pane → CSS estrecha y oculta labels.
-const railCollapsed = ref<boolean>(false);
+// Versión de la app (horneada por Vite, ver vite.config.ts `define`).
+const appVersion = __APP_VERSION__;
+
+// Estado del modal de reporte de problemas (footer del sidebar).
+const bugReportOpen = ref<boolean>(false);
 
 const isActive = (path: string): boolean =>
   route.path === path || route.path.startsWith(`${path}/`);
@@ -172,6 +209,10 @@ watch(needsActivation, (needs) => {
 
 function goHome(): void {
   void router.push('/dashboard');
+}
+
+function goProfile(): void {
+  void router.push(PROFILE_ROUTE);
 }
 
 async function onLogout(): Promise<void> {

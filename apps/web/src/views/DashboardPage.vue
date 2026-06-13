@@ -1,11 +1,6 @@
 <template>
   <ion-page>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-buttons slot="start"><ion-menu-button /></ion-buttons>
-        <ion-title>Inicio</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    <AppTopbar :title="t('nav.home')" />
 
     <ion-content class="ion-padding">
       <!-- ── Resumen ── -->
@@ -16,14 +11,14 @@
               <ion-card class="ion-no-margin">
                 <ion-card-header>
                   <ion-card-subtitle>
-                    <ion-icon :icon="kpi.icon" /> {{ kpi.label }}
+                    <HubIcon :name="kpi.icon" /> {{ kpi.label }}
                   </ion-card-subtitle>
                   <ion-card-title>{{ kpi.value }}</ion-card-title>
                 </ion-card-header>
                 <ion-card-content v-if="kpi.sub">
                   <ion-text :color="trendColor(kpi.trend)">
-                    <ion-icon v-if="kpi.trend === 'up'" :icon="trendingUpOutline" />
-                    <ion-icon v-else-if="kpi.trend === 'down'" :icon="trendingDownOutline" />
+                    <HubIcon v-if="kpi.trend === 'up'" name="trending-up-outline" />
+                    <HubIcon v-else-if="kpi.trend === 'down'" name="trending-down-outline" />
                     {{ kpi.sub }}
                   </ion-text>
                 </ion-card-content>
@@ -52,7 +47,7 @@
           </ion-item>
         </ion-list>
         <ion-button expand="block" fill="outline" router-link="/system" router-direction="forward">
-          <ion-icon :icon="hardwareChipOutline" slot="start" /> Abrir sistema
+          <HubIcon name="hardware-chip-outline" slot="start" /> Abrir sistema
         </ion-button>
       </template>
 
@@ -69,7 +64,7 @@
             <ion-col v-for="entry in modules" :key="entry.moduleId" size="6" size-md="3">
               <ion-card button class="ion-no-margin ion-text-center" @click="router.push(`/m/${entry.moduleId}`)">
                 <ion-card-content>
-                  <ion-icon :icon="manifestIcon(entry.nav.icon)" size="large" />
+                  <HubIcon :name="entry.iconSvg ?? entry.nav.icon" size="large" />
                   <p>{{ entry.moduleName }}</p>
                 </ion-card-content>
               </ion-card>
@@ -77,7 +72,7 @@
             <ion-col size="6" size-md="3">
               <ion-card button class="ion-no-margin ion-text-center" router-link="/marketplace" router-direction="forward">
                 <ion-card-content>
-                  <ion-icon :icon="addOutline" size="large" />
+                  <HubIcon name="add-outline" size="large" />
                   <p>Añadir módulo</p>
                 </ion-card-content>
               </ion-card>
@@ -91,7 +86,7 @@
         <ion-list inset>
           <ion-list-header>Actividad reciente</ion-list-header>
           <ion-item v-for="item in FEED" :key="item.primary" :lines="item === FEED[FEED.length - 1] ? 'none' : 'inset'">
-            <ion-icon slot="start" :icon="ellipse" :color="item.tone" class="feed-dot" />
+            <HubIcon slot="start" name="ellipse" :color="item.tone" class="feed-dot" />
             <ion-label>
               <h3>{{ item.primary }}</h3>
               <p>{{ item.sub }}</p>
@@ -109,15 +104,15 @@
           @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value"
         >
           <ion-segment-button value="resumen">
-            <ion-icon :icon="speedometerOutline" />
+            <HubIcon name="speedometer-outline" />
             <ion-label>Resumen</ion-label>
           </ion-segment-button>
           <ion-segment-button value="apps">
-            <ion-icon :icon="gridOutline" />
+            <HubIcon name="grid-outline" />
             <ion-label>Aplicaciones</ion-label>
           </ion-segment-button>
           <ion-segment-button value="actividad">
-            <ion-icon :icon="pulseOutline" />
+            <HubIcon name="pulse-outline" />
             <ion-label>Actividad</ion-label>
           </ion-segment-button>
         </ion-segment>
@@ -129,18 +124,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import {
-  IonPage, IonHeader, IonToolbar, IonButtons, IonMenuButton, IonTitle, IonContent, IonFooter,
+  IonPage, IonContent, IonFooter,
   IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
-  IonCardContent, IonGrid, IonRow, IonCol, IonIcon, IonBadge, IonButton, IonSpinner,
-  IonList, IonListHeader, IonItem, IonNote, IonText,
+  IonCardContent, IonGrid, IonRow, IonCol,  IonBadge, IonButton, IonSpinner,
+  IonList, IonListHeader, IonItem, IonNote, IonText, IonToolbar
 } from '@ionic/vue';
-import {
-  speedometerOutline, gridOutline, pulseOutline, trendingUpOutline, trendingDownOutline,
-  receiptOutline, peopleOutline, warningOutline, hardwareChipOutline, addOutline, ellipse,
-} from 'ionicons/icons';
+import HubIcon from '../components/HubIcon.vue';
+import AppTopbar from '../components/AppTopbar.vue';
 import { loadMenu, type MenuEntry } from '../lib/module-loader';
-import { manifestIcon } from '../lib/icons';
+
+const { t } = useI18n();
 
 type Tab = 'resumen' | 'apps' | 'actividad';
 type Trend = 'up' | 'down';
@@ -155,10 +150,10 @@ const trendColor = (t?: Trend): string => (t === 'up' ? 'success' : t === 'down'
 
 interface Kpi { label: string; value: string; icon: string; sub?: string; trend?: Trend }
 const KPIS: Kpi[] = [
-  { label: 'Ventas hoy', value: '€4 812', icon: trendingUpOutline, sub: '+12,4% vs ayer', trend: 'up' },
-  { label: 'Pedidos', value: '183', icon: receiptOutline, sub: '+9 en la última hora', trend: 'up' },
-  { label: 'Personal activo', value: '6', icon: peopleOutline, sub: '2 en caja ahora' },
-  { label: 'Stock bajo', value: '7', icon: warningOutline, sub: 'bajo umbral', trend: 'down' },
+  { label: 'Ventas hoy', value: '€4 812', icon: 'trending-up-outline', sub: '+12,4% vs ayer', trend: 'up' },
+  { label: 'Pedidos', value: '183', icon: 'receipt-outline', sub: '+9 en la última hora', trend: 'up' },
+  { label: 'Personal activo', value: '6', icon: 'people-outline', sub: '2 en caja ahora' },
+  { label: 'Stock bajo', value: '7', icon: 'warning-outline', sub: 'bajo umbral', trend: 'down' },
 ];
 
 interface FeedItem { primary: string; sub: string; tone: Tone }

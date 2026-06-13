@@ -44,5 +44,14 @@ for (const id of MODULES) {
   mkdirSync(join(dstDir, dirname(entry)), { recursive: true });
   copyFileSync(manifestPath, join(dstDir, 'module.json'));
   copyFileSync(bundlePath, join(dstDir, entry));
-  console.log(`✓ sync ${id}: module.json + ${entry} → public/modules/${id}/`);
+
+  // Sidecar de iconos (ADR-0036): SVG horneados del módulo, junto al bundle en dist/. El shell
+  // (module-loader.loadMenu) lo lee para pintar los iconos de nav del módulo. Opcional.
+  let iconsNote = '';
+  const iconsPath = join(src, dirname(entry), 'icons.json');
+  if (existsSync(iconsPath)) {
+    copyFileSync(iconsPath, join(dstDir, dirname(entry), 'icons.json'));
+    iconsNote = ' + icons.json';
+  }
+  console.log(`✓ sync ${id}: module.json + ${entry}${iconsNote} → public/modules/${id}/`);
 }

@@ -465,5 +465,50 @@
   },
   "ui": {
     "entry": "dist/kitchen_orders.esm.js"
-  }
+  },
+  "sync": [
+    {
+      "table": "kitchen_orders_settings",
+      "pk": ["id"],
+      "hub_scoped": true,
+      "updated_at": "updated_at",
+      "_note": "Settings singleton per hub — LWW risk (concurrent edits clobber), revisar humano."
+    },
+    {
+      "table": "kitchen_orders_station",
+      "pk": ["id"],
+      "hub_scoped": true,
+      "updated_at": "updated_at"
+    },
+    {
+      "table": "kitchen_orders_order",
+      "pk": ["id"],
+      "hub_scoped": true,
+      "updated_at": "updated_at"
+    },
+    {
+      "table": "kitchen_orders_order_item",
+      "pk": ["id"],
+      "hub_scoped": true,
+      "updated_at": "updated_at"
+    },
+    {
+      "table": "kitchen_orders_order_modifier",
+      "pk": ["id"],
+      "hub_scoped": true,
+      "updated_at": "updated_at"
+    },
+    {
+      "table": "kitchen_orders_product_station",
+      "pk": ["id"],
+      "hub_scoped": true,
+      "updated_at": "updated_at"
+    },
+    {
+      "table": "kitchen_orders_category_station",
+      "pk": ["id"],
+      "hub_scoped": true,
+      "updated_at": "updated_at"
+    }
+  ]
 }

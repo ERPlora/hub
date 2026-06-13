@@ -1,13 +1,6 @@
 <template>
   <ion-page>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-menu-button />
-        </ion-buttons>
-        <ion-title>Marketplace</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    <AppTopbar :title="t('nav.marketplace')" />
 
     <ion-content class="ion-padding">
       <h2 class="text-lg font-semibold mb-3">{{ tabTitle }}</h2>
@@ -16,8 +9,40 @@
         <ion-spinner name="dots" />
       </div>
 
+      <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida -->
+      <template v-else-if="tab === 'mine'">
+        <ion-list v-if="installedModules.length > 0" lines="full">
+          <ion-item v-for="m in installedModules" :key="m.id">
+            <HubIcon
+              slot="start"
+              :name="iconForModule(m.id, '')"
+              class="text-[color:var(--ion-color-primary)]"
+            />
+            <ion-label>
+              <h2 class="text-base font-medium">{{ m.name }}</h2>
+              <p class="text-sm">
+                v{{ m.version }} ·
+                <ion-text :color="m.status === 'active' ? 'success' : 'medium'">
+                  {{ m.status === 'active' ? 'Activo' : 'Inactivo' }}
+                </ion-text>
+              </p>
+            </ion-label>
+            <ion-button slot="end" fill="clear" size="small" @click="toggleModule(m)">
+              {{ m.status === 'active' ? 'Desactivar' : 'Activar' }}
+            </ion-button>
+            <ion-button slot="end" fill="clear" size="small" color="danger" @click="removeModule(m)">
+              Desinstalar
+            </ion-button>
+          </ion-item>
+        </ion-list>
+        <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
+          <HubIcon name="cube-outline" style="font-size: 2.5rem;" />
+          <p>No tienes módulos instalados</p>
+        </div>
+      </template>
+
       <template v-else-if="filteredModules.length > 0">
-        <!-- Vista tarjetas (por defecto) -->
+        <!-- Vista tarjetas (catálogo / pago) -->
         <ion-grid>
           <ion-row>
             <ion-col
@@ -30,8 +55,8 @@
               <ion-card class="h-full m-0">
                 <ion-card-header>
                   <ion-card-title class="flex items-center gap-2 text-base">
-                    <ion-icon
-                      :icon="iconForModule(mod.id, mod.cat)"
+                    <HubIcon
+                      :name="iconForModule(mod.id, mod.cat)"
                       class="shrink-0 text-[color:var(--ion-color-primary)]"
                       style="font-size: 1.15rem;"
                     />
@@ -69,8 +94,8 @@
       </template>
 
       <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
-        <ion-icon :icon="cubeOutline" style="font-size: 2.5rem;" />
-        <p>{{ tab === 'mine' ? 'No tienes módulos instalados' : 'Sin módulos' }}</p>
+        <HubIcon name="cube-outline" style="font-size: 2.5rem;" />
+        <p>Sin módulos</p>
       </div>
 
       <!-- Toast simple (Ionic IonToast no requiere importaciones extra en el template) -->
@@ -88,15 +113,15 @@
       <ion-toolbar>
         <ion-segment :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="mine">
-            <ion-icon :icon="cubeOutline" />
+            <HubIcon name="cube-outline" />
             <ion-label>Mis módulos</ion-label>
           </ion-segment-button>
           <ion-segment-button value="all">
-            <ion-icon :icon="storefrontOutline" />
+            <HubIcon name="storefront-outline" />
             <ion-label>Catálogo</ion-label>
           </ion-segment-button>
           <ion-segment-button value="paid">
-            <ion-icon :icon="walletOutline" />
+            <HubIcon name="wallet-outline" />
             <ion-label>Pago</ion-label>
           </ion-segment-button>
         </ion-segment>
@@ -107,20 +132,24 @@
 
 <script setup lang="ts">
 import { inject, ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useI18n } from 'vue-i18n';
 import {
-  IonPage, IonHeader, IonToolbar, IonButtons, IonMenuButton, IonTitle, IonContent,
-  IonFooter, IonSegment, IonSegmentButton, IonLabel, IonIcon, IonBadge,
+  IonPage, IonToolbar, IonContent,
+  IonFooter, IonSegment, IonSegmentButton, IonLabel,  IonBadge,
   IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSpinner,
-  IonGrid, IonRow, IonCol, IonToast,
+  IonGrid, IonRow, IonCol, IonToast, IonList, IonItem, IonText
 } from '@ionic/vue';
-import {
-  cubeOutline, storefrontOutline, walletOutline,
-  cartOutline, peopleOutline, documentTextOutline, sendOutline,
-  calendarOutline, chatbubbleOutline, barChartOutline,
-} from 'ionicons/icons';
+import HubIcon from '../components/HubIcon.vue';
+import AppTopbar from '../components/AppTopbar.vue';
+
+const { t } = useI18n();
 import { cloudMarketplaceModules, type CloudMarketplaceModule } from '../lib/cloud';
 import { config } from '../lib/config';
-import { clientInjectionKey, getClient, requestInstall } from '../lib/runtime';
+import {
+  clientInjectionKey, getClient, requestInstall,
+  listInstalledModules, activateModule, deactivateModule, uninstallModule,
+  type InstalledModule
+} from '../lib/runtime';
 import { refreshModuleNav } from '../lib/nav';
 
 // --- Tipos ---
@@ -152,6 +181,7 @@ const MODULES_DEMO: Mod[] = [
 // --- Estado ---
 const tab = ref<MarketplaceTab>('mine');
 const modules = ref<Mod[]>([]);
+const installedModules = ref<InstalledModule[]>([]);
 const loading = ref(true);
 const toastOpen = ref(false);
 const toastMsg = ref('');
@@ -160,14 +190,14 @@ const toastColor = ref<'primary' | 'success' | 'danger'>('primary');
 // --- Helpers ---
 function iconForModule(id: string, category: string): string {
   const key = `${id} ${category}`.toLowerCase();
-  if (key.includes('pos') || key.includes('tpv') || key.includes('venta')) return cartOutline;
-  if (key.includes('client') || key.includes('crm')) return peopleOutline;
-  if (key.includes('fact') || key.includes('invoice')) return documentTextOutline;
-  if (key.includes('env') || key.includes('courier') || key.includes('log')) return sendOutline;
-  if (key.includes('reserva') || key.includes('agenda') || key.includes('appointment')) return calendarOutline;
-  if (key.includes('message') || key.includes('whatsapp') || key.includes('comun')) return chatbubbleOutline;
-  if (key.includes('analytic') || key.includes('bi')) return barChartOutline;
-  return cubeOutline;
+  if (key.includes('pos') || key.includes('tpv') || key.includes('venta')) return 'cart-outline';
+  if (key.includes('client') || key.includes('crm')) return 'people-outline';
+  if (key.includes('fact') || key.includes('invoice')) return 'document-text-outline';
+  if (key.includes('env') || key.includes('courier') || key.includes('log')) return 'send-outline';
+  if (key.includes('reserva') || key.includes('agenda') || key.includes('appointment')) return 'calendar-outline';
+  if (key.includes('message') || key.includes('whatsapp') || key.includes('comun')) return 'chatbubble-outline';
+  if (key.includes('analytic') || key.includes('bi')) return 'bar-chart-outline';
+  return 'cube-outline';
 }
 
 function toViewModule(m: CloudMarketplaceModule): Mod {
@@ -177,7 +207,7 @@ function toViewModule(m: CloudMarketplaceModule): Mod {
     desc: m.description,
     price: m.priceLabel || 'Consultar',
     installed: m.installed,
-    cat: m.category,
+    cat: m.category
   };
 }
 
@@ -221,6 +251,50 @@ async function installModule(mod: Mod): Promise<void> {
   }
 }
 
+/** Carga los módulos instalados desde el RUNTIME (fuente de verdad local, no el catálogo Cloud). */
+async function loadInstalled(): Promise<void> {
+  try {
+    installedModules.value = await listInstalledModules();
+  } catch {
+    installedModules.value = [];
+  }
+}
+
+function notify(msg: string, color: 'primary' | 'success' | 'danger'): void {
+  toastMsg.value = msg;
+  toastColor.value = color;
+  toastOpen.value = true;
+}
+
+/** Activa o desactiva un módulo (hot-plug) y refresca la lista + la nav del shell. */
+async function toggleModule(m: InstalledModule): Promise<void> {
+  try {
+    if (m.status === 'active') {
+      await deactivateModule(m.id);
+      notify(`${m.name} desactivado.`, 'primary');
+    } else {
+      await activateModule(m.id);
+      notify(`${m.name} activado.`, 'success');
+    }
+    await loadInstalled();
+    void refreshModuleNav();
+  } catch {
+    notify(`No se pudo cambiar el estado de ${m.name}.`, 'danger');
+  }
+}
+
+/** Desinstala un módulo y refresca la lista + la nav del shell. */
+async function removeModule(m: InstalledModule): Promise<void> {
+  try {
+    await uninstallModule(m.id);
+    notify(`${m.name} desinstalado.`, 'primary');
+    await Promise.all([loadInstalled(), loadCatalog()]);
+    void refreshModuleNav();
+  } catch {
+    notify(`No se pudo desinstalar ${m.name}.`, 'danger');
+  }
+}
+
 /** Recarga el catálogo (estados de instalado) desde el Cloud, con fallback demo. */
 async function loadCatalog(): Promise<void> {
   loading.value = true;
@@ -237,14 +311,14 @@ async function loadCatalog(): Promise<void> {
 // --- Fetch + suscripción al evento de instalación al montar ---
 onMounted(() => {
   void loadCatalog();
-  // Cuando el runtime termina de instalar un módulo, refrescamos el catálogo y la nav del shell.
+  void loadInstalled();
+  // Cuando el runtime termina de instalar un módulo, refrescamos catálogo, instalados y nav.
   unsubInstalled = client.on('module.installed', (payload) => {
     const id = (payload as { module_id?: string } | null)?.module_id;
     const found = modules.value.find((m) => m.id === id);
-    toastMsg.value = found ? `${found.name} instalado.` : 'Módulo instalado.';
-    toastColor.value = 'success';
-    toastOpen.value = true;
+    notify(found ? `${found.name} instalado.` : 'Módulo instalado.', 'success');
     void loadCatalog();
+    void loadInstalled();
     void refreshModuleNav();
   });
 });

@@ -27,6 +27,42 @@ ion-toolbar {
 }
 ion-title { font-weight: 650; letter-spacing: -0.01em; font-size: 1.0625rem; }
 
+/* ── Topbar compartida (AppTopbar.vue) — paridad con .dash-header de Cloud ─────────────────── */
+.app-topbar { position: relative; }
+/* Avatar de la topbar (iniciales) → perfil. Mismo lenguaje que .sidebar-user-avatar. */
+.topbar-avatar {
+  width: 32px; height: 32px; border-radius: 999px; margin-inline: 6px;
+  display: grid; place-items: center; font-weight: 700; font-size: 0.72rem;
+  text-decoration: none; cursor: pointer;
+  background: color-mix(in oklab, var(--ion-color-primary) 18%, transparent);
+  color: var(--ion-color-primary);
+}
+/* Badge de notificaciones (campana). Posicionado sobre el ion-button (relative host). */
+.topbar-notif { position: relative; overflow: visible; }
+.topbar-notif .notif-badge {
+  position: absolute; top: 2px; right: 0; transform: scale(0.7);
+  pointer-events: none;
+}
+/* Barra de progreso de peticiones en vuelo (bajo el toolbar). */
+.topbar-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; overflow: hidden; }
+.topbar-progress > div {
+  height: 100%; background: var(--ion-color-primary);
+  animation: topbarpulse 1s ease-in-out infinite;
+}
+@keyframes topbarpulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .topbar-progress > div { animation: none; } }
+
+/* Fila de acciones del footer del sidebar (reportar/logout/versión). */
+.sidebar-foot-actions {
+  display: flex; align-items: center; gap: 0.2rem;
+  padding: 0 0.4rem 0.6rem; font-size: 0.72rem;
+}
+.sidebar-foot-actions ion-button { --color: var(--ion-color-medium); height: 32px; }
+.sidebar-foot-text { color: color-mix(in oklab, var(--ion-text-color) 55%, transparent); }
+.ml-auto { margin-inline-start: auto; }
+/* Rail colapsado: oculta la fila de acciones/versión, como en Cloud. */
+ion-split-pane.rail .sidebar-foot-actions { display: none; }
+
 /* ── Cards: radio + elevación suave + hover en cards clicables ────────────────────────────── */
 ion-card {
   border-radius: var(--ok-radius);

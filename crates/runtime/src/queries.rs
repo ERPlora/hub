@@ -51,6 +51,15 @@ pub async fn execute_page(
         .get_query(name)
         .ok_or_else(|| RuntimeError::QueryNotFound(name.to_string()))?;
     permissions::check(ctx, &q.def.permission)?;
+
+    // Validación del payload contra el JSON Schema declarado (compilado al instalar y
+    // cacheado en el Registry): rechaza ANTES de tocar la BD (hub#27).
+    if let Some(schema) = &q.schema {
+        schema
+            .validate(&Json::Object(params.clone()))
+            .map_err(|detail| RuntimeError::InvalidPayload { name: name.to_string(), detail })?;
+    }
+
     let bound = crate::system_params(params, ctx);
 
     match &q.def.list {

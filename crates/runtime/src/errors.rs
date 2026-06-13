@@ -17,6 +17,8 @@ pub enum RuntimeError {
     PermissionDenied(String),
     #[error("dependencia no satisfecha: el módulo `{module}` requiere `{dep}`")]
     MissingDependency { module: String, dep: String },
+    #[error("ciclo de dependencias entre módulos en `{module}` (depends_on cíclico)")]
+    DependencyCycle { module: String },
     #[error("ciclo de eventos demasiado profundo (posible bucle de listeners)")]
     EventLoop,
     #[error("característica no implementada: {0}")]
@@ -25,6 +27,16 @@ pub enum RuntimeError {
     Wasm(String),
     #[error("error de plugin nativo: {0}")]
     Native(String),
+    /// El payload del llamador no cumple el JSON Schema declarado por la query/command.
+    /// Se rechaza ANTES de tocar la BD (Rust = única autoridad de payload, §8).
+    #[error("payload inválido para `{name}`: {detail}")]
+    InvalidPayload { name: String, detail: String },
+    /// El JSON Schema declarado por una query/command no compila (se detecta al instalar).
+    #[error("schema inválido en `{name}`: {detail}")]
+    Schema { name: String, detail: String },
+    /// Fallo del motor de sync local↔cloud (ADR-0031).
+    #[error("sync: {0}")]
+    Sync(String),
 }
 
 pub type Result<T> = std::result::Result<T, RuntimeError>;

@@ -101,13 +101,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     if let Some(dir) = &cfg.modules_dir {
         // Instala los módulos del dir resolviendo el orden de `depends_on` por topo-sort (hub#16):
         // una dependencia se instala antes que quien la declara, sin depender del orden del FS.
-        match runtime.install_all_from_dir(std::path::Path::new(dir)).await {
-            Ok(ids) => {
-                for id in ids {
-                    eprintln!("✓ módulo instalado: {id}");
-                }
-            }
-            Err(e) => eprintln!("✗ instalación de módulos: {e}"),
+        // `install_all_from_dir` es tolerante (loguea ✓/✗ por módulo y salta los rotos); aquí solo
+        // registramos un error externo (read_dir fallido o ciclo de dependencias del conjunto).
+        if let Err(e) = runtime.install_all_from_dir(std::path::Path::new(dir)).await {
+            eprintln!("✗ instalación de módulos: {e}");
         }
     }
 

@@ -194,6 +194,107 @@ async fn validate_entitlement(
     Ok(gate.resolve(&hub_id, &access_token, now_unix()).await)
 }
 
+// ── Camino de datos: handlers `invoke` → runtime embebido (issue #5) ────────────────────────────
+//
+// El runtime de negocio corre embebido como servidor Axum por loopback (`127.0.0.1:8787`, ver
+// `embedded_serve_config`/`spawn_embedded_runtime`). El `IpcTransport` del SDK
+// (`packages/module-sdk/src/index.ts:425`) invoca `erplora_query`/`erplora_command` con
+// `{name, params}` / `{name, payload}` y espera de vuelta el **envelope** `{ok, data?, error?}`.
+//
+// La forma más simple y correcta de delegar (sin tocar la API pública de `erplora-server`, que es
+// columna de otro worker) es **reenviar la invocación al mismo servidor loopback** por HTTP
+// (`reqwest`, ya en el árbol de deps) hacia `POST /api/query` y `/api/command`, y devolver su JSON
+// tal cual — exactamente lo que ya hace hoy `HttpWsTransport` desde `apps/web` (que en Tauri apunta
+// a este mismo loopback). Así el envelope sale ya formado por el runtime (rutas en
+// `crates/server/src/lib.rs:290-291`).
+//
+// Auth: en modo `Session` (el de `embedded_serve_config`) el runtime gatea query/command por la
+// cabecera `X-Hub-Session` (más `X-Hub-Id` / `Authorization: Bearer` opcionales) —
+// `crates/server/src/auth.rs::authenticate`. El contrato `invoke` del `IpcTransport` hoy NO viaja
+// con esas cabeceras; para no CAMBIAR el contrato del SDK (columna del humano) estos handlers las
+// aceptan como argumentos `invoke` **opcionales** (`Option<String>`), de modo que el frontend pueda
+// adjuntar la sesión sin romper el shape `{name, params}` existente. Sin sesión, el runtime
+// responde 401 en modo Session (comportamiento correcto). Ver nota de diseño en el reporte.
+
+/// URL base del runtime embebido por loopback. Coincide con `embedded_serve_config().bind`.
+const EMBEDDED_RUNTIME_URL: &str = "http://127.0.0.1:8787";
+
+/// Error de los handlers de datos `invoke`. Se serializa como string para el frontend.
+#[derive(Debug, thiserror::Error)]
+pub enum IpcError {
+    #[error("transporte loopback: {0}")]
+    Transport(String),
+}
+
+impl serde::Serialize for IpcError {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&self.to_string())
+    }
+}
+
+/// Reenvía un POST JSON al runtime embebido (loopback) y devuelve el **envelope** crudo
+/// (`{ok, data?, error?}`) como `serde_json::Value`. Adjunta las cabeceras de auth que el shell
+/// haya recibido por `invoke` (sesión/hub/bearer), igual que `HttpWsTransport` desde `apps/web`.
+async fn forward_to_runtime(
+    path: &str,
+    body: serde_json::Value,
+    session: Option<String>,
+    hub_id: Option<String>,
+    bearer: Option<String>,
+) -> Result<serde_json::Value, IpcError> {
+    let client = reqwest::Client::new();
+    let mut builder = client
+        .post(format!("{EMBEDDED_RUNTIME_URL}{path}"))
+        .header("Content-Type", "application/json");
+    if let Some(s) = session.as_deref().filter(|s| !s.is_empty()) {
+        builder = builder.header("X-Hub-Session", s);
+    }
+    if let Some(h) = hub_id.as_deref().filter(|s| !s.is_empty()) {
+        builder = builder.header("X-Hub-Id", h);
+    }
+    if let Some(b) = bearer.as_deref().filter(|s| !s.is_empty()) {
+        builder = builder.header("Authorization", format!("Bearer {b}"));
+    }
+    let resp = builder
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| IpcError::Transport(e.to_string()))?;
+    // El runtime ya forma el envelope (incluso en 4xx: `{ok:false,error:…}`), así que devolvemos
+    // el cuerpo tal cual sin tratar el status como error de transporte.
+    resp.json::<serde_json::Value>().await.map_err(|e| IpcError::Transport(e.to_string()))
+}
+
+/// Handler `invoke` del camino de datos: ejecuta una **query** en el runtime embebido y devuelve
+/// el envelope `{ok, data?, error?}`. Contrato del `IpcTransport` (`invoke('erplora_query',
+/// {name, params})`). `session`/`hub_id`/`bearer` son opcionales (auth, ver nota arriba).
+#[tauri::command]
+async fn erplora_query(
+    name: String,
+    params: Option<serde_json::Value>,
+    session: Option<String>,
+    hub_id: Option<String>,
+    bearer: Option<String>,
+) -> Result<serde_json::Value, IpcError> {
+    let body = serde_json::json!({ "name": name, "params": params.unwrap_or(serde_json::json!({})) });
+    forward_to_runtime("/api/query", body, session, hub_id, bearer).await
+}
+
+/// Handler `invoke` del camino de datos: ejecuta un **command** en el runtime embebido y devuelve
+/// el envelope `{ok, data?, error?}`. Contrato del `IpcTransport` (`invoke('erplora_command',
+/// {name, payload})`).
+#[tauri::command]
+async fn erplora_command(
+    name: String,
+    payload: Option<serde_json::Value>,
+    session: Option<String>,
+    hub_id: Option<String>,
+    bearer: Option<String>,
+) -> Result<serde_json::Value, IpcError> {
+    let body = serde_json::json!({ "name": name, "payload": payload.unwrap_or(serde_json::json!({})) });
+    forward_to_runtime("/api/command", body, session, hub_id, bearer).await
+}
+
 const DEVICE_ID_FILE: &str = "device.id";
 
 /// Identidad de dispositivo que el frontend envía al hacer login (ARQUITECTURA.md §2.9b:
@@ -418,6 +519,8 @@ fn embedded_serve_config(
             auth_mode: erplora_server::AuthMode::Session,
             jwt_public_key: None, // `serve()` la trae del Cloud si hay red (login cloud); PIN no la necesita
             cloud_api_token: None, // la celda compartida es la fuente del token (hot-reload)
+            // DSN del remoto de sync (Cloud DB). Ausente en local-gratis → sync deshabilitado.
+            cloud_db_url: std::env::var("HUB_CLOUD_DB_URL").ok().filter(|s| !s.trim().is_empty()),
         },
         machine_token_cell: Some(machine_token_cell),
     }
@@ -445,6 +548,203 @@ fn spawn_embedded_runtime(cache_dir: PathBuf, machine_token_cell: erplora_server
     });
 }
 
+// ── Camino de hardware: handlers `invoke` → erplora-peripherals (issue #29) ──────────────────────
+//
+// En los combos Tauri **el shell ES el bridge** (no hay proceso bridge aparte, §2.7): el hardware
+// se expone por handlers `invoke` que delegan en `erplora-peripherals`, el mismo crate que usa el
+// bridge standalone (`apps/bridge`) vía WebSocket. El contrato de datos es idéntico al de las
+// frames WS del bridge: `discoverPrinters`/`getDevices` devuelven el array de
+// `protocol::{PrinterInfo,Device}` (serde-serializado igual que `BridgePrinter`/`BridgeDevice` del
+// SDK, `packages/module-sdk/src/index.ts:719`); `print`/`testPrint`/`openDrawer` no devuelven nada.
+//
+// El `Watchdog` del registry corre como tarea async del shell (auto-recuperación de IP por DHCP),
+// y la `PrintQueue` con reintentos drena en segundo plano — igual que `apps/bridge`. Los outcomes
+// y eventos del watchdog se loguean (en el bridge standalone viajan por WS; aquí el canal a la UI
+// se cablearía con eventos Tauri en una fase posterior — columna del humano).
+
+use erplora_peripherals::discovery::{self, parse_printer_id};
+use erplora_peripherals::drawer;
+use erplora_peripherals::escpos::{self, DocumentType};
+use erplora_peripherals::protocol::{Device, PrinterInfo};
+use erplora_peripherals::queue::{JobOutcome, PrintJob, PrintQueue, RetryPolicy};
+use erplora_peripherals::registry::DeviceRegistry;
+
+const DEVICES_FILE: &str = "devices.json";
+
+/// Estado de hardware compartido entre handlers `invoke`: registro persistente de dispositivos +
+/// cola de impresión con reintentos. Vive en el estado gestionado de Tauri (`app.manage`). El
+/// registro y la cola van tras `Arc` para que las tareas de fondo (watchdog + worker de la cola)
+/// compartan las mismas instancias que los handlers `invoke`.
+struct PeripheralsState {
+    registry: std::sync::Arc<DeviceRegistry>,
+    queue: std::sync::Arc<PrintQueue>,
+}
+
+/// Construye el estado de hardware y **lanza** las tareas de fondo en el runtime tokio actual:
+///   - worker de la `PrintQueue` (envío con reintentos; cada `JobOutcome` se loguea),
+///   - `Watchdog` del registry (health-check + recovery por MAC ante cambio de IP DHCP).
+/// Espejo de `spawn_queue_worker`/`spawn_watchdog` del bridge standalone (`apps/bridge/src/main.rs`).
+/// En el bridge los eventos viajan por WS; aquí se loguean (el canal a la UI por eventos Tauri es
+/// una fase posterior — columna del humano).
+fn build_peripherals_state(devices_path: PathBuf) -> PeripheralsState {
+    let registry = std::sync::Arc::new(DeviceRegistry::load(devices_path));
+    let queue = std::sync::Arc::new(PrintQueue::new(RetryPolicy::default()));
+
+    // Worker de la cola de impresión: drena y reintenta; loguea cada outcome. `async_runtime::spawn`
+    // usa el runtime tokio global de Tauri, así que funciona desde el `setup` hook.
+    let worker_queue = queue.clone();
+    tauri::async_runtime::spawn(async move {
+        let (outcomes_tx, mut outcomes_rx) = tokio::sync::mpsc::unbounded_channel::<JobOutcome>();
+        tauri::async_runtime::spawn(async move {
+            while let Some(outcome) = outcomes_rx.recv().await {
+                match outcome {
+                    JobOutcome::Completed { job_id } => {
+                        eprintln!("peripherals: trabajo de impresión completado ({job_id:?})")
+                    }
+                    JobOutcome::Failed { job_id, error } => {
+                        eprintln!("peripherals: trabajo de impresión fallido ({job_id:?}): {error}")
+                    }
+                }
+            }
+        });
+        worker_queue.run(outcomes_tx).await;
+        eprintln!("peripherals: worker de la cola de impresión terminado (cola cerrada)");
+    });
+
+    // Watchdog del registry: auto-recuperación de dispositivos tras cambio de IP por DHCP.
+    let watchdog_registry = registry.clone();
+    tauri::async_runtime::spawn(async move {
+        use erplora_peripherals::registry::{Watchdog, WatchdogConfig, WatchdogEvent};
+        let (events_tx, mut events_rx) =
+            tokio::sync::mpsc::unbounded_channel::<WatchdogEvent>();
+        tauri::async_runtime::spawn(async move {
+            while let Some(ev) = events_rx.recv().await {
+                match ev {
+                    WatchdogEvent::Recovered(d) => {
+                        eprintln!("peripherals: dispositivo recuperado {} ({})", d.name, d.mac)
+                    }
+                    WatchdogEvent::Lost(d) => {
+                        eprintln!("peripherals: dispositivo perdido {} ({})", d.name, d.mac)
+                    }
+                }
+            }
+        });
+        let watchdog = Watchdog::new(WatchdogConfig::default()).with_events(events_tx);
+        watchdog.run(&watchdog_registry).await;
+    });
+
+    PeripheralsState { registry, queue }
+}
+
+/// Error de los handlers de hardware. Se serializa como string para el frontend (igual que el
+/// `Event::Error` del bridge standalone se mapea a un rechazo de la promesa en el SDK).
+#[derive(Debug, thiserror::Error)]
+pub enum HardwareError {
+    #[error("{0}")]
+    Peripheral(#[from] erplora_peripherals::PeripheralError),
+}
+
+impl serde::Serialize for HardwareError {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&self.to_string())
+    }
+}
+
+/// `erplora_bridge_status` — el `IpcBridgeTransport.detect()` lo invoca para saber si el canal de
+/// hardware existe (en Tauri siempre existe: el shell ES el bridge). Devuelve la versión del shell.
+#[tauri::command]
+fn erplora_bridge_status() -> serde_json::Value {
+    serde_json::json!({ "version": env!("CARGO_PKG_VERSION") })
+}
+
+/// `erplora_discover_printers` — re-escanea la red (mDNS + subred), registra y devuelve las
+/// impresoras. Espejo de `Command::DiscoverPrinters` del bridge; devuelve el array directo.
+#[tauri::command]
+async fn erplora_discover_printers(
+    state: tauri::State<'_, PeripheralsState>,
+) -> Result<Vec<PrinterInfo>, HardwareError> {
+    Ok(discovery::discover_printers(&state.registry).await?)
+}
+
+/// `erplora_get_devices` — contenido del registro persistente de dispositivos (con sus roles).
+#[tauri::command]
+fn erplora_get_devices(state: tauri::State<'_, PeripheralsState>) -> Vec<Device> {
+    state.registry.get_all()
+}
+
+/// `erplora_print` — renderiza el documento ESC/POS y lo **encola** para envío con reintentos
+/// (mismo flujo que `Command::Print` del bridge). Errores previos al encolado (printer_id/payload
+/// inválidos) se devuelven; el resultado del envío llega por el worker de la cola (log).
+#[tauri::command]
+fn erplora_print(
+    state: tauri::State<'_, PeripheralsState>,
+    printer_id: String,
+    document_type: String,
+    data: serde_json::Value,
+    job_id: Option<String>,
+) -> Result<(), HardwareError> {
+    let target = parse_printer_id(&printer_id)?;
+    let payload = escpos::render_document(DocumentType::from_wire(&document_type), &data)?;
+    state.queue.enqueue(PrintJob { job_id, target, payload, attempts: 0 })?;
+    Ok(())
+}
+
+/// `erplora_test_print` — encola una página de prueba en la impresora dada.
+#[tauri::command]
+fn erplora_test_print(
+    state: tauri::State<'_, PeripheralsState>,
+    printer_id: String,
+) -> Result<(), HardwareError> {
+    let target = parse_printer_id(&printer_id)?;
+    let payload = escpos::render_test_page(&printer_id);
+    state.queue.enqueue(PrintJob { job_id: None, target, payload, attempts: 0 })?;
+    Ok(())
+}
+
+/// `erplora_open_drawer` — abre el cajón vía kick ESC/POS por el socket de la impresora.
+#[tauri::command]
+async fn erplora_open_drawer(
+    printer_id: String,
+    pin: Option<u8>,
+) -> Result<(), HardwareError> {
+    let target = parse_printer_id(&printer_id)?;
+    drawer::open_drawer(&target, pin.unwrap_or(2)).await?;
+    Ok(())
+}
+
+/// `erplora_set_device_role` — asigna rol (receipt/kitchen/bar/label) y devuelve el registro
+/// actualizado. Espejo de `Command::SetDeviceRole`.
+#[tauri::command]
+fn erplora_set_device_role(
+    state: tauri::State<'_, PeripheralsState>,
+    mac: String,
+    role: String,
+) -> Result<Vec<Device>, HardwareError> {
+    state.registry.set_role(&mac, &role)?;
+    Ok(state.registry.get_all())
+}
+
+/// `erplora_set_device_name` — renombra un dispositivo y devuelve el registro actualizado.
+#[tauri::command]
+fn erplora_set_device_name(
+    state: tauri::State<'_, PeripheralsState>,
+    mac: String,
+    name: String,
+) -> Result<Vec<Device>, HardwareError> {
+    state.registry.set_name(&mac, &name)?;
+    Ok(state.registry.get_all())
+}
+
+/// `erplora_remove_device` — elimina un dispositivo del registro y devuelve el registro actualizado.
+#[tauri::command]
+fn erplora_remove_device(
+    state: tauri::State<'_, PeripheralsState>,
+    mac: String,
+) -> Result<Vec<Device>, HardwareError> {
+    state.registry.remove(&mac)?;
+    Ok(state.registry.get_all())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -458,6 +758,10 @@ pub fn run() {
                 let cell: erplora_server::MachineToken =
                     std::sync::Arc::new(std::sync::RwLock::new(load_machine_token(&cache_dir)));
                 app.manage(MachineTokenHandle(cell.clone()));
+                // Estado de hardware (issue #29): registro de dispositivos + cola de impresión, y
+                // lanza el watchdog + el worker de la cola como tareas async del shell. `devices.json`
+                // se persiste en `app_data_dir` (misma raíz por-instalación que el resto de datos).
+                app.manage(build_peripherals_state(cache_dir.join(DEVICES_FILE)));
                 spawn_embedded_runtime(cache_dir, cell);
             } else {
                 eprintln!("runtime embebido: no se pudo resolver app_data_dir; no se arranca");
@@ -468,7 +772,20 @@ pub fn run() {
             validate_entitlement,
             device_context,
             enroll_device,
-            rotate_machine_token
+            rotate_machine_token,
+            // Camino de datos (issue #5): query/command → runtime embebido.
+            erplora_query,
+            erplora_command,
+            // Camino de hardware (issue #29): impresoras de red ESC/POS + cajón → peripherals.
+            erplora_bridge_status,
+            erplora_discover_printers,
+            erplora_get_devices,
+            erplora_print,
+            erplora_test_print,
+            erplora_open_drawer,
+            erplora_set_device_role,
+            erplora_set_device_name,
+            erplora_remove_device
         ])
         .run(tauri::generate_context!())
         .expect("error while running ERPlora Tauri app");

@@ -1,11 +1,6 @@
 <template>
   <ion-page>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-buttons slot="start"><ion-menu-button /></ion-buttons>
-        <ion-title>{{ moduleName }}</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    <AppTopbar :title="moduleName" />
     <ion-content class="ion-padding">
       <div v-if="status === 'loading'" class="flex items-center gap-2 py-8 opacity-70">
         <ion-spinner name="crescent" /> Cargando módulo…
@@ -27,7 +22,7 @@
           @ion-change="onTabChange($event as CustomEvent<{ value: string }>)"
         >
           <ion-segment-button v-for="t in tabs" :key="t.nav.id" :value="t.nav.id">
-            <ion-icon :icon="manifestIcon(t.nav.icon)" />
+            <HubIcon :name="t.iconSvg ?? t.nav.icon" />
             <ion-label>{{ t.nav.label }}</ion-label>
           </ion-segment-button>
         </ion-segment>
@@ -40,12 +35,13 @@
 import { inject, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  IonPage, IonHeader, IonToolbar, IonButtons, IonMenuButton, IonTitle, IonContent,
-  IonFooter, IonSegment, IonSegmentButton, IonIcon, IonLabel, IonSpinner,
+  IonPage, IonToolbar, IonContent,
+  IonFooter, IonSegment, IonSegmentButton,  IonLabel, IonSpinner
 } from '@ionic/vue';
+import HubIcon from '../components/HubIcon.vue';
+import AppTopbar from '../components/AppTopbar.vue';
 import { loadMenu, loadComponent, type MenuEntry } from '../lib/module-loader';
 import { clientInjectionKey, getClient } from '../lib/runtime';
-import { manifestIcon } from '../lib/icons';
 
 const route = useRoute();
 const router = useRouter();
@@ -61,7 +57,7 @@ const activeNavId = ref<string>('');
 function params(): { moduleId: string; navId: string } {
   return {
     moduleId: String(route.params.moduleId ?? ''),
-    navId: String(route.params.navId ?? ''),
+    navId: String(route.params.navId ?? '')
   };
 }
 

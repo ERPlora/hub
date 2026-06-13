@@ -2,6 +2,11 @@
   "id": "tables",
   "name": "Tables",
   "version": "2.0.6",
+  "sync": [
+    { "table": "tables_zone", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "tables_table", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "tables_session", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ],
   "agent": {
     "description": "Manages restaurant floor plan zones, tables, and table sessions: create/update/delete zones and tables, open/close/transfer sessions, and bulk-create tables.",
     "keywords": [
@@ -261,6 +266,7 @@
   "commands": {
     "tables.zones.create": {
       "permission": "tables.add_zone",
+      "schema": "schemas/zone_create.json",
       "transaction": true,
       "sql": [
         "commands/zone_create.sql"
@@ -274,6 +280,7 @@
     },
     "tables.zones.update": {
       "permission": "tables.change_zone",
+      "schema": "schemas/zone_update.json",
       "transaction": true,
       "sql": [
         "commands/zone_update.sql"
@@ -287,6 +294,7 @@
     },
     "tables.zones.delete": {
       "permission": "tables.delete_zone",
+      "schema": "schemas/zone_delete.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -301,6 +309,7 @@
     },
     "tables.tables.create": {
       "permission": "tables.add_table",
+      "schema": "schemas/table_create.json",
       "transaction": true,
       "sql": [
         "commands/table_create.sql"
@@ -314,6 +323,7 @@
     },
     "tables.tables.update": {
       "permission": "tables.change_table",
+      "schema": "schemas/table_update.json",
       "transaction": true,
       "sql": [
         "commands/table_update.sql"
@@ -327,6 +337,7 @@
     },
     "tables.tables.delete": {
       "permission": "tables.delete_table",
+      "schema": "schemas/table_delete.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -341,6 +352,7 @@
     },
     "tables.tables.bulk_create": {
       "permission": "tables.add_table",
+      "schema": "schemas/table_bulk_create.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -355,6 +367,7 @@
     },
     "tables.sessions.open": {
       "permission": "tables.add_tablesession",
+      "schema": "schemas/session_open.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -369,6 +382,7 @@
     },
     "tables.sessions.close": {
       "permission": "tables.change_tablesession",
+      "schema": "schemas/session_close.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -383,6 +397,7 @@
     },
     "tables.sessions.transfer": {
       "permission": "tables.change_tablesession",
+      "schema": "schemas/session_transfer.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -397,6 +412,7 @@
     },
     "tables.sessions.delete": {
       "permission": "tables.delete_tablesession",
+      "schema": "schemas/session_delete.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",

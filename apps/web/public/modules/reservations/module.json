@@ -84,6 +84,13 @@
       "migrations/sqlite/002_gate.sql"
     ]
   },
+  "sync": [
+    { "table": "reservations_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "reservations_timeslot", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "reservations_blockeddate", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "reservations_reservation", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "reservations_waitlistentry", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ],
   "queries": {
     "reservations.reservations.list": {
       "permission": "reservations.view_reservation",

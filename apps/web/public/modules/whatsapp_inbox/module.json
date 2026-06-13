@@ -1,7 +1,15 @@
 {
   "id": "whatsapp_inbox",
   "name": "WhatsApp Inbox",
-  "version": "2.1.3",
+  "version": "2.1.7",
+  "sync": [
+    { "table": "whatsapp_inbox_employee_link", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "whatsapp_inbox_conversation", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "whatsapp_inbox_message", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "whatsapp_inbox_request", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "whatsapp_inbox_template", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "whatsapp_inbox_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at", "note": "LWW risk — revisar humano: singleton de settings por hub, mutable; Last-Write-Wins puede pisar configuración del canal" }
+  ],
   "agent": {
     "description": "Manages WhatsApp conversations, inbound requests, message templates, and channel settings: list and read conversations/messages, assign conversations, approve or reject requests, and configure the WhatsApp channel.",
     "keywords": [
@@ -66,7 +74,8 @@
   "migrations": {
     "sqlite": [
       "migrations/sqlite/001_init.sql",
-      "migrations/sqlite/002_free_tier.sql"
+      "migrations/sqlite/002_free_tier.sql",
+      "migrations/sqlite/003_request_counter.sql"
     ]
   },
   "queries": {
@@ -409,6 +418,33 @@
         "commands/_fulfill_transition.sql"
       ]
     },
+    "whatsapp_inbox.requests.ingest": {
+      "permission": "whatsapp_inbox.manage_connections",
+      "schema": "schemas/request_ingest.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "parse_inbound_message"
+      },
+      "emit": [
+        "whatsapp_inbox.request.created"
+      ],
+      "ai": {
+        "description": "Creates the AI-parsed request from an inbound message already ingested by messages.ingest: validates parsed_data against the dynamic request_schema, maps confidence to confidence_score, generates the atomic WA-YYYYMMDD-NNNN reference number, and sets status from approval_mode (auto=confirmed, manual=pending_review)."
+      }
+    },
+    "whatsapp_inbox._bump_request_counter": {
+      "permission": "whatsapp_inbox.manage_connections",
+      "sql": [
+        "commands/_bump_request_counter.sql"
+      ]
+    },
+    "whatsapp_inbox._insert_request": {
+      "permission": "whatsapp_inbox.manage_connections",
+      "sql": [
+        "commands/_insert_request.sql"
+      ]
+    },
     "whatsapp_inbox.templates.create": {
       "permission": "whatsapp_inbox.manage_settings",
       "transaction": true,
@@ -486,6 +522,7 @@
     "listen": [],
     "emit": [
       "whatsapp_inbox.message.received",
+      "whatsapp_inbox.request.created",
       "whatsapp_inbox.conversation.assigned",
       "whatsapp_inbox.request.approved",
       "whatsapp_inbox.request.rejected",
@@ -499,5 +536,50 @@
   },
   "ui": {
     "entry": "dist/whatsapp_inbox.esm.js"
+  },
+  "billing": {
+    "tier": "premium",
+    "type": "subscription",
+    "trial_days": 15,
+    "tiers": [
+      {
+        "slug": "free",
+        "name": "WhatsApp Free",
+        "price": 0,
+        "interval": "month",
+        "quota": {
+          "conversations_per_month": 30
+        }
+      },
+      {
+        "slug": "starter",
+        "name": "WhatsApp Starter",
+        "price": 14.99,
+        "interval": "month",
+        "quota": {
+          "conversations_per_month": 200
+        }
+      },
+      {
+        "slug": "business",
+        "name": "WhatsApp Business",
+        "price": 59.99,
+        "interval": "month",
+        "quota": {
+          "conversations_per_month": 800
+        }
+      },
+      {
+        "slug": "flex",
+        "name": "WhatsApp Flex",
+        "price": 19.99,
+        "interval": "month",
+        "metered": true,
+        "overage_price": 0.075,
+        "quota": {
+          "conversations_per_month": 270
+        }
+      }
+    ]
   }
 }

@@ -59,6 +59,12 @@
       "label": "Time Off",
       "icon": "calendar-outline",
       "component": "erp-staff-time-off"
+    },
+    {
+      "id": "schedules",
+      "label": "Horarios",
+      "icon": "time-outline",
+      "component": "erp-staff-schedules"
     }
   ],
   "migrations": {
@@ -66,6 +72,15 @@
       "migrations/sqlite/001_init.sql"
     ]
   },
+  "sync": [
+    { "table": "staff_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "staff_role", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "staff_member", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "staff_schedule", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "staff_working_hours", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "staff_time_off", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
+    { "table": "staff_service", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ],
   "queries": {
     "staff.members.list": {
       "permission": "staff.view_staff_member",
