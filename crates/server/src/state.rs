@@ -4,8 +4,14 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use erplora_runtime::{EventSink, Runtime};
+use erplora_vector::VectorStore;
 use serde_json::{json, Value as Json};
 use tokio::sync::{broadcast, Mutex};
+
+/// Índice vectorial compartido para el routing de tools (§9.2b) y la ingestión de embeddings de
+/// módulos al instalar (§9.6). `None` = no hay índice → el asistente degrada a "todos los tools"
+/// (§9.5). Es un trait object para no acoplar el server a SQLite vs pgvector.
+pub type SharedVectorStore = Arc<dyn VectorStore + Send + Sync>;
 
 /// Frame que se reenvía tal cual a los clientes WebSocket (ya serializado como JSON `Value`).
 ///
@@ -130,6 +136,9 @@ pub struct AppState {
     /// Gateway multi-tenant (ADR-0005, hub#24). `None` = modo single-tenant actual (N=1); `Some` =
     /// tier "cloud compartido" (N orgs, un pool por org). Aditivo: no rompe el modo single-tenant.
     pub tenants: Option<Arc<crate::tenant::TenantRouter>>,
+    /// Índice vectorial para routing de tools (§9.2b) + ingestión de embeddings (§9.6). `None` =
+    /// sin índice (degradación §9.5: el asistente manda todos los tools). Lo siembra `serve()`.
+    pub vector: Option<SharedVectorStore>,
 }
 
 impl AppState {
@@ -158,7 +167,15 @@ impl AppState {
             machine_token,
             http: reqwest::Client::new(),
             tenants: None,
+            vector: None,
         }
+    }
+
+    /// Adjunta el índice vectorial (routing §9.2b + ingestión §9.6). Aditivo: sin él, el asistente
+    /// degrada a "todos los tools" (§9.5).
+    pub fn with_vector(mut self, store: SharedVectorStore) -> Self {
+        self.vector = Some(store);
+        self
     }
 
     /// Activa el modo **cloud compartido** (ADR-0005): adjunta el gateway multi-tenant. A partir de
