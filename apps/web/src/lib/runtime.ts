@@ -17,9 +17,15 @@ import { config } from './config';
 import { getAccessToken } from './cloud';
 import { getHubSession } from './session';
 
-/** Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL). */
+/**
+ * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
+ * Default: en PRODUCCIÓN (build) → "" = MISMO ORIGEN (el propio hub sirve este dist en el
+ * mismo host:puerto que /api y /ws). En DEV (`vite dev`) → http://127.0.0.1:8787 (proxy Vite).
+ * `VITE_RUNTIME_URL` sigue teniendo prioridad si se define.
+ */
 export const RUNTIME_URL: string =
-  (import.meta.env.VITE_RUNTIME_URL as string | undefined) ?? 'http://127.0.0.1:8787';
+  (import.meta.env.VITE_RUNTIME_URL as string | undefined) ||
+  (import.meta.env.PROD ? '' : 'http://127.0.0.1:8787');
 
 /** Respuesta de `GET /api/hub/context` del runtime. */
 export interface HubContext {
