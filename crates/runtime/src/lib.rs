@@ -22,6 +22,7 @@ pub mod installer;
 pub mod loader;
 pub mod manifest;
 pub mod migrations;
+pub mod money_backfill;
 pub mod native;
 pub mod outbox;
 pub mod permissions;
@@ -254,7 +255,20 @@ impl Runtime {
         scheduler::ensure_tables(self.db.as_ref()).await?;
         identity::ensure_tables(self.db.as_ref()).await?;
         // 2) Migraciones de sistema versionadas (≥ v1), scoped por hub_id del despliegue.
-        system_migrations::apply(self.db.as_ref(), &self.hub_id).await
+        system_migrations::apply(self.db.as_ref(), &self.hub_id).await?;
+        // 3) Marcador de unidad monetaria (ADR-0007): una instalación NUEVA (esquema ya en
+        // céntimos) se auto-marca `money_unit=cents` para que el backfill jamás la convierta. Un
+        // hub VIEJO en euros NO se auto-marca aquí — espera a `--backfill-money` (que convierte).
+        money_backfill::seed_marker_if_cents(self.db.as_ref()).await?;
+        Ok(())
+    }
+
+    /// Backfill **idempotente** euros→céntimos para hubs ya desplegados (ADR-0007). No-op en
+    /// instalaciones nuevas (esquema ya en céntimos) y en hubs ya convertidos (marcador
+    /// `_hub_meta.money_unit=cents`). Lo invoca el subcomando `--backfill-money` del binario.
+    /// SEGURO de re-ejecutar. Ver [`money_backfill`].
+    pub async fn backfill_money(&self) -> Result<money_backfill::BackfillReport> {
+        money_backfill::run_logged(self.db.as_ref()).await
     }
 
     /// Aplica un **seed de configuración inicial** (SQL idempotente) sobre la conexión del runtime,
