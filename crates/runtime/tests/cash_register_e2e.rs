@@ -20,7 +20,7 @@ async fn rt_cr() -> Runtime {
     rt
 }
 
-async fn open_session(rt: &Runtime, ctx: &RequestContext, opening: f64) -> String {
+async fn open_session(rt: &Runtime, ctx: &RequestContext, opening: i64) -> String {
     rt.execute_command("cash_register.session.open", &params(json!({
         "register_id": null, "session_number": "AB-260531-1000",
         "opening_balance": opening, "opening_notes": ""
@@ -43,44 +43,44 @@ async fn install_registers_capabilities() {
 async fn open_movements_close_reconciles() {
     let rt = rt_cr().await;
     let ctx = admin();
-    let sid = open_session(&rt, &ctx, 100.0).await;
+    let sid = open_session(&rt, &ctx, 10000).await;
 
     // dos movimientos: venta +50, retirada -20.
     rt.execute_command("cash_register.movement.add", &params(json!({
-        "session_id": sid, "movement_type": "sale", "amount": 50.0, "payment_method": "cash",
+        "session_id": sid, "movement_type": "sale", "amount": 5000, "payment_method": "cash",
         "sale_reference": "", "description": "venta"
     })), &ctx).await.unwrap();
     rt.execute_command("cash_register.movement.add", &params(json!({
-        "session_id": sid, "movement_type": "out", "amount": -20.0, "payment_method": "cash",
+        "session_id": sid, "movement_type": "out", "amount": -2000, "payment_method": "cash",
         "sale_reference": "", "description": "retirada"
     })), &ctx).await.unwrap();
 
     // cierre declarando 135 contados → expected = 100+50-20 = 130; difference = 135-130 = 5.
     rt.execute_command("cash_register.session.close", &params(json!({
-        "session_id": sid, "closing_balance": 135.0, "closing_notes": ""
+        "session_id": sid, "closing_balance": 13500, "closing_notes": ""
     })), &ctx).await.unwrap();
 
     let sessions = rt.execute_query("cash_register.sessions.list", &Params::new(), &ctx).await.unwrap();
     let s = &sessions[0];
     assert_eq!(s["status"], json!("closed"));
-    assert_eq!(s["expected_balance"].as_f64().unwrap(), 130.0);
-    assert_eq!(s["difference"].as_f64().unwrap(), 5.0);
+    assert_eq!(s["expected_balance"].as_i64().unwrap(), 13000);
+    assert_eq!(s["difference"].as_i64().unwrap(), 500);
 }
 
 #[tokio::test]
 async fn session_summary_aggregates_by_type() {
     let rt = rt_cr().await;
     let ctx = admin();
-    let sid = open_session(&rt, &ctx, 0.0).await;
-    for (ty, amt) in [("sale", 30.0), ("sale", 20.0), ("refund", -10.0), ("in", 5.0)] {
+    let sid = open_session(&rt, &ctx, 0).await;
+    for (ty, amt) in [("sale", 3000), ("sale", 2000), ("refund", -1000), ("in", 500)] {
         rt.execute_command("cash_register.movement.add", &params(json!({
             "session_id": sid, "movement_type": ty, "amount": amt, "payment_method": "cash",
             "sale_reference": "", "description": ""
         })), &ctx).await.unwrap();
     }
     let sum = rt.execute_query("cash_register.session.summary", &params(json!({"session_id": sid})), &ctx).await.unwrap();
-    assert_eq!(sum[0]["total_sales"].as_f64().unwrap(), 50.0);
-    assert_eq!(sum[0]["total_refunds"].as_f64().unwrap(), -10.0);
+    assert_eq!(sum[0]["total_sales"].as_i64().unwrap(), 5000);
+    assert_eq!(sum[0]["total_refunds"].as_i64().unwrap(), -1000);
     assert_eq!(sum[0]["movement_count"], json!(4));
 }
 
@@ -89,7 +89,7 @@ async fn add_count_wasm_sums_denominations() {
     if !wasm() { eprintln!("SKIP: cash_register handler.wasm ausente"); return; }
     let rt = rt_cr().await;
     let ctx = admin();
-    let sid = open_session(&rt, &ctx, 0.0).await;
+    let sid = open_session(&rt, &ctx, 0).await;
     // 2×50 + 5×20 + 10×1 = 210.
     let res = rt.execute_command("cash_register.count.add", &params(json!({
         "session_id": sid, "count_type": "opening",
@@ -98,7 +98,7 @@ async fn add_count_wasm_sums_denominations() {
     assert_eq!(res["operations"], json!(1));
     let counts = rt.execute_query("cash_register.counts.list", &params(json!({"session_id": sid})), &ctx).await.unwrap();
     assert_eq!(counts.len(), 1);
-    assert_eq!(counts[0]["total"].as_f64().unwrap(), 210.0);
+    assert_eq!(counts[0]["total"].as_i64().unwrap(), 21000);
 }
 
 #[tokio::test]
@@ -115,12 +115,12 @@ async fn sale_completed_records_cash_movement() {
     let ctx = admin();
 
     // sesión abierta del usuario activo (u1).
-    let sid = open_session(&rt, &ctx, 0.0).await;
+    let sid = open_session(&rt, &ctx, 0).await;
 
     // venta de 30 → cash_register.record_sale añade un movimiento 'sale' de 30 a la sesión.
     rt.execute_command("sales.complete_sale", &params(json!({
         "tax_included": false,
-        "items": [{ "product_name": "X", "price": 30.0, "quantity": 1, "tax_rate": 0.0 }]
+        "items": [{ "product_name": "X", "price": 3000, "quantity": 1, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
     // Entrega asíncrona: el relay procesa sale.completed → cash_register.record_sale.
     rt.drain_outbox().await.unwrap();
@@ -128,5 +128,5 @@ async fn sale_completed_records_cash_movement() {
     let movs = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &ctx).await.unwrap();
     assert_eq!(movs.len(), 1, "la venta debe registrar 1 movimiento de caja");
     assert_eq!(movs[0]["movement_type"], json!("sale"));
-    assert_eq!(movs[0]["amount"].as_f64().unwrap(), 30.0);
+    assert_eq!(movs[0]["amount"].as_i64().unwrap(), 3000);
 }

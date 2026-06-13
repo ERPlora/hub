@@ -149,10 +149,12 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
             issuer_name = esc(&s(record, "issuer_name")),
             tipo = esc(&s(record, "invoice_type")),
             desc = esc(&s(record, "description")),
+            // tax_rate es % (REAL) → se formatea tal cual. Los importes están en CÉNTIMOS
+            // (INTEGER, ADR-0007) y la AEAT exige euros con 2 decimales → /100.0 en el límite.
             tax_rate = format_amount(f(record, "tax_rate")),
-            base = format_amount(f(record, "base_amount")),
-            cuota = format_amount(f(record, "tax_amount")),
-            total = format_amount(f(record, "total_amount")),
+            base = format_amount(f(record, "base_amount") / 100.0),
+            cuota = format_amount(f(record, "tax_amount") / 100.0),
+            total = format_amount(f(record, "total_amount") / 100.0),
             chain = encadenamiento(record, prev),
             sistema = sistema_informatico(config, hub_id),
             ts = esc(&gen_ts),
