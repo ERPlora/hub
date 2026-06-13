@@ -51,24 +51,9 @@
             </ion-menu-toggle>
           </ion-list>
 
-          <!-- Módulos instalados (dinámico): se rellena del runtime y se refresca al instalar. -->
-          <ion-list v-if="moduleNav.length" lines="none" class="nav-list">
-            <ion-list-header class="nav-section-label">{{ t('nav.modules') }}</ion-list-header>
-            <ion-menu-toggle v-for="m in moduleNav" :key="m.path" :auto-hide="false">
-              <ion-item
-                button
-                class="nav-item"
-                :class="{ selected: isActive(m.path) }"
-                :router-link="m.path"
-                router-direction="root"
-                :detail="false"
-                :aria-current="isActive(m.path) ? 'page' : undefined"
-              >
-                <HubIcon slot="start" class="nav-icon" :name="m.icon" />
-                <ion-label class="nav-label">{{ m.label }}</ion-label>
-              </ion-item>
-            </ion-menu-toggle>
-          </ion-list>
+          <!-- Los módulos instalados NO van en el sidebar: se acceden desde el botón «apps»
+               de la topbar (rejilla, estilo Google) y desde el Home del Hub (pestaña Aplicaciones).
+               El estado `moduleNav` sigue vivo (lo usa la rejilla de la topbar). -->
         </ion-content>
 
         <!-- Tarjeta de usuario: avatar + nombre/email + enlace a perfil; fila de acciones
@@ -152,7 +137,7 @@ import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
 import BugReportModal from './components/BugReportModal.vue';
 import { user, isAuthed, logout } from './lib/session';
-import { moduleNav, refreshModuleNav } from './lib/nav';
+import { refreshModuleNav } from './lib/nav';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
 import { railCollapsed } from './lib/shell';
 import { PROFILE_ROUTE } from './lib/routes';

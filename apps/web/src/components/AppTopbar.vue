@@ -35,6 +35,18 @@
         <!-- Acciones propias de la vista (a la izquierda de los controles globales). -->
         <slot name="actions" />
 
+        <!-- Apps (rejilla estilo Google): acceso rápido a los módulos instalados desde cualquier
+             pantalla. Abre un popover con la rejilla de módulos + enlace a la tienda. Los módulos
+             NO viven en el sidebar; se entra por aquí o por el Home (pestaña Aplicaciones). -->
+        <ion-button
+          fill="clear"
+          :aria-label="t('topbar.apps')"
+          :title="t('topbar.apps')"
+          @click="openApps"
+        >
+          <HubIcon slot="icon-only" name="apps-outline" />
+        </ion-button>
+
         <!-- Asistente (sparkles): visible cuando la capacidad está disponible. Abre el drawer. -->
         <ion-button
           v-if="assistantAvailable"
@@ -85,18 +97,59 @@
 
     <!-- Barra de progreso mientras hay peticiones en vuelo (paridad .dash-progress de Cloud). -->
     <div v-show="isLoading" class="topbar-progress"><div /></div>
+
+    <!-- Rejilla de apps (módulos instalados). Anclada al botón «apps» de la topbar. -->
+    <ion-popover
+      :is-open="appsOpen"
+      :event="appsEvent"
+      :show-backdrop="true"
+      @did-dismiss="appsOpen = false"
+    >
+      <ion-content class="apps-popover">
+        <div class="apps-grid">
+          <a
+            v-for="m in moduleNav"
+            :key="m.path"
+            class="apps-tile"
+            role="button"
+            tabindex="0"
+            @click="goModule(m.path)"
+            @keydown.enter="goModule(m.path)"
+          >
+            <HubIcon class="apps-tile-icon" :name="m.icon" />
+            <span class="apps-tile-label">{{ m.label }}</span>
+          </a>
+          <!-- Tienda: siempre presente, para instalar más módulos. -->
+          <a
+            class="apps-tile apps-tile-store"
+            role="button"
+            tabindex="0"
+            @click="goModule('/marketplace')"
+            @keydown.enter="goModule('/marketplace')"
+          >
+            <HubIcon class="apps-tile-icon" name="storefront-outline" />
+            <span class="apps-tile-label">{{ t('nav.marketplace') }}</span>
+          </a>
+        </div>
+        <p v-if="!moduleNav.length" class="apps-empty">{{ t('topbar.appsEmpty') }}</p>
+      </ion-content>
+    </ion-popover>
   </ion-header>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IonHeader, IonToolbar, IonButtons, IonButton, IonMenuButton, IonTitle, IonBadge } from '@ionic/vue';
+import {
+  IonHeader, IonToolbar, IonButtons, IonButton, IonMenuButton, IonTitle, IonBadge,
+  IonPopover, IonContent,
+} from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { user } from '../lib/session';
 import { isDark, toggleTheme } from '../lib/theme';
 import { assistantAvailable, toggleAssistant, notificationCount, isLoading } from '../lib/shell';
+import { moduleNav } from '../lib/nav';
 import { PROFILE_ROUTE } from '../lib/routes';
 
 const props = defineProps<{
@@ -110,6 +163,18 @@ const { t } = useI18n();
 const router = useRouter();
 
 const backHref = computed<string | undefined>(() => props.backHref);
+
+// Popover de apps (rejilla de módulos instalados), anclado al botón de la topbar.
+const appsOpen = ref<boolean>(false);
+const appsEvent = ref<Event | undefined>(undefined);
+function openApps(e: Event): void {
+  appsEvent.value = e;
+  appsOpen.value = true;
+}
+function goModule(path: string): void {
+  appsOpen.value = false;
+  void router.push(path);
+}
 
 // Iniciales para el avatar (mismo cálculo que el footer del sidebar).
 const initials = computed<string>(() => {
@@ -131,3 +196,57 @@ function goProfile(): void {
   void router.push(PROFILE_ROUTE);
 }
 </script>
+
+<style scoped>
+/* Rejilla de apps estilo «Google apps»: tiles cuadrados con icono + etiqueta. */
+.apps-popover {
+  --width: 320px;
+}
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 12px;
+}
+.apps-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 6px;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: center;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+.apps-tile:hover,
+.apps-tile:focus-visible {
+  background: var(--ion-color-step-100, rgba(0, 0, 0, 0.06));
+  outline: none;
+}
+.apps-tile-icon {
+  font-size: 1.7rem;
+}
+.apps-tile-label {
+  font-size: 0.72rem;
+  line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.apps-tile-store .apps-tile-icon {
+  color: var(--ion-color-primary, #0091ce);
+}
+.apps-empty {
+  padding: 8px 16px 16px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium, #6b7280);
+  text-align: center;
+}
+</style>
