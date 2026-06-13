@@ -35,7 +35,10 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json ./apps/web/
 COPY packages ./packages
-COPY modules ./modules
+# `hub/modules` es el dir reservado para módulos INSTALADOS en runtime: está vacío en git (0
+# ficheros trackeados), así que NO se copia (un `COPY modules` fallaría en el checkout de CI).
+# Solo creamos el dir vacío para satisfacer el glob `modules/*` de pnpm-workspace.yaml.
+RUN mkdir -p modules
 RUN pnpm install --frozen-lockfile
 # Ahora el código del shell web.
 COPY apps/web ./apps/web
