@@ -14,8 +14,12 @@ SQLite en `app_data_dir`. Sin red salvo marketplace/AI/primer-login (§2.8).
 **Para construir el binario** (`cargo tauri build`):
 1. Toolchain Tauri v2 + WebView del SO (macOS WKWebView / Windows WebView2 / Linux webkit2gtk).
 2. Frontend: `pnpm -F @erplora/web build` (genera el `dist` que referencia `tauri.conf.json`).
-3. Iconos de bundle completos: hay `icons/icon.png` (suficiente para `cargo check`/dev); para el
-   bundle final generar el set con `cargo tauri icon icons/icon.png` (`.icns`/`.ico`/PNGs).
+3. Iconos de bundle completos: el set vive en `src-tauri/icons/` y lo genera el pipeline propio
+   `scripts/gen-tauri-icon.py` (icono de **app** real: fondo de marca + safe-area + forma por
+   plataforma), a partir del asset fuente `branding/app-icon-source.png`. El arte de marca
+   **definitivo lo aporta el humano** ahí; el set actual es **provisional** (marca V5). Ver
+   [`branding/README.md`](branding/README.md). (`cargo tauri icon` sigue valiendo como
+   alternativa, pero genera un recorte plano sin composición de app.)
 
 ## Gate de arranque por entitlement (la app Tauri es GRATIS)
 
