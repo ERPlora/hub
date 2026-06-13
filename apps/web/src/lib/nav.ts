@@ -2,8 +2,9 @@
 // pinta la sección "Módulos" en el menú) y las vistas que cambian qué hay instalado
 // (MarketplacePage, al recibir el evento WS `module.installed`).
 //
-// Las entradas salen de los manifests de los módulos instalados (module-loader.loadMenu).
-// `refreshModuleNav()` recarga; `bumpNav()` fuerza una recarga (p.ej. tras instalar).
+// Las entradas salen del RUNTIME (`GET /api/navigation` vía module-loader.loadMenu): los módulos
+// instalados y activos que reporta el runtime, no un set hardcodeado.
+// `refreshModuleNav()` recarga (p.ej. tras instalar/activar un módulo).
 import { ref } from 'vue';
 import { loadMenu } from './module-loader';
 
@@ -22,7 +23,7 @@ export interface ModuleNavItem {
 /** Entradas de menú de los módulos instalados (sección "Módulos" del shell). */
 export const moduleNav = ref<ModuleNavItem[]>([]);
 
-/** (Re)carga las entradas de menú leyendo los manifests instalados. No lanza. */
+/** (Re)carga las entradas de menú desde el runtime (`/api/navigation`). No lanza. */
 export async function refreshModuleNav(): Promise<void> {
   try {
     const entries = await loadMenu();
