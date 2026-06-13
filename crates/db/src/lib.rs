@@ -343,14 +343,33 @@ fn pg_cell(row: &PgRow, i: usize) -> Json {
 /// **Set fijo y cerrado** de funciones-puente `erp_*` que el shim sabe reescribir
 /// (ADR-0007 decisión 4a; ejemplos enumerados en `runtime-dispatcher.md §4bis`). Es cerrado a
 /// propósito: usar una `erp_*` fuera de este set debe **fallar en `validate`** (build) del
-/// `module-toolkit`, nunca colarse a runtime. Mantener esta lista alineada con el validador.
+/// `module-toolkit`, nunca colarse a runtime.
 ///
-/// TODO (columna del humano): ADR-0007 enumera el set solo con ejemplos ("p.ej. `erp_now()`/
-/// `erp_lpad()`") y no lo cierra del todo. Implementadas las que SÍ están documentadas
-/// (`erp_now`, `erp_lpad`) + `erp_pad` (variante ya en uso por el equipo para nº de documento).
-/// Confirmar con el humano el set completo definitivo (¿`erp_concat`, `erp_substr`, …?) y que
-/// el validador del toolkit lo refleje exactamente.
-pub const BRIDGE_FUNCTIONS: &[&str] = &["erp_now", "erp_lpad", "erp_pad"];
+/// **REGLA VINCULANTE: este array DEBE coincidir EXACTAMENTE con `BRIDGE_FUNCTIONS` del
+/// validador del toolkit** (`module-toolkit/src/validate-sql.mjs`). Si añades/quitas una
+/// función-puente, cámbiala en LOS DOS sitios a la vez o el validador y el runtime se
+/// desincronizan (el validador aceptaría algo que el runtime no sabe reescribir, o al revés).
+///
+/// Conjunto (ADR-0007 §4a; cubre las divergencias reales de los módulos POS):
+/// - String/número:  `erp_now`, `erp_pad`, `erp_lpad`.
+/// - Fecha/hora (las fechas se guardan como TEXT ISO-8601, ADR-0007 §1):
+///   `erp_dt` (normaliza un texto ISO a datetime comparable), `erp_date` (parte fecha),
+///   `erp_dateadd` (suma intervalo), `erp_month_start` (trunca a inicio de mes),
+///   `erp_dow_mon0` (día de la semana 0=lunes…6=domingo), `erp_extract` (extrae hora/minuto),
+///   `erp_datediff_days` (diferencia fraccionaria en días), `erp_timefmt` (formatea HH:MM).
+pub const BRIDGE_FUNCTIONS: &[&str] = &[
+    "erp_now",
+    "erp_lpad",
+    "erp_pad",
+    "erp_dt",
+    "erp_date",
+    "erp_dateadd",
+    "erp_month_start",
+    "erp_dow_mon0",
+    "erp_extract",
+    "erp_datediff_days",
+    "erp_timefmt",
+];
 
 /// Reescribe las **funciones-puente** del subconjunto portable a la expresión nativa del dialecto.
 /// Sustitución textual anclada con escaneo de paréntesis balanceados (NO es un parser AST),
@@ -509,6 +528,135 @@ fn render_bridge_fn(
                     }
                 }
                 Dialect::Postgres => format!("lpad(({value})::text, {width}, {fill})"),
+            })
+        }
+
+        // ── funciones-puente de fecha/hora ───────────────────────────────────────────────────
+        // Contrato (ADR-0007 §1): las fechas se guardan como **TEXT ISO-8601**. En SQLite las
+        // funciones `datetime()/date()/strftime()/julianday()` aceptan ese texto directamente; en
+        // Postgres hay que castear (`::timestamptz` / `::date`). Comparar dos `erp_dt(...)` entre
+        // sí es portable porque ambos lados quedan en el tipo nativo del motor.
+        "erp_dt" => {
+            // erp_dt(x): normaliza un texto ISO a datetime comparable.
+            if args.len() != 1 {
+                return None;
+            }
+            let x = arg(0);
+            Some(match dialect {
+                Dialect::Sqlite => format!("datetime({x})"),
+                Dialect::Postgres => format!("(({x})::timestamptz)"),
+            })
+        }
+        "erp_date" => {
+            // erp_date(x): parte fecha (sin hora) de un texto ISO.
+            if args.len() != 1 {
+                return None;
+            }
+            let x = arg(0);
+            Some(match dialect {
+                Dialect::Sqlite => format!("date({x})"),
+                Dialect::Postgres => format!("(({x})::date)"),
+            })
+        }
+        "erp_dateadd" => {
+            // erp_dateadd(x, n, unit): suma `n` veces `unit` a `x`. `unit` es un literal
+            // ('minutes'|'hours'|'days'|'months'|…) compatible con los modificadores de SQLite y
+            // con los campos de `interval` de Postgres. `n` puede ser una expresión (columna).
+            if args.len() != 3 {
+                return None;
+            }
+            let x = arg(0);
+            let n = arg(1);
+            let unit = arg(2); // literal entre comillas: 'minutes'
+            Some(match dialect {
+                // SQLite: datetime(x, '+' || n || ' ' || 'minutes')
+                Dialect::Sqlite => {
+                    format!("datetime({x}, '+' || ({n}) || ' ' || {unit})")
+                }
+                // Postgres: (x::timestamptz + ((n) || ' ' || 'minutes')::interval)
+                Dialect::Postgres => {
+                    format!("(({x})::timestamptz + (({n}) || ' ' || {unit})::interval)")
+                }
+            })
+        }
+        "erp_month_start" => {
+            // erp_month_start(x): trunca al inicio del mes de `x`.
+            if args.len() != 1 {
+                return None;
+            }
+            let x = arg(0);
+            Some(match dialect {
+                Dialect::Sqlite => format!("datetime({x}, 'start of month')"),
+                Dialect::Postgres => format!("date_trunc('month', ({x})::timestamptz)"),
+            })
+        }
+        "erp_dow_mon0" => {
+            // erp_dow_mon0(x): día de la semana con 0=lunes … 6=domingo (convención de los
+            // módulos). SQLite `strftime('%w')` da 0=domingo … 6=sábado → (+6) % 7. En Postgres
+            // ISODOW da 1=lunes … 7=domingo → (ISODOW - 1).
+            if args.len() != 1 {
+                return None;
+            }
+            let x = arg(0);
+            Some(match dialect {
+                Dialect::Sqlite => {
+                    format!("((CAST(strftime('%w', {x}) AS INTEGER) + 6) % 7)")
+                }
+                Dialect::Postgres => {
+                    format!("((EXTRACT(ISODOW FROM ({x})::timestamptz)::int) - 1)")
+                }
+            })
+        }
+        "erp_extract" => {
+            // erp_extract(part, x): extrae un campo de `x` como INTEGER. `part` es un literal:
+            // 'hour' | 'minute' | 'second' | 'epoch'. Cubre los strftime('%H'/'%M'/'%S'/'%s').
+            if args.len() != 2 {
+                return None;
+            }
+            let part_raw = sql[args[0].0..args[0].1].trim();
+            let x = arg(1);
+            // El literal debe ir entre comillas simples; tomamos su contenido en minúsculas.
+            let part = part_raw.trim_matches('\'').to_ascii_lowercase();
+            let (sqlite_code, pg_field) = match part.as_str() {
+                "hour" => ("%H", "hour"),
+                "minute" => ("%M", "minute"),
+                "second" => ("%S", "second"),
+                "epoch" => ("%s", "epoch"),
+                _ => return None, // parte no soportada → el validador debió atraparlo
+            };
+            Some(match dialect {
+                Dialect::Sqlite => format!("CAST(strftime('{sqlite_code}', {x}) AS INTEGER)"),
+                Dialect::Postgres => {
+                    format!("(EXTRACT({pg_field} FROM ({x})::timestamptz)::bigint)")
+                }
+            })
+        }
+        "erp_datediff_days" => {
+            // erp_datediff_days(a, b): diferencia (a - b) en días, fraccionaria (REAL).
+            if args.len() != 2 {
+                return None;
+            }
+            let a = arg(0);
+            let b = arg(1);
+            Some(match dialect {
+                Dialect::Sqlite => format!("(julianday({a}) - julianday({b}))"),
+                Dialect::Postgres => format!(
+                    "(EXTRACT(EPOCH FROM (({a})::timestamptz - ({b})::timestamptz)) / 86400.0)"
+                ),
+            })
+        }
+        "erp_timefmt" => {
+            // erp_timefmt(h, m): formatea "HH:MM" a partir de dos enteros (horas, minutos).
+            if args.len() != 2 {
+                return None;
+            }
+            let h = arg(0);
+            let m = arg(1);
+            Some(match dialect {
+                Dialect::Sqlite => format!("printf('%02d:%02d', {h}, {m})"),
+                Dialect::Postgres => format!(
+                    "(lpad(({h})::text, 2, '0') || ':' || lpad(({m})::text, 2, '0'))"
+                ),
             })
         }
         _ => None,
@@ -931,6 +1079,157 @@ mod tests {
             sql,
             "SELECT (replace(substr(printf('%*s', 4, ''), 1, max(4 - length((?1)::text), 0)), ' ', '*') || (?1)::text)"
         );
+    }
+
+    // ── shim de funciones-puente de fecha/hora (ADR-0007 §4a) ─────────────────────────────────
+
+    #[test]
+    fn shim_erp_dt() {
+        let (s, _) = translate("SELECT erp_dt(:x)", Dialect::Sqlite);
+        assert_eq!(s, "SELECT datetime(?1)");
+        let (p, _) = translate("SELECT erp_dt(:x)", Dialect::Postgres);
+        assert_eq!(p, "SELECT (($1)::timestamptz)");
+    }
+
+    #[test]
+    fn shim_erp_date() {
+        let (s, _) = translate("SELECT erp_date(:x)", Dialect::Sqlite);
+        assert_eq!(s, "SELECT date(?1)");
+        let (p, _) = translate("SELECT erp_date(:x)", Dialect::Postgres);
+        assert_eq!(p, "SELECT (($1)::date)");
+    }
+
+    #[test]
+    fn shim_erp_dateadd() {
+        let (s, _) = translate("SELECT erp_dateadd(:now, c.dur, 'minutes')", Dialect::Sqlite);
+        assert_eq!(s, "SELECT datetime(?1, '+' || (c.dur) || ' ' || 'minutes')");
+        let (p, _) = translate("SELECT erp_dateadd(:now, c.dur, 'minutes')", Dialect::Postgres);
+        assert_eq!(p, "SELECT (($1)::timestamptz + ((c.dur) || ' ' || 'minutes')::interval)");
+    }
+
+    #[test]
+    fn shim_erp_month_start() {
+        let (s, _) = translate("WHERE x >= erp_month_start(:now)", Dialect::Sqlite);
+        assert_eq!(s, "WHERE x >= datetime(?1, 'start of month')");
+        let (p, _) = translate("WHERE x >= erp_month_start(:now)", Dialect::Postgres);
+        assert_eq!(p, "WHERE x >= date_trunc('month', ($1)::timestamptz)");
+    }
+
+    #[test]
+    fn shim_erp_dow_mon0() {
+        let (s, _) = translate("SELECT erp_dow_mon0(:date)", Dialect::Sqlite);
+        assert_eq!(s, "SELECT ((CAST(strftime('%w', ?1) AS INTEGER) + 6) % 7)");
+        let (p, _) = translate("SELECT erp_dow_mon0(:date)", Dialect::Postgres);
+        assert_eq!(p, "SELECT ((EXTRACT(ISODOW FROM ($1)::timestamptz)::int) - 1)");
+    }
+
+    #[test]
+    fn shim_erp_extract() {
+        let (s, _) = translate("SELECT erp_extract('hour', :dt)", Dialect::Sqlite);
+        assert_eq!(s, "SELECT CAST(strftime('%H', ?1) AS INTEGER)");
+        let (p, _) = translate("SELECT erp_extract('minute', :dt)", Dialect::Postgres);
+        assert_eq!(p, "SELECT (EXTRACT(minute FROM ($1)::timestamptz)::bigint)");
+    }
+
+    #[test]
+    fn shim_erp_datediff_days() {
+        let (s, _) =
+            translate("WHERE erp_datediff_days(:date || ' ' || :time, :now) >= 1", Dialect::Sqlite);
+        assert_eq!(s, "WHERE (julianday(?1 || ' ' || ?2) - julianday(?3)) >= 1");
+        let (p, _) = translate("WHERE erp_datediff_days(:a, :b) >= 1", Dialect::Postgres);
+        assert_eq!(
+            p,
+            "WHERE (EXTRACT(EPOCH FROM (($1)::timestamptz - ($2)::timestamptz)) / 86400.0) >= 1"
+        );
+    }
+
+    #[test]
+    fn shim_erp_timefmt() {
+        let (s, _) = translate("SELECT erp_timefmt(m / 60, m % 60)", Dialect::Sqlite);
+        assert_eq!(s, "SELECT printf('%02d:%02d', m / 60, m % 60)");
+        let (p, _) = translate("SELECT erp_timefmt(m / 60, m % 60)", Dialect::Postgres);
+        assert_eq!(
+            p,
+            "SELECT (lpad((m / 60)::text, 2, '0') || ':' || lpad((m % 60)::text, 2, '0'))"
+        );
+    }
+
+    #[test]
+    fn shim_erp_date_funcs_distinguish_similar_prefixes() {
+        // erp_date / erp_dateadd / erp_datediff_days comparten prefijo: el guard `next_is_ident`
+        // garantiza que se elige el nombre correcto sin depender del orden del array.
+        let (s, _) = translate(
+            "SELECT erp_date(:x), erp_dateadd(:x, 1, 'days'), erp_datediff_days(:x, :y)",
+            Dialect::Sqlite,
+        );
+        assert_eq!(
+            s,
+            "SELECT date(?1), datetime(?1, '+' || (1) || ' ' || 'days'), (julianday(?1) - julianday(?2))"
+        );
+    }
+
+    #[tokio::test]
+    async fn availability_shape_roundtrip_sqlite() {
+        // Reproduce la forma real de appointments/availability_*: settings + cita + filtro de
+        // solape con erp_dt/erp_dateadd, día de semana con erp_dow_mon0 y formato con erp_timefmt.
+        // Verifica que el SQL migrado traduce a SQLite VÁLIDO y con la semántica esperada.
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        db.execute_batch(
+            "CREATE TABLE appt (id TEXT, hub_id TEXT, start_datetime TEXT, end_datetime TEXT, is_deleted INTEGER);",
+        )
+        .await
+        .unwrap();
+        // Cita 2026-06-15 (lunes) 10:00–11:00.
+        db.execute(
+            "INSERT INTO appt (id, hub_id, start_datetime, end_datetime, is_deleted) \
+             VALUES (:id, :h, :s, :e, 0)",
+            &params(json!({
+                "id":"a1","h":"h1",
+                "s":"2026-06-15T10:00:00","e":"2026-06-15T11:00:00"
+            })),
+        )
+        .await
+        .unwrap();
+        // Candidata 10:30–11:30 solapa; ventana de antelación 60 min desde :now.
+        let q = db
+            .query(
+                "SELECT erp_dow_mon0(:date) AS dow, \
+                        erp_timefmt(10, 30) AS t, \
+                        EXISTS ( \
+                          SELECT 1 FROM appt a \
+                          WHERE a.hub_id = :h AND a.is_deleted = 0 \
+                            AND erp_dt(a.start_datetime) < erp_dt(:cand_end) \
+                            AND erp_dt(a.end_datetime) > erp_dt(:cand_start) \
+                        ) AS overlaps, \
+                        (erp_dt(:cand_start) >= erp_dateadd(:now, 60, 'minutes')) AS notice_ok",
+                &params(json!({
+                    "date":"2026-06-15","h":"h1",
+                    "cand_start":"2026-06-15T10:30:00","cand_end":"2026-06-15T11:30:00",
+                    "now":"2026-06-15T08:00:00"
+                })),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows[0]["dow"], json!(0), "2026-06-15 es lunes → 0");
+        assert_eq!(q.rows[0]["t"], json!("10:30"));
+        assert_eq!(q.rows[0]["overlaps"], json!(1), "10:30–11:30 solapa con 10:00–11:00");
+        assert_eq!(q.rows[0]["notice_ok"], json!(1), "10:30 está ≥ 08:00+60min");
+    }
+
+    #[tokio::test]
+    async fn erp_dow_timefmt_roundtrip_sqlite() {
+        // Verifica de extremo a extremo en SQLite real: día de la semana 0=lunes y formato HH:MM.
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        // 2026-06-15 es lunes → erp_dow_mon0 = 0. 8*60+5 = 485 min → '08:05'.
+        let q = db
+            .query(
+                "SELECT erp_dow_mon0(:d) AS dow, erp_timefmt(485 / 60, 485 % 60) AS t",
+                &params(json!({ "d": "2026-06-15" })),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows[0]["dow"], json!(0));
+        assert_eq!(q.rows[0]["t"], json!("08:05"));
     }
 
     // ── shim de normalización de tipos en DDL (ADR-0007 §4b) ──────────────────────────────────
