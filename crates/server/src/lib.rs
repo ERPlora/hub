@@ -19,6 +19,7 @@ use axum::body::Body;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, State};
 use axum::http::{header, HeaderMap, StatusCode};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -294,6 +295,11 @@ pub fn app(state: AppState) -> Router {
         .route("/api/auth/logout", post(auth_logout))
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
         .route("/ws", get(ws_upgrade))
+        // SSE: alternativa a /ws para el MISMO canal de eventos (hub#19). Se suscribe al mismo
+        // `AppState.events` (broadcast, N suscriptores), así que no duplica el fan-out. Da gratis
+        // reconexión del navegador (EventSource) + keep-alive (idle timeout del ALB). Nombre de
+        // ruta = decisión del humano (`/api/events` por defecto).
+        .route("/api/events", get(sse_events))
         .with_state(state)
 }
 
@@ -831,6 +837,31 @@ async fn mint_session(rt: &erplora_runtime::Runtime, user: erplora_runtime::iden
 
 async fn ws_upgrade(State(st): State<AppState>, ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(move |socket| ws_loop(socket, st))
+}
+
+/// GET /api/events — el MISMO canal de eventos que `/ws`, servido como Server-Sent Events (hub#19).
+/// Se suscribe al broadcast compartido `AppState.events` (no duplica el fan-out) y emite cada
+/// evento como `data: <json>` (idéntico al frame que manda el WS). `KeepAlive` envía comentarios
+/// periódicos para sobrevivir al idle timeout del ALB; el navegador (`EventSource`) reconecta solo.
+async fn sse_events(
+    State(st): State<AppState>,
+) -> Sse<impl futures_util::stream::Stream<Item = Result<Event, std::convert::Infallible>>> {
+    let rx = st.events.subscribe();
+    let stream = futures_util::stream::unfold(rx, |mut rx| async move {
+        loop {
+            match rx.recv().await {
+                Ok(ev) => {
+                    let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
+                    return Some((Ok(Event::default().data(data)), rx));
+                }
+                // Suscriptor lento: saltamos lo perdido y seguimos (igual que el WS).
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                // Canal cerrado: termina el stream.
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
+            }
+        }
+    });
+    Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
 async fn ws_loop(mut socket: WebSocket, st: AppState) {

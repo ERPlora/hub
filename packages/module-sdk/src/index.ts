@@ -300,33 +300,51 @@ function unwrapPage(data: unknown): unknown {
 export interface HttpWsOptions {
   /** Base URL del server del hub (p.ej. "" para mismo origen, o "http://localhost:8787"). */
   baseUrl?: string;
+  /**
+   * Canal push servidor→cliente (hub#19). `'ws'` (por defecto) = WebSocket `/ws`; `'sse'` =
+   * Server-Sent Events `/api/events` (reconexión automática del navegador + keep-alive gratis).
+   * La interfaz `ErploraTransport` no cambia: los módulos no se enteran del canal usado.
+   */
+  push?: 'ws' | 'sse';
   /** URL del WebSocket de eventos. Por defecto deriva de baseUrl. */
   wsUrl?: string;
+  /** URL del endpoint SSE de eventos. Por defecto deriva de baseUrl (`…/api/events`). */
+  sseUrl?: string;
   /** Cabeceras de auth (X-Hub-Id, Authorization, …) calculadas por el shell. */
   headers?: () => Record<string, string>;
   /** Inyectable para tests (por defecto el fetch global). */
   fetchImpl?: typeof fetch;
   /** Inyectable para tests (por defecto el WebSocket global). */
   WebSocketImpl?: typeof WebSocket;
+  /** Inyectable para tests (por defecto el EventSource global). */
+  EventSourceImpl?: typeof EventSource;
 }
 
 export class HttpWsTransport implements ErploraTransport {
   private readonly baseUrl: string;
+  private readonly push: 'ws' | 'sse';
   private readonly wsUrl: string;
+  private readonly sseUrl: string;
   private readonly headers: () => Record<string, string>;
   private readonly fetchImpl: typeof fetch;
   private readonly WebSocketImpl?: typeof WebSocket;
+  private readonly EventSourceImpl?: typeof EventSource;
 
   private ws?: WebSocket;
+  private es?: EventSource;
   private readonly listeners = new Map<string, Set<(p: unknown) => void>>();
-  private wsStarted = false;
+  private pushStarted = false;
 
   constructor(opts: HttpWsOptions = {}) {
     this.baseUrl = opts.baseUrl ?? '';
+    this.push = opts.push ?? 'ws';
     this.wsUrl = opts.wsUrl ?? deriveWsUrl(this.baseUrl);
+    this.sseUrl = opts.sseUrl ?? deriveSseUrl(this.baseUrl);
     this.headers = opts.headers ?? (() => ({}));
     this.fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.WebSocketImpl = opts.WebSocketImpl ?? (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
+    this.EventSourceImpl =
+      opts.EventSourceImpl ?? (globalThis as { EventSource?: typeof EventSource }).EventSource;
   }
 
   private async post(path: string, body: unknown): Promise<unknown> {
@@ -354,47 +372,73 @@ export class HttpWsTransport implements ErploraTransport {
       this.listeners.set(event, set);
     }
     set.add(cb);
-    this.ensureWs();
+    this.ensurePush();
     return () => {
       set!.delete(cb);
       if (set!.size === 0) this.listeners.delete(event);
     };
   }
 
-  /** Abre el WS (lazy) la primera vez que alguien se suscribe. */
+  /** Reparte un frame del wire (texto JSON) a los suscriptores. Común a WS y SSE. */
+  private handleFrame(raw: unknown): void {
+    let msg: { event?: string; name?: string; type?: string; payload?: unknown };
+    try {
+      msg = JSON.parse(typeof raw === 'string' ? raw : '');
+    } catch {
+      return;
+    }
+    // Formas reales del frame en el wire del runtime (crates/server/src/state.rs):
+    //   - eventos de dominio (outbox→broadcast): {"name":"sale.completed","payload":{…}}
+    //   - flujo de instalación:                  {"type":"module.installed","module_id":"…"}
+    // Se acepta también {"event":…} por compat. Sin `payload`, se entrega el frame entero
+    // (p.ej. module.installed lleva module_id en la raíz).
+    const name = msg.event ?? msg.name ?? msg.type;
+    if (!name) return;
+    const set = this.listeners.get(name);
+    if (set) for (const cb of set) cb(msg.payload ?? msg);
+  }
+
+  /** Abre el canal push (lazy) la primera vez que alguien se suscribe, según `push`. */
+  private ensurePush(): void {
+    if (this.pushStarted) return;
+    if (this.push === 'sse') this.ensureSse();
+    else this.ensureWs();
+  }
+
   private ensureWs(): void {
-    if (this.wsStarted || !this.WebSocketImpl) return;
-    this.wsStarted = true;
+    if (!this.WebSocketImpl) return;
+    this.pushStarted = true;
     this.ws = new this.WebSocketImpl(this.wsUrl);
-    this.ws.onmessage = (ev: MessageEvent) => {
-      let msg: { event?: string; name?: string; type?: string; payload?: unknown };
-      try {
-        msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
-      } catch {
-        return;
-      }
-      // Formas reales del frame en el wire del runtime (crates/server/src/state.rs):
-      //   - eventos de dominio (outbox→broadcast): {"name":"sale.completed","payload":{…}}
-      //   - flujo de instalación:                  {"type":"module.installed","module_id":"…"}
-      // Se acepta también {"event":…} por compat. Sin `payload`, se entrega el frame entero
-      // (p.ej. module.installed lleva module_id en la raíz).
-      const name = msg.event ?? msg.name ?? msg.type;
-      if (!name) return;
-      const set = this.listeners.get(name);
-      if (set) for (const cb of set) cb(msg.payload ?? msg);
-    };
+    this.ws.onmessage = (ev: MessageEvent) => this.handleFrame(ev.data);
     this.ws.onclose = () => {
-      this.wsStarted = false;
+      this.pushStarted = false;
       this.ws = undefined;
       // Reabre si aún hay suscriptores (degradación elegante: query/command siguen por HTTP).
-      if (this.listeners.size > 0) setTimeout(() => this.ensureWs(), 1000);
+      if (this.listeners.size > 0) setTimeout(() => this.ensurePush(), 1000);
     };
   }
 
-  /** Cierra el WS (p.ej. al desmontar el shell). */
+  /** SSE: el navegador reconecta solo (con `Last-Event-ID`), no necesitamos reabrir a mano. */
+  private ensureSse(): void {
+    if (!this.EventSourceImpl) return;
+    this.pushStarted = true;
+    this.es = new this.EventSourceImpl(this.sseUrl);
+    this.es.onmessage = (ev: MessageEvent) => this.handleFrame(ev.data);
+  }
+
+  /** Cierra el canal push (p.ej. al desmontar el shell). */
   close(): void {
     this.ws?.close();
+    this.es?.close();
   }
+}
+
+function deriveSseUrl(baseUrl: string): string {
+  if (!baseUrl) {
+    const loc = (globalThis as { location?: Location }).location;
+    return loc ? `${loc.protocol}//${loc.host}/api/events` : 'http://localhost:8787/api/events';
+  }
+  return baseUrl.replace(/\/$/, '') + '/api/events';
 }
 
 function deriveWsUrl(baseUrl: string): string {
@@ -517,8 +561,12 @@ export class ErploraClient {
   }
 }
 
-/** Selección por flag de arranque (ARQUITECTURA.md §7.6). */
-export type TransportKind = 'ipc' | 'http+ws' | 'ws';
+/**
+ * Selección por flag de arranque (ARQUITECTURA.md §7.6). `http+ws` y `http+sse` comparten el
+ * mismo RPC por HTTP y solo difieren en el canal push de eventos (WebSocket vs Server-Sent
+ * Events, hub#19); `ws` es alias histórico de `http+ws`. Nombre `http+sse` = decisión del humano.
+ */
+export type TransportKind = 'ipc' | 'http+ws' | 'http+sse' | 'ws';
 
 /** Fábrica: construye el cliente según el flag de transporte del boot. */
 export function createClient(
@@ -531,8 +579,9 @@ export function createClient(
     // Datos por invoke + hardware por invoke (el shell Tauri ES el bridge, §2.7).
     return new ErploraClient(new IpcTransport(deps.tauri), clientOpts, new IpcBridgeTransport(deps.tauri));
   }
-  // Datos por HTTP+WS + hardware por WS-localhost (el Bridge standalone, §2.7).
-  return new ErploraClient(new HttpWsTransport(deps.http), clientOpts, new BridgeClient());
+  // Datos por HTTP + push por WS (def.) o SSE (hub#19); hardware por WS-localhost (Bridge §2.7).
+  const httpOpts: HttpWsOptions = { ...deps.http, push: kind === 'http+sse' ? 'sse' : (deps.http?.push ?? 'ws') };
+  return new ErploraClient(new HttpWsTransport(httpOpts), clientOpts, new BridgeClient());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

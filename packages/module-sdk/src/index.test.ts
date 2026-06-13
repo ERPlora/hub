@@ -96,6 +96,55 @@ test('subscribe abre el WS lazy y enruta eventos por nombre', () => {
   assert.equal(seen.length, 1, 'tras unsub no se reciben más');
 });
 
+// ── HttpWsTransport: push por SSE (hub#19) ──────────────────────────────────
+
+class FakeEventSource {
+  onmessage: ((e: { data: string }) => void) | null = null;
+  onerror: (() => void) | null = null;
+  static last: FakeEventSource | undefined;
+  close = () => {};
+  constructor(public url: string) {
+    FakeEventSource.last = this;
+  }
+}
+
+test('push:sse abre EventSource(/api/events) y enruta eventos por nombre', () => {
+  const t = new HttpWsTransport({
+    baseUrl: 'http://h',
+    push: 'sse',
+    EventSourceImpl: FakeEventSource as unknown as typeof EventSource,
+  });
+  const seen: unknown[] = [];
+  const unsub = t.subscribe('sale.completed', (p) => seen.push(p));
+
+  // SSE, no WS: el endpoint es /api/events sobre http.
+  assert.equal(FakeEventSource.last?.url, 'http://h/api/events');
+  // Mismo wire que el WS: {name|event, payload}. Otro tipo → ignorado; el nuestro → entregado.
+  FakeEventSource.last!.onmessage!({ data: JSON.stringify({ name: 'other', payload: 1 }) });
+  FakeEventSource.last!.onmessage!({ data: JSON.stringify({ name: 'sale.completed', payload: { total: 7 } }) });
+  assert.deepEqual(seen, [{ total: 7 }]);
+
+  unsub();
+  FakeEventSource.last!.onmessage!({ data: JSON.stringify({ name: 'sale.completed', payload: { total: 2 } }) });
+  assert.equal(seen.length, 1, 'tras unsub no se reciben más');
+});
+
+test("createClient('http+sse') selecciona el push por SSE", () => {
+  const es: string[] = [];
+  class ES {
+    onmessage = null;
+    close = () => {};
+    constructor(public url: string) {
+      es.push(url);
+    }
+  }
+  const c = createClient('http+sse', {
+    http: { baseUrl: 'http://h', EventSourceImpl: ES as unknown as typeof EventSource },
+  });
+  c.on('x', () => {});
+  assert.deepEqual(es, ['http://h/api/events']);
+});
+
 // ── IpcTransport (Tauri) ────────────────────────────────────────────────────
 
 test('IpcTransport.query usa invoke(erplora_query) y desenvuelve', async () => {

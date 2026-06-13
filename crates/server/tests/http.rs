@@ -80,6 +80,18 @@ async fn static_frontend_serves_index_and_keeps_api() {
 }
 
 #[tokio::test]
+async fn sse_events_is_event_stream() {
+    let resp = make_app().await
+        .oneshot(Request::builder().uri("/api/events").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let ct = resp.headers().get("content-type").unwrap().to_str().unwrap();
+    assert!(ct.starts_with("text/event-stream"), "content-type = {ct}");
+    // El body es un stream infinito (keep-alive) → no se consume en el test.
+}
+
+#[tokio::test]
 async fn navigation_lists_module_menu() {
     let resp = make_app().await
         .oneshot(Request::builder().uri("/api/navigation").body(Body::empty()).unwrap())
