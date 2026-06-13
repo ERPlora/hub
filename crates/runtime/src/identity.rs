@@ -199,6 +199,31 @@ pub async fn verify_pin(db: &dyn DatabaseAdapter, name: &str, pin: &str) -> Resu
     Ok(None)
 }
 
+/// Lista los usuarios **activos con PIN** del hub `(id, name, role)`, ordenados por nombre. Lo usa
+/// `GET /api/hub/context` para que el shell muestre el grid de PIN directamente (sin depender de un
+/// flag en localStorage). Solo usuarios con `pin_hash` no vacío (los que pueden hacer login local).
+pub async fn list_pin_users(db: &dyn DatabaseAdapter) -> Result<Vec<(String, String, String)>> {
+    let res = db
+        .query(
+            "SELECT id, name, role FROM hub_user \
+             WHERE is_active = 1 AND pin_hash IS NOT NULL AND pin_hash != '' \
+             ORDER BY name",
+            &Params::new(),
+        )
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .map(|r| {
+            (
+                r["id"].as_str().unwrap_or_default().to_string(),
+                r["name"].as_str().unwrap_or_default().to_string(),
+                r["role"].as_str().unwrap_or_default().to_string(),
+            )
+        })
+        .collect())
+}
+
 /// Resuelve (o crea) el `hub_user` vinculado a una identidad cloud. Es el adaptador del **JWT de
 /// usuario**: tras verificar el token (server), se mapea su `user_id` a un usuario local. Si no
 /// existe, se **provisiona** (primer login online, §2.9) con `default_role`.
