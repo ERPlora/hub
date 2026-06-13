@@ -25,7 +25,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 tracing = "0.1"
-# Embedder trait (proxy de embeddings del Cloud) dyn-compatible para inyectar mocks en test.
+# Para implementar el trait async `BackupTransport` del runtime (transporte real de backup) y el
+# `Embedder` trait (proxy de embeddings del Cloud) dyn-compatible para inyectar mocks en test.
 async-trait = "0.1"
 # Cliente HTTP async (rustls): descarga de módulos + proxy SSE del asistente hacia el Cloud.
 # `rustls-tls-native-roots`: confía en el trust store del SO (como curl), no solo en los
