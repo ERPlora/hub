@@ -90,8 +90,13 @@ COPY --from=frontend /app/apps/web/dist /app/web
 # Config por defecto del contenedor (sobreescribible por ECS/env).
 #   HUB_BIND     — escuchar en todas las interfaces (no solo loopback) para el ALB.
 #   HUB_WEB_DIR  — servir el shell web horneado en la imagen.
+#   HOME=/tmp    — el usuario `erplora` no puede escribir en /app (root-owned), y
+#                  wasmtime/extism crea su cache de compilación en $HOME/.cache/wasmtime.
+#                  Sin esto, los handlers WASM de los módulos fallan ("failed to create
+#                  cache directory"). /tmp es escribible. Aplica a TODOS los hubs.
 ENV HUB_BIND=0.0.0.0:8787 \
-    HUB_WEB_DIR=/app/web
+    HUB_WEB_DIR=/app/web \
+    HOME=/tmp
 
 USER erplora
 EXPOSE 8787
