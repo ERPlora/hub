@@ -99,14 +99,15 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     );
 
     if let Some(dir) = &cfg.modules_dir {
-        for entry in std::fs::read_dir(dir)? {
-            let path = entry?.path();
-            if path.join("module.json").exists() {
-                match runtime.install_from_dir(&path).await {
-                    Ok(id) => eprintln!("✓ módulo instalado: {id}"),
-                    Err(e) => eprintln!("✗ módulo {}: {e}", path.display()),
+        // Instala los módulos del dir resolviendo el orden de `depends_on` por topo-sort (hub#16):
+        // una dependencia se instala antes que quien la declara, sin depender del orden del FS.
+        match runtime.install_all_from_dir(std::path::Path::new(dir)).await {
+            Ok(ids) => {
+                for id in ids {
+                    eprintln!("✓ módulo instalado: {id}");
                 }
             }
+            Err(e) => eprintln!("✗ instalación de módulos: {e}"),
         }
     }
 
@@ -144,10 +145,131 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
+    // Relay de sync (ADR-0031, **primer borrador**): tick periódico local↔Aurora cuando hay
+    // Cloud DB configurada (`HUB_CLOUD_DB_URL`). La **detección de conectividad** es el propio
+    // intento: si la conexión/sync falla ⇒ `online=false` + `last_error` y **backoff exponencial**
+    // (cada fallo dobla la espera hasta un techo; un ciclo OK vuelve a la cadencia base). El estado
+    // se publica en `sync_status` para la UI (`GET /api/sync/status`) y el lock del runtime se
+    // libera antes de dormir. Intervalo base configurable con `HUB_SYNC_INTERVAL_SECS` (def. 30s).
+    // BORRADOR (ADR-0031, columna humano): cadencia, techo/multiplicador del backoff y política de
+    // conectividad por afinar (marcados abajo).
+    if let Some(dsn) = state.config.cloud_db_url.clone() {
+        let runtime = state.runtime.clone();
+        let hub_id = state.config.hub_id.clone();
+        let status = state.sync_status.clone();
+        let base = std::env::var("HUB_SYNC_INTERVAL_SECS")
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+            .filter(|n| *n > 0)
+            .unwrap_or(30);
+        // BORRADOR (ADR-0031, columna humano): cadencia/backoff/conectividad por afinar. Techo del
+        // backoff = 10× la base (30s → 300s); cada fallo dobla la espera, un ciclo OK la resetea.
+        let max_backoff = base.saturating_mul(10).max(base);
+        tokio::spawn(async move {
+            use std::time::Duration;
+            // Backoff exponencial: la "detección offline" es el propio intento (connect/run_sync).
+            // Empieza en `base`; cada fallo dobla hasta `max_backoff`; un éxito vuelve a `base`.
+            let mut delay = base;
+            // Conexión inicial. NO se mantiene el lock del runtime durante la conexión de red.
+            let remote = loop {
+                match erplora_db::PgAdapter::connect(&dsn).await {
+                    Ok(a) => {
+                        delay = base;
+                        break a;
+                    }
+                    Err(e) => {
+                        if let Ok(mut s) = status.lock() {
+                            s.online = false;
+                            s.last_error = Some(e.to_string());
+                        }
+                        eprintln!("relay sync: sin conexión cloud ({e}); reintento en {delay}s");
+                        tokio::time::sleep(Duration::from_secs(delay)).await;
+                        // BORRADOR (ADR-0031, columna humano): política de backoff por afinar.
+                        delay = delay.saturating_mul(2).min(max_backoff);
+                    }
+                }
+            };
+            eprintln!("relay sync: conectado al Cloud DB; tick cada {base}s");
+            loop {
+                // El lock del runtime se libera al salir de este bloque, antes del sleep.
+                let result = {
+                    let rt = runtime.lock().await;
+                    rt.run_sync(&remote, &hub_id).await
+                };
+                match &result {
+                    Ok(r) => {
+                        delay = base; // reconectado / sync OK → vuelve a la cadencia base.
+                        if let Ok(mut s) = status.lock() {
+                            s.online = true;
+                            s.last_sync_epoch = Some(now_secs());
+                            s.last_pushed = r.pushed;
+                            s.last_pulled = r.pulled;
+                            s.last_error = None;
+                        }
+                        if r.pushed + r.pulled > 0 {
+                            eprintln!("relay sync: ↑{} ↓{}", r.pushed, r.pulled);
+                        }
+                    }
+                    Err(e) => {
+                        if let Ok(mut s) = status.lock() {
+                            s.online = false;
+                            s.last_error = Some(e.to_string());
+                        }
+                        eprintln!("relay sync: {e} (reintento en {delay}s)");
+                    }
+                }
+                tokio::time::sleep(Duration::from_secs(delay)).await;
+                // Si el ciclo falló, aumenta la espera para el siguiente intento (backoff).
+                // BORRADOR (ADR-0031, columna humano): política de backoff por afinar.
+                if result.is_err() {
+                    delay = delay.saturating_mul(2).min(max_backoff);
+                }
+            }
+        });
+    }
+
+    // Router de API + (opcional) frontend estático. Si `HUB_WEB_DIR` apunta al `dist/` de Vite,
+    // se sirve con fallback SPA a `index.html` (combo cloud + web-PWA, §3): /api, /ws y /healthz
+    // los resuelve el router; cualquier otra ruta cae al `ServeDir`. Sin `HUB_WEB_DIR` (Tauri,
+    // que sirve su propio webview) solo se montan las rutas de API.
+    let router = match std::env::var("HUB_WEB_DIR").ok().filter(|s| !s.is_empty()) {
+        Some(dir) => {
+            eprintln!("sirviendo frontend estático desde {dir} (fallback SPA → index.html)");
+            with_static_frontend(app(state), &dir)
+        }
+        None => app(state),
+    };
+
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
     eprintln!("erplora-server escuchando en http://{}", cfg.bind);
-    axum::serve(listener, app(state)).await?;
+    // Apagado limpio (ECS/Tauri): Ctrl-C o SIGTERM → deja de aceptar conexiones y drena las en
+    // vuelo antes de salir, en vez de cortar a mitad (importante para ECS al desescalar/desplegar).
+    axum::serve(listener, router)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
+}
+
+/// Espera Ctrl-C o (en Unix) SIGTERM. ECS envía SIGTERM al desescalar/desplegar; al recibirla,
+/// `axum::serve` deja de aceptar conexiones nuevas y drena las en vuelo antes de cerrar.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c().await.expect("instalar handler de Ctrl-C");
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("instalar handler de SIGTERM")
+            .recv()
+            .await;
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+    eprintln!("apagado: señal recibida, drenando conexiones en vuelo…");
 }
 
 /// Construye el router con todas las rutas montadas sobre `state`.
@@ -167,7 +289,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules/:id/uninstall", post(uninstall_module))
         .route("/api/query", post(query))
         .route("/api/command", post(command))
+        .route("/api/sync", post(sync_now))
+        .route("/api/sync/status", get(sync_status))
         .route("/api/auth/pin", post(auth_pin))
+        .route("/api/auth/set-pin", post(auth_set_pin))
         .route("/api/auth/cloud", post(auth_cloud))
         .route("/api/auth/logout", post(auth_logout))
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
@@ -177,6 +302,16 @@ pub fn app(state: AppState) -> Router {
 
 async fn healthz() -> &'static str {
     "ok"
+}
+
+/// Envuelve el router de API para servir el frontend estático (el `dist/` de Vite) con **fallback
+/// SPA** a `index.html`: las rutas de API (`/api/*`, `/ws`, `/healthz`) las resuelve el router; el
+/// resto cae al `ServeDir`, y las rutas del router SPA cliente (sin fichero en disco) sirven el
+/// `index.html`. Para el combo cloud + web-PWA (§3).
+pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
+    use tower_http::services::{ServeDir, ServeFile};
+    let index = format!("{}/index.html", web_dir.trim_end_matches('/'));
+    router.fallback_service(ServeDir::new(web_dir).fallback(ServeFile::new(index)))
 }
 
 /// GET /api/hub/context — el `hub_id` inyectado por el despliegue (env `HUB_ID`) + el usuario
@@ -427,6 +562,7 @@ fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     let (status, code) = match &e {
         E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied"),
         E::QueryNotFound(_) | E::CommandNotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
+        E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload"),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
         _ => (StatusCode::BAD_REQUEST, "error"),
     };
@@ -528,6 +664,63 @@ async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json
     }
 }
 
+/// `POST /api/sync` — dispara un ciclo de sync local↔cloud (ADR-0031, **primer borrador**).
+/// Auth hub-scoped (mismo gate que query/command). El DSN de Aurora lo inyecta el provisioning
+/// Cloud DB en `HUB_CLOUD_DB_URL`; ausente ⇒ tier local-only ⇒ sync deshabilitado.
+/// Columna del humano: el tick automático + detección de conectividad los decide/escribe el humano.
+async fn sync_now(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let rt = st.runtime.lock().await;
+    let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
+        Ok(c) => c,
+        Err(e) => return unauthorized(e),
+    };
+    // DSN del backend cloud (Aurora), ya resuelto en `HubConfig` desde `HUB_CLOUD_DB_URL`.
+    // Ausente ⇒ tier local-only ⇒ sync deshabilitado.
+    let dsn = match st.config.cloud_db_url.clone() {
+        Some(s) => s,
+        None => {
+            return Json(json!({ "ok": true, "data": { "pushed": 0, "pulled": 0, "disabled": true } }))
+                .into_response()
+        }
+    };
+    let remote = match erplora_db::PgAdapter::connect(&dsn).await {
+        Ok(a) => a,
+        Err(e) => {
+            return err_response(erplora_runtime::RuntimeError::Sync(format!(
+                "conexión cloud: {e}"
+            )))
+        }
+    };
+    match rt.run_sync(&remote, &ctx.hub_id).await {
+        Ok(r) => Json(json!({ "ok": true, "data": { "pushed": r.pushed, "pulled": r.pulled } }))
+            .into_response(),
+        Err(e) => err_response(e),
+    }
+}
+
+/// Epoch en segundos (para `last_sync_epoch`); 0 si el reloj está antes de 1970 (imposible).
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// `GET /api/sync/status` — estado del relay de sync para la UI (ADR-0031). Sin auth: solo expone
+/// conectividad y contadores, nada sensible. `configured:false` ⇒ tier local-only.
+async fn sync_status(State(st): State<AppState>) -> Response {
+    let s = st.sync_status.lock().ok().map(|g| g.clone()).unwrap_or_default();
+    Json(json!({ "ok": true, "data": {
+        "configured": s.configured,
+        "online": s.online,
+        "last_sync_epoch": s.last_sync_epoch,
+        "pushed": s.last_pushed,
+        "pulled": s.last_pulled,
+        "error": s.last_error,
+    } }))
+    .into_response()
+}
+
 #[derive(serde::Deserialize)]
 struct PinReq {
     name: String,
@@ -594,6 +787,30 @@ async fn auth_cloud(
     let rt = st.runtime.lock().await;
     match rt.get_or_link_cloud_user(&cloud_user_id, &name, &default_role).await {
         Ok(user) => mint_session(&rt, user).await,
+        Err(e) => err_response(e),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct SetPinReq {
+    pin: String,
+}
+
+/// Fija el PIN del **usuario de la sesión actual** (`X-Hub-Session`). Lo usa el alta de PIN tras el
+/// primer login cloud (§2.9): el usuario ya está autenticado por su JWT→sesión y elige su PIN en
+/// este dispositivo de confianza. Body `{pin}` (4 dígitos; vacío lo borra). → `{ok}` (401 sin sesión).
+async fn auth_set_pin(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<SetPinReq>) -> Response {
+    let rt = st.runtime.lock().await;
+    let Some(token) = auth::session_token(&headers) else {
+        return unauthorized(auth::AuthError::MissingSession);
+    };
+    let user = match rt.resolve_session(&token).await {
+        Ok(Some(u)) => u,
+        Ok(None) => return unauthorized(auth::AuthError::Invalid("sesión inválida o caducada".into())),
+        Err(e) => return err_response(e),
+    };
+    match rt.set_pin(&user.id, &req.pin).await {
+        Ok(()) => Json(json!({ "ok": true })).into_response(),
         Err(e) => err_response(e),
     }
 }
