@@ -519,8 +519,7 @@ fn embedded_serve_config(
             auth_mode: erplora_server::AuthMode::Session,
             jwt_public_key: None, // `serve()` la trae del Cloud si hay red (login cloud); PIN no la necesita
             cloud_api_token: None, // la celda compartida es la fuente del token (hot-reload)
-            // DSN del remoto de sync (Cloud DB). Ausente en local-gratis → sync deshabilitado.
-            cloud_db_url: std::env::var("HUB_CLOUD_DB_URL").ok().filter(|s| !s.trim().is_empty()),
+            device_trust_enforce: false, // hub#15: gate de login por PIN; el host debe aportar device_id antes de activarlo
         },
         machine_token_cell: Some(machine_token_cell),
     }

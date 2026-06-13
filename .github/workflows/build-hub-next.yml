@@ -1,0 +1,127 @@
+# ==============================================================================
+# ERPlora Hub (Rust) — Build & Push image to ECR  (erplora-hub:next)
+# ==============================================================================
+#
+# Construye la imagen del runtime del Hub (docker/Dockerfile: pnpm build del shell web +
+# cargo release de erplora-server → debian-slim) y la publica en ECR.
+#
+# Tags publicados (mismo repo ECR que ya existe, `erplora-hub`, account 363427305647):
+#   - erplora-hub:next            (tag móvil del flujo demo del Hub Rust — desbloquea #36)
+#   - erplora-hub:<git-sha>       (tag inmutable por commit, para pin/rollback)
+#
+# Pipeline:
+#   push a main      ─► build ─► push ECR  (:next + :<sha>)
+#   tag v*           ─► build ─► push ECR  (:next + :<sha>)  [versión por tag]
+#   workflow_dispatch ─► build ─► push ECR (manual)
+#
+# AWS auth: OIDC (rol `github-actions-deploy`, sin claves estáticas) — igual patrón que
+# `bridge-release.yml` (este repo) y los workflows de los repos `cloud` y `aws`. El rol
+# ya confía en `repo:ERPlora/hub:ref:refs/heads/main` y tiene ECR vía AdministratorAccess.
+# Para publicar por tag, el rol debe confiar además en `repo:ERPlora/hub:ref:refs/tags/v*`
+# (ver nota al final — mismo pendiente que bridge-release.yml).
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# Variables/secrets de GitHub Actions usados (configurables a nivel repo/org):
+#   vars.AWS_ROLE_ARN     (opcional)  ARN del rol OIDC a asumir.
+#                                     Default si no se define: el rol estándar del proyecto
+#                                     arn:aws:iam::363427305647:role/github-actions-deploy
+#   vars.AWS_ACCOUNT_ID   (opcional)  Cuenta AWS. Default: 363427305647.
+#   vars.AWS_REGION       (opcional)  Región. Default: eu-west-1.
+#   vars.ECR_REPO         (opcional)  Nombre del repo ECR. Default: erplora-hub.
+# Si se quieren parametrizar de verdad, definirlos con:  gh variable set <NAME> --body <val>
+# (a nivel repo ERPlora/hub o a nivel org ERPlora). Mientras no existan, se usan los defaults
+# de arriba — los mismos valores ya hardcodeados en los otros workflows del proyecto.
+# ==============================================================================
+
+name: Build Hub Image (next)
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: build-hub-next-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build & Push erplora-hub
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      id-token: write   # OIDC
+      contents: read
+
+    env:
+      # Resuelve a la variable de repo/org si existe; si no, al default del proyecto.
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || 'arn:aws:iam::363427305647:role/github-actions-deploy' }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID || '363427305647' }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
+      ECR_REPO: ${{ vars.ECR_REPO || 'erplora-hub' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          set -euo pipefail
+          IMAGE="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
+          # Tag inmutable por commit + el tag móvil `next` (lo consume el flujo demo del Hub Rust).
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE}:next"
+            echo "${IMAGE}:${GITHUB_SHA}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Output image URIs
+        run: |
+          echo "Imagen publicada:"
+          echo "  ${{ steps.tags.outputs.image }}:next"
+          echo "  ${{ steps.tags.outputs.image }}:${GITHUB_SHA}"
+          echo ""
+          echo "Los contenedores de hub los aprovisiona el Cloud Portal (boto3)."
+          echo "El flujo demo del Hub Rust apunta a :next (issue #36)."
+
+# ==============================================================================
+# Pendiente de confirmación humana / infra (OIDC, en aws/terraform/github_actions_oidc.tf):
+#   - `repo:ERPlora/hub:ref:refs/heads/main`  → YA presente (push a main publica :next + :sha).
+#   - `repo:ERPlora/hub:ref:refs/tags/v*`     → AÑADIR si se quiere publicar por tag de versión
+#     (mismo pendiente que bridge-release.yml). El rol ya tiene ECR vía AdministratorAccess.
+#
+# Relación con aws/.github/workflows/deploy-hub.yml: ese workflow (en el repo `aws`) hace
+# checkout de ERPlora/hub y construye la MISMA imagen con `context: .` esperando un Dockerfile
+# en la RAÍZ; ahora el Dockerfile vive en `docker/Dockerfile`. Si se quiere seguir usando
+# deploy-hub.yml habría que apuntarlo a `-f docker/Dockerfile` (o moverlo a este workflow).
+# DECISIÓN del humano: cuál de los dos es el canónico para publicar la imagen del Hub.
+# ==============================================================================

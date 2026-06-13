@@ -34,9 +34,21 @@ pub enum RuntimeError {
     /// El JSON Schema declarado por una query/command no compila (se detecta al instalar).
     #[error("schema inválido en `{name}`: {detail}")]
     Schema { name: String, detail: String },
-    /// Fallo del motor de sync local↔cloud (ADR-0031).
-    #[error("sync: {0}")]
-    Sync(String),
+    /// Fallo de la capacidad de host `host.notify` (ADR-0012): el transporte de un canal
+    /// (email/sms/whatsapp) no pudo entregar. El relay del outbox lo trata como un listener
+    /// fallido → reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter.
+    #[error("host.notify: {0}")]
+    Notify(String),
+    /// Fallo de la capacidad de host `host.backup_upload` (ADR-0040): el transporte de backup
+    /// (cifrado + petición de credencial al Cloud + subida a S3) no pudo completar. El relay del
+    /// outbox lo trata como un listener fallido → reintento con backoff y, tras `MAX_ATTEMPTS`,
+    /// dead-letter — exactamente como `host.notify`.
+    #[error("host.backup: {0}")]
+    Backup(String),
+    /// Error genérico que no encaja en una variante específica (p. ej. fallo del hasher argon2id
+    /// al fijar un PIN, hub#15). Mensaje libre.
+    #[error("{0}")]
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, RuntimeError>;

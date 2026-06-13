@@ -108,6 +108,21 @@ pub struct Registry {
     /// Plugins **nativos first-party** (ADR-0009): `module_id` → motor horneado en el
     /// runtime. Los registra el host (server/Tauri) al arrancar, no la instalación.
     pub native: HashMap<String, std::sync::Arc<dyn crate::native::NativeHandler>>,
+    /// Transporte de `host.notify` (ADR-0012): el cliente real de email/sms/whatsapp. Lo
+    /// inyecta el host al arrancar (`Runtime::set_notify_transport`). `None` = la capacidad
+    /// `host.notify` no está disponible (los eventos `*.reminder.due` se entregan a sus
+    /// listeners de módulo, pero el listener-host no envía nada). Ver `outbox.rs`.
+    pub notify_transport: Option<std::sync::Arc<dyn crate::host_notify::NotifyTransport>>,
+    /// Conjunto de módulos cuyo canal WhatsApp es **premium de ERPlora** (sale por el proxy de
+    /// Cloud con `check_quota`, ADR-0006/ADR-0012). El `tier` vive en Cloud (ADR-0007), así que
+    /// el host lo siembra; un módulo no listado usa WhatsApp del tenant (secreto local).
+    pub premium_whatsapp_modules: HashSet<String>,
+    /// Transporte de `host.backup_upload` (ADR-0040): el cliente real que pide la credencial STS/
+    /// presignada al Cloud y sube el blob cifrado del backup a S3. Lo inyecta el host al arrancar
+    /// (`Runtime::set_backup_transport`). `None` = la capacidad `host.backup_upload` no está
+    /// disponible (los eventos `backup.requested` se entregan a sus listeners de módulo, pero el
+    /// listener-host no sube nada). Espejo de `notify_transport`. Ver `outbox.rs`.
+    pub backup_transport: Option<std::sync::Arc<dyn crate::host_backup::BackupTransport>>,
 }
 
 impl Registry {
@@ -152,16 +167,6 @@ impl Registry {
     /// Menú dinámico: entradas de navegación **solo de módulos activos**.
     pub fn active_navigation(&self) -> Vec<&NavEntry> {
         self.navigation.iter().filter(|n| self.is_active(&n.module_id)).collect()
-    }
-
-    /// Tablas sincronizables declaradas por los módulos **activos** (ADR-0031). El runtime las
-    /// convierte en `SyncTable` y se las pasa al motor de sync.
-    pub fn active_sync_tables(&self) -> Vec<&crate::manifest::SyncTableDef> {
-        self.installed
-            .iter()
-            .filter(|m| self.is_active(&m.id))
-            .flat_map(|m| m.sync.iter())
-            .collect()
     }
 
     /// Cambia el estado de un módulo instalado. Devuelve `false` si no existe.

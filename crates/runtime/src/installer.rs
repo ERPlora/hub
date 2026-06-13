@@ -15,13 +15,27 @@ use crate::registry::{
     CompiledSchema, ModuleStatus, NavEntry, RegisteredCommand, RegisteredQuery, Registry,
 };
 
+// Baseline (v0) de `hub_module`: PK simple `module_id`. La migración de sistema v1 (hub#31 /
+// ADR-0005) la recompone a PK `(hub_id, module_id)` para BD compartida por org. Las BD nuevas
+// nacen con este baseline y la v1 lo migra al arrancar (ver `system_migrations.rs`); las viejas
+// que ya tienen la tabla reciben el cambio por la misma v1. No editar este baseline para añadir
+// hub_id aquí: el cambio de esquema va SIEMPRE por migración versionada para que llegue a BD
+// existentes (un `CREATE IF NOT EXISTS` no altera una tabla ya creada).
 const ENSURE_HUB_MODULE: &str = "CREATE TABLE IF NOT EXISTS hub_module (\
     module_id TEXT PRIMARY KEY, version TEXT NOT NULL, status TEXT NOT NULL, \
     installed_at TEXT NOT NULL, updated_at TEXT NOT NULL);";
 
+/// Asegura el baseline (v0) de `hub_module` (idempotente). Lo llama `ensure_system_tables` antes
+/// de aplicar las migraciones de sistema, para que la migración v1 (que recrea/altera la tabla)
+/// tenga sobre qué operar también en un hub vacío.
+pub async fn ensure_hub_module_table(db: &dyn DatabaseAdapter) -> Result<()> {
+    db.execute_batch(ENSURE_HUB_MODULE).await?;
+    Ok(())
+}
+
 /// Instala el módulo de `dir` en el registro, aplica migraciones y lo deja **activo**.
-/// Persiste el estado en `hub_module`. Devuelve el id del módulo.
-pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, dir: &Path) -> Result<String> {
+/// Persiste el estado en `hub_module` **scoped por `hub_id`** (§2.5). Devuelve el id del módulo.
+pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: &str, dir: &Path) -> Result<String> {
     let manifest = Manifest::load(dir)?;
 
     // Tablas de sistema del runtime (outbox de eventos): necesarias en cuanto un command emita.
@@ -94,12 +108,17 @@ pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, dir: &Pa
         registry.navigation.push(NavEntry { module_id: manifest.id.clone(), nav: nav.clone() });
     }
 
+    // Vuelca las scheduled tasks del manifest a `_scheduled_tasks` (ADR-0011). Idempotente:
+    // preserva el reloj (next_run/last_run) de las tareas ya existentes en una reinstalación y
+    // borra las retiradas del manifest. El `command` de cada tarea debe ser del propio módulo.
+    crate::scheduler::seed_module_tasks(db, &manifest.id, &manifest.scheduled_tasks).await?;
+
     let id = manifest.id.clone();
     let version = manifest.version.clone();
     registry.installed.push(manifest);
     registry.status.insert(id.clone(), ModuleStatus::Active);
 
-    persist_status(db, &id, &version, ModuleStatus::Active).await?;
+    persist_status(db, hub_id, &id, &version, ModuleStatus::Active).await?;
     Ok(id)
 }
 
@@ -118,8 +137,8 @@ fn load_schema(dir: &Path, name: &str, rel: Option<&str>) -> Result<Option<Compi
     Ok(Some(compiled))
 }
 
-/// Cambia el estado (activar/desactivar) de un módulo instalado y lo persiste.
-pub async fn set_status(db: &dyn DatabaseAdapter, registry: &mut Registry, module_id: &str, status: ModuleStatus) -> Result<()> {
+/// Cambia el estado (activar/desactivar) de un módulo instalado y lo persiste para `hub_id`.
+pub async fn set_status(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: &str, module_id: &str, status: ModuleStatus) -> Result<()> {
     if !registry.set_status(module_id, status) {
         return Err(RuntimeError::CommandNotFound(format!("módulo no instalado: {module_id}")));
     }
@@ -129,19 +148,51 @@ pub async fn set_status(db: &dyn DatabaseAdapter, registry: &mut Registry, modul
         .find(|m| m.id == module_id)
         .map(|m| m.version.clone())
         .unwrap_or_default();
-    persist_status(db, module_id, &version, status).await?;
+    persist_status(db, hub_id, module_id, &version, status).await?;
     Ok(())
 }
 
-/// Desinstala: quita capacidades del registro y borra la fila de `hub_module`. No borra datos.
-pub async fn uninstall(db: &dyn DatabaseAdapter, registry: &mut Registry, module_id: &str) -> Result<()> {
+/// Desinstala: quita capacidades del registro y borra la fila de `hub_module` **de este hub**
+/// (no toca el mismo módulo en otros hubs de la BD compartida). No borra datos.
+pub async fn uninstall(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: &str, module_id: &str) -> Result<()> {
     if !registry.remove_module(module_id) {
         return Err(RuntimeError::CommandNotFound(format!("módulo no instalado: {module_id}")));
     }
+    // Quita las scheduled tasks del módulo (ADR-0011): sus capacidades dejan de existir.
+    crate::scheduler::remove_module_tasks(db, module_id).await?;
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("module_id".into(), json!(module_id));
-    db.execute("DELETE FROM hub_module WHERE module_id = :module_id", &p).await?;
+    db.execute("DELETE FROM hub_module WHERE hub_id = :hub_id AND module_id = :module_id", &p).await?;
     Ok(())
+}
+
+/// Lee de `hub_module` el estado persistido de los módulos **de este hub** (`hub_id`), como
+/// `(module_id, status)`. Filtra por `hub_id`: en una BD compartida por org, dos hubs tienen sets
+/// distintos y este SELECT solo devuelve los del hub que pregunta. Lo usa la reconstrucción del
+/// `Registry` para respetar el estado activo/inactivo por hub tras un reinicio. Idempotente: si la
+/// tabla aún no tiene la forma hub-scoped, asegura+migra primero.
+pub async fn installed_status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<(String, ModuleStatus)>> {
+    ensure_hub_module_table(db).await?;
+    crate::system_migrations::apply(db, hub_id).await?;
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT module_id, status FROM hub_module WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await?;
+    let mut out = Vec::with_capacity(res.rows.len());
+    for row in &res.rows {
+        let id = row["module_id"].as_str().unwrap_or_default().to_string();
+        let status = match row["status"].as_str() {
+            Some("inactive") => ModuleStatus::Inactive,
+            _ => ModuleStatus::Active,
+        };
+        out.push((id, status));
+    }
+    Ok(out)
 }
 
 /// Ordena módulos topológicamente por `depends_on` (hub#16): una dependencia va **antes** que
@@ -186,23 +237,30 @@ fn visit(
     Ok(())
 }
 
-async fn persist_status(db: &dyn DatabaseAdapter, id: &str, version: &str, status: ModuleStatus) -> Result<()> {
-    db.execute_batch(ENSURE_HUB_MODULE).await?;
+/// Upsert del estado del módulo en `hub_module`, **scoped por `hub_id`** (§2.5). Asegura primero
+/// que el esquema hub-scoped existe: baseline (v0) + migración de sistema v1 (que recompone la PK
+/// a `(hub_id, module_id)`). Es idempotente y barato (las migraciones ya aplicadas se saltan), y
+/// cubre el caso de instalar un módulo en un hub vacío antes de que `ensure_system_tables` corra.
+async fn persist_status(db: &dyn DatabaseAdapter, hub_id: &str, id: &str, version: &str, status: ModuleStatus) -> Result<()> {
+    ensure_hub_module_table(db).await?;
+    crate::system_migrations::apply(db, hub_id).await?;
     let status_str = match status {
         ModuleStatus::Active => "active",
         ModuleStatus::Inactive => "inactive",
     };
     let now = crate::registry::now_rfc3339();
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("module_id".into(), json!(id));
     p.insert("version".into(), json!(version));
     p.insert("status".into(), json!(status_str));
     p.insert("now".into(), json!(now));
-    // upsert por PK (SQLite ON CONFLICT).
+    // upsert por PK compuesta (hub_id, module_id): instalar/activar el mismo módulo en otro hub
+    // de la misma BD es una fila distinta, no un conflicto.
     db.execute(
-        "INSERT INTO hub_module (module_id, version, status, installed_at, updated_at) \
-         VALUES (:module_id, :version, :status, :now, :now) \
-         ON CONFLICT(module_id) DO UPDATE SET status = :status, version = :version, updated_at = :now",
+        "INSERT INTO hub_module (hub_id, module_id, version, status, installed_at, updated_at) \
+         VALUES (:hub_id, :module_id, :version, :status, :now, :now) \
+         ON CONFLICT(hub_id, module_id) DO UPDATE SET status = :status, version = :version, updated_at = :now",
         &p,
     ).await?;
     Ok(())

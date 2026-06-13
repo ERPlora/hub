@@ -7,9 +7,6 @@ license.workspace = true
 
 [dependencies]
 erplora-db = { path = "../db" }
-# Motor de sync local↔cloud (ADR-0031, primer borrador). El runtime construye la lista de tablas
-# sincronizables de los módulos activos y delega en este crate genérico.
-erplora-datasync = { path = "../datasync" }
 erplora-wasm-host = { path = "../wasm-host" }
 # Traits async del contrato de plugins nativos first-party (ADR-0009, native.rs).
 async-trait = "0.1"
@@ -19,6 +16,11 @@ thiserror = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 uuid = { version = "1", features = ["v4"] }
 sha2 = "0.10"
+# PIN hashing con argon2id + string PHC estándar (`$argon2id$v=19$...`). Decisión humano hub#15:
+# se mantiene `sha2` para verificar (y rehashear perezosamente) los PINs viejos `salt:hash`.
+argon2 = "0.5"
+# (ADR-0040, opción B 2026-06-13) El backup ya NO cifra en cliente: el cifrado es SSE en el Cloud,
+# así que se quitó `aes-gcm` (no hay master key ni AES-GCM en el hub). Ver `host_backup.rs`.
 # Validación del payload contra el JSON Schema declarado por cada query/command (§5.2).
 # Sin resolución de $ref externos (offline): los schemas de módulo son autocontenidos.
 jsonschema = { version = "0.33", default-features = false }

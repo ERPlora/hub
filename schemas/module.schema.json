@@ -118,13 +118,7 @@
             "then": { "required": ["file"] }
           },
           "emit": { "type": "array", "items": { "type": "string" } },
-          "ai": { "$ref": "#/$defs/aiTool" },
-          "offline": {
-            "type": "string",
-            "enum": ["queue", "forbid"],
-            "default": "queue",
-            "description": "BORRADOR (Worker D, sin enforcement — ver architecture/hub/sync-hard-cases.md). Política offline del comando: 'queue' (append, se sincroniza al volver la red) | 'forbid' (online-only: fiscal/VeriFactu, stock crítico). El runtime aún NO la aplica."
-          }
+          "ai": { "$ref": "#/$defs/aiTool" }
         }
       }
     },
@@ -143,45 +137,30 @@
     },
     "network": {
       "type": "object",
-      "description": "Capacidad http.fetch mediada por el host (ARQUITECTURA.md §5.5, Opción A).",
+      "description": "Capacidad `http.fetch` mediada por el host (ADR-0012, ARQUITECTURA.md §5.5, Opción A). El WASM no tiene red: el runtime hace la llamada saliente, valida el host contra `allow` (allowlist) e inyecta los `secrets` por nombre (el módulo nunca ve su valor).",
       "additionalProperties": false,
       "properties": {
-        "allow": { "type": "array", "items": { "type": "string" } },
-        "secrets": { "type": "array", "items": { "type": "string" } }
+        "allow": { "type": "array", "items": { "type": "string" }, "description": "Hosts/patrones permitidos para las llamadas salientes (allowlist). Una llamada a un host fuera de la lista se rechaza." },
+        "secrets": { "type": "array", "items": { "type": "string" }, "description": "Nombres de secretos del hub que el host inyecta en la llamada (cabeceras/auth). El módulo declara el nombre, no el valor." }
       }
     },
-    "scheduled_tasks": { "type": "array", "items": { "type": "object" }, "default": [] },
-    "sync": {
-      "type": "array",
-      "description": "OPCIONAL (ADR-0031). Declara qué tablas del módulo participan en la sincronización local↔cloud. Solo tablas de negocio append-style (cabeceras y líneas), NO contadores/estado interno. Cada item identifica la tabla, su clave primaria y la columna de marca temporal para el delta.",
-      "default": [],
-      "items": {
-        "type": "object",
-        "required": ["table", "pk"],
-        "additionalProperties": false,
-        "properties": {
-          "table": {
-            "type": "string",
-            "description": "Nombre real de la tabla (tal cual en las migraciones)."
-          },
-          "pk": {
-            "type": "array",
-            "items": { "type": "string" },
-            "minItems": 1,
-            "description": "Columna(s) de la clave primaria de la tabla."
-          },
-          "hub_scoped": {
-            "type": "boolean",
-            "default": true,
-            "description": "Si la tabla está discriminada por `hub_id` (contrato de fila §2.5)."
-          },
-          "updated_at": {
-            "type": "string",
-            "default": "updated_at",
-            "description": "Columna de marca temporal usada para el delta de sincronización."
-          }
+    "notify": {
+      "type": "object",
+      "description": "Capacidad `host.notify(channel, payload)` de alto nivel (ADR-0012). El módulo declara QUÉ canales de notificación usa; el runtime implementa el cliente y decide DÓNDE viven los secretos/cuota por canal y por `tier` (tenant=secreto local cifrado; WhatsApp premium=proxy Cloud con check_quota). El envío va por el Outbox: el command emite un evento `*.reminder.due` con la intención `{channel,to,template,vars}` y el listener-host lo entrega con reintentos/dead-letter.",
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["email", "sms", "whatsapp"] },
+          "description": "Canales de alto nivel que necesita el módulo. Conjunto cerrado (añadir uno = tocar el runtime)."
         }
       }
+    },
+    "scheduled_tasks": {
+      "type": "array",
+      "description": "Tareas programadas del módulo (ADR-0011). Las ejecuta el Hub (no Cloud): se vuelcan a la tabla de sistema `_scheduled_tasks` al instalar y el barrido del relay corre el `command` al vencer el `cron`, sin usuario (contexto de sistema). Idempotentes por diseño (catch-up collapse tras un apagado).",
+      "default": [],
+      "items": { "$ref": "#/$defs/scheduledTask" }
     },
     "ui": {
       "type": "object",
@@ -290,6 +269,37 @@
         "name": {
           "type": "string",
           "description": "Nombre opcional que ve el LLM (por defecto = el nombre de la operación, p. ej. inventory.products.list)."
+        }
+      }
+    },
+    "scheduledTask": {
+      "type": "object",
+      "description": "Una tarea programada del módulo (ADR-0011). El runtime la vuelca a `_scheduled_tasks` al instalar (idempotente, clave = módulo + `name`) y ejecuta su `command` al vencer el `cron`, sin usuario.",
+      "required": ["name", "command", "cron"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Nombre único de la tarea DENTRO del módulo (clave de idempotencia junto al module_id)."
+        },
+        "command": {
+          "type": "string",
+          "description": "Command a ejecutar al vencer el cron. Debe ser del PROPIO módulo (mismo aislamiento que el handler WASM); se ejecuta sin usuario (contexto de sistema)."
+        },
+        "cron": {
+          "type": "string",
+          "description": "Expresión cron de 5 campos `min hora dom mes dow` (p. ej. `*/5 * * * *`) o atajo `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`. El parser actual soporta `*`, `*/N` y valor fijo por campo (no rangos/listas todavía)."
+        },
+        "payload": {
+          "type": "object",
+          "description": "Payload fijo que recibe el command en cada ejecución (opcional)."
+        },
+        "catch_up": {
+          "type": "string",
+          "enum": ["collapse", "skip"],
+          "default": "collapse",
+          "description": "Comportamiento tras un apagado: `collapse` ejecuta UNA sola vez el backlog vencido al arrancar; `skip` no ejecuta nada vencido durante el apagado y solo reprograma."
         }
       }
     }

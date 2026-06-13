@@ -167,7 +167,7 @@ async fn hub_context_returns_configured_hub_id() {
         auth_mode: erplora_server::AuthMode::Dev,
         jwt_public_key: None,
         cloud_api_token: None,
-        cloud_db_url: None,
+        device_trust_enforce: false,
     };
     let app = app(AppState::with_config(rt, cfg));
     let resp = app

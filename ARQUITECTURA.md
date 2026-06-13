@@ -124,12 +124,12 @@ cloud); **`web-pwa` ⟹ cloud** (forzado).
   para hardware/FS — **independiente del transport de datos**. En `cloud + Tauri` los datos van
   por HTTP+WS y `invoke` se usa **solo** para este canal local (§2.7, §7.5).
 - **DB intercambiable**: `DatabaseAdapter` con backends SQLite y PostgreSQL (§8).
-- **Offline/sync (modelo decidido, ADR-0031)**: **local-first + sync** en todos los tiers — cada
-  dispositivo opera sobre su **SQLite local como autoridad** y **funciona offline** (tras un primer
-  arranque online: login + provisión + descarga de módulos, §2.8/§2.9). La nube **no reemplaza** lo
-  local, lo **sincroniza**: el tier **Cloud DB** es SQLite local **+ sync** a Aurora (no thin-client),
-  conservando el offline; el **web-PWA/iOS** sí es online-only. El **motor de sync** está **pendiente
-  de diseño (columna humano)**; alcance y conflictos en §2.8.
+- **Offline (modelo decidido, ADR-0040 — sin sync en fase 1)**: **dos productos sin puente**.
+  **Local** (`single`+Tauri, SQLite local = autoridad, gratis, 100% offline, un dispositivo) y **Cloud**
+  (`cloud`: ECS hub + Aurora por org, multi-dispositivo/web, **online-only**). Un dispositivo ⇒ Local;
+  ¿varios? ⇒ Cloud. **No hay sincronización local↔cloud**; el respaldo del Local es el módulo `backup`
+  premium (export lógico cifrado a S3, no es sync). Se retiró el tier "Cloud DB local-first + sync" y el
+  motor de sync (ver §2.8, OBSOLETO). El web-PWA/iOS es online-only.
 - **Rust es la autoridad**: valida permisos, tenant (`hub_id`), payload y ejecuta. La UI
   nunca toca la base de datos.
 
@@ -358,18 +358,35 @@ SO/navegador como teclado.
 - *Decisión abierta (§14)*: descubrimiento primario↔satélite en LAN, y qué pasa si el primario
   cae (¿se puede promover un satélite?).
 
-### 2.8 Modelo offline = local-first + sync (ADR-0031)
+### 2.8 Modelo offline — dos productos, SIN sync en fase 1 (ADR-0040)
 
-> ✅ **Decisión (ADR-0031, revisa el thin-client de ADR-0030): local-first + sync.** La nube **no
-> reemplaza** lo local, lo **sincroniza**. Cada dispositivo tiene **SQLite local como autoridad**
-> (Rust valida permisos/tenant/payload antes de escribir, igual que la app gratis) y **funciona
-> offline siempre**. Motivo: con el thin-client (app local → Aurora directa) un usuario de un solo
-> dispositivo que **paga** quedaba **peor** que con la app gratis al perder la red.
+> ⛔ **ACTUALIZADO — ADR-0040 (2026-06-13): NO hay sincronización en fase 1.** Se **retiró** el modelo
+> "local-first + sync" (ADR-0031), el tier intermedio "Cloud DB" (ADR-0029) y **todo el motor de sync**
+> (`crates/datasync`, relay, LWW, conflictos de stock, remapeo). Lo de abajo (tres tiers, sync, LWW)
+> queda **histórico**; borrado físico en [`todo/F-remove-sync-clouddb-execution.md`](../todo/F-remove-sync-clouddb-execution.md).
 
-**Tres tiers** (detalle de producto en [overview.md](../architecture/hub/overview.md) y
-[MODELO-PLANES-Y-CAPACIDAD](../docs/producto/MODELO-PLANES-Y-CAPACIDAD.md)):
+> ✅ **Decisión (ADR-0040): dos productos sin puente.** **Local** (`single`+Tauri, SQLite local =
+> autoridad, gratis, 100% offline, **un dispositivo**) y **Cloud** (`cloud`: ECS hub + Aurora por org,
+> **online-only**, multi-dispositivo/web). Un dispositivo ⇒ Local; ¿necesitas varios? ⇒ Cloud (online).
+> **No se sincroniza dato** entre ambos en fase 1. El respaldo del Local es el módulo **`backup`** premium
+> (export lógico cifrado a S3 vía endpoint Cloud, [modules/backup.md](../architecture/modules/backup.md)) —
+> copia unidireccional, **no** sync.
 
-| Tier | Datos | Multi-device | Offline |
+**Dos productos** (detalle en [overview.md](../architecture/hub/overview.md)):
+
+| Producto | Datos | Multi-device | Offline |
+| --- | --- | --- | --- |
+| **Local — gratis** | SQLite local (autoridad) + `backup` a S3 | No | Sí (100%) |
+| **Cloud — starter/standard** | ECS hub + Aurora por org | Sí | **Online-only** |
+
+---
+
+#### (histórico — retirado por ADR-0040) Modelo local-first + sync de ADR-0031
+
+> Lo que sigue describía el motor de sync **ya retirado**. Se conserva como contexto por si el sync se
+> reabre en el futuro (sería un ADR nuevo).
+
+| Tier (histórico) | Datos | Multi-device | Offline |
 | --- | --- | --- | --- |
 | **Local — gratis** | SQLite local | No | Sí |
 | **Cloud DB — 14,99 €/hub** | SQLite local **+ sync** a Aurora | Sí (sync rápido) | Sí |
@@ -393,9 +410,13 @@ SO/navegador como teclado.
 > **El motor de sync es columna del humano** (sync local/cloud · offline son núcleo, ver
 > [hub/CLAUDE.md](CLAUDE.md)). Aquí se documenta el **modelo decidido**, no el motor: su diseño e
 > implementación están **pendientes**. Puntos abiertos (transporte por tier DB-to-DB vs replay,
-> stock server-autoritativo, alcance `offline: queue|forbid` por comando, convergencia LAN) en
-> ADR-0031. **Ojo:** el crate `sync` (§11) es el **cliente WS de eventos en vivo**, **no** este
-> motor de datos — serán componentes distintos.
+> convergencia LAN) siguen en ADR-0031. La **identidad/PK** quedó fijada en **UUID-TEXT sin remapeo** y
+> el **stock** acotado a **hub-scoped en fase 1** (multi-tienda/multi-almacén = futuro módulo
+> `warehouse`) por **ADR-0035**; el campo `offline: queue|forbid` por comando está **scaffoldeado sin
+> enforcement**. Diseño y casos difíciles en
+> [`architecture/hub/sync-hard-cases.md`](../architecture/hub/sync-hard-cases.md). **Ojo:** el crate
+> `sync` (§11) es el **cliente WS de eventos en vivo**, **no** este motor de datos — serán componentes
+> distintos.
 
 ### 2.9 Login de usuario, dispositivos de confianza y tipos de usuario
 
@@ -1298,7 +1319,7 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 | **Red saliente de módulos** | ✅ **Decidido (Opción A)**: `http.fetch` mediado (allowlist + creds inyectadas + auditoría §5.5) para terceros; **B (nativo)** para fiscal. |
 | **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware compartido (sidecar en Tauri \| standalone opcional para `cloud + web-PWA`), §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
 | **Modelo de módulos** | ✅ **Decidido**: híbrido (declarativo + WASM + SDK). |
-| **Offline/sync** | ✅ **Decidido (ADR-0031)**: **local-first + sync** — SQLite local autoridad en todos los tiers (offline siempre); Cloud DB = local + sync a Aurora (no thin-client); web-PWA/iOS online-only. Motor de sync pendiente (columna humano) (§2.8). |
+| **Offline** | ✅ **Decidido (ADR-0040): dos productos, SIN sync.** **Local** (SQLite local autoridad, gratis, 100% offline, un dispositivo) y **Cloud** (ECS+Aurora, online-only, multi-dispositivo). Sin puente; respaldo del Local = módulo `backup` (export cifrado a S3, no sync). Retira el motor de sync y el tier "Cloud DB" de ADR-0029/0031 (§2.8). |
 | **Login de usuario** | ✅ **Decidido**: 1er login email+password online → dispositivo de confianza → PIN (offline a futuro); usuarios cloud y solo-locales (§2.9). |
 | **Reactividad UI** | ✅ **Decidido**: eventos WS/Tauri → el WC re-consulta (§7.7). Sustituye a LiveComponent. |
 | **ABI WASM** | Extism (recomendado) vs WASI vs propia. Validar en Fase 0. |
@@ -1393,7 +1414,7 @@ Rust = autoridad / runtime genérico (execute_command / execute_query)
 SQLite (local) / Postgres-Aurora (cloud) = solo Rust accede; hub_id (UUID) por fila + PK = UUID v4 (TEXT)
 WASM (Extism) = lógica avanzada y batch, en sandbox (sin red/BD libres)
 SDK TS = puente para la UI (IpcTransport local / HttpWsTransport cloud)
-Offline = local-first + sync (ADR-0031): SQLite local autoridad siempre; Cloud DB sincroniza a Aurora (no thin-client); web-PWA/iOS online. Motor de sync pendiente (columna humano)
+Offline = dos productos SIN sync (ADR-0040): Local (SQLite local autoridad, gratis, offline, un dispositivo) y Cloud (ECS+Aurora, online-only, multi-dispositivo); sin puente. Respaldo del Local = módulo `backup` (export cifrado a S3). Retira el motor de sync y el tier Cloud DB de ADR-0029/0031
 Login = email+password online (setup) → dispositivo de confianza → PIN (offline a futuro)
 Reactividad = evento (WS/Tauri) → el WC re-consulta (no server-render)
 Eventos = transactional outbox (escritura atómica + relay async at-least-once + _event_delivery); WS solo push UI (§4.1)

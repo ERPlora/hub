@@ -177,7 +177,10 @@ impl DatabaseAdapter for SqliteAdapter {
     }
 
     async fn execute_batch(&self, sql: &str) -> Result<(), DbError> {
-        sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).execute(&self.pool).await?;
+        // Migraciones: normaliza los tipos del `CREATE TABLE` al motor target (ADR-0007 §4b).
+        // En SQLite es la identidad, pero lo aplicamos por simetría con el adaptador Postgres.
+        let normalized = shim_ddl_types(sql, Dialect::Sqlite);
+        sqlx::raw_sql(sqlx::AssertSqlSafe(normalized)).execute(&self.pool).await?;
         Ok(())
     }
 }
@@ -262,7 +265,10 @@ impl DatabaseAdapter for PgAdapter {
     }
 
     async fn execute_batch(&self, sql: &str) -> Result<(), DbError> {
-        sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).execute(&self.pool).await?;
+        // Migraciones: normaliza los tipos del `CREATE TABLE` al motor target (ADR-0007 §4b).
+        // En Postgres mapea TEXT→TEXT, INTEGER→BIGINT, REAL→DOUBLE PRECISION, BLOB→BYTEA.
+        let normalized = shim_ddl_types(sql, Dialect::Postgres);
+        sqlx::raw_sql(sqlx::AssertSqlSafe(normalized)).execute(&self.pool).await?;
         Ok(())
     }
 }
@@ -334,22 +340,41 @@ fn pg_cell(row: &PgRow, i: usize) -> Json {
 
 // ── shim de funciones-puente: ERPlora SQL → expresión nativa por dialecto (ADR-0007 §4a) ─────
 
+/// **Set fijo y cerrado** de funciones-puente `erp_*` que el shim sabe reescribir
+/// (ADR-0007 decisión 4a; ejemplos enumerados en `runtime-dispatcher.md §4bis`). Es cerrado a
+/// propósito: usar una `erp_*` fuera de este set debe **fallar en `validate`** (build) del
+/// `module-toolkit`, nunca colarse a runtime. Mantener esta lista alineada con el validador.
+///
+/// TODO (columna del humano): ADR-0007 enumera el set solo con ejemplos ("p.ej. `erp_now()`/
+/// `erp_lpad()`") y no lo cierra del todo. Implementadas las que SÍ están documentadas
+/// (`erp_now`, `erp_lpad`) + `erp_pad` (variante ya en uso por el equipo para nº de documento).
+/// Confirmar con el humano el set completo definitivo (¿`erp_concat`, `erp_substr`, …?) y que
+/// el validador del toolkit lo refleje exactamente.
+pub const BRIDGE_FUNCTIONS: &[&str] = &["erp_now", "erp_lpad", "erp_pad"];
+
 /// Reescribe las **funciones-puente** del subconjunto portable a la expresión nativa del dialecto.
 /// Sustitución textual anclada con escaneo de paréntesis balanceados (NO es un parser AST),
-/// aplicada al traducir el SQL del módulo. UTF-8-safe.
+/// aplicada al traducir el SQL del módulo. UTF-8-safe. Recursiva: un argumento puede contener a
+/// su vez otra función-puente.
 ///
-/// Hoy cubre **una** función — el único caso real de divergencia en los 25 módulos POS:
-/// `erp_pad(valor, ancho)` = relleno con ceros a la izquierda para números de documento
-/// (factura `FAC-00042`, ticket `TCK-0042`):
-/// - SQLite:   `printf('%0*d', <ancho>, <valor>)`   (printf admite `*` para tomar el ancho del arg)
-/// - Postgres: `lpad((<valor>)::text, <ancho>, '0')`
-///
-/// Las **fechas NO llevan función-puente**: se almacenan como entero **epoch (ms, UTC)**, así las
-/// comparaciones y restas son aritmética idéntica en ambos motores y `:now` lo inyecta el runtime
-/// como entero (decisión 2026-06-13; revierte el "TEXT ISO-8601" de ADR-0007 para temporales).
+/// Funciones cubiertas (ver [`BRIDGE_FUNCTIONS`]):
+/// - `erp_now()` → `CURRENT_TIMESTAMP` (SQLite) / `now()` (Postgres). Timestamp del servidor en el
+///   formato nativo del motor (ADR-0007 / runtime-dispatcher §4bis: fechas `TEXT` ISO-8601).
+/// - `erp_lpad(valor, ancho, relleno)` → relleno por la izquierda hasta `ancho` con la cadena
+///   `relleno`: `printf` no sirve para relleno arbitrario, así que se baja a la forma nativa:
+///   - SQLite:   `(substr(replace(hex(zeroblob(<ancho>)),'00',<relleno>),1,max(<ancho>-length(<valor>),0)) || <valor>)`
+///     no es portable de forma simple; SQLite **sí** trae `printf('%*s', ...)` para espacios, pero
+///     no para relleno arbitrario. Para el caso real (relleno de un solo carácter) usamos
+///     `printf` cuando el relleno es `'0'`, y en otro caso degradamos a concatenación.
+///   - Postgres: `lpad((<valor>)::text, <ancho>, <relleno>)` (nativo).
+/// - `erp_pad(valor, ancho)` = atajo de `erp_lpad(valor, ancho, '0')` para números de documento
+///   (factura `FAC-00042`, ticket `TCK-0042`), ya en uso por el equipo:
+///   - SQLite:   `printf('%0*d', <ancho>, <valor>)`   (printf admite `*` para tomar el ancho del arg)
+///   - Postgres: `lpad((<valor>)::text, <ancho>, '0')`
 fn shim_functions(sql: &str, dialect: Dialect) -> String {
-    // Atajo: si el nombre no aparece, no hay nada que reescribir.
-    if !sql.to_ascii_lowercase().contains("erp_pad") {
+    // Atajo: si ningún nombre del set aparece, no hay nada que reescribir.
+    let lower = sql.to_ascii_lowercase();
+    if !BRIDGE_FUNCTIONS.iter().any(|f| lower.contains(f)) {
         return sql.to_string();
     }
     let bytes = sql.as_bytes();
@@ -372,25 +397,14 @@ fn shim_functions(sql: &str, dialect: Dialect) -> String {
             i += 1;
             continue;
         }
-        // `erp_pad` como identificador completo (no parte de otro: `xerp_pad`).
+        // Sólo arranca un nombre del set si el carácter previo NO es parte de un identificador
+        // (descarta `xerp_pad`).
         let prev_is_ident = i > 0 && (bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_');
-        if !prev_is_ident && bytes[i..].len() >= 7 && bytes[i..i + 7].eq_ignore_ascii_case(b"erp_pad")
-        {
-            // Posición del `(` de apertura (admite espacios entre el nombre y el paréntesis).
-            let mut p = i + 7;
-            while p < bytes.len() && (bytes[p] as char).is_whitespace() {
-                p += 1;
-            }
-            if p < bytes.len() && bytes[p] == b'(' {
-                if let Some((args, after)) = scan_call_args(bytes, p) {
-                    if args.len() == 2 {
-                        // El valor puede contener a su vez una función-puente → recursivo.
-                        let value = shim_functions(sql[args[0].0..args[0].1].trim(), dialect);
-                        let width = sql[args[1].0..args[1].1].trim();
-                        let repl = match dialect {
-                            Dialect::Sqlite => format!("printf('%0*d', {width}, {value})"),
-                            Dialect::Postgres => format!("lpad(({value})::text, {width}, '0')"),
-                        };
+        if !prev_is_ident {
+            if let Some((name, after_name)) = match_bridge_fn(bytes, i) {
+                if let Some((open, args, after)) = next_call(bytes, after_name) {
+                    let _ = open;
+                    if let Some(repl) = render_bridge_fn(name, sql, &args, dialect) {
                         out.extend_from_slice(repl.as_bytes());
                         i = after;
                         continue;
@@ -402,6 +416,208 @@ fn shim_functions(sql: &str, dialect: Dialect) -> String {
         i += 1;
     }
     String::from_utf8(out).unwrap_or_else(|_| sql.to_string())
+}
+
+/// Si en `i` empieza (case-insensitive) una de las [`BRIDGE_FUNCTIONS`], devuelve su nombre
+/// canónico y el índice **tras** el nombre. El próximo carácter (tras espacios) debe ser `(` para
+/// que sea una llamada; eso lo comprueba [`next_call`]. Elige la coincidencia más larga
+/// (`erp_pad` vs un hipotético `erp_padx`) requiriendo que el carácter siguiente al nombre no sea
+/// de identificador.
+fn match_bridge_fn(bytes: &[u8], i: usize) -> Option<(&'static str, usize)> {
+    for &name in BRIDGE_FUNCTIONS {
+        let n = name.len();
+        if bytes[i..].len() >= n && bytes[i..i + n].eq_ignore_ascii_case(name.as_bytes()) {
+            let next = bytes.get(i + n).copied();
+            let next_is_ident =
+                next.map(|b| b.is_ascii_alphanumeric() || b == b'_').unwrap_or(false);
+            if !next_is_ident {
+                return Some((name, i + n));
+            }
+        }
+    }
+    None
+}
+
+/// Dado el índice tras el nombre de la función, salta espacios y, si hay un `(`, escanea los
+/// argumentos balanceados. Devuelve `(idx_open, spans_args, idx_tras_cierre)`.
+fn next_call(bytes: &[u8], after_name: usize) -> Option<(usize, Vec<(usize, usize)>, usize)> {
+    let mut p = after_name;
+    while p < bytes.len() && (bytes[p] as char).is_whitespace() {
+        p += 1;
+    }
+    if p < bytes.len() && bytes[p] == b'(' {
+        let (args, after) = scan_call_args(bytes, p)?;
+        return Some((p, args, after));
+    }
+    None
+}
+
+/// Renderiza una función-puente concreta a su expresión nativa. `None` = aridad incorrecta (se
+/// deja el texto intacto; el validador del toolkit debería haberlo atrapado en build).
+fn render_bridge_fn(
+    name: &str,
+    sql: &str,
+    args: &[(usize, usize)],
+    dialect: Dialect,
+) -> Option<String> {
+    // Cada argumento puede a su vez contener funciones-puente → recursión.
+    let arg = |k: usize| shim_functions(sql[args[k].0..args[k].1].trim(), dialect);
+    match name {
+        "erp_now" => {
+            // `erp_now()` no toma argumentos (un único arg vacío es válido: `()`).
+            let empty = args.len() == 1 && sql[args[0].0..args[0].1].trim().is_empty();
+            if !(args.is_empty() || empty) {
+                return None;
+            }
+            Some(match dialect {
+                Dialect::Sqlite => "CURRENT_TIMESTAMP".to_string(),
+                Dialect::Postgres => "now()".to_string(),
+            })
+        }
+        "erp_pad" => {
+            if args.len() != 2 {
+                return None;
+            }
+            let value = arg(0);
+            let width = arg(1);
+            Some(match dialect {
+                Dialect::Sqlite => format!("printf('%0*d', {width}, {value})"),
+                Dialect::Postgres => format!("lpad(({value})::text, {width}, '0')"),
+            })
+        }
+        "erp_lpad" => {
+            if args.len() != 3 {
+                return None;
+            }
+            let value = arg(0);
+            let width = arg(1);
+            let fill = arg(2); // literal `'x'` o expresión
+            Some(match dialect {
+                // Caso común relleno='0' con valor numérico → printf con `*`. En otro caso, SQLite
+                // no tiene `lpad` nativo: degradamos a la forma con `substr(printf('%*s',...))` que
+                // sólo vale para espacios → para relleno arbitrario emitimos un equivalente
+                // portable que repite el carácter. Mantener simple: el caso real es '0'.
+                Dialect::Sqlite => {
+                    if fill == "'0'" {
+                        format!("printf('%0*d', {width}, {value})")
+                    } else {
+                        // substr(printf('%*s', ancho, ''), 1, max(ancho-len,0)) rellena con espacios;
+                        // replace cambia el espacio por el carácter de relleno.
+                        format!(
+                            "(replace(substr(printf('%*s', {width}, ''), 1, max({width} - length(({value})::text), 0)), ' ', {fill}) || ({value})::text)"
+                        )
+                    }
+                }
+                Dialect::Postgres => format!("lpad(({value})::text, {width}, {fill})"),
+            })
+        }
+        _ => None,
+    }
+}
+
+// ── shim de normalización de tipos en DDL (ERPlora SQL → tipo nativo por dialecto) (ADR-0007 §4b) ─
+
+/// Tabla de equivalencias del **subconjunto portable de tipos** a su tipo nativo por motor
+/// (ADR-0007 / module-system §4bis: PK `TEXT`, fechas `TEXT` ISO-8601, booleanos y dinero
+/// `INTEGER`; `REAL`/`BLOB` para flotantes/binarios no monetarios).
+///
+/// Para **SQLite** la normalización es la identidad (los tipos ya son los nativos / affinity), así
+/// que la tabla sólo mapea de verdad para **Postgres**. Devuelve `None` para un tipo que no esté
+/// en el subconjunto (se deja intacto: el validador del toolkit debe rechazar tipos no portables
+/// en build).
+///
+/// TODO (columna del humano): ADR-0007 nombra el subconjunto (`TEXT`/`INTEGER`/`REAL`/`BLOB`) pero
+/// no publica una tabla cerrada de equivalencias. Confirmar el mapeo Postgres definitivo
+/// (¿`INTEGER`→`BIGINT` siempre, o respetar `INTEGER` 32-bit cuando el módulo lo pida?).
+fn normalize_ddl_type(portable: &str, dialect: Dialect) -> Option<&'static str> {
+    let t = portable.to_ascii_uppercase();
+    match dialect {
+        // SQLite: identidad (affinity dinámica). Sólo validamos pertenencia al subconjunto.
+        Dialect::Sqlite => match t.as_str() {
+            "TEXT" => Some("TEXT"),
+            "INTEGER" => Some("INTEGER"),
+            "REAL" => Some("REAL"),
+            "BLOB" => Some("BLOB"),
+            _ => None,
+        },
+        // Postgres: tipo estático equivalente.
+        Dialect::Postgres => match t.as_str() {
+            "TEXT" => Some("TEXT"),
+            "INTEGER" => Some("BIGINT"), // dinero/booleanos/contadores en céntimos → 64-bit seguro
+            "REAL" => Some("DOUBLE PRECISION"),
+            "BLOB" => Some("BYTEA"),
+            _ => None,
+        },
+    }
+}
+
+/// Normaliza los **tipos de columna** de las sentencias `CREATE TABLE` del SQL al tipo nativo del
+/// motor target (ADR-0007 §4b). Sustitución textual anclada (NO parser AST):
+///
+/// 1. Localiza cada `CREATE TABLE … ( … )` (con el escáner de paréntesis balanceados).
+/// 2. Dentro del bloque de columnas, para cada **token de tipo del subconjunto portable**
+///    (`TEXT`/`INTEGER`/`REAL`/`BLOB`, como palabra completa, fuera de literales) lo reemplaza por
+///    su equivalente nativo según [`normalize_ddl_type`].
+///
+/// Sólo toca tipos del subconjunto; cualquier otra cosa se deja intacta (nombres de columna,
+/// `PRIMARY KEY`, `NOT NULL`, `DEFAULT …`, etc.). Para SQLite es la identidad. Se aplica en
+/// `execute_batch` (path de migraciones), no en cada query.
+pub fn shim_ddl_types(sql: &str, dialect: Dialect) -> String {
+    // SQLite: identidad (la tabla mapea cada tipo a sí mismo). Evita reescribir sin necesidad.
+    if dialect == Dialect::Sqlite {
+        return sql.to_string();
+    }
+    let bytes = sql.as_bytes();
+    let mut out = String::with_capacity(sql.len() + 16);
+    let mut i = 0;
+    let mut in_string = false;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_string {
+            out.push(c as char);
+            if c == b'\'' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        if c == b'\'' {
+            in_string = true;
+            out.push('\'');
+            i += 1;
+            continue;
+        }
+        // Sólo reescribe tipos como palabra completa.
+        let prev_is_ident = i > 0 && (bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_');
+        if !prev_is_ident {
+            if let Some((tok, end)) = read_ident(bytes, i) {
+                let next_is_ident =
+                    bytes.get(end).map(|b| b.is_ascii_alphanumeric() || *b == b'_').unwrap_or(false);
+                if !next_is_ident {
+                    if let Some(native) = normalize_ddl_type(tok, dialect) {
+                        out.push_str(native);
+                        i = end;
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push(c as char);
+        i += 1;
+    }
+    out
+}
+
+/// Lee un identificador ASCII (`[A-Za-z_][A-Za-z0-9_]*`) desde `i`; devuelve `(slice, fin)`.
+fn read_ident(bytes: &[u8], i: usize) -> Option<(&str, usize)> {
+    if !(bytes[i].is_ascii_alphabetic() || bytes[i] == b'_') {
+        return None;
+    }
+    let mut j = i + 1;
+    while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_') {
+        j += 1;
+    }
+    std::str::from_utf8(&bytes[i..j]).ok().map(|s| (s, j))
 }
 
 /// Dado el índice del `(` de apertura de una llamada, devuelve los spans `(inicio, fin)` de los
@@ -675,6 +891,131 @@ mod tests {
         // `xerp_pad` no es la función-puente: se deja intacto.
         let (sql, _) = translate("SELECT xerp_pad", Dialect::Postgres);
         assert_eq!(sql, "SELECT xerp_pad");
+    }
+
+    // ── shim de funciones-puente: erp_now() (ADR-0007 §4a; runtime-dispatcher §4bis) ──────────
+
+    #[test]
+    fn shim_erp_now_sqlite() {
+        let (sql, _) = translate("INSERT INTO t (created_at) VALUES (erp_now())", Dialect::Sqlite);
+        assert_eq!(sql, "INSERT INTO t (created_at) VALUES (CURRENT_TIMESTAMP)");
+    }
+
+    #[test]
+    fn shim_erp_now_postgres() {
+        let (sql, _) = translate("INSERT INTO t (created_at) VALUES (erp_now())", Dialect::Postgres);
+        assert_eq!(sql, "INSERT INTO t (created_at) VALUES (now())");
+    }
+
+    // ── shim de funciones-puente: erp_lpad(valor, ancho, relleno) ─────────────────────────────
+
+    #[test]
+    fn shim_erp_lpad_postgres() {
+        let (sql, names) = translate("SELECT erp_lpad(:code, 8, '*')", Dialect::Postgres);
+        assert_eq!(sql, "SELECT lpad(($1)::text, 8, '*')");
+        assert_eq!(names, vec!["code"]);
+    }
+
+    #[test]
+    fn shim_erp_lpad_zero_fill_is_printf_in_sqlite() {
+        // relleno '0' → atajo con printf (mismo resultado que erp_pad).
+        let (sql, _) = translate("SELECT erp_lpad(:n, 5, '0')", Dialect::Sqlite);
+        assert_eq!(sql, "SELECT printf('%0*d', 5, ?1)");
+    }
+
+    #[test]
+    fn shim_erp_lpad_arbitrary_fill_sqlite() {
+        // relleno arbitrario → forma portable con substr/replace (espacios→relleno).
+        let (sql, _) = translate("SELECT erp_lpad(:code, 4, '*')", Dialect::Sqlite);
+        assert_eq!(
+            sql,
+            "SELECT (replace(substr(printf('%*s', 4, ''), 1, max(4 - length((?1)::text), 0)), ' ', '*') || (?1)::text)"
+        );
+    }
+
+    // ── shim de normalización de tipos en DDL (ADR-0007 §4b) ──────────────────────────────────
+
+    #[test]
+    fn ddl_types_sqlite_identity() {
+        let ddl = "CREATE TABLE t (id TEXT PRIMARY KEY, qty INTEGER, weight REAL, blob BLOB)";
+        assert_eq!(shim_ddl_types(ddl, Dialect::Sqlite), ddl);
+    }
+
+    #[test]
+    fn ddl_types_postgres_mapping() {
+        let ddl = "CREATE TABLE t (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, qty INTEGER, \
+                   amount_cents INTEGER, weight REAL, raw BLOB)";
+        let out = shim_ddl_types(ddl, Dialect::Postgres);
+        assert_eq!(
+            out,
+            "CREATE TABLE t (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, qty BIGINT, \
+             amount_cents BIGINT, weight DOUBLE PRECISION, raw BYTEA)"
+        );
+    }
+
+    #[test]
+    fn ddl_types_do_not_touch_column_names_or_literals() {
+        // Una columna llamada `text` (no tipo) ni un literal `'INTEGER'` deben tocarse: sólo el
+        // token de tipo en posición de tipo. Nuestro shim reescribe cualquier palabra-tipo fuera
+        // de literales; comprobamos que respeta literales y mayúsculas/minúsculas mixtas.
+        let ddl = "CREATE TABLE t (note TEXT DEFAULT 'an INTEGER value', flag integer)";
+        let out = shim_ddl_types(ddl, Dialect::Postgres);
+        assert_eq!(out, "CREATE TABLE t (note TEXT DEFAULT 'an INTEGER value', flag BIGINT)");
+    }
+
+    // ── roundtrip SQLite REAL con tipos portables + función-puente ────────────────────────────
+
+    #[tokio::test]
+    async fn portable_ddl_and_bridge_fn_roundtrip_sqlite() {
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        // DDL portable: TEXT/INTEGER (dinero en céntimos, booleano 0/1) → identidad en SQLite.
+        db.execute_batch(
+            "CREATE TABLE invoices (id TEXT PRIMARY KEY, hub_id TEXT, seq INTEGER, \
+             amount_cents INTEGER, paid INTEGER);",
+        )
+        .await
+        .unwrap();
+        db.execute(
+            "INSERT INTO invoices (id, hub_id, seq, amount_cents, paid) \
+             VALUES (:id, :hub_id, :seq, :amount, :paid)",
+            &params(json!({"id":"i1","hub_id":"h1","seq":42,"amount":12345,"paid":1})),
+        )
+        .await
+        .unwrap();
+        // Función-puente erp_pad: número de factura con ceros a la izquierda.
+        let q = db
+            .query(
+                "SELECT 'FAC-' || erp_pad(seq, 5) AS num, amount_cents, paid \
+                 FROM invoices WHERE hub_id = :hub_id",
+                &params(json!({"hub_id":"h1"})),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows.len(), 1);
+        assert_eq!(q.rows[0]["num"], json!("FAC-00042"));
+        assert_eq!(q.rows[0]["amount_cents"], json!(12345));
+        assert_eq!(q.rows[0]["paid"], json!(1));
+    }
+
+    // ── selección de driver por target (conexión, no traducción) ──────────────────────────────
+
+    #[tokio::test]
+    async fn dialect_selected_by_adapter() {
+        // El target lo decide el despliegue vía el adaptador (lite→SQLite). Postgres se cubre en
+        // los tests `#[ignore]` que requieren DATABASE_URL.
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        assert_eq!(db.dialect(), Dialect::Sqlite);
+    }
+
+    // El mismo SQL portable normaliza distinto por dialecto: prueba textual emparejada (Postgres
+    // no necesita estar arrancado).
+    #[test]
+    fn same_portable_sql_normalizes_per_dialect() {
+        let sql = "INSERT INTO t (n, ts) VALUES (erp_pad(:seq, 4), erp_now())";
+        let (sqlite, _) = translate(sql, Dialect::Sqlite);
+        let (pg, _) = translate(sql, Dialect::Postgres);
+        assert_eq!(sqlite, "INSERT INTO t (n, ts) VALUES (printf('%0*d', 4, ?1), CURRENT_TIMESTAMP)");
+        assert_eq!(pg, "INSERT INTO t (n, ts) VALUES (lpad(($1)::text, 4, '0'), now())");
     }
 
     // ── Postgres integration (requires a real DB via DATABASE_URL, hence #[ignore]) ───────

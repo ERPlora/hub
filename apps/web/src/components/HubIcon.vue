@@ -11,6 +11,10 @@
   Uso:  <HubIcon name="save-outline" slot="start" />
         <HubIcon :name="kpi.icon" />                 (nombre dinámico)
         <HubIcon :name="entry.nav.icon" size="large" /> (nombre o SVG inline de un módulo)
+
+  TODO(#39): set de iconos del chrome (lucide vía iconify, como Cloud, vs ionicons, como el Hub
+  hoy) = DECISIÓN DEL HUMANO. No se unifica el set aquí; el shell sigue con `ion:` (+ alias lucide
+  en lib/icons.ts) hasta que el humano fije el set canónico para shells idénticos píxel a píxel.
 -->
 <script setup lang="ts">
 import { computed } from 'vue';
