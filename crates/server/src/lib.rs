@@ -33,8 +33,12 @@ pub mod ingest;
 pub mod install;
 pub mod session;
 pub mod state;
+pub mod tenant;
 
 pub use state::{AppState, AuthMode, HubConfig, MachineToken, DEV_HUB_ID, WsEvent};
+pub use tenant::{
+    EnvOrgResolver, OrgDescriptor, OrgId, OrgResolver, RuntimeFactory, TenantError, TenantRouter,
+};
 
 /// Configuración de arranque del runtime **embebible** — la usan el binario (`main.rs`) y el shell
 /// **Tauri in-process** (§11). Envuelve la [`HubConfig`] de despliegue + parámetros de proceso.
@@ -90,7 +94,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
 
     // sqlx-style URL: `sqlite://<path>?mode=rwc` crea el fichero si falta.
     let db = SqliteAdapter::connect(&format!("sqlite://{}?mode=rwc", cfg.sqlite_path)).await?;
-    let mut runtime = Runtime::new(Box::new(db));
+    // El runtime se construye con el `hub_id` del despliegue (config, no spoofable): scope del
+    // estado de módulos (`hub_module`) y de las migraciones de sistema (hub#31 / hub#37).
+    let mut runtime = Runtime::with_hub_id(Box::new(db), cfg.hub.hub_id.clone());
 
     // Plugins nativos first-party (ADR-0009): motores compliance-crítico horneados en el
     // runtime. Hoy solo `verifactu` (cadena fiscal + transmisión AEAT TLS-mutua).
@@ -124,104 +130,63 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         Some(cell) => AppState::with_config_cell(runtime, cfg.hub, cell),
         None => AppState::with_config(runtime, cfg.hub),
     };
-    // Tablas de sistema del runtime (outbox) — para el caso de hub vacío sin módulos.
+    // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
-    // Relay de eventos: entrega at-least-once asíncrona del outbox a sus listeners (§5.4).
+    // Transporte de `host.notify` (ADR-0012): cliente real de email/sms/whatsapp. Hoy un MOCK
+    // (decisión de dependencia del humano para el SMTP/SMS reales; ver crates/runtime/host_notify.rs).
+    // El mock pasa por el Outbox como cualquier transporte, así que la mecánica de reintentos/
+    // dead-letter del listener-host queda real. TODO: sustituir por el transporte real (lettre/HTTP).
+    state
+        .runtime
+        .lock()
+        .await
+        .set_notify_transport(std::sync::Arc::new(erplora_runtime::host_notify::MockTransport::new()));
+
+    // Transporte de `host.backup_upload` (ADR-0040, opción B): dump del SQLite + STREAM al Cloud,
+    // que lo guarda en S3 con cifrado de SERVIDOR (SSE). El hub NO cifra ni habla con S3. Hoy un
+    // MOCK ("streamea" en memoria un dump sintético) — pasa por el Outbox como cualquier transporte,
+    // así que el flujo create→requested→subida queda real. TODO: sustituir por el transporte real
+    // (CloudClient::backup_upload + POST stream del dump) + la fuente del dump del SQLite
+    // (columna humano; ver crates/runtime/host_backup.rs).
+    state
+        .runtime
+        .lock()
+        .await
+        .set_backup_transport(std::sync::Arc::new(erplora_runtime::host_backup::MockTransport::new()));
+
+    // Catch-up del scheduler al arrancar (ADR-0011): un hub que estuvo apagado ejecuta UNA sola
+    // vez las tareas con backlog vencido (collapse) y reprograma el resto. Se hace antes del loop.
+    {
+        let hub_id = state.config.hub_id.clone();
+        let rt = state.runtime.lock().await;
+        match rt.scheduler_catch_up(&hub_id).await {
+            Ok(n) if n > 0 => eprintln!("scheduler: catch-up de arranque ejecutó {n} tarea(s)"),
+            Ok(_) => {}
+            Err(e) => eprintln!("scheduler catch-up: {e}"),
+        }
+    }
+
+    // Bucle de background: relay de eventos del outbox (§5.4) + barrido del scheduler (ADR-0011).
+    // Ambos comparten el mismo tick de 1s y el mismo lock del runtime (un ECS container por hub).
     {
         let runtime = state.runtime.clone();
+        let hub_id = state.config.hub_id.clone();
         tokio::spawn(async move {
             loop {
                 {
                     let rt = runtime.lock().await;
+                    // Entrega at-least-once asíncrona del outbox a sus listeners (+ listener-host
+                    // de host.notify para los eventos `*.reminder.due`).
                     if let Err(e) = rt.process_outbox().await {
                         eprintln!("relay outbox: {e}");
                     }
+                    // Scheduled tasks vencidas → execute_command del propio módulo (sin usuario).
+                    if let Err(e) = rt.process_scheduler(&hub_id).await {
+                        eprintln!("scheduler: {e}");
+                    }
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-            }
-        });
-    }
-
-    // Relay de sync (ADR-0031, **primer borrador**): tick periódico local↔Aurora cuando hay
-    // Cloud DB configurada (`HUB_CLOUD_DB_URL`). La **detección de conectividad** es el propio
-    // intento: si la conexión/sync falla ⇒ `online=false` + `last_error` y **backoff exponencial**
-    // (cada fallo dobla la espera hasta un techo; un ciclo OK vuelve a la cadencia base). El estado
-    // se publica en `sync_status` para la UI (`GET /api/sync/status`) y el lock del runtime se
-    // libera antes de dormir. Intervalo base configurable con `HUB_SYNC_INTERVAL_SECS` (def. 30s).
-    // BORRADOR (ADR-0031, columna humano): cadencia, techo/multiplicador del backoff y política de
-    // conectividad por afinar (marcados abajo).
-    if let Some(dsn) = state.config.cloud_db_url.clone() {
-        let runtime = state.runtime.clone();
-        let hub_id = state.config.hub_id.clone();
-        let status = state.sync_status.clone();
-        let base = std::env::var("HUB_SYNC_INTERVAL_SECS")
-            .ok()
-            .and_then(|s| s.parse::<u64>().ok())
-            .filter(|n| *n > 0)
-            .unwrap_or(30);
-        // BORRADOR (ADR-0031, columna humano): cadencia/backoff/conectividad por afinar. Techo del
-        // backoff = 10× la base (30s → 300s); cada fallo dobla la espera, un ciclo OK la resetea.
-        let max_backoff = base.saturating_mul(10).max(base);
-        tokio::spawn(async move {
-            use std::time::Duration;
-            // Backoff exponencial: la "detección offline" es el propio intento (connect/run_sync).
-            // Empieza en `base`; cada fallo dobla hasta `max_backoff`; un éxito vuelve a `base`.
-            let mut delay = base;
-            // Conexión inicial. NO se mantiene el lock del runtime durante la conexión de red.
-            let remote = loop {
-                match erplora_db::PgAdapter::connect(&dsn).await {
-                    Ok(a) => {
-                        delay = base;
-                        break a;
-                    }
-                    Err(e) => {
-                        if let Ok(mut s) = status.lock() {
-                            s.online = false;
-                            s.last_error = Some(e.to_string());
-                        }
-                        eprintln!("relay sync: sin conexión cloud ({e}); reintento en {delay}s");
-                        tokio::time::sleep(Duration::from_secs(delay)).await;
-                        // BORRADOR (ADR-0031, columna humano): política de backoff por afinar.
-                        delay = delay.saturating_mul(2).min(max_backoff);
-                    }
-                }
-            };
-            eprintln!("relay sync: conectado al Cloud DB; tick cada {base}s");
-            loop {
-                // El lock del runtime se libera al salir de este bloque, antes del sleep.
-                let result = {
-                    let rt = runtime.lock().await;
-                    rt.run_sync(&remote, &hub_id).await
-                };
-                match &result {
-                    Ok(r) => {
-                        delay = base; // reconectado / sync OK → vuelve a la cadencia base.
-                        if let Ok(mut s) = status.lock() {
-                            s.online = true;
-                            s.last_sync_epoch = Some(now_secs());
-                            s.last_pushed = r.pushed;
-                            s.last_pulled = r.pulled;
-                            s.last_error = None;
-                        }
-                        if r.pushed + r.pulled > 0 {
-                            eprintln!("relay sync: ↑{} ↓{}", r.pushed, r.pulled);
-                        }
-                    }
-                    Err(e) => {
-                        if let Ok(mut s) = status.lock() {
-                            s.online = false;
-                            s.last_error = Some(e.to_string());
-                        }
-                        eprintln!("relay sync: {e} (reintento en {delay}s)");
-                    }
-                }
-                tokio::time::sleep(Duration::from_secs(delay)).await;
-                // Si el ciclo falló, aumenta la espera para el siguiente intento (backoff).
-                // BORRADOR (ADR-0031, columna humano): política de backoff por afinar.
-                if result.is_err() {
-                    delay = delay.saturating_mul(2).min(max_backoff);
-                }
             }
         });
     }
@@ -287,11 +252,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules/:id/uninstall", post(uninstall_module))
         .route("/api/query", post(query))
         .route("/api/command", post(command))
-        .route("/api/sync", post(sync_now))
-        .route("/api/sync/status", get(sync_status))
         .route("/api/auth/pin", post(auth_pin))
         .route("/api/auth/set-pin", post(auth_set_pin))
         .route("/api/auth/cloud", post(auth_cloud))
+        .route("/api/auth/refresh", post(auth_refresh))
         .route("/api/auth/logout", post(auth_logout))
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
         .route("/ws", get(ws_upgrade))
@@ -573,6 +537,22 @@ fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     (status, Json(body)).into_response()
 }
 
+/// Respuesta para un fallo de **enrutado multi-tenant** (ADR-0005, hub#24):
+///  - `UnknownOrg` → `403`: el `hub_id` de la petición no pertenece a ninguna org conocida; es un
+///    intento de acceso cruzado o un hub no provisionado. **No** se cae a ninguna BD.
+///  - `PoolLimit` → `503`: back-pressure (techo de orgs por proceso alcanzado), reintenta luego.
+///  - `Connect`   → `502`: la Aurora de la org no responde (failover/credencial).
+fn tenant_rejected(e: tenant::TenantError) -> Response {
+    use tenant::TenantError as T;
+    let (status, code) = match &e {
+        T::UnknownOrg(_) => (StatusCode::FORBIDDEN, "unknown_org"),
+        T::PoolLimit(_) => (StatusCode::SERVICE_UNAVAILABLE, "pool_limit"),
+        T::Connect(_) => (StatusCode::BAD_GATEWAY, "org_db_unavailable"),
+    };
+    let body = json!({ "ok": false, "error": { "code": code, "message": e.to_string() } });
+    (status, Json(body)).into_response()
+}
+
 /// `401` uniforme para fallos de autenticación (modo Jwt: token ausente/ inválido).
 fn unauthorized(e: auth::AuthError) -> Response {
     (
@@ -635,7 +615,14 @@ async fn uninstall_module(State(st): State<AppState>, Path(id): Path<String>) ->
 }
 
 async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<QueryReq>) -> Response {
-    let rt = st.runtime.lock().await;
+    // Tier cloud compartido (ADR-0005): resuelve el runtime de la ORG dueña del `hub_id` de la
+    // petición (un pool por org). En single-tenant devuelve el runtime único. El rechazo cross-org
+    // (hub_id de org desconocida) ocurre aquí, ANTES de tocar ninguna BD.
+    let arc = match st.runtime_for(&auth::hub_id(&headers, &st.config.hub_id)).await {
+        Ok(rt) => rt,
+        Err(e) => return tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
     let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),
@@ -656,7 +643,12 @@ async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Q
 }
 
 async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<CommandReq>) -> Response {
-    let rt = st.runtime.lock().await;
+    // Mismo enrutado por org que `query` (ADR-0005): el `PgAdapter` de la org corre server-side.
+    let arc = match st.runtime_for(&auth::hub_id(&headers, &st.config.hub_id)).await {
+        Ok(rt) => rt,
+        Err(e) => return tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
     let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),
@@ -667,78 +659,51 @@ async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json
     }
 }
 
-/// `POST /api/sync` — dispara un ciclo de sync local↔cloud (ADR-0031, **primer borrador**).
-/// Auth hub-scoped (mismo gate que query/command). El DSN de Aurora lo inyecta el provisioning
-/// Cloud DB en `HUB_CLOUD_DB_URL`; ausente ⇒ tier local-only ⇒ sync deshabilitado.
-/// Columna del humano: el tick automático + detección de conectividad los decide/escribe el humano.
-async fn sync_now(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let rt = st.runtime.lock().await;
-    let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
-        Ok(c) => c,
-        Err(e) => return unauthorized(e),
-    };
-    // DSN del backend cloud (Aurora), ya resuelto en `HubConfig` desde `HUB_CLOUD_DB_URL`.
-    // Ausente ⇒ tier local-only ⇒ sync deshabilitado.
-    let dsn = match st.config.cloud_db_url.clone() {
-        Some(s) => s,
-        None => {
-            return Json(json!({ "ok": true, "data": { "pushed": 0, "pulled": 0, "disabled": true } }))
-                .into_response()
-        }
-    };
-    let remote = match erplora_db::PgAdapter::connect(&dsn).await {
-        Ok(a) => a,
-        Err(e) => {
-            return err_response(erplora_runtime::RuntimeError::Sync(format!(
-                "conexión cloud: {e}"
-            )))
-        }
-    };
-    match rt.run_sync(&remote, &ctx.hub_id).await {
-        Ok(r) => Json(json!({ "ok": true, "data": { "pushed": r.pushed, "pulled": r.pulled } }))
-            .into_response(),
-        Err(e) => err_response(e),
-    }
-}
-
-/// Epoch en segundos (para `last_sync_epoch`); 0 si el reloj está antes de 1970 (imposible).
-fn now_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
-/// `GET /api/sync/status` — estado del relay de sync para la UI (ADR-0031). Sin auth: solo expone
-/// conectividad y contadores, nada sensible. `configured:false` ⇒ tier local-only.
-async fn sync_status(State(st): State<AppState>) -> Response {
-    let s = st.sync_status.lock().ok().map(|g| g.clone()).unwrap_or_default();
-    Json(json!({ "ok": true, "data": {
-        "configured": s.configured,
-        "online": s.online,
-        "last_sync_epoch": s.last_sync_epoch,
-        "pushed": s.last_pushed,
-        "pulled": s.last_pulled,
-        "error": s.last_error,
-    } }))
-    .into_response()
-}
-
 #[derive(serde::Deserialize)]
 struct PinReq {
     name: String,
     pin: String,
+    /// Id estable del dispositivo (lo aporta el host: Tauri = id de máquina; web-PWA = id
+    /// persistido). Opcional: solo lo usa el gate de device-trust si está activo (hub#15, §2.9).
+    #[serde(default)]
+    device_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
 struct CloudLoginReq {
     #[serde(default)]
     name: Option<String>,
+    /// Id del dispositivo a marcar de confianza tras este login online (§2.9). Opcional.
+    #[serde(default)]
+    device_id: Option<String>,
 }
 
-/// Login local por **PIN** → abre sesión. Body `{name, pin}` → `{ok, token, user}` (401 si falla).
+/// Login local por **PIN** → abre sesión. Body `{name, pin, device_id?}` → `{ok, token, user}`
+/// (401 si falla). Si el **device-trust** está activo (`HUB_DEVICE_TRUST=enforce`) y el cliente
+/// manda `device_id`, se rechaza el PIN si el dispositivo no es de confianza (no hubo login online
+/// previo en él, §2.9).
 async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Response {
     let rt = st.runtime.lock().await;
+    // Gate de device-trust (opt-in): solo si está activo Y el cliente identifica el dispositivo.
+    if st.config.device_trust_enforce {
+        if let Some(device_id) = req.device_id.as_deref() {
+            match rt.is_device_trusted(device_id).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    return (
+                        StatusCode::FORBIDDEN,
+                        Json(json!({
+                            "ok": false,
+                            "error": "dispositivo no de confianza: inicia sesión online (cloud) primero",
+                            "code": "device_untrusted"
+                        })),
+                    )
+                        .into_response()
+                }
+                Err(e) => return err_response(e),
+            }
+        }
+    }
     match rt.verify_pin(&req.name, &req.pin).await {
         Ok(Some(user)) => mint_session(&rt, user).await,
         Ok(None) => (
@@ -783,13 +748,48 @@ async fn auth_cloud(
         }
     };
     let cloud_user_id = claims.user_id_str();
-    let name = body.and_then(|b| b.0.name).unwrap_or_else(|| format!("user:{cloud_user_id}"));
+    let body = body.map(|b| b.0);
+    let device_id = body.as_ref().and_then(|b| b.device_id.clone());
+    let name = body
+        .and_then(|b| b.name)
+        .unwrap_or_else(|| format!("user:{cloud_user_id}"));
     // Rol por defecto al provisionar un usuario cloud nuevo (bootstrap). Decisión de política —
     // configurable por entorno; ajustable luego por un admin del hub.
     let default_role = std::env::var("HUB_DEFAULT_ROLE").unwrap_or_else(|_| "admin".into());
     let rt = st.runtime.lock().await;
     match rt.get_or_link_cloud_user(&cloud_user_id, &name, &default_role).await {
-        Ok(user) => mint_session(&rt, user).await,
+        Ok(user) => {
+            // Device-trust (§2.9): este es un login ONLINE correcto → marca el dispositivo de
+            // confianza para habilitar luego el login local por PIN. Best-effort (no bloquea el
+            // login si falla el marcado).
+            if let Some(device_id) = device_id.as_deref() {
+                let _ = rt.trust_device(device_id, &name).await;
+            }
+            mint_session(&rt, user).await
+        }
+        Err(e) => err_response(e),
+    }
+}
+
+/// Refresca la sesión **local** del header `X-Hub-Session` (hub#15): rota el token opaco y extiende
+/// la expiración. → `{ok, token, user}` (401 si la sesión no es válida; el cliente debe re-loguear).
+///
+/// NOTA: este es el refresh de la **sesión server-side local** (token de `hub_session`), que es lo
+/// que gatea las peticiones al runtime. El refresh del **JWT cloud** de usuario es distinto y va
+/// contra el Cloud (`POST /api/v1/auth/refresh/`, `cloud_client::CloudClient::refresh`): lo dispara
+/// el interceptor del Hub al recibir un 401, fuera de este endpoint.
+/// TODO(humano): si se decide que el runtime también custodia/rota el JWT cloud (hoy lo lleva el
+/// navegador), añadir aquí un proxy a `CloudClient::refresh` + persistencia del refresh rotado.
+async fn auth_refresh(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(token) = auth::session_token(&headers) else {
+        return unauthorized(auth::AuthError::MissingSession);
+    };
+    let rt = st.runtime.lock().await;
+    match rt.refresh_session(&token, erplora_runtime::identity::DEFAULT_SESSION_TTL_SECS).await {
+        Ok(Some((new_token, user))) => {
+            Json(json!({ "ok": true, "token": new_token, "user": user })).into_response()
+        }
+        Ok(None) => unauthorized(auth::AuthError::Invalid("sesión inválida o caducada".into())),
         Err(e) => err_response(e),
     }
 }

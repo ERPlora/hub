@@ -76,6 +76,9 @@
              de Cloud (cloud/.../partials/sidebar.html). -->
         <ion-footer class="ion-no-border sidebar-foot">
           <div class="sidebar-user">
+            <!-- TODO(#39): migrar a ok-avatar cuando exista (ERPlora/outfitkit). Hasta entonces,
+                 avatar de iniciales a mano (mismo cálculo en AppTopbar); el CSS NO se vuelve a
+                 duplicar (vive en dashboard-shell). -->
             <div class="sidebar-user-avatar">{{ initials }}</div>
             <div class="sidebar-user-meta nav-label">
               <div class="sidebar-user-name">{{ user?.name }}</div>

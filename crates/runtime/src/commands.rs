@@ -307,7 +307,6 @@ mod tests {
             handler: None,
             ai: None,
             schema: None,
-            offline: Default::default(),
         }
     }
 

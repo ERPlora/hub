@@ -70,6 +70,7 @@
         </ion-button>
 
         <!-- Avatar (iniciales) → perfil. -->
+        <!-- TODO(#39): migrar a ok-avatar cuando exista (ERPlora/outfitkit). -->
         <a
           class="topbar-avatar"
           :aria-label="t('topbar.profile')"

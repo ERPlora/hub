@@ -58,10 +58,12 @@ pub struct HubConfig {
     /// vive solo aquí (runtime), nunca en el navegador. `None` en dev/local sin enrolar → se cae al
     /// JWT del usuario activo. Ver ARQUITECTURA.md §2.3.
     pub cloud_api_token: Option<String>,
-    /// DSN del backend **remoto** de sync (Aurora por-org, vía RDS Proxy + NLB — ADR-0030/0031).
-    /// Lo inyecta el provisioning Cloud DB como env `HUB_CLOUD_DB_URL`. `None` ⇒ tier local-only:
-    /// `POST /api/sync` responde `disabled:true` sin error. Es un **secreto** (vive solo aquí).
-    pub cloud_db_url: Option<String>,
+    /// **Device-trust** del login por PIN (§2.9, hub#15). Si está activo (`HUB_DEVICE_TRUST=enforce`)
+    /// y el cliente manda `device_id`, el login por PIN se rechaza salvo que el dispositivo haya sido
+    /// marcado de confianza (tras un login online cloud previo). Por defecto **desactivado** para no
+    /// romper dev/local: un cliente que no manda `device_id` nunca se ve afectado.
+    /// TODO(humano): el host (Tauri/web) debe aportar un `device_id` estable; cerrar el diseño en §2.9.
+    pub device_trust_enforce: bool,
 }
 
 /// UUID fijo de desarrollo si no se inyecta `HUB_ID` (decisión tomada — flag para humano).
@@ -85,9 +87,8 @@ impl HubConfig {
         // Token de máquina (ECS lo inyecta como `HUB_CLOUD_API_TOKEN`; Tauri lo setea tras enrolar).
         let cloud_api_token =
             std::env::var("HUB_CLOUD_API_TOKEN").ok().filter(|s| !s.trim().is_empty());
-        // DSN del remoto de sync (Cloud DB lo inyecta tras provisionar). Ausente = local-only.
-        let cloud_db_url =
-            std::env::var("HUB_CLOUD_DB_URL").ok().filter(|s| !s.trim().is_empty());
+        let device_trust_enforce =
+            matches!(std::env::var("HUB_DEVICE_TRUST").as_deref(), Ok("enforce"));
         Self {
             hub_id,
             cloud_base_url,
@@ -95,7 +96,7 @@ impl HubConfig {
             auth_mode,
             jwt_public_key,
             cloud_api_token,
-            cloud_db_url,
+            device_trust_enforce,
         }
     }
 }
@@ -105,29 +106,17 @@ impl HubConfig {
 /// app** (`auth::machine_auth` la lee en cada petición). En ECS basta el valor inicial del env.
 pub type MachineToken = Arc<RwLock<Option<String>>>;
 
-/// Estado del relay de sync (ADR-0031) para exponerlo a la UI. Lo actualiza el relay en cada
-/// ciclo; lo lee `GET /api/sync/status`. **Primer borrador** (columna humano: enriquecer con
-/// nº de pendientes, próximo tick, etc.).
-#[derive(Clone, Default)]
-pub struct SyncStatus {
-    /// ¿Hay Cloud DB configurada? (`HUB_CLOUD_DB_URL`). `false` ⇒ tier local-only.
-    pub configured: bool,
-    /// ¿El último intento de sync conectó con el cloud?
-    pub online: bool,
-    /// Epoch (segundos) del último sync con éxito.
-    pub last_sync_epoch: Option<u64>,
-    /// Filas movidas en el último ciclo.
-    pub last_pushed: u64,
-    pub last_pulled: u64,
-    /// Último error (si lo hubo).
-    pub last_error: Option<String>,
-}
-
-/// Celda compartida del estado de sync (relay escribe, endpoint lee).
-pub type SharedSyncStatus = Arc<std::sync::Mutex<SyncStatus>>;
-
 /// Estado de la app Axum. El runtime no es `Sync` para mutación, así que va tras un `Mutex`;
 /// para 1–30 usuarios por hub (ARQUITECTURA.md §7.5) es más que suficiente.
+///
+/// **Dos modos de topología** (ADR-0005):
+///  - **single-tenant (N=1)** — `tenants = None`: hay UN runtime (`runtime`), el del hub/org del
+///    despliegue. Es el modo actual (un contenedor ECS por hub, o local Tauri). Todas las
+///    peticiones usan ese runtime. **Comportamiento sin cambios.**
+///  - **cloud compartido (N orgs)** — `tenants = Some(router)`: el proceso sirve **N** orgs; el
+///    runtime de cada petición se resuelve por su `hub_id` vía el [`TenantRouter`] (un pool por
+///    org). El campo `runtime` sigue existiendo como **fallback/bootstrap** (tablas de sistema,
+///    arranque), pero el camino de datos va por el router. Ver [`AppState::runtime_for`].
 #[derive(Clone)]
 pub struct AppState {
     pub runtime: Arc<Mutex<Runtime>>,
@@ -138,8 +127,9 @@ pub struct AppState {
     pub machine_token: MachineToken,
     /// Cliente HTTP async (rustls) compartido para hablar con el Cloud (descargas + proxy SSE).
     pub http: reqwest::Client,
-    /// Estado del relay de sync (ADR-0031), expuesto a la UI por `GET /api/sync/status`.
-    pub sync_status: SharedSyncStatus,
+    /// Gateway multi-tenant (ADR-0005, hub#24). `None` = modo single-tenant actual (N=1); `Some` =
+    /// tier "cloud compartido" (N orgs, un pool por org). Aditivo: no rompe el modo single-tenant.
+    pub tenants: Option<Arc<crate::tenant::TenantRouter>>,
 }
 
 impl AppState {
@@ -161,17 +151,40 @@ impl AppState {
         let (tx, _rx) = broadcast::channel::<WsEvent>(256);
         let sink = Arc::new(BroadcastSink { tx: tx.clone() });
         runtime.set_event_sink(sink);
-        let sync_status = Arc::new(std::sync::Mutex::new(SyncStatus {
-            configured: config.cloud_db_url.is_some(),
-            ..Default::default()
-        }));
         Self {
             runtime: Arc::new(Mutex::new(runtime)),
             events: tx,
             config,
             machine_token,
             http: reqwest::Client::new(),
-            sync_status,
+            tenants: None,
+        }
+    }
+
+    /// Activa el modo **cloud compartido** (ADR-0005): adjunta el gateway multi-tenant. A partir de
+    /// aquí, [`runtime_for`](Self::runtime_for) resuelve el runtime por org. Aditivo: el `runtime`
+    /// single-tenant sigue ahí como fallback de bootstrap.
+    pub fn with_tenants(mut self, router: Arc<crate::tenant::TenantRouter>) -> Self {
+        self.tenants = Some(router);
+        self
+    }
+
+    /// Resuelve el [`Runtime`] a usar para esta petición:
+    ///  - **single-tenant** (`tenants = None`): siempre el `runtime` del despliegue (modo actual).
+    ///  - **cloud compartido** (`tenants = Some`): el runtime de la org dueña del `hub_id` de la
+    ///    petición, vía el [`TenantRouter`]. Si el `hub_id` no mapea a ninguna org, **se rechaza**
+    ///    (`TenantError::UnknownOrg`) — un token de la org A no puede resolver el pool de la B.
+    ///
+    /// El `hub_id` viene de la auth ya existente (`X-Hub-Id` inyectado por el despliegue, no
+    /// spoofable; ver `auth.rs`). La autoridad sigue **server-side**: el gate de permisos + el
+    /// scoping `hub_id` los aplica el `Runtime` resuelto en `execute_query`/`execute_command`.
+    pub async fn runtime_for(
+        &self,
+        hub_id: &str,
+    ) -> Result<Arc<Mutex<Runtime>>, crate::tenant::TenantError> {
+        match &self.tenants {
+            Some(router) => router.resolve_runtime(hub_id).await,
+            None => Ok(self.runtime.clone()),
         }
     }
 

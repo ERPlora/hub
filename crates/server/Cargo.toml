@@ -8,8 +8,6 @@ license.workspace = true
 [dependencies]
 erplora-runtime = { path = "../runtime" }
 erplora-db = { path = "../db" }
-# Tipo `SyncReport` del endpoint /api/sync (ADR-0031).
-erplora-datasync = { path = "../datasync" }
 # Plugin nativo first-party (ADR-0009): motor fiscal VeriFactu horneado en el runtime.
 erplora-verifactu = { path = "../verifactu" }
 # Cliente del Cloud Portal: construye las peticiones (versions/ download/ mark_installed/ +

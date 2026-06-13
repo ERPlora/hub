@@ -26,39 +26,78 @@ pub struct Manifest {
     pub commands: HashMap<String, CommandDef>,
     #[serde(default)]
     pub events: Events,
-    /// Tablas sincronizables local↔cloud (ADR-0031). Vacío = el módulo no sincroniza.
-    #[serde(default)]
-    pub sync: Vec<SyncTableDef>,
     /// Resumen del módulo para el routing del asistente (nivel 1). ARQUITECTURA.md §9.2b.
     #[serde(default)]
     pub agent: Option<Agent>,
     /// Conocimiento del módulo para RAG (§9.4) — aparcado/en diseño. Se captura tal cual.
     #[serde(default)]
     pub ai_context: Option<serde_json::Value>,
+    /// Tareas programadas del módulo (ADR-0011). Cada una ejecuta un command del **propio
+    /// módulo** cuando vence su `cron`, sin usuario (contexto de sistema). Se vuelcan a la tabla
+    /// de sistema `_scheduled_tasks` al instalar (idempotente). Ver `scheduler.rs`.
+    #[serde(default)]
+    pub scheduled_tasks: Vec<ScheduledTaskDef>,
+    /// Capacidad `host.notify` de alto nivel (ADR-0012): qué canales de notificación
+    /// (`email`/`sms`/`whatsapp`) declara necesitar el módulo. El host resuelve DÓNDE viven
+    /// los secretos/cuota por canal y por `tier`; el módulo solo declara qué canal usa.
+    #[serde(default)]
+    pub notify: Option<NotifyCapability>,
+    /// Capacidad `http.fetch` mediada (ADR-0012, campo `network` ya en el schema): allowlist de
+    /// hosts y secretos que el host inyecta. El WASM no tiene red; el runtime hace la llamada.
+    #[serde(default)]
+    pub network: Option<NetworkCapability>,
 }
 
-/// Una tabla declarada como sincronizable (bloque `sync` del manifest, ADR-0031). Espejo del
-/// JSON Schema. El runtime la convierte en `erplora_datasync::SyncTable`.
+/// Una tarea programada declarada en el manifest (ADR-0011). Espejo de `$defs/scheduledTask`
+/// en `schemas/module.schema.json`. El `command` debe pertenecer al **propio módulo** (mismo
+/// aislamiento que el handler WASM); se valida al volcar la tarea a `_scheduled_tasks`.
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct SyncTableDef {
-    /// Nombre de la tabla (debe existir en ambos lados; lo crean las migraciones).
-    pub table: String,
-    /// Columnas que forman el conflict-target del UPSERT (la PK lógica).
-    pub pk: Vec<String>,
-    /// Si lleva `hub_id`, se filtra por hub en push/pull (tenancy, §2.5). Por defecto `true`.
-    #[serde(default = "default_hub_scoped")]
-    pub hub_scoped: bool,
-    /// Columna de versión para LWW (ISO-8601 TEXT). Por defecto `updated_at`.
-    #[serde(default = "default_updated_at")]
-    pub updated_at: String,
+pub struct ScheduledTaskDef {
+    /// Nombre único de la tarea **dentro del módulo** (clave de idempotencia con `module_id`).
+    pub name: String,
+    /// Command del propio módulo a ejecutar al vencer el cron (sin usuario).
+    pub command: String,
+    /// Expresión cron de 5 campos (`min hora dom mes dow`) o atajo (`@daily`, `@hourly`…).
+    /// Ver `scheduler::cron` para la gramática soportada.
+    pub cron: String,
+    /// Payload fijo que recibe el command en cada ejecución (opcional).
+    #[serde(default)]
+    pub payload: Option<serde_json::Value>,
+    /// Comportamiento de catch-up tras un apagado (ADR-0011): `collapse` (por defecto) ejecuta
+    /// **una sola vez** el backlog al arrancar; `skip` no ejecuta nada vencido durante el apagado
+    /// y solo reprograma. (No hay modo "run-all": el ADR fija collapse para tareas idempotentes.)
+    #[serde(default)]
+    pub catch_up: CatchUp,
 }
 
-fn default_hub_scoped() -> bool {
-    true
+/// Política de catch-up de una scheduled task tras un periodo apagado (ADR-0011).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CatchUp {
+    /// Ejecuta una sola vez si había backlog vencido (idempotente). Por defecto.
+    #[default]
+    Collapse,
+    /// No ejecuta el backlog; solo reprograma al siguiente vencimiento.
+    Skip,
 }
 
-fn default_updated_at() -> String {
-    "updated_at".to_string()
+/// Bloque `notify` del manifest (ADR-0012): los canales de alto nivel que usa el módulo.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NotifyCapability {
+    /// Canales declarados (`email`/`sms`/`whatsapp`).
+    #[serde(default)]
+    pub channels: Vec<String>,
+}
+
+/// Bloque `network` del manifest (ADR-0012, §5.5): allowlist de `http.fetch` mediado.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NetworkCapability {
+    /// Hosts/patrones permitidos para las llamadas salientes mediadas por el host.
+    #[serde(default)]
+    pub allow: Vec<String>,
+    /// Nombres de secretos del hub que el host inyecta en las llamadas (no su valor).
+    #[serde(default)]
+    pub secrets: Vec<String>,
 }
 
 /// Bloque `agent` del manifest: descripción del módulo (en inglés) para el routing del
@@ -200,24 +239,6 @@ pub struct CommandDef {
     /// schema se heredan del propio command, no se redeclaran. ARQUITECTURA.md §9.2.
     #[serde(default)]
     pub ai: Option<AiTool>,
-    /// **BORRADOR (Worker D, sin enforcement).** Política offline del comando — ver
-    /// `architecture/hub/sync-hard-cases.md`. Solo se DECLARA aquí; el runtime **no la aplica
-    /// todavía** (el mecanismo lo decide el humano: ledger de stock / decremento server-autoritativo).
-    /// `queue` (por defecto) = append que se encola y sincroniza al volver la red; `forbid` =
-    /// online-only (fiscal/VeriFactu, decrementos de stock críticos).
-    #[serde(default)]
-    pub offline: OfflinePolicy,
-}
-
-/// **BORRADOR (Worker D).** Política offline declarada por comando. Sin enforcement hoy.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum OfflinePolicy {
-    /// Se permite offline: se encola y sincroniza al recuperar la red (append). Por defecto.
-    #[default]
-    Queue,
-    /// No se permite offline: el comando exige red (fiscal/VeriFactu, stock crítico).
-    Forbid,
 }
 
 /// Referencia al handler de un command. ARQUITECTURA.md §5.3, §9.2.

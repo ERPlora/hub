@@ -15,6 +15,8 @@ use serde_json::Value as Json;
 pub mod commands;
 pub mod errors;
 pub mod events;
+pub mod host_backup;
+pub mod host_notify;
 pub mod identity;
 pub mod installer;
 pub mod loader;
@@ -25,6 +27,8 @@ pub mod outbox;
 pub mod permissions;
 pub mod queries;
 pub mod registry;
+pub mod scheduler;
+pub mod system_migrations;
 pub mod ui;
 pub mod wasm;
 
@@ -41,20 +45,48 @@ pub struct ModuleInfo {
     pub status: ModuleStatus,
 }
 
+/// `hub_id` de desarrollo por defecto (mismo UUID fijo que `crates/server::DEV_HUB_ID`). El host
+/// real (server/Tauri) sobreescribe con el del despliegue vía [`Runtime::with_hub_id`].
+pub const DEV_HUB_ID: &str = "00000000-0000-0000-0000-000000000001";
+
 /// El runtime: une el adaptador de BD con el registro de módulos y ejecuta queries/commands.
 pub struct Runtime {
     db: Box<dyn DatabaseAdapter>,
     registry: Registry,
+    /// `hub_id` del despliegue (§2.5). Scoping del estado de módulos (`hub_module`) y de las
+    /// migraciones de sistema. Lo inyecta el host; en tests por defecto = [`DEV_HUB_ID`].
+    hub_id: String,
 }
 
 impl Runtime {
     pub fn new(db: Box<dyn DatabaseAdapter>) -> Self {
-        Self { db, registry: Registry::new() }
+        Self { db, registry: Registry::new(), hub_id: DEV_HUB_ID.to_string() }
+    }
+
+    /// Igual que [`Runtime::new`] pero fijando el `hub_id` del despliegue (lo usa el host real;
+    /// el `hub_id` viene de `HubConfig.hub_id`, inyectado por el despliegue y no spoofable).
+    pub fn with_hub_id(db: Box<dyn DatabaseAdapter>, hub_id: impl Into<String>) -> Self {
+        Self { db, registry: Registry::new(), hub_id: hub_id.into() }
+    }
+
+    /// `hub_id` del despliegue de este runtime.
+    pub fn hub_id(&self) -> &str {
+        &self.hub_id
+    }
+
+    /// Acceso al adaptador de BD subyacente. Pensado para que el **gateway multi-tenant**
+    /// (`erplora-server::tenant`, hub#24) y sus tests puedan verificar el **aislamiento entre
+    /// pools por org** a nivel de almacenamiento (cada org tiene su propio adaptador). En
+    /// producción el camino normal sigue siendo `execute_query`/`execute_command` (gate +
+    /// scoping `hub_id`); esto NO salta el gate, solo expone el adaptador ya scopeado por org.
+    #[doc(hidden)]
+    pub fn db_for_test(&self) -> &dyn DatabaseAdapter {
+        self.db.as_ref()
     }
 
     /// Instala un módulo ya extraído en `dir` (lee `module.json`, migra, registra, activa).
     pub async fn install_from_dir(&mut self, dir: &Path) -> Result<String> {
-        installer::install(self.db.as_ref(), &mut self.registry, dir).await
+        installer::install(self.db.as_ref(), &mut self.registry, &self.hub_id, dir).await
     }
 
     /// Instala todos los módulos de las subcarpetas de `root` (las que tienen `module.json`),
@@ -79,11 +111,17 @@ impl Runtime {
                 Err(e) => eprintln!("✗ módulo {}: {e}", path.display()),
             }
         }
-        // 2) Orden topológico por depends_on (un ciclo sí aborta: error de diseño del conjunto).
+        // 2) Estado persistido por hub ANTES de instalar (hub#31): `install` reactiva todo al
+        // re-registrar desde disco, así que capturamos aquí el activo/inactivo previo **de este
+        // hub** (filtrado por `hub_id`; en BD compartida no toma el estado de otro hub) para
+        // reponerlo tras instalar. Lo leemos antes porque el upsert de `install` lo sobreescribiría.
+        let persisted = installer::installed_status(self.db.as_ref(), &self.hub_id).await?;
+
+        // 3) Orden topológico por depends_on (un ciclo sí aborta: error de diseño del conjunto).
         let pairs: Vec<(String, Vec<String>)> =
             found.iter().map(|(_, m)| (m.id.clone(), m.depends_on.clone())).collect();
         let order = installer::install_order(&pairs)?;
-        // 3) Instala en orden; un módulo que falle se omite (log) sin tumbar a los demás.
+        // 4) Instala en orden; un módulo que falle se omite (log) sin tumbar a los demás.
         let mut installed = Vec::with_capacity(order.len());
         for i in order {
             match self.install_from_dir(&found[i].0).await {
@@ -94,22 +132,31 @@ impl Runtime {
                 Err(e) => eprintln!("✗ módulo {}: {e}", found[i].0.display()),
             }
         }
+
+        // 5) Repón el estado inactivo previo de este hub sobre el registro recién reconstruido y
+        // persístelo (el upsert del install lo había dejado `active`). Solo módulos presentes en
+        // disco; un estado huérfano de un módulo ya borrado se ignora.
+        for (id, status) in persisted {
+            if status == ModuleStatus::Inactive && self.registry.is_installed(&id) {
+                self.deactivate(&id).await?;
+            }
+        }
         Ok(installed)
     }
 
     /// Activa un módulo instalado (sus capacidades vuelven a estar disponibles).
     pub async fn activate(&mut self, module_id: &str) -> Result<()> {
-        installer::set_status(self.db.as_ref(), &mut self.registry, module_id, ModuleStatus::Active).await
+        installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id, ModuleStatus::Active).await
     }
 
     /// Desactiva un módulo instalado (oculta su menú y bloquea sus queries/commands).
     pub async fn deactivate(&mut self, module_id: &str) -> Result<()> {
-        installer::set_status(self.db.as_ref(), &mut self.registry, module_id, ModuleStatus::Inactive).await
+        installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id, ModuleStatus::Inactive).await
     }
 
     /// Desinstala un módulo (quita sus capacidades; no borra sus datos).
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
-        installer::uninstall(self.db.as_ref(), &mut self.registry, module_id).await
+        installer::uninstall(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id).await
     }
 
     /// Lista de módulos instalados con su estado (para el dashboard / `/api/modules`).
@@ -129,6 +176,27 @@ impl Runtime {
     /// Registra un observador de eventos (el server lo usa para reenviar por WS).
     pub fn set_event_sink(&mut self, sink: Arc<dyn EventSink>) {
         self.registry.event_sink = Some(sink);
+    }
+
+    /// Registra el **transporte de `host.notify`** (ADR-0012): el cliente real de email/sms/
+    /// whatsapp. Lo pone el host (server/Tauri) al arrancar. Sin él, los eventos `*.reminder.due`
+    /// se entregan a sus listeners de módulo pero el envío externo es no-op.
+    pub fn set_notify_transport(&mut self, transport: Arc<dyn host_notify::NotifyTransport>) {
+        self.registry.notify_transport = Some(transport);
+    }
+
+    /// Registra el **transporte de `host.backup_upload`** (ADR-0040): el cliente real que empaqueta
+    /// el dump del SQLite, lo cifra en cliente, pide la credencial STS/presignada al Cloud y sube el
+    /// blob a S3. Lo pone el host (server/Tauri) al arrancar. Sin él, los eventos `backup.requested`
+    /// se entregan a sus listeners de módulo pero la subida es no-op (capacidad no disponible).
+    pub fn set_backup_transport(&mut self, transport: Arc<dyn host_backup::BackupTransport>) {
+        self.registry.backup_transport = Some(transport);
+    }
+
+    /// Marca un módulo como **WhatsApp premium de ERPlora** (su canal WhatsApp sale por el proxy
+    /// de Cloud con `check_quota`, ADR-0006/ADR-0012). El `tier` vive en Cloud; el host lo siembra.
+    pub fn mark_premium_whatsapp(&mut self, module_id: &str) {
+        self.registry.premium_whatsapp_modules.insert(module_id.to_string());
     }
 
     /// Registra un **plugin nativo first-party** (ADR-0009) para `module_id`. Los commands
@@ -168,11 +236,24 @@ impl Runtime {
         commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx).await
     }
 
-    /// Crea las tablas de sistema del runtime (outbox de eventos + identidad de usuarios/sesiones).
-    /// Idempotente; el server la llama al arrancar para cubrir el caso de hub vacío (sin módulos).
+    /// Asegura + migra el **esquema de sistema** del runtime (hub#37). Dos fases:
+    ///  1. **ensure baseline (v0):** los `CREATE TABLE IF NOT EXISTS` de las tablas de sistema
+    ///     (`hub_module`, outbox `_event_outbox`/`_event_delivery`, scheduler `_scheduled_tasks`,
+    ///     identidad `hub_user`/`hub_session`). Cubre el hub vacío (BD nueva sin módulos).
+    ///  2. **migrate (≥ v1):** aplica en orden las migraciones de sistema versionadas que aún no
+    ///     estén registradas en `_hub_system_migrations`, **scoped por el `hub_id` del despliegue**.
+    ///     Así un cambio de esquema de sistema llega también a un `erplora.db` ya existente (un
+    ///     `CREATE IF NOT EXISTS` no altera tablas previas — ver `system_migrations.rs`).
+    ///
+    /// Idempotente: re-arrancar no reaplica. El server la llama al arrancar.
     pub async fn ensure_system_tables(&self) -> Result<()> {
+        // 1) Baseline v0 (idempotente).
+        installer::ensure_hub_module_table(self.db.as_ref()).await?;
         outbox::ensure_tables(self.db.as_ref()).await?;
-        identity::ensure_tables(self.db.as_ref()).await
+        scheduler::ensure_tables(self.db.as_ref()).await?;
+        identity::ensure_tables(self.db.as_ref()).await?;
+        // 2) Migraciones de sistema versionadas (≥ v1), scoped por hub_id del despliegue.
+        system_migrations::apply(self.db.as_ref(), &self.hub_id).await
     }
 
     // ── Identidad local (usuarios/PIN/sesiones; §2.9). La autoridad de permisos es local. ──
@@ -212,6 +293,27 @@ impl Runtime {
         identity::delete_session(self.db.as_ref(), token).await
     }
 
+    /// Refresca la sesión local: rota el token opaco y extiende la expiración. `(nuevo_token, user)`
+    /// o `None` si la sesión no es válida (hub#15).
+    pub async fn refresh_session(&self, token: &str, ttl_secs: i64) -> Result<Option<(String, identity::HubUser)>> {
+        identity::refresh_session(self.db.as_ref(), token, ttl_secs).await
+    }
+
+    /// Marca un dispositivo como de confianza (tras el primer login online). Idempotente (§2.9).
+    pub async fn trust_device(&self, device_id: &str, label: &str) -> Result<()> {
+        identity::trust_device(self.db.as_ref(), device_id, label).await
+    }
+
+    /// `true` si el dispositivo es de confianza (gate del login por PIN, §2.9).
+    pub async fn is_device_trusted(&self, device_id: &str) -> Result<bool> {
+        identity::is_device_trusted(self.db.as_ref(), device_id).await
+    }
+
+    /// Revoca la confianza de un dispositivo (perdido/robado). Idempotente (§2.9).
+    pub async fn untrust_device(&self, device_id: &str) -> Result<()> {
+        identity::untrust_device(self.db.as_ref(), device_id).await
+    }
+
     /// Permisos efectivos del `role` (unión de `role_permissions` de los módulos activos).
     pub fn permissions_for_role(&self, role: &str) -> std::collections::HashSet<String> {
         identity::permissions_for_role(&self.registry, role)
@@ -228,6 +330,19 @@ impl Runtime {
         outbox::drain(self.db.as_ref(), &self.registry).await
     }
 
+    /// Un ciclo del barrido del **scheduler** (ADR-0011): ejecuta las scheduled tasks vencidas de
+    /// los módulos activos. Lo llama el bucle de background del server (junto al relay del outbox).
+    /// Devuelve cuántas tareas corrió. `hub_id` es el del despliegue (contexto de sistema).
+    pub async fn process_scheduler(&self, hub_id: &str) -> Result<usize> {
+        scheduler::process_once(self.db.as_ref(), &self.registry, hub_id).await
+    }
+
+    /// Catch-up del scheduler al **arrancar** (Tauri/local): ejecuta una sola vez las tareas con
+    /// backlog vencido (collapse) y reprograma las demás. Lo llama el host una vez al arrancar.
+    pub async fn scheduler_catch_up(&self, hub_id: &str) -> Result<usize> {
+        scheduler::catch_up_on_boot(self.db.as_ref(), &self.registry, hub_id).await
+    }
+
     /// Menú dinámico de los módulos **activos** (lo consume el shell). ARQUITECTURA.md §7.7.
     pub fn navigation(&self) -> Vec<NavEntry> {
         self.registry.active_navigation().into_iter().cloned().collect()
@@ -236,34 +351,6 @@ impl Runtime {
     /// Acceso de solo lectura al registro (introspección / tests).
     pub fn registry(&self) -> &Registry {
         &self.registry
-    }
-
-    /// Ejecuta un ciclo de sync local↔cloud (ADR-0031, **primer borrador**). Reúne las tablas
-    /// sincronizables de los módulos activos, las convierte en `SyncTable` y delega en el motor
-    /// genérico (`erplora-datasync`). `remote` es el backend cloud (Aurora) que aporta el host
-    /// (server) desde `HUB_CLOUD_DB_URL`; el local (SQLite) es la autoridad. Columna del humano:
-    /// el schedule / detección de conectividad / origen del DSN per-tier los decide el humano.
-    pub async fn run_sync(
-        &self,
-        remote: &dyn DatabaseAdapter,
-        hub_id: &str,
-    ) -> Result<erplora_datasync::SyncReport> {
-        let tables: Vec<erplora_datasync::SyncTable> = self
-            .registry
-            .active_sync_tables()
-            .iter()
-            .map(|d| {
-                let pk: Vec<&str> = d.pk.iter().map(String::as_str).collect();
-                let mut t = erplora_datasync::SyncTable::new(&d.table, &pk);
-                t.hub_scoped = d.hub_scoped;
-                t.updated_at = d.updated_at.clone();
-                t
-            })
-            .collect();
-        erplora_datasync::SyncEngine::new(self.db.as_ref(), remote, tables)
-            .sync(hub_id)
-            .await
-            .map_err(|e| crate::errors::RuntimeError::Sync(e.to_string()))
     }
 }
 
