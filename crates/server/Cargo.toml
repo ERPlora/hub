@@ -25,6 +25,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 tracing = "0.1"
+# Para implementar el trait async `BackupTransport` del runtime (transporte real de backup).
+async-trait = "0.1"
 # Cliente HTTP async (rustls): descarga de módulos + proxy SSE del asistente hacia el Cloud.
 # `rustls-tls-native-roots`: confía en el trust store del SO (como curl), no solo en los
 # `webpki-roots` empaquetados. Necesario tras proxies de inspección TLS corporativos (CA propia

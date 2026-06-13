@@ -29,6 +29,7 @@ use serde_json::{json, Map, Value};
 
 pub mod assistant;
 pub mod auth;
+pub mod backup;
 pub mod ingest;
 pub mod install;
 pub mod session;
@@ -92,8 +93,11 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     use erplora_db::SqliteAdapter;
     use erplora_runtime::Runtime;
 
+    // Path del SQLite del hub: fuente del dump de backup (`VACUUM INTO`); se captura antes de mover
+    // `cfg` al state.
+    let sqlite_path = cfg.sqlite_path.clone();
     // sqlx-style URL: `sqlite://<path>?mode=rwc` crea el fichero si falta.
-    let db = SqliteAdapter::connect(&format!("sqlite://{}?mode=rwc", cfg.sqlite_path)).await?;
+    let db = SqliteAdapter::connect(&format!("sqlite://{}?mode=rwc", sqlite_path)).await?;
     // El runtime se construye con el `hub_id` del despliegue (config, no spoofable): scope del
     // estado de módulos (`hub_module`) y de las migraciones de sistema (hub#31 / hub#37).
     let mut runtime = Runtime::with_hub_id(Box::new(db), cfg.hub.hub_id.clone());
@@ -143,17 +147,31 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         .await
         .set_notify_transport(std::sync::Arc::new(erplora_runtime::host_notify::MockTransport::new()));
 
-    // Transporte de `host.backup_upload` (ADR-0040, opción B): dump del SQLite + STREAM al Cloud,
-    // que lo guarda en S3 con cifrado de SERVIDOR (SSE). El hub NO cifra ni habla con S3. Hoy un
-    // MOCK ("streamea" en memoria un dump sintético) — pasa por el Outbox como cualquier transporte,
-    // así que el flujo create→requested→subida queda real. TODO: sustituir por el transporte real
-    // (CloudClient::backup_upload + POST stream del dump) + la fuente del dump del SQLite
-    // (columna humano; ver crates/runtime/host_backup.rs).
-    state
-        .runtime
-        .lock()
-        .await
-        .set_backup_transport(std::sync::Arc::new(erplora_runtime::host_backup::MockTransport::new()));
+    // Transporte de `host.backup_upload` (ADR-0040/0042, opción B): dump consistente del SQLite
+    // (`VACUUM INTO`) + STREAM `POST` al Cloud, que lo guarda en S3 con cifrado de SERVIDOR (SSE).
+    // El hub NO cifra ni habla con S3. Si el hub está **enrolado** (hay token de máquina) se registra
+    // el transporte REAL (`backup::CloudBackupTransport`); si no, el MOCK (que "streamea" un dump
+    // sintético) para que la mecánica Outbox (reintentos/dead-letter) siga real en dev/sin Cloud.
+    {
+        let real = backup::build_transport(
+            sqlite_path.clone(),
+            &state.config.cloud_base_url,
+            state.config.hub_id.clone(),
+            state.machine_token.clone(),
+            state.http.clone(),
+        );
+        let transport: std::sync::Arc<dyn erplora_runtime::host_backup::BackupTransport> = match real {
+            Some(t) => {
+                eprintln!("backup: transporte real (dump + stream al Cloud) activo");
+                t
+            }
+            None => {
+                eprintln!("backup: hub sin enrolar → transporte MOCK (no sube al Cloud)");
+                std::sync::Arc::new(erplora_runtime::host_backup::MockTransport::new())
+            }
+        };
+        state.runtime.lock().await.set_backup_transport(transport);
+    }
 
     // Catch-up del scheduler al arrancar (ADR-0011): un hub que estuvo apagado ejecuta UNA sola
     // vez las tareas con backlog vencido (collapse) y reprograma el resto. Se hace antes del loop.

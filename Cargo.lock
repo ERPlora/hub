@@ -1821,6 +1821,7 @@ dependencies = [
 name = "erplora-server"
 version = "0.0.0"
 dependencies = [
+ "async-trait",
  "axum",
  "erplora-cloud-client",
  "erplora-db",

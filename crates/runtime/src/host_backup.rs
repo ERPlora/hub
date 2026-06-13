@@ -148,24 +148,23 @@ impl BackupTransport for MockTransport {
     }
 }
 
-// ── TODO (columna del humano — otra capa) ────────────────────────────────────────────────────
-// 1) **Empaquetado del dump del SQLite (host, FS).** El runtime aún NO expone una API que lea el
-//    fichero `erplora.db` y produzca un dump consistente (VACUUM INTO / backup API de SQLite o un
-//    export lógico). El transporte real necesita ese blob para streamearlo. Mientras no exista, el
-//    MockTransport usa un dump sintético. Pieza de core → la escribe el humano.
-// 2) **Transporte real (opción B, stream al Cloud):** leer el dump (TODO 1) y `POST`-streamearlo a
-//    `erplora_cloud_client::CloudClient::backup_upload` (`POST /api/v1/hub/device/backup/`,
-//    `X-Hub-Token` + `X-Hub-Id`, body = dump en claro sobre TLS) con un cliente HTTP (reqwest ya
-//    está en el server). El Cloud aplica SSE y guarda en S3; su respuesta `{ s3_key, bytes }` se
-//    mapea a [`UploadOutcome`]. **Sin** presign/STS/AWS SDK en el dispositivo (ADR-0040). Decisión
-//    de dependencia del humano.
-// 3) **Restore (opción B, pull del Cloud):** la capacidad host consume `backup.restore_requested`,
-//    pide al Cloud el listado de copias (user-scoped) + descarga los bytes de la copia elegida
-//    (`erplora_cloud_client::CloudClient::backup_list` / `backup_download`; el Cloud sirve los bytes
-//    ya descifrados, SSE es transparente) → reemplaza el SQLite local → reinicia. Al re-arrancar, el
-//    hub re-descarga los módulos de la BD restaurada y reconstruye todo. Capacidad de core → humano.
-// 4) **Endpoints Django del Cloud** (stream/upload + list/download para restore): contrato fijado en
-//    `crates/cloud-client`; la implementación Cloud la escribe el humano.
+// ── Estado de implementación (opción B) ───────────────────────────────────────────────────────
+// 1) **Empaquetado del dump del SQLite (host, FS).** HECHO: `erplora_db::backup::vacuum_into`
+//    (`VACUUM INTO`) produce un snapshot consistente sin parar el hub; `verify_sqlite_file` valida
+//    el fichero. El `MockTransport` sigue para tests/dev sin Cloud.
+// 2) **Transporte real (opción B, stream al Cloud).** HECHO: `erplora_server::backup::CloudBackupTransport`
+//    lee el dump (TODO 1) y lo `POST`-streamea con `reqwest` a `CloudClient::backup_upload`
+//    (`POST /api/v1/hub/device/backup/`, `X-Hub-Token` + `X-Hub-Id`, en claro sobre TLS); el Cloud
+//    aplica SSE y guarda en S3, y su `{ s3_key, bytes }` se mapea a [`UploadOutcome`]. El server lo
+//    registra cuando el hub está enrolado (hay token de máquina); si no, el Mock.
+// 3) **Restore (opción B, pull del Cloud).** PARCIAL: `erplora_server::backup::restore_from_cloud`
+//    descarga la copia elegida (`CloudClient::backup_download`, user-JWT; SSE transparente), la
+//    escribe a un path destino y valida que es un SQLite íntegro. **TODO core/humano:** el
+//    **hot-swap** del fichero vivo + reinicio/relink del pool (delicado: el modelo seguro es cerrar
+//    el runtime, mover el fichero y reiniciar el proceso — backup.md §4). El listado user-scoped lo
+//    sirve `CloudClient::backup_list`.
+// 4) **Endpoints Django del Cloud** (upload + list/download): implementados en
+//    `cloud/apps/dashboard/hubs/main/` (rama de backup); contrato fijado en `crates/cloud-client`.
 
 #[cfg(test)]
 mod tests {

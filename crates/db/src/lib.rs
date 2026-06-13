@@ -14,6 +14,9 @@ use async_trait::async_trait;
 use serde_json::{Map, Value as Json};
 use sqlx::{Column, Row, TypeInfo, ValueRef};
 
+/// Dump consistente del SQLite local (`VACUUM INTO`) para el módulo `backup` (ADR-0040/0041).
+pub mod backup;
+
 use sqlx::postgres::{PgPool, PgRow};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
 
