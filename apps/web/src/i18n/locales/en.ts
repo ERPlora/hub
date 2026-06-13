@@ -24,6 +24,7 @@ export default {
   },
   sidebar: {
     profile: 'Profile',
+    installApp: 'Install app',
     reportProblem: 'Report a problem',
     signOut: 'Sign out',
   },

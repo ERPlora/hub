@@ -95,6 +95,17 @@
             </ion-button>
           </div>
           <div class="sidebar-foot-actions nav-label">
+            <!-- Botón «Instalar app» (PWA): solo cuando el navegador la ofrece (Chrome/Edge/
+                 Android) y aún no está instalada. lib/pwa.ts captura beforeinstallprompt. -->
+            <ion-button
+              v-if="canInstall"
+              fill="clear"
+              size="small"
+              :aria-label="t('sidebar.installApp')"
+              @click="onInstallApp"
+            >
+              <HubIcon slot="icon-only" name="download-outline" />
+            </ion-button>
             <ion-button
               fill="clear"
               size="small"
@@ -145,6 +156,7 @@ import { moduleNav, refreshModuleNav } from './lib/nav';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
 import { railCollapsed } from './lib/shell';
 import { PROFILE_ROUTE } from './lib/routes';
+import { canInstall, promptInstall } from './lib/pwa';
 
 interface NavItem { path: string; labelKey: string; icon: string }
 interface NavSection { titleKey: string; items: NavItem[] }
@@ -178,6 +190,11 @@ const appVersion = __APP_VERSION__;
 
 // Estado del modal de reporte de problemas (footer del sidebar).
 const bugReportOpen = ref<boolean>(false);
+
+// Botón «Instalar app» (PWA): dispara el prompt nativo del navegador (lib/pwa.ts).
+async function onInstallApp(): Promise<void> {
+  await promptInstall();
+}
 
 const isActive = (path: string): boolean =>
   route.path === path || route.path.startsWith(`${path}/`);

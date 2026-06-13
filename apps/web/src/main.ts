@@ -14,6 +14,7 @@ import { setOnSessionExpired } from './lib/cloud';
 import { logout } from './lib/session';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { bootTheme } from './lib/theme';
+import { bootPwa } from './lib/pwa';
 
 // Los componentes de OutfitKit (ok-data-table, etc.) usan ion-icon POR NOMBRE ('pencil', 'trash',
 // 'chevron-back'…). En @ionic/vue los iconos por nombre hay que registrarlos con addIcons (no se
@@ -50,6 +51,9 @@ import './theme/global.css';
 
 // Aplica el modo de tema guardado (claro/oscuro/system) antes del primer render.
 bootTheme();
+
+// Registra el service worker y engancha el botón «Instalar app» (PWA, ver lib/pwa.ts).
+bootPwa();
 
 const app = createApp(App).use(IonicVue).use(router).use(i18n);
 
