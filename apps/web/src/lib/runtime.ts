@@ -12,20 +12,43 @@
 //   - clientInjectionKey (provide/inject de Vue) para inyectar el cliente a las vistas
 //   - bootHubContext() — se llama una vez en main.ts; resuelve hub_id y lo guarda en config
 import type { InjectionKey } from 'vue';
+import { ref } from 'vue';
 import { ErploraClient, HttpWsTransport } from '@erplora/module-sdk';
 import { config } from './config';
 import { getAccessToken } from './cloud';
 import { getHubSession } from './session';
 
-/** Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL). */
+/**
+ * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
+ * Default: en PRODUCCIÓN (build) → "" = MISMO ORIGEN (el propio hub sirve este dist en el
+ * mismo host:puerto que /api y /ws). En DEV (`vite dev`) → http://127.0.0.1:8787 (proxy Vite).
+ * `VITE_RUNTIME_URL` sigue teniendo prioridad si se define.
+ */
 export const RUNTIME_URL: string =
-  (import.meta.env.VITE_RUNTIME_URL as string | undefined) ?? 'http://127.0.0.1:8787';
+  (import.meta.env.VITE_RUNTIME_URL as string | undefined) ||
+  (import.meta.env.PROD ? '' : 'http://127.0.0.1:8787');
+
+/** Usuario con PIN del hub (para el grid de login local). */
+export interface PinUser {
+  id: string;
+  name: string;
+  role: string;
+}
 
 /** Respuesta de `GET /api/hub/context` del runtime. */
 export interface HubContext {
   hub_id: string;
   user: unknown | null;
+  /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
+  pin_users?: PinUser[];
 }
+
+/**
+ * Usuarios-PIN del hub resueltos en el boot (`GET /api/hub/context`). El LoginPage los usa para
+ * mostrar el grid de PIN directamente cuando el hub ya tiene usuarios (p. ej. el demo: "Demo"),
+ * sin depender de un flag en localStorage. `[]` hasta que el boot responde.
+ */
+export const pinUsers = ref<PinUser[]>([]);
 
 let _client: ErploraClient | null = null;
 
@@ -128,6 +151,7 @@ export async function bootHubContext(): Promise<HubContext | null> {
     if (!res.ok) return null;
     const ctx = (await res.json()) as HubContext;
     if (ctx.hub_id) config.hubId = ctx.hub_id;
+    if (Array.isArray(ctx.pin_users)) pinUsers.value = ctx.pin_users;
     return ctx;
   } catch {
     return null;

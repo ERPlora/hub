@@ -278,7 +278,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonContent, IonCard, IonCardContent, IonButton, 
@@ -289,6 +289,7 @@ import HubIcon from '../components/HubIcon.vue';
 import { setUser, setHubSession, getHubSession } from '../lib/session';
 import { cloudLogin, setTokens, runtimeCloudSession, runtimePinLogin, runtimeSetPin } from '../lib/cloud';
 import { config } from '../lib/config';
+import { pinUsers } from '../lib/runtime';
 import { isDark, toggleTheme } from '../lib/theme';
 
 // ---------------------------------------------------------------------------
@@ -342,6 +343,25 @@ const trustedUsers = ref<TrustedUser[]>(readTrustedUsers());
 // ---------------------------------------------------------------------------
 const step = ref<Step>(trusted.value ? 'pin' : 'email');
 const showTabs = computed(() => trusted.value && step.value !== 'setup');
+
+// Si el RUNTIME reporta usuarios con PIN (`GET /api/hub/context` → pin_users), mostramos el grid
+// de PIN directamente — sin depender del flag local (que solo se rellenaba tras un login cloud
+// "confiar en este dispositivo"). Así cualquier hub con usuarios (p. ej. el demo: "Demo") presenta
+// el login local al llegar. El flujo de device-trust/seguridad (§2.9) NO cambia: solo se decide
+// qué pestaña se muestra; la pestaña Email sigue disponible. `immediate` cubre el caso ya resuelto.
+watch(
+  pinUsers,
+  (users) => {
+    if (!users.length || step.value === 'setup') return;
+    const merged = [...users.map((u) => ({ id: u.id, name: u.name, initials: initials(u.name) }))];
+    // Conserva los del localStorage que no estén ya en la lista del runtime (multi-cuenta).
+    for (const u of trustedUsers.value) if (!merged.some((m) => m.id === u.id)) merged.push(u);
+    trustedUsers.value = merged;
+    trusted.value = true;
+    step.value = 'pin';
+  },
+  { immediate: true },
+);
 
 // ---------------------------------------------------------------------------
 // EmailForm state

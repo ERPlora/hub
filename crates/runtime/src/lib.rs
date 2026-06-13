@@ -291,6 +291,11 @@ impl Runtime {
         identity::verify_pin(self.db.as_ref(), name, pin).await
     }
 
+    /// Usuarios activos del hub con PIN (para mostrar el grid de login local). `(id, name, role)`.
+    pub async fn list_pin_users(&self) -> Result<Vec<(String, String, String)>> {
+        identity::list_pin_users(self.db.as_ref()).await
+    }
+
     /// Resuelve (o provisiona) el `hub_user` vinculado a una identidad cloud (mapeo del JWT).
     pub async fn get_or_link_cloud_user(&self, cloud_user_id: &str, default_name: &str, default_role: &str) -> Result<identity::HubUser> {
         identity::get_or_link_cloud_user(self.db.as_ref(), cloud_user_id, default_name, default_role).await

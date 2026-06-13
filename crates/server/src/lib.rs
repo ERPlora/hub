@@ -343,9 +343,19 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
 }
 
 /// GET /api/hub/context — el `hub_id` inyectado por el despliegue (env `HUB_ID`) + el usuario
-/// activo (hoy `null`; el frontend resuelve la sesión por separado). Contrato del frontend.
+/// activo (hoy `null`; el frontend resuelve la sesión por separado) + `pin_users`: usuarios activos
+/// con PIN del hub, para que el shell muestre el grid de login local directamente (sin depender de
+/// un flag en localStorage). Contrato del frontend.
 async fn hub_context(State(st): State<AppState>) -> Response {
-    Json(json!({ "hub_id": st.config.hub_id, "user": Value::Null })).into_response()
+    let pin_users: Vec<Value> = {
+        let rt = st.runtime.lock().await;
+        rt.list_pin_users().await.unwrap_or_default()
+    }
+    .into_iter()
+    .map(|(id, name, role)| json!({ "id": id, "name": name, "role": role }))
+    .collect();
+    Json(json!({ "hub_id": st.config.hub_id, "user": Value::Null, "pin_users": pin_users }))
+        .into_response()
 }
 
 #[derive(Deserialize)]
