@@ -193,15 +193,20 @@ async fn create_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     };
 
     // Huella (formatos AEAT exactos — chain.rs) + QR.
+    // ⚠️ ADR-0007: los importes llegan/persisten en CÉNTIMOS (INTEGER), pero la huella y el
+    // XML/QR de la AEAT exigen EUROS con 2 decimales. Se convierte céntimos→euros SOLO en el
+    // límite de formateo fiscal; las columnas (`base/tax/total_amount`) siguen en céntimos.
     let generation_timestamp = ctx.now.clone();
+    let tax_amount_eur = tax_amount / 100.0;
+    let total_amount_eur = total_amount / 100.0;
     let record_hash = if record_type == "alta" {
         chain::alta_hash(
             &issuer_nif,
             &invoice_number,
             &invoice_date,
             &invoice_type,
-            tax_amount,
-            total_amount,
+            tax_amount_eur,
+            total_amount_eur,
             &previous_hash,
             &generation_timestamp,
         )
@@ -214,7 +219,7 @@ async fn create_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             &generation_timestamp,
         )
     };
-    let qr_url = chain::qr_url(&issuer_nif, &invoice_number, &invoice_date, total_amount);
+    let qr_url = chain::qr_url(&issuer_nif, &invoice_number, &invoice_date, total_amount_eur);
 
     let config = read_config(host, &ctx.hub_id).await?;
     let auto_transmit = config
