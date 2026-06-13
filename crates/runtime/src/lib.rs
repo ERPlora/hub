@@ -28,6 +28,7 @@ pub mod permissions;
 pub mod queries;
 pub mod registry;
 pub mod scheduler;
+pub mod seed;
 pub mod system_migrations;
 pub mod ui;
 pub mod wasm;
@@ -254,6 +255,14 @@ impl Runtime {
         identity::ensure_tables(self.db.as_ref()).await?;
         // 2) Migraciones de sistema versionadas (≥ v1), scoped por hub_id del despliegue.
         system_migrations::apply(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Aplica un **seed de configuración inicial** (SQL idempotente) sobre la conexión del runtime,
+    /// **después** de [`Runtime::ensure_system_tables`] (hub#36). Mecanismo genérico de carga de
+    /// config (no es "modo demo"); la idempotencia la garantiza el propio SQL. Devuelve cuántas
+    /// sentencias aplicó. Lo llama el host al arrancar si hay `HUB_SEED_SQL`/`HUB_SEED_SQL_PATH`.
+    pub async fn apply_seed(&self, sql: &str) -> Result<usize> {
+        seed::apply(self.db.as_ref(), sql).await
     }
 
     // ── Identidad local (usuarios/PIN/sesiones; §2.9). La autoridad de permisos es local. ──

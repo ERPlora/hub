@@ -83,6 +83,24 @@ async fn fetch_jwt_public_key(cloud_base_url: &str) -> Option<String> {
     v.get("public_key").and_then(|k| k.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string())
 }
 
+/// Resuelve el SQL de seed de configuración inicial desde el entorno (hub#36):
+///  - `HUB_SEED_SQL` — SQL inline (gana si está presente y no vacío). Lo usa ECS/terraform.
+///  - `HUB_SEED_SQL_PATH` — ruta a un fichero `.sql` (alternativa para local/dev).
+///
+/// `Ok(None)` si no se configura ninguno (arranque normal sin seed). Un `HUB_SEED_SQL_PATH` que
+/// no se puede leer es un error de configuración → aborta el arranque con un mensaje claro.
+fn load_seed_sql() -> Result<Option<String>, Box<dyn std::error::Error>> {
+    if let Some(sql) = std::env::var("HUB_SEED_SQL").ok().filter(|s| !s.trim().is_empty()) {
+        return Ok(Some(sql));
+    }
+    if let Some(path) = std::env::var("HUB_SEED_SQL_PATH").ok().filter(|s| !s.trim().is_empty()) {
+        let sql = std::fs::read_to_string(&path)
+            .map_err(|e| format!("HUB_SEED_SQL_PATH={path}: no se pudo leer el seed: {e}"))?;
+        return Ok(Some(sql));
+    }
+    Ok(None)
+}
+
 /// Arranca el runtime completo y **sirve Axum** en `cfg.bind` hasta que termina. Punto de entrada
 /// único del binario y del shell Tauri (in-process, §11): abre SQLite, instala los módulos del dir
 /// si se indica, resuelve la clave pública del Cloud si falta, monta el [`AppState`], lanza el
@@ -132,6 +150,16 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     };
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
+
+    // Seed de configuración inicial (hub#36): SQL idempotente que se aplica UNA vez al arrancar,
+    // tras las tablas de sistema. Mecanismo genérico (NO "modo demo"): el host lo pasa por env —
+    // `HUB_SEED_SQL` (SQL inline, p. ej. el del despliegue demo) o `HUB_SEED_SQL_PATH` (fichero).
+    // Si ambos están, gana el inline. La idempotencia la garantiza el propio SQL (`WHERE NOT
+    // EXISTS`/`ON CONFLICT`). Un seed roto aborta el arranque (error claro), no se traga en silencio.
+    if let Some(seed_sql) = load_seed_sql()? {
+        let n = state.runtime.lock().await.apply_seed(&seed_sql).await?;
+        eprintln!("seed: aplicadas {n} sentencia(s) de configuración inicial");
+    }
 
     // Transporte de `host.notify` (ADR-0012): cliente real de email/sms/whatsapp. Hoy un MOCK
     // (decisión de dependencia del humano para el SMTP/SMS reales; ver crates/runtime/host_notify.rs).
