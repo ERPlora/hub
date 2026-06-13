@@ -139,6 +139,12 @@ impl Registry {
         matches!(self.status.get(module_id), Some(ModuleStatus::Active))
     }
 
+    /// Nº de módulos **activos**. Lo usa el router de tools (§9.2b) para decidir si vale la pena
+    /// enrutar (con pocos módulos sale más barato mandar todos los tools al LLM).
+    pub fn active_module_count(&self) -> usize {
+        self.status.values().filter(|s| matches!(s, ModuleStatus::Active)).count()
+    }
+
     /// Query registrada, **solo si su módulo está activo** (hot-plug).
     pub fn get_query(&self, name: &str) -> Option<&RegisteredQuery> {
         self.queries.get(name).filter(|q| self.is_active(&q.module_id))

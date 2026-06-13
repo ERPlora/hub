@@ -198,6 +198,26 @@ impl CloudClient {
         }
     }
 
+    /// **Embeddings vía el proxy del Cloud** (§9.3/§9.4/§9.6 — el Hub nunca llama a un proveedor
+    /// de embeddings directamente; va por el Cloud, que mide el coste en `AssistantUsage`).
+    /// `POST /api/v1/hub/device/assistant/embeddings/` (verificado contra
+    /// `cloud/apps/assistant/api/views.py::embed_texts_view`). El body es un
+    /// [`EmbeddingsRequest`] (`{"texts":[…], "model"?}`) y la respuesta un
+    /// [`EmbeddingsResponse`] (`{"embeddings":[[…]], "model"}`). El cuerpo lo construye el
+    /// llamador (server) a partir de los textos a indexar (routing de módulos §9.2b o RAG §9.4).
+    ///
+    /// Es un endpoint **hub-scoped**: se firma con la credencial de **máquina** del hub
+    /// (`X-Hub-Token`) cuando se llama desde el lifecycle de install (sin usuario logueado), o
+    /// con el JWT de usuario para la embebida de la petición en query-time del router. El I/O de
+    /// red lo hace el cliente HTTP del llamador (espejo de [`assistant_chat_stream`]).
+    pub fn embeddings(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/assistant/embeddings/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
     /// **Notificación WhatsApp PREMIUM de ERPlora vía el proxy del Cloud** (ADR-0012 + ADR-0006).
     /// Como el asistente, el Hub no habla con la Graph API de Meta directamente: la llamada sale
     /// por Cloud, que aplica `check_quota`, inyecta el token de Meta de ERPlora y bloquea al
@@ -353,6 +373,41 @@ impl RefreshGrant {
     }
 }
 
+/// Body de [`CloudClient::embeddings`]: los textos a embeber + el modelo opcional. El Cloud
+/// usa su modelo por defecto (`text-embedding-3-small`, 1536 dims, casa con `vector(1536)` de
+/// §9.4) si `model` es `None`. El límite de `texts` por llamada lo aplica el Cloud (256 hoy);
+/// el llamador debe trocear lotes grandes. Se serializa al body de la petición.
+#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
+pub struct EmbeddingsRequest {
+    pub texts: Vec<String>,
+    /// Modelo de embeddings; `None` → el Cloud usa su `DEFAULT_EMBED_MODEL`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+impl EmbeddingsRequest {
+    /// Construye una petición con los textos dados y el modelo por defecto del Cloud.
+    pub fn new(texts: Vec<String>) -> Self {
+        Self { texts, model: None }
+    }
+}
+
+/// Respuesta de [`CloudClient::embeddings`]: un vector por cada texto de entrada (mismo orden) +
+/// el modelo realmente usado. El hub almacena estos vectores en su índice local
+/// (`erplora-vector`); NUNCA genera embeddings por su cuenta (§9.3).
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct EmbeddingsResponse {
+    pub embeddings: Vec<Vec<f32>>,
+    #[serde(default)]
+    pub model: String,
+}
+
+impl EmbeddingsResponse {
+    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
 /// Respuesta de [`CloudClient::backup_upload`] (ADR-0040, **opción B**): el resultado de subir
 /// (stream) el dump al Cloud, que lo guardó en S3 con **cifrado de servidor (SSE)**. El hub **no**
 /// recibe credenciales AWS ni URLs S3: solo dónde quedó la copia y su tamaño, para reflejarlo en
@@ -445,6 +500,43 @@ mod tests {
         assert_eq!(s.url, "https://erplora.com/api/v1/hub/device/assistant/chat/stream/");
         assert!(s.headers.contains(&("Authorization", "Bearer abc".to_string())));
         assert!(s.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn embeddings_endpoint_and_machine_token() {
+        // La embebida en el lifecycle de install va con la credencial de MÁQUINA del hub
+        // (X-Hub-Token): no hay usuario logueado al instalar (§9.6 + ADR-0003).
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken { hub_id: "h1".into(), token: "machine-tok".into() };
+        let r = c.embeddings(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/assistant/embeddings/");
+        assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn embeddings_request_serializes_with_and_without_model() {
+        // Sin modelo: no se serializa la clave `model` (el Cloud usa su default).
+        let req = EmbeddingsRequest::new(vec!["hello".into(), "world".into()]);
+        let body = serde_json::to_value(&req).unwrap();
+        assert_eq!(body["texts"][0], "hello");
+        assert!(body.get("model").is_none(), "model None no se serializa");
+
+        // Con modelo explícito.
+        let req = EmbeddingsRequest { texts: vec!["x".into()], model: Some("custom".into()) };
+        let body = serde_json::to_value(&req).unwrap();
+        assert_eq!(body["model"], "custom");
+    }
+
+    #[test]
+    fn embeddings_response_parses() {
+        // El Cloud devuelve un vector por texto (mismo orden) + el modelo usado.
+        let body = r#"{"embeddings":[[0.1,0.2,0.3],[0.4,0.5,0.6]],"model":"text-embedding-3-small"}"#;
+        let resp = EmbeddingsResponse::parse(body).unwrap();
+        assert_eq!(resp.embeddings.len(), 2);
+        assert_eq!(resp.embeddings[0], vec![0.1, 0.2, 0.3]);
+        assert_eq!(resp.model, "text-embedding-3-small");
     }
 
     #[test]

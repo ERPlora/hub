@@ -29,8 +29,10 @@ use serde_json::{json, Map, Value};
 
 pub mod assistant;
 pub mod auth;
+pub mod embed;
 pub mod ingest;
 pub mod install;
+pub mod router;
 pub mod session;
 pub mod state;
 pub mod tenant;
@@ -110,8 +112,11 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     use erplora_db::SqliteAdapter;
     use erplora_runtime::Runtime;
 
+    use erplora_vector::{SqliteVectorStore, VectorStore};
+
     // sqlx-style URL: `sqlite://<path>?mode=rwc` crea el fichero si falta.
-    let db = SqliteAdapter::connect(&format!("sqlite://{}?mode=rwc", cfg.sqlite_path)).await?;
+    let sqlite_url = format!("sqlite://{}?mode=rwc", cfg.sqlite_path);
+    let db = SqliteAdapter::connect(&sqlite_url).await?;
     // El runtime se construye con el `hub_id` del despliegue (config, no spoofable): scope del
     // estado de módulos (`hub_module`) y de las migraciones de sistema (hub#31 / hub#37).
     let mut runtime = Runtime::with_hub_id(Box::new(db), cfg.hub.hub_id.clone());
@@ -143,11 +148,21 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     }
     eprintln!("auth: modo {:?}", cfg.hub.auth_mode);
 
+    // Índice vectorial local (§9.2b routing + §9.6 ingestión). Opción A de §9.5: vectores en una
+    // tabla SQLite + coseno por fuerza bruta, sobre una conexión propia al MISMO fichero del hub
+    // (la tabla `knowledge_chunk` es independiente de los datos de negocio). La generación de
+    // embeddings sigue yendo SIEMPRE por el Cloud (§9.3); este store solo guarda/busca vectores.
+    let vector_db = SqliteAdapter::connect(&sqlite_url).await?;
+    let vector_store = SqliteVectorStore::new(vector_db);
+    vector_store.ensure_schema().await?;
+    let vector_store: state::SharedVectorStore = std::sync::Arc::new(vector_store);
+
     // Celda del token de máquina: externa (compartida con el shell Tauri para hot-reload) o propia.
     let state = match cfg.machine_token_cell.take() {
         Some(cell) => AppState::with_config_cell(runtime, cfg.hub, cell),
         None => AppState::with_config(runtime, cfg.hub),
-    };
+    }
+    .with_vector(vector_store);
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
@@ -353,18 +368,36 @@ async fn request_install(
 
     match result {
         Ok(installed) => {
-            // Ingestión de embeddings (§9): recoge el texto agéntico del módulo. La obtención
-            // del vector va vía el proxy del Cloud (pendiente de cableado, §9.3) — aquí solo se
-            // recolecta y se registra; NO se llama a ningún proveedor de embeddings localmente.
+            // Ingestión de embeddings (§9.6): recoge el texto agéntico del módulo (agent.description
+            // + ai.description de queries/commands), lo embebe **vía el proxy del Cloud** (§9.3 — el
+            // Hub nunca llama a un proveedor de embeddings directamente) y lo registra en el índice
+            // vectorial para el routing de tools (§9.2b). Best-effort: un fallo aquí NO aborta la
+            // instalación (el módulo ya está instalado y operativo; el router degrada a "todos").
             let chunks = ingest::collect_chunks(rt.registry(), &installed.module_id);
-            if !chunks.is_empty() {
-                tracing::info!(
-                    module_id = %installed.module_id,
-                    chunks = chunks.len(),
-                    "ingestión de embeddings recolectada (wired to Cloud, pending)"
-                );
-            }
             drop(rt);
+            if !chunks.is_empty() {
+                if let Some(store) = &st.vector {
+                    let embedder = embed::CloudEmbedder::new(
+                        st.http.clone(),
+                        &st.config.cloud_base_url,
+                        auth.clone(),
+                    );
+                    match embed::index_chunks(
+                        &embedder,
+                        store.as_ref(),
+                        &st.config.hub_id,
+                        &installed.version,
+                        &chunks,
+                    )
+                    .await
+                    {
+                        Ok(n) => tracing::info!(module_id = %installed.module_id, chunks = n, "embeddings indexados (§9.6)"),
+                        Err(e) => tracing::warn!(module_id = %installed.module_id, error = %e, "ingestión de embeddings falló (no crítico; router degrada)"),
+                    }
+                } else {
+                    tracing::info!(module_id = %installed.module_id, chunks = chunks.len(), "sin índice vectorial; ingestión de embeddings omitida (§9.5)");
+                }
+            }
 
             // Evento WS con la forma exacta del contrato del frontend.
             st.broadcast(json!({ "type": "module.installed", "module_id": installed.module_id }));
@@ -446,14 +479,43 @@ async fn assistant_chat_stream(
     };
     // La sesión LOCAL del hub da el contexto/permisos para ensamblar las tools (gate = el de la UI)
     // y el id del usuario activo, que se manda como metadata de coste/auditoría (no permisos).
-    let (tools, active_user) = {
+    let (all_tools, active_user, active_modules) = {
         let rt = st.runtime.lock().await;
         let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
             Ok(c) => c,
             Err(e) => return unauthorized(e),
         };
-        (assistant::assemble_tools(rt.registry(), &ctx), ctx.user_id.clone())
+        let tools = assistant::assemble_tools(rt.registry(), &ctx);
+        let active = rt.registry().active_module_count();
+        (tools, ctx.user_id.clone(), active)
     };
+
+    // Router de tools por vectores (§9.2b): embebe la última petición del usuario, busca en el
+    // índice y recorta los tools a los módulos relevantes. Degrada a "todos los tools" si no hay
+    // índice, si hay pocos módulos, o ante cualquier fallo del prefiltro (§9.5). El permiso lo
+    // revalida igual el runtime: el router solo abarata el prompt, no es un gate.
+    let tools = match &st.vector {
+        Some(store) => {
+            let query = assistant::last_user_message(&frontend);
+            let embedder = embed::CloudEmbedder::new(
+                st.http.clone(),
+                &st.config.cloud_base_url,
+                auth.clone(),
+            );
+            router::assemble_routed_tools(
+                &embedder,
+                store.as_ref(),
+                &st.config.hub_id,
+                &query,
+                all_tools,
+                active_modules,
+                router::RouterConfig::default(),
+            )
+            .await
+        }
+        None => all_tools,
+    };
+
     let body = assistant::build_cloud_body(&frontend, tools, Some(&active_user));
 
     // Construye la petición al Cloud (POST, Bearer + X-Hub-Id) y abre el stream.
@@ -637,7 +699,17 @@ async fn deactivate_module(State(st): State<AppState>, Path(id): Path<String>) -
 async fn uninstall_module(State(st): State<AppState>, Path(id): Path<String>) -> Response {
     let mut rt = st.runtime.lock().await;
     match rt.uninstall(&id).await {
-        Ok(()) => Json(json!({ "ok": true })).into_response(),
+        Ok(()) => {
+            drop(rt);
+            // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.
+            // Best-effort: no falla la desinstalación si el store da error.
+            if let Some(store) = &st.vector {
+                if let Err(e) = embed::drop_module(store.as_ref(), &st.config.hub_id, &id).await {
+                    tracing::warn!(module_id = %id, error = %e, "no se pudieron borrar embeddings del módulo (no crítico)");
+                }
+            }
+            Json(json!({ "ok": true })).into_response()
+        }
         Err(e) => err_response(e),
     }
 }
