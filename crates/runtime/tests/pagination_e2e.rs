@@ -11,7 +11,7 @@ fn params(v: serde_json::Value) -> Params {
 }
 
 fn inventory_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../modules/inventory")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/inventory")
 }
 
 fn ctx() -> RequestContext {

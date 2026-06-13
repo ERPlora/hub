@@ -12,7 +12,7 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 fn dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../modules/customers")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/customers")
 }
 fn admin() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])

@@ -277,12 +277,16 @@ fn pg_row_to_json(row: &PgRow) -> Json {
 }
 
 /// Postgres cell → JSON. Postgres is statically typed per column, so we decide by the
-/// column's type name. We cover the scalar types modules use.
+/// column's type name. We cover the scalar types modules use plus the fiscal/money types
+/// (§8/§9): NUMERIC, TIMESTAMPTZ/TIMESTAMP/DATE/TIME, UUID and JSONB/JSON.
 ///
-/// TODO §8/§9: NUMERIC (money), TIMESTAMPTZ, UUID and JSONB currently fall to the `_` arm
-/// (string) and, in binary format, fail to `null`. A fiscal ERP needs the sqlx features
-/// (`uuid`, `chrono`/`time`, `bigdecimal`/`rust_decimal`) enabled and a dedicated arm here.
+/// Money/precision contract: NUMERIC is decoded to a **string** (via `BigDecimal`) so no
+/// precision is lost on the JSON round-trip — modules format it in the UI. Temporals are
+/// emitted as ISO-8601 strings; UUID as its canonical string; JSONB/JSON as the parsed JSON.
 fn pg_cell(row: &PgRow, i: usize) -> Json {
+    use sqlx::types::chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+    use sqlx::types::{BigDecimal, Uuid};
+
     // NULL first: read the raw value only to ask `is_null`.
     let is_null = row.try_get_raw(i).map(|r| r.is_null()).unwrap_or(true);
     if is_null {
@@ -295,8 +299,148 @@ fn pg_cell(row: &PgRow, i: usize) -> Json {
         "INT8" => row.try_get::<i64, _>(i).map(Json::from).unwrap_or(Json::Null),
         "FLOAT4" => row.try_get::<f32, _>(i).map(|v| Json::from(v as f64)).unwrap_or(Json::Null),
         "FLOAT8" => row.try_get::<f64, _>(i).map(Json::from).unwrap_or(Json::Null),
+        // NUMERIC/money → string to preserve exact precision (never f64).
+        "NUMERIC" => row
+            .try_get::<BigDecimal, _>(i)
+            .map(|v| Json::String(v.to_string()))
+            .unwrap_or(Json::Null),
+        // Temporals → ISO-8601 strings.
+        "TIMESTAMPTZ" => row
+            .try_get::<DateTime<Utc>, _>(i)
+            .map(|v| Json::String(v.to_rfc3339()))
+            .unwrap_or(Json::Null),
+        "TIMESTAMP" => row
+            .try_get::<NaiveDateTime, _>(i)
+            .map(|v| Json::String(v.format("%Y-%m-%dT%H:%M:%S%.f").to_string()))
+            .unwrap_or(Json::Null),
+        "DATE" => row
+            .try_get::<NaiveDate, _>(i)
+            .map(|v| Json::String(v.to_string()))
+            .unwrap_or(Json::Null),
+        "TIME" => row
+            .try_get::<NaiveTime, _>(i)
+            .map(|v| Json::String(v.to_string()))
+            .unwrap_or(Json::Null),
+        // UUID → canonical hyphenated string.
+        "UUID" => row
+            .try_get::<Uuid, _>(i)
+            .map(|v| Json::String(v.to_string()))
+            .unwrap_or(Json::Null),
+        // JSONB/JSON → the parsed JSON value, verbatim.
+        "JSONB" | "JSON" => row.try_get::<Json, _>(i).unwrap_or(Json::Null),
         _ => row.try_get::<String, _>(i).map(Json::String).unwrap_or(Json::Null),
     }
+}
+
+// ── shim de funciones-puente: ERPlora SQL → expresión nativa por dialecto (ADR-0007 §4a) ─────
+
+/// Reescribe las **funciones-puente** del subconjunto portable a la expresión nativa del dialecto.
+/// Sustitución textual anclada con escaneo de paréntesis balanceados (NO es un parser AST),
+/// aplicada al traducir el SQL del módulo. UTF-8-safe.
+///
+/// Hoy cubre **una** función — el único caso real de divergencia en los 25 módulos POS:
+/// `erp_pad(valor, ancho)` = relleno con ceros a la izquierda para números de documento
+/// (factura `FAC-00042`, ticket `TCK-0042`):
+/// - SQLite:   `printf('%0*d', <ancho>, <valor>)`   (printf admite `*` para tomar el ancho del arg)
+/// - Postgres: `lpad((<valor>)::text, <ancho>, '0')`
+///
+/// Las **fechas NO llevan función-puente**: se almacenan como entero **epoch (ms, UTC)**, así las
+/// comparaciones y restas son aritmética idéntica en ambos motores y `:now` lo inyecta el runtime
+/// como entero (decisión 2026-06-13; revierte el "TEXT ISO-8601" de ADR-0007 para temporales).
+fn shim_functions(sql: &str, dialect: Dialect) -> String {
+    // Atajo: si el nombre no aparece, no hay nada que reescribir.
+    if !sql.to_ascii_lowercase().contains("erp_pad") {
+        return sql.to_string();
+    }
+    let bytes = sql.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(sql.len() + 16);
+    let mut i = 0;
+    let mut in_string = false;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_string {
+            out.push(c);
+            if c == b'\'' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        if c == b'\'' {
+            in_string = true;
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        // `erp_pad` como identificador completo (no parte de otro: `xerp_pad`).
+        let prev_is_ident = i > 0 && (bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_');
+        if !prev_is_ident && bytes[i..].len() >= 7 && bytes[i..i + 7].eq_ignore_ascii_case(b"erp_pad")
+        {
+            // Posición del `(` de apertura (admite espacios entre el nombre y el paréntesis).
+            let mut p = i + 7;
+            while p < bytes.len() && (bytes[p] as char).is_whitespace() {
+                p += 1;
+            }
+            if p < bytes.len() && bytes[p] == b'(' {
+                if let Some((args, after)) = scan_call_args(bytes, p) {
+                    if args.len() == 2 {
+                        // El valor puede contener a su vez una función-puente → recursivo.
+                        let value = shim_functions(sql[args[0].0..args[0].1].trim(), dialect);
+                        let width = sql[args[1].0..args[1].1].trim();
+                        let repl = match dialect {
+                            Dialect::Sqlite => format!("printf('%0*d', {width}, {value})"),
+                            Dialect::Postgres => format!("lpad(({value})::text, {width}, '0')"),
+                        };
+                        out.extend_from_slice(repl.as_bytes());
+                        i = after;
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push(c);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| sql.to_string())
+}
+
+/// Dado el índice del `(` de apertura de una llamada, devuelve los spans `(inicio, fin)` de los
+/// argumentos de **primer nivel** (separados por comas no anidadas, ignorando comas dentro de
+/// `'...'`) y el índice **después** del `)` de cierre. `None` si los paréntesis no cierran.
+fn scan_call_args(bytes: &[u8], open: usize) -> Option<(Vec<(usize, usize)>, usize)> {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut args: Vec<(usize, usize)> = Vec::new();
+    let mut arg_start = open + 1;
+    let mut i = open;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_string {
+            if c == b'\'' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            b'\'' => in_string = true,
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 {
+                    args.push((arg_start, i));
+                    return Some((args, i + 1));
+                }
+            }
+            b',' if depth == 1 => {
+                args.push((arg_start, i));
+                arg_start = i + 1;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
 }
 
 // ── placeholder translator `:name` → `$n` (Postgres) / `?n` (SQLite) ──────────────────────
@@ -313,6 +457,11 @@ fn pg_cell(row: &PgRow, i: usize) -> Json {
 /// Returns the rewritten SQL and the ordered (deduplicated) list of names, so the caller binds
 /// in that order. `names` is **identical** for both dialects: only the emitted SQL changes.
 pub(crate) fn translate(sql: &str, dialect: Dialect) -> (String, Vec<String>) {
+    // Funciones-puente ERPlora SQL → expresión nativa del dialecto (ADR-0007 §4a), antes de bajar
+    // los placeholders. Trabaja sobre el texto ya con `:name` (se traducen en el segundo paso).
+    let shimmed = shim_functions(sql, dialect);
+    let sql = shimmed.as_str();
+
     let prefix = match dialect {
         Dialect::Postgres => '$',
         Dialect::Sqlite => '?',
@@ -485,6 +634,49 @@ mod tests {
         assert_eq!(names, vec!["b", "a"]);
     }
 
+    // ── shim de funciones-puente (ADR-0007 §4a): erp_pad → printf/lpad ───────────────────────
+
+    #[test]
+    fn shim_erp_pad_sqlite() {
+        let (sql, names) = translate("SELECT 'FAC-' || erp_pad(:n, 5)", Dialect::Sqlite);
+        assert_eq!(sql, "SELECT 'FAC-' || printf('%0*d', 5, ?1)");
+        assert_eq!(names, vec!["n"]);
+    }
+
+    #[test]
+    fn shim_erp_pad_postgres() {
+        let (sql, names) = translate("SELECT 'FAC-' || erp_pad(:n, 5)", Dialect::Postgres);
+        assert_eq!(sql, "SELECT 'FAC-' || lpad(($1)::text, 5, '0')");
+        assert_eq!(names, vec!["n"]);
+    }
+
+    #[test]
+    fn shim_erp_pad_nested_subquery() {
+        // El valor es una subconsulta con paréntesis anidados: el escáner balanceado la respeta.
+        let (sql, names) = translate(
+            "SELECT erp_pad((SELECT max(seq) + 1 FROM t WHERE hub_id = :h), 6)",
+            Dialect::Postgres,
+        );
+        assert_eq!(
+            sql,
+            "SELECT lpad(((SELECT max(seq) + 1 FROM t WHERE hub_id = $1))::text, 6, '0')"
+        );
+        assert_eq!(names, vec!["h"]);
+    }
+
+    #[test]
+    fn shim_ignores_erp_pad_inside_string_literal() {
+        let (sql, _) = translate("SELECT 'erp_pad(x, 5) literal'", Dialect::Postgres);
+        assert_eq!(sql, "SELECT 'erp_pad(x, 5) literal'");
+    }
+
+    #[test]
+    fn shim_does_not_match_partial_identifier() {
+        // `xerp_pad` no es la función-puente: se deja intacto.
+        let (sql, _) = translate("SELECT xerp_pad", Dialect::Postgres);
+        assert_eq!(sql, "SELECT xerp_pad");
+    }
+
     // ── Postgres integration (requires a real DB via DATABASE_URL, hence #[ignore]) ───────
     //
     //   DATABASE_URL=postgres://user:pass@localhost:5432/erplora_test \
@@ -522,5 +714,46 @@ mod tests {
         assert_eq!(q.rows[0]["name"], json!("alice"));
         assert_eq!(q.rows[0]["ok"], json!(true));
         assert_eq!(q.rows[0]["price"], json!(4.5));
+    }
+
+    // §8/§9 — decode of the fiscal/money Postgres types. Inserts literals (not the param
+    // path) so this isolates `pg_cell`'s decode arms. Requires a real Postgres.
+    #[tokio::test]
+    #[ignore = "requires a real Postgres via DATABASE_URL"]
+    async fn pg_fiscal_types_roundtrip() {
+        let url = std::env::var("DATABASE_URL").expect("set DATABASE_URL");
+        let db = PgAdapter::connect(&url).await.expect("connect to postgres");
+        db.execute_batch(
+            "DROP TABLE IF EXISTS erplora_pg_fiscal; \
+             CREATE TABLE erplora_pg_fiscal ( \
+                 amount NUMERIC, ts TIMESTAMPTZ, d DATE, uid UUID, meta JSONB \
+             ); \
+             INSERT INTO erplora_pg_fiscal (amount, ts, d, uid, meta) VALUES ( \
+                 12345.67, \
+                 '2026-06-13T10:30:00Z', \
+                 '2026-06-13', \
+                 '00000000-0000-0000-0000-000000000001', \
+                 '{\"a\":1}' \
+             )",
+        )
+        .await
+        .unwrap();
+        let q = db
+            .query(
+                "SELECT amount, ts, d, uid, meta FROM erplora_pg_fiscal",
+                &params(json!({})),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows.len(), 1);
+        let r = &q.rows[0];
+        // NUMERIC keeps exact precision as a string (never f64).
+        assert_eq!(r["amount"], json!("12345.67"));
+        // TIMESTAMPTZ → RFC-3339 (UTC).
+        assert_eq!(r["ts"], json!("2026-06-13T10:30:00+00:00"));
+        assert_eq!(r["d"], json!("2026-06-13"));
+        assert_eq!(r["uid"], json!("00000000-0000-0000-0000-000000000001"));
+        // JSONB → parsed value, verbatim.
+        assert_eq!(r["meta"], json!({"a": 1}));
     }
 }

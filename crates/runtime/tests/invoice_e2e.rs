@@ -8,7 +8,7 @@ use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
 fn params(v: serde_json::Value) -> Params { v.as_object().cloned().unwrap_or_default() }
-fn mdir(n: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../modules").join(n) }
+fn mdir(n: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(n) }
 fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
 fn wasm() -> bool { mdir("invoice").join("dist/handler.wasm").exists() }
 
