@@ -15,6 +15,8 @@ export default {
   },
   topbar: {
     back: 'Atrás',
+    apps: 'Aplicaciones',
+    appsEmpty: 'No tienes módulos instalados. Abre la tienda para añadir.',
     assistant: 'Asistente',
     notifications: 'Notificaciones',
     toggleTheme: 'Cambiar tema',

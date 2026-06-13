@@ -14,6 +14,8 @@ export default {
   },
   topbar: {
     back: 'Back',
+    apps: 'Apps',
+    appsEmpty: 'No modules installed yet. Open the store to add some.',
     assistant: 'Assistant',
     notifications: 'Notifications',
     toggleTheme: 'Toggle theme',
