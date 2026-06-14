@@ -36,6 +36,7 @@ pub mod install;
 pub mod router;
 pub mod session;
 pub mod state;
+pub mod system;
 pub mod tenant;
 
 pub use state::{AppState, AuthMode, HubConfig, MachineToken, DEV_HUB_ID, WsEvent};
@@ -301,6 +302,7 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .route("/api/hub/context", get(hub_context))
+        .route("/api/system", get(system::system_info))
         .route("/api/navigation", get(navigation))
         .route("/api/modules", get(list_modules))
         .route("/api/modules/install", post(install_module))

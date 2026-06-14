@@ -34,6 +34,9 @@ async-trait = "0.1"
 # en el llavero del SO, no en webpki) y prod-safe (en ECS carga el bundle de CAs del sistema).
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "rustls-tls-native-roots"] }
 futures-util = "0.3"
+# Métricas del SO para `/api/system` en el combo LOCAL (single/Tauri): CPU + memoria reales del
+# equipo. En cloud (ECS) NO se usa: ahí las métricas salen del ECS Task Metadata Endpoint v4 (HTTP).
+sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

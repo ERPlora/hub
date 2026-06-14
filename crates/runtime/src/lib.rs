@@ -86,6 +86,13 @@ impl Runtime {
         self.db.as_ref()
     }
 
+    /// Acceso de **solo lectura** al adaptador de BD para introspección de sistema
+    /// (`/api/system`: dialecto, tamaño SQLite, conexiones Postgres). No salta el gate de
+    /// permisos/scoping de `execute_query`/`execute_command` — es para métricas, no datos de negocio.
+    pub fn db(&self) -> &dyn DatabaseAdapter {
+        self.db.as_ref()
+    }
+
     /// Instala un módulo ya extraído en `dir` (lee `module.json`, migra, registra, activa).
     pub async fn install_from_dir(&mut self, dir: &Path) -> Result<String> {
         installer::install(self.db.as_ref(), &mut self.registry, &self.hub_id, dir).await
