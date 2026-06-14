@@ -1,7 +1,7 @@
 {
   "id": "inventory",
   "name": "Inventory",
-  "version": "1.0.14",
+  "version": "1.0.16",
   "agent": {
     "description": "Manages stock, warehouses and products: check availability, adjust stock, receive goods, create or remove products and categories.",
     "keywords": [
@@ -81,13 +81,14 @@
       "migrations/sqlite/001_init.sql"
     ]
   },
-  "sync": [
-    { "table": "inventory_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "inventory_category", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "inventory_product", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "inventory_product_variant", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
   "queries": {
+    "inventory.product_categories": {
+      "permission": "inventory.view_product",
+      "sql": "queries/product_categories.sql",
+      "ai": {
+        "description": "Maps each active product to its category ids (M2M), used to filter the POS catalog by category"
+      }
+    },
     "inventory.products.list": {
       "permission": "inventory.view_product",
       "sql": "queries/products_list.sql",

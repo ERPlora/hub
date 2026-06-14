@@ -1,7 +1,7 @@
 {
   "id": "appointments",
   "name": "Appointments",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "agent": {
     "description": "Schedules and manages client appointments: books slots against services and staff, tracks status lifecycle (pending → confirmed → in_progress → completed / cancelled / no_show), manages staff availability and blocked time, and handles recurring appointment templates.",
     "keywords": [
@@ -65,15 +65,6 @@
       "migrations/sqlite/002_counter.sql"
     ]
   },
-  "sync": [
-    { "table": "appointments_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "appointments_schedule", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "appointments_schedule_timeslot", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "appointments_blocked_time", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "appointments_appointment", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "appointments_history", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "appointments_recurring", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
   "queries": {
     "appointments.appointments.list": {
       "permission": "appointments.view_appointment",

@@ -1,7 +1,7 @@
 {
   "id": "services",
   "name": "Services",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "agent": {
     "description": "Manages the service catalogue: create, update and delete services, categories, and service packages; list available services and packages; configure module settings.",
     "keywords": [
@@ -65,15 +65,6 @@
       "migrations/sqlite/001_init.sql"
     ]
   },
-  "sync": [
-    { "table": "services_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "services_category", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "services_service", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "services_variant", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "services_addon", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "services_package", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "services_packageitem", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
   "queries": {
     "services.services.list": {
       "permission": "services.view_service",
@@ -404,8 +395,7 @@
       "permission": "services.delete_package",
       "transaction": true,
       "sql": [
-        "commands/package_delete.sql",
-        "commands/package_delete_items.sql"
+        "commands/package_delete.sql"
       ],
       "emit": [
         "services.package.deleted"

@@ -1,12 +1,7 @@
 {
   "id": "taxes",
   "name": "Taxes",
-  "version": "1.0.0",
-  "sync": [
-    { "table": "taxes_category", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "taxes_rate", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "taxes_rule", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
+  "version": "1.0.1",
   "agent": {
     "description": "Manages tax categories, tax rates, and tax rules: list/create rates and categories, filter by country, define application rules, and calculate tax amounts for sale lines.",
     "keywords": [

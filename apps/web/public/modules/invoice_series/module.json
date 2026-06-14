@@ -280,21 +280,5 @@
   },
   "ui": {
     "entry": "dist/invoice_series.esm.js"
-  },
-  "sync": [
-    {
-      "table": "invoice_series_series",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at",
-      "_note": "FISCAL sequence counter (current_sequence advanced atomically per allocation) — MUTABLE counter row. LWW risk, revisar humano."
-    },
-    {
-      "table": "invoice_series_allocation",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at",
-      "_note": "Fiscal allocation audit: one immutable row per allocated number (UUID PK, never updated; RD 1007/2023 no-gaps/no-dups). Append-only → syncs safely under LWW."
-    }
-  ]
+  }
 }

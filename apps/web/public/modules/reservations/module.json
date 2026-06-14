@@ -1,7 +1,7 @@
 {
   "id": "reservations",
   "name": "Reservations",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "agent": {
     "description": "Manages table and resource reservations: create, update and track bookings, configure time slots and blocked dates, and handle the waitlist.",
     "keywords": [
@@ -84,13 +84,6 @@
       "migrations/sqlite/002_gate.sql"
     ]
   },
-  "sync": [
-    { "table": "reservations_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "reservations_timeslot", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "reservations_blockeddate", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "reservations_reservation", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "reservations_waitlistentry", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
   "queries": {
     "reservations.reservations.list": {
       "permission": "reservations.view_reservation",

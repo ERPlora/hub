@@ -62,12 +62,6 @@
       "migrations/sqlite/001_init.sql"
     ]
   },
-  "sync": [
-    { "table": "schedules_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "schedules_business_hours", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "schedules_special_day", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "schedules_override", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
   "queries": {
     "schedules.business_hours.list": {
       "permission": "schedules.view_schedule",

@@ -1,15 +1,7 @@
 {
   "id": "whatsapp_inbox",
   "name": "WhatsApp Inbox",
-  "version": "2.1.7",
-  "sync": [
-    { "table": "whatsapp_inbox_employee_link", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "whatsapp_inbox_conversation", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "whatsapp_inbox_message", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "whatsapp_inbox_request", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "whatsapp_inbox_template", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "whatsapp_inbox_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at", "note": "LWW risk — revisar humano: singleton de settings por hub, mutable; Last-Write-Wins puede pisar configuración del canal" }
-  ],
+  "version": "2.1.8",
   "agent": {
     "description": "Manages WhatsApp conversations, inbound requests, message templates, and channel settings: list and read conversations/messages, assign conversations, approve or reject requests, and configure the WhatsApp channel.",
     "keywords": [
@@ -519,7 +511,7 @@
     }
   },
   "events": {
-    "listen": [],
+    "listen": {},
     "emit": [
       "whatsapp_inbox.message.received",
       "whatsapp_inbox.request.created",

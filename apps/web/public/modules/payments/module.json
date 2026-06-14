@@ -1,7 +1,7 @@
 {
   "id": "payments",
   "name": "Payments",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "agent": {
     "description": "Manages outbound and inbound payments: create, approve, track status, and configure payment methods.",
     "keywords": [
@@ -49,11 +49,6 @@
       "migrations/postgres/001_init.sql"
     ]
   },
-  "sync": [
-    { "table": "payments_payment_method", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "payments_payment", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "payments_payment_counter", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
   "queries": {
     "payments.payments.list": {
       "permission": "payments.view_payment",

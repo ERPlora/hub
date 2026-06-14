@@ -1,12 +1,7 @@
 {
   "id": "tables",
   "name": "Tables",
-  "version": "2.0.6",
-  "sync": [
-    { "table": "tables_zone", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "tables_table", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "tables_session", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
+  "version": "2.1.0",
   "agent": {
     "description": "Manages restaurant floor plan zones, tables, and table sessions: create/update/delete zones and tables, open/close/transfer sessions, and bulk-create tables.",
     "keywords": [
@@ -63,7 +58,7 @@
       "id": "floor_plan",
       "label": "Floor Plan",
       "icon": "map-outline",
-      "component": "erp-tables-floor-plan"
+      "component": "erp-tables-canvas"
     },
     {
       "id": "zones",
@@ -88,6 +83,14 @@
       "label": "Settings",
       "icon": "settings-outline",
       "component": "erp-tables-floor-plan"
+    }
+  ],
+  "provides_slots": [
+    {
+      "slot": "sales.pos.order_context",
+      "component": "erp-tables-pos-zones",
+      "permission": "tables.view_table",
+      "priority": 100
     }
   ],
   "migrations": {
@@ -333,6 +336,20 @@
       ],
       "ai": {
         "description": "Updates a table's data (name, capacity, position)"
+      }
+    },
+    "tables.tables.move": {
+      "permission": "tables.change_table",
+      "schema": "schemas/table_move.json",
+      "transaction": true,
+      "sql": [
+        "commands/table_move.sql"
+      ],
+      "emit": [
+        "tables.table.updated"
+      ],
+      "ai": {
+        "description": "Repositions or resizes a table on the floor plan (drag in the canvas editor)"
       }
     },
     "tables.tables.delete": {

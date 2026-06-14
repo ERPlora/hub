@@ -1,7 +1,7 @@
 {
   "id": "pricing",
   "name": "Pricing",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "agent": {
     "description": "Manages price lists and pricing rules: create and maintain price lists, set item prices, define discount or surcharge rules, and compute the final price for a customer.",
     "keywords": [
@@ -50,11 +50,6 @@
       "migrations/postgres/001_init.sql"
     ]
   },
-  "sync": [
-    { "table": "pricing_price_list", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "pricing_price_list_item", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "pricing_discount_rule", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
   "queries": {
     "pricing.price_lists.list": {
       "permission": "pricing.view_pricing",

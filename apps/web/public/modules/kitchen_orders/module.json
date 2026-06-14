@@ -1,7 +1,7 @@
 {
   "id": "kitchen_orders",
   "name": "Kitchen Orders",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "agent": {
     "description": "Manages kitchen orders and stations: create, track, and update order status through kitchen workflows from firing to serving.",
     "keywords": [
@@ -31,7 +31,8 @@
     "kitchen_orders.view_history",
     "kitchen_orders.view_settings",
     "kitchen_orders.change_settings",
-    "kitchen_orders.manage_settings"
+    "kitchen_orders.manage_settings",
+    "kitchen_orders.view_log"
   ],
   "role_permissions": {
     "admin": [
@@ -46,12 +47,15 @@
       "kitchen_orders.complete_order",
       "kitchen_orders.view_history",
       "kitchen_orders.view_settings",
-      "kitchen_orders.change_settings"
+      "kitchen_orders.change_settings",
+      "kitchen_orders.view_log"
     ],
     "employee": [
       "kitchen_orders.view_order",
       "kitchen_orders.add_order",
-      "kitchen_orders.complete_order"
+      "kitchen_orders.complete_order",
+      "kitchen_orders.view_settings",
+      "kitchen_orders.view_log"
     ]
   },
   "navigation": [
@@ -71,6 +75,9 @@
   "migrations": {
     "sqlite": [
       "migrations/sqlite/001_init.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql"
     ]
   },
   "queries": {
@@ -254,7 +261,53 @@
       "sql": "queries/settings_get.sql",
       "schema": "schemas/settings_get.json",
       "ai": {
-        "description": "Retrieves the current settings for the kitchen orders module"
+        "description": "Retrieves the current kitchen settings (display and order behaviour)"
+      }
+    },
+    "kitchen_orders.logs.list": {
+      "permission": "kitchen_orders.view_log",
+      "sql": "queries/logs_list.sql",
+      "schema": "schemas/logs_list.json",
+      "list": {
+        "sort": [
+          "id",
+          "order_id",
+          "order_item_id",
+          "station_id",
+          "action",
+          "performed_by_id",
+          "notes",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "order_id": {
+            "op": "eq"
+          },
+          "order_item_id": {
+            "op": "eq"
+          },
+          "station_id": {
+            "op": "eq"
+          },
+          "action": {
+            "op": "eq"
+          },
+          "performed_by_id": {
+            "op": "eq"
+          },
+          "notes": {
+            "op": "eq"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the log of order events processed by the kitchen"
       }
     }
   },
@@ -267,11 +320,8 @@
         "file": "dist/handler.wasm",
         "function": "create_order"
       },
-      "emit": [
-        "kitchen_orders.order.created"
-      ],
       "ai": {
-        "description": "Creates a new kitchen order"
+        "description": "Creates a new kitchen order (the handler emits kitchen_orders.order.created)"
       }
     },
     "kitchen_orders.orders.update": {
@@ -296,14 +346,8 @@
         "file": "dist/handler.wasm",
         "function": "update_order_status"
       },
-      "emit": [
-        "kitchen_orders.order.fired",
-        "kitchen_orders.order.ready",
-        "kitchen_orders.order.served",
-        "kitchen_orders.order.cancelled"
-      ],
       "ai": {
-        "description": "Changes the status of a kitchen order (fired, ready, served, cancelled)"
+        "description": "Changes the status of a kitchen order (fire, mark_ready, mark_served, cancel, recall); the handler emits the matching kitchen_orders.order.* event"
       }
     },
     "kitchen_orders.orders.delete": {
@@ -314,25 +358,20 @@
         "file": "dist/handler.wasm",
         "function": "delete_order"
       },
-      "emit": [
-        "kitchen_orders.order.deleted"
-      ],
       "ai": {
-        "description": "Deletes a kitchen order (destructive)"
+        "description": "Deletes a kitchen order (destructive, guarded: only pending/cancelled and not linked to a sale)"
       }
     },
     "kitchen_orders.orders.create_from_sale": {
       "permission": "kitchen_orders.add_order",
+      "schema": "schemas/order_create_from_sale.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
         "function": "create_order_from_sale"
       },
-      "emit": [
-        "kitchen_orders.order.created"
-      ],
       "ai": {
-        "description": "Creates a kitchen order automatically from a completed sale"
+        "description": "Creates a kitchen order automatically from a completed sale (event-driven, idempotent per sale)"
       }
     },
     "kitchen_orders.stations.create": {
@@ -371,11 +410,8 @@
         "file": "dist/handler.wasm",
         "function": "delete_station"
       },
-      "emit": [
-        "kitchen_orders.station.deleted"
-      ],
       "ai": {
-        "description": "Deletes a kitchen station (destructive)"
+        "description": "Deletes a kitchen station (destructive, guarded: no active routings nor in-progress items)"
       }
     },
     "kitchen_orders.stations.set_routing": {
@@ -386,9 +422,6 @@
         "file": "dist/handler.wasm",
         "function": "set_routing"
       },
-      "emit": [
-        "kitchen_orders.routing.changed"
-      ],
       "ai": {
         "description": "Configures the routing of products and categories to kitchen stations"
       }
@@ -404,8 +437,25 @@
         "kitchen_orders.settings.updated"
       ],
       "ai": {
-        "description": "Updates the settings of the kitchen orders module"
+        "description": "Updates the kitchen settings (display and order behaviour)"
       }
+    },
+    "kitchen_orders.logs.create": {
+      "permission": "kitchen_orders.view_log",
+      "transaction": true,
+      "sql": [
+        "commands/log_create.sql"
+      ],
+      "schema": "schemas/log_create.json",
+      "ai": {
+        "description": "Records a new order status event in the kitchen log"
+      }
+    },
+    "kitchen_orders._bump_counter": {
+      "permission": "kitchen_orders.add_order",
+      "sql": [
+        "commands/_bump_counter.sql"
+      ]
     },
     "kitchen_orders._insert_order": {
       "permission": "kitchen_orders.add_order",
@@ -425,10 +475,10 @@
         "commands/_set_order_status.sql"
       ]
     },
-    "kitchen_orders._set_item_status": {
+    "kitchen_orders._cascade_item_status": {
       "permission": "kitchen_orders.change_order",
       "sql": [
-        "commands/_set_item_status.sql"
+        "commands/_cascade_item_status.sql"
       ]
     },
     "kitchen_orders._product_route_set": {
@@ -460,55 +510,25 @@
     "listen": {
       "sale.completed": {
         "command": "kitchen_orders.orders.create_from_sale"
+      },
+      "kitchen_orders.order.fired": {
+        "command": "kitchen_orders.logs.create"
+      },
+      "kitchen_orders.order.ready": {
+        "command": "kitchen_orders.logs.create"
+      },
+      "kitchen_orders.order.served": {
+        "command": "kitchen_orders.logs.create"
+      },
+      "kitchen_orders.order.recalled": {
+        "command": "kitchen_orders.logs.create"
+      },
+      "kitchen_orders.order.cancelled": {
+        "command": "kitchen_orders.logs.create"
       }
     }
   },
   "ui": {
     "entry": "dist/kitchen_orders.esm.js"
-  },
-  "sync": [
-    {
-      "table": "kitchen_orders_settings",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at",
-      "_note": "Settings singleton per hub — LWW risk (concurrent edits clobber), revisar humano."
-    },
-    {
-      "table": "kitchen_orders_station",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_orders_order",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_orders_order_item",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_orders_order_modifier",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_orders_product_station",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_orders_category_station",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    }
-  ]
+  }
 }

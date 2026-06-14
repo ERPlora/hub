@@ -1,7 +1,7 @@
 {
   "id": "kitchen",
   "name": "Kitchen",
-  "version": "2.2.4",
+  "version": "2.2.5",
   "agent": {
     "description": "Single kitchen module: kitchen display system (KDS), production orders (create, track and transition status from firing to serving), stations with product/category routing, and an audit log of kitchen actions.",
     "keywords": [
@@ -539,56 +539,5 @@
   },
   "ui": {
     "entry": "dist/kitchen.esm.js"
-  },
-  "sync": [
-    {
-      "table": "kitchen_settings",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at",
-      "_note": "Settings singleton per hub — LWW risk (concurrent edits clobber), revisar humano."
-    },
-    {
-      "table": "kitchen_station",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_order",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_order_item",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_order_modifier",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_product_station",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_category_station",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    },
-    {
-      "table": "kitchen_order_log",
-      "pk": ["id"],
-      "hub_scoped": true,
-      "updated_at": "updated_at"
-    }
-  ]
+  }
 }

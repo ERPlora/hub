@@ -2,11 +2,6 @@
   "id": "tickets",
   "name": "Tickets",
   "version": "1.0.0",
-  "sync": [
-    { "table": "tickets_sla", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "tickets_ticket", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "tickets_comment", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
   "agent": {
     "description": "Manages customer support tickets: create, assign, update status, resolve, close, reopen tickets, manage SLA policies, and add comments.",
     "keywords": [

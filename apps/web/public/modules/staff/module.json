@@ -1,7 +1,7 @@
 {
   "id": "staff",
   "name": "Staff",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "agent": {
     "description": "Manages staff members, roles, schedules and time-off requests: list, create, update and deactivate employees, manage work schedules, and approve or reject time-off.",
     "keywords": [
@@ -72,15 +72,6 @@
       "migrations/sqlite/001_init.sql"
     ]
   },
-  "sync": [
-    { "table": "staff_settings", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "staff_role", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "staff_member", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "staff_schedule", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "staff_working_hours", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "staff_time_off", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" },
-    { "table": "staff_service", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
-  ],
   "queries": {
     "staff.members.list": {
       "permission": "staff.view_staff_member",
@@ -471,9 +462,7 @@
     }
   },
   "events": {
-    "listen": [
-      "appointment.created"
-    ]
+    "listen": {}
   },
   "ui": {
     "entry": "dist/staff.esm.js"
