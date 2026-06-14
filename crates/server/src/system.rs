@@ -64,7 +64,11 @@ pub async fn system_info(State(st): State<AppState>) -> Response {
     let (documents, backups, storage_used) = if in_ecs {
         cloud_storage(&st.http, &st.config.cloud_base_url, &st.config.hub_id, st.machine_token()).await
     } else {
-        local_storage(&st.config.media_dir).await
+        // Carpeta media del hub, resuelta del entorno (igual que el arranque): HUB_MEDIA_DIR o `media`.
+        let media_dir = std::env::var("HUB_MEDIA_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| std::path::PathBuf::from("media"));
+        local_storage(&media_dir).await
     };
 
     Json(json!({
