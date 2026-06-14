@@ -56,7 +56,7 @@ let _client: ErploraClient | null = null;
  * Cabeceras de auth para cada llamada al runtime: X-Hub-Id (inyectado por deployment, leído
  * del runtime en boot) + Bearer del usuario activo si hay sesión. El runtime Rust revalida.
  */
-function runtimeHeaders(): Record<string, string> {
+export function runtimeHeaders(): Record<string, string> {
   const h: Record<string, string> = {};
   if (config.hubId) h['X-Hub-Id'] = config.hubId;
   // Sesión local del runtime: autoridad de permisos en modo Session (gate de query/command).

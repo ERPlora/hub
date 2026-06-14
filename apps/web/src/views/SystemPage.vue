@@ -1,36 +1,73 @@
 <template>
   <AppPage :title="t('nav.system')">
 
+    <!-- ── Cargando: una sola vez en el boot ─────────────────────────── -->
+    <div v-if="loading" style="display: grid; place-items: center; padding: 64px 0">
+      <ion-spinner name="crescent" />
+    </div>
+
+    <template v-else>
+
       <!-- ── Tab: Recursos ──────────────────────────────────────── -->
       <template v-if="tab === 'resources'">
-        <!-- KPI grid -->
+        <!-- KPI grid — SIEMPRE visible. Sin datos del runtime → gauges a 0 (no mensaje de error).
+             CPU/Memoria/Conexiones = ok-gauge (anillo); Base de datos = stat (tamaño, no %).
+             En 'cloud' estos datos los reporta ECS; el Bridge es ajeno a las métricas. -->
         <ion-grid class="ion-no-padding" style="margin-bottom: 16px">
           <ion-row>
-            <ion-col v-for="m in METRICS" :key="m.label" size="6" size-md="3">
-              <ion-card class="ion-no-margin" style="margin: 4px">
-                <ion-card-content>
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px">
-                    <span style="font-size: 12px; opacity: 0.65">{{ m.label }}</span>
-                    <HubIcon :name="m.icon" style="font-size: 18px; opacity: 0.5" />
-                  </div>
-                  <div style="font-size: 20px; font-weight: 600; line-height: 1.2">{{ m.value }}</div>
-                  <div v-if="m.unit" style="font-size: 11px; opacity: 0.55; margin-bottom: 6px">{{ m.unit }}</div>
-                  <ion-progress-bar v-if="m.progress !== undefined" :value="m.progress" />
+            <ion-col size="6" size-md="3">
+              <ion-card class="ion-no-margin metric-card">
+                <ion-card-content class="metric-card__content">
+                  <ok-gauge type="ring" label="CPU" :value="cpuPct" unit="%" :thresholds="usageThresholds"
+                    :sublabel="cpuSub" size="128"></ok-gauge>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+
+            <ion-col size="6" size-md="3">
+              <ion-card class="ion-no-margin metric-card">
+                <ion-card-content class="metric-card__content">
+                  <ok-gauge type="ring" label="Memoria" :value="memPct" unit="%" :thresholds="usageThresholds"
+                    :sublabel="memSub" size="128"></ok-gauge>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+
+            <!-- Base de datos: el tamaño solo existe en 'single' (SQLite). En 'cloud' es Aurora
+                 compartida por organización → sin tamaño local; mostramos el motor (no es un %). -->
+            <ion-col size="6" size-md="3">
+              <ion-card class="ion-no-margin metric-card">
+                <ion-card-content class="metric-card__content metric-stat">
+                  <HubIcon name="cube-outline" class="metric-stat__icon" />
+                  <div class="metric-stat__label">Base de datos</div>
+                  <div class="metric-stat__value">{{ dbValue }}</div>
+                  <div class="metric-stat__sub">{{ dbSub }}</div>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+
+            <!-- Conexiones BD reales (pool / pg_stat_activity). Un hub mínimo en reposo ≈ 0. -->
+            <ion-col size="6" size-md="3">
+              <ion-card class="ion-no-margin metric-card">
+                <ion-card-content class="metric-card__content">
+                  <ok-gauge type="ring" label="Conexiones" :value="dbConnections" unit="" :max="connectionsMax"
+                    color="var(--ion-color-primary)" :sublabel="connectionsLimitLabel" size="128"></ok-gauge>
                 </ion-card-content>
               </ion-card>
             </ion-col>
           </ion-row>
         </ion-grid>
 
-        <!-- Conexión Bridge -->
+        <!-- Conexión Bridge — hardware local (impresoras/cajón). Ajeno a las métricas de arriba:
+             en cloud las métricas vienen de ECS y NO requieren Bridge. -->
         <ion-card class="ion-no-margin">
           <ion-card-content>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
               <h3 style="margin: 0; font-weight: 600">Conexión Bridge</h3>
               <div style="display: flex; align-items: center; gap: 8px">
-                <ion-badge :color="bridge.online ? 'success' : 'medium'">
+                <ok-status-pill :tone="bridge.online ? 'success' : 'neutral'" dot>
                   {{ bridge.online ? 'Conectado' : 'Desconectado' }}
-                </ion-badge>
+                </ok-status-pill>
                 <ion-button fill="clear" size="small" aria-label="Recomprobar" @click="refreshBridge">
                   <HubIcon slot="icon-only" name="refresh-outline" />
                 </ion-button>
@@ -75,7 +112,6 @@
             </div>
           </ion-card-content>
         </ion-card>
-
       </template>
 
       <!-- ── Tab: Actualizaciones ───────────────────────────────── -->
@@ -84,11 +120,43 @@
           <ion-card-content style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 24px; text-align: center">
             <HubIcon name="checkmark-circle-outline" style="font-size: 48px; color: var(--ion-color-success)" />
             <strong style="font-size: 18px">Estás al día</strong>
-            <p style="margin: 0; opacity: 0.6; font-family: monospace; font-size: 13px">Hub v3.4 · comprobado ahora</p>
+            <p style="margin: 0; opacity: 0.6; font-family: monospace; font-size: 13px">
+              Hub {{ info?.hubVersion ?? '—' }} · comprobado ahora
+            </p>
             <ion-button fill="outline" @click="handleCheckUpdates">
               <HubIcon slot="start" name="refresh-outline" />
               Buscar actualizaciones
             </ion-button>
+          </ion-card-content>
+        </ion-card>
+      </template>
+
+      <!-- ── Tab: Documentos (S3 en cloud / disco en Tauri) ─────────── -->
+      <template v-else-if="tab === 'documents'">
+        <ion-card class="ion-no-margin">
+          <ion-card-content>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+              <h3 style="margin: 0; font-weight: 600">Documentos</h3>
+              <ok-status-pill tone="info">{{ storageSourceLabel }}</ok-status-pill>
+            </div>
+            <ok-empty-state
+              v-if="!documents.length"
+              icon="folder-open-outline"
+              heading="Sin documentos"
+              :message="info?.storageSource === 'disk' ? 'No hay documentos en el almacenamiento local de este equipo.' : 'El bucket de almacenamiento de este hub está vacío.'"
+            />
+            <ok-data-table
+              v-else
+              ref="docsTable"
+              :columns="docColumns"
+              :rows="documents"
+              :searchKeys="['name', 'kind']"
+              :actions="docActions"
+              search-placeholder="Buscar documento…"
+              page-size="12"
+              csv
+              csv-name="documentos"
+            ></ok-data-table>
           </ion-card-content>
         </ion-card>
       </template>
@@ -104,20 +172,32 @@
                 Copia ahora
               </ion-button>
             </div>
-            <p style="margin: 0 0 4px; font-size: 13px; opacity: 0.65">Almacenamiento usado · 2,1 GB / 8 GB</p>
-            <ion-progress-bar :value="0.26" style="margin-bottom: 16px" />
-            <ion-list :inset="false">
+
+            <template v-if="info?.storageUsed">
+              <p style="margin: 0 0 4px; font-size: 13px; opacity: 0.65">
+                Almacenamiento usado · {{ info.storageUsed.usedLabel }}<span v-if="info.storageUsed.limitLabel"> / {{ info.storageUsed.limitLabel }}</span>
+              </p>
+              <ion-progress-bar v-if="info.storageUsed.fraction != null" :value="info.storageUsed.fraction" style="margin-bottom: 16px" />
+            </template>
+
+            <ok-empty-state
+              v-if="!backups.length"
+              icon="cloud-offline-outline"
+              heading="Aún no hay copias"
+              message="Cuando el módulo de copias ejecute su primera copia (manual o programada), aparecerá aquí."
+            />
+            <ion-list v-else :inset="false">
               <ion-item
-                v-for="(backup, i) in BACKUPS"
+                v-for="(backup, i) in backups"
                 :key="backup.when"
-                :lines="i === BACKUPS.length - 1 ? 'none' : 'inset'"
+                :lines="i === backups.length - 1 ? 'none' : 'inset'"
               >
                 <HubIcon slot="start" name="server-outline" color="medium" />
                 <ion-label>
-                  <h2 style="font-weight: 600">Copia diaria</h2>
-                  <ion-note style="font-family: monospace; font-size: 12px">{{ backup.when }} · 8,6 MB</ion-note>
+                  <h2 style="font-weight: 600">Copia</h2>
+                  <ion-note style="font-family: monospace; font-size: 12px">{{ fmtDateTime(backup.when) }} · {{ backup.sizeLabel }}</ion-note>
                 </ion-label>
-                <ion-button slot="end" fill="clear" aria-label="Descargar">
+                <ion-button v-if="backup.url" slot="end" fill="clear" aria-label="Descargar" @click="openUrl(backup.url)">
                   <HubIcon slot="icon-only" name="download-outline" />
                 </ion-button>
               </ion-item>
@@ -131,48 +211,53 @@
         <ion-card class="ion-no-margin">
           <ion-card-content>
             <h3 style="margin: 0 0 12px; font-weight: 600">Registro de eventos</h3>
-            <ion-list :inset="false">
-              <ion-item
-                v-for="(l, i) in LOGS"
-                :key="i"
-                :lines="i === LOGS.length - 1 ? 'none' : 'inset'"
-              >
-                <ion-note slot="start" style="font-family: monospace; font-size: 11px; width: 78px">[{{ l.when }}]</ion-note>
-                <ion-badge :color="l.lvl === 'WARN' ? 'warning' : 'medium'" style="margin-right: 8px; flex-shrink: 0">
-                  {{ l.lvl }}
-                </ion-badge>
-                <ion-label class="ion-text-wrap" style="font-family: monospace; font-size: 12.5px">
-                  {{ l.msg }} <ion-note>{{ l.meta }}</ion-note>
-                </ion-label>
-              </ion-item>
-            </ion-list>
+            <ok-empty-state
+              v-if="!logs.length"
+              icon="document-text-outline"
+              heading="Sin eventos"
+              message="El runtime no ha reportado eventos recientes."
+            />
+            <ok-data-table
+              v-else
+              :columns="logColumns"
+              :rows="logRows"
+              :searchKeys="['message', 'meta']"
+              search-placeholder="Buscar evento…"
+              page-size="20"
+            ></ok-data-table>
           </ion-card-content>
         </ion-card>
       </template>
 
+    </template>
+
     <!-- ── Footer con ion-segment (tabs) ─────────────────────────── -->
     <template #footer>
       <ion-footer class="ion-no-border">
-      <ion-toolbar>
-        <ion-segment :value="tab" @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value">
-          <ion-segment-button value="resources">
-            <HubIcon name="pulse-outline" />
-            <ion-label>Recursos</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="updates">
-            <HubIcon name="refresh-outline" />
-            <ion-label>Actualizaciones</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="backups">
-            <HubIcon name="cloud-upload-outline" />
-            <ion-label>Copias</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="logs">
-            <HubIcon name="document-text-outline" />
-            <ion-label>Registros</ion-label>
-          </ion-segment-button>
-        </ion-segment>
-      </ion-toolbar>
+        <ion-toolbar>
+          <ion-segment :value="tab" scrollable @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value">
+            <ion-segment-button value="resources">
+              <HubIcon name="pulse-outline" />
+              <ion-label>Recursos</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="updates">
+              <HubIcon name="refresh-outline" />
+              <ion-label>Actualizaciones</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="documents">
+              <HubIcon name="folder-outline" />
+              <ion-label>Documentos</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="backups">
+              <HubIcon name="cloud-upload-outline" />
+              <ion-label>Copias</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="logs">
+              <HubIcon name="document-text-outline" />
+              <ion-label>Registros</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+        </ion-toolbar>
       </ion-footer>
 
       <ion-toast
@@ -187,31 +272,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
-  IonGrid, IonRow, IonCol, IonProgressBar, IonBadge,  IonButton,
-  IonList, IonItem, IonNote, IonToast
+  IonGrid, IonRow, IonCol, IonProgressBar, IonBadge, IonButton,
+  IonList, IonItem, IonNote, IonToast, IonSpinner
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import { detectBridge, bridgeDownloadUrl, type BridgePlatform, type BridgeStatus } from '../lib/bridge-client';
+import { fetchSystemInfo, type SystemInfo } from '../lib/system';
 
 const { t } = useI18n();
-import { detectBridge, bridgeDownloadUrl, type BridgePlatform, type BridgeStatus } from '../lib/bridge-client';
 
 // ── Types ────────────────────────────────────────────────────────
 
-type Tab = 'resources' | 'updates' | 'backups' | 'logs';
-
-interface Metric {
-  label: string;
-  value: string;
-  unit?: string;
-  icon: string;
-  progress?: number;
-}
+type Tab = 'resources' | 'updates' | 'documents' | 'backups' | 'logs';
 
 interface BridgeOs {
   label: string;
@@ -219,56 +297,130 @@ interface BridgeOs {
   platform: BridgePlatform;
 }
 
-interface Backup {
-  when: string;
+// ok-data-table (OutfitKit): tipos locales mínimos (OutfitKit no emite .d.ts de la tabla).
+type Row = Record<string, unknown>;
+interface DataTableColumn {
+  key: string;
+  header: string;
+  align?: 'left' | 'right' | 'center';
+  filterable?: boolean;
+  filterType?: 'text' | 'select' | 'number' | 'date' | 'range' | 'daterange';
+  format?: (row: Row) => string;
+  render?: (row: Row) => Node | string;
 }
-
-interface LogEntry {
-  when: string;
-  lvl: 'INFO' | 'WARN';
-  msg: string;
-  meta: string;
-}
+interface DataTableAction { id: string; label: string; icon?: string; color?: string }
 
 // ── State ────────────────────────────────────────────────────────
 
 const tab = ref<Tab>('resources');
 const toastMessage = ref('');
 const toastOpen = ref(false);
+const loading = ref(true);
 
-// Estado real del Bridge local (detección por GET localhost:12321/status).
+// Estado REAL del sistema (GET /api/system). null = endpoint aún no disponible → UI degrada.
+const info = ref<SystemInfo | null>(null);
+// Estado real del Bridge local (GET localhost:12321/status), independiente del runtime.
 const bridge = ref<BridgeStatus>({ online: false });
-
-// ── Static demo data (fiel al original) ─────────────────────────
-
-const METRICS: Metric[] = [
-  { label: 'RAM',            value: '612 MB',   unit: 'de 2 GB',  icon: 'server-outline',       progress: 0.3  },
-  { label: 'CPU',            value: '0,4 cores', unit: '2 vCPU',  icon: 'hardware-chip-outline', progress: 0.2  },
-  { label: 'Base de datos',  value: '8,6 MB',   unit: 'SQLite local', icon: 'server-outline'                  },
-  { label: 'Conexiones BD',  value: '12',       unit: '/ 120',    icon: 'flash-outline',         progress: 0.1 },
-];
 
 const bridgeSteps: string[] = ['Descargar', 'Instalar', 'Vincular', 'Configurar'];
 
 // macOS fuera (solo desarrollo local). El Cloud sirve Windows/Linux/Android.
 const BRIDGE_OS: BridgeOs[] = [
-  { label: 'Windows', icon: 'desktop-outline',       platform: 'windows' },
-  { label: 'Linux',   icon: 'terminal-outline',      platform: 'linux'   },
+  { label: 'Windows', icon: 'desktop-outline',        platform: 'windows' },
+  { label: 'Linux',   icon: 'terminal-outline',       platform: 'linux'   },
   { label: 'Android', icon: 'phone-portrait-outline', platform: 'android' },
 ];
 
-const BACKUPS: Backup[] = [
-  { when: '2026-05-30 03:00' },
-  { when: '2026-05-29 03:00' },
-  { when: '2026-05-28 03:00' },
+// ── Derivados (axis-aware) ───────────────────────────────────────
+
+const dbEngineLabel = computed<string>(() => {
+  const e = info.value?.database.engine ?? '';
+  if (e === 'sqlite') return 'SQLite local';
+  if (e === 'aurora') return 'Aurora';
+  if (e === 'postgres') return 'PostgreSQL';
+  return e || '—';
+});
+
+// Métricas con defaults a 0: las tarjetas KPI SIEMPRE se muestran (aunque no haya datos del
+// runtime todavía), con valores neutros. En cloud estos datos vienen de ECS, no del Bridge.
+const cpu = computed(() => info.value?.cpu ?? null);
+const memory = computed(() => info.value?.memory ?? null);
+
+// Gauges: % de uso (0 sin datos) + subetiqueta con el valor absoluto.
+const cpuPct = computed<number>(() => Math.round((cpu.value?.fraction ?? 0) * 100));
+const memPct = computed<number>(() => Math.round((memory.value?.fraction ?? 0) * 100));
+const cpuSub = computed<string>(() =>
+  cpu.value ? [cpu.value.usedLabel, cpu.value.limitLabel].filter(Boolean).join(' · ') : '—'
+);
+const memSub = computed<string>(() =>
+  memory.value ? [memory.value.usedLabel, memory.value.limitLabel].filter(Boolean).join(' · ') : '—'
+);
+// Zonas de color del gauge de uso (verde→ámbar→rojo). Hex Ionic para que el SVG las pinte fiable.
+const usageThresholds = [
+  { to: 70, color: '#2dd36f' },
+  { to: 90, color: '#ffc409' },
+  { to: 100, color: '#eb445a' },
 ];
 
-const LOGS: LogEntry[] = [
-  { when: '03:00:01', lvl: 'INFO', msg: 'backup.completed',   meta: 'size=8.6MB'              },
-  { when: '02:14:55', lvl: 'INFO', msg: 'module.sync',        meta: 'ok'                       },
-  { when: '01:58:12', lvl: 'WARN', msg: 'bridge.disconnected', meta: 'retry=3'                 },
-  { when: '01:40:03', lvl: 'INFO', msg: 'auth.login',         meta: 'user=demo@erplora.com'    },
-  { when: '00:12:44', lvl: 'INFO', msg: 'invoice.issued',     meta: 'INV-2026-00034'           },
+const dbValue = computed<string>(() => info.value?.database?.sizeLabel ?? dbEngineLabel.value);
+const dbSub = computed<string>(() => {
+  const db = info.value?.database;
+  if (db?.sizeLabel) return dbEngineLabel.value;          // single: "SQLite local" bajo el tamaño
+  if (db) return db.engine === 'sqlite' ? 'SQLite local' : 'gestionada por AWS';
+  return 'gestionada por AWS';
+});
+const dbConnections = computed<number>(() => info.value?.database?.connections ?? 0);
+const connectionsMax = computed<number>(() => info.value?.database?.connectionsLimit ?? 100);
+const connectionsLimitLabel = computed<string>(() =>
+  info.value?.database?.connectionsLimit != null ? `de ${info.value.database.connectionsLimit}` : 'activas'
+);
+
+const storageSourceLabel = computed<string>(() =>
+  info.value?.storageSource === 'disk' ? 'Disco local' : 'Almacenamiento S3'
+);
+
+const documents = computed<Row[]>(() => (info.value?.documents ?? []) as unknown as Row[]);
+const backups = computed(() => info.value?.backups ?? []);
+const logs = computed(() => info.value?.logs ?? []);
+const logRows = computed<Row[]>(() => logs.value as unknown as Row[]);
+
+// ── Formato ──────────────────────────────────────────────────────
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+// Pill de nivel de log como nodo DOM (patrón de celda rica de ok-data-table desde Vue).
+function levelPill(row: Row): Node {
+  const level = String(row.level ?? 'INFO');
+  const pill = document.createElement('ok-status-pill');
+  pill.setAttribute('size', 'sm');
+  pill.setAttribute('tone', level === 'ERROR' ? 'danger' : level === 'WARN' ? 'warning' : 'neutral');
+  pill.textContent = level;
+  return pill;
+}
+
+// ── Columnas de tabla ────────────────────────────────────────────
+
+const docColumns: DataTableColumn[] = [
+  { key: 'name', header: 'Nombre' },
+  { key: 'kind', header: 'Tipo', filterable: true, filterType: 'select', format: (r) => String(r.kind ?? '—') },
+  { key: 'sizeLabel', header: 'Tamaño', align: 'right' },
+  { key: 'modified', header: 'Modificado', filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.modified)) },
+];
+const docActions: DataTableAction[] = [
+  { id: 'download', label: 'Descargar', icon: 'download' },
+];
+
+const logColumns: DataTableColumn[] = [
+  { key: 'when', header: 'Hora', format: (r) => fmtDateTime(String(r.when)) },
+  { key: 'level', header: 'Nivel', filterable: true, filterType: 'select', render: levelPill },
+  { key: 'message', header: 'Evento', format: (r) => `${String(r.message)}${r.meta ? `  ${String(r.meta)}` : ''}` },
 ];
 
 // ── Handlers ─────────────────────────────────────────────────────
@@ -276,6 +428,10 @@ const LOGS: LogEntry[] = [
 function showToast(message: string): void {
   toastMessage.value = message;
   toastOpen.value = true;
+}
+
+function openUrl(url: string | null | undefined): void {
+  if (url) window.open(url, '_blank', 'noopener');
 }
 
 function handleBridgeDownload(os: BridgeOs): void {
@@ -288,8 +444,6 @@ async function refreshBridge(): Promise<void> {
   bridge.value = await detectBridge();
 }
 
-onMounted(refreshBridge);
-
 function handleCheckUpdates(): void {
   showToast('Buscando actualizaciones…');
 }
@@ -297,4 +451,69 @@ function handleCheckUpdates(): void {
 function handleBackupNow(): void {
   showToast('Creando copia…');
 }
+
+// `rowAction` es camelCase; Vue lo baja a minúsculas en plantilla → se engancha con ref + listener.
+const docsTable = ref<HTMLElement | null>(null);
+function handleDocAction(e: Event): void {
+  const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
+  if (actionId === 'download') openUrl(row.url as string | undefined);
+}
+
+// La tabla de Documentos solo está en el DOM cuando su pestaña está activa (v-else-if). Al
+// activarla, esperamos al render y enganchamos el listener de `rowAction` (idempotente).
+watch(tab, async (value) => {
+  if (value !== 'documents') return;
+  await nextTick();
+  docsTable.value?.addEventListener('rowAction', handleDocAction);
+});
+
+onMounted(async () => {
+  void refreshBridge();
+  info.value = await fetchSystemInfo();
+  loading.value = false;
+});
+onBeforeUnmount(() => {
+  docsTable.value?.removeEventListener('rowAction', handleDocAction);
+});
 </script>
+
+<style scoped>
+/* Tarjetas de métrica: misma altura, contenido centrado (gauge o stat). */
+.metric-card {
+  margin: 4px;
+  height: 100%;
+}
+.metric-card__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 178px;
+  box-sizing: border-box;
+}
+/* Tarjeta de Base de datos: stat centrada (no es un %), alineada con los gauges. */
+.metric-stat {
+  gap: 4px;
+  text-align: center;
+}
+.metric-stat__icon {
+  font-size: 28px;
+  opacity: 0.5;
+  margin-bottom: 4px;
+}
+.metric-stat__label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ion-color-medium);
+}
+.metric-stat__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.metric-stat__sub {
+  font-size: 0.8125rem;
+  color: var(--ion-color-medium);
+}
+</style>

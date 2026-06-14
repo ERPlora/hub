@@ -8,6 +8,15 @@
 
 // Compuestos / dashboard
 import './components/ok-data-table/ok-data-table.js';
+// App launcher
+import './components/ok-app-launcher/ok-app-launcher.js';
+// Dashboard / métricas (pantalla /system)
+import './components/ok-gauge/ok-gauge.js';
+import './components/ok-kpi/ok-kpi.js';
+import './components/ok-stat/ok-stat.js';
+import './components/ok-sparkline/ok-sparkline.js';
+import './components/ok-status-pill/ok-status-pill.js';
+import './components/ok-empty-state/ok-empty-state.js';
 // Landing chrome
 import './components/ok-navbar/ok-navbar.js';
 import './components/ok-footer/ok-footer.js';

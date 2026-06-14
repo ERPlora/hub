@@ -4,6 +4,7 @@ import { addIcons } from 'ionicons';
 import {
   pencil, trash, add, close, chevronBack, chevronForward,
   listOutline, gridOutline, funnelOutline, downloadOutline, cloudUploadOutline,
+  appsOutline, closeOutline,
 } from 'ionicons/icons';
 
 import App from './App.vue';
@@ -24,6 +25,8 @@ addIcons({
   'chevron-back': chevronBack, 'chevron-forward': chevronForward,
   'list-outline': listOutline, 'grid-outline': gridOutline, 'funnel-outline': funnelOutline,
   'download-outline': downloadOutline, 'cloud-upload-outline': cloudUploadOutline,
+  // Trigger (rejilla) y cerrar de ok-app-launcher (OutfitKit), por NOMBRE.
+  'apps-outline': appsOutline, 'close-outline': closeOutline,
 });
 
 // CSS base de Ionic (core + utilidades). Dark mode por clase (.ion-palette-dark).
@@ -38,6 +41,15 @@ import '@ionic/vue/css/palettes/dark.class.css';
 // OutfitKit: registra los Web Components (Lit) que usa el shell. OutfitKit aporta lo que Ionic
 // no tiene o compuestos complejos (p. ej. ok-data-table). Import por efecto secundario.
 import '@erplora/outfitkit/ok-data-table';
+// Launcher de apps (rejilla «Google apps» + hoja inferior) usado en la topbar del shell.
+import '@erplora/outfitkit/ok-app-launcher';
+// Dashboard / métricas de la pantalla /system (gauge, KPIs, stat, sparkline, pill de estado, vacío).
+import '@erplora/outfitkit/ok-gauge';
+import '@erplora/outfitkit/ok-kpi';
+import '@erplora/outfitkit/ok-stat';
+import '@erplora/outfitkit/ok-sparkline';
+import '@erplora/outfitkit/ok-status-pill';
+import '@erplora/outfitkit/ok-empty-state';
 // Los ok-* asumen que el host registró los ion-* que usan por dentro (searchbar/select/overlays).
 import { registerOutfitkitIonicDeps } from './lib/ionic-wc';
 
