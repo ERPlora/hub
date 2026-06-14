@@ -151,10 +151,10 @@ async function get<T>(path: string, timeoutMs = 8000): Promise<T> {
 // añade la credencial y proxea al Cloud. Reenviamos el JWT del usuario como FALLBACK para dev /
 // Tauri sin enrolar (el runtime prefiere su token de máquina cuando lo tiene). RUNTIME_URL se
 // define aquí (no se importa de ./runtime) para no crear un ciclo de módulos.
-// Default: PRODUCCIÓN (build) → "" = mismo origen; DEV → 127.0.0.1:8787 (proxy Vite).
+// Default: "" = mismo origen siempre (prod: el hub sirve el dist; dev: rutas relativas → proxy
+// Vite hacia :8787, sin CORS). La URL absoluta :8787 en dev rompía por CORS.
 const RUNTIME_URL: string =
-  (import.meta.env.VITE_RUNTIME_URL as string | undefined) ||
-  (import.meta.env.PROD ? '' : 'http://127.0.0.1:8787');
+  (import.meta.env.VITE_RUNTIME_URL as string | undefined) || '';
 
 async function runtimeGet<T>(path: string, timeoutMs = 8000): Promise<T> {
   const call = (token: string | null): Promise<Response> => {

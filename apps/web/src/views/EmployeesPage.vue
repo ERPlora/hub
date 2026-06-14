@@ -1,22 +1,22 @@
 <template>
   <AppPage :title="t('nav.employees')">
-    <template #actions>
-      <ion-button @click="onNew">
-        <HubIcon slot="start" name="add-outline" />
-        Nuevo empleado
-      </ion-button>
-    </template>
-
-    <!-- Staff: tabla con ok-data-table (OutfitKit) -->
+    <!-- `.fill` fija el alto al área de `ion-content`; las tablas en modo `fill` resuelven su
+         `:host{height:100%}` contra él → cabecera y pager fijos, scroll SOLO en el cuerpo, y se
+         adapta a la altura del dispositivo (mismo patrón que ModuleView). -->
+    <div class="fill">
+      <!-- Staff: tabla con ok-data-table (OutfitKit) — toda la chrome (búsqueda, alta, selector de
+           columnas, filas/página, vistas, CSV) vive DENTRO de la tabla, no en la topbar. -->
       <ok-data-table
         v-show="tab === 'staff'"
         ref="staffTable"
+        fill
         :columns="employeeColumns"
         :rows="employees"
         :searchKeys="['name', 'email', 'role']"
         :actions="rowActions"
+        :primaryAction="newEmployeeAction"
         search-placeholder="Buscar empleado…"
-        page-size="12"
+        page-size="10"
         views
         csv
         csv-name="empleados"
@@ -24,7 +24,7 @@
       ></ok-data-table>
 
       <!-- Usuarios: placeholder (igual que el original) -->
-      <div v-show="tab === 'users'" class="grid place-items-center py-16 text-center opacity-60">
+      <div v-show="tab === 'users'" class="grid place-items-center h-full text-center opacity-60">
         El acceso de usuarios (PIN, cuentas) se gestionará aquí.
       </div>
 
@@ -32,16 +32,20 @@
       <ok-data-table
         v-show="tab === 'roles'"
         ref="rolesTable"
+        fill
         :columns="roleColumns"
         :rows="roles"
         :searchKeys="['name', 'scope']"
         :actions="rowActions"
+        :primaryAction="newRoleAction"
         search-placeholder="Buscar rol…"
-        page-size="12"
+        page-size="10"
         views
         csv
         csv-name="roles"
+        column-picker
       ></ok-data-table>
+    </div>
     <!-- Tabs en footer (staff / usuarios / roles) -->
     <template #footer>
       <ion-footer class="ion-no-border">
@@ -75,7 +79,7 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
-  IonButton,  IonFooter, IonSegment, IonSegmentButton, IonLabel
+  IonFooter, IonSegment, IonSegmentButton, IonLabel
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -94,6 +98,7 @@ interface DataTableColumn {
   render?: (row: Row) => Node | string;
 }
 interface DataTableAction { id: string; label: string; icon?: string; color?: string }
+interface DataTablePrimaryAction { label: string; icon?: string }
 
 type EmployeeTab = 'staff' | 'users' | 'roles';
 
@@ -192,8 +197,16 @@ const rowActions: DataTableAction[] = [
   { id: 'delete', label: 'Borrar', icon: 'trash', color: 'danger' },
 ];
 
+// Acción primaria (botón "Nuevo") dentro de la propia tabla → evento `primaryAction`.
+const newEmployeeAction: DataTablePrimaryAction = { label: 'Nuevo empleado', icon: 'add' };
+const newRoleAction: DataTablePrimaryAction = { label: 'Nuevo rol', icon: 'add' };
+
 function onNew(): void {
   void router.push('/employees/new');
+}
+function onNewRole(): void {
+  // Sin pantalla de alta de rol todavía (pendiente humano); se registra el intento.
+  console.info('roles.new');
 }
 
 // `rowAction` es camelCase; Vue baja a minúsculas los nombres de evento en plantilla, así que se
@@ -210,12 +223,30 @@ function handleRowAction(e: Event): void {
   }
 }
 
+// `primaryAction` (botón "Nuevo" de la tabla) también es camelCase → addEventListener.
+function handleStaffPrimary(): void { onNew(); }
+function handleRolesPrimary(): void { onNewRole(); }
+
 onMounted(() => {
   staffTable.value?.addEventListener('rowAction', handleRowAction);
   rolesTable.value?.addEventListener('rowAction', handleRowAction);
+  staffTable.value?.addEventListener('primaryAction', handleStaffPrimary);
+  rolesTable.value?.addEventListener('primaryAction', handleRolesPrimary);
 });
 onBeforeUnmount(() => {
   staffTable.value?.removeEventListener('rowAction', handleRowAction);
   rolesTable.value?.removeEventListener('rowAction', handleRowAction);
+  staffTable.value?.removeEventListener('primaryAction', handleStaffPrimary);
+  rolesTable.value?.removeEventListener('primaryAction', handleRolesPrimary);
 });
 </script>
+
+<style scoped>
+/* Fija el alto al área de `ion-content` (no `min-height`): las tablas en modo `fill` resuelven
+   su `:host{height:100%}` contra este contenedor → cabecera + pager fijos y scroll SOLO en el
+   cuerpo, adaptándose a la altura disponible del dispositivo. Mismo patrón que `.outlet` de
+   ModuleView. */
+.fill {
+  height: 100%;
+}
+</style>

@@ -20,13 +20,14 @@ import { getHubSession } from './session';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
- * Default: en PRODUCCIÓN (build) → "" = MISMO ORIGEN (el propio hub sirve este dist en el
- * mismo host:puerto que /api y /ws). En DEV (`vite dev`) → http://127.0.0.1:8787 (proxy Vite).
+ * Default: "" = MISMO ORIGEN siempre. En PRODUCCIÓN (build) el propio hub sirve este dist en el
+ * mismo host:puerto que /api y /ws. En DEV (`vite dev`) las rutas relativas (/api, /ws) pasan por
+ * el PROXY de Vite hacia :8787 (mismo origen → sin CORS; el runtime Axum no expone CORS). Usar la
+ * URL absoluta :8787 en dev rompía por CORS (fetch cross-origin desde :5173).
  * `VITE_RUNTIME_URL` sigue teniendo prioridad si se define.
  */
 export const RUNTIME_URL: string =
-  (import.meta.env.VITE_RUNTIME_URL as string | undefined) ||
-  (import.meta.env.PROD ? '' : 'http://127.0.0.1:8787');
+  (import.meta.env.VITE_RUNTIME_URL as string | undefined) || '';
 
 /** Usuario con PIN del hub (para el grid de login local). */
 export interface PinUser {

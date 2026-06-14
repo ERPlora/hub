@@ -286,6 +286,17 @@ ok-data-table {
   box-shadow: var(--ok-shadow-sm);
   overflow: hidden;
 }
+/* Modo `fill`: la tabla ocupa el alto disponible (cabecera + pager fijos, scroll en el cuerpo).
+   Esta regla a NIVEL DOCUMENTO es necesaria porque, para el host de un shadow tree, las
+   declaraciones normales del árbol EXTERNO ganan a `:host([fill])` (paso de contexto del cascade,
+   antes que la especificidad) — sin ella, el `display:block` de arriba anulaba el `display:flex`
+   interno y la tabla se quedaba a la altura del contenido. */
+ok-data-table[fill] {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
 
 /* ── Scrollbar fino moderno ───────────────────────────────────────────────────────────────── */
 * { scrollbar-width: thin; scrollbar-color: rgba(var(--ion-text-color-rgb), 0.22) transparent; }
