@@ -25,7 +25,7 @@
       </template>
     </AppTopbar>
 
-    <ion-content fullscreen="true" class="ion-padding">
+    <ion-content :fullscreen="true" class="ion-padding">
       <slot />
     </ion-content>
 
