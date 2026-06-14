@@ -520,6 +520,7 @@ fn embedded_serve_config(
             jwt_public_key: None, // `serve()` la trae del Cloud si hay red (login cloud); PIN no la necesita
             cloud_api_token: None, // la celda compartida es la fuente del token (hot-reload)
             device_trust_enforce: false, // hub#15: gate de login por PIN; el host debe aportar device_id antes de activarlo
+            media_dir: cache_dir.join("media"), // ficheros/documentos locales en el app data dir (junto a SQLite y módulos)
         },
         machine_token_cell: Some(machine_token_cell),
     }
@@ -752,6 +753,12 @@ pub fn run() {
             // Arranca el runtime local ANTES de que el webview lo necesite (login `/api/auth/cloud`,
             // query/command, entitlement). app_data_dir es la raíz de datos por-instalación.
             if let Ok(cache_dir) = app.path().app_data_dir() {
+                // Primer arranque: el `app_data_dir` puede no existir aún en disco. Créalo antes de
+                // tocarlo (SQLite/módulos/media/token cuelgan de aquí), o el runtime embebido muere
+                // al abrir `erplora.db` (sqlx code 14: unable to open database file).
+                if let Err(e) = std::fs::create_dir_all(&cache_dir) {
+                    eprintln!("runtime embebido: no se pudo crear app_data_dir ({}): {e}", cache_dir.display());
+                }
                 // Celda compartida del token de máquina: la siembra el keychain/fichero y se
                 // conserva en el estado de Tauri para actualizarla en caliente tras enrolar/rotar.
                 let cell: erplora_server::MachineToken =

@@ -12,6 +12,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/employees', name: 'employees', component: () => import('../views/EmployeesPage.vue'), meta: { auth: true } },
   { path: '/employees/new', name: 'employee-new', component: () => import('../views/EmployeeFormPage.vue'), meta: { auth: true } },
   { path: '/employees/:id', name: 'employee-edit', component: () => import('../views/EmployeeFormPage.vue'), meta: { auth: true } },
+  { path: '/files', name: 'files', component: () => import('../views/FilesPage.vue'), meta: { auth: true } },
   { path: '/billing', name: 'billing', component: () => import('../views/BillingPage.vue'), meta: { auth: true } },
   { path: '/marketplace', name: 'marketplace', component: () => import('../views/MarketplacePage.vue'), meta: { auth: true } },
   { path: '/system', name: 'system', component: () => import('../views/SystemPage.vue'), meta: { auth: true } },

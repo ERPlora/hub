@@ -22,6 +22,7 @@
     "./ok-sparkline": "./dist/ok-sparkline.js",
     "./ok-status-pill": "./dist/ok-status-pill.js",
     "./ok-empty-state": "./dist/ok-empty-state.js",
+    "./ok-file-manager": "./dist/ok-file-manager.js",
     "./ok-navbar": "./dist/ok-navbar.js",
     "./ok-footer": "./dist/ok-footer.js",
     "./ok-container": "./dist/ok-container.js",

@@ -168,6 +168,7 @@ async fn hub_context_returns_configured_hub_id() {
         jwt_public_key: None,
         cloud_api_token: None,
         device_trust_enforce: false,
+        media_dir: std::env::temp_dir().join("erplora-test-media"),
     };
     let app = app(AppState::with_config(rt, cfg));
     let resp = app

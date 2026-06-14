@@ -50,6 +50,8 @@ import '@erplora/outfitkit/ok-stat';
 import '@erplora/outfitkit/ok-sparkline';
 import '@erplora/outfitkit/ok-status-pill';
 import '@erplora/outfitkit/ok-empty-state';
+// Gestor de archivos (Drive-like) de la carpeta media del Hub — pantalla /files.
+import '@erplora/outfitkit/ok-file-manager';
 // Los ok-* asumen que el host registró los ion-* que usan por dentro (searchbar/select/overlays).
 import { registerOutfitkitIonicDeps } from './lib/ionic-wc';
 

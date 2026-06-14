@@ -2,10 +2,10 @@
 // compartido y el menú lo compartan sin prop-drilling. Reactivo con `ref`.
 //
 // Incluye:
-//  - railCollapsed   → colapsar el menú lateral a "rail" (solo escritorio). DECISIÓN HUMANO
-//    PENDIENTE (issue #38 punto 7): el toggle del rail está hoy en la cabecera del sidebar
-//    (App.vue), NO en la topbar como en Cloud. Mantenemos la ubicación actual del Hub hasta que
-//    el humano decida; el estado vive aquí para que ambos sitios puedan tocarlo.
+//  - railCollapsed   → colapsar el menú lateral a "rail" (solo escritorio). El toggle vive en la
+//    topbar compartida (AppTopbar), a la derecha del back, dando paridad con el shell de Cloud
+//    (icono `panel-left`). El estado vive aquí porque lo tocan AppTopbar (botón) y App.vue
+//    (clase `.rail` del split-pane).
 //  - assistantOpen   → drawer del asistente (lo abre el botón sparkles de la topbar).
 //  - assistantAvailable → ¿se muestra el botón del asistente? (capacidad del hub).
 //  - inFlight        → contador de peticiones en vuelo → barra de progreso de la topbar.

@@ -5,21 +5,13 @@
         <ion-grid class="ion-no-padding">
           <ion-row>
             <ion-col v-for="kpi in KPIS" :key="kpi.label" size="6" size-md="3">
-              <ion-card class="ion-no-margin">
-                <ion-card-header>
-                  <ion-card-subtitle>
-                    <HubIcon :name="kpi.icon" /> {{ kpi.label }}
-                  </ion-card-subtitle>
-                  <ion-card-title>{{ kpi.value }}</ion-card-title>
-                </ion-card-header>
-                <ion-card-content v-if="kpi.sub">
-                  <ion-text :color="trendColor(kpi.trend)">
-                    <HubIcon v-if="kpi.trend === 'up'" name="trending-up-outline" />
-                    <HubIcon v-else-if="kpi.trend === 'down'" name="trending-down-outline" />
-                    {{ kpi.sub }}
-                  </ion-text>
-                </ion-card-content>
-              </ion-card>
+              <ok-kpi
+                :label="kpi.label"
+                :value="kpi.value"
+                :icon="kpi.icon"
+                :delta="kpi.sub"
+                :trend="kpi.trend ?? 'flat'"
+              />
             </ion-col>
           </ion-row>
         </ion-grid>
@@ -124,9 +116,9 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
-  IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
+  IonSegment, IonSegmentButton, IonLabel, IonCard,
   IonCardContent, IonGrid, IonRow, IonCol,  IonBadge, IonButton, IonSpinner,
-  IonList, IonListHeader, IonItem, IonNote, IonText, IonToolbar
+  IonList, IonListHeader, IonItem, IonNote, IonToolbar
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -135,15 +127,13 @@ import { loadMenu, type MenuEntry } from '../lib/module-loader';
 const { t } = useI18n();
 
 type Tab = 'resumen' | 'apps' | 'actividad';
-type Trend = 'up' | 'down';
+type Trend = 'up' | 'down' | 'flat';
 type Tone = 'success' | 'warning' | 'primary';
 
 const tab = ref<Tab>('resumen');
 const modules = ref<MenuEntry[]>([]);
 const loading = ref<boolean>(true);
 const router = useRouter();
-
-const trendColor = (t?: Trend): string => (t === 'up' ? 'success' : t === 'down' ? 'danger' : 'medium');
 
 interface Kpi { label: string; value: string; icon: string; sub?: string; trend?: Trend }
 const KPIS: Kpi[] = [

@@ -33,6 +33,8 @@ pub mod backup;
 pub mod embed;
 pub mod ingest;
 pub mod install;
+pub mod logging;
+pub mod media;
 pub mod router;
 pub mod session;
 pub mod state;
@@ -115,6 +117,11 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     use erplora_runtime::Runtime;
 
     use erplora_vector::{SqliteVectorStore, VectorStore};
+
+    // Logging del hub → consola + `media/_logs/` (rotación diaria, retención 6 meses, ADR-0047).
+    // Se monta lo primero para capturar el arranque. El guard se mantiene vivo toda la función
+    // (al soltarlo se pierden los logs en cola del appender no-bloqueante).
+    let _log_guard = logging::init(&cfg.hub.media_dir);
 
     // Path del SQLite del hub: fuente del dump de backup (`VACUUM INTO`); se captura antes de mover
     // `cfg` al state.
@@ -267,6 +274,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
 
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
     eprintln!("erplora-server escuchando en http://{}", cfg.bind);
+    tracing::info!(bind = %cfg.bind, "erplora-server arrancado");
     // Apagado limpio (ECS/Tauri): Ctrl-C o SIGTERM → deja de aceptar conexiones y drena las en
     // vuelo antes de salir, en vez de cortar a mitad (importante para ECS al desescalar/desplegar).
     axum::serve(listener, router)
@@ -303,6 +311,11 @@ pub fn app(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/api/hub/context", get(hub_context))
         .route("/api/system", get(system::system_info))
+        // Gestor de la carpeta `media/` (pantalla /files). Browse + raw + upload + delete + mkdir.
+        .route("/api/media", get(media::media_list).delete(media::media_delete))
+        .route("/api/media/raw", get(media::media_raw))
+        .route("/api/media/upload", post(media::media_upload))
+        .route("/api/media/folder", post(media::media_create_folder))
         .route("/api/navigation", get(navigation))
         .route("/api/modules", get(list_modules))
         .route("/api/modules/install", post(install_module))
@@ -327,6 +340,18 @@ pub fn app(state: AppState) -> Router {
         // reconexión del navegador (EventSource) + keep-alive (idle timeout del ALB). Nombre de
         // ruta = decisión del humano (`/api/events` por defecto).
         .route("/api/events", get(sse_events))
+        // Log de cada request (método/ruta/estado/latencia) a INFO → consola + `media/_logs/`
+        // (ADR-0047): la primera población real de la carpeta media. La respuesta se loguea a INFO;
+        // los fallos del propio servidor a ERROR.
+        .layer(
+            tower_http::trace::TraceLayer::new_for_http()
+                .on_response(
+                    tower_http::trace::DefaultOnResponse::new().level(tracing::Level::INFO),
+                )
+                .on_failure(
+                    tower_http::trace::DefaultOnFailure::new().level(tracing::Level::ERROR),
+                ),
+        )
         .with_state(state)
 }
 

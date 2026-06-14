@@ -16,19 +16,8 @@
                 <span class="erp-wordmark nav-label">erplora</span>
               </a>
             </ion-menu-toggle>
-            <ion-buttons slot="end">
-              <!-- DECISIÓN HUMANO PENDIENTE (issue #38 pto 7): el rail-toggle vive aquí (cabecera
-                   del sidebar), NO en la topbar como en Cloud. Se mantiene la ubicación del Hub
-                   hasta que el humano decida; el estado es compartido (lib/shell). -->
-              <ion-button
-                class="rail-toggle"
-                fill="clear"
-                :aria-label="railCollapsed ? t('topbar.expandMenu') : t('topbar.collapseMenu')"
-                @click="railCollapsed = !railCollapsed"
-              >
-                <HubIcon slot="icon-only" :name="railCollapsed ? 'chevron-forward-outline' : 'chevron-back-outline'" />
-              </ion-button>
-            </ion-buttons>
+            <!-- El rail-toggle se movió a la topbar compartida (AppTopbar), a la derecha del back,
+                 para dar paridad con el shell de Cloud. El estado sigue en lib/shell (railCollapsed). -->
           </ion-toolbar>
         </ion-header>
 
@@ -129,7 +118,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
-  IonApp, IonSplitPane, IonMenu, IonMenuToggle, IonHeader, IonToolbar, IonButtons,
+  IonApp, IonSplitPane, IonMenu, IonMenuToggle, IonHeader, IonToolbar,
   IonContent, IonList, IonListHeader, IonItem, IonLabel,  IonFooter,
   IonButton, IonRouterOutlet
 } from '@ionic/vue';
@@ -153,6 +142,7 @@ const nav: NavSection[] = [
     items: [
       { path: '/dashboard', labelKey: 'nav.home', icon: 'home-outline' },
       { path: '/employees', labelKey: 'nav.employees', icon: 'people-outline' },
+      { path: '/files', labelKey: 'nav.files', icon: 'folder-outline' },
     ]
   },
   {

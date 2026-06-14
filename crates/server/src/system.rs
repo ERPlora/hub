@@ -119,12 +119,22 @@ async fn collect_database(db: &dyn erplora_db::DatabaseAdapter, dialect: Dialect
             )
             .await
             .unwrap_or(0);
-            let limit = scalar_i64(
+            // Límite CONTRATADO = el CONNECTION LIMIT del rol del hub (lo fija Cloud al provisionar
+            // según el plan: `ALTER ROLE … CONNECTION LIMIT n`). `rolconnlimit = -1` ⇒ el rol no
+            // tiene tope propio → caemos al `max_connections` del cluster (tope físico de Aurora).
+            let role_limit = scalar_i64(
                 db,
-                "SELECT current_setting('max_connections')::int AS n",
+                "SELECT rolconnlimit FROM pg_roles WHERE rolname = current_user",
                 &no_params,
             )
-            .await;
+            .await
+            .filter(|&n| n >= 0);
+            let limit = match role_limit {
+                Some(n) => Some(n),
+                None => {
+                    scalar_i64(db, "SELECT current_setting('max_connections')::int AS n", &no_params).await
+                }
+            };
             json!({
                 "engine": "postgres",
                 "sizeLabel": Value::Null,   // Aurora compartida por organización: sin "tamaño local"

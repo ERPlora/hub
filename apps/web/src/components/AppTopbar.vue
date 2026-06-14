@@ -27,6 +27,17 @@
         >
           <HubIcon slot="icon-only" name="arrow-back-outline" />
         </ion-button>
+        <!-- Rail-toggle (colapsar/expandir el menú lateral). Paridad con Cloud: vive en la topbar
+             de TODA la app, a la derecha del back. Icono `panel-left` (= lucide:panel-left de Cloud).
+             Solo escritorio (.rail-toggle se oculta en móvil, donde manda el drawer). -->
+        <ion-button
+          class="rail-toggle"
+          fill="clear"
+          :aria-label="railCollapsed ? t('topbar.expandMenu') : t('topbar.collapseMenu')"
+          @click="railCollapsed = !railCollapsed"
+        >
+          <HubIcon slot="icon-only" name="panel-left" />
+        </ion-button>
       </ion-buttons>
 
       <ion-title>{{ title }}</ion-title>
@@ -108,7 +119,7 @@ import {
 import HubIcon from './HubIcon.vue';
 import { user } from '../lib/session';
 import { isDark, toggleTheme } from '../lib/theme';
-import { assistantAvailable, toggleAssistant, notificationCount, isLoading } from '../lib/shell';
+import { assistantAvailable, toggleAssistant, notificationCount, isLoading, railCollapsed } from '../lib/shell';
 import { moduleNav } from '../lib/nav';
 import { resolveIcon } from '../lib/icons';
 import { PROFILE_ROUTE } from '../lib/routes';

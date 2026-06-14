@@ -91,6 +91,12 @@ import bugOutline from "~icons/ion/bug-outline?raw";
 import closeOutline from "~icons/ion/close-outline?raw";
 import stopCircleOutline from "~icons/ion/stop-circle-outline?raw";
 
+// `panel-left` (lucide) — NO hay equivalente en el set `ion:`; se hornea a mano para dar paridad
+// exacta con el rail-toggle de Cloud (que usa `lucide:panel-left`). SVG inline = offline/CSP-safe,
+// igual que los `?raw` de arriba (resolveIcon lo trata como SVG ya resuelto).
+const panelLeft =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></g></svg>';
+
 /** SVG inline (string) por nombre Iconify `ion:`. Build-time, no runtime. */
 const SVGS: Record<string, string> = {
   "add-outline": addOutline,
@@ -175,6 +181,7 @@ const SVGS: Record<string, string> = {
   "bug-outline": bugOutline,
   "close-outline": closeOutline,
   "stop-circle-outline": stopCircleOutline,
+  "panel-left": panelLeft,
 };
 
 // Alias de nombres estilo lucide que arrastran manifests antiguos → equivalente `ion:`.

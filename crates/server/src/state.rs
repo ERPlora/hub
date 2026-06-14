@@ -1,6 +1,6 @@
 //! Estado compartido del server: el runtime (tras un lock), el canal de eventos para WS,
 //! y la configuración de despliegue (hub_id + Cloud Portal + cache de módulos).
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use erplora_runtime::{EventSink, Runtime};
@@ -64,6 +64,12 @@ pub struct HubConfig {
     /// vive solo aquí (runtime), nunca en el navegador. `None` en dev/local sin enrolar → se cae al
     /// JWT del usuario activo. Ver ARQUITECTURA.md §2.3.
     pub cloud_api_token: Option<String>,
+    /// Raíz de la carpeta `media/` del hub: path por defecto de TODOS los ficheros (adjuntos de
+    /// módulos, registros `_logs/`, actividad `_system/`). La navega la pantalla /files
+    /// (`crate::media`). La inyecta el despliegue vía env `HUB_MEDIA_DIR`; default `./media`
+    /// (relativo al CWD del proceso), creado de forma perezosa al primer acceso. En cloud (S3) el
+    /// listado de objetos es follow-up del humano (igual que documentos en `system.rs`).
+    pub media_dir: PathBuf,
     /// **Device-trust** del login por PIN (§2.9, hub#15). Si está activo (`HUB_DEVICE_TRUST=enforce`)
     /// y el cliente manda `device_id`, el login por PIN se rechaza salvo que el dispositivo haya sido
     /// marcado de confianza (tras un login online cloud previo). Por defecto **desactivado** para no
@@ -95,6 +101,16 @@ impl HubConfig {
             std::env::var("HUB_CLOUD_API_TOKEN").ok().filter(|s| !s.trim().is_empty());
         let device_trust_enforce =
             matches!(std::env::var("HUB_DEVICE_TRUST").as_deref(), Ok("enforce"));
+        // Carpeta media por defecto: **co-localizada con la BD del hub** (`<dir de
+        // HUB_SQLITE_PATH>/media`), no relativa al CWD del proceso (frágil). Así el path es estable
+        // y predecible en local/Tauri (vive junto a `erplora.db`). Override explícito: `HUB_MEDIA_DIR`.
+        let media_dir = std::env::var("HUB_MEDIA_DIR").map(PathBuf::from).unwrap_or_else(|_| {
+            let db = std::env::var("HUB_SQLITE_PATH").unwrap_or_else(|_| "erplora.db".into());
+            match Path::new(&db).parent().filter(|p| !p.as_os_str().is_empty()) {
+                Some(dir) => dir.join("media"),
+                None => PathBuf::from("media"),
+            }
+        });
         Self {
             hub_id,
             cloud_base_url,
@@ -103,6 +119,7 @@ impl HubConfig {
             jwt_public_key,
             cloud_api_token,
             device_trust_enforce,
+            media_dir,
         }
     }
 }

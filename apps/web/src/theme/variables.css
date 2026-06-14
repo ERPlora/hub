@@ -1,9 +1,17 @@
-/* Tema de marca ERPlora — API oficial de Ionic (--ion-*). Dark por .ion-palette-dark.
-   Estética Linear/Vercel/Notion: lienzo neutro, superficies blancas separadas por elevación
-   suave, marca solo como acento. Los refinamientos por componente viven en polish.css. */
+/* Tema de marca ERPlora.
+   DECISIÓN (2026-06-14): se personaliza ÚNICAMENTE el color primary. Todos los demás colores
+   usan los DEFAULTS de Ionic — neutros estándar en claro y palettes/dark.class.css en oscuro.
+
+   Notas de Ionic v8 (por las que este fichero existe):
+   - Ionic NO trae paleta CLARA en :root (en claro los componentes usan fallbacks internos), así
+     que los neutros claros se fijan aquí con los VALORES por defecto de Ionic (blanco/negro).
+   - Ionic renombró los steps a --ion-background-color-step-*; los nombres legacy
+     --ion-color-step-* y --ion-border-color NO los define Ionic. polish.css y ok-data-table los
+     usan, así que se puentean a los tokens nuevos (se adaptan solos a claro/oscuro).
+   - Los tokens de diseño NO-color (radio, sombra, fuente) se mantienen: los usa polish.css. */
 
 :root {
-  /* ── Marca (primary) ── */
+  /* ── Marca (primary) — ÚNICO color personalizado ── */
   --ion-color-primary: #1496d6;
   --ion-color-primary-rgb: 20, 150, 214;
   --ion-color-primary-contrast: #ffffff;
@@ -11,38 +19,23 @@
   --ion-color-primary-shade: #1284bc;
   --ion-color-primary-tint: #2ca1da;
 
-  /* ── Lienzo neutro ── */
-  --ion-background-color: #f6f7f9;
-  --ion-background-color-rgb: 246, 247, 249;
-  --ion-text-color: #1a1c20;
-  --ion-text-color-rgb: 26, 28, 32;
-
-  /* Texto atenuado (labels, subtítulos) */
-  --ion-color-medium: #6b7280;
-  --ion-color-medium-rgb: 107, 114, 128;
-  --ion-color-medium-shade: #5e636f;
-  --ion-color-medium-tint: #797f8b;
-
-  /* Header/cards/items se funden con el lienzo (sin barras pesadas) */
-  --ion-toolbar-background: var(--ion-background-color);
-  --ion-item-background: #ffffff;
-  --ion-card-background: #ffffff;
-  --ion-border-color: #e7e9ee;
-
+  /* Tipografía (no es color) */
   --ion-font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  /* Escala de pasos (grises) — completa para sombras/superficies coherentes */
-  --ion-color-step-50: #f3f4f6;
-  --ion-color-step-100: #eceef1;
-  --ion-color-step-150: #e3e5ea;
-  --ion-color-step-200: #d8dbe1;
-  --ion-color-step-250: #cdd1d8;
-  --ion-color-step-300: #c0c4cd;
-  --ion-color-step-500: #8b8f99;
-  --ion-color-step-700: #4a4e57;
-  --ion-color-step-850: #2a2d33;
+  /* Alias legacy de steps → tokens nuevos de Ionic (resuelven a claro u oscuro automáticamente). */
+  --ion-color-step-50: var(--ion-background-color-step-50);
+  --ion-color-step-100: var(--ion-background-color-step-100);
+  --ion-color-step-150: var(--ion-background-color-step-150);
+  --ion-color-step-200: var(--ion-background-color-step-200);
+  --ion-color-step-250: var(--ion-background-color-step-250);
+  --ion-color-step-300: var(--ion-background-color-step-300);
+  --ion-color-step-500: var(--ion-background-color-step-500);
+  --ion-color-step-700: var(--ion-background-color-step-700);
+  --ion-color-step-850: var(--ion-background-color-step-850);
+  /* Borde = step-150 (convención de Ionic); Ionic no fija --ion-border-color por defecto. */
+  --ion-border-color: var(--ion-color-step-150);
 
-  /* ── Tokens de diseño propios (los usa polish.css; mismo nombre que un futuro tema OutfitKit) ── */
+  /* ── Tokens de diseño propios (NO-color) usados por polish.css ── */
   --ok-radius: 14px;
   --ok-radius-sm: 10px;
   --ok-radius-pill: 999px;
@@ -52,38 +45,37 @@
   --ok-surface-muted: var(--ion-color-step-50);
 }
 
-/* Dark neutro (zinc), coherente con el light. */
+/* ── Neutros CLAROS = pure white (blanco neutro, profesional) ──────────────────────────────────
+   Solo en claro (en oscuro manda .ion-palette-dark de Ionic, importado en main.ts). */
+:root:not(.ion-palette-dark) {
+  --ion-background-color: #ffffff;
+  --ion-background-color-rgb: 255, 255, 255;
+  --ion-text-color: #1c1d1f;
+  --ion-text-color-rgb: 28, 29, 31;
+  --ion-item-background: #ffffff;
+  --ion-card-background: #ffffff;
+  --ion-toolbar-background: #ffffff;
+
+  --ion-background-color-step-50: #fdfdfd;
+  --ion-background-color-step-100: #f6f6f7;
+  --ion-background-color-step-150: #eeeeef;
+  --ion-background-color-step-200: #e4e4e6;
+  --ion-background-color-step-250: #d4d4d7;
+  --ion-background-color-step-300: #bdbdc1;
+  --ion-background-color-step-500: #89898f;
+  --ion-background-color-step-700: #54545a;
+  --ion-background-color-step-850: #29292d;
+}
+
+/* ── Oscuro: SOLO el primary; el resto = paleta oscura por defecto de Ionic (dark.class.css). ── */
 :root.ion-palette-dark {
-  --ion-background-color: #0b0c0e;
-  --ion-background-color-rgb: 11, 12, 14;
-  --ion-text-color: #f4f5f7;
-  --ion-text-color-rgb: 244, 245, 247;
-
-  --ion-color-medium: #9aa0ac;
-  --ion-color-medium-rgb: 154, 160, 172;
-
-  --ion-toolbar-background: var(--ion-background-color);
-  --ion-item-background: #16181c;
-  --ion-card-background: #16181c;
-  --ion-border-color: #26282e;
-
-  --ion-color-step-50: #16181c;
-  --ion-color-step-100: #1d2025;
-  --ion-color-step-150: #26282e;
-  --ion-color-step-200: #2f323a;
-  --ion-color-step-250: #383b44;
-  --ion-color-step-300: #41454f;
-  --ion-color-step-500: #6b7280;
-  --ion-color-step-700: #aab0bc;
-  --ion-color-step-850: #d7dae0;
-
   --ion-color-primary: #2aa6e4;
   --ion-color-primary-rgb: 42, 166, 228;
   --ion-color-primary-shade: #2592c9;
   --ion-color-primary-tint: #3fafe7;
 
+  /* Sombras más marcadas sobre fondo oscuro (no son colores de tema). */
   --ok-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
   --ok-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
   --ok-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
-  --ok-surface-muted: #101216;
 }
