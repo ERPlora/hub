@@ -268,19 +268,16 @@ ion-split-pane.rail .nav-label,
 ion-split-pane.rail .nav-section-label,
 ion-split-pane.rail .sidebar-user-meta { display: none; }
 ion-split-pane.rail .brand-link { padding-inline-start: 0; justify-content: center; width: 100%; }
-ion-split-pane.rail .nav-item { --padding-start: 0; --inner-padding-end: 0; }
+ion-split-pane.rail .nav-item { --inner-padding-end: 0; }
 ion-split-pane.rail .nav-item::part(native) { justify-content: center; }
 ion-split-pane.rail .nav-icon { margin-inline-end: 0; }
 ion-split-pane.rail .sidebar-user { justify-content: center; }
 
 /* ── ok-data-table (OutfitKit): alinea sus tokens con el theme del Hub ────────────────────── */
 ok-data-table {
+  /* Solo se alinea el radio (token no-color). Los colores (cabecera, texto, bordes, hover)
+     caen a los defaults del propio componente → tokens --ion-* por defecto de Ionic. */
   --ok-radius: var(--ok-radius);
-  --ok-surface: var(--ion-card-background);
-  --ok-surface-2: var(--ion-color-step-50);
-  --ok-text: var(--ion-text-color);
-  --ok-muted: var(--ion-color-medium);
-  --ok-border: var(--ion-border-color);
   display: block;
   border-radius: var(--ok-radius);
   box-shadow: var(--ok-shadow-sm);
