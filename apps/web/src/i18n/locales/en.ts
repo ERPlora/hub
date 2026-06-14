@@ -16,6 +16,7 @@ export default {
     back: 'Back',
     apps: 'Apps',
     appsEmpty: 'No modules installed yet. Open the store to add some.',
+    appsClose: 'Close',
     assistant: 'Assistant',
     notifications: 'Notifications',
     toggleTheme: 'Toggle theme',

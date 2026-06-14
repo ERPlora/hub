@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, render, nothing } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { define } from '../../base/define.js';
 
@@ -24,8 +24,10 @@ export interface OkLauncherApp {
 // ok-app-launcher — botón estilo "Google apps": un disparador con icono de rejilla 3×3
 // (`apps-outline`) que abre una HOJA DE ACCIÓN (action sheet) anclada a la parte INFERIOR de la
 // pantalla con una REJILLA de apps (icono grande + label), al estilo del sheet modal de Ionic.
-// AUTOCONTENIDO: scrim + hoja deslizante propios en el shadow (sin Ionic salvo `ion-icon`, que
-// registra el host), por lo que evita el reparenting de los overlays de Ionic y cumple CSP.
+// AUTOCONTENIDO: scrim + hoja deslizante propios (sin Ionic salvo `ion-icon`, que registra el host)
+// y cumple CSP. El overlay se PORTA a `document.body` (shadow propio con la misma hoja de estilos)
+// para escapar de cualquier ancestro con `transform`/`filter`/`contain` —p. ej. el `ion-buttons`
+// del toolbar de Ionic— que, si no, capturaría el `position:fixed` y descolocaría la hoja.
 //   • prop `.apps` → Array<OkLauncherApp>
 // El disparador es INLINE (ocupa solo lo que mide el botón); la hoja es full-width abajo.
 // Click en una app: si tiene `href` navega; si no, emite `ok-app-select`. Cierra al click en el
@@ -279,9 +281,41 @@ export class OkAppLauncher extends LitElement {
     if (e.key === 'Escape') this.close();
   };
 
+  // Portal del overlay en `document.body` (shadow propio). El scrim + la hoja se renderizan AQUÍ,
+  // no en el shadow del host, para que el `position:fixed` se ancle al viewport y no a un ancestro
+  // transformado (Ionic pone `transform` en `ion-buttons`/`ion-router-outlet`).
+  private portalRoot: ShadowRoot | null = null;
+
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.unbind();
+    // Limpia el portal del body (si quedó montado) para no dejar nodos huérfanos.
+    const host = this.portalRoot?.host;
+    this.portalRoot = null;
+    if (host && host.parentNode) host.parentNode.removeChild(host);
+  }
+
+  // Crea (una vez) el portal: un div en `document.body` con shadow propio que ADOPTA la misma hoja
+  // de estilos del componente, de modo que `.scrim`/`.sheet`/`.app` se ven idénticos fuera del host.
+  private ensurePortal(): ShadowRoot {
+    if (this.portalRoot) return this.portalRoot;
+    const host = document.createElement('div');
+    host.setAttribute('data-ok-app-launcher-portal', '');
+    document.body.appendChild(host);
+    const root = host.attachShadow({ mode: 'open' });
+    const styles = (this.constructor as typeof OkAppLauncher).elementStyles ?? [];
+    root.adoptedStyleSheets = styles
+      .map((s) => (s instanceof CSSStyleSheet ? s : s.styleSheet))
+      .filter((s): s is CSSStyleSheet => !!s);
+    this.portalRoot = root;
+    return root;
+  }
+
+  // Renderiza el overlay (o nada) en el portal. Se llama tras cada update del host. No crea el
+  // portal hasta la primera apertura (evita divs vacíos en el body por cada launcher montado).
+  protected updated(): void {
+    if (!this.open && !this.portalRoot) return;
+    render(this.open ? this.overlayTemplate() : nothing, this.ensurePortal());
   }
 
   private bind(): void {
@@ -312,7 +346,7 @@ export class OkAppLauncher extends LitElement {
     this.unbind();
     // Animamos la salida: quitamos la clase y desmontamos al terminar la transición.
     this.shown = false;
-    const sheet = this.renderRoot.querySelector('.sheet') as HTMLElement | null;
+    const sheet = this.portalRoot?.querySelector('.sheet') as HTMLElement | null;
     const finish = (): void => {
       this.open = false;
     };
@@ -374,6 +408,7 @@ export class OkAppLauncher extends LitElement {
   }
 
   render(): unknown {
+    // Solo el disparador vive en el shadow del host; el overlay se renderiza en el portal del body.
     return html`
       <button
         type="button"
@@ -385,35 +420,30 @@ export class OkAppLauncher extends LitElement {
       >
         <ion-icon name="apps-outline"></ion-icon>
       </button>
-      ${this.open
-        ? html`
-            <div
-              class="scrim ${this.shown ? 'shown' : ''}"
-              @click=${() => this.close()}
-            ></div>
-            <div
-              class="sheet ${this.shown ? 'shown' : ''}"
-              role="menu"
-              aria-label=${this.t.apps}
-            >
-              <div class="handle"></div>
-              <div class="head">
-                <span class="title">${this.t.apps}</span>
-                <button
-                  type="button"
-                  class="close-btn"
-                  aria-label=${this.t.close}
-                  @click=${() => this.close()}
-                >
-                  <ion-icon name="close-outline"></ion-icon>
-                </button>
-              </div>
-              ${this.apps.length
-                ? html`<div class="grid">${this.apps.map((app) => this.renderApp(app))}</div>`
-                : html`<div class="empty">${this.t.empty}</div>`}
-            </div>
-          `
-        : ''}
+    `;
+  }
+
+  // Overlay (scrim + hoja inferior). Se renderiza en el portal de `document.body` vía `updated()`.
+  private overlayTemplate(): unknown {
+    return html`
+      <div class="scrim ${this.shown ? 'shown' : ''}" @click=${() => this.close()}></div>
+      <div class="sheet ${this.shown ? 'shown' : ''}" role="menu" aria-label=${this.t.apps}>
+        <div class="handle"></div>
+        <div class="head">
+          <span class="title">${this.t.apps}</span>
+          <button
+            type="button"
+            class="close-btn"
+            aria-label=${this.t.close}
+            @click=${() => this.close()}
+          >
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </div>
+        ${this.apps.length
+          ? html`<div class="grid">${this.apps.map((app) => this.renderApp(app))}</div>`
+          : html`<div class="empty">${this.t.empty}</div>`}
+      </div>
     `;
   }
 }

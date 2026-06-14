@@ -17,6 +17,7 @@ export default {
     back: 'Atrás',
     apps: 'Aplicaciones',
     appsEmpty: 'No tienes módulos instalados. Abre la tienda para añadir.',
+    appsClose: 'Cerrar',
     assistant: 'Asistente',
     notifications: 'Notificaciones',
     toggleTheme: 'Cambiar tema',
