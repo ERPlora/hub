@@ -1,8 +1,5 @@
 <template>
-  <ion-page>
-    <AppTopbar :title="t('nav.marketplace')" />
-
-    <ion-content class="ion-padding">
+  <AppPage :title="t('nav.marketplace')">
       <h2 class="text-lg font-semibold mb-3">{{ tabTitle }}</h2>
 
       <div v-if="loading" class="flex justify-center py-10">
@@ -106,10 +103,9 @@
         :duration="2500"
         @did-dismiss="toastOpen = false"
       />
-    </ion-content>
-
     <!-- Tabs en footer -->
-    <ion-footer class="ion-no-border">
+    <template #footer>
+      <ion-footer class="ion-no-border">
       <ion-toolbar>
         <ion-segment :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="mine">
@@ -126,21 +122,22 @@
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
-    </ion-footer>
-  </ion-page>
+      </ion-footer>
+    </template>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { inject, ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
-  IonPage, IonToolbar, IonContent,
+  IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel,  IonBadge,
   IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSpinner,
   IonGrid, IonRow, IonCol, IonToast, IonList, IonItem, IonText
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
-import AppTopbar from '../components/AppTopbar.vue';
+import AppPage from '../components/AppPage.vue';
 
 const { t } = useI18n();
 import { cloudMarketplaceModules, type CloudMarketplaceModule } from '../lib/cloud';

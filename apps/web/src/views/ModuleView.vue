@@ -1,21 +1,19 @@
 <template>
-  <ion-page>
-    <AppTopbar :title="moduleName" />
-    <ion-content class="ion-padding">
-      <div v-if="status === 'loading'" class="flex items-center gap-2 py-8 opacity-70">
-        <ion-spinner name="crescent" /> Cargando módulo…
-      </div>
-      <p v-else-if="status === 'error'" class="text-[color:var(--ion-color-danger)]">
-        No se pudo cargar el módulo.
-      </p>
-      <!-- El WebComponent (Lit) de la pestaña activa se monta aquí en runtime (createElement + append). -->
-      <div ref="outlet" v-show="status === 'ready'" />
-    </ion-content>
+  <AppPage :title="moduleName">
+    <div v-if="status === 'loading'" class="flex items-center gap-2 py-8 opacity-70">
+      <ion-spinner name="crescent" /> Cargando módulo…
+    </div>
+    <p v-else-if="status === 'error'" class="text-[color:var(--ion-color-danger)]">
+      No se pudo cargar el módulo.
+    </p>
+    <!-- El WebComponent (Lit) de la pestaña activa se monta aquí en runtime (createElement + append). -->
+    <div ref="outlet" class="outlet" v-show="status === 'ready'" />
 
     <!-- Tabbar secundario del módulo: las pestañas salen de `navigation[]` del manifest
          (module.json) — el módulo solo aporta el contenido (su WC), el shell pinta la nav.
          Mismo patrón que DashboardPage (ion-footer > ion-toolbar > ion-segment). -->
-    <ion-footer v-if="tabs.length > 1" class="ion-no-border">
+    <template #footer>
+      <ion-footer v-if="tabs.length > 1" class="ion-no-border">
       <ion-toolbar>
         <ion-segment
           :value="activeNavId"
@@ -27,19 +25,20 @@
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
-    </ion-footer>
-  </ion-page>
+      </ion-footer>
+    </template>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { inject, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  IonPage, IonToolbar, IonContent,
+  IonToolbar,
   IonFooter, IonSegment, IonSegmentButton,  IonLabel, IonSpinner
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
-import AppTopbar from '../components/AppTopbar.vue';
+import AppPage from '../components/AppPage.vue';
 import { loadMenu, loadComponent, type MenuEntry } from '../lib/module-loader';
 import { clientInjectionKey, getClient } from '../lib/runtime';
 
@@ -108,3 +107,18 @@ watch(
   },
 );
 </script>
+
+<style scoped>
+/* El WC del módulo se monta en `.outlet` y usa `:host{height:100%}`. Sin una altura
+   DEFINIDA aquí, ese 100% resolvía a `auto` (alto del contenido) y el modo `fill` de
+   `ok-data-table` (cabecera sticky + pager fijo + scroll SOLO en el cuerpo) no tenía
+   contra qué constreñir → scrolleaba la página entera.
+   `height:100%` (no `min-height`) fija el outlet al alto del área de `ion-content`:
+   - tablas en modo `fill` → su `:host{height:100%}` resuelve a ese alto y el scroll
+     queda DENTRO del WC (cabecera/pager fijos);
+   - pantallas no-tabla más altas (settings, formularios largos) → su contenido desborda
+     el outlet y sigue scrolleando vía `ion-content` (que es el scroller por defecto). */
+.outlet {
+  height: 100%;
+}
+</style>

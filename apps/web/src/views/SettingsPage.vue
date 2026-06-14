@@ -1,8 +1,5 @@
 <template>
-  <ion-page>
-    <AppTopbar :title="t('nav.settings')" />
-
-    <ion-content class="ion-padding">
+  <AppPage :title="t('nav.settings')">
       <!-- ── Tab: Hub ── -->
       <template v-if="tab === 'hub'">
         <ion-card>
@@ -249,10 +246,9 @@
           </ion-card-content>
         </ion-card>
       </template>
-    </ion-content>
-
     <!-- Footer tab bar -->
-    <ion-footer class="ion-no-border">
+    <template #footer>
+      <ion-footer class="ion-no-border">
       <ion-toolbar>
         <ion-segment :value="tab" @ion-change="tab = ($event.detail.value as Tab)">
           <ion-segment-button value="hub">
@@ -273,16 +269,15 @@
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
-    </ion-footer>
-  </ion-page>
+      </ion-footer>
+    </template>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
-  IonPage,
-  IonContent,
   IonFooter,
   IonToolbar,
   IonSegment,
@@ -299,7 +294,7 @@ import {
   IonButton,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
-import AppTopbar from '../components/AppTopbar.vue';
+import AppPage from '../components/AppPage.vue';
 import { themeMode, setThemeMode, type ThemeMode } from '../lib/theme';
 import { setLocale, type Locale } from '../i18n';
 

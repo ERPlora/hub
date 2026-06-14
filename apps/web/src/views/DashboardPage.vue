@@ -1,8 +1,5 @@
 <template>
-  <ion-page>
-    <AppTopbar :title="t('nav.home')" />
-
-    <ion-content class="ion-padding">
+  <AppPage :title="t('nav.home')">
       <!-- ── Resumen ── -->
       <template v-if="tab === 'resumen'">
         <ion-grid class="ion-no-padding">
@@ -94,10 +91,9 @@
           </ion-item>
         </ion-list>
       </template>
-    </ion-content>
-
     <!-- Tabs en footer -->
-    <ion-footer class="ion-no-border">
+    <template #footer>
+      <ion-footer class="ion-no-border">
       <ion-toolbar>
         <ion-segment
           :value="tab"
@@ -117,8 +113,9 @@
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
-    </ion-footer>
-  </ion-page>
+      </ion-footer>
+    </template>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -126,13 +123,13 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
-  IonPage, IonContent, IonFooter,
+  IonFooter,
   IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
   IonCardContent, IonGrid, IonRow, IonCol,  IonBadge, IonButton, IonSpinner,
   IonList, IonListHeader, IonItem, IonNote, IonText, IonToolbar
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
-import AppTopbar from '../components/AppTopbar.vue';
+import AppPage from '../components/AppPage.vue';
 import { loadMenu, type MenuEntry } from '../lib/module-loader';
 
 const { t } = useI18n();

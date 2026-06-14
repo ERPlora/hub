@@ -1,16 +1,13 @@
 <template>
-  <ion-page>
-    <AppTopbar :title="t('nav.employees')">
-      <template #actions>
-        <ion-button @click="onNew">
-          <HubIcon slot="start" name="add-outline" />
-          Nuevo empleado
-        </ion-button>
-      </template>
-    </AppTopbar>
+  <AppPage :title="t('nav.employees')">
+    <template #actions>
+      <ion-button @click="onNew">
+        <HubIcon slot="start" name="add-outline" />
+        Nuevo empleado
+      </ion-button>
+    </template>
 
-    <ion-content class="ion-padding">
-      <!-- Staff: tabla con ok-data-table (OutfitKit) -->
+    <!-- Staff: tabla con ok-data-table (OutfitKit) -->
       <ok-data-table
         v-show="tab === 'staff'"
         ref="staffTable"
@@ -45,10 +42,9 @@
         csv
         csv-name="roles"
       ></ok-data-table>
-    </ion-content>
-
     <!-- Tabs en footer (staff / usuarios / roles) -->
-    <ion-footer class="ion-no-border">
+    <template #footer>
+      <ion-footer class="ion-no-border">
       <ion-toolbar>
         <ion-segment
           :value="tab"
@@ -68,8 +64,9 @@
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
-    </ion-footer>
-  </ion-page>
+      </ion-footer>
+    </template>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -77,11 +74,11 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
-  IonPage, IonToolbar, IonContent,
+  IonToolbar,
   IonButton,  IonFooter, IonSegment, IonSegmentButton, IonLabel
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
-import AppTopbar from '../components/AppTopbar.vue';
+import AppPage from '../components/AppPage.vue';
 
 const { t } = useI18n();
 

@@ -1,8 +1,5 @@
 <template>
-  <ion-page>
-    <AppTopbar :title="t('nav.system')" />
-
-    <ion-content class="ion-padding">
+  <AppPage :title="t('nav.system')">
 
       <!-- ── Tab: Recursos ──────────────────────────────────────── -->
       <template v-if="tab === 'resources'">
@@ -153,10 +150,9 @@
         </ion-card>
       </template>
 
-    </ion-content>
-
     <!-- ── Footer con ion-segment (tabs) ─────────────────────────── -->
-    <ion-footer class="ion-no-border">
+    <template #footer>
+      <ion-footer class="ion-no-border">
       <ion-toolbar>
         <ion-segment :value="tab" @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value">
           <ion-segment-button value="resources">
@@ -177,30 +173,30 @@
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
-    </ion-footer>
+      </ion-footer>
 
-    <ion-toast
-      :is-open="toastOpen"
-      :message="toastMessage"
-      :duration="2500"
-      color="primary"
-      @did-dismiss="toastOpen = false"
-    />
-
-  </ion-page>
+      <ion-toast
+        :is-open="toastOpen"
+        :message="toastMessage"
+        :duration="2500"
+        color="primary"
+        @did-dismiss="toastOpen = false"
+      />
+    </template>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
-  IonPage, IonToolbar, IonContent,
+  IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
   IonGrid, IonRow, IonCol, IonProgressBar, IonBadge,  IonButton,
   IonList, IonItem, IonNote, IonToast
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
-import AppTopbar from '../components/AppTopbar.vue';
+import AppPage from '../components/AppPage.vue';
 
 const { t } = useI18n();
 import { detectBridge, bridgeDownloadUrl, type BridgePlatform, type BridgeStatus } from '../lib/bridge-client';

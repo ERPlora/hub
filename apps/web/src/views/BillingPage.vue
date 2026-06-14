@@ -1,8 +1,5 @@
 <template>
-  <ion-page>
-    <AppTopbar :title="t('nav.billing')" />
-
-    <ion-content class="ion-padding">
+  <AppPage :title="t('nav.billing')">
       <!-- Facturas -->
       <template v-if="tab === 'invoices'">
         <h2 class="text-lg font-semibold mb-3">Facturas</h2>
@@ -153,10 +150,9 @@
           <p>La gestión del método de pago se realiza desde el portal de facturación.</p>
         </div>
       </template>
-    </ion-content>
-
     <!-- Tabs en footer -->
-    <ion-footer class="ion-no-border">
+    <template #footer>
+      <ion-footer class="ion-no-border">
       <ion-toolbar>
         <ion-segment :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="invoices">
@@ -173,20 +169,21 @@
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
-    </ion-footer>
-  </ion-page>
+      </ion-footer>
+    </template>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
-  IonPage, IonToolbar, IonContent,
+  IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel,  IonBadge,
   IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSpinner
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
-import AppTopbar from '../components/AppTopbar.vue';
+import AppPage from '../components/AppPage.vue';
 
 const { t } = useI18n();
 import {

@@ -1,8 +1,5 @@
 <template>
-  <ion-page>
-    <AppTopbar :title="isEdit ? 'Editar empleado' : 'Nuevo empleado'" back-href="/employees" />
-
-    <ion-content class="ion-padding">
+  <AppPage :title="isEdit ? 'Editar empleado' : 'Nuevo empleado'" back-href="/employees">
       <ion-card class="ion-no-margin">
         <ion-card-content>
           <ion-list>
@@ -51,19 +48,17 @@
           </div>
         </ion-card-content>
       </ion-card>
-    </ion-content>
-  </ion-page>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  IonPage, IonContent,
   IonCard, IonCardContent, IonList, IonItem, IonInput, IonSelect, IonSelectOption,
   IonToggle, IonButton,
 } from '@ionic/vue';
-import AppTopbar from '../components/AppTopbar.vue';
+import AppPage from '../components/AppPage.vue';
 
 const ROLES = ['Administrador', 'Encargado', 'Cajero', 'Almacén'] as const;
 type Role = typeof ROLES[number];
