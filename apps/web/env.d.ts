@@ -5,3 +5,6 @@ declare module '*.vue' {
   const component: DefineComponent<Record<string, never>, Record<string, never>, unknown>;
   export default component;
 }
+
+// Versión de la app horneada por Vite (`define`). La consume el footer del sidebar.
+declare const __APP_VERSION__: string;

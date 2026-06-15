@@ -335,19 +335,32 @@ impl Default for WatchdogConfig {
 /// re-escanea la red para localizarlos por MAC en una IP nueva. Porta `DeviceWatchdog`.
 pub struct Watchdog {
     config: WatchdogConfig,
+    /// Canal opcional hacia el consumidor (bridge#8): los `WatchdogEvent` se publican aquí
+    /// además de por `tracing`. Sin canal, el comportamiento es solo-log como antes.
+    events: Option<tokio::sync::mpsc::UnboundedSender<WatchdogEvent>>,
 }
 
 impl Watchdog {
     pub fn new(config: WatchdogConfig) -> Self {
-        Self { config }
+        Self { config, events: None }
+    }
+
+    /// Cablea el canal de eventos hacia el consumidor (estilo builder; la firma de `run`
+    /// permanece intacta).
+    pub fn with_events(mut self, events: tokio::sync::mpsc::UnboundedSender<WatchdogEvent>) -> Self {
+        self.events = Some(events);
+        self
+    }
+
+    /// Publica un evento al consumidor si hay canal cableado.
+    fn emit(&self, event: WatchdogEvent) {
+        if let Some(tx) = &self.events {
+            let _ = tx.send(event);
+        }
     }
 
     /// Bucle principal: `check_devices` cada `check_interval`, `recovery_scan` cada
     /// `recovery_interval`. Porta `_run`.
-    ///
-    /// NOTA: la firma `run(&self, registry)` no recibe canal del consumidor, así que los eventos
-    /// (`WatchdogEvent::Recovered`/`Lost`) se emiten por `tracing` (info/warn) en lugar de un
-    /// `mpsc`. Mantener la firma intacta era requisito; cablear un canal real exigiría cambiarla.
     pub async fn run(&self, registry: &DeviceRegistry) {
         let check_interval = Duration::from_secs(self.config.check_interval_s);
         let recovery_interval = Duration::from_secs(self.config.recovery_interval_s);
@@ -390,7 +403,8 @@ impl Watchdog {
                     device.ip,
                     port
                 );
-                let _ = WatchdogEvent::Recovered(device.clone());
+                let recovered = registry.get_by_mac(&device.mac).unwrap_or_else(|| device.clone());
+                self.emit(WatchdogEvent::Recovered(recovered));
             } else if !reachable && device.status == "online" {
                 if let Err(e) = registry.set_status(&device.mac, "offline") {
                     tracing::warn!("no se pudo persistir status offline de {}: {e}", device.mac);
@@ -402,7 +416,8 @@ impl Watchdog {
                     device.ip,
                     port
                 );
-                let _ = WatchdogEvent::Lost(device.clone());
+                let lost = registry.get_by_mac(&device.mac).unwrap_or_else(|| device.clone());
+                self.emit(WatchdogEvent::Lost(lost));
             }
         }
     }
@@ -464,7 +479,7 @@ impl Watchdog {
                     tracing::warn!("no se pudo marcar online {mac}: {e}");
                 }
                 let recovered = registry.get_by_mac(&mac).unwrap_or(device);
-                let _ = WatchdogEvent::Recovered(recovered);
+                self.emit(WatchdogEvent::Recovered(recovered));
             }
         }
 

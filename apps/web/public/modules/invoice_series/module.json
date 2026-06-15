@@ -237,11 +237,8 @@
         "function": "set_as_default"
       },
       "schema": "schemas/series_get.json",
-      "emit": [
-        "invoice_series.series.default_changed"
-      ],
       "ai": {
-        "description": "Sets an invoice series as the default series for the hub."
+        "description": "Sets an invoice series as the default series for the hub; the handler emits invoice_series.series.default_changed."
       }
     },
     "invoice_series.series.next_number": {
@@ -252,12 +249,33 @@
         "function": "get_next_number"
       },
       "schema": "schemas/series_next_number.json",
-      "emit": [
-        "invoice_series.number.allocated"
-      ],
       "ai": {
-        "description": "Allocates and reserves the next sequential number in an invoice series."
+        "description": "Allocates and reserves the next sequential number in an invoice series; the handler emits invoice_series.number.allocated."
       }
+    },
+    "invoice_series._advance_sequence": {
+      "permission": "invoice_series.next_number",
+      "sql": [
+        "commands/_advance_sequence.sql"
+      ]
+    },
+    "invoice_series._insert_allocation": {
+      "permission": "invoice_series.next_number",
+      "sql": [
+        "commands/_insert_allocation.sql"
+      ]
+    },
+    "invoice_series._demote_default_siblings": {
+      "permission": "invoice_series.manage_series",
+      "sql": [
+        "commands/_demote_default_siblings.sql"
+      ]
+    },
+    "invoice_series._promote_default": {
+      "permission": "invoice_series.manage_series",
+      "sql": [
+        "commands/_promote_default.sql"
+      ]
     }
   },
   "ui": {

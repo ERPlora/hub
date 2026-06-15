@@ -12,7 +12,7 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 fn dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../modules/customers")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/customers")
 }
 fn admin() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
@@ -82,22 +82,21 @@ async fn record_purchase_transitions_lifecycle() {
     let ctx = admin();
     let id = new_customer(&rt, &ctx, "Lead X", "lead").await;
 
-    // primera compra: lead → first_purchase.
+    // primera compra: lead → first_purchase. total en CÉNTIMOS (ADR-0007): 5000 = 50€.
     rt.execute_command("customers.record_purchase",
-        &params(json!({ "customer_id": id, "total": 50.0 })), &ctx).await.unwrap();
+        &params(json!({ "customer_id": id, "total": 5000 })), &ctx).await.unwrap();
     let c = rt.execute_query("customers.get", &params(json!({"customer_id": id})), &ctx).await.unwrap();
     assert_eq!(c[0]["lifecycle_stage"], json!("first_purchase"));
     assert_eq!(c[0]["total_purchases"], json!(1));
-    // SQLite NUMERIC: 50.0 sin fracción se almacena como entero → comparamos numéricamente.
-    assert_eq!(c[0]["total_spent"].as_f64().unwrap(), 50.0);
+    assert_eq!(c[0]["total_spent"].as_i64().unwrap(), 5000);
 
-    // segunda compra: first_purchase → active.
+    // segunda compra: first_purchase → active. 3000 = 30€.
     rt.execute_command("customers.record_purchase",
-        &params(json!({ "customer_id": id, "total": 30.0 })), &ctx).await.unwrap();
+        &params(json!({ "customer_id": id, "total": 3000 })), &ctx).await.unwrap();
     let c2 = rt.execute_query("customers.get", &params(json!({"customer_id": id})), &ctx).await.unwrap();
     assert_eq!(c2[0]["lifecycle_stage"], json!("active"));
     assert_eq!(c2[0]["total_purchases"], json!(2));
-    assert_eq!(c2[0]["total_spent"].as_f64().unwrap(), 80.0);
+    assert_eq!(c2[0]["total_spent"].as_i64().unwrap(), 8000);
 }
 
 #[tokio::test]

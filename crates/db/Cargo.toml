@@ -14,6 +14,13 @@ sqlx={ version = "0.9.0", default-features = false, features = [
     "tls-rustls",
     "sqlite",
     "postgres",
+    # §8/§9 — tipos fiscales/dinero de Postgres: NUMERIC (bigdecimal), TIMESTAMPTZ/DATE/TIME
+    # (chrono), UUID y JSONB/JSON (json). Sin estas features caían al brazo string y, en
+    # formato binario, fallaban a `null`.
+    "bigdecimal",
+    "chrono",
+    "uuid",
+    "json",
 ]}
 
 [dev-dependencies]

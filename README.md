@@ -68,8 +68,35 @@ docker/          Dockerfile.planned                                             
 
 ```sh
 pnpm install
-pnpm -F @erplora/module-cli build:inventory   # compila el WC del módulo a ESM (CSP-safe)
-pnpm -F @erplora/web dev                        # Vite dev (http://localhost:5173)
+pnpm build:modules                              # compila los WC de los módulos a ESM (CSP-safe)
+pnpm dev                                         # ⭐ turnkey: runtime (Axum :8787) + web (Vite :5173)
+```
+
+### Arranque turnkey (`pnpm dev`) — runtime + web de un comando
+
+`pnpm dev` (orquestador [scripts/dev.mjs](scripts/dev.mjs), sin dependencias npm extra) levanta
+**a la vez**:
+
+- el **runtime** Rust (`cargo run -p erplora-server`) en `http://127.0.0.1:8787` (API + WS), que
+  instala al arrancar los módulos de `HUB_MODULES_DIR` (topo-orden por `depends_on`), y
+- el **shell web** (`pnpm -F @erplora/web dev`) en `http://localhost:5173`. El shell pega al runtime
+  por el proxy de Vite (`/api` + `/ws` → :8787; ver [apps/web/vite.config.ts](apps/web/vite.config.ts)),
+  así que no hay CORS ni cableado manual.
+
+Ctrl-C (o que uno de los dos muera) baja a ambos. La salida va prefijada `[runtime]` / `[web]`.
+
+**Defaults de entorno** (todos sobreescribibles exportando la variable antes de invocar):
+
+| Variable | Default | Qué es |
+| --- | --- | --- |
+| `HUB_SQLITE_PATH` | `/tmp/erplora-hub-dev.db` | BD local efímera (bórrala para empezar de cero) |
+| `HUB_MODULES_DIR` | `../modules-workspace/modules` | Fuente de módulos de dev (los mismos que el shell carga como WC) |
+| `HUB_BIND` | `127.0.0.1:8787` | Bind del runtime Axum |
+| `VITE_RUNTIME_URL` | `''` (proxy de Vite) | Cómo el shell alcanza el runtime |
+
+Atajos para arrancar solo una mitad: `pnpm dev:web` (Vite) · `pnpm dev:runtime` (Axum).
+
+```sh
 pnpm -F @erplora/web snapshot                   # build prod + headless: snapshots + verifica CSP
 pnpm -F @erplora/web typecheck                  # TS estricto
 ```

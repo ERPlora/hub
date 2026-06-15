@@ -8,22 +8,39 @@ license.workspace = true
 [dependencies]
 erplora-runtime = { path = "../runtime" }
 erplora-db = { path = "../db" }
+# Plugin nativo first-party (ADR-0009): motor fiscal VeriFactu horneado en el runtime.
+erplora-verifactu = { path = "../verifactu" }
 # Cliente del Cloud Portal: construye las peticiones (versions/ download/ mark_installed/ +
 # assistant stream) y verifica SHA256. `source` aporta el verify+unzip seguro (anti zip-slip).
 cloud_client = { package = "erplora-cloud-client", path = "../cloud-client" }
 source = { package = "erplora-source", path = "../source" }
 # Vector store local (RAG): ingestión de descripciones `ai:`/`agent` al instalar un módulo.
 erplora-vector = { path = "../vector" }
-axum = { version = "0.7", features = ["ws"] }
+# `multipart`: subida de ficheros a la carpeta media (`POST /api/media/upload`, pantalla /files).
+axum = { version = "0.7", features = ["ws", "multipart"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
 tower = "0.5"
+# Servir el frontend estático (dist de Vite) con fallback SPA para el combo cloud + web-PWA (§3).
+tower-http = { version = "0.6", features = ["fs", "trace"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 tracing = "0.1"
+# Logging del hub → consola + fichero rotado diario en `media/_logs/` (retención 6 meses, ADR-0047).
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+# Para implementar el trait async `BackupTransport` del runtime (transporte real de backup) y el
+# `Embedder` trait (proxy de embeddings del Cloud) dyn-compatible para inyectar mocks en test.
+async-trait = "0.1"
 # Cliente HTTP async (rustls): descarga de módulos + proxy SSE del asistente hacia el Cloud.
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+# `rustls-tls-native-roots`: confía en el trust store del SO (como curl), no solo en los
+# `webpki-roots` empaquetados. Necesario tras proxies de inspección TLS corporativos (CA propia
+# en el llavero del SO, no en webpki) y prod-safe (en ECS carga el bundle de CAs del sistema).
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "multipart", "rustls-tls", "rustls-tls-native-roots"] }
 futures-util = "0.3"
+# Métricas del SO para `/api/system` en el combo LOCAL (single/Tauri): CPU + memoria reales del
+# equipo. En cloud (ECS) NO se usa: ahí las métricas salen del ECS Task Metadata Endpoint v4 (HTTP).
+sysinfo = { version = "0.32", default-features = false, features = ["system", "disk"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

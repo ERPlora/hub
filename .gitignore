@@ -10,6 +10,12 @@ target/
 # OS / tmp
 .DS_Store
 
+# Dev: BD SQLite local que el runtime crea en hub/ al arrancarlo desde aquí
+# (server standalone). La app Tauri usa su propia BD en app_data_dir.
+erplora.db
+erplora.db-wal
+erplora.db-shm
+
 # Módulos de negocio: viven en sus propios repos, no se versionan en el hub.
 # La infra UI compartida (ok-data-table) vive en packages/outfitkit; el list-controller
 # y el SDK en packages/module-sdk; modules/ ya no contiene nada versionado.

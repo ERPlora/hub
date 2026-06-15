@@ -10,7 +10,7 @@
         class="theme-btn"
         @click="toggleTheme"
       >
-        <ion-icon slot="icon-only" :icon="dark ? sunnyOutline : moonOutline" />
+        <HubIcon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'" />
       </ion-button>
 
       <div class="login-wrap">
@@ -38,11 +38,11 @@
                 @ion-change="step = ($event as CustomEvent<{ value: Step }>).detail.value"
               >
                 <ion-segment-button value="pin">
-                  <ion-icon :icon="keypadOutline" />
+                  <HubIcon name="keypad-outline" />
                   <ion-label>PIN</ion-label>
                 </ion-segment-button>
                 <ion-segment-button value="email">
-                  <ion-icon :icon="mailOutline" />
+                  <HubIcon name="mail-outline" />
                   <ion-label>Email</ion-label>
                 </ion-segment-button>
               </ion-segment>
@@ -86,7 +86,7 @@
                     aria-label="Más información sobre dispositivos de confianza"
                     class="trust-info-btn"
                   >
-                    <ion-icon slot="icon-only" :icon="informationCircleOutline" />
+                    <HubIcon slot="icon-only" name="information-circle-outline" />
                   </ion-button>
                   <ion-popover
                     trigger="trust-info-btn"
@@ -112,7 +112,7 @@
                 <ion-button type="submit" expand="block" :disabled="emailLoading">
                   <ion-spinner v-if="emailLoading" name="crescent" />
                   <template v-else>
-                    <ion-icon slot="start" :icon="logInOutline" />
+                    <HubIcon slot="start" name="log-in-outline" />
                     Entrar
                   </template>
                 </ion-button>
@@ -278,20 +278,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  IonPage, IonContent, IonCard, IonCardContent, IonButton, IonIcon,
+  IonPage, IonContent, IonCard, IonCardContent, IonButton, 
   IonInput, IonCheckbox, IonText, IonSpinner, IonSegment, IonSegmentButton,
-  IonLabel, IonPopover, IonNote,
+  IonLabel, IonPopover, IonNote
 } from '@ionic/vue';
-import {
-  sunnyOutline, moonOutline, keypadOutline, mailOutline,
-  logInOutline, informationCircleOutline,
-} from 'ionicons/icons';
-import { setUser } from '../lib/session';
-import { cloudLogin, setTokens } from '../lib/cloud';
+import HubIcon from '../components/HubIcon.vue';
+import { setUser, setHubSession, getHubSession } from '../lib/session';
+import { cloudLogin, setTokens, runtimeCloudSession, runtimePinLogin, runtimeSetPin } from '../lib/cloud';
 import { config } from '../lib/config';
+import { pinUsers } from '../lib/runtime';
+import { isDark, toggleTheme } from '../lib/theme';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -306,18 +305,9 @@ interface TrustedUser {
 }
 
 // ---------------------------------------------------------------------------
-// Tema (dark mode Ionic: añade/quita la clase ion-palette-dark en <html>)
+// Tema: estado compartido (lib/theme) — mismo modo que el toggle de la topbar.
 // ---------------------------------------------------------------------------
-const dark = ref<boolean>(
-  typeof document !== 'undefined'
-    ? document.documentElement.classList.contains('ion-palette-dark')
-    : false,
-);
-
-function toggleTheme(): void {
-  dark.value = !dark.value;
-  document.documentElement.classList.toggle('ion-palette-dark', dark.value);
-}
+// `isDark` / `toggleTheme` se importan de lib/theme (ver imports del SFC).
 
 // ---------------------------------------------------------------------------
 // Estado de la sesión de dispositivo (PIN / trust)
@@ -354,6 +344,25 @@ const trustedUsers = ref<TrustedUser[]>(readTrustedUsers());
 const step = ref<Step>(trusted.value ? 'pin' : 'email');
 const showTabs = computed(() => trusted.value && step.value !== 'setup');
 
+// Si el RUNTIME reporta usuarios con PIN (`GET /api/hub/context` → pin_users), mostramos el grid
+// de PIN directamente — sin depender del flag local (que solo se rellenaba tras un login cloud
+// "confiar en este dispositivo"). Así cualquier hub con usuarios (p. ej. el demo: "Demo") presenta
+// el login local al llegar. El flujo de device-trust/seguridad (§2.9) NO cambia: solo se decide
+// qué pestaña se muestra; la pestaña Email sigue disponible. `immediate` cubre el caso ya resuelto.
+watch(
+  pinUsers,
+  (users) => {
+    if (!users.length || step.value === 'setup') return;
+    const merged = [...users.map((u) => ({ id: u.id, name: u.name, initials: initials(u.name) }))];
+    // Conserva los del localStorage que no estén ya en la lista del runtime (multi-cuenta).
+    for (const u of trustedUsers.value) if (!merged.some((m) => m.id === u.id)) merged.push(u);
+    trustedUsers.value = merged;
+    trusted.value = true;
+    step.value = 'pin';
+  },
+  { immediate: true },
+);
+
 // ---------------------------------------------------------------------------
 // EmailForm state
 // ---------------------------------------------------------------------------
@@ -381,35 +390,35 @@ async function submitEmail(): Promise<void> {
     // Login real contra el Cloud Portal (ARQUITECTURA.md §2.3: Bearer + X-Hub-Id).
     const result = await cloudLogin(emailVal.value.trim().toLowerCase(), passwordVal.value);
     setTokens(result.access, result.refresh);
+
+    // Abre la sesión LOCAL del runtime a partir del JWT (autoridad de permisos local, §2.9).
+    // El `name` se reusa para el login por PIN (el runtime resuelve el usuario por nombre).
+    const sess = await runtimeCloudSession(result.access, result.user.name);
+    setHubSession(sess.token);
+
     setUser({
       id: result.user.id,
       name: result.user.name,
       email: result.user.email,
-      avatarUrl: result.user.avatarUrl ?? null,
+      avatarUrl: result.user.avatarUrl ?? null
     });
 
-    // Si el usuario eligió "Confiar en este dispositivo", registramos el usuario
-    // localmente y redirigimos al alta de PIN.
+    // Si el usuario eligió "Confiar en este dispositivo", registramos el usuario localmente y
+    // vamos al alta de PIN (el PIN se fija en el runtime al confirmar — onSetupComplete).
     if (trust.value) {
       const userEntry: TrustedUser = {
         id: result.user.id,
         name: result.user.name,
         email: result.user.email,
-        initials: initials(result.user.name),
+        initials: initials(result.user.name)
       };
       const existing = trustedUsers.value.filter((u) => u.id !== result.user.id);
       trustedUsers.value = [userEntry, ...existing];
       saveTrustedUsers(trustedUsers.value);
       saveTrustedFlag(true);
       trusted.value = true;
-      // Solo pedimos crear PIN si el backend indica que es la primera vez o si
-      // no hay PIN ya guardado para este usuario. Actualmente cloudLogin.firstTime
-      // devuelve siempre false (el Cloud no expone este flag aún); lo dejamos como
-      // hook para cuando el backend lo soporte.
-      if (result.firstTime) {
-        step.value = 'setup';
-        return; // no navega aún; PinSetup navega tras confirmar el PIN
-      }
+      step.value = 'setup';
+      return; // no navega aún; onSetupComplete navega tras fijar el PIN en el runtime
     }
 
     const redirect = (router.currentRoute.value.query.redirect as string) || '/';
@@ -426,7 +435,7 @@ async function submitEmail(): Promise<void> {
           id: 'u1',
           name: emailVal.value || 'Demo Owner',
           email: emailVal.value || 'demo@erplora.com',
-          initials: initials(emailVal.value || 'Demo Owner'),
+          initials: initials(emailVal.value || 'Demo Owner')
         };
         trustedUsers.value = [userEntry];
         saveTrustedUsers(trustedUsers.value);
@@ -484,10 +493,10 @@ function pressKey(key: string): void {
 async function checkPin(pin: string): Promise<void> {
   if (pin.length < 4 || !pinUser.value) return;
   try {
-    // TODO: cablear auth.loginPin(userId, pin) cuando el runtime Rust exponga
-    // verificación de PIN local (ARQUITECTURA.md §2.9). Por ahora aceptamos
-    // cualquier PIN de 4 dígitos en demo.
+    // Login local por PIN contra el runtime (§2.9): verifica el PIN y abre sesión server-side.
     const u = pinUser.value;
+    const sess = await runtimePinLogin(u.name, pin);
+    setHubSession(sess.token);
     setUser({ id: u.id, name: u.name, email: u.email ?? '' });
     const redirect = (router.currentRoute.value.query.redirect as string) || '/';
     await router.replace(redirect);
@@ -533,12 +542,20 @@ async function onSetupComplete(pin: string): Promise<void> {
     setupPhase.value = 'confirm';
   } else {
     if (pin === setupFirst.value) {
-      // TODO: cablear auth.setupPin(pin) cuando el runtime Rust soporte PIN local.
-      // Por ahora solo guardamos un flag de que el PIN fue creado (el PIN real se
-      // verificará en el runtime cuando se implemente ARQUITECTURA.md §2.9).
-      try { localStorage.setItem('erplora.pin_set', '1'); } catch { /* ignore */ }
-      const redirect = (router.currentRoute.value.query.redirect as string) || '/';
-      await router.replace(redirect);
+      // Fija el PIN en el runtime para el usuario de la sesión actual (§2.9). Requiere la sesión
+      // abierta en el login cloud previo (X-Hub-Session).
+      const session = getHubSession();
+      try {
+        if (session) await runtimeSetPin(pin, session);
+        try { localStorage.setItem('erplora.pin_set', '1'); } catch { /* ignore */ }
+        const redirect = (router.currentRoute.value.query.redirect as string) || '/';
+        await router.replace(redirect);
+      } catch {
+        setupError.value = true;
+        setupFirst.value = '';
+        setupConfirm.value = '';
+        setupPhase.value = 'first';
+      }
     } else {
       setupError.value = true;
       setupFirst.value = '';

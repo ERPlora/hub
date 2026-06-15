@@ -1,0 +1,17 @@
+{
+  "id": "syncdemo",
+  "name": "Sync Demo",
+  "version": "1.0.0",
+  "permissions": ["syncdemo.write"],
+  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
+  "commands": {
+    "syncdemo.create": {
+      "permission": "syncdemo.write",
+      "transaction": true,
+      "sql": ["sql/create.sql"]
+    }
+  },
+  "sync": [
+    { "table": "syncdemo_item", "pk": ["id"], "hub_scoped": true, "updated_at": "updated_at" }
+  ]
+}

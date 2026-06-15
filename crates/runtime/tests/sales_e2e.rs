@@ -13,7 +13,7 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 fn mdir(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../modules").join(name)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(name)
 }
 fn admin() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
@@ -70,11 +70,12 @@ async fn complete_sale_creates_header_and_lines() {
     if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
     let (rt, sink) = fresh().await;
     let ctx = admin();
+    // Dinero en CÉNTIMOS (ADR-0007): price 121=1.21€, 110=1.10€; tendered 2000=20€.
     let res = rt.execute_command("sales.complete_sale", &params(json!({
-        "tax_included": true, "amount_tendered": 20.0, "customer_name": "Bar Manolo",
+        "tax_included": true, "amount_tendered": 2000, "customer_name": "Bar Manolo",
         "items": [
-            { "product_name": "Café", "price": 1.21, "quantity": 2, "tax_rate": 21.0 },
-            { "product_name": "Agua", "price": 1.10, "quantity": 1, "tax_rate": 10.0 }
+            { "product_name": "Café", "price": 121, "quantity": 2, "tax_rate": 21.0 },
+            { "product_name": "Agua", "price": 110, "quantity": 1, "tax_rate": 10.0 }
         ]
     })), &ctx).await.expect("complete_sale WASM");
     assert_eq!(res["operations"], json!(4)); // counter + sale + 2 líneas
@@ -83,13 +84,13 @@ async fn complete_sale_creates_header_and_lines() {
     assert_eq!(sales.len(), 1);
     let sale = &sales[0];
     assert!(sale["sale_number"].as_str().unwrap().ends_with("-0001"));
-    assert_eq!(sale["total"].as_f64().unwrap(), 3.52); // 2.42 + 1.10
+    assert_eq!(sale["total"].as_i64().unwrap(), 352); // 242 + 110 céntimos = 3.52€
 
     let lines = rt.execute_query("sales.lines", &params(json!({"sale_id": sale["id"]})), &ctx).await.unwrap();
     assert_eq!(lines.len(), 2);
     let cafe = lines.iter().find(|l| l["product_name"] == json!("Café")).unwrap();
-    assert_eq!(cafe["net_amount"].as_f64().unwrap(), 2.0);   // 2.42/1.21
-    assert_eq!(cafe["tax_amount"].as_f64().unwrap(), 0.42);
+    assert_eq!(cafe["net_amount"].as_i64().unwrap(), 200);   // 242/1.21 = 2.00€ = 200 céntimos
+    assert_eq!(cafe["tax_amount"].as_i64().unwrap(), 42);
 
     // sale.completed emitido con totales.
     let evs = sink.events.lock().unwrap();
@@ -101,7 +102,7 @@ async fn second_sale_increments_number() {
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
     let ctx = admin();
-    let p = params(json!({ "items": [{ "product_name": "X", "price": 10.0, "quantity": 1, "tax_rate": 21.0 }] }));
+    let p = params(json!({ "items": [{ "product_name": "X", "price": 1000, "quantity": 1, "tax_rate": 21.0 }] }));
     rt.execute_command("sales.complete_sale", &p, &ctx).await.unwrap();
     rt.execute_command("sales.complete_sale", &p, &ctx).await.unwrap();
     let mut nums: Vec<String> = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap()
@@ -117,7 +118,7 @@ async fn sale_decrements_stock_via_event() {
     let ctx = admin();
     // producto con stock 10.
     rt.execute_command("inventory.products.create", &params(json!({
-        "name": "Café", "sku": "CAF", "price": 1.21, "cost": 0.5, "stock": 10,
+        "name": "Café", "sku": "CAF", "price": 121, "cost": 50, "stock": 10,
         "low_stock_threshold": 5, "product_type": "physical",
         "ean13": null, "description": "", "tax_class_id": null, "image": ""
     })), &ctx).await.unwrap();
@@ -126,7 +127,7 @@ async fn sale_decrements_stock_via_event() {
 
     // venta de 3 unidades de ese producto → evento descuenta stock a 7.
     rt.execute_command("sales.complete_sale", &params(json!({
-        "items": [{ "product_id": pid, "product_name": "Café", "price": 1.21, "quantity": 3, "tax_rate": 21.0 }]
+        "items": [{ "product_id": pid, "product_name": "Café", "price": 121, "quantity": 3, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
     // Entrega asíncrona: el relay procesa sale.completed → inventory.stock.decrease.
     rt.drain_outbox().await.unwrap();
@@ -153,7 +154,7 @@ async fn sale_records_customer_purchase_via_event() {
     // venta a ese cliente → record_purchase: lead → first_purchase, total_spent sube.
     rt.execute_command("sales.complete_sale", &params(json!({
         "customer_id": cid, "customer_name": "Cliente",
-        "items": [{ "product_name": "X", "price": 50.0, "quantity": 1, "tax_rate": 0.0 }]
+        "items": [{ "product_name": "X", "price": 5000, "quantity": 1, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
     // Entrega asíncrona: el relay procesa sale.completed → customers.record_purchase.
     rt.drain_outbox().await.unwrap();
@@ -161,5 +162,5 @@ async fn sale_records_customer_purchase_via_event() {
     let c = rt.execute_query("customers.get", &params(json!({"customer_id": cid})), &ctx).await.unwrap();
     assert_eq!(c[0]["lifecycle_stage"], json!("first_purchase"));
     assert_eq!(c[0]["total_purchases"], json!(1));
-    assert_eq!(c[0]["total_spent"].as_f64().unwrap(), 50.0);
+    assert_eq!(c[0]["total_spent"].as_i64().unwrap(), 5000); // 50.00€ en céntimos
 }

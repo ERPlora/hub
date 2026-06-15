@@ -15,7 +15,7 @@ fn params(v: serde_json::Value) -> Params {
 }
 
 fn inventory_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../modules/inventory")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/inventory")
 }
 
 fn admin_ctx() -> RequestContext {
@@ -55,7 +55,7 @@ async fn product_crud_and_low_stock() {
     rt.execute_command(
         "inventory.products.create",
         &params(json!({
-            "name": "Café", "sku": "CAF", "price": 4.5, "cost": 2.0,
+            "name": "Café", "sku": "CAF", "price": 450, "cost": 200,
             "stock": 3, "low_stock_threshold": 5, "product_type": "physical",
             "ean13": null, "description": "", "tax_class_id": null, "image": ""
         })),
@@ -71,10 +71,10 @@ async fn product_crud_and_low_stock() {
     let low = rt.execute_query("inventory.products.low_stock", &Params::new(), &ctx).await.unwrap();
     assert_eq!(low.len(), 1);
 
-    // stats: 1 producto, en stock, valor 4.5*3 = 13.5.
+    // stats: 1 producto, en stock, valor 450 céntimos × 3 = 1350 céntimos (13.50€).
     let stats = rt.execute_query("inventory.products.stats", &Params::new(), &ctx).await.unwrap();
     assert_eq!(stats[0]["total_products"], json!(1));
-    assert_eq!(stats[0]["total_inventory_value"], json!(13.5));
+    assert_eq!(stats[0]["total_inventory_value"].as_i64().unwrap(), 1350);
 
     // Otro hub no ve nada (scope hub_id).
     let other = RequestContext::new("h2", "u9", ["*".to_string()]);
@@ -117,9 +117,9 @@ async fn bulk_create_wasm_inserts_with_generated_skus() {
             &params(json!({
                 "existing_count": 0,
                 "products": [
-                    { "name": "Café", "price": 4.5 },
-                    { "name": "Té", "sku": "TE-1", "price": 3.0, "stock": 20 },
-                    { "name": "Agua", "price": 1.0 }
+                    { "name": "Café", "price": 450 },
+                    { "name": "Té", "sku": "TE-1", "price": 300, "stock": 20 },
+                    { "name": "Agua", "price": 100 }
                 ]
             })),
             &ctx,
@@ -146,7 +146,7 @@ async fn receive_stock_wasm_increments_existing() {
     let ctx = admin_ctx();
     rt.execute_command(
         "inventory.products.create",
-        &params(json!({ "name": "Café", "sku": "CAF", "price": 4.5, "cost": 2.0, "stock": 10,
+        &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10,
                         "low_stock_threshold": 5, "product_type": "physical",
                         "ean13": null, "description": "", "tax_class_id": null, "image": "" })),
         &ctx,
@@ -157,14 +157,14 @@ async fn receive_stock_wasm_increments_existing() {
     // Recibe 25 unidades + actualiza coste a 2.5.
     let res = rt.execute_command(
         "inventory.stock.receive",
-        &params(json!({ "items": [{ "product_id": id, "qty": 25, "unit_cost": 2.5 }] })),
+        &params(json!({ "items": [{ "product_id": id, "qty": 25, "unit_cost": 250 }] })),
         &ctx,
     ).await.expect("receive_stock WASM");
     assert_eq!(res["operations"], json!(1));
 
     let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": id})), &ctx).await.unwrap();
     assert_eq!(p[0]["stock"], json!(35)); // 10 + 25
-    assert_eq!(p[0]["cost"], json!(2.5));
+    assert_eq!(p[0]["cost"], json!(250)); // 2.50€ en céntimos
 }
 
 #[tokio::test]

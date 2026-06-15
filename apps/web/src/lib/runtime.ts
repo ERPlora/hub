@@ -12,19 +12,44 @@
 //   - clientInjectionKey (provide/inject de Vue) para inyectar el cliente a las vistas
 //   - bootHubContext() — se llama una vez en main.ts; resuelve hub_id y lo guarda en config
 import type { InjectionKey } from 'vue';
+import { ref } from 'vue';
 import { ErploraClient, HttpWsTransport } from '@erplora/module-sdk';
 import { config } from './config';
 import { getAccessToken } from './cloud';
+import { getHubSession } from './session';
 
-/** Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL). */
+/**
+ * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
+ * Default: "" = MISMO ORIGEN siempre. En PRODUCCIÓN (build) el propio hub sirve este dist en el
+ * mismo host:puerto que /api y /ws. En DEV (`vite dev`) las rutas relativas (/api, /ws) pasan por
+ * el PROXY de Vite hacia :8787 (mismo origen → sin CORS; el runtime Axum no expone CORS). Usar la
+ * URL absoluta :8787 en dev rompía por CORS (fetch cross-origin desde :5173).
+ * `VITE_RUNTIME_URL` sigue teniendo prioridad si se define.
+ */
 export const RUNTIME_URL: string =
-  (import.meta.env.VITE_RUNTIME_URL as string | undefined) ?? 'http://127.0.0.1:8787';
+  (import.meta.env.VITE_RUNTIME_URL as string | undefined) || '';
+
+/** Usuario con PIN del hub (para el grid de login local). */
+export interface PinUser {
+  id: string;
+  name: string;
+  role: string;
+}
 
 /** Respuesta de `GET /api/hub/context` del runtime. */
 export interface HubContext {
   hub_id: string;
   user: unknown | null;
+  /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
+  pin_users?: PinUser[];
 }
+
+/**
+ * Usuarios-PIN del hub resueltos en el boot (`GET /api/hub/context`). El LoginPage los usa para
+ * mostrar el grid de PIN directamente cuando el hub ya tiene usuarios (p. ej. el demo: "Demo"),
+ * sin depender de un flag en localStorage. `[]` hasta que el boot responde.
+ */
+export const pinUsers = ref<PinUser[]>([]);
 
 let _client: ErploraClient | null = null;
 
@@ -32,9 +57,13 @@ let _client: ErploraClient | null = null;
  * Cabeceras de auth para cada llamada al runtime: X-Hub-Id (inyectado por deployment, leído
  * del runtime en boot) + Bearer del usuario activo si hay sesión. El runtime Rust revalida.
  */
-function runtimeHeaders(): Record<string, string> {
+export function runtimeHeaders(): Record<string, string> {
   const h: Record<string, string> = {};
   if (config.hubId) h['X-Hub-Id'] = config.hubId;
+  // Sesión local del runtime: autoridad de permisos en modo Session (gate de query/command).
+  const session = getHubSession();
+  if (session) h['X-Hub-Session'] = session;
+  // JWT del usuario: fallback hub-scoped (marketplace/install) cuando el hub no está enrolado.
   const token = getAccessToken();
   if (token) h['Authorization'] = `Bearer ${token}`;
   return h;
@@ -78,6 +107,38 @@ export async function requestInstall(moduleId: string, version: string): Promise
   return (await res.json()) as InstallRequestResult;
 }
 
+/** Un módulo instalado según el runtime (`GET /api/modules`). `status` = active|inactive. */
+export interface InstalledModule {
+  id: string;
+  name: string;
+  status: 'active' | 'inactive';
+  version: string;
+}
+
+/** Lista los módulos instalados en el runtime (fuente de verdad local, no el catálogo Cloud). */
+export async function listInstalledModules(): Promise<InstalledModule[]> {
+  const res = await fetch(`${RUNTIME_URL}/api/modules`, { headers: runtimeHeaders() });
+  if (!res.ok) throw new Error(`modules → ${res.status}`);
+  const env = (await res.json()) as { ok: boolean; data?: InstalledModule[] };
+  return env.ok && env.data ? env.data : [];
+}
+
+/** Activa / desactiva / desinstala un módulo en el runtime (hot-plug). Lanza si el runtime falla. */
+async function moduleAction(id: string, action: 'activate' | 'deactivate' | 'uninstall'): Promise<void> {
+  const res = await fetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST',
+    headers: runtimeHeaders(),
+  });
+  const env = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: { message?: string } };
+  if (!res.ok || env.ok === false) {
+    throw new Error(env.error?.message ?? `${action} ${id} → ${res.status}`);
+  }
+}
+
+export const activateModule = (id: string): Promise<void> => moduleAction(id, 'activate');
+export const deactivateModule = (id: string): Promise<void> => moduleAction(id, 'deactivate');
+export const uninstallModule = (id: string): Promise<void> => moduleAction(id, 'uninstall');
+
 /**
  * Obtiene el hub_id del runtime (`GET /api/hub/context`) y lo fija en `config.hubId`.
  * Se llama una vez en el boot (main.ts). Si el runtime no responde, deja el fallback
@@ -91,6 +152,7 @@ export async function bootHubContext(): Promise<HubContext | null> {
     if (!res.ok) return null;
     const ctx = (await res.json()) as HubContext;
     if (ctx.hub_id) config.hubId = ctx.hub_id;
+    if (Array.isArray(ctx.pin_users)) pinUsers.value = ctx.pin_users;
     return ctx;
   } catch {
     return null;

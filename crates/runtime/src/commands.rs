@@ -1,7 +1,8 @@
 //! Ejecución de commands declarativos (mutaciones) + emisión de eventos. ARQUITECTURA.md §4.
-//! Tier 0/1 (SQL declarativo) y Tier 2 (handler WASM vía `erplora-wasm-host`, §5.3 / §9.2).
+//! Tier 0/1 (SQL declarativo), Tier 2 (handler WASM vía `erplora-wasm-host`, §5.3 / §9.2)
+//! y plugins **nativos first-party** (ADR-0009, `native.rs`).
 use erplora_db::{DatabaseAdapter, Params};
-use erplora_wasm_host::{Operation, WasmHost};
+use erplora_wasm_host::{Operation, Output, WasmHost};
 use serde_json::{json, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
@@ -54,6 +55,21 @@ pub(crate) async fn execute_at(
 
     // El handler corre bajo el permiso del command que lo invoca (no re-eleva).
     permissions::check(ctx, &cmd.def.permission)?;
+
+    // Validación del payload contra el JSON Schema declarado (compilado al instalar y
+    // cacheado en el Registry): rechaza ANTES de tocar la BD o invocar handlers (hub#27).
+    if let Some(schema) = &cmd.schema {
+        schema
+            .validate(&Json::Object(payload.clone()))
+            .map_err(|detail| RuntimeError::InvalidPayload { name: name.to_string(), detail })?;
+    }
+
+    // ── Plugin nativo first-party (ADR-0009) ────────────────────────────────
+    if let Some(handler) = &cmd.def.handler {
+        if handler.kind == "native" {
+            return execute_native(db, registry, cmd, payload, ctx, depth, extra_ops).await;
+        }
+    }
 
     // ── Tier 2: handler WASM ────────────────────────────────────────────────
     if let Some(bytes) = &cmd.wasm {
@@ -132,6 +148,67 @@ async fn execute_wasm(
         .call(&handler.function, &input)
         .map_err(|e| RuntimeError::Wasm(e.to_string()))?;
 
+    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output).await
+}
+
+/// Ejecuta un command de **plugin nativo first-party** (ADR-0009): mismo contrato de
+/// intenciones que el WASM, pero la función vive en un crate horneado en el runtime
+/// (registrado vía [`crate::Runtime::register_native`]) con acceso pleno a red/cripto y
+/// lecturas mediadas (`native::NativeHost`, solo SELECT).
+async fn execute_native(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    cmd: &RegisteredCommand,
+    payload: &Params,
+    ctx: &RequestContext,
+    depth: u32,
+    extra_ops: &[(String, Params)],
+) -> Result<Json> {
+    let handler = cmd.def.handler.as_ref().ok_or_else(|| {
+        RuntimeError::Native("command nativo sin bloque handler".to_string())
+    })?;
+    let engine = registry.native.get(&cmd.module_id).ok_or_else(|| {
+        RuntimeError::Native(format!(
+            "plugin nativo del módulo `{}` no registrado en este runtime",
+            cmd.module_id
+        ))
+    })?;
+
+    // Mismo input que el WASM: payload con system_params + contexto con lote de ids.
+    let bound_payload = crate::system_params(payload, ctx);
+    let new_ids: Vec<Json> = (0..NEW_IDS_BATCH)
+        .map(|_| Json::String(crate::registry::new_id()))
+        .collect();
+    let input = json!({
+        "payload": Json::Object(bound_payload),
+        "context": {
+            "hub_id": ctx.hub_id,
+            "current_user_id": ctx.user_id,
+            "now": crate::registry::now_rfc3339(),
+            "new_ids": new_ids,
+        },
+    });
+
+    let host = crate::native::DbHost { db };
+    let output = engine.call(&handler.function, &input, &host).await?;
+
+    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output).await
+}
+
+/// Persiste el [`Output`] de un handler (WASM o nativo): valida cada intención contra los
+/// commands SQL del MISMO módulo y aplica intenciones + outbox (`emit` declarado + eventos
+/// del handler) + `extra_ops` en UNA transacción; notifica al WS tras el commit.
+#[allow(clippy::too_many_arguments)]
+async fn persist_handler_output(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    cmd: &RegisteredCommand,
+    payload: &Params,
+    ctx: &RequestContext,
+    depth: u32,
+    extra_ops: &[(String, Params)],
+    output: &Output,
+) -> Result<Json> {
     // Valida + resuelve cada operación a su(s) SQL contra los commands del MISMO módulo.
     let mut tx_ops: Vec<(String, Params)> = Vec::new();
     for op in &output.operations {
@@ -229,6 +306,7 @@ mod tests {
             emit: vec![],
             handler: None,
             ai: None,
+            schema: None,
         }
     }
 
@@ -242,6 +320,7 @@ mod tests {
                 def: cmd_def(),
                 sql: vec!["INSERT INTO x VALUES (1);".to_string()],
                 wasm: None,
+                schema: None,
             },
         );
         reg

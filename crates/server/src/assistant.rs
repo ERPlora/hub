@@ -29,7 +29,12 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
         }
         if let Some(ai) = &q.def.ai {
             if permits(&q.def.permission) {
-                tools.push(tool_def(ai.name.as_deref().unwrap_or(name), &ai.description, "query"));
+                tools.push(tool_def(
+                    ai.name.as_deref().unwrap_or(name),
+                    &ai.description,
+                    "query",
+                    &q.module_id,
+                ));
             }
         }
     }
@@ -39,7 +44,12 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
         }
         if let Some(ai) = &c.def.ai {
             if permits(&c.def.permission) {
-                tools.push(tool_def(ai.name.as_deref().unwrap_or(name), &ai.description, "command"));
+                tools.push(tool_def(
+                    ai.name.as_deref().unwrap_or(name),
+                    &ai.description,
+                    "command",
+                    &c.module_id,
+                ));
             }
         }
     }
@@ -49,11 +59,15 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
     tools
 }
 
-fn tool_def(name: &str, description: &str, kind: &str) -> Value {
+/// Construye la tool-spec de una operación. `module_id` lo usa el router vectorial (§9.2b) para
+/// prefiltrar por módulo ([`crate::router::filter_tools_by_modules`]); el Cloud lo ignora si no lo
+/// necesita (ya recibe `kind` de la misma forma).
+fn tool_def(name: &str, description: &str, kind: &str, module_id: &str) -> Value {
     json!({
         "name": name,
         "description": description,
         "kind": kind,
+        "module_id": module_id,
     })
 }
 
@@ -62,10 +76,32 @@ fn tool_def(name: &str, description: &str, kind: &str) -> Value {
 ///
 /// `input` toma el contenido del último mensaje de `role: user`; el historial completo se
 /// reenvía como `messages` para que el Cloud lo use si su orquestador lo soporta.
-pub fn build_cloud_body(frontend: &Value, tools: Vec<Value>) -> Value {
+///
+/// `user` es el id del usuario LOCAL activo (de la sesión del hub). Se manda como **metadata**
+/// para coste/auditoría — NO para permisos (el gate es local + el coste se mide por hub). Permite
+/// que un cajero solo-local (sin cuenta cloud) use el asistente vía el token de máquina del hub.
+pub fn build_cloud_body(frontend: &Value, tools: Vec<Value>, user: Option<&str>) -> Value {
     let messages = frontend.get("messages").cloned().unwrap_or_else(|| json!([]));
-    let last_user = messages
-        .as_array()
+    let last_user = last_user_message(frontend);
+
+    let mut body = json!({
+        "input": last_user,
+        "messages": messages,
+        "tools": tools,
+    });
+    if let Some(u) = user.filter(|u| !u.is_empty()) {
+        body["user"] = json!(u);
+    }
+    body
+}
+
+/// Extrae el contenido del último mensaje de `role: user` del payload del frontend
+/// (`{"messages":[…]}`). Es la "petición" que el router vectorial embebe (§9.2b). Cadena vacía si
+/// no hay ningún mensaje de usuario.
+pub fn last_user_message(frontend: &Value) -> String {
+    frontend
+        .get("messages")
+        .and_then(Value::as_array)
         .and_then(|arr| {
             arr.iter()
                 .rev()
@@ -73,13 +109,7 @@ pub fn build_cloud_body(frontend: &Value, tools: Vec<Value>) -> Value {
         })
         .and_then(|m| m.get("content").and_then(Value::as_str))
         .unwrap_or("")
-        .to_string();
-
-    json!({
-        "input": last_user,
-        "messages": messages,
-        "tools": tools,
-    })
+        .to_string()
 }
 
 /// Traduce **una línea** SSE del Cloud (`data: …`) al frame del frontend.
@@ -139,7 +169,7 @@ mod tests {
             {"role":"user","content":"crea una venta"}
         ]});
         let tools = vec![json!({"name":"pos.sale.create"})];
-        let body = build_cloud_body(&fe, tools);
+        let body = build_cloud_body(&fe, tools, None);
         assert_eq!(body["input"], "crea una venta");
         assert_eq!(body["tools"][0]["name"], "pos.sale.create");
         assert_eq!(body["messages"].as_array().unwrap().len(), 3);

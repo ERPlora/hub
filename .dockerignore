@@ -1,0 +1,29 @@
+# Build context para docker/Dockerfile. Cada stage hace su propio install/build dentro de la
+# imagen, así que excluimos artefactos pesados/locales que invalidarían la caché o filtrarían
+# secretos al contexto.
+
+# Artefactos de build (se regeneran dentro de la imagen)
+target/
+**/target/
+node_modules/
+**/node_modules/
+apps/web/dist/
+**/dist/
+**/.vite/
+
+# VCS y tooling local
+.git/
+.github/
+.vscode/
+.ruff_cache/
+.DS_Store
+**/.DS_Store
+
+# Secretos / entorno (nunca al contexto)
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Docs y misc
+*.md

@@ -13,10 +13,11 @@
 //! desactivamos la validación de `exp` de `jsonwebtoken` y comprobamos `grace_until` aquí.
 
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-/// Un módulo al que el hub tiene derecho.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+/// Un módulo al que el hub tiene derecho. `Serialize` además de `Deserialize`: el gate Tauri lo
+/// devuelve al frontend dentro de `GateOutcome` (vía `invoke`).
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct EntitledModule {
     pub module_id: String,
     pub tier: String,
@@ -101,4 +102,95 @@ pub fn verify_entitlement(
         return Err(EntitlementError::GraceExpired);
     }
     Ok(data.claims)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+    use serde_json::json;
+
+    const PRIV: &str = r#"-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDzGzIyJJGCZ9C6
+y6Bm5rDSD6oyPm6vNLbP1XE3JsIdtZx8yRBpfomjsgtl5BNixVgqFAxts5m7odJ1
+A3i2oKdBqsVK1wF+jpVaEf8O6+ts+8s3ju8AZCyUSNjCqRUObUC9jjOCW5VSWSnU
+sZdGNXU7UTWOtbvOxqy+IdFE0DOeazH+i2SSQ+WV4u37rlidGh0GHYSsnbQeHRyX
+Z4iyYxCfQDlqGAYCPp3GCvEdra+TiZXmJfIl7as8/cTqBY3wOuscwCi7pGLGODQy
+H8QawNShpzvUHNqtTo5/o4DVTWf3j0LUJDCllswkMIRMX9m9M9Dhvqr6qD9dei+j
+uR8WwyGdAgMBAAECggEAEKuWv5V+XODdkVGRSD0dduoYE6XwVRdaSdorD0sbGIpx
+lqT6+SDyM0VsPqprIeTCbPA/Ae7E5fbsxZVdW7icf4ZETSN9OL5yQ2DkipNm62xA
+vSiR/wbff7OXGZIanYikXds4cQHytVjj42/iHbBgv5aMA6M2o7E/+zG6deuI/p3c
+8iq9mBEA8ErV10ybS5lMyo1ZkIXWG2OStP4yXVg4jH9GVVBKrV/vFVDPXgJLY6nv
+aOBRu130OwK89STAqI13kBZ3H+wksu6UFc9NoQFPRnTf6pW+NhiO9F0RRAZwVC+N
+mJJ4xwKUB8sg9p6/mIfqQTjDuKd1IsvFcaDZgd3KSQKBgQD9BUOv1ok6PnSrSSrU
+5RsiJHuJcqR//qvFpyABejsB0Ilmco/dgQN6Knc4JZWX2FVcK8mofTbpQPKc6aOZ
+GE+15xP3W62MIgaz5kyltxqa0g9DIRKktmiQtGWHDUkL8kXyLwaNxHjj03h/3ku/
+AaiAt8qZ1xhBl4JvBKhmrUOnXwKBgQD1+AtzZ9fHLjN3GOk4SRvIMOt1mB0OOnZY
+19jTPJD+Pyw9AH8ohhhdTIQTRMm+TIC5n/G6lMtJu9iSwqY2Kis60UyJa6BxwJpf
+WTB1hyRUe9jGtwv9Aj9dyLwAyGAqp00WTkwoF7nRZO6pEpwCntydOsHFLlGR3hG2
++LYU4dkEgwKBgQCgN2QsBSJyMjg4eiVYGBc9YHKlj2Wg8wecKf63UMnqlT1cFPEK
+ZvZntlo1wH7gXwl2Svfv7BIIU6sNN1jzyZQ38DIRcQkM8kLiSdOBH9gF7zvg2yFu
+EV9XOhQMF5qIqQonmCWDQcT3JuJnvcCjG46yqy7siWp/pkvetslX8yEi6wKBgAdz
+MN2Y+pck1hg4X+/9fuLsYGVaax7gNG9ycjXLstSQk0Vxu2g9z4Ub6TAwODAUXx3A
+M3EkSpf8IY4oaSJg2phYeIn9AYoQfFyA9g/JPRd1/NXf+3P5WnP7vX4Ek60XDiWr
+z3Czb0RhWz0xvBn0N9hnTDEtuvjBEiZJmDI/uPQDAoGBAOIt9bClD86rZ+gQttCH
++IQF7kWpM5sFJ1T99WgzVhh2KcoAbYBJXeNBrDaV5RXH81lgpJCr33UUb6dEH6Ro
+jmmYhehBeEknoM0QbKpNkltZHLxv3hOEr3cdJxFhTfF1xtknyuD4PkCQxNCopR1N
+2LZnAS37uyj9SuBl2xKDyikA
+-----END PRIVATE KEY-----
+"#;
+    const PUB: &str = r#"-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8xsyMiSRgmfQusugZuaw
+0g+qMj5urzS2z9VxNybCHbWcfMkQaX6Jo7ILZeQTYsVYKhQMbbOZu6HSdQN4tqCn
+QarFStcBfo6VWhH/DuvrbPvLN47vAGQslEjYwqkVDm1AvY4zgluVUlkp1LGXRjV1
+O1E1jrW7zsasviHRRNAznmsx/otkkkPlleLt+65YnRodBh2ErJ20Hh0cl2eIsmMQ
+n0A5ahgGAj6dxgrxHa2vk4mV5iXyJe2rPP3E6gWN8DrrHMAou6Rixjg0Mh/EGsDU
+oac71BzarU6Of6OA1U1n949C1CQwpZbMJDCETF/ZvTPQ4b6q+qg/XXovo7kfFsMh
+nQIDAQAB
+-----END PUBLIC KEY-----
+"#;
+
+    fn sign(exp: i64, grace_until: i64) -> String {
+        let claims = json!({
+            "hub_id": "h1",
+            "deployment_mode": "desktop",
+            "modules": [{"module_id": "pos", "tier": "basic", "version": "1.0.0"}],
+            "iat": 1000,
+            "exp": exp,
+            "grace_until": grace_until,
+        });
+        let key = EncodingKey::from_rsa_pem(PRIV.as_bytes()).unwrap();
+        encode(&Header::new(Algorithm::RS256), &claims, &key).unwrap()
+    }
+
+    #[test]
+    fn verifies_within_grace_even_after_exp() {
+        // now (3000) is past exp (2000) but within grace_until (9000): offline-first.
+        let token = sign(2000, 9000);
+        let claims = verify_entitlement(&token, PUB, 3000).unwrap();
+        assert_eq!(claims.hub_id, "h1");
+        assert_eq!(claims.deployment_mode, "desktop");
+        assert!(claims.allows("pos"));
+        assert!(!claims.allows("not-installed"));
+    }
+
+    #[test]
+    fn rejects_past_grace_window() {
+        let token = sign(2000, 9000);
+        let err = verify_entitlement(&token, PUB, 9001).unwrap_err();
+        assert!(matches!(err, EntitlementError::GraceExpired));
+    }
+
+    #[test]
+    fn rejects_tampered_token() {
+        let token = sign(2000, 9000) + "tamper";
+        assert!(verify_entitlement(&token, PUB, 3000).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_public_key() {
+        let token = sign(2000, 9000);
+        let bad = "-----BEGIN PUBLIC KEY-----\nnot-a-real-key\n-----END PUBLIC KEY-----\n";
+        assert!(verify_entitlement(&token, bad, 3000).is_err());
+    }
 }
