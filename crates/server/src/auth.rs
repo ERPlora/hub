@@ -1,14 +1,71 @@
-//! Extracción del contexto de petición desde las cabeceras (ARQUITECTURA.md §2.3, §2.5, §2.9).
+//! Autenticación de la petición → `RequestContext` (ARQUITECTURA.md §2.3, §2.5, §2.9).
 //!
-//! Hoy: confía en `X-Hub-Id` + `X-User-Id` + `X-Permissions` que pone el frontend tras el
-//! login. Cuando exista `erplora-cloud-client`, aquí se validará el JWT del usuario / el
-//! `X-Hub-Token` de máquina contra el Cloud Portal. La autoridad de permisos ya es del runtime.
+//! Dos modos (`HubConfig::auth_mode`):
+//!  - **Dev**: confía en `X-Hub-Id` + `X-User-Id` + `X-Permissions` que pone el frontend. Para
+//!    desarrollo local sin Cloud.
+//!  - **Session** (modelo real, §2.9): la **autoridad de identidad/permisos es LOCAL**. El login
+//!    (PIN local o JWT de usuario cloud — ver handlers en `lib.rs`) abre una **sesión server-side**
+//!    (`hub_session`) y devuelve un token opaco; cada petición lo manda en `X-Hub-Session` y aquí se
+//!    resuelve a un `hub_user` y a los **permisos de su rol** (`role_permissions` de los módulos
+//!    activos). El `hub_id` viene del **config de despliegue** (no del header, no spoofable).
+//!
+//! El JWT de usuario (RS256) es solo el **adaptador de login cloud** (`cloud_client::verify_user_jwt`
+//! en el handler de login): prueba *quién* es el usuario cloud → se mapea a un `hub_user` local
+//! (`get_or_link_cloud_user`) → se abre sesión. Nunca es la fuente de permisos.
 use axum::http::HeaderMap;
-use erplora_runtime::RequestContext;
+use erplora_runtime::{RequestContext, Runtime};
+
+use crate::state::{AppState, AuthMode, HubConfig};
 
 const DEFAULT_HUB: &str = "local";
 const DEFAULT_USER: &str = "local";
 
+/// Error de autenticación. Se mapea a `401 Unauthorized` en los handlers.
+#[derive(Debug)]
+pub enum AuthError {
+    MissingSession,
+    Invalid(String),
+}
+
+impl AuthError {
+    pub fn message(&self) -> String {
+        match self {
+            AuthError::MissingSession => "falta sesión (cabecera X-Hub-Session)".to_string(),
+            AuthError::Invalid(e) => format!("no autenticado: {e}"),
+        }
+    }
+}
+
+/// Token de sesión del hub (cabecera `X-Hub-Session`), si viene.
+pub fn session_token(headers: &HeaderMap) -> Option<String> {
+    header(headers, "x-hub-session")
+}
+
+/// Autentica la petición y construye el `RequestContext` según el modo configurado.
+/// - `Dev`: confía en cabeceras (`X-User-Id`/`X-Permissions`).
+/// - `Session`: resuelve la sesión server-side → `hub_user` → permisos del rol (autoridad local).
+pub async fn authenticate(
+    headers: &HeaderMap,
+    config: &HubConfig,
+    rt: &Runtime,
+) -> Result<RequestContext, AuthError> {
+    match config.auth_mode {
+        AuthMode::Dev => Ok(context_from_headers(headers)),
+        AuthMode::Session => {
+            let token = session_token(headers).ok_or(AuthError::MissingSession)?;
+            let user = rt
+                .resolve_session(&token)
+                .await
+                .map_err(|e| AuthError::Invalid(e.to_string()))?
+                .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
+            // hub_id del despliegue (no spoofable); user_id + permisos de la identidad LOCAL.
+            let perms = rt.permissions_for_role(&user.role);
+            Ok(RequestContext::new(config.hub_id.clone(), user.id, perms))
+        }
+    }
+}
+
+/// Modo Dev: confía en las cabeceras que pone el frontend (sin verificación). Solo desarrollo.
 pub fn context_from_headers(headers: &HeaderMap) -> RequestContext {
     let hub = header(headers, "x-hub-id").unwrap_or_else(|| DEFAULT_HUB.to_string());
     let user = header(headers, "x-user-id").unwrap_or_else(|| DEFAULT_USER.to_string());
@@ -38,4 +95,26 @@ pub fn hub_id(headers: &HeaderMap, fallback: &str) -> String {
 pub fn user_auth(headers: &HeaderMap, fallback_hub: &str) -> Option<cloud_client::Auth> {
     let access = bearer(headers)?;
     Some(cloud_client::Auth::UserJwt { hub_id: hub_id(headers, fallback_hub), access })
+}
+
+/// Credencial de **máquina** del hub (`Auth::HubToken` = `X-Hub-Token` + `X-Hub-Id`), si el hub
+/// está enrolado. Lee el token **vivo** del [`AppState`] (`machine_token`), no la config estática,
+/// para que un enrol/rotación aplique sin reiniciar (§2.3, hot-reload). `None` si no hay token.
+pub fn machine_auth(st: &AppState) -> Option<cloud_client::Auth> {
+    st.machine_token().map(|token| cloud_client::Auth::HubToken {
+        hub_id: st.config.hub_id.clone(),
+        token,
+    })
+}
+
+/// Credencial para llamadas **hub-scoped** al Cloud (marketplace, entitlement, install, asistente):
+/// usa el **token de máquina** si el hub está enrolado; si no (dev/local sin enrolar), cae al JWT
+/// del usuario activo de la petición. `None` solo si no hay ninguna de las dos.
+///
+/// Desacopla "el hub puede llegar al Cloud" de "qué usuario está activo": un cajero solo-local
+/// (sesión por PIN, sin JWT cloud) sigue pudiendo navegar el marketplace y refrescar el
+/// entitlement porque el hub se autentica a sí mismo. El secreto de máquina NO viaja al navegador:
+/// estas llamadas las hace el runtime (server-side).
+pub fn hub_scoped_auth(headers: &HeaderMap, st: &AppState) -> Option<cloud_client::Auth> {
+    machine_auth(st).or_else(|| user_auth(headers, &st.config.hub_id))
 }

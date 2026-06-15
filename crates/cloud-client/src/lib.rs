@@ -12,9 +12,15 @@
 
 use serde::Deserialize;
 
+pub mod entitlement;
 pub mod integrity;
+pub mod user_jwt;
 
+pub use entitlement::{
+    verify_entitlement, EntitledModule, EntitlementClaims, EntitlementError, EntitlementResponse,
+};
 pub use integrity::{verify_sha256, IntegrityError};
+pub use user_jwt::{verify_user_jwt, UserClaims, UserJwtError};
 
 /// Credenciales con las que firmar una petición al Cloud.
 #[derive(Debug, Clone)]
@@ -85,6 +91,72 @@ impl CloudClient {
         self.get("/api/v1/marketplace/modules/", auth)
     }
 
+    /// **Gate de arranque de la app Tauri** — entitlement firmado de módulos del hub
+    /// (con JWT de usuario). `GET /api/v1/hub/device/entitlement/`. La respuesta es un
+    /// [`EntitlementResponse`]; su `token` se verifica offline con
+    /// [`verify_entitlement`] contra la clave pública del Cloud. Ver `entitlement.rs`.
+    pub fn entitlement(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/entitlement/", auth)
+    }
+
+    /// **Enrolamiento del dispositivo** — el runtime obtiene su credencial de máquina
+    /// (`cloud_api_token`) una sola vez. `GET /api/v1/hub/device/enroll/` con el JWT de un
+    /// **owner/admin** de la org del hub (`IsHubAdmin`) + `X-Hub-Id`. La respuesta es
+    /// [`EnrollGrant`] (`hub_id` + `cloud_api_token`); el runtime la persiste de forma segura
+    /// y a partir de ahí usa [`Auth::HubToken`] (`X-Hub-Token`) para llamadas hub-scoped sin
+    /// usuario logueado (marketplace, entitlement…). §2.3.
+    pub fn enroll(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/enroll/", auth)
+    }
+
+    /// **Rotación** de la credencial de máquina — `POST /api/v1/hub/device/enroll/` (mismo endpoint,
+    /// `IsHubAdmin`). El Cloud genera un `cloud_api_token` **nuevo** (invalida el anterior) y lo
+    /// devuelve como [`EnrollGrant`]; el runtime lo re-persiste. Usar deliberadamente (compromiso de
+    /// credencial / rotación periódica): un hub en ECS necesita redeploy para tomar el nuevo env. §2.3.
+    pub fn enroll_rotate(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/enroll/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Revocación** (kill-switch) de la credencial de máquina — `DELETE /api/v1/hub/device/enroll/`
+    /// (`IsHubAdmin`). Desactiva el token de máquina al instante sin emitir uno nuevo (dispositivo
+    /// perdido/robado); se re-habilita re-enrolando (`enroll_rotate`). Normalmente lo invoca el
+    /// dashboard/admin del owner (revoca un dispositivo que NO tiene a mano), no el propio hub. §2.3.
+    pub fn enroll_revoke(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "DELETE",
+            url: format!("{}/api/v1/hub/device/enroll/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Refresh del JWT de usuario** contra el Cloud (hub#15, §2.3) — `POST /api/v1/auth/refresh/`
+    /// (verificado: `cloud/apps/auth/users/api/urls.py` → `RotatingTokenRefreshView`, rota el
+    /// refresh). Es un endpoint **público** en cuanto a cabeceras: NO lleva `Authorization` ni
+    /// `X-Hub-Id`; el `refresh` token va en el **body** `{"refresh":"<token>"}`. La respuesta es un
+    /// [`RefreshGrant`] (`access` nuevo + `refresh` rotado). El interceptor del Hub lo invoca al
+    /// recibir un 401 con un access caducado. El body lo construye el llamador (server).
+    pub fn refresh(&self) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/auth/refresh/", self.base_url),
+            headers: vec![],
+        }
+    }
+
+    /// Clave pública RSA del Cloud (para verificar el token de entitlement offline).
+    /// `GET /api/v1/auth/public-key/`. Sin auth (endpoint público).
+    pub fn public_key(&self) -> PreparedRequest {
+        PreparedRequest {
+            method: "GET",
+            url: format!("{}/api/v1/auth/public-key/", self.base_url),
+            headers: vec![],
+        }
+    }
+
     /// **Flujo real de instalación, paso 1** — lista las versiones activas de un módulo.
     /// `GET /api/v1/marketplace/modules/{module_id}/versions/` (verificado contra
     /// `cloud/apps/public/modules/api_views.py::versions`). La respuesta es un array JSON
@@ -124,6 +196,88 @@ impl CloudClient {
             url: format!("{}/api/v1/hub/device/assistant/chat/stream/", self.base_url),
             headers: auth.headers(),
         }
+    }
+
+    /// **Embeddings vía el proxy del Cloud** (§9.3/§9.4/§9.6 — el Hub nunca llama a un proveedor
+    /// de embeddings directamente; va por el Cloud, que mide el coste en `AssistantUsage`).
+    /// `POST /api/v1/hub/device/assistant/embeddings/` (verificado contra
+    /// `cloud/apps/assistant/api/views.py::embed_texts_view`). El body es un
+    /// [`EmbeddingsRequest`] (`{"texts":[…], "model"?}`) y la respuesta un
+    /// [`EmbeddingsResponse`] (`{"embeddings":[[…]], "model"}`). El cuerpo lo construye el
+    /// llamador (server) a partir de los textos a indexar (routing de módulos §9.2b o RAG §9.4).
+    ///
+    /// Es un endpoint **hub-scoped**: se firma con la credencial de **máquina** del hub
+    /// (`X-Hub-Token`) cuando se llama desde el lifecycle de install (sin usuario logueado), o
+    /// con el JWT de usuario para la embebida de la petición en query-time del router. El I/O de
+    /// red lo hace el cliente HTTP del llamador (espejo de [`assistant_chat_stream`]).
+    pub fn embeddings(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/assistant/embeddings/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Notificación WhatsApp PREMIUM de ERPlora vía el proxy del Cloud** (ADR-0012 + ADR-0006).
+    /// Como el asistente, el Hub no habla con la Graph API de Meta directamente: la llamada sale
+    /// por Cloud, que aplica `check_quota`, inyecta el token de Meta de ERPlora y bloquea al
+    /// agotar la cuota (el Hub solo refleja el estado). `POST /api/v1/hub/device/notify/whatsapp/`
+    /// con la credencial de **máquina** (`X-Hub-Token`, contexto hub-scoped sin usuario; el envío
+    /// lo dispara una scheduled task / un listener del outbox, no un usuario). El body
+    /// (`{to, template, vars}`) lo construye el llamador (server) desde la `NotifyIntent`.
+    ///
+    /// Los canales **del tenant** (email/sms/WhatsApp self-hosted) NO pasan por aquí: usan el
+    /// secreto local cifrado del hub y el host llama directo (sin cuota ERPlora).
+    pub fn notify_whatsapp(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/notify/whatsapp/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Subida (stream) del backup local → Cloud** (ADR-0040, **opción B** 2026-06-13). La app
+    /// **Local (free)** NO habla con S3 ni guarda credenciales AWS: **streamea el dump** (bytes en
+    /// claro sobre TLS) a un endpoint del Cloud, que lo escribe a S3 con **cifrado de servidor (SSE)**.
+    /// `POST /api/v1/hub/device/backup/` con la credencial de **máquina** del hub (`X-Hub-Token` +
+    /// `X-Hub-Id`, contexto hub-scoped sin usuario: el backup lo dispara una scheduled task / la UI,
+    /// no un JWT cloud fresco). El Cloud valida entitlement del módulo `backup`, streamea a S3
+    /// (`erplora-storage`, key inmutable `backups/local/{hub}/{ts}.dump`) y responde con un
+    /// [`BackupUploadResult`] (`s3_key`, `bytes`, ...).
+    ///
+    /// El **body es el dump** (stream binario, en claro); el cifrado lo hace el Cloud (SSE), **no**
+    /// el hub. Metadatos opcionales (tamaño, sha256, versión de esquema, timestamp del cliente) van
+    /// en cabeceras. El cuerpo lo aporta el llamador (server/runtime) desde el dump del SQLite.
+    /// Espejo del estilo de [`assistant_chat_stream`]/[`notify_whatsapp`]: aquí solo se construye la
+    /// petición (método/URL/cabeceras); el I/O del stream lo hace el cliente HTTP del llamador.
+    ///
+    /// TODO (columna humano, otra capa): el endpoint Django del Cloud no existe aún — lo crea el
+    /// humano (`cloud/apps/dashboard/hubs/main/api/hub_api.py`). Contrato fijado aquí.
+    pub fn backup_upload(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/backup/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Restore, paso 1 — lista las copias del usuario** (ADR-0040, opción B). Mostrar las copias
+    /// de las orgs/hubs del usuario (también para "mover a otro equipo") requiere **JWT de usuario**
+    /// (no el machine token, que es de un solo hub): `GET /api/v1/hub/device/backup/` con
+    /// `Authorization: Bearer …` + `X-Hub-Id`. La respuesta es un array de [`BackupEntry`]
+    /// (`s3_key`, `created_at`, `bytes`, `hub_id`, ...). TODO endpoint Django = humano.
+    pub fn backup_list(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/backup/", auth)
+    }
+
+    /// **Restore, paso 2 — descarga los bytes de una copia** (ADR-0040, opción B). El Cloud sirve el
+    /// dump (SSE es transparente: el Cloud lo lee descifrado de S3); el hub lo aplica (reemplaza el
+    /// SQLite + reinicia). `GET /api/v1/hub/device/backup/download/?s3_key={s3_key}` con
+    /// `Authorization: Bearer …` + `X-Hub-Id` (flujo de usuario, posiblemente cross-hub). Respuesta =
+    /// stream binario del dump (en claro). TODO endpoint Django = humano.
+    pub fn backup_download(&self, auth: &Auth, s3_key: &str) -> PreparedRequest {
+        // El s3_key viaja en query; el llamador debe URL-encodearlo (contiene `/` y `:`).
+        self.get(&format!("/api/v1/hub/device/backup/download/?s3_key={s3_key}"), auth)
     }
 
     /// **DEPRECADO** — apuntaba a un endpoint ficticio `…/versions/{version}/install/` que
@@ -187,6 +341,119 @@ impl InstallGrant {
     }
 }
 
+/// Respuesta de [`CloudClient::enroll`]: la credencial de máquina del hub. §2.3.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct EnrollGrant {
+    pub hub_id: String,
+    /// Token de aplicación del hub para el header `X-Hub-Token` (contexto máquina).
+    pub cloud_api_token: String,
+}
+
+impl EnrollGrant {
+    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
+/// Respuesta de [`CloudClient::refresh`]: el par de tokens renovado por SimpleJWT (hub#15, §2.3).
+/// El `refresh` viene rotado (la vista del Cloud es `RotatingTokenRefreshView`); el Hub debe
+/// **persistir el refresh nuevo** y reintentar la petición original con el `access` nuevo.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct RefreshGrant {
+    /// Access JWT nuevo (RS256, ~1h).
+    pub access: String,
+    /// Refresh token rotado. `None` si el Cloud no rota (no debería con la vista actual).
+    #[serde(default)]
+    pub refresh: Option<String>,
+}
+
+impl RefreshGrant {
+    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
+/// Body de [`CloudClient::embeddings`]: los textos a embeber + el modelo opcional. El Cloud
+/// usa su modelo por defecto (`text-embedding-3-small`, 1536 dims, casa con `vector(1536)` de
+/// §9.4) si `model` es `None`. El límite de `texts` por llamada lo aplica el Cloud (256 hoy);
+/// el llamador debe trocear lotes grandes. Se serializa al body de la petición.
+#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
+pub struct EmbeddingsRequest {
+    pub texts: Vec<String>,
+    /// Modelo de embeddings; `None` → el Cloud usa su `DEFAULT_EMBED_MODEL`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+impl EmbeddingsRequest {
+    /// Construye una petición con los textos dados y el modelo por defecto del Cloud.
+    pub fn new(texts: Vec<String>) -> Self {
+        Self { texts, model: None }
+    }
+}
+
+/// Respuesta de [`CloudClient::embeddings`]: un vector por cada texto de entrada (mismo orden) +
+/// el modelo realmente usado. El hub almacena estos vectores en su índice local
+/// (`erplora-vector`); NUNCA genera embeddings por su cuenta (§9.3).
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct EmbeddingsResponse {
+    pub embeddings: Vec<Vec<f32>>,
+    #[serde(default)]
+    pub model: String,
+}
+
+impl EmbeddingsResponse {
+    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
+/// Respuesta de [`CloudClient::backup_upload`] (ADR-0040, **opción B**): el resultado de subir
+/// (stream) el dump al Cloud, que lo guardó en S3 con **cifrado de servidor (SSE)**. El hub **no**
+/// recibe credenciales AWS ni URLs S3: solo dónde quedó la copia y su tamaño, para reflejarlo en
+/// `backup_log`. La ruta S3 la fija el Cloud (inmutable/create-only `backups/local/{hub}/{ts}.dump`).
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct BackupUploadResult {
+    /// Clave S3 donde quedó el blob (la fija el Cloud).
+    pub s3_key: String,
+    /// Tamaño en bytes del dump subido (en claro; el cifrado es SSE en reposo, transparente).
+    #[serde(default)]
+    pub bytes: u64,
+    /// SHA256 hex que calculó el Cloud al recibir el stream (opcional, para verificación).
+    #[serde(default)]
+    pub sha256: Option<String>,
+}
+
+impl BackupUploadResult {
+    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
+/// Una copia de seguridad tal como la lista [`CloudClient::backup_list`] (restore, opción B). El
+/// Cloud devuelve las copias de las orgs/hubs del usuario (también sirve para "mover a otro equipo").
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct BackupEntry {
+    /// Clave S3 de la copia (lo que se pasa a [`CloudClient::backup_download`]).
+    pub s3_key: String,
+    /// Hub al que pertenece la copia (puede no ser el hub actual: restore cross-hub/migración).
+    #[serde(default)]
+    pub hub_id: String,
+    /// Instante de creación (RFC3339).
+    #[serde(default)]
+    pub created_at: String,
+    /// Tamaño en bytes de la copia.
+    #[serde(default)]
+    pub bytes: u64,
+}
+
+impl BackupEntry {
+    /// Parsea la lista JSON del endpoint `backup_list`.
+    pub fn parse_list(json: &str) -> Result<Vec<BackupEntry>, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,6 +500,122 @@ mod tests {
         assert_eq!(s.url, "https://erplora.com/api/v1/hub/device/assistant/chat/stream/");
         assert!(s.headers.contains(&("Authorization", "Bearer abc".to_string())));
         assert!(s.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn embeddings_endpoint_and_machine_token() {
+        // La embebida en el lifecycle de install va con la credencial de MÁQUINA del hub
+        // (X-Hub-Token): no hay usuario logueado al instalar (§9.6 + ADR-0003).
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken { hub_id: "h1".into(), token: "machine-tok".into() };
+        let r = c.embeddings(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/assistant/embeddings/");
+        assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn embeddings_request_serializes_with_and_without_model() {
+        // Sin modelo: no se serializa la clave `model` (el Cloud usa su default).
+        let req = EmbeddingsRequest::new(vec!["hello".into(), "world".into()]);
+        let body = serde_json::to_value(&req).unwrap();
+        assert_eq!(body["texts"][0], "hello");
+        assert!(body.get("model").is_none(), "model None no se serializa");
+
+        // Con modelo explícito.
+        let req = EmbeddingsRequest { texts: vec!["x".into()], model: Some("custom".into()) };
+        let body = serde_json::to_value(&req).unwrap();
+        assert_eq!(body["model"], "custom");
+    }
+
+    #[test]
+    fn embeddings_response_parses() {
+        // El Cloud devuelve un vector por texto (mismo orden) + el modelo usado.
+        let body = r#"{"embeddings":[[0.1,0.2,0.3],[0.4,0.5,0.6]],"model":"text-embedding-3-small"}"#;
+        let resp = EmbeddingsResponse::parse(body).unwrap();
+        assert_eq!(resp.embeddings.len(), 2);
+        assert_eq!(resp.embeddings[0], vec![0.1, 0.2, 0.3]);
+        assert_eq!(resp.model, "text-embedding-3-small");
+    }
+
+    #[test]
+    fn notify_whatsapp_uses_machine_token() {
+        // WhatsApp premium sale por el proxy de Cloud con la credencial de máquina del hub
+        // (X-Hub-Token), no con JWT de usuario: lo dispara una scheduled task / el relay del
+        // outbox, sin usuario logueado (ADR-0012/ADR-0003).
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken { hub_id: "h1".into(), token: "machine-tok".into() };
+        let r = c.notify_whatsapp(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/notify/whatsapp/");
+        assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn backup_upload_uses_machine_token() {
+        // El stream del backup lo sube el hub con su credencial de MÁQUINA (X-Hub-Token), no con
+        // JWT de usuario: el backup lo dispara una scheduled task / la UI, sin un JWT cloud fresco
+        // (ADR-0040 opción B + ADR-0003, contexto hub-scoped sin usuario). El Cloud cifra (SSE).
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken { hub_id: "h1".into(), token: "machine-tok".into() };
+        let r = c.backup_upload(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/backup/");
+        assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn backup_upload_result_parses() {
+        // El Cloud responde con dónde quedó la copia (s3_key) + tamaño/sha (sin URLs ni credenciales).
+        let body = r#"{"s3_key":"backups/local/h1/2026-06-13T10:00:00Z.dump",
+            "bytes":12345,"sha256":"deadbeef"}"#;
+        let g = BackupUploadResult::parse(body).unwrap();
+        assert_eq!(g.s3_key, "backups/local/h1/2026-06-13T10:00:00Z.dump");
+        assert_eq!(g.bytes, 12345);
+        assert_eq!(g.sha256.as_deref(), Some("deadbeef"));
+    }
+
+    #[test]
+    fn backup_restore_list_and_download_use_user_jwt() {
+        // Listar las copias del usuario (posiblemente cross-hub) y descargarlas va con JWT de
+        // usuario (opción B): el listado cross-org/hub no lo cubre el machine token (ADR-0040 §4).
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::UserJwt { hub_id: "h1".into(), access: "abc".into() };
+
+        let l = c.backup_list(&auth);
+        assert_eq!(l.method, "GET");
+        assert_eq!(l.url, "https://erplora.com/api/v1/hub/device/backup/");
+        assert!(l.headers.contains(&("Authorization", "Bearer abc".to_string())));
+
+        let d = c.backup_download(&auth, "backups/local/h1/x.dump");
+        assert_eq!(d.method, "GET");
+        assert_eq!(d.url, "https://erplora.com/api/v1/hub/device/backup/download/?s3_key=backups/local/h1/x.dump");
+
+        // La lista de copias parsea (array de BackupEntry).
+        let body = r#"[{"s3_key":"backups/local/h1/x.dump","hub_id":"h1",
+            "created_at":"2026-06-13T10:00:00Z","bytes":999}]"#;
+        let entries = BackupEntry::parse_list(body).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].hub_id, "h1");
+        assert_eq!(entries[0].bytes, 999);
+    }
+
+    #[test]
+    fn refresh_is_public_post_with_body_token() {
+        // El refresh del JWT de usuario va sin cabeceras de auth (el refresh token va en el body).
+        let c = CloudClient::new("https://erplora.com");
+        let r = c.refresh();
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/auth/refresh/");
+        assert!(r.headers.is_empty(), "refresh no lleva Authorization ni X-Hub-Id");
+
+        // La respuesta (access nuevo + refresh rotado) parsea.
+        let g = RefreshGrant::parse(r#"{"access":"a2","refresh":"r2"}"#).unwrap();
+        assert_eq!(g.access, "a2");
+        assert_eq!(g.refresh.as_deref(), Some("r2"));
     }
 
     #[test]

@@ -1,0 +1,25 @@
+# erplora-verifactu — motor fiscal VeriFactu (RD 1007/2023) como **plugin nativo
+# first-party** (ADR-0009): cadena SHA-256, XML SOAP y transmisión AEAT con TLS mutua
+# (certificado PKCS#12). Horneado en el runtime; el SQL/UI del módulo `verifactu`
+# siguen el modelo declarativo normal.
+[package]
+name = "erplora-verifactu"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+erplora-runtime = { path = "../runtime" }
+erplora-db = { path = "../db" }
+# Tipos del contrato de intenciones (Output/Operation), compartidos con el WASM Tier 2.
+erplora-wasm-host = { path = "../wasm-host", default-features = false }
+async-trait = "0.1"
+serde_json = "1"
+sha2 = "0.10"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# POST TLS-mutua a la AEAT. rustls (sin openssl); la identidad cliente entra como PEM.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# Parseo del contenedor PKCS#12 (clave + cadena de certificados) en Rust puro.
+p12-keystore = "0.2"
+base64 = "0.22"
+thiserror = "1"

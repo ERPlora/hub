@@ -17,7 +17,9 @@
   "scripts": {
     "build:inventory": "pnpm -F @erplora/module-cli build:inventory",
     "verify": "pnpm -F @erplora/web verify",
-    "dev": "pnpm -F @erplora/web dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "pnpm -F @erplora/web dev",
+    "dev:runtime": "cargo run -p erplora-server",
     "build:modules": "pnpm -F @erplora/module-cli build:all"
   },
   "devDependencies": {

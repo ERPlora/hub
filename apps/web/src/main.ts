@@ -4,14 +4,18 @@ import { addIcons } from 'ionicons';
 import {
   pencil, trash, add, close, chevronBack, chevronForward,
   listOutline, gridOutline, funnelOutline, downloadOutline, cloudUploadOutline,
+  appsOutline, closeOutline,
 } from 'ionicons/icons';
 
 import App from './App.vue';
 import { router } from './router';
+import { i18n } from './i18n';
 import { getClient, clientInjectionKey, bootHubContext } from './lib/runtime';
 import { setOnSessionExpired } from './lib/cloud';
 import { logout } from './lib/session';
 import { bootPrintOnSale } from './lib/print-on-sale';
+import { bootTheme } from './lib/theme';
+import { bootPwa } from './lib/pwa';
 
 // Los componentes de OutfitKit (ok-data-table, etc.) usan ion-icon POR NOMBRE ('pencil', 'trash',
 // 'chevron-back'…). En @ionic/vue los iconos por nombre hay que registrarlos con addIcons (no se
@@ -21,6 +25,8 @@ addIcons({
   'chevron-back': chevronBack, 'chevron-forward': chevronForward,
   'list-outline': listOutline, 'grid-outline': gridOutline, 'funnel-outline': funnelOutline,
   'download-outline': downloadOutline, 'cloud-upload-outline': cloudUploadOutline,
+  // Trigger (rejilla) y cerrar de ok-app-launcher (OutfitKit), por NOMBRE.
+  'apps-outline': appsOutline, 'close-outline': closeOutline,
 });
 
 // CSS base de Ionic (core + utilidades). Dark mode por clase (.ion-palette-dark).
@@ -35,6 +41,17 @@ import '@ionic/vue/css/palettes/dark.class.css';
 // OutfitKit: registra los Web Components (Lit) que usa el shell. OutfitKit aporta lo que Ionic
 // no tiene o compuestos complejos (p. ej. ok-data-table). Import por efecto secundario.
 import '@erplora/outfitkit/ok-data-table';
+// Launcher de apps (rejilla «Google apps» + hoja inferior) usado en la topbar del shell.
+import '@erplora/outfitkit/ok-app-launcher';
+// Dashboard / métricas de la pantalla /system (gauge, KPIs, stat, sparkline, pill de estado, vacío).
+import '@erplora/outfitkit/ok-gauge';
+import '@erplora/outfitkit/ok-kpi';
+import '@erplora/outfitkit/ok-stat';
+import '@erplora/outfitkit/ok-sparkline';
+import '@erplora/outfitkit/ok-status-pill';
+import '@erplora/outfitkit/ok-empty-state';
+// Gestor de archivos (Drive-like) de la carpeta media del Hub — pantalla /files.
+import '@erplora/outfitkit/ok-file-manager';
 // Los ok-* asumen que el host registró los ion-* que usan por dentro (searchbar/select/overlays).
 import { registerOutfitkitIonicDeps } from './lib/ionic-wc';
 
@@ -46,7 +63,13 @@ import './theme/erplora-logo.css';
 import './theme/polish.css';
 import './theme/global.css';
 
-const app = createApp(App).use(IonicVue).use(router);
+// Aplica el modo de tema guardado (claro/oscuro/system) antes del primer render.
+bootTheme();
+
+// Registra el service worker y engancha el botón «Instalar app» (PWA, ver lib/pwa.ts).
+bootPwa();
+
+const app = createApp(App).use(IonicVue).use(router).use(i18n);
 
 // Cliente del runtime local (Axum) inyectado en todo el árbol (provide/inject). Las vistas y
 // ModuleView lo consumen para hablar con el runtime (query/command/eventos WS). lib/runtime.ts.

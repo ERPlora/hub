@@ -14,6 +14,20 @@ export type {
   DataTableView,
 } from './components/ok-data-table/ok-data-table.js';
 
+// ── App launcher (grid 3×3 del shell) ─────────────────────────────────────────────────────
+export { OkAppLauncher } from './components/ok-app-launcher/ok-app-launcher.js';
+export type { OkLauncherApp } from './components/ok-app-launcher/ok-app-launcher.js';
+
+// ── Dashboard / métricas (pantalla /system) ───────────────────────────────────────────────
+export { OkGauge } from './components/ok-gauge/ok-gauge.js';
+export type { OkGaugeThreshold, OkGaugeType } from './components/ok-gauge/ok-gauge.js';
+export { OkKpi } from './components/ok-kpi/ok-kpi.js';
+export { OkStat } from './components/ok-stat/ok-stat.js';
+export { OkSparkline } from './components/ok-sparkline/ok-sparkline.js';
+export { OkStatusPill } from './components/ok-status-pill/ok-status-pill.js';
+export type { OkStatusPillTone, OkStatusPillSize } from './components/ok-status-pill/ok-status-pill.js';
+export { OkEmptyState } from './components/ok-empty-state/ok-empty-state.js';
+
 // ── Landing chrome ──────────────────────────────────────────────────────────────────────
 export { OkNavbar } from './components/ok-navbar/ok-navbar.js';
 export { OkFooter } from './components/ok-footer/ok-footer.js';

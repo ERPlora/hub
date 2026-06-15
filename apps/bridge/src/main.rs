@@ -22,16 +22,24 @@ use erplora_peripherals::discovery::{self, parse_printer_id};
 use erplora_peripherals::drawer;
 use erplora_peripherals::escpos::{self, DocumentType};
 use erplora_peripherals::protocol::{Command, Event};
-use erplora_peripherals::queue::{PrintJob, PrintQueue, RetryPolicy};
-use erplora_peripherals::registry::DeviceRegistry;
+use erplora_peripherals::queue::{JobOutcome, PrintJob, PrintQueue, RetryPolicy};
+use erplora_peripherals::registry::{DeviceRegistry, Watchdog, WatchdogConfig, WatchdogEvent};
 use erplora_peripherals::BRIDGE_WS_PORT;
+use tokio::sync::{broadcast, mpsc};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Estado compartido entre conexiones: registro de dispositivos + cola de impresión.
+/// Capacidad del canal de broadcast hacia las conexiones WS (los eventos son pequeños; si un
+/// cliente se retrasa más de esto, pierde los más antiguos — `RecvError::Lagged`).
+const EVENT_BUS_CAPACITY: usize = 64;
+
+/// Estado compartido entre conexiones: registro de dispositivos + cola de impresión + bus de
+/// eventos (bridge#8): los outcomes de la cola y los eventos del watchdog se publican aquí y
+/// cada conexión WS abierta los reenvía al Hub.
 struct AppState {
     registry: DeviceRegistry,
     queue: PrintQueue,
+    events: broadcast::Sender<Event>,
 }
 
 #[tokio::main]
@@ -43,10 +51,15 @@ async fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("devices.json"));
 
+    let (events_tx, _) = broadcast::channel(EVENT_BUS_CAPACITY);
     let state = Arc::new(AppState {
         registry: DeviceRegistry::load(devices_path),
         queue: PrintQueue::new(RetryPolicy::default()),
+        events: events_tx,
     });
+
+    spawn_queue_worker(state.clone());
+    spawn_watchdog(state.clone());
 
     let app = Router::new()
         .route("/status", get(status))
@@ -59,12 +72,66 @@ async fn main() {
     axum::serve(listener, app).await.expect("serve");
 }
 
-/// `GET /status` — usado por el navegador para detectar el bridge (timeout ~500ms en `bridge.js`).
-async fn status() -> impl IntoResponse {
+/// Spawnea el worker de la cola de impresión (`PrintQueue::run`, reintentos según
+/// `RetryPolicy`) y el puente outcome → evento WS: cada `JobOutcome` se publica en el bus
+/// como `print_complete` / `print_error` (bridge#8).
+fn spawn_queue_worker(state: Arc<AppState>) {
+    let (outcomes_tx, mut outcomes_rx) = mpsc::unbounded_channel::<JobOutcome>();
+
+    let worker_state = state.clone();
+    tokio::spawn(async move {
+        worker_state.queue.run(outcomes_tx).await;
+        tracing::warn!("worker de la cola de impresión terminado (cola cerrada)");
+    });
+
+    tokio::spawn(async move {
+        while let Some(outcome) = outcomes_rx.recv().await {
+            let event = match outcome {
+                JobOutcome::Completed { job_id } => Event::PrintComplete { job_id },
+                JobOutcome::Failed { job_id, error } => Event::PrintError { job_id, error },
+            };
+            // Sin conexiones WS abiertas no hay receptores; el evento simplemente se descarta.
+            let _ = state.events.send(event);
+        }
+    });
+}
+
+/// Spawnea el `Watchdog` (config por defecto: check 30s / recovery 120s) y el puente
+/// `WatchdogEvent` → evento WS (`device_recovered` / `device_lost`) (bridge#8).
+fn spawn_watchdog(state: Arc<AppState>) {
+    let (events_tx, mut events_rx) = mpsc::unbounded_channel::<WatchdogEvent>();
+
+    let watchdog_state = state.clone();
+    tokio::spawn(async move {
+        let watchdog = Watchdog::new(WatchdogConfig::default()).with_events(events_tx);
+        watchdog.run(&watchdog_state.registry).await;
+    });
+
+    tokio::spawn(async move {
+        while let Some(wd_event) = events_rx.recv().await {
+            let event = match wd_event {
+                WatchdogEvent::Recovered(device) => Event::DeviceRecovered { device },
+                WatchdogEvent::Lost(device) => Event::DeviceLost { device },
+            };
+            let _ = state.events.send(event);
+        }
+    });
+}
+
+/// `GET /status` — usado por el navegador para detectar el bridge (timeout corto en
+/// `apps/web/src/lib/bridge-client.ts`).
+///
+/// Contrato mínimo común Rust↔Android (bridge#10): `{ "ok": true, "version": "<semver>" }` —
+/// es lo único que consume `bridge-client.ts`. El resto de claves son informativas y pueden
+/// variar por plataforma (`service` identifica esta línea; `devices`/`watchdog` espejan los
+/// contadores que ya reporta la app Android).
+async fn status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json(serde_json::json!({
-        "service": "erplora-bridge",
-        "version": VERSION,
         "ok": true,
+        "version": VERSION,
+        "service": "erplora-bridge",
+        "devices": state.registry.get_all().len(),
+        "watchdog": true,
     }))
 }
 
@@ -73,31 +140,61 @@ async fn ws_upgrade(State(state): State<Arc<AppState>>, ws: WebSocketUpgrade) ->
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 
-/// Bucle por conexión: parsea `Command`, despacha y responde con `Event`(s) en JSON.
+/// Bucle por conexión: parsea `Command`, despacha y responde con `Event`(s) en JSON. Además
+/// reenvía los eventos del bus compartido (outcomes de la cola + watchdog) a esta conexión
+/// (bridge#8): `print_complete` / `print_error` / `device_recovered` / `device_lost` llegan a
+/// todas las conexiones WS abiertas.
 async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
     // Al conectar, el Bridge Python emite un `status` inicial.
     if let Ok(text) = serde_json::to_string(&initial_status()) {
         let _ = socket.send(Message::Text(text)).await;
     }
 
-    while let Some(Ok(msg)) = socket.recv().await {
-        let Message::Text(raw) = msg else { continue };
-        let reply = match serde_json::from_str::<Command>(&raw) {
-            Ok(cmd) => dispatch(cmd, &state).await,
-            Err(e) => Some(Event::Error {
-                message: format!("comando inválido: {e}"),
-                code: "bad_command".into(),
-            }),
-        };
-        // Algunos comandos (p.ej. notificaciones) no producen evento de respuesta.
-        if let Some(event) = reply {
-            if let Ok(text) = serde_json::to_string(&event) {
-                if socket.send(Message::Text(text)).await.is_err() {
-                    break;
+    let mut bus = state.events.subscribe();
+
+    loop {
+        tokio::select! {
+            incoming = socket.recv() => {
+                let Some(Ok(msg)) = incoming else { break };
+                let Message::Text(raw) = msg else { continue };
+                let reply = match serde_json::from_str::<Command>(&raw) {
+                    Ok(cmd) => dispatch(cmd, &state).await,
+                    Err(e) => Some(Event::Error {
+                        message: format!("comando inválido: {e}"),
+                        code: "bad_command".into(),
+                    }),
+                };
+                // Algunos comandos (p.ej. print encolado, notificaciones) no producen evento
+                // de respuesta inmediato.
+                if let Some(event) = reply {
+                    if send_event(&mut socket, &event).await.is_err() {
+                        break;
+                    }
+                }
+            }
+            published = bus.recv() => {
+                match published {
+                    Ok(event) => {
+                        if send_event(&mut socket, &event).await.is_err() {
+                            break;
+                        }
+                    }
+                    // Cliente lento: se pierden los eventos más antiguos, seguimos.
+                    Err(broadcast::error::RecvError::Lagged(missed)) => {
+                        tracing::warn!(missed, "conexión WS retrasada: eventos del bus perdidos");
+                    }
+                    // El emisor vive en AppState; si se cierra, terminó el proceso.
+                    Err(broadcast::error::RecvError::Closed) => break,
                 }
             }
         }
     }
+}
+
+/// Serializa y envía un evento por el socket. `Err(())` si el socket está roto.
+async fn send_event(socket: &mut WebSocket, event: &Event) -> std::result::Result<(), ()> {
+    let Ok(text) = serde_json::to_string(event) else { return Ok(()) };
+    socket.send(Message::Text(text)).await.map_err(|_| ())
 }
 
 /// Evento `status` inicial / de `get_status`.
@@ -116,7 +213,7 @@ async fn dispatch(cmd: Command, state: &AppState) -> Option<Event> {
         }),
 
         Command::Print { printer_id, document_type, data, job_id } => {
-            Some(print_job(state, &printer_id, DocumentType::from_wire(&document_type), &data, job_id).await)
+            print_job(state, &printer_id, DocumentType::from_wire(&document_type), &data, job_id).await
         }
 
         Command::TestPrint { printer_id } => {
@@ -130,10 +227,7 @@ async fn dispatch(cmd: Command, state: &AppState) -> Option<Event> {
                 payload: escpos::render_test_page(&printer_id),
                 attempts: 0,
             };
-            Some(match state.queue.send_once(&job).await {
-                Ok(()) => Event::PrintComplete { job_id: None },
-                Err(e) => Event::PrintError { job_id: None, error: e.to_string() },
-            })
+            enqueue_job(state, job)
         }
 
         Command::OpenDrawer { printer_id, pin } => {
@@ -147,10 +241,27 @@ async fn dispatch(cmd: Command, state: &AppState) -> Option<Event> {
             })
         }
 
-        // No hay evento de ACK en el protocolo; mostramos la notificación de SO (pendiente) y
-        // no respondemos. Por ahora solo se registra.
+        // No hay evento de ACK en el protocolo; mostramos la notificación de SO y no
+        // respondemos (bridge#9). `show()` es bloqueante (DBus/AppKit/WinRT) → spawn_blocking.
+        // Si la plataforma no la soporta (headless, sin DBus…), degradamos a log sin panic.
+        // En el sidecar Tauri esta capacidad la cubre el shell (plugin de notificaciones),
+        // no este binario — ver architecture/bridge/websocket-interface.md.
         Command::SendNotification { title, body } => {
-            tracing::info!(%title, %body, "notificación (OS notification pendiente de implementar)");
+            tokio::task::spawn_blocking(move || {
+                match notify_rust::Notification::new()
+                    .appname("ERPlora Bridge")
+                    .summary(&title)
+                    .body(&body)
+                    .show()
+                {
+                    Ok(_) => tracing::info!(%title, "notificación de SO mostrada"),
+                    Err(e) => tracing::warn!(
+                        %title,
+                        error = %e,
+                        "la plataforma no pudo mostrar la notificación de SO (degradado a log)"
+                    ),
+                }
+            });
             None
         }
 
@@ -162,26 +273,35 @@ async fn dispatch(cmd: Command, state: &AppState) -> Option<Event> {
     }
 }
 
-/// Renderiza el documento y lo envía (un intento) por la cola; mapea el resultado a evento.
+/// Renderiza el documento y lo encola para envío asíncrono con reintentos (bridge#8). El
+/// resultado (`print_complete` / `print_error`) llega vía el bus de eventos cuando el worker
+/// de la cola procesa el trabajo; aquí solo se reportan los errores previos al encolado
+/// (printer_id o payload inválidos).
 async fn print_job(
     state: &AppState,
     printer_id: &str,
     doc: DocumentType,
     data: &serde_json::Value,
     job_id: Option<String>,
-) -> Event {
+) -> Option<Event> {
     let target = match parse_printer_id(printer_id) {
         Ok(t) => t,
-        Err(e) => return Event::PrintError { job_id, error: e.to_string() },
+        Err(e) => return Some(Event::PrintError { job_id, error: e.to_string() }),
     };
     let payload = match escpos::render_document(doc, data) {
         Ok(bytes) => bytes,
-        Err(e) => return Event::PrintError { job_id, error: e.to_string() },
+        Err(e) => return Some(Event::PrintError { job_id, error: e.to_string() }),
     };
-    let job = PrintJob { job_id: job_id.clone(), target, payload, attempts: 0 };
-    match state.queue.send_once(&job).await {
-        Ok(()) => Event::PrintComplete { job_id },
-        Err(e) => Event::PrintError { job_id, error: e.to_string() },
+    enqueue_job(state, PrintJob { job_id, target, payload, attempts: 0 })
+}
+
+/// Encola un trabajo en la `PrintQueue`. `None` si se encoló (el outcome llegará por el bus);
+/// `print_error` inmediato solo si la cola está cerrada (no debería ocurrir en operación).
+fn enqueue_job(state: &AppState, job: PrintJob) -> Option<Event> {
+    let job_id = job.job_id.clone();
+    match state.queue.enqueue(job) {
+        Ok(()) => None,
+        Err(e) => Some(Event::PrintError { job_id, error: e.to_string() }),
     }
 }
 

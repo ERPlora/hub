@@ -18,6 +18,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+# Notificaciones de SO para `send_notification` (bridge#9): multiplataforma (Linux DBus /
+# macOS / Windows Toast); si la plataforma no soporta, degradamos a log sin panic.
+notify-rust = "4"
 
 # Pendiente de fase de implementación: `tray-icon` (bandeja del sistema) — no añadido aún para
 # mantener el esqueleto compilando headless sin dependencias gráficas.

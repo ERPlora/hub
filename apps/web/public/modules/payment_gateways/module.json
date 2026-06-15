@@ -1,7 +1,7 @@
 {
   "id": "payment_gateways",
   "name": "Payment Gateways",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "agent": {
     "description": "Manages payment gateway integrations: configure gateways, initiate and track transactions, process refunds, and report on payment outcomes.",
     "keywords": [
@@ -298,6 +298,42 @@
       "ai": {
         "description": "Generates an aggregated summary of transactions by gateway, status, and amount."
       }
+    },
+    "payment_gateways._bump_counter": {
+      "permission": "payment_gateways.process_payment",
+      "sql": [
+        "commands/_bump_counter.sql"
+      ]
+    },
+    "payment_gateways._insert_transaction": {
+      "permission": "payment_gateways.process_payment",
+      "sql": [
+        "commands/_insert_transaction.sql"
+      ]
+    },
+    "payment_gateways._mark_succeeded": {
+      "permission": "payment_gateways.process_payment",
+      "sql": [
+        "commands/_mark_succeeded.sql"
+      ]
+    },
+    "payment_gateways._mark_failed": {
+      "permission": "payment_gateways.process_payment",
+      "sql": [
+        "commands/_mark_failed.sql"
+      ]
+    },
+    "payment_gateways._insert_refund": {
+      "permission": "payment_gateways.process_payment",
+      "sql": [
+        "commands/_insert_refund.sql"
+      ]
+    },
+    "payment_gateways._update_tx_after_refund": {
+      "permission": "payment_gateways.process_payment",
+      "sql": [
+        "commands/_update_tx_after_refund.sql"
+      ]
     }
   },
   "ui": {

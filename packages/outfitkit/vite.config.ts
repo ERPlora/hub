@@ -37,6 +37,15 @@ export default defineConfig({
         // Compuestos / dashboard. Construido SOBRE Ionic (ion-* nativos registrados por el host);
         // ya NO envuelve primitivos ok-* (esos los da Ionic directamente).
         'ok-data-table': resolve(__dirname, 'src/components/ok-data-table/ok-data-table.ts'),
+        // App launcher (grid 3×3 del shell).
+        'ok-app-launcher': resolve(__dirname, 'src/components/ok-app-launcher/ok-app-launcher.ts'),
+        // Dashboard / métricas (usados por la pantalla /system del Hub).
+        'ok-gauge': resolve(__dirname, 'src/components/ok-gauge/ok-gauge.ts'),
+        'ok-kpi': resolve(__dirname, 'src/components/ok-kpi/ok-kpi.ts'),
+        'ok-stat': resolve(__dirname, 'src/components/ok-stat/ok-stat.ts'),
+        'ok-sparkline': resolve(__dirname, 'src/components/ok-sparkline/ok-sparkline.ts'),
+        'ok-status-pill': resolve(__dirname, 'src/components/ok-status-pill/ok-status-pill.ts'),
+        'ok-empty-state': resolve(__dirname, 'src/components/ok-empty-state/ok-empty-state.ts'),
         // Landing chrome
         'ok-navbar': resolve(__dirname, 'src/components/ok-navbar/ok-navbar.ts'),
         'ok-footer': resolve(__dirname, 'src/components/ok-footer/ok-footer.ts'),

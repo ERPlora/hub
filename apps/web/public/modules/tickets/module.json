@@ -385,6 +385,36 @@
       "ai": {
         "description": "Checks whether a ticket has breached its SLA and records the violation"
       }
+    },
+    "tickets._insert_ticket": {
+      "permission": "tickets.add_ticket",
+      "sql": [
+        "commands/_insert_ticket.sql"
+      ]
+    },
+    "tickets._assign": {
+      "permission": "tickets.manage_ticket",
+      "sql": [
+        "commands/_assign.sql"
+      ]
+    },
+    "tickets._set_status": {
+      "permission": "tickets.manage_ticket",
+      "sql": [
+        "commands/_set_status.sql"
+      ]
+    },
+    "tickets._insert_comment": {
+      "permission": "tickets.manage_ticket",
+      "sql": [
+        "commands/_insert_comment.sql"
+      ]
+    },
+    "tickets._touch_first_response": {
+      "permission": "tickets.manage_ticket",
+      "sql": [
+        "commands/_touch_first_response.sql"
+      ]
     }
   },
   "ui": {

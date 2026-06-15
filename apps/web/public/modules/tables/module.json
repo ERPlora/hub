@@ -1,7 +1,7 @@
 {
   "id": "tables",
   "name": "Tables",
-  "version": "2.0.6",
+  "version": "2.1.0",
   "agent": {
     "description": "Manages restaurant floor plan zones, tables, and table sessions: create/update/delete zones and tables, open/close/transfer sessions, and bulk-create tables.",
     "keywords": [
@@ -58,7 +58,7 @@
       "id": "floor_plan",
       "label": "Floor Plan",
       "icon": "map-outline",
-      "component": "erp-tables-floor-plan"
+      "component": "erp-tables-canvas"
     },
     {
       "id": "zones",
@@ -85,9 +85,18 @@
       "component": "erp-tables-floor-plan"
     }
   ],
+  "provides_slots": [
+    {
+      "slot": "sales.pos.order_context",
+      "component": "erp-tables-pos-zones",
+      "permission": "tables.view_table",
+      "priority": 100
+    }
+  ],
   "migrations": {
     "sqlite": [
-      "migrations/sqlite/001_init.sql"
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_gate.sql"
     ]
   },
   "queries": {
@@ -260,6 +269,7 @@
   "commands": {
     "tables.zones.create": {
       "permission": "tables.add_zone",
+      "schema": "schemas/zone_create.json",
       "transaction": true,
       "sql": [
         "commands/zone_create.sql"
@@ -273,6 +283,7 @@
     },
     "tables.zones.update": {
       "permission": "tables.change_zone",
+      "schema": "schemas/zone_update.json",
       "transaction": true,
       "sql": [
         "commands/zone_update.sql"
@@ -286,6 +297,7 @@
     },
     "tables.zones.delete": {
       "permission": "tables.delete_zone",
+      "schema": "schemas/zone_delete.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -300,6 +312,7 @@
     },
     "tables.tables.create": {
       "permission": "tables.add_table",
+      "schema": "schemas/table_create.json",
       "transaction": true,
       "sql": [
         "commands/table_create.sql"
@@ -313,6 +326,7 @@
     },
     "tables.tables.update": {
       "permission": "tables.change_table",
+      "schema": "schemas/table_update.json",
       "transaction": true,
       "sql": [
         "commands/table_update.sql"
@@ -324,8 +338,23 @@
         "description": "Updates a table's data (name, capacity, position)"
       }
     },
+    "tables.tables.move": {
+      "permission": "tables.change_table",
+      "schema": "schemas/table_move.json",
+      "transaction": true,
+      "sql": [
+        "commands/table_move.sql"
+      ],
+      "emit": [
+        "tables.table.updated"
+      ],
+      "ai": {
+        "description": "Repositions or resizes a table on the floor plan (drag in the canvas editor)"
+      }
+    },
     "tables.tables.delete": {
       "permission": "tables.delete_table",
+      "schema": "schemas/table_delete.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -340,6 +369,7 @@
     },
     "tables.tables.bulk_create": {
       "permission": "tables.add_table",
+      "schema": "schemas/table_bulk_create.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -354,6 +384,7 @@
     },
     "tables.sessions.open": {
       "permission": "tables.add_tablesession",
+      "schema": "schemas/session_open.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -368,6 +399,7 @@
     },
     "tables.sessions.close": {
       "permission": "tables.change_tablesession",
+      "schema": "schemas/session_close.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -382,6 +414,7 @@
     },
     "tables.sessions.transfer": {
       "permission": "tables.change_tablesession",
+      "schema": "schemas/session_transfer.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -396,6 +429,7 @@
     },
     "tables.sessions.delete": {
       "permission": "tables.delete_tablesession",
+      "schema": "schemas/session_delete.json",
       "handler": {
         "type": "wasm",
         "file": "dist/handler.wasm",
@@ -407,6 +441,67 @@
       "ai": {
         "description": "Deletes a table session (destructive, requires delete permission)"
       }
+    },
+    "tables._insert_table": {
+      "permission": "tables.add_table",
+      "sql": [
+        "commands/_bulk_insert_table.sql",
+        "commands/_bulk_insert_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._session_open": {
+      "permission": "tables.add_tablesession",
+      "sql": [
+        "commands/_session_open_insert.sql",
+        "commands/_session_open_occupy.sql",
+        "commands/_session_open_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._session_close": {
+      "permission": "tables.change_tablesession",
+      "sql": [
+        "commands/_session_close_update.sql",
+        "commands/_session_close_free.sql",
+        "commands/_session_close_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._session_transfer": {
+      "permission": "tables.change_tablesession",
+      "sql": [
+        "commands/_session_transfer_close.sql",
+        "commands/_session_transfer_free.sql",
+        "commands/_session_transfer_insert.sql",
+        "commands/_session_transfer_occupy.sql",
+        "commands/_session_transfer_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._session_delete": {
+      "permission": "tables.delete_tablesession",
+      "sql": [
+        "commands/_session_delete_update.sql",
+        "commands/_session_delete_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._zone_delete": {
+      "permission": "tables.delete_zone",
+      "sql": [
+        "commands/_zone_delete_update.sql",
+        "commands/_zone_delete_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
+    },
+    "tables._table_delete": {
+      "permission": "tables.delete_table",
+      "sql": [
+        "commands/_table_delete_update.sql",
+        "commands/_table_delete_assert.sql",
+        "commands/_gate_clear.sql"
+      ]
     }
   },
   "ui": {

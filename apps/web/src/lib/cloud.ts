@@ -2,6 +2,8 @@
 // billing van por aquí (ARQUITECTURA.md §2.1–2.3). Si el Cloud no es accesible (sandbox),
 // las llamadas lanzan y la capa de auth degrada a modo demo.
 import { config } from './config';
+import { loginHeaders } from './device';
+import { beginRequest, endRequest } from './shell';
 
 export interface CloudUser {
   id: string;
@@ -107,6 +109,7 @@ async function refreshTokens(): Promise<string | null> {
 
 /** `fetch` con auth + reintento único en 401 vía refresh. Base de get/post. */
 async function authedFetch(path: string, init: RequestInit, timeoutMs = 8000): Promise<Response> {
+  beginRequest(); // barra de progreso de la topbar
   const doFetch = (token: string | null): Promise<Response> => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -120,22 +123,144 @@ async function authedFetch(path: string, init: RequestInit, timeoutMs = 8000): P
       .finally(() => clearTimeout(t));
   };
 
-  let res = await doFetch(getAccessToken());
-  if (res.status === 401) {
-    const fresh = await refreshTokens();
-    if (fresh) {
-      res = await doFetch(fresh); // reintento único con el token rotado
-    } else {
-      expireSession();
+  try {
+    let res = await doFetch(getAccessToken());
+    if (res.status === 401) {
+      const fresh = await refreshTokens();
+      if (fresh) {
+        res = await doFetch(fresh); // reintento único con el token rotado
+      } else {
+        expireSession();
+      }
     }
+    return res;
+  } finally {
+    endRequest();
   }
-  return res;
 }
 
 async function get<T>(path: string, timeoutMs = 8000): Promise<T> {
   const res = await authedFetch(path, { method: 'GET' }, timeoutMs);
   if (!res.ok) throw new Error(`cloud ${path} → ${res.status}`);
   return (await res.json()) as T;
+}
+
+// --- Llamadas hub-scoped vía el RUNTIME local (no directas al Cloud) ---------
+// marketplace + entitlement los firma el RUNTIME con el token de MÁQUINA del hub (X-Hub-Token),
+// que es un secreto y NO debe vivir en el navegador. El web pega al runtime local; el runtime
+// añade la credencial y proxea al Cloud. Reenviamos el JWT del usuario como FALLBACK para dev /
+// Tauri sin enrolar (el runtime prefiere su token de máquina cuando lo tiene). RUNTIME_URL se
+// define aquí (no se importa de ./runtime) para no crear un ciclo de módulos.
+// Default: "" = mismo origen siempre (prod: el hub sirve el dist; dev: rutas relativas → proxy
+// Vite hacia :8787, sin CORS). La URL absoluta :8787 en dev rompía por CORS.
+const RUNTIME_URL: string =
+  (import.meta.env.VITE_RUNTIME_URL as string | undefined) || '';
+
+async function runtimeGet<T>(path: string, timeoutMs = 8000): Promise<T> {
+  const call = (token: string | null): Promise<Response> => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    return fetch(`${RUNTIME_URL}${path}`, { headers, signal: ctrl.signal }).finally(() =>
+      clearTimeout(t),
+    );
+  };
+  beginRequest();
+  try {
+    let res = await call(getAccessToken());
+    if (res.status === 401) {
+      const fresh = await refreshTokens();
+      if (fresh) res = await call(fresh);
+    }
+    if (!res.ok) throw new Error(`runtime ${path} → ${res.status}`);
+    return (await res.json()) as T;
+  } finally {
+    endRequest();
+  }
+}
+
+// --- Sesión server-side del runtime (auth local, ARQUITECTURA.md §2.9) ------
+// El JWT del Cloud prueba QUIÉN es el usuario; la autoridad de permisos es LOCAL. Tras el login
+// cloud (o por PIN) el runtime abre una sesión (`hub_session`) y devuelve un token opaco que el
+// frontend manda como `X-Hub-Session` en cada query/command. Estas tres llamadas pegan al RUNTIME
+// local (no al Cloud): mintear sesión desde el JWT, login por PIN, y fijar el PIN del usuario.
+
+export interface HubSessionResult {
+  token: string;
+  user: { id: string; name: string; role: string };
+}
+
+async function runtimePost<T>(path: string, body: unknown, headers: Record<string, string>): Promise<T> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  beginRequest();
+  try {
+    const res = await fetch(`${RUNTIME_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string } & T;
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.error ?? `runtime ${path} → ${res.status}`);
+    }
+    return data;
+  } finally {
+    clearTimeout(t);
+    endRequest();
+  }
+}
+
+/** Abre una sesión local en el runtime a partir del JWT del usuario (login cloud). `name` se usa
+ *  para el `hub_user` local (y para el posterior login por PIN, que resuelve por nombre). */
+export async function runtimeCloudSession(access: string, name: string): Promise<HubSessionResult> {
+  return runtimePost<HubSessionResult>('/api/auth/cloud', { name }, { Authorization: `Bearer ${access}` });
+}
+
+/** Login local por PIN contra el runtime → sesión server-side. */
+export async function runtimePinLogin(name: string, pin: string): Promise<HubSessionResult> {
+  return runtimePost<HubSessionResult>('/api/auth/pin', { name, pin }, {});
+}
+
+/** Fija el PIN del usuario de la sesión actual (alta de PIN tras el primer login cloud). */
+export async function runtimeSetPin(pin: string, sessionToken: string): Promise<void> {
+  await runtimePost<{ ok: boolean }>('/api/auth/set-pin', { pin }, { 'X-Hub-Session': sessionToken });
+}
+
+/** Revoca la sesión server-side del runtime (logout). Best-effort: no lanza si el runtime falla. */
+export async function runtimeLogout(sessionToken: string): Promise<void> {
+  try {
+    await fetch(`${RUNTIME_URL}/api/auth/logout`, {
+      method: 'POST',
+      headers: { 'X-Hub-Session': sessionToken },
+    });
+  } catch {
+    /* el token local se borra igualmente; la fila caduca por TTL */
+  }
+}
+
+// --- Entitlement de módulos (gate de arranque, ARQUITECTURA.md §2.10) -------
+// Camino WEB (online): pide directamente el endpoint del Cloud. El camino TAURI usa el
+// comando `validate_entitlement` (caché offline + gracia) — ver lib/entitlement.ts.
+export interface EntitledModuleInfo {
+  moduleId: string;
+  tier: string;
+  version: string;
+}
+
+/** Lista de módulos que ESTE hub puede montar (según deployment_mode + compras de la org).
+ *  Vía el runtime local (firma con el token de máquina del hub). */
+export async function cloudEntitlement(): Promise<{ modules: EntitledModuleInfo[] }> {
+  const data = await runtimeGet<{ modules?: Array<{ module_id?: string; tier?: string; version?: string }> }>(
+    '/api/entitlement',
+  );
+  const modules = (data.modules ?? []).map((m) => ({
+    moduleId: String(m.module_id ?? ''),
+    tier: String(m.tier ?? 'basic'),
+    version: String(m.version ?? ''),
+  }));
+  return { modules };
 }
 
 // --- Billing: facturas y suscripciones (datos reales del Cloud) -------------
@@ -202,13 +327,19 @@ export async function cloudSubscriptions(): Promise<CloudSubscription[]> {
   }));
 }
 
-async function post<T>(path: string, body: unknown, timeoutMs = 8000): Promise<T> {
+async function post<T>(
+  path: string,
+  body: unknown,
+  timeoutMs = 8000,
+  extraHeaders: Record<string, string> = {},
+): Promise<T> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  beginRequest();
   try {
     const res = await fetch(`${config.cloudApiUrl}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub' },
+      headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub', ...extraHeaders },
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
@@ -216,18 +347,29 @@ async function post<T>(path: string, body: unknown, timeoutMs = 8000): Promise<T
     return (await res.json()) as T;
   } finally {
     clearTimeout(t);
+    endRequest();
   }
 }
 
 /** Login email+password contra el Cloud (primer setup / dispositivo no confiable). */
 export async function cloudLogin(email: string, password: string): Promise<LoginResult> {
-  const tokens = await post<{ access: string; refresh: string }>('/api/v1/auth/login/', { email, password });
+  // En Tauri esto añade X-Client-Type: hub-desktop|hub-local + X-Device-Id para que el Cloud
+  // cree/resuelva el hub de ESTE dispositivo (ARQUITECTURA.md §2.9b). En web pura va como 'hub'.
+  const tokens = await post<{ access: string; refresh: string }>(
+    '/api/v1/auth/login/',
+    { email, password },
+    8000,
+    await loginHeaders(),
+  );
   const me = await meRequest(tokens.access);
   return { access: tokens.access, refresh: tokens.refresh, user: me, firstTime: false };
 }
 
 function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudMarketplaceModule {
-  const id = String(raw.id ?? raw.module_id ?? raw.slug ?? raw.name);
+  // El id DEBE ser el slug del módulo (`module_id`, p.ej. "inventory"), no el id numérico del
+  // catálogo Cloud (`raw.id`, p.ej. 362): es lo que el runtime usa como clave de instalación,
+  // caché y desinstalación. Preferimos module_id/slug y caemos a id numérico solo como último.
+  const id = String(raw.module_id ?? raw.slug ?? raw.id ?? raw.name);
   const price = raw.price_label ?? raw.price ?? raw.monthly_price ?? raw.pricing;
   return {
     id,
@@ -239,11 +381,10 @@ function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudMarketpl
   };
 }
 
-/** Catálogo del Marketplace desde el Cloud Portal. En demo degrada a datos locales. */
+/** Catálogo del Marketplace vía el runtime local (firma con el token de máquina del hub, que
+ *  proxea a Cloud `/api/v1/marketplace/modules/`). En demo degrada a datos locales. */
 export async function cloudMarketplaceModules(): Promise<CloudMarketplaceModule[]> {
-  // Contrato del hub actual: apps/marketplace/api.py expone este proxy y el proxy
-  // consulta Cloud en /api/v1/marketplace/modules/.
-  const data = await get<unknown>('/api/v1/modules/marketplace/catalog/');
+  const data = await runtimeGet<unknown>('/api/marketplace/catalog');
   const items = Array.isArray(data)
     ? data
     : Array.isArray((data as { results?: unknown[] }).results)
@@ -253,6 +394,19 @@ export async function cloudMarketplaceModules(): Promise<CloudMarketplaceModule[
         : [];
 
   return items.map((item) => normalizeMarketplaceModule(item as Record<string, unknown>));
+}
+
+// --- Reporte de problemas (bug report) --------------------------------------
+// Contrato Cloud: POST /api/v1/hub/device/bug-report/ (hub-scoped). authedFetch añade el JWT del
+// usuario + X-Hub-Id; el Cloud acepta IsHubMember | IsHubMachine. Lo usa el botón "reportar un
+// problema" del footer del sidebar (paridad con el shell de Cloud).
+export async function cloudBugReport(message: string, context?: Record<string, unknown>): Promise<void> {
+  const res = await authedFetch('/api/v1/hub/device/bug-report/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, ...(context ? { context } : {}) }),
+  });
+  if (!res.ok) throw new Error(`cloud bug-report → ${res.status}`);
 }
 
 async function meRequest(access: string): Promise<CloudUser> {

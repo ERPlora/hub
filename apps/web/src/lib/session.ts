@@ -11,6 +11,11 @@ export interface SessionUser {
 }
 
 const LS_KEY = 'erplora.session';
+// Token opaco de la **sesión server-side del runtime** (`X-Hub-Session`). Lo emite el runtime al
+// hacer login (PIN o JWT cloud → `/api/auth/{pin,cloud}`) y el frontend lo manda en cada query/
+// command. Es la autoridad de permisos LOCAL (ARQUITECTURA.md §2.9); el JWT cloud es solo el
+// adaptador de login. Distinto del JWT del usuario (ese vive en cloud.ts para hablar con el Cloud).
+const HUB_SESSION_KEY = 'erplora.hub_session';
 
 function read(): SessionUser | null {
   try {
@@ -36,6 +41,31 @@ export function setUser(u: SessionUser | null): void {
   }
 }
 
+/** Token de la sesión server-side del runtime (`X-Hub-Session`), o null si no hay sesión local. */
+export function getHubSession(): string | null {
+  try {
+    return localStorage.getItem(HUB_SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Guarda (o borra) el token de sesión del runtime emitido por `/api/auth/{pin,cloud}`. */
+export function setHubSession(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(HUB_SESSION_KEY, token);
+    else localStorage.removeItem(HUB_SESSION_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
 export function logout(): void {
+  // Revoca la sesión server-side del runtime ANTES de borrar el token local (best-effort).
+  const token = getHubSession();
+  if (token) void import('./cloud').then((m) => m.runtimeLogout(token));
   setUser(null);
+  setHubSession(null);
+  // Olvida el entitlement resuelto: el próximo login lo recalcula para el hub activo.
+  void import('./entitlement').then((m) => m.resetEntitlement());
 }

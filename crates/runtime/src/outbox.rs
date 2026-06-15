@@ -17,10 +17,28 @@ use serde_json::{json, Value as Json};
 
 use crate::commands::{self, MAX_EVENT_DEPTH};
 use crate::errors::Result;
+use crate::host_backup::BackupIntent;
+use crate::host_notify::{self, NotifyIntent};
 use crate::registry::{new_id, now_rfc3339, Registry, RequestContext};
 
 /// Reintentos antes de mandar la fila a dead-letter (`status='dead'`).
 pub const MAX_ATTEMPTS: i64 = 8;
+
+/// Sufijo convencional de los eventos que el **listener-host** de `host.notify` consume (ADR-0012):
+/// un command de módulo emite `<algo>.reminder.due` con la intención `{channel,to,template,vars}`.
+pub const REMINDER_DUE_SUFFIX: &str = ".reminder.due";
+
+/// Nombre del listener sintético del host en `_event_delivery` (idempotencia del envío externo).
+/// No es un command de módulo: lo entrega el runtime vía el transporte de notificación.
+pub const HOST_NOTIFY_LISTENER: &str = "host.notify";
+
+/// Evento que el módulo `backup` emite (command `backup.create`) para disparar la capacidad de host
+/// `host.backup_upload` (ADR-0040). No es un sufijo como `*.reminder.due`: es un nombre exacto, así
+/// que solo el flujo de backup lo activa (un módulo de terceros no puede colar uno por convención).
+pub const BACKUP_REQUESTED_EVENT: &str = "backup.requested";
+
+/// Nombre del listener sintético del host de backup en `_event_delivery` (idempotencia de la subida).
+pub const HOST_BACKUP_LISTENER: &str = "host.backup_upload";
 
 /// Tamaño de lote por ciclo del relay (mantiene el lock del runtime acotado).
 const BATCH: i64 = 50;
@@ -154,7 +172,82 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         }
     }
 
+    // ── Listener-host de `host.notify` (ADR-0012) ───────────────────────────────────────────
+    // Un evento `*.reminder.due` además dispara el envío externo (email/sms/whatsapp) por el
+    // transporte del runtime. Reusa la MISMA infra del outbox: idempotencia por `_event_delivery`
+    // (listener sintético `host.notify`) y, si el transporte falla, reintento/backoff/dead-letter.
+    if event_name.ends_with(REMINDER_DUE_SUFFIX) {
+        if let Err(e) = deliver_host_notify(db, registry, &id, &payload).await {
+            return defer_or_dead(db, &id, attempts, &format!("{HOST_NOTIFY_LISTENER}: {e}")).await;
+        }
+    }
+
+    // ── Listener-host de `host.backup_upload` (ADR-0040, opción B) ───────────────────────────
+    // El evento `backup.requested` (del command `backup.create`) dispara la subida del backup
+    // (dump + stream al Cloud, que guarda en S3 con cifrado de SERVIDOR/SSE) por el transporte del
+    // runtime. Misma infra del outbox: idempotencia por `_event_delivery` (listener sintético
+    // `host.backup_upload`) y, si el transporte falla, reintento/backoff/dead-letter. Por qué Outbox
+    // y no inline: ver `host_backup.rs` (operación de red lenta y falible; no bloquea la tx del command).
+    if event_name == BACKUP_REQUESTED_EVENT {
+        if let Err(e) = deliver_host_backup(db, registry, &id, &payload).await {
+            return defer_or_dead(db, &id, attempts, &format!("{HOST_BACKUP_LISTENER}: {e}")).await;
+        }
+    }
+
     mark_delivered(db, &id).await
+}
+
+/// Entrega un evento `*.reminder.due` al transporte de `host.notify` (ADR-0012), con idempotencia
+/// por `_event_delivery` (listener sintético [`HOST_NOTIFY_LISTENER`]). Sin transporte configurado
+/// es no-op (la capacidad no está disponible en este host). El marcador de entrega se escribe SOLO
+/// tras un envío con éxito → un fallo deja la fila para reintento (no marca entregado).
+async fn deliver_host_notify(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    event_id: &str,
+    payload: &Params,
+) -> Result<()> {
+    let Some(transport) = &registry.notify_transport else {
+        return Ok(()); // capacidad no disponible: no se envía nada (ni se reintenta).
+    };
+    if delivery_exists(db, event_id, HOST_NOTIFY_LISTENER).await? {
+        return Ok(()); // ya enviado en un intento previo (idempotencia)
+    }
+    let intent = NotifyIntent::from_event_payload(payload)?;
+    // ¿WhatsApp premium de ERPlora? → proxy Cloud con cuota; si no, secreto local del tenant.
+    let premium = !registry.premium_whatsapp_modules.is_empty();
+    let routing = host_notify::route_channel(intent.channel, premium);
+    transport.send(&intent, routing).await?;
+    // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark).
+    let (sql, p) = delivery_op(event_id, HOST_NOTIFY_LISTENER);
+    db.execute(&sql, &p).await?;
+    Ok(())
+}
+
+/// Entrega un evento `backup.requested` al transporte de `host.backup_upload` (ADR-0040), con
+/// idempotencia por `_event_delivery` (listener sintético [`HOST_BACKUP_LISTENER`]). Espejo exacto
+/// de [`deliver_host_notify`]: sin transporte configurado es no-op (la capacidad no está disponible
+/// en este host); el marcador de entrega se escribe SOLO tras una subida con éxito → un fallo deja
+/// la fila para reintento (no marca entregado). El transporte hace dump + stream al Cloud, que lo
+/// guarda en S3 con cifrado de servidor/SSE (opción B, ver `host_backup.rs`).
+async fn deliver_host_backup(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    event_id: &str,
+    payload: &Params,
+) -> Result<()> {
+    let Some(transport) = &registry.backup_transport else {
+        return Ok(()); // capacidad no disponible: no se sube nada (ni se reintenta).
+    };
+    if delivery_exists(db, event_id, HOST_BACKUP_LISTENER).await? {
+        return Ok(()); // ya subido en un intento previo (idempotencia)
+    }
+    let intent = BackupIntent::from_event_payload(payload)?;
+    transport.run_backup(&intent).await?;
+    // Subida con éxito → marca la entrega (idempotencia ante un reinicio entre upload y mark).
+    let (sql, p) = delivery_op(event_id, HOST_BACKUP_LISTENER);
+    db.execute(&sql, &p).await?;
+    Ok(())
 }
 
 fn reconstruct_ctx(row: &Json) -> RequestContext {
@@ -252,9 +345,11 @@ mod tests {
                 emit,
                 handler: None,
                 ai: None,
+                schema: None,
             },
             sql: vec![sql.to_string()],
             wasm: None,
+            schema: None,
         }
     }
 
@@ -301,5 +396,213 @@ mod tests {
         // Idempotencia: re-drenar no re-ejecuta el listener.
         drain(&db, &reg).await.unwrap();
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1, "idempotente");
+    }
+
+    /// Un evento `*.reminder.due` dispara el **listener-host** de `host.notify` (ADR-0012) por el
+    /// relay: el transporte recibe la intención exactamente una vez y queda marcado en
+    /// `_event_delivery` (idempotente al re-drenar). Es el camino que pasa por el Outbox.
+    #[tokio::test]
+    async fn reminder_due_event_delivers_to_notify_transport_once() {
+        use crate::host_notify::{Channel, MockTransport, Routing};
+        use serde_json::json;
+
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        // Módulo "appt" activo: "appt.remind" emite "appt.reminder.due" con la intención.
+        let mut reg = Registry::new();
+        reg.status.insert("appt".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "appt.remind".into(),
+            cmd("appt", "INSERT INTO t (n) VALUES (1);", vec!["appt.reminder.due".into()]),
+        );
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+
+        // La intención viaja en el payload del command (que el outbox guarda como payload del evento).
+        let mut payload = Params::new();
+        payload.insert("channel".into(), json!("email"));
+        payload.insert("to".into(), json!("cliente@x.com"));
+        payload.insert("template".into(), json!("appointment_reminder"));
+        payload.insert("vars".into(), json!({ "when": "10:00" }));
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "appt.remind", &payload, &ctx).await.unwrap();
+        assert!(transport.sent().is_empty(), "no se envía inline; va por el relay");
+
+        // Relay: entrega el evento → el transporte recibe la intención una vez.
+        drain(&db, &reg).await.unwrap();
+        let sent = transport.sent();
+        assert_eq!(sent.len(), 1, "una entrega por el listener-host");
+        assert_eq!(sent[0].0.channel, Channel::Email);
+        assert_eq!(sent[0].0.to, "cliente@x.com");
+        assert_eq!(sent[0].1, Routing::Tenant, "email = canal del tenant (secreto local)");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'").await,
+            1
+        );
+
+        // Idempotencia: re-drenar no re-envía.
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(transport.sent().len(), 1, "idempotente (marcador host.notify)");
+    }
+
+    /// Un transporte que falla deja el evento `*.reminder.due` para reintento (backoff) y, tras
+    /// `MAX_ATTEMPTS`, lo manda a dead-letter — reusa la misma máquina del Outbox (sin código nuevo).
+    #[tokio::test]
+    async fn failing_notify_transport_retries_then_dead_letters() {
+        use crate::host_notify::MockTransport;
+        use serde_json::json;
+
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        let mut reg = Registry::new();
+        reg.status.insert("appt".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "appt.remind".into(),
+            cmd("appt", "INSERT INTO t (n) VALUES (1);", vec!["appt.reminder.due".into()]),
+        );
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::failing()));
+
+        let mut payload = Params::new();
+        payload.insert("channel".into(), json!("sms"));
+        payload.insert("to".into(), json!("+34600000000"));
+        payload.insert("template".into(), json!("reminder"));
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "appt.remind", &payload, &ctx).await.unwrap();
+
+        // Primer ciclo: el envío falla → la fila se difiere (sigue 'pending', attempts=1, no 'dead').
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await, 1);
+        assert_eq!(count(&db, "SELECT attempts AS c FROM _event_outbox").await, 1, "1 intento fallido");
+
+        // Simula que ya agotó los reintentos (sin esperar el backoff real): attempts justo por
+        // debajo del tope + vencido. El siguiente fallo lo manda a dead-letter.
+        let mut p = Params::new();
+        p.insert("a".into(), json!(MAX_ATTEMPTS - 1));
+        db.execute(
+            "UPDATE _event_outbox SET attempts = :a, next_attempt_at = '2020-01-01T00:00:00+00:00'",
+            &p,
+        )
+        .await
+        .unwrap();
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await, 1, "dead-letter");
+    }
+
+    /// El evento `backup.requested` (del command `backup.create`) dispara el **listener-host** de
+    /// `host.backup_upload` (ADR-0040) por el relay: el transporte ejecuta el backup exactamente una
+    /// vez y queda marcado en `_event_delivery` (idempotente al re-drenar). Espejo del de notify.
+    #[tokio::test]
+    async fn backup_requested_event_delivers_to_backup_transport_once() {
+        use crate::host_backup::MockTransport;
+
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        // Módulo "backup" activo: "backup.create" registra la fila y emite "backup.requested".
+        let mut reg = Registry::new();
+        reg.status.insert("backup".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "backup.create".into(),
+            cmd("backup", "INSERT INTO t (n) VALUES (1);", vec![BACKUP_REQUESTED_EVENT.into()]),
+        );
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.backup_transport = Some(transport.clone());
+
+        // La intención viaja en el payload del command (hub_id lo inyecta el runtime; aquí explícito).
+        let mut payload = Params::new();
+        payload.insert("backup_id".into(), json!("bk-1"));
+        payload.insert("hub_id".into(), json!("h1"));
+        payload.insert("trigger".into(), json!("manual"));
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "backup.create", &payload, &ctx).await.unwrap();
+        assert!(transport.uploads().is_empty(), "no se sube inline; va por el relay");
+
+        // Relay: entrega el evento → el transporte ejecuta el backup una vez.
+        drain(&db, &reg).await.unwrap();
+        let ups = transport.uploads();
+        assert_eq!(ups.len(), 1, "una subida por el listener-host");
+        assert_eq!(ups[0].0.backup_id, "bk-1");
+        assert_eq!(ups[0].0.hub_id, "h1");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.backup_upload'").await,
+            1
+        );
+
+        // Idempotencia: re-drenar no re-sube.
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(transport.uploads().len(), 1, "idempotente (marcador host.backup_upload)");
+    }
+
+    /// Sin transporte de backup configurado, `backup.requested` se entrega igual (no-op del host):
+    /// la capacidad no está disponible, pero el evento queda 'delivered' (no bloquea el outbox).
+    #[tokio::test]
+    async fn backup_requested_is_noop_without_transport() {
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        let mut reg = Registry::new();
+        reg.status.insert("backup".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "backup.create".into(),
+            cmd("backup", "INSERT INTO t (n) VALUES (1);", vec![BACKUP_REQUESTED_EVENT.into()]),
+        );
+        // reg.backup_transport = None (capacidad no disponible en este host).
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "backup.create", &Params::new(), &ctx).await.unwrap();
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            1,
+            "el evento se entrega aunque la capacidad no esté disponible (no-op)"
+        );
+    }
+
+    /// Un transporte de backup que falla deja `backup.requested` para reintento (backoff) y, tras
+    /// `MAX_ATTEMPTS`, dead-letter — reusa la misma máquina del Outbox (sin código nuevo).
+    #[tokio::test]
+    async fn failing_backup_transport_retries_then_dead_letters() {
+        use crate::host_backup::MockTransport;
+
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        ensure_tables(&db).await.unwrap();
+
+        let mut reg = Registry::new();
+        reg.status.insert("backup".into(), ModuleStatus::Active);
+        reg.commands.insert(
+            "backup.create".into(),
+            cmd("backup", "INSERT INTO t (n) VALUES (1);", vec![BACKUP_REQUESTED_EVENT.into()]),
+        );
+        reg.backup_transport = Some(std::sync::Arc::new(MockTransport::failing()));
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "backup.create", &Params::new(), &ctx).await.unwrap();
+
+        // Primer ciclo: la subida falla → la fila se difiere (sigue 'pending', attempts=1).
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await, 1);
+        assert_eq!(count(&db, "SELECT attempts AS c FROM _event_outbox").await, 1, "1 intento fallido");
+
+        // Agota reintentos (sin esperar el backoff real) → el siguiente fallo lo manda a dead-letter.
+        let mut p = Params::new();
+        p.insert("a".into(), json!(MAX_ATTEMPTS - 1));
+        db.execute(
+            "UPDATE _event_outbox SET attempts = :a, next_attempt_at = '2020-01-01T00:00:00+00:00'",
+            &p,
+        )
+        .await
+        .unwrap();
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await, 1, "dead-letter");
     }
 }

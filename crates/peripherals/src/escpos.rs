@@ -103,11 +103,78 @@ impl EscposBuilder {
         self
     }
 
-    /// Código de barras. Porta el fallback de `_RawNetworkPrinter.barcode`, que imprime
-    /// `[code]\n` como texto en vez de un GS k real (el camino python-escpos EAN13 no existe
-    /// en el fallback crudo, que es lo que portamos aquí).
+    /// Código de barras **nativo** (`GS k`, función B). Sustituye al antiguo fallback de texto
+    /// `[code]` del Bridge Python (bridge#1):
+    ///   - 12-13 dígitos → **EAN13** (m=67).
+    ///   - resto → **CODE128** (m=73) en code set B (prefijo `{B`); lo no-ASCII-imprimible → `?`.
+    ///
+    /// Configura altura (`GS h`), ancho de módulo (`GS w`) y HRI debajo (`GS H 2`, fuente A
+    /// `GS f 0`) antes de emitir el símbolo. Si el código está vacío o excede el límite del
+    /// comando (255 bytes) cae al fallback de texto `[code]` para no enviar bytes inválidos.
     pub fn barcode(&mut self, code: &str) -> &mut Self {
-        self.text(&format!("[{code}]\n"));
+        if code.is_empty() || code.len() > 250 {
+            self.text(&format!("[{code}]\n"));
+            return self;
+        }
+
+        // GS h n — altura del símbolo (puntos).
+        self.buf.extend_from_slice(&[0x1d, 0x68, 80]);
+        // GS w n — ancho de módulo.
+        self.buf.extend_from_slice(&[0x1d, 0x77, 2]);
+        // GS H n — HRI debajo del símbolo (2).
+        self.buf.extend_from_slice(&[0x1d, 0x48, 2]);
+        // GS f n — fuente A para el HRI.
+        self.buf.extend_from_slice(&[0x1d, 0x66, 0]);
+
+        let all_digits = code.chars().all(|c| c.is_ascii_digit());
+        if all_digits && (code.len() == 12 || code.len() == 13) {
+            // EAN13, función B: GS k 67 n d1..dn (con 12 dígitos la impresora calcula el checksum).
+            self.buf.extend_from_slice(&[0x1d, 0x6b, 67, code.len() as u8]);
+            self.buf.extend_from_slice(code.as_bytes());
+        } else {
+            // CODE128, función B: GS k 73 n {B d1..dk (code set B cubre ASCII 32-127).
+            let mut payload: Vec<u8> = Vec::with_capacity(code.len() + 2);
+            payload.extend_from_slice(b"{B");
+            payload.extend(code.bytes().map(|b| if (0x20..0x7f).contains(&b) { b } else { b'?' }));
+            self.buf.extend_from_slice(&[0x1d, 0x6b, 73, payload.len() as u8]);
+            self.buf.extend_from_slice(&payload);
+        }
+        self.buf.push(b'\n');
+        self
+    }
+
+    /// Código QR **nativo** (`GS ( k`, modelo 2) — bridge#1. Secuencia estándar Epson:
+    /// fn 165 (modelo 2) → fn 167 (tamaño de módulo) → fn 169 (corrección de errores M) →
+    /// fn 180 (almacenar datos) → fn 181 (imprimir). Datos vacíos o > límite del comando
+    /// (~7 KB) → no-op.
+    pub fn qr(&mut self, data: &str) -> &mut Self {
+        let bytes = data.as_bytes();
+        if bytes.is_empty() || bytes.len() > 7080 {
+            return self;
+        }
+
+        // GS ( k 4 0 49 65 50 0 — fn 165: seleccionar modelo 2.
+        self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 4, 0, 49, 65, 50, 0]);
+        // GS ( k 3 0 49 67 n — fn 167: tamaño de módulo (puntos).
+        self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 3, 0, 49, 67, 4]);
+        // GS ( k 3 0 49 69 n — fn 169: nivel de corrección M (49).
+        self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 3, 0, 49, 69, 49]);
+        // GS ( k pL pH 49 80 48 d1..dk — fn 180: almacenar los datos (len = k + 3).
+        let len = bytes.len() + 3;
+        self.buf.extend_from_slice(&[
+            0x1d,
+            0x28,
+            0x6b,
+            (len & 0xff) as u8,
+            (len >> 8) as u8,
+            49,
+            80,
+            48,
+        ]);
+        self.buf.extend_from_slice(bytes);
+        // GS ( k 3 0 49 81 48 — fn 181: imprimir el símbolo almacenado.
+        self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 3, 0, 49, 81, 48]);
+        self.buf.push(b'\n');
         self
     }
 
@@ -304,6 +371,12 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
         }
     }
 
+    // QR opcional del ticket (p.ej. VeriFactu / enlace a factura): campo `qr_data` del payload.
+    if is_truthy(data, "qr_data") {
+        b.set(Align::Center, false, false, false);
+        b.qr(str_field(data, "qr_data", ""));
+    }
+
     b.text("\n");
     if is_truthy(data, "receipt_header") {
         b.set(Align::Center, false, false, false);
@@ -417,7 +490,8 @@ fn render_barcode_label(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     let barcode_value = str_field(data, "barcode", "");
     if !barcode_value.is_empty() {
-        // El fallback crudo de Python siempre imprime [code] como texto.
+        // GS k nativo (EAN13/CODE128) con HRI debajo; ya no es el fallback de texto [code].
+        b.set(Align::Center, false, false, false);
         b.barcode(barcode_value);
     }
 

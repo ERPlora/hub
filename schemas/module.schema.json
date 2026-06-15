@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://erplora.com/schemas/module.schema.json",
   "title": "ERPlora hub module manifest",
-  "description": "Contrato técnico de un módulo (module.json). La clasificación de marketplace (sectors/business_types/pricing) NO va aquí — vive en el Cloud Portal (ARQUITECTURA.md §2.4).",
+  "description": "Contrato del módulo (module.json). Incluye el contrato técnico (runtime) + los bloques `marketplace` (clasificación por código) y `billing` (términos comerciales) que SOLO lee el Cloud (ADR-0007). El Hub ignora marketplace/billing.",
   "type": "object",
   "required": ["id", "name", "version"],
   "additionalProperties": false,
@@ -19,7 +19,7 @@
     },
     "icon": {
       "type": "string",
-      "description": "Nombre del icono del módulo (p. ej. ionicon `storefront-outline`)."
+      "description": "Nombre del icono del módulo (set Iconify `ion:`, p. ej. `storefront-outline`). El `module-toolkit build` lo hornea a SVG en `dist/icons.json` y el shell lo pinta vía HubIcon (ADR-0036). Solo el nombre aquí; el SVG no se escribe en el manifest."
     },
     "version": {
       "type": "string",
@@ -65,7 +65,7 @@
         "properties": {
           "id": { "type": "string" },
           "label": { "type": "string" },
-          "icon": { "type": "string" },
+          "icon": { "type": "string", "description": "Nombre del icono de la entrada (set Iconify `ion:`). Horneado a SVG en `dist/icons.json` por el build (ADR-0036)." },
           "component": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$",
@@ -105,14 +105,17 @@
           "permission": { "type": "string" },
           "transaction": { "type": "boolean", "default": false },
           "sql": { "type": "array", "items": { "type": "string" } },
+          "schema": { "type": "string" },
           "handler": {
             "type": "object",
-            "required": ["type", "file"],
+            "required": ["type", "function"],
             "properties": {
-              "type": { "type": "string", "enum": ["wasm"] },
+              "type": { "type": "string", "enum": ["wasm", "native"] },
               "file": { "type": "string" },
               "function": { "type": "string" }
-            }
+            },
+            "if": { "properties": { "type": { "const": "wasm" } } },
+            "then": { "required": ["file"] }
           },
           "emit": { "type": "array", "items": { "type": "string" } },
           "ai": { "$ref": "#/$defs/aiTool" }
@@ -134,14 +137,31 @@
     },
     "network": {
       "type": "object",
-      "description": "Capacidad http.fetch mediada por el host (ARQUITECTURA.md §5.5, Opción A).",
+      "description": "Capacidad `http.fetch` mediada por el host (ADR-0012, ARQUITECTURA.md §5.5, Opción A). El WASM no tiene red: el runtime hace la llamada saliente, valida el host contra `allow` (allowlist) e inyecta los `secrets` por nombre (el módulo nunca ve su valor).",
       "additionalProperties": false,
       "properties": {
-        "allow": { "type": "array", "items": { "type": "string" } },
-        "secrets": { "type": "array", "items": { "type": "string" } }
+        "allow": { "type": "array", "items": { "type": "string" }, "description": "Hosts/patrones permitidos para las llamadas salientes (allowlist). Una llamada a un host fuera de la lista se rechaza." },
+        "secrets": { "type": "array", "items": { "type": "string" }, "description": "Nombres de secretos del hub que el host inyecta en la llamada (cabeceras/auth). El módulo declara el nombre, no el valor." }
       }
     },
-    "scheduled_tasks": { "type": "array", "items": { "type": "object" }, "default": [] },
+    "notify": {
+      "type": "object",
+      "description": "Capacidad `host.notify(channel, payload)` de alto nivel (ADR-0012). El módulo declara QUÉ canales de notificación usa; el runtime implementa el cliente y decide DÓNDE viven los secretos/cuota por canal y por `tier` (tenant=secreto local cifrado; WhatsApp premium=proxy Cloud con check_quota). El envío va por el Outbox: el command emite un evento `*.reminder.due` con la intención `{channel,to,template,vars}` y el listener-host lo entrega con reintentos/dead-letter.",
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["email", "sms", "whatsapp"] },
+          "description": "Canales de alto nivel que necesita el módulo. Conjunto cerrado (añadir uno = tocar el runtime)."
+        }
+      }
+    },
+    "scheduled_tasks": {
+      "type": "array",
+      "description": "Tareas programadas del módulo (ADR-0011). Las ejecuta el Hub (no Cloud): se vuelcan a la tabla de sistema `_scheduled_tasks` al instalar y el barrido del relay corre el `command` al vencer el `cron`, sin usuario (contexto de sistema). Idempotentes por diseño (catch-up collapse tras un apagado).",
+      "default": [],
+      "items": { "$ref": "#/$defs/scheduledTask" }
+    },
     "ui": {
       "type": "object",
       "required": ["entry"],
@@ -150,6 +170,51 @@
         "entry": {
           "type": "string",
           "description": "Ruta al ESM del Web Component compilado (cargado en runtime por el shell)."
+        }
+      }
+    },
+    "marketplace": {
+      "type": "object",
+      "description": "Clasificación de marketplace por CÓDIGO (ADR-0007). El Cloud VALIDA estos códigos contra su taxonomía (Sector/BusinessType/FunctionalUnit) en el sync; un código desconocido rechaza el sync. Los nombres localizados (ES/EN) viven en Cloud. El Hub ignora este bloque.",
+      "additionalProperties": false,
+      "properties": {
+        "functional_unit": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Código de la unidad funcional primaria." },
+        "sectors": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }, "description": "Códigos de sectores compatibles." },
+        "business_types": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }, "description": "Códigos de tipos de negocio compatibles." }
+      }
+    },
+    "billing": {
+      "type": "object",
+      "description": "Términos comerciales del módulo (ADR-0007). SOLO lo lee el Cloud para crear/actualizar productos en Stripe; el Hub lo ignora. Relevante solo para `tier: premium` (basic/essential son gratis en todo despliegue). Precio único con `interval`+`price`, o multi-tier con `tiers`.",
+      "additionalProperties": false,
+      "properties": {
+        "tier": { "type": "string", "enum": ["basic", "essential", "premium"] },
+        "type": { "type": "string", "enum": ["free", "one_time", "subscription"] },
+        "interval": { "type": "string", "enum": ["month", "year"], "description": "Intervalo de la suscripción de precio único." },
+        "price": { "type": "number", "minimum": 0, "description": "Precio único en EUR (IVA incl.)." },
+        "trial_days": { "type": "integer", "minimum": 0, "default": 15 },
+        "tiers": {
+          "type": "array",
+          "description": "Tiers de pago para módulos premium con API (free + pago con cuota + metered). Si está presente, manda sobre `price`.",
+          "items": {
+            "type": "object",
+            "required": ["slug", "name", "price"],
+            "additionalProperties": false,
+            "properties": {
+              "slug": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "name": { "type": "string" },
+              "price": { "type": "number", "minimum": 0, "description": "EUR/intervalo (IVA incl.). 0 = tier gratis." },
+              "interval": { "type": "string", "enum": ["month", "year"], "default": "month" },
+              "trial_days": { "type": "integer", "minimum": 0 },
+              "metered": { "type": "boolean", "default": false, "description": "Si true, cuota base + overage por uso (Stripe Billing Meters)." },
+              "overage_price": { "type": "number", "minimum": 0, "description": "Precio por unidad de exceso (EUR) si `metered`." },
+              "quota": {
+                "type": "object",
+                "description": "Límites incluidos por métrica `{ metrica: limite }` (p. ej. messages_per_month). Al agotar → bloqueo en Cloud (o overage si metered).",
+                "additionalProperties": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
         }
       }
     }
@@ -204,6 +269,37 @@
         "name": {
           "type": "string",
           "description": "Nombre opcional que ve el LLM (por defecto = el nombre de la operación, p. ej. inventory.products.list)."
+        }
+      }
+    },
+    "scheduledTask": {
+      "type": "object",
+      "description": "Una tarea programada del módulo (ADR-0011). El runtime la vuelca a `_scheduled_tasks` al instalar (idempotente, clave = módulo + `name`) y ejecuta su `command` al vencer el `cron`, sin usuario.",
+      "required": ["name", "command", "cron"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Nombre único de la tarea DENTRO del módulo (clave de idempotencia junto al module_id)."
+        },
+        "command": {
+          "type": "string",
+          "description": "Command a ejecutar al vencer el cron. Debe ser del PROPIO módulo (mismo aislamiento que el handler WASM); se ejecuta sin usuario (contexto de sistema)."
+        },
+        "cron": {
+          "type": "string",
+          "description": "Expresión cron de 5 campos `min hora dom mes dow` (p. ej. `*/5 * * * *`) o atajo `@hourly`/`@daily`/`@weekly`/`@monthly`/`@yearly`. El parser actual soporta `*`, `*/N` y valor fijo por campo (no rangos/listas todavía)."
+        },
+        "payload": {
+          "type": "object",
+          "description": "Payload fijo que recibe el command en cada ejecución (opcional)."
+        },
+        "catch_up": {
+          "type": "string",
+          "enum": ["collapse", "skip"],
+          "default": "collapse",
+          "description": "Comportamiento tras un apagado: `collapse` ejecuta UNA sola vez el backlog vencido al arrancar; `skip` no ejecuta nada vencido durante el apagado y solo reprograma."
         }
       }
     }

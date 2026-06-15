@@ -25,6 +25,11 @@ pub enum SourceError {
     /// El SHA256 del zip no coincide con el esperado en el grant.
     #[error(transparent)]
     Integrity(#[from] IntegrityError),
+    /// El grant no trae `sha256`: sin hash esperado no hay verificación de integridad
+    /// posible. ADR-0015: SHA256 **obligatorio y no-saltable** — se aborta ANTES de
+    /// descargar/descomprimir nada.
+    #[error("grant sin sha256 para {module_id}@{version}: la verificación de integridad es obligatoria (ADR-0015)")]
+    MissingSha256 { module_id: String, version: String },
     /// El zip está corrupto o una entrada intenta escapar del destino (zip-slip).
     #[error("zip inválido: {0}")]
     Zip(String),
@@ -73,10 +78,20 @@ impl ModuleStore {
     /// Si ya está cacheado, devuelve el path sin descargar. Si no: descarga → verifica SHA256
     /// → descomprime → valida que existe `module.json`. Ante cualquier fallo limpia el dir
     /// parcial para no dejar basura.
+    ///
+    /// La verificación SHA256 es **obligatoria y no-saltable** (ADR-0015): un grant sin
+    /// `sha256` se rechaza con [`SourceError::MissingSha256`] **antes** de descargar.
     pub fn install(&self, fetcher: &dyn Fetcher, grant: &InstallGrant) -> Result<PathBuf> {
         let dest = self.path_for(&grant.module_id, &grant.version);
         if self.is_cached(&grant.module_id, &grant.version) {
             return Ok(dest);
+        }
+
+        if grant.sha256.trim().is_empty() {
+            return Err(SourceError::MissingSha256 {
+                module_id: grant.module_id.clone(),
+                version: grant.version.clone(),
+            });
         }
 
         let bytes = fetcher.fetch(&grant.download_url)?;

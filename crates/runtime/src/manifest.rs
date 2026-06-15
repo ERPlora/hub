@@ -32,6 +32,72 @@ pub struct Manifest {
     /// Conocimiento del módulo para RAG (§9.4) — aparcado/en diseño. Se captura tal cual.
     #[serde(default)]
     pub ai_context: Option<serde_json::Value>,
+    /// Tareas programadas del módulo (ADR-0011). Cada una ejecuta un command del **propio
+    /// módulo** cuando vence su `cron`, sin usuario (contexto de sistema). Se vuelcan a la tabla
+    /// de sistema `_scheduled_tasks` al instalar (idempotente). Ver `scheduler.rs`.
+    #[serde(default)]
+    pub scheduled_tasks: Vec<ScheduledTaskDef>,
+    /// Capacidad `host.notify` de alto nivel (ADR-0012): qué canales de notificación
+    /// (`email`/`sms`/`whatsapp`) declara necesitar el módulo. El host resuelve DÓNDE viven
+    /// los secretos/cuota por canal y por `tier`; el módulo solo declara qué canal usa.
+    #[serde(default)]
+    pub notify: Option<NotifyCapability>,
+    /// Capacidad `http.fetch` mediada (ADR-0012, campo `network` ya en el schema): allowlist de
+    /// hosts y secretos que el host inyecta. El WASM no tiene red; el runtime hace la llamada.
+    #[serde(default)]
+    pub network: Option<NetworkCapability>,
+}
+
+/// Una tarea programada declarada en el manifest (ADR-0011). Espejo de `$defs/scheduledTask`
+/// en `schemas/module.schema.json`. El `command` debe pertenecer al **propio módulo** (mismo
+/// aislamiento que el handler WASM); se valida al volcar la tarea a `_scheduled_tasks`.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ScheduledTaskDef {
+    /// Nombre único de la tarea **dentro del módulo** (clave de idempotencia con `module_id`).
+    pub name: String,
+    /// Command del propio módulo a ejecutar al vencer el cron (sin usuario).
+    pub command: String,
+    /// Expresión cron de 5 campos (`min hora dom mes dow`) o atajo (`@daily`, `@hourly`…).
+    /// Ver `scheduler::cron` para la gramática soportada.
+    pub cron: String,
+    /// Payload fijo que recibe el command en cada ejecución (opcional).
+    #[serde(default)]
+    pub payload: Option<serde_json::Value>,
+    /// Comportamiento de catch-up tras un apagado (ADR-0011): `collapse` (por defecto) ejecuta
+    /// **una sola vez** el backlog al arrancar; `skip` no ejecuta nada vencido durante el apagado
+    /// y solo reprograma. (No hay modo "run-all": el ADR fija collapse para tareas idempotentes.)
+    #[serde(default)]
+    pub catch_up: CatchUp,
+}
+
+/// Política de catch-up de una scheduled task tras un periodo apagado (ADR-0011).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CatchUp {
+    /// Ejecuta una sola vez si había backlog vencido (idempotente). Por defecto.
+    #[default]
+    Collapse,
+    /// No ejecuta el backlog; solo reprograma al siguiente vencimiento.
+    Skip,
+}
+
+/// Bloque `notify` del manifest (ADR-0012): los canales de alto nivel que usa el módulo.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NotifyCapability {
+    /// Canales declarados (`email`/`sms`/`whatsapp`).
+    #[serde(default)]
+    pub channels: Vec<String>,
+}
+
+/// Bloque `network` del manifest (ADR-0012, §5.5): allowlist de `http.fetch` mediado.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NetworkCapability {
+    /// Hosts/patrones permitidos para las llamadas salientes mediadas por el host.
+    #[serde(default)]
+    pub allow: Vec<String>,
+    /// Nombres de secretos del hub que el host inyecta en las llamadas (no su valor).
+    #[serde(default)]
+    pub secrets: Vec<String>,
 }
 
 /// Bloque `agent` del manifest: descripción del módulo (en inglés) para el routing del
@@ -58,6 +124,25 @@ pub struct Nav {
     #[serde(default)]
     pub icon: Option<String>,
     pub component: String,
+    /// Acciones de topbar de esta pestaña: el shell las pinta en `slot="end"` y al pulsar
+    /// reenvía `module-action` al Web Component montado. El manifest declara el botón;
+    /// el comportamiento vive en el componente del módulo.
+    #[serde(default)]
+    pub actions: Vec<NavAction>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NavAction {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub icon: Option<String>,
+    /// Botón destacado (color primario).
+    #[serde(default)]
+    pub primary: bool,
+    /// Permiso para MOSTRAR el botón (show/hide de UI; Rust revalida siempre el command real).
+    #[serde(default)]
+    pub permission: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -138,28 +223,39 @@ pub struct CommandDef {
     pub transaction: bool,
     #[serde(default)]
     pub sql: Vec<String>,
+    /// Ruta (relativa a la carpeta del módulo) del JSON Schema del payload. Si está
+    /// presente, el runtime valida el payload del llamador contra él ANTES de ejecutar
+    /// (se compila una vez al instalar y se cachea en el `Registry`). §5.2, hub#27.
+    #[serde(default)]
+    pub schema: Option<String>,
     #[serde(default)]
     pub emit: Vec<String>,
-    /// Handler de lógica (Tier 2, WASM). Si está presente, el command ejecuta el
-    /// handler en sandbox en vez de su `sql` directo. ARQUITECTURA.md §5.3.
+    /// Handler de lógica: Tier 2 (WASM sandbox) o **plugin nativo first-party**
+    /// (ADR-0009, crate horneado en el runtime). Si está presente, el command ejecuta
+    /// el handler en vez de su `sql` directo. ARQUITECTURA.md §5.3.
     #[serde(default)]
-    pub handler: Option<WasmHandler>,
+    pub handler: Option<HandlerRef>,
     /// Si está presente, expone este command al asistente como tool (nivel 2). El permiso y el
     /// schema se heredan del propio command, no se redeclaran. ARQUITECTURA.md §9.2.
     #[serde(default)]
     pub ai: Option<AiTool>,
 }
 
-/// Referencia a un handler WASM (Tier 2): el fichero `.wasm` del módulo y la
-/// función exportada a invocar. ARQUITECTURA.md §5.3, §9.2.
+/// Referencia al handler de un command. ARQUITECTURA.md §5.3, §9.2.
+///
+/// - `type: "wasm"` — Tier 2: fichero `.wasm` del módulo (`file`) + función exportada.
+/// - `type: "native"` — plugin nativo first-party (ADR-0009): la función vive en un
+///   crate Rust horneado en el runtime, registrado por `module_id` vía
+///   [`crate::Runtime::register_native`]. No lleva `file`.
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct WasmHandler {
-    /// Tipo de handler. Hoy solo `"wasm"`.
+pub struct HandlerRef {
+    /// Tipo de handler: `"wasm"` | `"native"`.
     #[serde(rename = "type")]
     pub kind: String,
-    /// Ruta (relativa a la carpeta del módulo) del `.wasm`.
-    pub file: String,
-    /// Función exportada del guest a invocar.
+    /// Ruta (relativa a la carpeta del módulo) del `.wasm`. Solo para `type: "wasm"`.
+    #[serde(default)]
+    pub file: Option<String>,
+    /// Función del handler a invocar (exportada del guest WASM o del plugin nativo).
     pub function: String,
 }
 
