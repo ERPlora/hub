@@ -112,6 +112,12 @@ export async function loadMenu(): Promise<MenuEntry[]> {
     const base = `${MODULES_BASE}/${moduleId}`;
     const entry = manifest.ui.entry;
     const icons = await loadIconMap(base, entry);
+    // `chrome` (ADR-0048) aún no lo re-sirve `/api/navigation`; se lee del manifest crudo por id
+    // (mismo patrón que `provides_slots`). Mapa id → chrome[] para enriquecer cada entrada.
+    const chromeById = new Map<string, string[]>();
+    for (const n of manifest.navigation ?? []) {
+      if (n.chrome?.length) chromeById.set(n.id, n.chrome);
+    }
     for (const item of items) {
       entries.push({
         moduleId,
@@ -121,6 +127,7 @@ export async function loadMenu(): Promise<MenuEntry[]> {
           label: item.label,
           icon: item.icon ?? undefined,
           component: item.component,
+          chrome: chromeById.get(item.id),
         },
         entryUrl: `${base}/${entry}`,
         iconSvg: item.icon ? icons[item.icon] : undefined,

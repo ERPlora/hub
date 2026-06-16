@@ -1,0 +1,19 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@erplora/module-sdk':
+        specifier: workspace:*
+        version: link:../../packages/module-sdk
+      '@erplora/module-types':
+        specifier: workspace:*
+        version: link:../../packages/module-types
+      '@erplora/outfitkit':
+        specifier: workspace:*
+        version: link:../../../outfitkit

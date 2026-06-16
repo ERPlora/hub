@@ -90,6 +90,15 @@ import personOutline from "~icons/ion/person-outline?raw";
 import bugOutline from "~icons/ion/bug-outline?raw";
 import closeOutline from "~icons/ion/close-outline?raw";
 import stopCircleOutline from "~icons/ion/stop-circle-outline?raw";
+import expandOutline from "~icons/ion/expand-outline?raw";
+import contractOutline from "~icons/ion/contract-outline?raw";
+import pauseOutline from "~icons/ion/pause-outline?raw";
+import playOutline from "~icons/ion/play-outline?raw";
+import trashOutline from "~icons/ion/trash-outline?raw";
+import appsOutline from "~icons/ion/apps-outline?raw";
+import barChartOutline from "~icons/ion/bar-chart-outline?raw";
+import sendOutline from "~icons/ion/send-outline?raw";
+import chatbubbleOutline from "~icons/ion/chatbubble-outline?raw";
 
 // `panel-left` (lucide) — NO hay equivalente en el set `ion:`; se hornea a mano para dar paridad
 // exacta con el rail-toggle de Cloud (que usa `lucide:panel-left`). SVG inline = offline/CSP-safe,
@@ -181,6 +190,15 @@ const SVGS: Record<string, string> = {
   "bug-outline": bugOutline,
   "close-outline": closeOutline,
   "stop-circle-outline": stopCircleOutline,
+  "expand-outline": expandOutline,
+  "contract-outline": contractOutline,
+  "pause-outline": pauseOutline,
+  "play-outline": playOutline,
+  "trash-outline": trashOutline,
+  "apps-outline": appsOutline,
+  "bar-chart-outline": barChartOutline,
+  "send-outline": sendOutline,
+  "chatbubble-outline": chatbubbleOutline,
   "panel-left": panelLeft,
 };
 

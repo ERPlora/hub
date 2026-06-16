@@ -21,6 +21,10 @@
   --ok-spacing: 1rem;
   --ok-container-max: 1140px;
   --ok-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Micro-interacciones (hover suave en escritorio + feedback de pulsación, sutil) */
+  --ok-transition: 150ms ease;   /* duración/easing de los estados hover/activo */
+  --ok-press-scale: 0.97;        /* escala al pulsar (feedback breve, vale en táctil) */
 }
 
 /* Ejemplo SIN Ionic (descomenta y pon tu marca):
@@ -39,3 +43,28 @@
   --ok-border: rgba(250, 250, 250, 0.14);
 }
 */
+
+/* ── Overlay estrecho estilo "menú web" ──────────────────────────────────────
+ * Los overlays de Ionic (ion-popover / ion-menu / ion-modal) son anchos por
+ * defecto. Aplica esta clase con su `css-class`/`cssClass` (o directamente al
+ * elemento) para que en ESCRITORIO tengan un ancho máximo acorde a un menú web;
+ * en MÓVIL se dejan al ancho nativo de Ionic.
+ *   <ion-popover css-class="ok-overlay"> …  |  popover.cssClass = 'ok-overlay'
+ */
+.ok-overlay {
+  --width: auto;
+  --max-width: var(--ok-overlay-max, 380px);
+  /* También aplica a ion-modal / ion-select interface="modal" en ESCRITORIO:
+   * tamaño auto y acotado (menú web), no el modal a pantalla completa de Ionic. */
+  --height: auto;
+  --max-height: 80vh;
+  --border-radius: 14px;
+}
+@media (max-width: 768px) {
+  .ok-overlay {
+    /* En MÓVIL se deja al comportamiento nativo de Ionic (ancho completo). */
+    --width: 100%;
+    --max-width: 100%;
+    --max-height: 80vh;
+  }
+}

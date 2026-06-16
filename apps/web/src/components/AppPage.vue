@@ -19,7 +19,7 @@
 -->
 <template>
   <ion-page>
-    <AppTopbar :title="title" :back-href="backHref">
+    <AppTopbar :title="title" :back-href="backHref" :chrome="chrome">
       <template v-if="$slots.actions" #actions>
         <slot name="actions" />
       </template>
@@ -42,5 +42,7 @@ defineProps<{
   title: string;
   /** Href de fallback del botón Back; si se pasa, AppTopbar muestra el Back (vista de detalle). */
   backHref?: string;
+  /** Controles de chrome del shell que pide la vista activa (Nivel 1, ADR-0048); se reenvía a AppTopbar. */
+  chrome?: string[];
 }>();
 </script>

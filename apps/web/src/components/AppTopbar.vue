@@ -46,6 +46,19 @@
         <!-- Acciones propias de la vista (a la izquierda de los controles globales). -->
         <slot name="actions" />
 
+        <!-- Chrome del shell pedido por la vista activa (Nivel 1, ADR-0048). Fullscreen: la vista
+             del módulo lo OPTA-IN con `navigation[].chrome: ["fullscreen"]`; el botón y su lógica
+             son del SHELL (Fullscreen API), no del módulo (respeta ADR-0022). -->
+        <ion-button
+          v-if="showFullscreen"
+          fill="clear"
+          :aria-label="isFullscreen ? t('topbar.exitFullscreen') : t('topbar.fullscreen')"
+          :title="isFullscreen ? t('topbar.exitFullscreen') : t('topbar.fullscreen')"
+          @click="toggleFullscreen"
+        >
+          <HubIcon slot="icon-only" :name="isFullscreen ? 'contract-outline' : 'expand-outline'" />
+        </ion-button>
+
         <!-- Apps (rejilla estilo Google): acceso rápido a los módulos instalados desde cualquier
              pantalla. ok-app-launcher (OutfitKit) abre una hoja inferior con la rejilla de módulos
              + enlace a la tienda. Los módulos NO viven en el sidebar; se entra por aquí o por el
@@ -120,6 +133,7 @@ import HubIcon from './HubIcon.vue';
 import { user } from '../lib/session';
 import { isDark, toggleTheme } from '../lib/theme';
 import { assistantAvailable, toggleAssistant, notificationCount, isLoading, railCollapsed } from '../lib/shell';
+import { isFullscreen, fullscreenSupported, toggleFullscreen } from '../lib/fullscreen';
 import { moduleNav } from '../lib/nav';
 import { resolveIcon } from '../lib/icons';
 import { PROFILE_ROUTE } from '../lib/routes';
@@ -137,12 +151,23 @@ const props = defineProps<{
   title: string;
   /** Href de fallback del botón Back. Si se pasa, la vista es de detalle y muestra el Back. */
   backHref?: string;
+  /**
+   * Controles de chrome del shell que pide la vista activa (Nivel 1, ADR-0048). Hoy: `"fullscreen"`.
+   * Lo pasa la vista (p. ej. ModuleView lee `navigation[].chrome` de la pestaña activa).
+   */
+  chrome?: string[];
 }>();
 
 const { t } = useI18n();
 const router = useRouter();
 
 const backHref = computed<string | undefined>(() => props.backHref);
+
+// Botón de fullscreen: solo si la vista lo pide (`chrome` incluye "fullscreen") y el navegador
+// soporta la Fullscreen API. La lógica de entrar/salir vive en lib/fullscreen (chrome del shell).
+const showFullscreen = computed<boolean>(
+  () => (props.chrome?.includes('fullscreen') ?? false) && fullscreenSupported(),
+);
 
 // Rejilla de apps para ok-app-launcher: un tile por módulo instalado + la Tienda al final.
 // El icono se PRE-RESUELVE a SVG horneado (resolveIcon, offline/CSP); el launcher lo detecta como

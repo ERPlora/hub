@@ -1,169 +1,114 @@
+<!--
+  MarketplacePage — tienda de módulos del Hub.
+
+  TODO va dentro de `ok-data-table`: vista de TARJETAS por defecto (cada fila se pinta como
+  `ok-product-card`, la misma tarjeta del marketplace público del Cloud), con selección múltiple,
+  búsqueda, filtros por columna (categoría = multiselect, precio) y paginación. Dos pestañas:
+    · Mis módulos → instalados en el RUNTIME (activos + inactivos), acciones activar/desactivar/
+      desinstalar; filtro de estado por la columna Estado.
+    · Catálogo    → todos los módulos del Cloud; acción Instalar; filtro por categoría y precio.
+-->
 <template>
   <AppPage :title="t('nav.marketplace')">
-      <h2 class="text-lg font-semibold mb-3">{{ tabTitle }}</h2>
-
-      <div v-if="loading" class="flex justify-center py-10">
+    <div class="fill">
+      <div v-if="loading" class="grid place-items-center h-full">
         <ion-spinner name="dots" />
       </div>
 
-      <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida -->
-      <template v-else-if="tab === 'mine'">
-        <ion-list v-if="installedModules.length > 0" lines="full">
-          <ion-item v-for="m in installedModules" :key="m.id">
-            <HubIcon
-              slot="start"
-              :name="iconForModule(m.id, '')"
-              class="text-[color:var(--ion-color-primary)]"
-            />
-            <ion-label>
-              <h2 class="text-base font-medium">{{ m.name }}</h2>
-              <p class="text-sm">
-                v{{ m.version }} ·
-                <ion-text :color="m.status === 'active' ? 'success' : 'medium'">
-                  {{ m.status === 'active' ? 'Activo' : 'Inactivo' }}
-                </ion-text>
-              </p>
-            </ion-label>
-            <ion-button slot="end" fill="clear" size="small" @click="toggleModule(m)">
-              {{ m.status === 'active' ? 'Desactivar' : 'Activar' }}
-            </ion-button>
-            <ion-button slot="end" fill="clear" size="small" color="danger" @click="removeModule(m)">
-              Desinstalar
-            </ion-button>
-          </ion-item>
-        </ion-list>
-        <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
-          <HubIcon name="cube-outline" style="font-size: 2.5rem;" />
-          <p>No tienes módulos instalados</p>
-        </div>
-      </template>
+      <ok-data-table
+        v-show="!loading && tab === 'mine'"
+        ref="mineTable"
+        fill
+        selectable
+        :views="['cards', 'table']"
+        :columns="installedColumns"
+        :rows="installedRows"
+        :renderCard="renderInstalledCard"
+        :searchKeys="['name', 'id']"
+        :actions="installedActions"
+        search-placeholder="Buscar módulo…"
+        page-size="12"
+        empty-message="No tienes módulos instalados"
+      ></ok-data-table>
 
-      <template v-else-if="filteredModules.length > 0">
-        <!-- Vista tarjetas (catálogo / pago) -->
-        <ion-grid>
-          <ion-row>
-            <ion-col
-              v-for="mod in filteredModules"
-              :key="mod.id"
-              size="12"
-              size-sm="6"
-              size-lg="4"
-            >
-              <ion-card class="h-full m-0">
-                <ion-card-header>
-                  <ion-card-title class="flex items-center gap-2 text-base">
-                    <HubIcon
-                      :name="iconForModule(mod.id, mod.cat)"
-                      class="shrink-0 text-[color:var(--ion-color-primary)]"
-                      style="font-size: 1.15rem;"
-                    />
-                    <span class="truncate">{{ mod.name }}</span>
-                  </ion-card-title>
-                </ion-card-header>
-                <ion-card-content class="flex flex-col gap-2">
-                  <ion-badge color="light">{{ mod.cat }}</ion-badge>
-                  <p class="text-sm text-[color:var(--ion-color-medium)]">{{ mod.desc }}</p>
-                  <div class="flex items-center justify-between mt-2">
-                    <ion-badge :color="mod.price === 'Gratis' ? 'success' : 'medium'">
-                      {{ mod.price }}
-                    </ion-badge>
-                    <ion-button
-                      v-if="mod.installed"
-                      fill="outline"
-                      size="small"
-                      disabled
-                    >
-                      Instalado
-                    </ion-button>
-                    <ion-button
-                      v-else
-                      size="small"
-                      @click="installModule(mod)"
-                    >
-                      Instalar
-                    </ion-button>
-                  </div>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
-          </ion-row>
-        </ion-grid>
-      </template>
+      <ok-data-table
+        v-show="!loading && tab === 'catalog'"
+        ref="catalogTable"
+        fill
+        selectable
+        :views="['cards', 'table']"
+        :columns="catalogColumns"
+        :rows="catalogRows"
+        :renderCard="renderCatalogCard"
+        :searchKeys="['name', 'desc', 'cat']"
+        :actions="catalogActions"
+        search-placeholder="Buscar módulo…"
+        page-size="12"
+        empty-message="Sin módulos"
+      ></ok-data-table>
+    </div>
 
-      <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
-        <HubIcon name="cube-outline" style="font-size: 2.5rem;" />
-        <p>Sin módulos</p>
-      </div>
+    <ion-toast
+      :is-open="toastOpen"
+      :message="toastMsg"
+      :color="toastColor"
+      :duration="2500"
+      @did-dismiss="toastOpen = false"
+    />
 
-      <!-- Toast simple (Ionic IonToast no requiere importaciones extra en el template) -->
-      <ion-toast
-        :is-open="toastOpen"
-        :message="toastMsg"
-        :color="toastColor"
-        :duration="2500"
-        @did-dismiss="toastOpen = false"
-      />
     <!-- Tabs en footer -->
     <template #footer>
       <ion-footer class="ion-no-border">
-      <ion-toolbar>
-        <ion-segment :value="tab" @ion-change="onTabChange">
-          <ion-segment-button value="mine">
-            <HubIcon name="cube-outline" />
-            <ion-label>Mis módulos</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="all">
-            <HubIcon name="storefront-outline" />
-            <ion-label>Catálogo</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="paid">
-            <HubIcon name="wallet-outline" />
-            <ion-label>Pago</ion-label>
-          </ion-segment-button>
-        </ion-segment>
-      </ion-toolbar>
+        <ion-toolbar>
+          <ion-segment :value="tab" @ion-change="onTabChange">
+            <ion-segment-button value="mine">
+              <HubIcon name="cube-outline" />
+              <ion-label>Mis módulos</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="catalog">
+              <HubIcon name="storefront-outline" />
+              <ion-label>Catálogo</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+        </ion-toolbar>
       </ion-footer>
     </template>
   </AppPage>
 </template>
 
 <script setup lang="ts">
-import { inject, ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { inject, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
-  IonToolbar,
-  IonFooter, IonSegment, IonSegmentButton, IonLabel,  IonBadge,
-  IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSpinner,
-  IonGrid, IonRow, IonCol, IonToast, IonList, IonItem, IonText
+  IonToolbar, IonFooter, IonSegment, IonSegmentButton, IonLabel, IonSpinner, IonToast,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
-
-const { t } = useI18n();
+import { resolveIcon } from '../lib/icons';
 import { cloudMarketplaceModules, type CloudMarketplaceModule } from '../lib/cloud';
 import { config } from '../lib/config';
 import {
   clientInjectionKey, getClient, requestInstall,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
-  type InstalledModule
+  type InstalledModule,
 } from '../lib/runtime';
 import { refreshModuleNav } from '../lib/nav';
 
-// --- Tipos ---
-interface Mod {
-  id: string;
-  name: string;
-  desc: string;
-  price: string;
-  installed: boolean;
-  cat: string;
-  /** Versión a instalar; si el Cloud no la expone usamos 'latest' en el request-install. */
-  version?: string;
+const { t } = useI18n();
+
+// ── Tipos locales de ok-data-table (OutfitKit no emite .d.ts consumibles aquí) ──────────────────
+type Row = Record<string, unknown>;
+interface DataTableColumn {
+  key: string; header: string; align?: 'left' | 'right' | 'center';
+  filterable?: boolean; filterType?: 'text' | 'select' | 'multiselect' | 'number' | 'date' | 'range' | 'daterange';
+  format?: (row: Row) => string; render?: (row: Row) => Node | string;
 }
+interface DataTableAction { id: string; label: string; icon?: string; color?: string }
 
-type MarketplaceTab = 'mine' | 'all' | 'paid';
+interface Mod { id: string; name: string; desc: string; price: string; installed: boolean; cat: string; version?: string }
+type MarketplaceTab = 'mine' | 'catalog';
 
-// --- Datos demo (igual que el original React) ---
+// --- Datos demo (fallback sin Cloud) ---
 const MODULES_DEMO: Mod[] = [
   { id: 'inventory', name: 'Inventario', desc: 'Productos, stock y movimientos', price: 'Gratis', installed: true, cat: 'Operación' },
   { id: 'pos', name: 'TPV / POS', desc: 'Punto de venta y caja', price: 'Gratis', installed: true, cat: 'Ventas' },
@@ -191,79 +136,104 @@ function iconForModule(id: string, category: string): string {
   if (key.includes('client') || key.includes('crm')) return 'people-outline';
   if (key.includes('fact') || key.includes('invoice')) return 'document-text-outline';
   if (key.includes('env') || key.includes('courier') || key.includes('log')) return 'send-outline';
-  if (key.includes('reserva') || key.includes('agenda') || key.includes('appointment')) return 'calendar-outline';
+  if (key.includes('reserva') || key.includes('agenda') || key.includes('appointment') || key.includes('booking')) return 'calendar-outline';
   if (key.includes('message') || key.includes('whatsapp') || key.includes('comun')) return 'chatbubble-outline';
   if (key.includes('analytic') || key.includes('bi')) return 'bar-chart-outline';
   return 'cube-outline';
 }
-
 function toViewModule(m: CloudMarketplaceModule): Mod {
-  return {
-    id: m.id,
-    name: m.name,
-    desc: m.description,
-    price: m.priceLabel || 'Consultar',
-    installed: m.installed,
-    cat: m.category
-  };
+  return { id: m.id, name: m.name, desc: m.description, price: m.priceLabel || 'Consultar', installed: m.installed, cat: m.category };
+}
+function badgeCell(text: string, tone: 'success' | 'medium' | 'primary' | 'warning' | 'danger'): Node {
+  const span = document.createElement('span');
+  span.textContent = text;
+  span.style.cssText =
+    'display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;' +
+    `background:rgba(var(--ion-color-${tone}-rgb), 0.14);color:var(--ion-color-${tone}-shade, var(--ion-color-${tone}))`;
+  return span;
 }
 
-const filteredModules = computed<Mod[]>(() => {
-  if (tab.value === 'mine') return modules.value.filter((m) => m.installed);
-  if (tab.value === 'paid') return modules.value.filter((m) => m.price !== 'Gratis');
-  return modules.value;
-});
+// ── renderCard: cada fila → ok-product-card (la tarjeta del marketplace del Cloud). El icono va por
+//    el slot (SVG horneado offline; el attr `icon` de ok-product-card tira de api.iconify = red/CSP). ─
+function productCardEl(opts: { id: string; name: string; cat: string; desc?: string; price?: string; badge?: string }): HTMLElement {
+  const c = document.createElement('ok-product-card');
+  if (opts.cat) c.setAttribute('category', opts.cat);
+  c.setAttribute('name', opts.name);
+  if (opts.badge) c.setAttribute('badge', opts.badge);
+  if (opts.price) c.setAttribute('price', opts.price);
+  // Transparente + sin borde y a sangre: la propia `rcard` de la tabla aporta el fondo/selección.
+  c.style.cssText = '--border:transparent;--surface:transparent;margin:-0.6rem -0.85rem';
+  const ic = document.createElement('ion-icon');
+  ic.setAttribute('slot', 'icon');
+  (ic as HTMLElement & { icon?: string }).icon = resolveIcon(iconForModule(opts.id, opts.cat));
+  ic.style.fontSize = '1.2rem';
+  c.appendChild(ic);
+  if (opts.desc) c.appendChild(document.createTextNode(opts.desc));
+  return c;
+}
+function renderCatalogCard(row: Row): Node {
+  const m = row as unknown as Mod;
+  const badge = m.installed ? 'Instalado' : m.price !== 'Gratis' ? 'Premium' : undefined;
+  return productCardEl({ id: m.id, name: m.name, cat: m.cat, desc: m.desc, price: m.price, badge });
+}
+function renderInstalledCard(row: Row): Node {
+  const m = row as unknown as InstalledModule;
+  return productCardEl({
+    id: m.id, name: m.name, cat: 'Instalado',
+    price: `v${m.version}`, badge: m.status === 'active' ? 'Activo' : 'Inactivo',
+  });
+}
 
-const tabTitle = computed<string>(() => {
-  if (tab.value === 'mine') return 'Mis módulos';
-  if (tab.value === 'paid') return 'Módulos de pago';
-  return 'Catálogo';
-});
+// --- Columnas / acciones (vista tabla + búsqueda/filtros/CSV) ---
+const installedColumns: DataTableColumn[] = [
+  { key: 'name', header: 'Módulo' },
+  { key: 'version', header: 'Versión', format: (r) => `v${String(r.version ?? '—')}` },
+  {
+    key: 'status', header: 'Estado', filterable: true, filterType: 'select',
+    render: (r) => badgeCell(r.status === 'active' ? 'Activo' : 'Inactivo', r.status === 'active' ? 'success' : 'medium'),
+  },
+];
+const installedActions: DataTableAction[] = [
+  { id: 'toggle', label: 'Activar / Desactivar', icon: 'power' },
+  { id: 'uninstall', label: 'Desinstalar', icon: 'trash', color: 'danger' },
+];
+const installedRows = computed<Row[]>(() => installedModules.value as unknown as Row[]);
+
+const catalogColumns: DataTableColumn[] = [
+  { key: 'name', header: 'Módulo' },
+  { key: 'cat', header: 'Categoría', filterable: true, filterType: 'multiselect', render: (r) => badgeCell(String(r.cat), 'primary') },
+  { key: 'desc', header: 'Descripción', format: (r) => String(r.desc ?? '') },
+  { key: 'price', header: 'Precio', filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price), r.price === 'Gratis' ? 'success' : 'medium') },
+  { key: 'installed', header: 'Instalado', align: 'center', render: (r) => (r.installed ? badgeCell('Sí', 'success') : document.createTextNode('—')) },
+];
+const catalogActions: DataTableAction[] = [
+  { id: 'install', label: 'Instalar', icon: 'download-outline' },
+];
+const catalogRows = computed<Row[]>(() => modules.value as unknown as Row[]);
 
 // --- Handlers ---
 function onTabChange(ev: Event): void {
-  const detail = (ev as CustomEvent<{ value: string }>).detail;
-  if (detail.value === 'mine' || detail.value === 'all' || detail.value === 'paid') {
-    tab.value = detail.value;
-  }
+  const v = (ev as CustomEvent<{ value: string }>).detail.value;
+  if (v === 'mine' || v === 'catalog') tab.value = v;
 }
-
-// Cliente del runtime (provide en main.ts; fallback al singleton) para escuchar `module.installed`.
-const client = inject(clientInjectionKey) ?? getClient();
-let unsubInstalled: (() => void) | null = null;
-
-async function installModule(mod: Mod): Promise<void> {
-  toastMsg.value = `Instalando ${mod.name}…`;
-  toastColor.value = 'primary';
-  toastOpen.value = true;
-  try {
-    // Pide la instalación al runtime: descarga el zip firmado (marketplace Cloud), verifica
-    // SHA256 y aplica migraciones. La confirmación llega por el evento WS `module.installed`.
-    // Default de versión: 'latest' (el runtime resuelve la última publicada). flag → humano.
-    await requestInstall(mod.id, mod.version ?? 'latest');
-  } catch {
-    toastMsg.value = `No se pudo iniciar la instalación de ${mod.name}.`;
-    toastColor.value = 'danger';
-    toastOpen.value = true;
-  }
-}
-
-/** Carga los módulos instalados desde el RUNTIME (fuente de verdad local, no el catálogo Cloud). */
-async function loadInstalled(): Promise<void> {
-  try {
-    installedModules.value = await listInstalledModules();
-  } catch {
-    installedModules.value = [];
-  }
-}
-
 function notify(msg: string, color: 'primary' | 'success' | 'danger'): void {
   toastMsg.value = msg;
   toastColor.value = color;
   toastOpen.value = true;
 }
 
-/** Activa o desactiva un módulo (hot-plug) y refresca la lista + la nav del shell. */
+const client = inject(clientInjectionKey) ?? getClient();
+let unsubInstalled: (() => void) | null = null;
+
+async function installModule(mod: Mod): Promise<void> {
+  if (mod.installed) { notify(`${mod.name} ya está instalado.`, 'primary'); return; }
+  notify(`Instalando ${mod.name}…`, 'primary');
+  try {
+    await requestInstall(mod.id, mod.version ?? 'latest');
+  } catch {
+    notify(`No se pudo iniciar la instalación de ${mod.name}.`, 'danger');
+  }
+}
 async function toggleModule(m: InstalledModule): Promise<void> {
   try {
     if (m.status === 'active') {
@@ -279,8 +249,6 @@ async function toggleModule(m: InstalledModule): Promise<void> {
     notify(`No se pudo cambiar el estado de ${m.name}.`, 'danger');
   }
 }
-
-/** Desinstala un módulo y refresca la lista + la nav del shell. */
 async function removeModule(m: InstalledModule): Promise<void> {
   try {
     await uninstallModule(m.id);
@@ -292,7 +260,28 @@ async function removeModule(m: InstalledModule): Promise<void> {
   }
 }
 
-/** Recarga el catálogo (estados de instalado) desde el Cloud, con fallback demo. */
+// `rowAction` (camelCase) → ref + addEventListener (igual que /employees).
+const mineTable = ref<(HTMLElement & { viewMode?: string }) | null>(null);
+const catalogTable = ref<(HTMLElement & { viewMode?: string }) | null>(null);
+function handleMineAction(e: Event): void {
+  const { actionId, row } = (e as CustomEvent<{ actionId: string; row: InstalledModule }>).detail;
+  if (actionId === 'toggle') void toggleModule(row);
+  else if (actionId === 'uninstall') void removeModule(row);
+}
+function handleCatalogAction(e: Event): void {
+  const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Mod }>).detail;
+  if (actionId === 'install') void installModule(row);
+}
+// Vista por defecto = TARJETAS. ok-data-table arranca en 'table'; fijamos su viewMode reactivo al
+// montar (consumer-side, hasta que el componente exponga un prop `default-view`).
+function defaultToCards(el: (HTMLElement & { viewMode?: string }) | null): void {
+  if (el) el.viewMode = 'cards';
+}
+
+// --- Carga de datos ---
+async function loadInstalled(): Promise<void> {
+  try { installedModules.value = await listInstalledModules(); } catch { installedModules.value = []; }
+}
 async function loadCatalog(): Promise<void> {
   loading.value = true;
   try {
@@ -305,11 +294,15 @@ async function loadCatalog(): Promise<void> {
   }
 }
 
-// --- Fetch + suscripción al evento de instalación al montar ---
 onMounted(() => {
   void loadCatalog();
   void loadInstalled();
-  // Cuando el runtime termina de instalar un módulo, refrescamos catálogo, instalados y nav.
+  void nextTick(() => {
+    mineTable.value?.addEventListener('rowAction', handleMineAction);
+    catalogTable.value?.addEventListener('rowAction', handleCatalogAction);
+    defaultToCards(mineTable.value);
+    defaultToCards(catalogTable.value);
+  });
   unsubInstalled = client.on('module.installed', (payload) => {
     const id = (payload as { module_id?: string } | null)?.module_id;
     const found = modules.value.find((m) => m.id === id);
@@ -320,7 +313,24 @@ onMounted(() => {
   });
 });
 
+// Las tablas se montan con v-show; al cambiar de pestaña re-enganchamos y fijamos la vista cards.
+watch(tab, async () => {
+  await nextTick();
+  mineTable.value?.removeEventListener('rowAction', handleMineAction);
+  catalogTable.value?.removeEventListener('rowAction', handleCatalogAction);
+  mineTable.value?.addEventListener('rowAction', handleMineAction);
+  catalogTable.value?.addEventListener('rowAction', handleCatalogAction);
+  defaultToCards(mineTable.value);
+  defaultToCards(catalogTable.value);
+});
+
 onBeforeUnmount(() => {
   unsubInstalled?.();
+  mineTable.value?.removeEventListener('rowAction', handleMineAction);
+  catalogTable.value?.removeEventListener('rowAction', handleCatalogAction);
 });
 </script>
+
+<style scoped>
+.fill { height: 100%; }
+</style>

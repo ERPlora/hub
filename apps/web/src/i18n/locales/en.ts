@@ -13,6 +13,24 @@ export default {
     system: 'System',
     settings: 'Settings',
   },
+  dashboard: {
+    heading: 'Overview',
+    today: 'Today',
+    myPanel: 'My panel',
+    tabWidgets: 'Widgets',
+    apps: 'Apps',
+    activity: 'Activity',
+    addModule: 'Add module',
+    loadingModules: 'Loading modules…',
+    board: {
+      customize: 'Customize panel',
+      close: 'Close',
+      presets: 'Start from a preset',
+      active: 'Active · drag to reorder',
+      available: 'Available',
+      empty: 'Empty panel. Tap ⋮ to add widgets.',
+    },
+  },
   topbar: {
     back: 'Back',
     apps: 'Apps',
@@ -25,6 +43,8 @@ export default {
     menu: 'Open menu',
     collapseMenu: 'Collapse menu',
     expandMenu: 'Expand menu',
+    fullscreen: 'Fullscreen',
+    exitFullscreen: 'Exit fullscreen',
   },
   sidebar: {
     profile: 'Profile',

@@ -14,6 +14,24 @@ export default {
     system: 'Sistema',
     settings: 'Ajustes',
   },
+  dashboard: {
+    heading: 'Vista general',
+    today: 'Hoy',
+    myPanel: 'Mi panel',
+    tabWidgets: 'Widgets',
+    apps: 'Aplicaciones',
+    activity: 'Actividad',
+    addModule: 'Añadir módulo',
+    loadingModules: 'Cargando módulos…',
+    board: {
+      customize: 'Personalizar panel',
+      close: 'Cerrar',
+      presets: 'Empezar con un preset',
+      active: 'Activos · arrastra para ordenar',
+      available: 'Disponibles',
+      empty: 'Panel vacío. Pulsa ⋮ para añadir widgets.',
+    },
+  },
   topbar: {
     back: 'Atrás',
     apps: 'Aplicaciones',
@@ -26,6 +44,8 @@ export default {
     menu: 'Abrir menú',
     collapseMenu: 'Colapsar menú',
     expandMenu: 'Expandir menú',
+    fullscreen: 'Pantalla completa',
+    exitFullscreen: 'Salir de pantalla completa',
   },
   sidebar: {
     profile: 'Perfil',

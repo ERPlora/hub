@@ -124,9 +124,18 @@ pub struct Nav {
     #[serde(default)]
     pub icon: Option<String>,
     pub component: String,
-    /// Acciones de topbar de esta pestaña: el shell las pinta en `slot="end"` y al pulsar
-    /// reenvía `module-action` al Web Component montado. El manifest declara el botón;
-    /// el comportamiento vive en el componente del módulo.
+    /// Controles de **chrome del shell** que esta vista pide habilitar en la topbar (Nivel 1,
+    /// ADR-0048). El módulo solo OPTA-IN por nombre (p. ej. `["fullscreen"]`); el botón y su
+    /// lógica los pone y maneja el SHELL — no es un botón del módulo, así que respeta ADR-0022
+    /// ("el módulo es contenido, no chrome"). Acciones propias del módulo van por
+    /// `provides_slots` al slot `shell.topbar:<scope>` (Nivel 2, ADR-0043), no por aquí.
+    /// Hoy soportado por el shell: `fullscreen`. Follow-up: re-servir en `GET /api/navigation`
+    /// (hoy el shell lo lee del `module.json` crudo, igual que `provides_slots`).
+    #[serde(default)]
+    pub chrome: Vec<String>,
+    /// (Reservado, sin uso) Acciones de topbar declaradas por el módulo. Rechazado por ADR-0022
+    /// y superado por el modelo de dos niveles de ADR-0048 (`chrome` + slot `shell.topbar:*`).
+    /// Se mantiene el campo para no romper el parseo de manifests antiguos que lo declaren.
     #[serde(default)]
     pub actions: Vec<NavAction>,
 }

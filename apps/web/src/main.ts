@@ -4,7 +4,13 @@ import { addIcons } from 'ionicons';
 import {
   pencil, trash, add, close, chevronBack, chevronForward,
   listOutline, gridOutline, funnelOutline, downloadOutline, cloudUploadOutline,
-  appsOutline, closeOutline,
+  appsOutline, closeOutline, ellipsisVertical, power,
+  // Iconos que pintan POR NOMBRE los widgets del dashboard (ok-kpi/ok-timeline/ok-inline-feedback
+  // usan ion-icon por dentro). Tendencia de ok-kpi: trending-up/down/remove.
+  trendingUp, trendingDown, remove,
+  trendingUpOutline, receiptOutline, peopleOutline, alertCircleOutline,
+  walletOutline, barChartOutline,
+  bagHandleOutline, checkmarkOutline, warningOutline, personOutline, fingerPrintOutline,
 } from 'ionicons/icons';
 
 import App from './App.vue';
@@ -27,6 +33,19 @@ addIcons({
   'download-outline': downloadOutline, 'cloud-upload-outline': cloudUploadOutline,
   // Trigger (rejilla) y cerrar de ok-app-launcher (OutfitKit), por NOMBRE.
   'apps-outline': appsOutline, 'close-outline': closeOutline,
+  // ⋮ del ok-widget-board (botón "Personalizar panel") + menú overflow de ok-data-table.
+  'ellipsis-vertical': ellipsisVertical,
+  // Acción «Activar / Desactivar» del marketplace (menú de fila de ok-data-table).
+  power,
+  // Flechas de tendencia de ok-kpi.
+  'trending-up': trendingUp, 'trending-down': trendingDown, remove,
+  // Iconos de label de los KPIs y de las celdas del dashboard (ok-kpi/ok-timeline/feedback).
+  'trending-up-outline': trendingUpOutline, 'receipt-outline': receiptOutline,
+  'people-outline': peopleOutline, 'alert-circle-outline': alertCircleOutline,
+  'wallet-outline': walletOutline, 'bar-chart-outline': barChartOutline,
+  'bag-handle-outline': bagHandleOutline, 'checkmark-outline': checkmarkOutline,
+  'warning-outline': warningOutline, 'person-outline': personOutline,
+  'finger-print-outline': fingerPrintOutline,
 });
 
 // CSS base de Ionic (core + utilidades). Dark mode por clase (.ion-palette-dark).
@@ -50,6 +69,17 @@ import '@erplora/outfitkit/ok-stat';
 import '@erplora/outfitkit/ok-sparkline';
 import '@erplora/outfitkit/ok-status-pill';
 import '@erplora/outfitkit/ok-empty-state';
+// Dashboard del Hub: panel de widgets configurable (ok-widget-board) + widgets que monta dentro
+// (ok-chart, ok-bar-list, ok-timeline) y cabecera de página (ok-page-header). ok-kpi/ok-sparkline
+// /ok-status-pill ya están arriba; ok-inline-feedback se usa para avisos en el panel.
+import '@erplora/outfitkit/ok-widget-board';
+import '@erplora/outfitkit/ok-chart';
+import '@erplora/outfitkit/ok-bar-list';
+import '@erplora/outfitkit/ok-timeline';
+import '@erplora/outfitkit/ok-page-header';
+import '@erplora/outfitkit/ok-inline-feedback';
+// Tarjeta de catálogo del marketplace (misma que el marketplace público del Cloud).
+import '@erplora/outfitkit/ok-product-card';
 // Gestor de archivos (Drive-like) de la carpeta media del Hub — pantalla /files.
 import '@erplora/outfitkit/ok-file-manager';
 // Los ok-* asumen que el host registró los ion-* que usan por dentro (searchbar/select/overlays).

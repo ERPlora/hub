@@ -42,8 +42,19 @@ export class OkFooter extends LitElement {
       max-width: var(--max-width);
       margin-inline: auto;
     }
-    ::slotted(a) { color: var(--color-muted); text-decoration: none; }
-    ::slotted(a:hover) { color: var(--primary-color); }
+    ::slotted(a) {
+      color: var(--color-muted);
+      text-decoration: none;
+      /* Micro-interacción: transición sutil en color al hacer hover. */
+      transition: background-color var(--ok-transition, 150ms ease), color var(--ok-transition, 150ms ease), border-color var(--ok-transition, 150ms ease), box-shadow var(--ok-transition, 150ms ease), transform 120ms ease;
+    }
+    /* Hover de enlaces solo con ratón (evita estados pegados en táctil). */
+    @media (hover: hover) {
+      ::slotted(a:hover) { color: var(--primary-color); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      ::slotted(a):active { transform: none; }
+    }
   `;
 
   render(): unknown {

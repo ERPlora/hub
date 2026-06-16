@@ -23,11 +23,6 @@
         column-picker
       ></ok-data-table>
 
-      <!-- Usuarios: placeholder (igual que el original) -->
-      <div v-show="tab === 'users'" class="grid place-items-center h-full text-center opacity-60">
-        El acceso de usuarios (PIN, cuentas) se gestionará aquí.
-      </div>
-
       <!-- Roles: segunda tabla -->
       <ok-data-table
         v-show="tab === 'roles'"
@@ -56,10 +51,6 @@
         >
           <ion-segment-button value="staff">
             <HubIcon name="people-outline" />
-            <ion-label>Staff</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="users">
-            <HubIcon name="person-circle-outline" />
             <ion-label>Usuarios</ion-label>
           </ion-segment-button>
           <ion-segment-button value="roles">
@@ -100,7 +91,7 @@ interface DataTableColumn {
 interface DataTableAction { id: string; label: string; icon?: string; color?: string }
 interface DataTablePrimaryAction { label: string; icon?: string }
 
-type EmployeeTab = 'staff' | 'users' | 'roles';
+type EmployeeTab = 'staff' | 'roles';
 
 const router = useRouter();
 const tab = ref<EmployeeTab>('staff');

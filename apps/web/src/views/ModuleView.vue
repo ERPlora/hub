@@ -1,5 +1,5 @@
 <template>
-  <AppPage :title="moduleName">
+  <AppPage :title="moduleName" :chrome="activeChrome">
     <div v-if="status === 'loading'" class="flex items-center gap-2 py-8 opacity-70">
       <ion-spinner name="crescent" /> Cargando módulo…
     </div>
@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onMounted, ref, watch } from 'vue';
+import { computed, inject, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar,
@@ -52,6 +52,14 @@ const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
 const tabs = ref<MenuEntry[]>([]);
 const activeNavId = ref<string>('');
+
+/**
+ * Chrome del shell (ADR-0048) que pide la pestaña activa (`navigation[].chrome`, p. ej.
+ * `["fullscreen"]`). Se reenvía a AppPage → AppTopbar, que pinta el control (lógica del shell).
+ */
+const activeChrome = computed<string[]>(
+  () => tabs.value.find((t) => t.nav.id === activeNavId.value)?.nav.chrome ?? [],
+);
 
 function params(): { moduleId: string; navId: string } {
   return {

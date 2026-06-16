@@ -70,6 +70,13 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$",
             "description": "Nombre del custom element (Web Component) a montar."
+          },
+          "chrome": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["fullscreen"] },
+            "uniqueItems": true,
+            "default": [],
+            "description": "Controles de CHROME del shell que esta vista pide habilitar en la topbar (Nivel 1, ADR-0048). El módulo solo OPTA-IN por nombre; el botón y su lógica los pone y maneja el shell (no es un botón del módulo → respeta ADR-0022). Acciones propias del módulo van por `provides_slots` al slot `shell.topbar:<scope>` (Nivel 2), no aquí. Hoy soportado: `fullscreen` (Fullscreen API sobre el documento)."
           }
         }
       }

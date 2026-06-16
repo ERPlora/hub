@@ -7,6 +7,12 @@ export interface NavigationItem {
   label: string;
   icon?: string;
   component: string; // custom element a montar
+  /**
+   * Controles de CHROME del shell que esta vista pide habilitar en la topbar (Nivel 1, ADR-0048).
+   * El módulo solo opta-in por nombre; el botón y su lógica los pone el SHELL (respeta ADR-0022).
+   * Hoy: `"fullscreen"`. Acciones propias del módulo van por `provides_slots` (Nivel 2), no aquí.
+   */
+  chrome?: string[];
 }
 
 export interface ModuleManifest {
