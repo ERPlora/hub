@@ -10,6 +10,11 @@ target/
 # OS / tmp
 .DS_Store
 
+# Secretos: nunca versionar (cloud_api_token, etc.). Copiar a mano entre máquinas.
+.env
+.env.*
+!.env.example
+
 # Dev: BD SQLite local que el runtime crea en hub/ al arrancarlo desde aquí
 # (server standalone). La app Tauri usa su propia BD en app_data_dir.
 erplora.db
