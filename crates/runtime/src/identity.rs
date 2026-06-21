@@ -62,34 +62,16 @@ fn hash_pin_argon2(pin: &str) -> Result<String> {
     Ok(hash.to_string())
 }
 
-/// Resultado de verificar un PIN contra el hash almacenado.
-enum PinCheck {
-    /// No coincide (o no hay PIN).
-    NoMatch,
-    /// Coincide con el hash argon2id almacenado.
-    Match,
-}
-
-/// Verifica `pin` contra el hash argon2id almacenado.
-fn check_pin(stored: &str, pin: &str) -> PinCheck {
-    if !stored.is_empty() {
-        // Hash PHC argon2id: verificar con argon2.
-        match PasswordHash::new(stored) {
-            Ok(parsed) => {
-                if Argon2::default()
-                    .verify_password(pin.as_bytes(), &parsed)
-                    .is_ok()
-                {
-                    PinCheck::Match
-                } else {
-                    PinCheck::NoMatch
-                }
-            }
-            Err(_) => PinCheck::NoMatch, // hash corrupto → no autenticable
-        }
-    } else {
-        PinCheck::NoMatch
+/// Verifica `pin` contra el hash argon2id almacenado. `true` si coincide. Hash vacío o corrupto
+/// ⇒ `false` (no autenticable).
+fn check_pin(stored: &str, pin: &str) -> bool {
+    if stored.is_empty() {
+        return false;
     }
+    // Hash PHC argon2id: parsear y verificar; si el hash está corrupto, no autenticable.
+    PasswordHash::new(stored)
+        .map(|parsed| Argon2::default().verify_password(pin.as_bytes(), &parsed).is_ok())
+        .unwrap_or(false)
 }
 
 // ── Usuarios ────────────────────────────────────────────────────────────────────────────────
@@ -171,9 +153,8 @@ pub async fn verify_pin(
         )
         .await?;
     for row in &res.rows {
-        match check_pin(row["pin_hash"].as_str().unwrap_or_default(), pin) {
-            PinCheck::Match => return Ok(Some(row_to_user(row))),
-            PinCheck::NoMatch => {}
+        if check_pin(row["pin_hash"].as_str().unwrap_or_default(), pin) {
+            return Ok(Some(row_to_user(row)));
         }
     }
     Ok(None)
@@ -283,53 +264,6 @@ pub async fn delete_session(db: &dyn DatabaseAdapter, token: &str) -> Result<()>
     db.execute("DELETE FROM hub_session WHERE token = :token", &p)
         .await?;
     Ok(())
-}
-
-/// **Refresca la sesión local** (hub#15): si `token` apunta a una sesión válida (no caducada y de
-/// usuario activo), **rota el token opaco** y **extiende la expiración** `ttl_secs` desde ahora,
-/// devolviendo `(nuevo_token, user)`. `None` si la sesión no existe o caducó (el cliente debe
-/// re-loguear). La rotación se hace en una transacción (DELETE viejo + INSERT nuevo) para que no
-/// queden dos tokens vivos para la misma renovación.
-///
-/// Es el refresh de la **sesión server-side local** (token de `hub_session`). El refresh del **JWT
-/// cloud** de usuario es otra cosa: va contra el Cloud (`POST /api/v1/auth/refresh/`,
-/// `cloud_client::CloudClient::refresh`); el interceptor del Hub lo usa al recibir un 401. Aquí solo
-/// tratamos la sesión local que gatea las peticiones al runtime.
-pub async fn refresh_session(
-    db: &dyn DatabaseAdapter,
-    token: &str,
-    ttl_secs: i64,
-) -> Result<Option<(String, HubUser)>> {
-    // Solo refresca si la sesión actual es válida y el usuario sigue activo.
-    let Some(user) = resolve_session(db, token).await? else {
-        return Ok(None);
-    };
-    let new_token = format!("{}{}", new_id(), new_id()).replace('-', "");
-    let expires = (chrono::Utc::now() + chrono::Duration::seconds(ttl_secs)).to_rfc3339();
-
-    let mut del = Params::new();
-    del.insert("token".into(), json!(token));
-
-    let mut ins = Params::new();
-    ins.insert("token".into(), json!(new_token));
-    ins.insert("user_id".into(), json!(user.id));
-    ins.insert("now".into(), json!(now_rfc3339()));
-    ins.insert("expires".into(), json!(expires));
-
-    db.execute_tx(&[
-        (
-            "DELETE FROM hub_session WHERE token = :token".to_string(),
-            del,
-        ),
-        (
-            "INSERT INTO hub_session (token, user_id, created_at, expires_at) \
-              VALUES (:token, :user_id, :now, :expires)"
-                .to_string(),
-            ins,
-        ),
-    ])
-    .await?;
-    Ok(Some((new_token, user)))
 }
 
 // ── Device-trust (§2.9) ───────────────────────────────────────────────────────────────────────
@@ -509,37 +443,6 @@ mod tests {
         let ok = verify_pin(&db, "Eva", "1111").await.unwrap();
         assert!(ok.is_some());
         assert!(verify_pin(&db, "Eva", "2222").await.unwrap().is_none());
-    }
-
-
-    #[tokio::test]
-    async fn session_refresh_rotates_token_and_extends() {
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
-        ensure_tables(&db).await.unwrap();
-        let uid = create_user(&db, "Sam", "9999", "manager", None)
-            .await
-            .unwrap();
-        let token = create_session(&db, &uid, 3600).await.unwrap();
-
-        // Refresh rota el token y resuelve al mismo usuario; el token viejo deja de valer.
-        let (new_token, user) = refresh_session(&db, &token, 3600).await.unwrap().unwrap();
-        assert_eq!(user.id, uid);
-        assert_ne!(new_token, token, "el token se rota");
-        assert!(
-            resolve_session(&db, &token).await.unwrap().is_none(),
-            "el token viejo se invalida"
-        );
-        assert_eq!(
-            resolve_session(&db, &new_token).await.unwrap().unwrap().id,
-            uid
-        );
-
-        // Una sesión caducada no se puede refrescar.
-        let expired = create_session(&db, &uid, -10).await.unwrap();
-        assert!(refresh_session(&db, &expired, 3600)
-            .await
-            .unwrap()
-            .is_none());
     }
 
     #[tokio::test]

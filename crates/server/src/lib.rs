@@ -331,7 +331,6 @@ pub fn app(state: AppState) -> Router {
         .route("/api/auth/pin", post(auth_pin))
         .route("/api/auth/set-pin", post(auth_set_pin))
         .route("/api/auth/cloud", post(auth_cloud))
-        .route("/api/auth/refresh", post(auth_refresh))
         .route("/api/auth/logout", post(auth_logout))
         .route("/api/assistant/chat/stream", post(assistant_chat_stream))
         .route("/ws", get(ws_upgrade))
@@ -922,29 +921,6 @@ async fn auth_cloud(
             }
             mint_session(&rt, user).await
         }
-        Err(e) => err_response(e),
-    }
-}
-
-/// Refresca la sesión **local** del header `X-Hub-Session` (hub#15): rota el token opaco y extiende
-/// la expiración. → `{ok, token, user}` (401 si la sesión no es válida; el cliente debe re-loguear).
-///
-/// NOTA: este es el refresh de la **sesión server-side local** (token de `hub_session`), que es lo
-/// que gatea las peticiones al runtime. El refresh del **JWT cloud** de usuario es distinto y va
-/// contra el Cloud (`POST /api/v1/auth/refresh/`, `cloud_client::CloudClient::refresh`): lo dispara
-/// el interceptor del Hub al recibir un 401, fuera de este endpoint.
-/// TODO(humano): si se decide que el runtime también custodia/rota el JWT cloud (hoy lo lleva el
-/// navegador), añadir aquí un proxy a `CloudClient::refresh` + persistencia del refresh rotado.
-async fn auth_refresh(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let Some(token) = auth::session_token(&headers) else {
-        return unauthorized(auth::AuthError::MissingSession);
-    };
-    let rt = st.runtime.lock().await;
-    match rt.refresh_session(&token, erplora_runtime::identity::DEFAULT_SESSION_TTL_SECS).await {
-        Ok(Some((new_token, user))) => {
-            Json(json!({ "ok": true, "token": new_token, "user": user })).into_response()
-        }
-        Ok(None) => unauthorized(auth::AuthError::Invalid("sesión inválida o caducada".into())),
         Err(e) => err_response(e),
     }
 }

@@ -444,8 +444,6 @@ async function submitEmail(): Promise<void> {
     const redirect = (router.currentRoute.value.query.redirect as string) || '/';
     await router.replace(redirect);
   } catch {
-    // TODO: cablear cloud.ts login real cuando el Cloud esté accesible desde el hub.
-    // Por ahora, en modo demo/sandbox usamos credenciales ficticias para probar el flujo.
     // Fallback demo SOLO con VITE_DEMO=1 (config.demo). En prod (sin la flag) el login falla
     // duro y mostramos el error real — nunca creamos una sesión ficticia.
     if (config.demo) {
@@ -567,7 +565,6 @@ async function onSetupComplete(pin: string): Promise<void> {
       const session = getHubSession();
       try {
         if (session) await runtimeSetPin(pin, session);
-        try { localStorage.setItem('erplora.pin_set', '1'); } catch { /* ignore */ }
         const redirect = (router.currentRoute.value.query.redirect as string) || '/';
         await router.replace(redirect);
       } catch {

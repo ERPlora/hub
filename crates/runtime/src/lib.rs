@@ -328,12 +328,6 @@ impl Runtime {
         identity::delete_session(self.db.as_ref(), token).await
     }
 
-    /// Refresca la sesión local: rota el token opaco y extiende la expiración. `(nuevo_token, user)`
-    /// o `None` si la sesión no es válida (hub#15).
-    pub async fn refresh_session(&self, token: &str, ttl_secs: i64) -> Result<Option<(String, identity::HubUser)>> {
-        identity::refresh_session(self.db.as_ref(), token, ttl_secs).await
-    }
-
     /// Marca un dispositivo como de confianza (tras el primer login online). Idempotente (§2.9).
     pub async fn trust_device(&self, device_id: &str, label: &str) -> Result<()> {
         identity::trust_device(self.db.as_ref(), device_id, label).await

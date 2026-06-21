@@ -18,7 +18,6 @@ export interface LoginResult {
   access: string;
   refresh: string;
   user: CloudUser;
-  firstTime: boolean;
 }
 
 export interface CloudMarketplaceModule {
@@ -362,7 +361,7 @@ export async function cloudLogin(email: string, password: string): Promise<Login
     await loginHeaders(),
   );
   const me = await meRequest(tokens.access);
-  return { access: tokens.access, refresh: tokens.refresh, user: me, firstTime: false };
+  return { access: tokens.access, refresh: tokens.refresh, user: me };
 }
 
 function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudMarketplaceModule {
