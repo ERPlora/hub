@@ -215,3 +215,29 @@ async function onLogout(): Promise<void> {
   await router.replace('/login');
 }
 </script>
+
+<!--
+  CSS GLOBAL (no scoped) del "push" del panel del asistente. La clase `assistant-open` la togglea
+  AssistantDrawer.vue en <html> según `assistantOpen` (lib/shell). En desktop (≥992px, el mismo
+  breakpoint que el ion-split-pane when="lg") reservamos 420px a la derecha del shell: el panel
+  (position:fixed; right:0; width:420px) cae en ese hueco y EMPUJA el contenido (sin scrim). En
+  móvil (<992px) no reservamos nada → el panel overlaya con scrim (ver AssistantDrawer.vue).
+  El ion-split-pane es `position:absolute; inset:0` (right:0), así que padear el <ion-app> NO lo
+  encoge (un hijo inset:0 llena el padding-box). Movemos su borde derecho a 420px directamente.
+-->
+<style>
+@media (min-width: 992px) {
+  /* Encoge el shell entero (menú fijo + contenido flex) moviendo el borde derecho del split-pane a
+     420px → el contenido (flex:1) absorbe la reducción y el panel fijo cae en el hueco. Verificado en
+     QA con Playwright (main_right pasa de 1280→860 en viewport 1280). */
+  html.assistant-open ion-split-pane {
+    inset-inline-end: 420px;
+    transition: inset-inline-end 0.2s ease;
+  }
+}
+@media (min-width: 992px) and (prefers-reduced-motion: reduce) {
+  html.assistant-open ion-split-pane {
+    transition: none;
+  }
+}
+</style>

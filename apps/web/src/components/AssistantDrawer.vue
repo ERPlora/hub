@@ -141,21 +141,40 @@ function stop(): void {
   streaming.value = false;
 }
 
-// Al abrir el drawer, lleva el foco al fondo del hilo.
-watch(assistantOpen, (open) => {
-  if (open) void scrollToBottom();
-});
+// Al abrir el panel, lleva el foco al fondo del hilo + togglea la clase global `assistant-open`
+// en <html>. Esa clase la consume el CSS global de App.vue para EMPUJAR el contenido (push) en
+// desktop (≥992px) reservando 420px a la derecha del shell. En móvil el panel overlaya (no empuja),
+// el CSS no padea nada por debajo del breakpoint. `immediate` para reflejar el estado inicial
+// restaurado desde localStorage en el primer render (si quedó abierto tras recargar).
+watch(
+  assistantOpen,
+  (open) => {
+    document.documentElement.classList.toggle('assistant-open', open);
+    if (open) void scrollToBottom();
+  },
+  { immediate: true }
+);
 
-onBeforeUnmount(() => abort?.());
+onBeforeUnmount(() => {
+  abort?.();
+  // No dejar la clase pegada en <html> si el panel se desmonta (p. ej. al cerrar sesión).
+  document.documentElement.classList.remove('assistant-open');
+});
 </script>
 
 <style scoped>
+/* Scrim: SOLO en móvil (<992px). El panel es overlay y el scrim oscuro clicable cierra. En desktop
+   el panel es push (columna fija que reserva 420px, sin scrim) → se oculta vía media query abajo. */
 .assistant-scrim {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
   z-index: 40;
 }
+/* Panel persistente: columna fija de 420px pegada a la derecha (100% si la pantalla es más estrecha).
+   - Desktop (≥992px): vive dentro del hueco de 420px que el shell reserva (ver App.vue, push), sin scrim.
+   - Móvil (<992px): overlaya sobre el contenido con scrim.
+   En ambos casos: open → translateX(0); cerrado → translateX(100%) (fuera de pantalla). */
 .assistant-drawer {
   position: fixed;
   top: 0;
@@ -173,6 +192,12 @@ onBeforeUnmount(() => abort?.());
 }
 .assistant-drawer[data-open='true'] {
   transform: translateX(0);
+}
+/* Desktop: ocultar el scrim (el panel empuja, no overlaya). */
+@media (min-width: 992px) {
+  .assistant-scrim {
+    display: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .assistant-drawer {

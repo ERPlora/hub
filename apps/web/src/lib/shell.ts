@@ -10,13 +10,38 @@
 //  - assistantAvailable → ¿se muestra el botón del asistente? (capacidad del hub).
 //  - inFlight        → contador de peticiones en vuelo → barra de progreso de la topbar.
 //  - notifications   → STUB del contador de la campana (no hay señal de backend todavía).
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 // ── Rail (menú lateral colapsable) ──────────────────────────────────────────
 export const railCollapsed = ref<boolean>(false);
 
-// ── Drawer del asistente ────────────────────────────────────────────────────
-export const assistantOpen = ref<boolean>(false);
+// ── Panel del asistente ─────────────────────────────────────────────────────
+// El asistente es un PANEL PERSISTENTE del shell (no un overlay que se cierra al navegar):
+// al activarse se queda abierto en TODAS las páginas hasta que el usuario lo cierra. Por ser ref
+// de módulo persiste entre rutas; además lo respaldamos en localStorage para sobrevivir al refresco
+// (paridad con el Cloud). Clave `erplora.assistant.open`.
+const ASSISTANT_OPEN_KEY = 'erplora.assistant.open';
+
+function readAssistantOpen(): boolean {
+  try {
+    return localStorage.getItem(ASSISTANT_OPEN_KEY) === 'true';
+  } catch {
+    // localStorage puede no estar disponible (modo privado, SSR…): degrada a cerrado.
+    return false;
+  }
+}
+
+export const assistantOpen = ref<boolean>(readAssistantOpen());
+
+// Persiste cada cambio del estado abierto en localStorage.
+watch(assistantOpen, (open) => {
+  try {
+    localStorage.setItem(ASSISTANT_OPEN_KEY, open ? 'true' : 'false');
+  } catch {
+    // Ignorar fallos de escritura (cuota/modo privado): el estado en memoria sigue siendo válido.
+  }
+});
+
 export function toggleAssistant(): void {
   assistantOpen.value = !assistantOpen.value;
 }
