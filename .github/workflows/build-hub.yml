@@ -10,13 +10,11 @@
 #                                  del Cloud registra la task def con `…/erplora-hub:latest`,
 #                                  cloud/apps/dashboard/hubs/servers/services/providers/aws.py).
 #                                  ESTE es el tag canónico — sin él, ECS no puede hacer pull.
-#   - erplora-hub:next            (tag móvil que consume la DEMO vía Terraform,
-#                                  aws/terraform/ecs_demo.tf — se mantiene por compatibilidad).
 #   - erplora-hub:<git-sha>       (tag inmutable por commit, para pin/rollback)
 #
 # Pipeline:
-#   push a main      ─► build ─► push ECR  (:latest + :next + :<sha>)
-#   tag v*           ─► build ─► push ECR  (:latest + :next + :<sha>)  [versión por tag]
+#   push a main      ─► build ─► push ECR  (:latest + :<sha>)
+#   tag v*           ─► build ─► push ECR  (:latest + :<sha>)  [versión por tag]
 #   workflow_dispatch ─► build ─► push ECR (manual)
 #
 # AWS auth: OIDC (rol `github-actions-deploy`, sin claves estáticas) — igual patrón que
@@ -47,7 +45,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: build-hub-next-${{ github.ref }}
+  group: build-hub-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -91,12 +89,10 @@ jobs:
           set -euo pipefail
           IMAGE="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
           # :latest  → tag canónico que consumen los hubs reales (provisioning del Cloud).
-          # :next    → tag que consume la demo (aws/terraform/ecs_demo.tf), por compatibilidad.
           # :<sha>   → tag inmutable por commit, para pin/rollback.
           {
             echo "tags<<EOF"
             echo "${IMAGE}:latest"
-            echo "${IMAGE}:next"
             echo "${IMAGE}:${GITHUB_SHA}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
@@ -116,15 +112,13 @@ jobs:
         run: |
           echo "Imagen publicada:"
           echo "  ${{ steps.tags.outputs.image }}:latest   (hubs reales — Cloud provisioning)"
-          echo "  ${{ steps.tags.outputs.image }}:next     (demo — aws/terraform/ecs_demo.tf)"
           echo "  ${{ steps.tags.outputs.image }}:${GITHUB_SHA}"
           echo ""
           echo "Los contenedores de hub los aprovisiona el Cloud Portal (boto3) y tiran de :latest."
-          echo "El flujo demo del Hub Rust apunta a :next (issue #36)."
 
 # ==============================================================================
 # Pendiente de confirmación humana / infra (OIDC, en aws/terraform/github_actions_oidc.tf):
-#   - `repo:ERPlora/hub:ref:refs/heads/main`  → YA presente (push a main publica :latest + :next + :sha).
+#   - `repo:ERPlora/hub:ref:refs/heads/main`  → YA presente (push a main publica :latest + :sha).
 #   - `repo:ERPlora/hub:ref:refs/tags/v*`     → AÑADIR si se quiere publicar por tag de versión
 #     (mismo pendiente que bridge-release.yml). El rol ya tiene ECR vía AdministratorAccess.
 #

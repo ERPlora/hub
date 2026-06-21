@@ -30,7 +30,7 @@ este fichero se actualiza desde él. Plan completo en `ARQUITECTURA.md` + el pla
 - [ ] `P2` `[IA]` Decode tipos Postgres en `db` (NUMERIC/TIMESTAMPTZ/UUID/JSONB).
 
 ## Workstream D — CI/CD & artefactos
-- [ ] `P1` `[IA]` **Docker real** (`docker/Dockerfile`) + workflow `build→ECR` (`erplora-hub:next`).
+- [ ] `P1` `[IA]` **Docker real** (`docker/Dockerfile`) + workflow `build→ECR` (`erplora-hub:latest`).
 - [ ] `P1` `[IA]` CI **ejecutables Tauri → S3 privado** (confirmar bucket) — requiere `apps/tauri`.
 - [ ] `P1` `[IA]` CI **zips de módulos → S3 marketplace** (por repo de módulo; usa `pack`+`sign`).
 
