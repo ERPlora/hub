@@ -13,7 +13,6 @@ use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, Salt
 use argon2::Argon2;
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
-use sha2::{Digest, Sha256};
 
 use crate::errors::Result;
 use crate::registry::{new_id, now_rfc3339, Registry};
@@ -50,12 +49,8 @@ pub struct HubUser {
 // **argon2id** con string PHC estándar (`$argon2id$v=19$...`), decisión humano hub#15. NOTA: el PIN
 // es corto (4 dígitos), así que la seguridad real depende de que el dispositivo sea de confianza
 // (device-trust, ver más abajo) + rate-limiting en el login; argon2id solo encarece el ataque
-// offline si se filtra la BD. Cadena vacía = sin PIN (no autenticable).
-//
-// **Compat hacia atrás**: hasta hub#15 el PIN se guardaba como SHA-256 salteado en el formato
-// `"{salt_hex}:{hash_hex}"`. `verify_pin` detecta ese formato viejo, lo valida con el método viejo
-// y, si encaja, **rehashea a argon2id** de forma transparente (sin invalidar PINs existentes).
-// `set_pin`/`create_user` SIEMPRE escriben argon2id.
+// offline si se filtra la BD. Cadena vacía = sin PIN (no autenticable). `set_pin`/`create_user`
+// son los únicos que escriben el hash (siempre argon2id); `verify_pin` solo lo verifica.
 
 /// Hash argon2id (string PHC) de un PIN con sal aleatoria. Parámetros = `Argon2::default()`
 /// (argon2id, v=19) — razonables; el PIN es corto, ver nota arriba.
@@ -67,53 +62,30 @@ fn hash_pin_argon2(pin: &str) -> Result<String> {
     Ok(hash.to_string())
 }
 
-/// Hash SHA-256 salteado **legacy** (formato `"{salt}:{hash}"`). Solo para verificar PINs viejos.
-fn hash_pin_legacy(pin: &str, salt: &str) -> String {
-    let mut h = Sha256::new();
-    h.update(salt.as_bytes());
-    h.update(b":");
-    h.update(pin.as_bytes());
-    format!("{salt}:{:x}", h.finalize())
-}
-
-/// `true` si `stored` es un hash argon2id en formato PHC (no el legacy `salt:hash`).
-fn is_argon2(stored: &str) -> bool {
-    stored.starts_with("$argon2")
-}
-
 /// Resultado de verificar un PIN contra el hash almacenado.
 enum PinCheck {
     /// No coincide (o no hay PIN).
     NoMatch,
-    /// Coincide y el hash ya es argon2id (no hay que rehashear).
-    MatchArgon2,
-    /// Coincide pero el hash es legacy SHA-256 → hay que rehashear a argon2id (rehash perezoso).
-    MatchNeedsRehash,
+    /// Coincide con el hash argon2id almacenado.
+    Match,
 }
 
-/// Verifica `pin` contra el hash almacenado, distinguiendo formato argon2id vs legacy.
+/// Verifica `pin` contra el hash argon2id almacenado.
 fn check_pin(stored: &str, pin: &str) -> PinCheck {
-    if stored.is_empty() {
-        return PinCheck::NoMatch;
-    }
-    if is_argon2(stored) {
+    if !stored.is_empty() {
         // Hash PHC argon2id: verificar con argon2.
         match PasswordHash::new(stored) {
             Ok(parsed) => {
-                if Argon2::default().verify_password(pin.as_bytes(), &parsed).is_ok() {
-                    PinCheck::MatchArgon2
+                if Argon2::default()
+                    .verify_password(pin.as_bytes(), &parsed)
+                    .is_ok()
+                {
+                    PinCheck::Match
                 } else {
                     PinCheck::NoMatch
                 }
             }
             Err(_) => PinCheck::NoMatch, // hash corrupto → no autenticable
-        }
-    } else if let Some((salt, _)) = stored.split_once(':') {
-        // Legacy SHA-256 `salt:hash`: verificar con el método viejo; si encaja, marcar rehash.
-        if hash_pin_legacy(pin, salt) == stored {
-            PinCheck::MatchNeedsRehash
-        } else {
-            PinCheck::NoMatch
         }
     } else {
         PinCheck::NoMatch
@@ -131,7 +103,11 @@ pub async fn create_user(
     cloud_user_id: Option<&str>,
 ) -> Result<String> {
     let id = new_id();
-    let pin_hash = if pin.is_empty() { String::new() } else { hash_pin_argon2(pin)? };
+    let pin_hash = if pin.is_empty() {
+        String::new()
+    } else {
+        hash_pin_argon2(pin)?
+    };
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
     p.insert("name".into(), json!(name));
@@ -141,7 +117,7 @@ pub async fn create_user(
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
         "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
-         VALUES (:id, :name, :pin_hash, :role, :cloud_user_id, 1, :now)",
+          VALUES (:id, :name, :pin_hash, :role, :cloud_user_id, 1, :now)",
         &p,
     )
     .await?;
@@ -153,11 +129,19 @@ pub async fn create_user(
 /// confianza. `pin` vacío borra el PIN (deja el usuario no autenticable por PIN). Idempotente.
 pub async fn set_pin(db: &dyn DatabaseAdapter, user_id: &str, pin: &str) -> Result<()> {
     // Siempre escribe argon2id (string PHC); `pin` vacío deja el hash vacío (no autenticable).
-    let pin_hash = if pin.is_empty() { String::new() } else { hash_pin_argon2(pin)? };
+    let pin_hash = if pin.is_empty() {
+        String::new()
+    } else {
+        hash_pin_argon2(pin)?
+    };
     let mut p = Params::new();
     p.insert("id".into(), json!(user_id));
     p.insert("pin_hash".into(), json!(pin_hash));
-    db.execute("UPDATE hub_user SET pin_hash = :pin_hash WHERE id = :id", &p).await?;
+    db.execute(
+        "UPDATE hub_user SET pin_hash = :pin_hash WHERE id = :id",
+        &p,
+    )
+    .await?;
     Ok(())
 }
 
@@ -172,27 +156,23 @@ fn row_to_user(row: &serde_json::Value) -> HubUser {
 }
 
 /// Verifica el PIN de un usuario activo por **nombre**. `Some(user)` si el PIN encaja.
-pub async fn verify_pin(db: &dyn DatabaseAdapter, name: &str, pin: &str) -> Result<Option<HubUser>> {
+pub async fn verify_pin(
+    db: &dyn DatabaseAdapter,
+    name: &str,
+    pin: &str,
+) -> Result<Option<HubUser>> {
     let mut p = Params::new();
     p.insert("name".into(), json!(name));
     let res = db
         .query(
             "SELECT id, name, role, cloud_user_id, is_active, pin_hash FROM hub_user \
-             WHERE name = :name AND is_active = 1",
+              WHERE name = :name AND is_active = 1",
             &p,
         )
         .await?;
     for row in &res.rows {
         match check_pin(row["pin_hash"].as_str().unwrap_or_default(), pin) {
-            PinCheck::MatchArgon2 => return Ok(Some(row_to_user(row))),
-            PinCheck::MatchNeedsRehash => {
-                // Rehash perezoso: el PIN encajó con el hash legacy SHA-256 → re-escribe a
-                // argon2id (migración transparente, sin invalidar el PIN del usuario). Si el
-                // rehash fallara, el login igual procede (no se bloquea al usuario).
-                let user = row_to_user(row);
-                let _ = set_pin(db, &user.id, pin).await;
-                return Ok(Some(user));
-            }
+            PinCheck::Match => return Ok(Some(row_to_user(row))),
             PinCheck::NoMatch => {}
         }
     }
@@ -206,8 +186,8 @@ pub async fn list_pin_users(db: &dyn DatabaseAdapter) -> Result<Vec<(String, Str
     let res = db
         .query(
             "SELECT id, name, role FROM hub_user \
-             WHERE is_active = 1 AND pin_hash IS NOT NULL AND pin_hash != '' \
-             ORDER BY name",
+              WHERE is_active = 1 AND pin_hash IS NOT NULL AND pin_hash != '' \
+              ORDER BY name",
             &Params::new(),
         )
         .await?;
@@ -238,7 +218,7 @@ pub async fn get_or_link_cloud_user(
     let res = db
         .query(
             "SELECT id, name, role, cloud_user_id, is_active FROM hub_user \
-             WHERE cloud_user_id = :cuid AND is_active = 1",
+              WHERE cloud_user_id = :cuid AND is_active = 1",
             &p,
         )
         .await?;
@@ -259,7 +239,11 @@ pub async fn get_or_link_cloud_user(
 
 /// Abre una sesión para `user_id` y devuelve el token opaco (lo guarda el frontend y lo manda en
 /// cada petición). TTL en segundos.
-pub async fn create_session(db: &dyn DatabaseAdapter, user_id: &str, ttl_secs: i64) -> Result<String> {
+pub async fn create_session(
+    db: &dyn DatabaseAdapter,
+    user_id: &str,
+    ttl_secs: i64,
+) -> Result<String> {
     let token = format!("{}{}", new_id(), new_id()).replace('-', "");
     let expires = (chrono::Utc::now() + chrono::Duration::seconds(ttl_secs)).to_rfc3339();
     let mut p = Params::new();
@@ -269,7 +253,7 @@ pub async fn create_session(db: &dyn DatabaseAdapter, user_id: &str, ttl_secs: i
     p.insert("expires".into(), json!(expires));
     db.execute(
         "INSERT INTO hub_session (token, user_id, created_at, expires_at) \
-         VALUES (:token, :user_id, :now, :expires)",
+          VALUES (:token, :user_id, :now, :expires)",
         &p,
     )
     .await?;
@@ -284,8 +268,8 @@ pub async fn resolve_session(db: &dyn DatabaseAdapter, token: &str) -> Result<Op
     let res = db
         .query(
             "SELECT u.id, u.name, u.role, u.cloud_user_id, u.is_active \
-             FROM hub_session s JOIN hub_user u ON u.id = s.user_id \
-             WHERE s.token = :token AND s.expires_at > :now AND u.is_active = 1",
+              FROM hub_session s JOIN hub_user u ON u.id = s.user_id \
+              WHERE s.token = :token AND s.expires_at > :now AND u.is_active = 1",
             &p,
         )
         .await?;
@@ -296,7 +280,8 @@ pub async fn resolve_session(db: &dyn DatabaseAdapter, token: &str) -> Result<Op
 pub async fn delete_session(db: &dyn DatabaseAdapter, token: &str) -> Result<()> {
     let mut p = Params::new();
     p.insert("token".into(), json!(token));
-    db.execute("DELETE FROM hub_session WHERE token = :token", &p).await?;
+    db.execute("DELETE FROM hub_session WHERE token = :token", &p)
+        .await?;
     Ok(())
 }
 
@@ -332,10 +317,13 @@ pub async fn refresh_session(
     ins.insert("expires".into(), json!(expires));
 
     db.execute_tx(&[
-        ("DELETE FROM hub_session WHERE token = :token".to_string(), del),
+        (
+            "DELETE FROM hub_session WHERE token = :token".to_string(),
+            del,
+        ),
         (
             "INSERT INTO hub_session (token, user_id, created_at, expires_at) \
-             VALUES (:token, :user_id, :now, :expires)"
+              VALUES (:token, :user_id, :now, :expires)"
                 .to_string(),
             ins,
         ),
@@ -369,8 +357,8 @@ pub async fn trust_device(db: &dyn DatabaseAdapter, device_id: &str, label: &str
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
         "INSERT INTO hub_trusted_device (device_id, label, trusted_at) \
-         VALUES (:device_id, :label, :now) \
-         ON CONFLICT (device_id) DO UPDATE SET label = excluded.label",
+          VALUES (:device_id, :label, :now) \
+          ON CONFLICT (device_id) DO UPDATE SET label = excluded.label",
         &p,
     )
     .await?;
@@ -382,7 +370,10 @@ pub async fn is_device_trusted(db: &dyn DatabaseAdapter, device_id: &str) -> Res
     let mut p = Params::new();
     p.insert("device_id".into(), json!(device_id));
     let res = db
-        .query("SELECT 1 AS ok FROM hub_trusted_device WHERE device_id = :device_id", &p)
+        .query(
+            "SELECT 1 AS ok FROM hub_trusted_device WHERE device_id = :device_id",
+            &p,
+        )
         .await?;
     Ok(!res.rows.is_empty())
 }
@@ -391,7 +382,11 @@ pub async fn is_device_trusted(db: &dyn DatabaseAdapter, device_id: &str) -> Res
 pub async fn untrust_device(db: &dyn DatabaseAdapter, device_id: &str) -> Result<()> {
     let mut p = Params::new();
     p.insert("device_id".into(), json!(device_id));
-    db.execute("DELETE FROM hub_trusted_device WHERE device_id = :device_id", &p).await?;
+    db.execute(
+        "DELETE FROM hub_trusted_device WHERE device_id = :device_id",
+        &p,
+    )
+    .await?;
     Ok(())
 }
 
@@ -424,7 +419,9 @@ mod tests {
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         ensure_tables(&db).await.unwrap();
 
-        let uid = create_user(&db, "María", "1234", "manager", None).await.unwrap();
+        let uid = create_user(&db, "María", "1234", "manager", None)
+            .await
+            .unwrap();
 
         // PIN correcto resuelve al usuario; PIN incorrecto no.
         let ok = verify_pin(&db, "María", "1234").await.unwrap();
@@ -448,27 +445,45 @@ mod tests {
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         ensure_tables(&db).await.unwrap();
         // Cloud-linked user provisioned without a PIN (first online login).
-        let user = get_or_link_cloud_user(&db, "7", "Ada", "admin").await.unwrap();
-        assert!(verify_pin(&db, "Ada", "4242").await.unwrap().is_none(), "no PIN yet");
+        let user = get_or_link_cloud_user(&db, "7", "Ada", "admin")
+            .await
+            .unwrap();
+        assert!(
+            verify_pin(&db, "Ada", "4242").await.unwrap().is_none(),
+            "no PIN yet"
+        );
 
         set_pin(&db, &user.id, "4242").await.unwrap();
         let ok = verify_pin(&db, "Ada", "4242").await.unwrap();
         assert_eq!(ok.map(|u| u.id), Some(user.id.clone()));
-        assert!(verify_pin(&db, "Ada", "0000").await.unwrap().is_none(), "wrong PIN rejected");
+        assert!(
+            verify_pin(&db, "Ada", "0000").await.unwrap().is_none(),
+            "wrong PIN rejected"
+        );
 
         // Empty PIN clears it again.
         set_pin(&db, &user.id, "").await.unwrap();
-        assert!(verify_pin(&db, "Ada", "4242").await.unwrap().is_none(), "PIN cleared");
+        assert!(
+            verify_pin(&db, "Ada", "4242").await.unwrap().is_none(),
+            "PIN cleared"
+        );
     }
 
     #[tokio::test]
     async fn cloud_user_link_is_idempotent() {
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         ensure_tables(&db).await.unwrap();
-        let a = get_or_link_cloud_user(&db, "42", "Demo", "cashier").await.unwrap();
-        let b = get_or_link_cloud_user(&db, "42", "OtroNombre", "admin").await.unwrap();
+        let a = get_or_link_cloud_user(&db, "42", "Demo", "cashier")
+            .await
+            .unwrap();
+        let b = get_or_link_cloud_user(&db, "42", "OtroNombre", "admin")
+            .await
+            .unwrap();
         assert_eq!(a.id, b.id, "el mismo cloud_user_id reusa el hub_user");
-        assert_eq!(b.role, "cashier", "no re-provisiona ni cambia el rol existente");
+        assert_eq!(
+            b.role, "cashier",
+            "no re-provisiona ni cambia el rol existente"
+        );
     }
 
     #[tokio::test]
@@ -476,72 +491,55 @@ mod tests {
         // create_user/set_pin escriben siempre argon2id (string PHC `$argon2id$...`).
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         ensure_tables(&db).await.unwrap();
-        create_user(&db, "Eva", "1111", "cashier", None).await.unwrap();
+        create_user(&db, "Eva", "1111", "cashier", None)
+            .await
+            .unwrap();
         let mut p = Params::new();
         p.insert("name".into(), json!("Eva"));
-        let res = db.query("SELECT pin_hash FROM hub_user WHERE name = :name", &p).await.unwrap();
+        let res = db
+            .query("SELECT pin_hash FROM hub_user WHERE name = :name", &p)
+            .await
+            .unwrap();
         let stored = res.rows[0]["pin_hash"].as_str().unwrap();
-        assert!(stored.starts_with("$argon2id$"), "hash debe ser argon2id PHC, fue: {stored}");
+        assert!(
+            stored.starts_with("$argon2id$"),
+            "hash debe ser argon2id PHC, fue: {stored}"
+        );
         // Verifica argon2id directamente.
         let ok = verify_pin(&db, "Eva", "1111").await.unwrap();
         assert!(ok.is_some());
         assert!(verify_pin(&db, "Eva", "2222").await.unwrap().is_none());
     }
 
-    #[tokio::test]
-    async fn legacy_sha256_pin_verifies_and_rehashes_to_argon2id() {
-        // Simula un usuario creado ANTES de hub#15: PIN guardado como SHA-256 salteado `salt:hash`.
-        let db = SqliteAdapter::open_in_memory().await.unwrap();
-        ensure_tables(&db).await.unwrap();
-        let legacy = hash_pin_legacy("4321", &new_id());
-        assert!(!is_argon2(&legacy), "el hash legacy NO es PHC argon2");
-
-        let id = new_id();
-        let mut p = Params::new();
-        p.insert("id".into(), json!(id));
-        p.insert("name".into(), json!("Vieja"));
-        p.insert("pin_hash".into(), json!(legacy));
-        p.insert("now".into(), json!(now_rfc3339()));
-        db.execute(
-            "INSERT INTO hub_user (id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
-             VALUES (:id, :name, :pin_hash, 'cashier', NULL, 1, :now)",
-            &p,
-        )
-        .await
-        .unwrap();
-
-        // verify_pin acepta el PIN viejo…
-        let ok = verify_pin(&db, "Vieja", "4321").await.unwrap();
-        assert_eq!(ok.map(|u| u.id), Some(id.clone()));
-        assert!(verify_pin(&db, "Vieja", "0000").await.unwrap().is_none(), "PIN incorrecto rechazado");
-
-        // …y lo rehashea perezosamente a argon2id (la fila ya NO guarda el formato legacy).
-        let mut q = Params::new();
-        q.insert("id".into(), json!(id));
-        let res = db.query("SELECT pin_hash FROM hub_user WHERE id = :id", &q).await.unwrap();
-        let now_stored = res.rows[0]["pin_hash"].as_str().unwrap();
-        assert!(now_stored.starts_with("$argon2id$"), "rehash a argon2id, fue: {now_stored}");
-        // El PIN sigue funcionando tras el rehash.
-        assert!(verify_pin(&db, "Vieja", "4321").await.unwrap().is_some());
-    }
 
     #[tokio::test]
     async fn session_refresh_rotates_token_and_extends() {
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         ensure_tables(&db).await.unwrap();
-        let uid = create_user(&db, "Sam", "9999", "manager", None).await.unwrap();
+        let uid = create_user(&db, "Sam", "9999", "manager", None)
+            .await
+            .unwrap();
         let token = create_session(&db, &uid, 3600).await.unwrap();
 
         // Refresh rota el token y resuelve al mismo usuario; el token viejo deja de valer.
         let (new_token, user) = refresh_session(&db, &token, 3600).await.unwrap().unwrap();
         assert_eq!(user.id, uid);
         assert_ne!(new_token, token, "el token se rota");
-        assert!(resolve_session(&db, &token).await.unwrap().is_none(), "el token viejo se invalida");
-        assert_eq!(resolve_session(&db, &new_token).await.unwrap().unwrap().id, uid);
+        assert!(
+            resolve_session(&db, &token).await.unwrap().is_none(),
+            "el token viejo se invalida"
+        );
+        assert_eq!(
+            resolve_session(&db, &new_token).await.unwrap().unwrap().id,
+            uid
+        );
 
         // Una sesión caducada no se puede refrescar.
         let expired = create_session(&db, &uid, -10).await.unwrap();
-        assert!(refresh_session(&db, &expired, 3600).await.unwrap().is_none());
+        assert!(refresh_session(&db, &expired, 3600)
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
@@ -551,16 +549,24 @@ mod tests {
         // La tabla la crea la migración de sistema v2; en el test la creamos a mano (sin hub_id).
         db.execute_batch(
             "CREATE TABLE hub_trusted_device (device_id TEXT PRIMARY KEY, \
-             label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
+              label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
         )
         .await
         .unwrap();
 
-        assert!(!is_device_trusted(&db, "dev-1").await.unwrap(), "desconocido = no confianza");
+        assert!(
+            !is_device_trusted(&db, "dev-1").await.unwrap(),
+            "desconocido = no confianza"
+        );
         trust_device(&db, "dev-1", "Caja 1").await.unwrap();
-        assert!(is_device_trusted(&db, "dev-1").await.unwrap(), "marcado = de confianza");
+        assert!(
+            is_device_trusted(&db, "dev-1").await.unwrap(),
+            "marcado = de confianza"
+        );
         // Idempotente (re-marcar no falla).
-        trust_device(&db, "dev-1", "Caja 1 (renombrada)").await.unwrap();
+        trust_device(&db, "dev-1", "Caja 1 (renombrada)")
+            .await
+            .unwrap();
         assert!(is_device_trusted(&db, "dev-1").await.unwrap());
         // Revocar lo quita.
         untrust_device(&db, "dev-1").await.unwrap();

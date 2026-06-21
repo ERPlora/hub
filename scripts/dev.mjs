@@ -34,6 +34,10 @@ const DEFAULTS = {
   HUB_MODULES_DIR: join(MONOREPO_ROOT, 'modules-workspace', 'modules'),
   // Bind del runtime Axum.
   HUB_BIND: '127.0.0.1:8787',
+  // Auth en modo sesión server-side (el ÚNICO flujo del frontend: login cloud/PIN → X-Hub-Session).
+  // En modo `dev` (sin esto) el runtime no descarga la clave pública del Cloud y `/api/auth/cloud`
+  // devuelve 503 ("login cloud no disponible (sin clave pública)") → la pantalla de login no funciona.
+  HUB_AUTH: 'session',
 };
 
 const env = { ...process.env };

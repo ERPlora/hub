@@ -58,7 +58,8 @@
       "id": "pos",
       "label": "Vender",
       "icon": "storefront",
-      "component": "erp-pos"
+      "component": "erp-pos",
+      "chrome": ["fullscreen"]
     },
     {
       "id": "sales",

@@ -18,7 +18,15 @@
 
           <!-- Logo / cabecera -->
           <div class="logo-area">
-            <div class="logo-mark" aria-hidden="true">E</div>
+            <!-- Logo de marca: el personalizado del hub si lo hay, si no el de ERPlora (local,
+                offline-safe). Si la URL personalizada falla/está offline, cae al logo local. -->
+            <img
+              class="logo-img"
+              :src="hubLogo"
+              alt="ERPlora"
+              decoding="async"
+              @error="onLogoError"
+            />
             <p class="logo-sub">
               <template v-if="step === 'setup'">Crea tu PIN de acceso</template>
               <template v-else-if="step === 'pin'">Introduce tu PIN</template>
@@ -68,7 +76,9 @@
                   fill="outline"
                   placeholder="••••••••"
                   @ion-input="passwordVal = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"
-                />
+                >
+                  <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+                </ion-input>
 
                 <!-- Checkbox "confiar en este dispositivo" + popover informativo -->
                 <div class="trust-row">
@@ -291,6 +301,7 @@ import { cloudLogin, setTokens, runtimeCloudSession, runtimePinLogin, runtimeSet
 import { config } from '../lib/config';
 import { pinUsers } from '../lib/runtime';
 import { isDark, toggleTheme } from '../lib/theme';
+import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -308,6 +319,15 @@ interface TrustedUser {
 // Tema: estado compartido (lib/theme) — mismo modo que el toggle de la topbar.
 // ---------------------------------------------------------------------------
 // `isDark` / `toggleTheme` se importan de lib/theme (ver imports del SFC).
+
+// ---------------------------------------------------------------------------
+// Logo de marca (lib/branding): `hubLogo` = el del hub si lo hay, si no el de ERPlora local.
+// Si la URL personalizada falla (rota / offline), caemos al logo local horneado.
+// ---------------------------------------------------------------------------
+function onLogoError(ev: Event): void {
+  const img = ev.target as HTMLImageElement;
+  if (!img.src.endsWith(DEFAULT_HUB_LOGO)) img.src = DEFAULT_HUB_LOGO;
+}
 
 // ---------------------------------------------------------------------------
 // Estado de la sesión de dispositivo (PIN / trust)
@@ -599,16 +619,11 @@ async function onSetupComplete(pin: string): Promise<void> {
   margin-bottom: 32px;
   text-align: center;
 }
-.logo-mark {
-  width: 56px;
+.logo-img {
   height: 56px;
-  border-radius: 16px;
-  background: var(--ion-color-primary);
-  color: #fff;
-  font-size: 28px;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
 }
 .logo-sub {
   font-size: 14px;
