@@ -4,7 +4,7 @@ import { addIcons } from 'ionicons';
 import {
   pencil, trash, add, close, chevronBack, chevronForward,
   listOutline, gridOutline, funnelOutline, downloadOutline, cloudUploadOutline,
-  appsOutline, closeOutline,
+  appsOutline, closeOutline, arrowBackOutline, backspaceOutline,
 } from 'ionicons/icons';
 
 import App from './App.vue';
@@ -27,6 +27,8 @@ addIcons({
   'download-outline': downloadOutline, 'cloud-upload-outline': cloudUploadOutline,
   // Trigger (rejilla) y cerrar de ok-app-launcher (OutfitKit), por NOMBRE.
   'apps-outline': appsOutline, 'close-outline': closeOutline,
+  // Teclado PIN del login (ok-pinpad): borrado + tecla «cambiar usuario».
+  'arrow-back-outline': arrowBackOutline, 'backspace-outline': backspaceOutline,
 });
 
 // CSS base de Ionic (core + utilidades). Dark mode por clase (.ion-palette-dark).
@@ -52,6 +54,9 @@ import '@erplora/outfitkit/ok-status-pill';
 import '@erplora/outfitkit/ok-empty-state';
 // Gestor de archivos (Drive-like) de la carpeta media del Hub — pantalla /files.
 import '@erplora/outfitkit/ok-file-manager';
+// Login (LoginPage): teclado PIN (con pantalla de círculos + tecla «cambiar usuario») y avatares.
+import '@erplora/outfitkit/ok-pinpad';
+import '@erplora/outfitkit/ok-avatar';
 // Los ok-* asumen que el host registró los ion-* que usan por dentro (searchbar/select/overlays).
 import { registerOutfitkitIonicDeps } from './lib/ionic-wc';
 

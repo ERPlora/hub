@@ -145,18 +145,22 @@
                   <ion-text color="medium" class="pin-choose-title">
                     <p>Elige tu usuario</p>
                   </ion-text>
-                  <div class="user-grid">
-                    <button
-                      v-for="u in trustedUsers"
-                      :key="u.id"
-                      type="button"
-                      class="user-card"
-                      @click="selectPinUser(u)"
-                    >
-                      <span class="user-avatar">{{ u.initials }}</span>
-                      <span class="user-name">{{ u.name }}</span>
-                      <span v-if="u.email" class="user-email">{{ u.email }}</span>
-                    </button>
+                  <div class="user-scroll">
+                    <div class="user-grid">
+                      <ion-card
+                        v-for="u in trustedUsers"
+                        :key="u.id"
+                        button
+                        class="user-card"
+                        @click="selectPinUser(u)"
+                      >
+                        <ion-card-content class="ion-text-center">
+                          <ok-avatar :name="u.name" size="lg"></ok-avatar>
+                          <p class="user-name">{{ u.name }}</p>
+                          <p v-if="u.email" class="user-email">{{ u.email }}</p>
+                        </ion-card-content>
+                      </ion-card>
+                    </div>
                   </div>
                   <ion-button
                     v-if="!showTabs"
@@ -171,54 +175,24 @@
                 <!-- Paso 2: introducir PIN del usuario elegido -->
                 <template v-else>
                   <div class="pin-user-info">
-                    <span class="user-avatar user-avatar--lg">{{ pinUser.initials }}</span>
+                    <ok-avatar :name="pinUser.name" size="lg"></ok-avatar>
                     <p class="user-name mt-2">{{ pinUser.name }}</p>
-                    <button
-                      v-if="trustedUsers.length > 1"
-                      type="button"
-                      class="change-user-btn"
-                      @click="pinUser = null; pinValue = ''; pinError = false"
-                    >
-                      Cambiar usuario
-                    </button>
                   </div>
 
-                  <!-- PinPad inline: campo numérico oculto + dots de visualización -->
+                  <!-- ok-pinpad: pantalla (4 círculos), teclado y, si hay varios usuarios,
+                       tecla «cambiar usuario» (flecha a la izquierda del 0; borrado a la derecha). -->
                   <div class="pinpad-wrap">
-                    <div class="pinpad-dots" :class="{ 'pinpad-dots--error': pinError }">
-                      <span
-                        v-for="i in 4"
-                        :key="i"
-                        class="dot"
-                        :class="{ filled: pinValue.length >= i }"
-                      />
-                    </div>
-                    <ion-input
-                      ref="pinInputRef"
-                      :value="pinValue"
-                      type="number"
-                      inputmode="numeric"
-                      :maxlength="4"
-                      pattern="[0-9]*"
-                      aria-label="PIN de 4 dígitos"
-                      class="pin-hidden-input"
-                      @ion-input="onPinInput"
-                    />
-                  </div>
-
-                  <div class="pinpad-keys">
-                    <button
-                      v-for="key in ['1','2','3','4','5','6','7','8','9','','0','⌫']"
-                      :key="key"
-                      type="button"
-                      class="pin-key"
-                      :class="{ 'pin-key--empty': key === '' }"
-                      :aria-label="key === '⌫' ? 'Borrar' : key === '' ? undefined : key"
-                      :tabindex="key === '' ? -1 : 0"
-                      @click="pressKey(key)"
-                    >
-                      {{ key }}
-                    </button>
+                    <ok-pinpad
+                      ref="mainPinpadRef"
+                      dots
+                      :length="4"
+                      :error="pinError"
+                      secondary-icon="arrow-back-outline"
+                      secondary-label="Cambiar usuario"
+                      @ok-input="onMainPinInput"
+                      @ok-complete="onMainPinComplete"
+                      @ok-secondary="onChangeUser"
+                    ></ok-pinpad>
                   </div>
 
                   <ion-note v-if="pinError" color="danger" class="error-note">
@@ -228,7 +202,7 @@
                     v-if="!showTabs"
                     fill="clear"
                     size="small"
-                    @click="step = 'email'; pinUser = null; pinValue = ''; pinError = false"
+                    @click="onPinToEmail"
                   >
                     Iniciar sesión con email
                   </ion-button>
@@ -241,31 +215,15 @@
                   <p>{{ setupPhase === 'first' ? 'Elige un PIN de 4 dígitos' : 'Confirma tu PIN' }}</p>
                 </ion-text>
 
-                <!-- PinPad inline reutilizado para setup -->
+                <!-- ok-pinpad reutilizado para el alta de PIN. -->
                 <div class="pinpad-wrap">
-                  <div class="pinpad-dots" :class="{ 'pinpad-dots--error': setupError }">
-                    <span
-                      v-for="i in 4"
-                      :key="i"
-                      class="dot"
-                      :class="{ filled: currentSetupPin.length >= i }"
-                    />
-                  </div>
-                </div>
-
-                <div class="pinpad-keys">
-                  <button
-                    v-for="key in ['1','2','3','4','5','6','7','8','9','','0','⌫']"
-                    :key="key"
-                    type="button"
-                    class="pin-key"
-                    :class="{ 'pin-key--empty': key === '' }"
-                    :aria-label="key === '⌫' ? 'Borrar' : key === '' ? undefined : key"
-                    :tabindex="key === '' ? -1 : 0"
-                    @click="pressSetupKey(key)"
-                  >
-                    {{ key }}
-                  </button>
+                  <ok-pinpad
+                    ref="setupPinpadRef"
+                    dots
+                    :length="4"
+                    :error="setupError"
+                    @ok-complete="onSetupPinComplete"
+                  ></ok-pinpad>
                 </div>
 
                 <ion-note v-if="setupError" color="danger" class="error-note">
@@ -484,6 +442,8 @@ const pinUser = ref<TrustedUser | null>(
 );
 const pinValue = ref<string>('');
 const pinError = ref<boolean>(false);
+// Referencia al <ok-pinpad> del paso PIN (para limpiar su valor tras error / cambiar usuario).
+const mainPinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
 
 function selectPinUser(u: TrustedUser): void {
   pinUser.value = u;
@@ -491,25 +451,28 @@ function selectPinUser(u: TrustedUser): void {
   pinError.value = false;
 }
 
-// Maneja el campo ion-input oculto del pinpad (path de accesibilidad)
-function onPinInput(ev: Event): void {
-  const val = (ev as CustomEvent<{ value: string }>).detail.value ?? '';
-  const digits = val.replace(/\D/g, '').slice(0, 4);
-  pinValue.value = digits;
-  void checkPin(digits);
+// Eventos del ok-pinpad (el componente pinta los círculos y gestiona el teclado).
+function onMainPinInput(ev: Event): void {
+  pinValue.value = (ev as CustomEvent<{ value: string }>).detail.value ?? '';
+  pinError.value = false;
 }
-
-function pressKey(key: string): void {
-  if (key === '') return;
-  if (key === '⌫') {
-    pinValue.value = pinValue.value.slice(0, -1);
-    pinError.value = false;
-    return;
-  }
-  if (pinValue.value.length >= 4) return;
-  const next = pinValue.value + key;
-  pinValue.value = next;
-  void checkPin(next);
+function onMainPinComplete(ev: Event): void {
+  const pin = (ev as CustomEvent<{ value: string }>).detail.value ?? '';
+  void checkPin(pin);
+}
+// Tecla secundaria del pinpad (flecha atrás) → volver a elegir usuario.
+function onChangeUser(): void {
+  pinUser.value = null;
+  pinValue.value = '';
+  pinError.value = false;
+  if (mainPinpadRef.value) mainPinpadRef.value.value = '';
+}
+// "Iniciar sesión con email" desde el paso PIN.
+function onPinToEmail(): void {
+  step.value = 'email';
+  pinUser.value = null;
+  pinValue.value = '';
+  pinError.value = false;
 }
 
 async function checkPin(pin: string): Promise<void> {
@@ -525,6 +488,8 @@ async function checkPin(pin: string): Promise<void> {
   } catch {
     pinError.value = true;
     pinValue.value = '';
+    // Limpia los círculos del ok-pinpad para reintentar.
+    if (mainPinpadRef.value) mainPinpadRef.value.value = '';
   }
 }
 
@@ -534,55 +499,49 @@ async function checkPin(pin: string): Promise<void> {
 type SetupPhase = 'first' | 'confirm';
 const setupPhase = ref<SetupPhase>('first');
 const setupFirst = ref<string>('');
-const setupConfirm = ref<string>('');
 const setupError = ref<boolean>(false);
+// Referencia al <ok-pinpad> del alta de PIN (para limpiar entre fases / errores).
+const setupPinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
 
-const currentSetupPin = computed<string>(() =>
-  setupPhase.value === 'first' ? setupFirst.value : setupConfirm.value,
-);
+function clearSetupPinpad(): void {
+  if (setupPinpadRef.value) setupPinpadRef.value.value = '';
+}
 
-function pressSetupKey(key: string): void {
-  if (key === '') return;
-  const current = setupPhase.value === 'first' ? setupFirst : setupConfirm;
-  if (key === '⌫') {
-    current.value = current.value.slice(0, -1);
-    setupError.value = false;
-    return;
-  }
-  if (current.value.length >= 4) return;
-  const next = current.value + key;
-  current.value = next;
-  if (next.length === 4) {
-    void onSetupComplete(next);
-  }
+// Evento ok-complete del pinpad de alta: recibe el PIN completo de 4 dígitos.
+function onSetupPinComplete(ev: Event): void {
+  const pin = (ev as CustomEvent<{ value: string }>).detail.value ?? '';
+  void onSetupComplete(pin);
 }
 
 async function onSetupComplete(pin: string): Promise<void> {
   setupError.value = false;
   if (setupPhase.value === 'first') {
+    // Fase 1: guarda el primer PIN y pasa a confirmación (limpia el teclado).
     setupFirst.value = pin;
     setupPhase.value = 'confirm';
-  } else {
-    if (pin === setupFirst.value) {
-      // Fija el PIN en el runtime para el usuario de la sesión actual (§2.9). Requiere la sesión
-      // abierta en el login cloud previo (X-Hub-Session).
-      const session = getHubSession();
-      try {
-        if (session) await runtimeSetPin(pin, session);
-        const redirect = (router.currentRoute.value.query.redirect as string) || '/';
-        await router.replace(redirect);
-      } catch {
-        setupError.value = true;
-        setupFirst.value = '';
-        setupConfirm.value = '';
-        setupPhase.value = 'first';
-      }
-    } else {
+    clearSetupPinpad();
+    return;
+  }
+  // Fase 2: confirmar contra el primero.
+  if (pin === setupFirst.value) {
+    // Fija el PIN en el runtime para el usuario de la sesión actual (§2.9). Requiere la sesión
+    // abierta en el login cloud previo (X-Hub-Session).
+    const session = getHubSession();
+    try {
+      if (session) await runtimeSetPin(pin, session);
+      const redirect = (router.currentRoute.value.query.redirect as string) || '/';
+      await router.replace(redirect);
+    } catch {
       setupError.value = true;
       setupFirst.value = '';
-      setupConfirm.value = '';
       setupPhase.value = 'first';
+      clearSetupPinpad();
     }
+  } else {
+    setupError.value = true;
+    setupFirst.value = '';
+    setupPhase.value = 'first';
+    clearSetupPinpad();
   }
 }
 </script>
@@ -638,10 +597,20 @@ async function onSetupComplete(pin: string): Promise<void> {
 }
 
 /* ---- Pasos ---- */
+/* Card de tamaño FIJO: todos los pasos (email / pin / setup / selección de usuario)
+ * reservan la misma altura, así no hay salto al cambiar entre pestañas. El paso más
+ * alto es el del teclado PIN (~411px); reservamos algo más y centramos el contenido. */
 .step-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* Altura FIJA: misma en email / pin / setup / selección → sin salto al cambiar de paso.
+   * Cabe el paso más alto (teclado PIN ~411px). El contenido se alinea arriba y, en la
+   * selección de usuario, la lista scrollea dentro (ver .user-grid). */
+  height: 26rem;
+  /* Formulario (email / PIN / setup) CENTRADO vertical. En la selección de usuario,
+   * el .user-scroll lleva flex:1 y rellena el alto, así sus cards quedan ARRIBA. */
+  justify-content: center;
 }
 
 /* ---- Trust row ---- */
@@ -689,47 +658,27 @@ async function onSetupComplete(pin: string): Promise<void> {
   font-size: 14px;
   margin: 0 0 8px;
 }
+/* Contenedor de scroll: ocupa el alto restante del card (fijo) y scrollea dentro. */
+.user-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Hueco para la barra de scroll sin tapar las cards. */
+  padding-right: 4px;
+}
 .user-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+  /* Filas a su altura natural (sin aplastar); el scroll lo hace .user-scroll. */
+  align-content: start;
 }
+/* Cada perfil es un ion-card (button): solo reseteamos el margen para encajar en la rejilla. */
 .user-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  border-radius: 12px;
-  border: 1px solid var(--ion-color-step-150, #dcdcdc);
-  background: var(--ion-card-background, #fff);
-  padding: 16px 8px;
-  text-align: center;
-  cursor: pointer;
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  margin: 0;
 }
-.user-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--ion-color-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-.user-card:active {
-  transform: scale(0.98);
-}
-.user-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: rgba(20, 150, 214, 0.12);
-  color: var(--ion-color-primary);
-  font-size: 16px;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
-}
-.user-avatar--lg {
-  width: 56px;
-  height: 56px;
-  font-size: 18px;
+.user-card .user-name {
+  margin-top: 8px;
 }
 .user-name {
   font-size: 14px;
@@ -747,6 +696,7 @@ async function onSetupComplete(pin: string): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin: 2px 0 0;
 }
 
 /* ---- PIN user info ---- */
@@ -757,82 +707,13 @@ async function onSetupComplete(pin: string): Promise<void> {
   text-align: center;
   gap: 4px;
 }
-.change-user-btn {
-  font-size: 12px;
-  color: var(--ion-color-primary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  margin-top: 4px;
-}
-.change-user-btn:hover {
-  text-decoration: underline;
-}
 
-/* ---- PinPad ---- */
+/* ---- PinPad (wrapper del ok-pinpad: solo centra) ---- */
 .pinpad-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-}
-.pinpad-dots {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  padding: 8px 0;
-}
-.pinpad-dots--error .dot {
-  border-color: var(--ion-color-danger);
-}
-.dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid var(--ion-color-medium);
-  transition: background 0.15s, border-color 0.15s;
-}
-.dot.filled {
-  background: var(--ion-color-primary);
-  border-color: var(--ion-color-primary);
-}
-/* El ion-input del PIN es visualmente invisible; solo existe para accesibilidad */
-.pin-hidden-input {
-  opacity: 0;
-  height: 0;
-  pointer-events: none;
-  position: absolute;
-}
-.pinpad-keys {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  width: 100%;
-  max-width: 260px;
-  margin: 0 auto;
-}
-.pin-key {
-  height: 56px;
-  border-radius: 12px;
-  border: 1px solid var(--ion-color-step-150, #dcdcdc);
-  background: var(--ion-card-background, #fff);
-  font-size: 20px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.1s, transform 0.1s;
-  display: grid;
-  place-items: center;
-}
-.pin-key:hover:not(.pin-key--empty) {
-  background: var(--ion-color-light);
-}
-.pin-key:active:not(.pin-key--empty) {
-  transform: scale(0.93);
-}
-.pin-key--empty {
-  visibility: hidden;
-  pointer-events: none;
 }
 
 /* ---- Setup hint ---- */
