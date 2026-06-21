@@ -52,7 +52,12 @@ COPY scripts ./scripts
 # (apps/web importa `@erplora/outfitkit/...` desde npm; el viejo `packages/outfitkit` de workspace
 #  ya no se usa ni está versionado.)
 ARG OUTFITKIT_CACHEBUST=local
-RUN pnpm --filter @erplora/web add @erplora/outfitkit@latest
+# OJO: hay que REFERENCIAR el ARG en el RUN. En Docker un ARG declarado pero NO usado no invalida
+# la caché; al imprimirlo aquí, su valor único por build (github.run_id) entra en la clave de caché
+# de esta capa → `pnpm add @latest` (+ el build de Vite de abajo) se re-ejecuta en CADA imagen y
+# coge SIEMPRE la última OutfitKit, incluso sin cambios de source.
+RUN echo "outfitkit cachebust=${OUTFITKIT_CACHEBUST}" \
+ && pnpm --filter @erplora/web add @erplora/outfitkit@latest
 # Build de producción del shell (vue-tsc + vite build → apps/web/dist).
 # prebuild (sync-modules.mjs) busca módulos en un workspace externo ausente aquí: warn+skip (ok).
 RUN pnpm -F @erplora/web build
