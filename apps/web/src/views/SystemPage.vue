@@ -10,9 +10,15 @@
 
       <!-- ── Tab: Recursos ──────────────────────────────────────── -->
       <template v-if="tab === 'resources'">
-        <!-- KPI grid — SIEMPRE visible. Sin datos del runtime → gauges a 0 (no mensaje de error).
-             CPU/Memoria/Conexiones = ok-gauge (anillo); Base de datos = stat (tamaño, no %).
-             En 'cloud' estos datos los reporta ECS; el Bridge es ajeno a las métricas. -->
+        <!-- ── Bloque Recursos del sistema — SIEMPRE visible; la FUENTE cambia con el despliegue ──
+             "Lo local se ve en local y lo de la nube en la nube" (ARQUITECTURA.md §1): en cloud
+             CPU/Memoria/Conexiones vienen de AWS (ECS Task Metadata + Aurora); en local, del propio
+             equipo (sysinfo + SQLite). El tamaño de BD solo existe en local (SQLite) → N/A en cloud.
+             La pill indica la fuente (AWS / Local). CPU/Memoria/Conexiones = ok-gauge; BD = stat. -->
+        <div class="block-header">
+          <h3 class="block-header__title">{{ resourcesTitle }}</h3>
+          <ok-status-pill v-if="resourcesSource" tone="info">{{ resourcesSource }}</ok-status-pill>
+        </div>
         <ion-grid class="ion-no-padding" style="margin-bottom: 16px">
           <ion-row>
             <ion-col size="6" size-md="3">
@@ -34,7 +40,7 @@
             </ion-col>
 
             <!-- Base de datos: el tamaño solo existe en 'single' (SQLite). En 'cloud' es Aurora
-                 compartida por organización → sin tamaño local; mostramos el motor (no es un %). -->
+                 compartida por organización → sin tamaño local: N/A. El motor va en la subetiqueta. -->
             <ion-col size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
                 <ion-card-content class="metric-card__content metric-stat">
@@ -58,9 +64,10 @@
           </ion-row>
         </ion-grid>
 
-        <!-- Conexión Bridge — hardware local (impresoras/cajón). Ajeno a las métricas de arriba:
-             en cloud las métricas vienen de ECS y NO requieren Bridge. -->
-        <ion-card class="ion-no-margin">
+        <!-- ── Bloque Bridge — hardware local (impresoras/cajón) ──────────────────────
+             Se muestra siempre SALVO en cloud-sin-bridge (caso "solo PWA": solo métricas). Así local
+             y el arranque sin contrato muestran el bloque, con CTA de instalación si está offline. -->
+        <ion-card v-if="showBridgeBlock" class="ion-no-margin">
           <ion-card-content>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
               <h3 style="margin: 0; font-weight: 600">Conexión Bridge</h3>
@@ -333,6 +340,22 @@ const BRIDGE_OS: BridgeOs[] = [
 
 // ── Derivados (axis-aware) ───────────────────────────────────────
 
+// Pestaña Recursos = dos bloques (ARQUITECTURA.md §1):
+//   • Recursos del sistema — SIEMPRE visible; la FUENTE cambia con el despliegue: en cloud los datos
+//     vienen de AWS (ECS + Aurora); en local, del propio equipo (sysinfo + SQLite). Así "lo local se
+//     ve en local y lo de la nube en la nube"; el tamaño SQLite solo existe (y se ve) en local.
+//   • Bridge — hardware local → siempre EXCEPTO cloud-sin-bridge (caso "solo PWA": solo métricas).
+//     Con `info` sin cargar (null) NO es cloud ⇒ mostramos Bridge (nunca dejamos Recursos vacío).
+const resourcesTitle = computed<string>(() =>
+  info.value?.backend === 'cloud' ? 'Recursos en la nube'
+    : info.value?.backend === 'single' ? 'Recursos de este equipo'
+      : 'Recursos del sistema'
+);
+const resourcesSource = computed<string | null>(() =>
+  info.value?.backend === 'cloud' ? 'AWS' : info.value?.backend === 'single' ? 'Local' : null
+);
+const showBridgeBlock = computed<boolean>(() => bridge.value.online || info.value?.backend !== 'cloud');
+
 const dbEngineLabel = computed<string>(() => {
   const e = info.value?.database.engine ?? '';
   if (e === 'sqlite') return 'SQLite local';
@@ -341,8 +364,9 @@ const dbEngineLabel = computed<string>(() => {
   return e || '—';
 });
 
-// Métricas con defaults a 0: las tarjetas KPI SIEMPRE se muestran (aunque no haya datos del
-// runtime todavía), con valores neutros. En cloud estos datos vienen de ECS, no del Bridge.
+// Métricas con defaults a 0: las tarjetas KPI SIEMPRE se muestran (aunque no haya datos del runtime
+// todavía), con valores neutros. La fuente cambia con el despliegue: cloud = ECS, local = sysinfo
+// del SO (el Bridge es ajeno a estas métricas).
 const cpu = computed(() => info.value?.cpu ?? null);
 const memory = computed(() => info.value?.memory ?? null);
 
@@ -362,13 +386,10 @@ const usageThresholds = [
   { to: 100, color: '#eb445a' },
 ];
 
-const dbValue = computed<string>(() => info.value?.database?.sizeLabel ?? dbEngineLabel.value);
-const dbSub = computed<string>(() => {
-  const db = info.value?.database;
-  if (db?.sizeLabel) return dbEngineLabel.value;          // single: "SQLite local" bajo el tamaño
-  if (db) return db.engine === 'sqlite' ? 'SQLite local' : 'gestionada por AWS';
-  return 'gestionada por AWS';
-});
+// Tamaño = headline. Solo existe en local (SQLite); en cloud (Aurora) no hay tamaño local → "N/A".
+// El motor (SQLite local / Aurora / PostgreSQL) va en la subetiqueta.
+const dbValue = computed<string>(() => info.value?.database?.sizeLabel ?? 'N/A');
+const dbSub = computed<string>(() => (info.value?.database ? dbEngineLabel.value : '—'));
 const dbConnections = computed<number>(() => info.value?.database?.connections ?? 0);
 const connectionsMax = computed<number>(() => info.value?.database?.connectionsLimit ?? 100);
 const connectionsLimitLabel = computed<string>(() =>
@@ -515,5 +536,16 @@ onBeforeUnmount(() => {
 .metric-stat__sub {
   font-size: 0.8125rem;
   color: var(--ion-color-medium);
+}
+/* Cabecera de sección (Recursos): título + pill de fuente, sobre la rejilla de métricas. */
+.block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 4px 4px 8px;
+}
+.block-header__title {
+  margin: 0;
+  font-weight: 600;
 }
 </style>
