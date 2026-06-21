@@ -1,6 +1,6 @@
 # hub
 
-Próxima generación del Hub de ERPlora: **Ionic React + Rust/Axum + Tauri + módulos
+Próxima generación del Hub de ERPlora: **Vue 3 + Ionic + Rust/Axum + Tauri + módulos
 declarativos (`module.json`) + WASM + SDK**, SQLite (local) / Postgres-Aurora (cloud).
 Reemplazará progresivamente al Hub actual (`../hub`).
 
@@ -11,8 +11,9 @@ Reemplazará progresivamente al Hub actual (`../hub`).
 
 Lo que **ya funciona** (validado en Chrome headless; sin Rust todavía):
 
-- **App web navegable** ([apps/web](apps/web)): **Ionic React 8.8 + Vite + TS + Tailwind v4
-  + react-icons** (componentes Ionic reales, **sin Capacitor**), tematizada a la marca por
+- **App web navegable** ([apps/web](apps/web)): **Vue 3 + Ionic (`@ionic/vue` 8.8) + vue-router
+  + Vite + TS + Tailwind v4 + Iconify (`unplugin-icons`)** (componentes Ionic reales, **sin
+  Capacitor**), tematizada a la marca por
   variables `--ion-*` (brand `#1496d6`, crema, dark por `.ion-palette-dark`). **13 pantallas**:
   login (email/**PIN**/setup), dashboard, empleados (+ alta/edición), roles y permisos,
   billing, marketplace, ajustes, sistema, **vista de módulo (WC Lit en runtime)** y
@@ -41,7 +42,7 @@ source,cloud-client,guest-sdk,wasm-host,server,sync}`, WASM.
 
 ```
 apps/
-  web/           Ionic React 8.8 + Vite + TS + Tailwind + react-icons (13 vistas)    [real]
+  web/           Vue 3 + Ionic 8.8 + Vite + TS + Tailwind + Iconify (13 vistas)       [real]
   tauri/         empaquetado desktop/móvil                                          [stub]
 packages/
   ui/            (ejemplo, NO usado por apps/web) componentes React+Tailwind         [ejemplo]
@@ -103,7 +104,7 @@ pnpm -F @erplora/web typecheck                  # TS estricto
 
 ## Decisiones fijadas (ver §14–15 del doc)
 
-- **TypeScript** en todo · **Ionic React 8.8 + Tailwind + react-icons** (sin Capacitor; nativo = Tauri).
+- **TypeScript** en todo · **Vue 3 + Ionic 8.8 + Tailwind + Iconify** (sin Capacitor; nativo = Tauri).
 - **Lit** para los Web Components de módulos · **pnpm** + Cargo workspaces (raíz compartida).
 - **Dos ejes ortogonales** (§1): backend `single` (SQLite) / `cloud` (Aurora) × shell `tauri` / `web-pwa`.
 - Transporte de datos **HTTP (RPC) + WS (eventos)** con backend cloud / **IPC** con backend single.

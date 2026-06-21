@@ -1,16 +1,15 @@
 # hub — Arquitectura
 
 > **Documento de diseño.** Define el Hub de
-> ERPlora: **Ionic React + Rust/Axum + Tauri + módulos declarativos (module.json) +
+> ERPlora: **Vue 3 + Ionic + Rust/Axum + Tauri + módulos declarativos (module.json) +
 > WASM + SDK**, con **SQLite en local** y **PostgreSQL/Aurora en cloud**.
 >
 > **hub ES el Hub de ERPlora.**
 >
-> Fuentes: visión [erplora_arquitectura_modular_ionic_rust_tauri.md](../docs/arquitectura/erplora_arquitectura_modular_ionic_rust_tauri.md),
-> diseño AI/RAG [PLAN-ASISTENTE-RAG.md](../docs/arquitectura/PLAN-ASISTENTE-RAG.md), mapa del monorepo
-> [CLAUDE.md](../CLAUDE.md).
+> Fuentes: diseño AI/RAG [PLAN-ASISTENTE-RAG.md](../docs/arquitectura/PLAN-ASISTENTE-RAG.md), mapa del monorepo
+> [CLAUDE.md](../CLAUDE.md), repo de arquitectura seccionado [architecture/](../architecture/).
 >
-> **Estado:** propuesta + scaffolding inicial (`apps/web` Ionic React, primer módulo
+> **Estado:** propuesta + scaffolding inicial (`apps/web` Vue 3 + Ionic, primer módulo
 > `modules/inventory` con WC Lit; CSP validada — §14). Última actualización: 2026-05-31
 > (decisiones fijadas: impresoras **solo LAN**, **PK = UUID v4 `TEXT` en todo** el dato de negocio (ADR-0035, sin remapeo) — §2.5, §2.7, §14).
 
@@ -113,7 +112,7 @@ single + web-PWA   no aplica: `single` exige runtime embebido ⇒ siempre Tauri
 Asimetría a recordar: **`single` ⟹ Tauri** (forzado); **Tauri no ⟹ single** (puede ser cliente
 cloud); **`web-pwa` ⟹ cloud** (forzado).
 
-- **UI idéntica**: Ionic React como *shell*; cada módulo aporta su pantalla como Web
+- **UI idéntica**: Vue 3 + Ionic como *shell*; cada módulo aporta su pantalla como Web
   Component (Lit, §3.1), cargado dinámicamente. El **hardware es una capacidad solo-Tauri**:
   presente en el build Tauri, ausente en el build web (se modela con un *capabilities descriptor*
   que el runtime expone y la UI usa solo para mostrar/ocultar).
@@ -144,7 +143,7 @@ cloud); **`web-pwa` ⟹ cloud** (forzado).
 
 | Pieza | Qué es | Tecnología | ¿Cambia? |
 |-------|--------|-----------|----------|
-| **Cloud Portal** | `erplora.com`: landing, dashboard, **marketplace**, **billing Stripe**, **provisioning** (boto3 → ECS+Aurora), **proxy AI** | Django 6 + Datastar | **NO** |
+| **Cloud Portal** | `erplora.com`: landing, dashboard, **marketplace**, **billing Stripe**, **provisioning** (boto3 → ECS+Aurora), **proxy AI** | Django 6 + htmx | **NO** |
 | **hub (modo cloud)** | El **runtime del tenant** en ECS. Sirve la app Ionic y ejecuta módulos | Rust + Axum | **SÍ** |
 | **hub (modo local)** | El mismo runtime **embebido** en un shell Tauri (desktop/móvil), offline-first con SQLite. El shell Tauri también puede actuar como **cliente del modo cloud** (datos en Aurora, hardware local vía `invoke`) — los ejes backend/shell son ortogonales (§1) | Rust + Tauri | Nuevo |
 
@@ -543,7 +542,7 @@ filtro de módulos + pantalla de activación; typecheck + build verdes).
 
 | Capa | Elección | Motivo |
 |------|----------|--------|
-| Shell frontend | **Ionic React 8.8 + Vite + TS + Tailwind v4 + react-icons** | Componentes Ionic reales; **sin Capacitor** (runtime nativo = Tauri). Tematizado por `--ion-*` (§3.1, §15) |
+| Shell frontend | **Vue 3 + Ionic (`@ionic/vue` 8.8) + vue-router + Vite + TS + Tailwind v4 + Iconify (`unplugin-icons`, build-inline)** | Componentes Ionic reales; **sin Capacitor** (runtime nativo = Tauri). Tematizado por `--ion-*` (§3.1, §15) |
 | UI de módulos | **Web Components** (Lit recomendado, §3.1) | WC estándar, cargables dinámicamente; default 2026 |
 | Runtime/backend | **Rust + Axum** | Runtime ligero/portátil, una sola autoridad, sin Node en prod local |
 | Desktop/móvil | **Tauri v2** | Empaqueta la misma UI; binario pequeño; `invoke` = transport de datos (backend `single`) **y/o** canal de hardware local (cualquier backend, §2.7); puede actuar como cliente del backend cloud |
@@ -560,7 +559,7 @@ runtime, plugins nativos `.so/.dll` dinámicos para terceros.
 > Investigado (mayo 2026). **Recomendación: Lit.** Stencil sigue **mantenido** (v4.43.x,
 > gobernanza por comité TSC tras la compra de Ionic por OutSystems), no es una apuesta muerta;
 > pero el **default del sector en 2026 es Lit**, salvo que necesites generar *wrappers* nativos
-> React/Vue/Angular — que **NO es nuestro caso** (nuestro shell es solo Ionic React).
+> React/Vue/Angular — que **NO es nuestro caso** (nuestro shell es solo Vue 3 + Ionic).
 
 | | **Lit** (Google) | **Stencil** (OutSystems/Ionic) |
 |---|---|---|
@@ -568,7 +567,7 @@ runtime, plugins nativos `.so/.dll` dinámicos para terceros.
 | Pros | Ligero, cercano al estándar, sin paso de compilación, **default 2026**, respaldo Google | Muy optimizado (lazy-load, scoped CSS, prerender), wrappers multi-framework |
 | Contras | Menos "baterías incluidas" | "Caja negra", más complejo; su killer-feature (multi-framework) **no la usamos** |
 
-- **Por qué Lit aquí**: el único consumidor es **Ionic React**; la ventaja única de Stencil
+- **Por qué Lit aquí**: el único consumidor es **Vue 3 + Ionic**; la ventaja única de Stencil
   (multi-framework) no aporta, así que pagaríamos su complejidad sin usar su beneficio. Lit es
   más ligero, más estándar y el camino mayoritario en 2026.
 - **Decisión abierta (§14)**: confirmar con un **componente de prueba en cada uno en Fase 0**
@@ -1338,7 +1337,7 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 - **El sync Git del Cloud parsea `module.py`** (§2.6) → sin `manifest_kind`, no ingiere `module.json`.
 - **Inmutabilidad S3**: republicar un `v{ver}.zip` rompe SHA256 de clientes (el Cloud lo bloquea).
 - **WC dinámico + CSP estricta**: el JS de módulo no puede exigir `unsafe-inline`/`eval`.
-  ✅ Validado en `apps/web` (Ionic React 8.8 + Vite + TS + Tailwind + react-icons) +
+  ✅ Validado en `apps/web` (Vue 3 + Ionic 8.8 + Vite + TS + Tailwind + Iconify) +
   `modules/inventory` (Lit + ESM + `import()` dinámico): **0 violaciones de CSP de script** en
   Chrome headless contra el build de prod; el CLI `build` verifica CSP-safe en cada compilación.
   ⚠️ **@ionic/react SÍ requiere `style-src 'self' 'unsafe-inline'`** (estilos inline; riesgo bajo).

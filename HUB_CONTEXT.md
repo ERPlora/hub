@@ -3,7 +3,7 @@
 ## Qué es
 
 `hub` es la nueva generación del Hub de ERPlora. La UI es una shell
-**Ionic React 8 + Vite + TypeScript + Tailwind v4**, sin Capacitor. La misma shell
+**Vue 3 + Ionic 8 + Vite + TypeScript + Tailwind v4**, sin Capacitor. La misma shell
 debe servir para cloud y para Tauri. Los módulos se cargan en runtime como Web
 Components, actualmente con **Lit**.
 
@@ -61,10 +61,15 @@ tenant que sustituira progresivamente al hub actual.
 - Transport de datos por backend: `cloud` usa HTTP (query/command) + WebSocket (solo
   eventos); `single` usa Tauri `invoke` + events. En cualquier shell Tauri, `invoke`
   es ademas el canal de hardware local (independiente del backend) -> combo `cloud + Tauri`.
-- Modelo **local-first + sync** (ADR-0031): cada dispositivo opera sobre SQLite local como
-  autoridad y funciona offline (tras primer login online). El tier **Cloud DB** es SQLite local
-  **+ sync** a Aurora (no thin-client); el **web-PWA/iOS** es online-only. El motor de sync está
-  pendiente (columna humano).
+- **Dos productos, SIN sync ni Cloud DB remota** (ADR-0040, 2026-06-13; supera el
+  "local-first + sync" de ADR-0031 y el tier "Cloud DB" de ADR-0030, ambos RETIRADOS):
+  - **Local** (gratis): backend `single`, **SQLite local autoritativo**, un dispositivo,
+    100% offline. El respaldo a la nube (cifrado a S3, manual o programado) lo da el módulo
+    **`backup`** premium — no hay base de datos remota intermedia ni motor de sincronización.
+  - **Cloud** (online): backend `cloud`, **Aurora por organización** + 1 contenedor ECS por hub,
+    multi-dispositivo / web, *online-only*.
+  - No existe migración Local→Cloud, ni RDS Proxy/NLB, ni crate `datasync`. El crate `sync`
+    que sigue vivo es **solo** el cliente WebSocket de eventos en vivo, NO un motor de datos.
 - El `bridge/` no se elimina: sidecar de hardware en Tauri, o standalone opcional
   para `cloud + web-PWA` (§2.7).
 - AI y embeddings siempre pasan por el proxy del Cloud Portal, no directo desde
