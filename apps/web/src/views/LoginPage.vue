@@ -364,19 +364,23 @@ const trustedUsers = ref<TrustedUser[]>(readTrustedUsers());
 const step = ref<Step>(trusted.value ? 'pin' : 'email');
 const showTabs = computed(() => trusted.value && step.value !== 'setup');
 
-// Si el RUNTIME reporta usuarios con PIN (`GET /api/hub/context` → pin_users), mostramos el grid
-// de PIN directamente — sin depender del flag local (que solo se rellenaba tras un login cloud
-// "confiar en este dispositivo"). Así cualquier hub con usuarios (p. ej. el demo: "Demo") presenta
-// el login local al llegar. El flujo de device-trust/seguridad (§2.9) NO cambia: solo se decide
-// qué pestaña se muestra; la pestaña Email sigue disponible. `immediate` cubre el caso ya resuelto.
+// El RUNTIME (`GET /api/hub/context` → pin_users) es la AUTORIDAD de quién puede hacer login local
+// por PIN. localStorage NO añade usuarios: solo **decora** con email/iniciales (hub_user no guarda
+// email), cacheados del login cloud y pegados a la entrada del runtime que coincida por id. Antes se
+// "conservaban" los de localStorage ausentes del runtime → podía resucitar usuarios obsoletos
+// (drift); ya no. El flujo de seguridad (§2.9) NO cambia: esto solo decide qué pestaña se muestra;
+// la pestaña Email sigue disponible. `immediate` cubre el caso ya resuelto.
 watch(
   pinUsers,
   (users) => {
     if (!users.length || step.value === 'setup') return;
-    const merged = [...users.map((u) => ({ id: u.id, name: u.name, initials: initials(u.name) }))];
-    // Conserva los del localStorage que no estén ya en la lista del runtime (multi-cuenta).
-    for (const u of trustedUsers.value) if (!merged.some((m) => m.id === u.id)) merged.push(u);
-    trustedUsers.value = merged;
+    const cachedById = new Map(trustedUsers.value.map((u) => [u.id, u]));
+    trustedUsers.value = users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      initials: initials(u.name),
+      email: cachedById.get(u.id)?.email,
+    }));
     trusted.value = true;
     step.value = 'pin';
   },
