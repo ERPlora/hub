@@ -107,6 +107,12 @@ jobs:
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Un único manifest por build (sin índice OCI ni attestation-manifest sin tag).
+          # Con la lifecycle policy `imageCountMoreThan: 1` los sub-manifests sin tag que crea
+          # provenance/sbom se expirarían y dejarían `:latest` como referencia colgante
+          # (docker pull → "manifest unknown"). Sin ellos, "la última" = 1 imagen limpia.
+          provenance: false
+          sbom: false
 
       - name: Output image URIs
         run: |
