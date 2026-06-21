@@ -105,6 +105,11 @@ jobs:
           file: docker/Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          # OUTFITKIT_CACHEBUST único por run → invalida la capa `pnpm add @erplora/outfitkit@latest`
+          # del Dockerfile en CADA build, forzando que la imagen coja SIEMPRE la última OutfitKit
+          # publicada (el tag npm `latest` lo mueve la GH action de release de outfitkit).
+          build-args: |
+            OUTFITKIT_CACHEBUST=${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # Un único manifest por build (sin índice OCI ni attestation-manifest sin tag).

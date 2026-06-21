@@ -43,9 +43,16 @@ RUN pnpm install --frozen-lockfile
 # Ahora el código del shell web.
 COPY apps/web ./apps/web
 COPY scripts ./scripts
-# OutfitKit (@erplora/outfitkit) expone `./dist/*` y su dist NO está versionado (gitignored, sin
-# postinstall): hay que compilarlo antes que el shell, que lo importa (`@erplora/outfitkit/...`).
-RUN pnpm -F @erplora/outfitkit build
+# OutfitKit SIEMPRE a la última publicada en npm. El tag `latest` lo mueve la GitHub Action de
+# release de `outfitkit` en cada publish, así que el Hub debe reflejar lo último que haya ahí
+# (DECISIÓN de producto, 2026-06-22). El `pnpm install --frozen-lockfile` de arriba deja el RESTO
+# de deps pineadas/reproducibles; aquí re-resolvemos SOLO outfitkit a `@latest`, ignorando el pin
+# del lockfile. El ARG cambia en cada build de CI (github.run_id, vía build-hub.yml) para invalidar
+# la caché de esta capa y forzar la re-descarga de la última versión en CADA imagen.
+# (apps/web importa `@erplora/outfitkit/...` desde npm; el viejo `packages/outfitkit` de workspace
+#  ya no se usa ni está versionado.)
+ARG OUTFITKIT_CACHEBUST=local
+RUN pnpm --filter @erplora/web add @erplora/outfitkit@latest
 # Build de producción del shell (vue-tsc + vite build → apps/web/dist).
 # prebuild (sync-modules.mjs) busca módulos en un workspace externo ausente aquí: warn+skip (ok).
 RUN pnpm -F @erplora/web build
