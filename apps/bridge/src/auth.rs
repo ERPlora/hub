@@ -14,25 +14,45 @@
 //!      `WebSocket`, así que el token se acepta por **cabecera** (`Authorization: Bearer` o
 //!      `X-Hub-Session`) **o por query param** (`?token=…`).
 //!
-//! **Decisiones que el humano debe revisar:**
-//!   - **Sin `BRIDGE_TOKEN` configurado, la auth de token queda DESACTIVADA** (solo se aplica la
-//!     allowlist de `Origin`). Es deliberado para no romper el arranque local en desarrollo, pero
-//!     el binario loggea un `warn` ruidoso. En producción (sidecar/standalone empaquetado) el
-//!     token SIEMPRE debe inyectarse. Alternativa si el humano prefiere fail-closed: exigir token
-//!     siempre y que `main` aborte si falta.
-//!   - **El `Origin` ausente se permite** (clientes nativos sin navegador — p.ej. pruebas, el
-//!     sidecar local — no envían `Origin`). El token sigue siendo obligatorio si está configurado.
-//!   - El secreto vive **solo** en el proceso del Bridge; nunca se loggea.
+//! **Modelo (aprobado 2026-06-22, ADR-0050 §seguridad — fail-closed + emparejamiento):**
+//!   - **El token es la frontera real, fail-CLOSED por defecto.** El token es *infalsificable* por un
+//!     tercero (no conoce el secreto) **y agnóstico al dominio**, así que es lo único que aguanta que
+//!     el tenant sirva la PWA desde su **propio dominio** (`pos.surestaurante.com`): el `Origin` no se
+//!     puede enumerar de antemano, el token sí viaja igual. Por eso el token **siempre** se exige,
+//!     salvo en modo dev explícito (`BRIDGE_DEV`).
+//!   - **Origen del token** (en este orden): (1) `BRIDGE_TOKEN` inyectado (ECS/empaquetado, igual que
+//!     `HUB_CLOUD_API_TOKEN`); (2) **emparejamiento**: si no se inyecta, el Bridge **genera** un token
+//!     aleatorio en el primer arranque, lo **persiste** (`BRIDGE_TOKEN_FILE`, por defecto
+//!     `bridge-token` junto al cwd, como `devices.json`) y muestra **una vez** el código para que el
+//!     usuario lo empareje en la app. En arranques siguientes lo lee del fichero.
+//!   - **`BRIDGE_DEV` (solo desarrollo)** desactiva la barrera de token (queda solo la allowlist de
+//!     `Origin`), con un `warn` ruidoso. NUNCA en producción. Reemplaza al viejo "fail-open si falta
+//!     el token", que era demasiado fácil de shippear sin querer.
+//!   - **El `Origin` es defensa en profundidad**, no la puerta: rechaza `null`/orígenes foráneos, pero
+//!     el dominio del tenant se inyecta vía `BRIDGE_ALLOWED_ORIGINS` al provisionar. El `Origin`
+//!     ausente se permite (clientes nativos sin navegador no lo envían); el token sigue mandando.
+//!   - El secreto **no se loggea nunca en validación**; solo se muestra **una vez** como código de
+//!     emparejamiento al generarlo (canal local: la consola del operador en su propia máquina).
+
+use std::path::{Path, PathBuf};
 
 use axum::http::{HeaderMap, Uri};
 
 /// Nombre de la cabecera propia de sesión del Hub (alternativa a `Authorization: Bearer`).
 pub const SESSION_HEADER: &str = "x-hub-session";
 
-/// Env var del secreto compartido del Bridge.
+/// Env var del secreto compartido del Bridge (inyectado: ECS/empaquetado).
 pub const ENV_TOKEN: &str = "BRIDGE_TOKEN";
+/// Env var de la ruta del fichero donde se persiste el token de emparejamiento.
+pub const ENV_TOKEN_FILE: &str = "BRIDGE_TOKEN_FILE";
+/// Env var que activa el **modo desarrollo** (desactiva la barrera de token). Cualquier valor
+/// "truthy" (`1`/`true`/`yes`/`on`) la activa. NUNCA en producción.
+pub const ENV_DEV: &str = "BRIDGE_DEV";
 /// Env var de orígenes extra permitidos (CSV). P.ej. `https://app.erplora.com,https://hub.local`.
 pub const ENV_ALLOWED_ORIGINS: &str = "BRIDGE_ALLOWED_ORIGINS";
+
+/// Nombre por defecto del fichero del token (junto al cwd, igual que `devices.json`).
+const DEFAULT_TOKEN_FILE: &str = "bridge-token";
 
 /// Resultado de evaluar el handshake. Mapea a un status HTTP cuando se rechaza.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,9 +86,12 @@ pub struct BridgeAuth {
 }
 
 impl BridgeAuth {
-    /// Construye la política leyendo `BRIDGE_TOKEN` y `BRIDGE_ALLOWED_ORIGINS` del entorno.
+    /// Construye la política desde el entorno (fail-closed salvo `BRIDGE_DEV`).
+    ///
+    /// - `BRIDGE_DEV` truthy → barrera de token **desactivada** (solo `Origin`), con `warn`.
+    /// - en cualquier otro caso → token **obligatorio**, resuelto por `resolve_token`
+    ///   (`BRIDGE_TOKEN` inyectado → fichero persistido → genera+persiste+muestra el emparejamiento).
     pub fn from_env() -> Self {
-        let token = std::env::var(ENV_TOKEN).ok().filter(|t| !t.trim().is_empty());
         let extra_origins = std::env::var(ENV_ALLOWED_ORIGINS)
             .ok()
             .map(|csv| {
@@ -79,14 +102,17 @@ impl BridgeAuth {
             })
             .unwrap_or_default();
 
-        if token.is_none() {
+        if dev_mode() {
             tracing::warn!(
-                "{ENV_TOKEN} no configurado: el WS del Bridge NO exige token (solo allowlist de \
-                 Origin). Configúralo en producción (sidecar/standalone empaquetado)."
+                "{ENV_DEV} activo: el WS del Bridge NO exige token (solo allowlist de Origin). \
+                 Es SOLO para desarrollo — nunca en producción."
             );
+            return Self { token: None, extra_origins };
         }
 
-        Self { token, extra_origins }
+        let env_token = std::env::var(ENV_TOKEN).ok();
+        let token = resolve_token(env_token, &token_file_path());
+        Self { token: Some(token), extra_origins }
     }
 
     /// Constructor explícito (tests / arranque programático del sidecar Tauri, que construirá la
@@ -144,6 +170,88 @@ impl BridgeAuth {
             None => false,
         }
     }
+}
+
+/// `true` si `BRIDGE_DEV` tiene un valor truthy (desactiva la barrera de token — solo dev).
+fn dev_mode() -> bool {
+    std::env::var(ENV_DEV).ok().as_deref().map(is_truthy).unwrap_or(false)
+}
+
+/// Interpreta un valor de env como booleano: `1`/`true`/`yes`/`on` (case-insensitive) ⇒ `true`.
+fn is_truthy(v: &str) -> bool {
+    matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")
+}
+
+/// Ruta del fichero del token de emparejamiento (`BRIDGE_TOKEN_FILE`, por defecto junto al cwd).
+fn token_file_path() -> PathBuf {
+    std::env::var(ENV_TOKEN_FILE)
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(DEFAULT_TOKEN_FILE))
+}
+
+/// Resuelve el token (fail-closed): `env_token` inyectado → fichero persistido → genera+persiste y
+/// muestra el código de emparejamiento. **Siempre** devuelve un token no vacío. Pura respecto al
+/// entorno (recibe el valor de env y la ruta) para poder testearla sin tocar variables globales.
+fn resolve_token(env_token: Option<String>, path: &Path) -> String {
+    // 1. Token inyectado (ECS/empaquetado).
+    if let Some(t) = env_token {
+        let t = t.trim();
+        if !t.is_empty() {
+            return t.to_string();
+        }
+    }
+    // 2. Token persistido de un emparejamiento anterior.
+    if let Ok(contents) = std::fs::read_to_string(path) {
+        let t = contents.trim();
+        if !t.is_empty() {
+            return t.to_string();
+        }
+    }
+    // 3. Primer arranque sin token: genera, persiste y muestra el código de emparejamiento.
+    let token = generate_token();
+    persist_token(path, &token);
+    log_pairing_code(&token);
+    token
+}
+
+/// Token aleatorio = dos uuid v4 concatenados (≈244 bits de entropía, CSPRNG vía getrandom).
+fn generate_token() -> String {
+    format!(
+        "{}{}",
+        uuid::Uuid::new_v4().simple(),
+        uuid::Uuid::new_v4().simple()
+    )
+}
+
+/// Persiste el token (best-effort). En unix restringe los permisos a `0600` (solo el dueño).
+/// Si falla la escritura, loggea un `warn`: el token se regenerará en el próximo arranque.
+fn persist_token(path: &Path, token: &str) {
+    match std::fs::write(path, token) {
+        Ok(()) => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+            }
+            tracing::info!(path = %path.display(), "Bridge: token de emparejamiento generado y guardado");
+        }
+        Err(e) => tracing::warn!(
+            error = %e,
+            path = %path.display(),
+            "Bridge: no pude persistir el token; se regenerará en el próximo arranque",
+        ),
+    }
+}
+
+/// Muestra **una vez** el código de emparejamiento en la consola del operador. Es el único punto
+/// donde el secreto se imprime (canal local, máquina del propio usuario); nunca en validación.
+fn log_pairing_code(token: &str) {
+    tracing::info!(
+        "\n┌─ Bridge · código de emparejamiento ────────────────────────────\n\
+         │  {token}\n\
+         │  Introdúcelo en Ajustes → Bridge de la app para conectar el hardware.\n\
+         └─────────────────────────────────────────────────────────────────"
+    );
 }
 
 /// Orígenes implícitamente de confianza, sin necesidad de configuración:
@@ -441,5 +549,62 @@ mod tests {
         assert!(!constant_time_eq(b"abc", b"ab"));
         assert!(!constant_time_eq(b"", b"x"));
         assert!(constant_time_eq(b"", b""));
+    }
+
+    // ── token: dev mode + resolución/persistencia (emparejamiento) ───────────
+
+    /// Ruta temporal única por test (uuid) para no pisarse entre tests en paralelo.
+    fn tmp_token_path() -> PathBuf {
+        std::env::temp_dir().join(format!("bridge-token-test-{}", uuid::Uuid::new_v4()))
+    }
+
+    #[test]
+    fn is_truthy_values() {
+        for v in ["1", "true", "TRUE", "yes", "on", " On "] {
+            assert!(is_truthy(v), "{v:?} debería ser truthy");
+        }
+        for v in ["0", "false", "no", "off", "", "x"] {
+            assert!(!is_truthy(v), "{v:?} NO debería ser truthy");
+        }
+    }
+
+    #[test]
+    fn resolve_token_prefers_injected_env() {
+        let p = tmp_token_path();
+        let t = resolve_token(Some("  injected-secret  ".into()), &p);
+        assert_eq!(t, "injected-secret", "el token inyectado gana y se trimea");
+        assert!(!p.exists(), "con token inyectado NO se escribe fichero de emparejamiento");
+    }
+
+    #[test]
+    fn resolve_token_generates_persists_then_reuses() {
+        let p = tmp_token_path();
+        // 1er arranque sin token: genera y persiste.
+        let t1 = resolve_token(None, &p);
+        assert!(t1.len() >= 32, "token generado suficientemente largo (fue {})", t1.len());
+        assert!(p.exists(), "el token de emparejamiento se persiste");
+        // 2º arranque: reutiliza el mismo del fichero (emparejamiento estable entre reinicios).
+        let t2 = resolve_token(None, &p);
+        assert_eq!(t1, t2, "el token persistido se reutiliza entre arranques");
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn resolve_token_ignores_blank_env_and_blank_file() {
+        let p = tmp_token_path();
+        std::fs::write(&p, "   \n").unwrap(); // fichero en blanco
+        let t = resolve_token(Some("   ".into()), &p); // env en blanco
+        assert!(!t.trim().is_empty(), "ni env ni fichero en blanco valen → genera uno nuevo");
+        assert_eq!(
+            std::fs::read_to_string(&p).unwrap().trim(),
+            t,
+            "el token nuevo sobrescribe el fichero en blanco",
+        );
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn generated_tokens_are_unique() {
+        assert_ne!(generate_token(), generate_token(), "cada token generado es distinto");
     }
 }

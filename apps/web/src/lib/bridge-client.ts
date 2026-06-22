@@ -13,6 +13,46 @@ import { config } from './config';
 /** Host del Bridge local. Puerto fijo `BRIDGE_WS_PORT` (crates/peripherals/src/lib.rs). */
 export const BRIDGE_HOST = 'http://localhost:12321';
 
+/** Clave de `localStorage` donde la app guarda el token de emparejamiento del Bridge. */
+const BRIDGE_TOKEN_KEY = 'erplora.bridge.token';
+
+/**
+ * Token de emparejamiento guardado, o `null` si aún no se emparejó (ADR-0050 §seguridad).
+ * El Bridge muestra el código una vez al arrancar; el usuario lo introduce en Ajustes → Bridge,
+ * que llama a {@link setBridgeToken}. El token NO es necesario para `GET /status` (abierto), solo
+ * para abrir el canal `WS /ws` que maneja hardware.
+ */
+export function getBridgeToken(): string | null {
+  try {
+    const t = localStorage.getItem(BRIDGE_TOKEN_KEY);
+    return t && t.trim() ? t.trim() : null;
+  } catch {
+    return null; // localStorage no disponible (SSR / modo restringido)
+  }
+}
+
+/** Guarda (o borra, con `null`) el token de emparejamiento del Bridge. Lo llama la UI de Ajustes. */
+export function setBridgeToken(token: string | null): void {
+  try {
+    if (token && token.trim()) localStorage.setItem(BRIDGE_TOKEN_KEY, token.trim());
+    else localStorage.removeItem(BRIDGE_TOKEN_KEY);
+  } catch {
+    /* localStorage no disponible: no-op */
+  }
+}
+
+/**
+ * URL del canal WebSocket del Bridge (`ws://localhost:12321/ws`) con el token de emparejamiento
+ * como query param (`?token=…`) — única vía por la que un `WebSocket` de navegador puede presentar
+ * credenciales (no puede fijar cabeceras). La consumirá el transporte de hardware cuando se cablee
+ * (hoy `bridge-client.ts` solo hace detección). Sin token emparejado, el Bridge responderá 401.
+ */
+export function bridgeWsUrl(): string {
+  const ws = BRIDGE_HOST.replace(/^http/, 'ws');
+  const token = getBridgeToken();
+  return token ? `${ws}/ws?token=${encodeURIComponent(token)}` : `${ws}/ws`;
+}
+
 /** Plataformas de descarga expuestas por el Cloud (macOS es solo desarrollo local → fuera). */
 export type BridgePlatform = 'windows' | 'linux' | 'android';
 
