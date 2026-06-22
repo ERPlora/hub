@@ -211,8 +211,10 @@ jobs:
           sdkmanager --install "ndk;${NDK_VERSION}" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
           echo "NDK_HOME=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
 
+      # CLI nativo vía cargo (NO el npm global): con el npm global, el task gradle rustBuild invoca
+      # `node .../tauri` con una ruta mal resuelta ("Cannot find module .../src-tauri/tauri").
       - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli@^2
+        run: cargo install tauri-cli --version "^2" --locked
 
       - name: Set version from tag
         if: startsWith(github.ref, 'refs/tags/v')
@@ -223,8 +225,8 @@ jobs:
       - name: Build Android APK
         working-directory: apps/tauri
         run: |
-          tauri android init
-          tauri android build --apk
+          cargo tauri android init
+          cargo tauri android build --apk
 
       - name: Sign APK
         env:
