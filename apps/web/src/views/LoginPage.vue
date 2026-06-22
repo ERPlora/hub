@@ -257,6 +257,7 @@ import HubIcon from '../components/HubIcon.vue';
 import { setUser, setHubSession, getHubSession } from '../lib/session';
 import { cloudLogin, setTokens, runtimeCloudSession, runtimePinLogin, runtimeSetPin } from '../lib/cloud';
 import { config } from '../lib/config';
+import { isTauri, invokeTauri } from '../lib/device';
 import { pinUsers } from '../lib/runtime';
 import { isDark, toggleTheme } from '../lib/theme';
 import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
@@ -371,6 +372,24 @@ async function submitEmail(): Promise<void> {
   try {
     // Login real contra el Cloud Portal (ARQUITECTURA.md §2.3: Bearer + X-Hub-Id).
     const result = await cloudLogin(emailVal.value.trim().toLowerCase(), passwordVal.value);
+
+    // Primer login = el Cloud crea/resuelve el Hub de ESTE dispositivo y devuelve su hub_id real
+    // (ARQUITECTURA.md §2.9b). Lo adoptamos como X-Hub-Id ANTES de activar la sesión, para que el
+    // gate de entitlement (App.vue → resolveEntitlement) deje de pegar contra el hub placeholder.
+    // En Tauri, además, ENROLAMOS el dispositivo: el shell pide el token de máquina al Cloud y
+    // persiste token + hub_id real en disco (hot-reload del runtime embebido), así marketplace/
+    // entitlement firman con la identidad real sin depender de un JWT fresco. Best-effort: si el
+    // enroll falla, el JWT del usuario ya autoriza por IsHubMember.
+    if (result.hubId) {
+      config.hubId = result.hubId;
+      if (isTauri()) {
+        await invokeTauri('enroll_device', {
+          hubId: result.hubId,
+          accessToken: result.access,
+        }).catch(() => null);
+      }
+    }
+
     setTokens(result.access, result.refresh);
 
     // Abre la sesión LOCAL del runtime a partir del JWT (autoridad de permisos local, §2.9).

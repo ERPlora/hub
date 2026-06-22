@@ -71,6 +71,12 @@ export default defineConfig({
   // (ver .env.local) todas las llamadas salen de :5173 y Vite las reenvía:
   //   /api + /ws → runtime Axum local · /cloud/* → Cloud Portal (reescrito sin el prefijo)
   server: {
+    // Bind explícito a IPv4. Node 17+ (aquí v24) resuelve `localhost`→`::1` primero, así que
+    // Vite quedaba escuchando SOLO en IPv6 `[::1]:5173`. El webview de Tauri pega a `127.0.0.1`
+    // → conexión rechazada → ventana en blanco. Forzar 127.0.0.1 + strictPort lo evita.
+    host: '127.0.0.1',
+    port: 5173,
+    strictPort: true,
     proxy: {
       '/cloud': {
         target: 'https://erplora.com',

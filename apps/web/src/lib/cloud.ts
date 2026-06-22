@@ -18,6 +18,10 @@ export interface LoginResult {
   access: string;
   refresh: string;
   user: CloudUser;
+  /** Hub de ESTE dispositivo, creado/resuelto por el Cloud en el primer login (§2.9b) cuando el
+   *  cliente manda `X-Client-Type: hub-desktop|hub-local` + `X-Device-Id`. Es el PK del registro
+   *  `Hub` en la BD del Cloud → se adopta como `X-Hub-Id`. `undefined` en web-pwa pura. */
+  hubId?: string;
 }
 
 export interface CloudMarketplaceModule {
@@ -354,14 +358,14 @@ async function post<T>(
 export async function cloudLogin(email: string, password: string): Promise<LoginResult> {
   // En Tauri esto añade X-Client-Type: hub-desktop|hub-local + X-Device-Id para que el Cloud
   // cree/resuelva el hub de ESTE dispositivo (ARQUITECTURA.md §2.9b). En web pura va como 'hub'.
-  const tokens = await post<{ access: string; refresh: string }>(
+  const tokens = await post<{ access: string; refresh: string; hub_id?: string }>(
     '/api/v1/auth/login/',
     { email, password },
     8000,
     await loginHeaders(),
   );
   const me = await meRequest(tokens.access);
-  return { access: tokens.access, refresh: tokens.refresh, user: me };
+  return { access: tokens.access, refresh: tokens.refresh, user: me, hubId: tokens.hub_id };
 }
 
 function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudMarketplaceModule {
