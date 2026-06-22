@@ -23,6 +23,8 @@ import { i18n } from './i18n';
 import { getClient, clientInjectionKey, bootHubContext } from './lib/runtime';
 import { setOnSessionExpired } from './lib/cloud';
 import { logout } from './lib/session';
+import { setOnHubGone } from './lib/entitlement';
+import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
@@ -119,6 +121,16 @@ bootPrintOnSale(getClient());
 // Si un refresh falla (sesión expirada de verdad), cloud.ts ya limpió los tokens; aquí
 // limpiamos el estado reactivo del usuario y mandamos a /login vía el router del shell.
 setOnSessionExpired(() => {
+  logout();
+  void router.replace('/login');
+});
+
+// El Cloud reportó que el hub fue borrado/revocado (410 hub_not_found, vía el gate de
+// entitlement): olvidamos la identidad de máquina local (`forget_hub` borra token + hub_id +
+// entitlement cacheado) y cerramos sesión. El `device.id` se conserva, así que el próximo login
+// re-registra el hub por dispositivo (§2.9b). Distinto de un token caducado (que solo refresca).
+setOnHubGone(() => {
+  void invokeTauri('forget_hub').catch(() => null);
   logout();
   void router.replace('/login');
 });

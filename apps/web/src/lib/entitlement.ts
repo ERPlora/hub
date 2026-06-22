@@ -17,7 +17,7 @@ export type EntitlementStatus = 'unknown' | 'unlocked' | 'needs_activation';
 
 /** Resultado del comando Tauri `validate_entitlement` (serde tag="state", snake_case). */
 interface GateOutcome {
-  state: 'unlocked' | 'needs_activation';
+  state: 'unlocked' | 'needs_activation' | 'hub_gone';
   modules?: Array<{ module_id: string; tier: string; version: string }>;
   deployment_mode?: string;
   offline?: boolean;
@@ -47,6 +47,14 @@ export function resetEntitlement(): void {
   _status.value = 'unknown';
   _offline.value = false;
   _reason.value = '';
+}
+
+/** Hook que dispara el shell cuando el Cloud reporta que el hub fue borrado/revocado (410
+ *  `hub_not_found`). El shell lo cablea para olvidar la identidad local (`forget_hub`) + logout
+ *  → /login; el siguiente login re-registra por `X-Device-Id` (§2.9b). */
+let onHubGone: (() => void) | null = null;
+export function setOnHubGone(fn: () => void): void {
+  onHubGone = fn;
 }
 
 function applyOutcome(o: GateOutcome): void {
@@ -82,6 +90,14 @@ export async function resolveEntitlement(): Promise<void> {
     accessToken: token,
   }).catch(() => null);
   if (outcome) {
+    if (outcome.state === 'hub_gone') {
+      // El Cloud dice que el hub fue borrado/revocado (410 hub_not_found): olvidamos la identidad
+      // local y salimos a /login. El siguiente login re-registra por X-Device-Id (§2.9b). NO
+      // mostramos la pantalla de activación (no es un problema de licencia, el hub ya no existe).
+      resetEntitlement();
+      onHubGone?.();
+      return;
+    }
     applyOutcome(outcome);
     return;
   }

@@ -30,6 +30,10 @@ const PUBKEY_FILE: &str = "cloud_public_key.pem";
 pub enum GateError {
     #[error("http error: {0}")]
     Http(String),
+    /// El Cloud respondió 410 `hub_not_found`: el hub fue borrado/revocado. Señal inequívoca
+    /// (distinta de un token caducado) para que el frontend haga logout + `forget_hub`.
+    #[error("hub_not_found")]
+    HubGone,
     #[error("io error: {0}")]
     Io(String),
     #[error("respuesta del Cloud inválida: {0}")]
@@ -57,6 +61,10 @@ pub enum GateOutcome {
     },
     /// Sin entitlement válido: mostrar login/activación, no montar negocio.
     NeedsActivation { reason: String },
+    /// El hub fue borrado/revocado en el Cloud (410 `hub_not_found`): el frontend debe hacer
+    /// logout + olvidar la identidad local (`forget_hub`) y re-registrar en el próximo login
+    /// (por `X-Device-Id`, §2.9b). NO se cae a la caché de gracia: la identidad ya no existe.
+    HubGone,
 }
 
 /// Respuesta del endpoint público de clave (`GET /api/v1/auth/public-key/`).
@@ -137,6 +145,9 @@ impl EntitlementGate {
                 deployment_mode: claims.deployment_mode,
                 offline: false,
             },
+            // Hub borrado/revocado: NO cae a la caché de gracia (la identidad ya no existe);
+            // el frontend hará logout + forget_hub y re-registrará en el próximo login.
+            Err(GateError::HubGone) => GateOutcome::HubGone,
             Err(online_err) => {
                 // Sin red (o error transitorio): intenta el token cacheado en gracia.
                 match self.load_cached(now_unix) {
@@ -163,8 +174,14 @@ async fn exec(req: PreparedRequest) -> Result<String, GateError> {
         builder = builder.header(k, v);
     }
     let resp = builder.send().await.map_err(|e| GateError::Http(e.to_string()))?;
-    if !resp.status().is_success() {
-        return Err(GateError::Http(format!("status {}", resp.status())));
+    let status = resp.status();
+    if !status.is_success() {
+        // 410 Gone = el Cloud responde `hub_not_found` (hub borrado/revocado): señal inequívoca
+        // para logout + forget, distinta de un token caducado (401 → refresh).
+        if status.as_u16() == 410 {
+            return Err(GateError::HubGone);
+        }
+        return Err(GateError::Http(format!("status {status}")));
     }
     resp.text().await.map_err(|e| GateError::Http(e.to_string()))
 }
@@ -361,6 +378,12 @@ fn keyring_get() -> Option<String> {
     let t = e.get_password().ok()?.trim().to_string();
     (!t.is_empty()).then_some(t)
 }
+#[cfg(not(target_os = "android"))]
+fn keyring_delete() -> bool {
+    keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .and_then(|e| e.delete_credential())
+        .is_ok()
+}
 #[cfg(target_os = "android")]
 fn keyring_set(_token: &str) -> bool {
     false
@@ -368,6 +391,10 @@ fn keyring_set(_token: &str) -> bool {
 #[cfg(target_os = "android")]
 fn keyring_get() -> Option<String> {
     None
+}
+#[cfg(target_os = "android")]
+fn keyring_delete() -> bool {
+    false
 }
 
 /// Escribe el token en un fichero con permisos **restrictivos** (0600 en unix). Fallback cuando el
@@ -482,6 +509,30 @@ async fn rotate_machine_token(
     let out = fetch_and_persist_token(&cache_dir, hub_id, access_token, true).await?;
     apply_persisted_token(&app, &cache_dir); // hot-reload del token rotado
     Ok(out)
+}
+
+/// Olvida la identidad de máquina de ESTE dispositivo. Lo invoca el frontend cuando el Cloud
+/// responde 410 `hub_not_found` (hub borrado/revocado): borra el token de máquina (keychain +
+/// fichero), el `hub_id` cacheado y el entitlement firmado cacheado, y resetea la celda viva del
+/// runtime embebido (deja de firmar con el token viejo, sin reiniciar). CONSERVA el `device.id`
+/// (ancla estable §2.9b) para que el siguiente login re-registre el hub por dispositivo. Best-effort:
+/// no falla si algún recurso ya no existe.
+#[tauri::command]
+fn forget_hub(app: tauri::AppHandle) -> Result<(), GateError> {
+    use tauri::Manager;
+    let cache_dir: PathBuf =
+        app.path().app_data_dir().map_err(|e| GateError::Io(e.to_string()))?;
+    let _ = keyring_delete();
+    let _ = std::fs::remove_file(machine_token_path(&cache_dir));
+    let _ = std::fs::remove_file(cache_dir.join(HUB_ID_FILE));
+    let _ = std::fs::remove_file(cache_dir.join(TOKEN_FILE));
+    let _ = std::fs::remove_file(cache_dir.join(PUBKEY_FILE));
+    if let Some(h) = app.try_state::<MachineTokenHandle>() {
+        if let Ok(mut g) = h.0.write() {
+            *g = None;
+        }
+    }
+    Ok(())
 }
 
 /// Celda del token de máquina compartida entre el shell Tauri y el runtime embebido (**hot-reload**,
@@ -779,6 +830,7 @@ pub fn run() {
             device_context,
             enroll_device,
             rotate_machine_token,
+            forget_hub,
             // Camino de datos (issue #5): query/command → runtime embebido.
             erplora_query,
             erplora_command,
