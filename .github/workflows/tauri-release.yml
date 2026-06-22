@@ -195,10 +195,13 @@ jobs:
       - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
-      - name: Install Rust toolchain + Android targets
+      # Solo arm64 (arm64-v8a): cubre ~todos los móviles modernos y mantiene el build viable en CI
+      # (cada ABI = una compilación release completa del workspace; 4 ABIs en frío = +60 min).
+      # Añadir armv7-linux-androideabi si hace falta soporte de 32-bit antiguos.
+      - name: Install Rust toolchain + Android target
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -226,7 +229,7 @@ jobs:
         working-directory: apps/tauri
         run: |
           cargo tauri android init
-          cargo tauri android build --apk
+          cargo tauri android build --apk --target aarch64
 
       - name: Sign APK
         env:
