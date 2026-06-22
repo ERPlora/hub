@@ -10,6 +10,8 @@
 
 import { ref } from 'vue';
 
+import { isTauri } from './device';
+
 // `BeforeInstallPromptEvent` no está en lib.dom todavía; tipamos lo que usamos.
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -32,6 +34,23 @@ export const isStandalone = ref<boolean>(
 /** Registra el service worker y engancha los eventos de instalación. Idempotente. */
 export function bootPwa(): void {
   if (typeof window === 'undefined') return;
+
+  // En el shell Tauri (app NATIVA) el service worker de la PWA no aporta nada: su caché del
+  // app-shell sirve assets viejos tras cambiar código → ventana en blanco. NO lo registramos; y
+  // si quedó uno de una sesión anterior (o de una build PWA), lo DESREGISTRAMOS y vaciamos sus
+  // cachés para que el webview deje de servir lo rancio. El SW es solo para el despliegue web-PWA.
+  if (isTauri()) {
+    if ('serviceWorker' in navigator) {
+      void navigator.serviceWorker
+        .getRegistrations()
+        .then((regs) => regs.forEach((r) => void r.unregister()))
+        .catch(() => {});
+    }
+    if ('caches' in window) {
+      void caches.keys().then((keys) => keys.forEach((k) => void caches.delete(k))).catch(() => {});
+    }
+    return;
+  }
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
