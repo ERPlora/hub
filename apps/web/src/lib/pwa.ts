@@ -35,11 +35,14 @@ export const isStandalone = ref<boolean>(
 export function bootPwa(): void {
   if (typeof window === 'undefined') return;
 
-  // En el shell Tauri (app NATIVA) el service worker de la PWA no aporta nada: su caché del
-  // app-shell sirve assets viejos tras cambiar código → ventana en blanco. NO lo registramos; y
-  // si quedó uno de una sesión anterior (o de una build PWA), lo DESREGISTRAMOS y vaciamos sus
-  // cachés para que el webview deje de servir lo rancio. El SW es solo para el despliegue web-PWA.
-  if (isTauri()) {
+  // El SW solo aporta en el despliegue web-PWA de PRODUCCIÓN. NO se registra cuando:
+  //   • Tauri (app NATIVA): su caché del app-shell sirve assets viejos tras cambiar código.
+  //   • DEV (Vite): Vite sirve módulos con URLs cambiantes; el SW (stale-while-revalidate +
+  //     fallback al index en navegaciones) los cachea rancios o devuelve index.html a una
+  //     petición de módulo → "Expected a JS module but got text/html" → ventana en blanco.
+  // En ambos casos, además, DESREGISTRAMOS cualquier SW y vaciamos sus cachés para que el
+  // navegador deje de servir lo rancio de una sesión anterior.
+  if (isTauri() || import.meta.env.DEV) {
     if ('serviceWorker' in navigator) {
       void navigator.serviceWorker
         .getRegistrations()
