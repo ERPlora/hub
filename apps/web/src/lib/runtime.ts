@@ -17,6 +17,7 @@ import { ErploraClient, HttpWsTransport } from '@erplora/module-sdk';
 import { config } from './config';
 import { getAccessToken } from './cloud';
 import { getHubSession } from './session';
+import { beginRequest, endRequest } from './shell';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -98,13 +99,20 @@ export interface InstallRequestResult {
  * `module.installed`. ARQUITECTURA.md §2.2/§4.
  */
 export async function requestInstall(moduleId: string, version: string): Promise<InstallRequestResult> {
-  const res = await fetch(`${RUNTIME_URL}/api/modules/request-install`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
-    body: JSON.stringify({ module_id: moduleId, version }),
-  });
-  if (!res.ok) throw new Error(`request-install ${moduleId} → ${res.status}`);
-  return (await res.json()) as InstallRequestResult;
+  // Barra de progreso del shell mientras instala: descarga el zip + verifica SHA256 + migra puede
+  // tardar (trabajo en background). beginRequest/endRequest alimenta el `inFlight` de la topbar.
+  beginRequest();
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/modules/request-install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ module_id: moduleId, version }),
+    });
+    if (!res.ok) throw new Error(`request-install ${moduleId} → ${res.status}`);
+    return (await res.json()) as InstallRequestResult;
+  } finally {
+    endRequest();
+  }
 }
 
 /** Un módulo instalado según el runtime (`GET /api/modules`). `status` = active|inactive. */

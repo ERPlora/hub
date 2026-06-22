@@ -27,6 +27,7 @@ import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
+import { bootActionFeedback } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 
 // Los componentes de OutfitKit (ok-data-table, etc.) usan ion-icon POR NOMBRE ('pencil', 'trash',
@@ -98,6 +99,10 @@ bootTheme();
 
 // Registra el service worker y engancha el botón «Instalar app» (PWA, ver lib/pwa.ts).
 bootPwa();
+
+// Feedback global de acciones: toast en export/import CSV de cualquier ok-data-table (y base para
+// que el shell muestre éxito/fallo de otras acciones). Ver lib/toast.ts.
+bootActionFeedback();
 
 const app = createApp(App).use(IonicVue).use(router).use(i18n);
 
