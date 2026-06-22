@@ -499,8 +499,10 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn ws_upgrade_open_when_token_disabled() {
-        // Sin BRIDGE_TOKEN, la barrera de token está desactivada: solo se exige buen Origin.
+    async fn ws_upgrade_open_in_dev_mode_without_token() {
+        // Modo dev (BRIDGE_DEV): `BridgeAuth` sin token desactiva la barrera; solo se exige buen
+        // Origin. En producción `from_env` SIEMPRE resuelve un token (fail-closed); este caso no
+        // ocurre salvo dev explícito.
         let port = spawn_server(BridgeAuth::new(None, vec![])).await;
         let req = ws_upgrade_request(port, "/ws", &[("Origin", "http://localhost:5173")]);
         let status = send_request(port, &req).await;
