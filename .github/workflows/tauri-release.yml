@@ -1,0 +1,199 @@
+# ==============================================================================
+# ERPlora Hub App (Tauri) — Build & Upload to S3
+# ==============================================================================
+#
+# La app de escritorio/móvil del Hub (`apps/tauri`, front Vue `@erplora/web` empaquetado con
+# Tauri v2). Espejo de `bridge-release.yml`: build por plataforma → S3 con el rol OIDC.
+#
+# Pipeline:
+#   push main      ─► build (Windows + Linux) ─► S3 app/latest/
+#   push tag v*    ─► build (Windows + Linux) ─► S3 app/v{version}/ + latest/
+#
+# S3 layout (mismo bucket que el bridge; lo consume el Cloud para la descarga):
+#   s3://erplora-downloads/app/
+#   ├── latest/
+#   │   ├── erplora-app-setup.exe   (Windows x64, instalador NSIS — SIN FIRMAR de momento)
+#   │   ├── erplora-app.msi         (Windows x64, MSI — SIN FIRMAR)
+#   │   ├── erplora-app.AppImage    (Linux x86_64, portable)
+#   │   └── erplora-app.deb         (Linux x86_64, Debian/Ubuntu)
+#   └── v{version}/...
+#
+# NO se construye aquí (decisión 2026-06-22):
+#   - macOS  → build local (`cargo tauri build`); no hay cert Apple Developer ID.
+#   - Android → diferido: la app Tauri aún no tiene `gen/android` (`tauri android init`) ni se
+#     ha cableado el job; cuando se haga, se firma con el keystore de Android (único cert
+#     disponible hoy, el mismo del bridge-android).
+#
+# Firma: SIN FIRMAR de momento (no hay cert Authenticode de Windows). El instalador funcionará
+# con aviso de SmartScreen hasta que se añada el cert.
+#
+# AWS auth: OIDC (rol github-actions-deploy, cuenta 363427305647), igual que bridge-release.yml.
+# El rol ya confía en `ERPlora/hub` main + tags v* y tiene S3.
+# ==============================================================================
+
+name: Build Hub App (Tauri)
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    # La app es pesada de compilar: solo se rebuildeará cuando cambie su código o el del front.
+    paths:
+      - 'apps/tauri/**'
+      - 'apps/web/**'
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/tauri-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux
+          - os: windows-latest
+            label: windows
+    steps:
+      - uses: actions/checkout@v4
+
+      # Dependencias de sistema de Tauri en Linux (webkit2gtk, appindicator, rsvg, patchelf…).
+      - name: Install Linux build deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            build-essential \
+            file \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+
+      # En tag push, fija la versión del bundle a partir del tag (`v1.2.3` → `1.2.3`) para que la
+      # app reporte su versión. En main se queda con la de `tauri.conf.json` (build "latest").
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          node -e "const f='apps/tauri/src-tauri/tauri.conf.json';const c=require('./'+f);c.version='${V}';require('fs').writeFileSync(f, JSON.stringify(c,null,2)+'\n');console.log('version →','${V}')"
+
+      # tauri-action instala el CLI de Tauri, ejecuta `beforeBuildCommand` (build del front) y
+      # genera los bundles. Sin `tagName` solo compila (no crea release de GitHub); subimos a S3.
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/tauri
+
+      # Recoge los bundles (sus nombres llevan la versión; los renombramos a nombres estables que
+      # el Cloud sirve desde `latest/`). El target es el del workspace Cargo (raíz del repo).
+      - name: Stage artifacts
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p dist
+          # $1 = patrón de nombre, $2 = nombre estable de destino.
+          copy_one() {
+            local found
+            found=$(find . -path '*/release/bundle/*' -name "$1" 2>/dev/null | head -1)
+            if [ -n "$found" ]; then cp "$found" "dist/$2"; echo "  $found -> dist/$2"; fi
+          }
+          echo "Artefactos encontrados:"
+          copy_one '*.AppImage'  erplora-app.AppImage
+          copy_one '*.deb'       erplora-app.deb
+          copy_one '*-setup.exe' erplora-app-setup.exe
+          copy_one '*.msi'       erplora-app.msi
+          echo "--- dist/ ---"; ls -la dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.label }}
+          path: dist/*
+          if-no-files-found: error
+
+  upload-s3:
+    name: Upload to S3
+    needs: [build]
+    # Igual que el bridge: solo publica desde `main` o un tag `v*` (develop/PR compilan, no publican).
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::363427305647:role/github-actions-deploy
+          aws-region: eu-west-1
+
+      - name: Upload to S3
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="latest"
+          fi
+
+          FILES="erplora-app-setup.exe erplora-app.msi erplora-app.AppImage erplora-app.deb"
+          for f in $FILES; do
+            if [ -f "artifacts/$f" ]; then
+              aws s3 cp "artifacts/$f" "s3://erplora-downloads/app/${VERSION}/$f"
+            fi
+          done
+
+          # En tag push, además refresca latest/.
+          if [[ "$VERSION" != "latest" ]]; then
+            for f in $FILES; do
+              aws s3 cp "s3://erplora-downloads/app/${VERSION}/$f" \
+                "s3://erplora-downloads/app/latest/$f" 2>/dev/null || true
+            done
+          fi
+
+          echo "Subido a s3://erplora-downloads/app/${VERSION}/"
