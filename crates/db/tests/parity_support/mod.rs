@@ -226,6 +226,9 @@ impl Backends {
     /// `expect_pg_code`: SQLSTATE esperado del error de Postgres (p.ej. "42883" función inexistente,
     /// "42702" referencia ambigua) — fija el fallo concreto para que, cuando el humano arregle el
     /// shim/SQL, este test salte y haya que convertirlo en paridad normal.
+    // Sin uso hoy: las 3 divergencias de portabilidad conocidas (42804/42883/42702) están resueltas
+    // y sus tests son ahora paridad normal. Se conserva como arnés para fijar futuras divergencias.
+    #[allow(dead_code)]
     pub async fn exec_known_divergence(&self, sql: &str, payload: Json, expect_pg_code: &str) {
         let p = params(payload);
         self.sqlite

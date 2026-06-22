@@ -12,7 +12,9 @@
 
 use async_trait::async_trait;
 use serde_json::{Map, Value as Json};
-use sqlx::{Column, Row, TypeInfo, ValueRef};
+use sqlx::encode::IsNull;
+use sqlx::error::BoxDynError;
+use sqlx::{Column, Encode, Row, Type, TypeInfo, ValueRef};
 
 /// Dump consistente del SQLite local (`VACUUM INTO`) para el módulo `backup` (ADR-0040/0041).
 pub mod backup;
@@ -85,6 +87,67 @@ pub trait DatabaseAdapter: Send + Sync {
     async fn execute_batch(&self, sql: &str) -> Result<(), DbError>;
 }
 
+// ── NULL binding (dialect-agnostic, context-inferred OID on Postgres) ──────────────────────
+//
+// Binding a JSON `null` as `Option::<String>::None` sends a NULL **typed as TEXT** (OID 25).
+// SQLite (no static column types) accepts it anywhere, but Postgres rejects it against a column
+// of another type (`42804`: "column is of type bigint but expression is of type text"). The same
+// declarative command then works on Local (SQLite) and breaks on Cloud (Postgres) — e.g.
+// `cash_register/commands/close_session.sql` binding `:closing_balance` (INTEGER nullable) as NULL.
+//
+// `DynNull` is a zero-sized marker for "SQL NULL of inferred type". The key is its `Encode<Postgres>`
+// impl: `produces()` returns `PgTypeInfo::with_oid(Oid(0))`, the Postgres **unknown/infer** OID. In
+// the Parse message that 0 tells Postgres "infer this parameter's type from context" (the target
+// column), so the NULL is coerced to whatever the column is (bigint, double precision, …). On
+// SQLite it is simply a NULL. The same value binds in the dialect-agnostic `build_query!` macro
+// because `DynNull` implements `Type`/`Encode` for **both** backends.
+#[derive(Debug, Clone, Copy)]
+struct DynNull;
+
+impl Type<sqlx::Postgres> for DynNull {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        // OID 0 = "let the server infer the parameter type from context" (the target column).
+        sqlx::postgres::PgTypeInfo::with_oid(sqlx::postgres::types::Oid(0))
+    }
+    fn compatible(_: &sqlx::postgres::PgTypeInfo) -> bool {
+        // An untyped NULL is compatible with any column; the server coerces it.
+        true
+    }
+}
+
+impl<'q> Encode<'q, sqlx::Postgres> for DynNull {
+    fn encode_by_ref(
+        &self,
+        _buf: &mut sqlx::postgres::PgArgumentBuffer,
+    ) -> Result<IsNull, BoxDynError> {
+        // Write nothing; the -1 length prefix written by the driver marks the value as NULL.
+        Ok(IsNull::Yes)
+    }
+    fn produces(&self) -> Option<sqlx::postgres::PgTypeInfo> {
+        // Overrides `type_info()` for the Parse message: OID 0 ⇒ inferred-by-context NULL.
+        Some(sqlx::postgres::PgTypeInfo::with_oid(sqlx::postgres::types::Oid(0)))
+    }
+}
+
+impl Type<sqlx::Sqlite> for DynNull {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <Option<String> as Type<sqlx::Sqlite>>::type_info()
+    }
+    fn compatible(_: &sqlx::sqlite::SqliteTypeInfo) -> bool {
+        true
+    }
+}
+
+impl<'q> Encode<'q, sqlx::Sqlite> for DynNull {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer,
+    ) -> Result<IsNull, BoxDynError> {
+        // SQLite is dynamically typed: a NULL is a NULL regardless of declared column type.
+        Encode::<sqlx::Sqlite>::encode_by_ref(&Option::<String>::None, buf)
+    }
+}
+
 // ── dynamic binding ──────────────────────────────────────────────────────────────────────
 //
 // SQL is dynamic, so we bind in a loop over `names` (the bind order returned by `translate`).
@@ -99,22 +162,12 @@ macro_rules! build_query {
         let mut q = sqlx::query(sqlx::AssertSqlSafe($tsql));
         for name in $names.iter() {
             q = match $params.get(name) {
-                // NULL.
-                //
-                // [REVISAR HUMANO] — TODO Fase 0 CONFIRMADO contra Postgres real (tests/parity.rs::
-                // `typed_null_into_non_text_column_divergence`): bindear un NULL como `Option::<String>::None`
-                // envía un NULL con OID **TEXT**, y Postgres lo rechaza contra una columna de otro tipo
-                // (`42804`: "column is of type bigint but expression is of type text"). SQLite, sin tipos
-                // estáticos de columna, lo acepta → MISMO command, distinto resultado Local vs Cloud.
-                // Alcance real (no latente): hay columnas nullable numéricas en el core
-                // (`cash_register.closing_balance/expected_balance/difference`, `kitchen.seat_number`,
-                // `pricing.min_amount/max_amount/max_quantity`) — p.ej. `close_session.sql` bindea
-                // `:closing_balance`, que un cierre-sin-recuento pasaría como NULL.
-                // Arreglo (decisión del humano, toca el core del adaptador): emitir el NULL con tipo
-                // **inferido por contexto** (Postgres OID `unknown`/705), no TEXT — requiere un wrapper
-                // `Encode` propio o conocer el tipo de columna. Hasta entonces, la divergencia queda FIJADA
-                // por el test de paridad para que no pase desapercibida.
-                None | Some(Json::Null) => q.bind(Option::<String>::None),
+                // NULL — bound as `DynNull` (see its definition above): on Postgres it emits a NULL
+                // with OID 0 (inferred-by-context), so the server coerces it to the target column's
+                // type (bigint, double precision, …) instead of fixing it to TEXT and raising 42804.
+                // On SQLite it is a plain NULL. This makes the same declarative command behave
+                // identically on Local (SQLite) and Cloud (Postgres).
+                None | Some(Json::Null) => q.bind(DynNull),
                 Some(Json::Bool(b)) => q.bind(*b),
                 Some(Json::Number(n)) => {
                     if let Some(i) = n.as_i64() {

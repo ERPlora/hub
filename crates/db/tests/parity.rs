@@ -113,25 +113,20 @@ async fn inventory_crud_scoping_softdelete_parity() {
         .assert_rows(1);
 }
 
-// ── 2. inventory — stock decrease (DIVERGENCIA CONOCIDA: MAX(0,…) no es portable) ─────────────
+// ── 2. inventory — stock decrease clamp (ANTES divergencia 42883: MAX(0,…) — AHORA paridad) ────
 //
-// `inventory/commands/stock_decrease.sql` usa `MAX(0, stock - :qty)` como **scalar greatest** (clamp
-// a 0). SQLite tiene `MAX(a,b)` escalar; Postgres NO: ahí `MAX` es un agregado y la forma escalar se
-// llama `GREATEST(a,b)`. Además el shim DDL mapea `stock INTEGER`→`BIGINT`, así que la firma queda
-// `max(integer, bigint)` → SQLSTATE 42883 ("function does not exist").
+// `inventory/commands/stock_decrease.sql` usaba `MAX(0, stock - :qty)` como **scalar greatest** (clamp
+// a 0). SQLite tiene `MAX(a,b)` escalar; Postgres NO (ahí `MAX` es agregado y la forma escalar es
+// `GREATEST(a,b)`), y con el shim DDL `stock INTEGER`→`BIGINT` la firma `max(integer, bigint)` daba
+// SQLSTATE 42883 ("function does not exist") → el MISMO command funcionaba en Local y rompía en Cloud.
 //
-// ⚠️ [REVISAR HUMANO] — semántica de tipos/funciones, NO un binding trivial. Opciones (decisión del
-// humano): (a) añadir una función-puente `erp_greatest(a,b)`/`erp_least(a,b)` al shim
-// (SQLite→`MAX/MIN`, Postgres→`GREATEST/LEAST`) y migrar los módulos a ella; o (b) reescribir
-// `MAX(0, x)`→`GREATEST(0, x)` en `shim_functions` cuando el dialecto es Postgres. Afecta:
-// inventory/commands/stock_decrease.sql y stock_adjust.sql (grep `MAX(0`).
-//
-// Este test FIJA la divergencia (SQLite ok, Postgres 42883). Cuando el humano la arregle, saltará y
-// habrá que convertirlo en un `assert_parity` normal (la forma correcta del assert de paridad está
-// comentada abajo, lista para reactivar).
+// ✅ ARREGLADO (2026-06-22) — el SQL del módulo se reescribió a una forma portable sin funciones
+// dialécticas: `CASE WHEN (stock - :qty) < 0 THEN 0 ELSE (stock - :qty) END`. Igual de legible, mismo
+// clamp a 0, y válido en ambos motores. Este test es ahora paridad normal: el clamp da el mismo
+// resultado en SQLite y Postgres.
 
 #[tokio::test]
-async fn inventory_stock_decrease_max_divergence() {
+async fn inventory_stock_decrease_clamp_parity() {
     let b = Backends::connect().await;
     b.migrate("inventory").await;
 
@@ -147,20 +142,23 @@ async fn inventory_stock_decrease_max_divergence() {
     )
     .await;
 
+    // Descontar 5 de un stock de 3: el clamp deja stock en 0 (no negativo) idéntico en ambos motores.
     let dec = b.command_sql("inventory", "stock_decrease");
-    // Descontar 5 de un stock de 3: en SQLite hace clamp a 0; en Postgres falla por `max(int,bigint)`.
-    b.exec_known_divergence(
+    b.exec_both(
         &dec,
         json!({ "product_id": "p-phys", "hub_id": "h1", "qty": 5, "now": "2026-06-22T12:00:00Z" }),
-        "42883",
     )
     .await;
 
-    // FUTURO (cuando MAX/GREATEST sea portable) — paridad del clamp y del filtro service:
-    //   b.exec_both(&dec, json!({ "product_id":"p-phys","hub_id":"h1","qty":5,"now":"…" })).await;
-    //   Case::new("inventory stock clamp")
-    //       .assert_parity(&b, "SELECT id, stock FROM inventory_product WHERE hub_id = :hub_id", …)
-    //       .await.assert_cell(0, "stock", json!(0));
+    Case::new("inventory stock clamp (parity)")
+        .assert_parity(
+            &b,
+            "SELECT id, stock FROM inventory_product WHERE hub_id = :hub_id",
+            json!({ "hub_id": "h1" }),
+        )
+        .await
+        .assert_rows(1)
+        .assert_cell(0, "stock", json!(0));
 }
 
 // ── 3. taxes — REAL (tasa %) y filtros por vigencia ──────────────────────────────────────────
@@ -217,33 +215,37 @@ async fn taxes_rate_real_and_active_filter_parity() {
         .assert_cell(1, "rate_pct", json!(21));
 }
 
-// ── 4a. sales — _bump_counter upsert (DIVERGENCIA CONOCIDA: self-ref ambiguo en Postgres) ─────
+// ── 4a. sales — _bump_counter upsert (ANTES divergencia 42702: self-ref ambiguo — AHORA paridad) ─
 //
 // `sales/commands/_bump_counter.sql`: `ON CONFLICT (hub_id, day) DO UPDATE SET last_number =
-// last_number + 1`. SQLite resuelve `last_number` a la fila existente; Postgres lo considera
-// **ambiguo** (SQLSTATE 42702) — en el `DO UPDATE` hay que cualificar (`sales_sale_counter.last_number`)
-// o usar `EXCLUDED`. Es el mismo patrón en 9 módulos (grep `DO UPDATE SET last_number = last_number`),
-// 3 de ellos del core (sales, cart_checkout, orders, kitchen).
+// last_number + 1`. SQLite resolvía `last_number` a la fila existente; Postgres lo consideraba
+// **ambiguo** (SQLSTATE 42702) y rechazaba el statement al planificarlo (no dependía de que hubiera
+// conflicto) → el MISMO command arrancaba el contador en Local y rompía en Cloud.
 //
-// ⚠️ [REVISAR HUMANO] — semántica de upsert, NO un binding. Opciones: (a) cualificar el self-ref con
-// el nombre de tabla en los `_bump_counter.sql` (portable a ambos); o (b) que el adaptador reescriba
-// el self-ref no cualificado del `DO UPDATE` para Postgres (más frágil). Recomendado: (a), es un
-// cambio mecánico de SQL del módulo.
+// ✅ ARREGLADO (2026-06-22) — el `DO UPDATE` se cualifica con el nombre de tabla
+// (`sales_sale_counter.last_number + 1`), portable a ambos motores. Mismo patrón aplicado a los
+// `_bump_counter.sql` del core (sales, cart_checkout, orders, kitchen). Este test es ahora paridad
+// normal: dos bumps dejan el contador en 2 idéntico en SQLite y Postgres (insert + conflict-update).
 
 #[tokio::test]
-async fn sales_counter_upsert_divergence() {
+async fn sales_counter_upsert_parity() {
     let b = Backends::connect().await;
     b.migrate("sales").await;
 
+    // Primer bump: INSERT (arranca en 1). Segundo bump: choca con (hub_id, day) → DO UPDATE (a 2).
     let bump = b.command_sql("sales", "_bump_counter");
-    // Postgres rechaza el statement al PLANIFICARLO (el self-ref ambiguo del `DO UPDATE` no depende
-    // de que haya conflicto): falla ya en el primer INSERT. SQLite lo acepta y arranca el contador.
-    b.exec_known_divergence(
-        &bump,
-        json!({ "new_id": "c-0", "hub_id": "h1", "day": "2026-06-22" }),
-        "42702",
-    )
-    .await;
+    b.exec_both(&bump, json!({ "new_id": "c-0", "hub_id": "h1", "day": "2026-06-22" })).await;
+    b.exec_both(&bump, json!({ "new_id": "c-1", "hub_id": "h1", "day": "2026-06-22" })).await;
+
+    Case::new("sales counter upsert (parity)")
+        .assert_parity(
+            &b,
+            "SELECT last_number FROM sales_sale_counter WHERE hub_id = :hub_id AND day = :day",
+            json!({ "hub_id": "h1", "day": "2026-06-22" }),
+        )
+        .await
+        .assert_rows(1)
+        .assert_cell(0, "last_number", json!(2));
 }
 
 // ── 4b. sales — erp_pad numeración de documento (PARIDAD REAL, independiente del upsert) ───────
@@ -391,45 +393,47 @@ async fn typed_null_into_text_column_parity() {
         .assert_cell(1, "t", json!("x")); // 'with'
 }
 
-// ── 7b. binding de NULL contra columna NO-TEXT (DIVERGENCIA CONOCIDA — el TODO Fase-0 era REAL) ─
+// ── 7b. binding de NULL contra columna NO-TEXT (ANTES divergencia 42804 — AHORA paridad) ───────
 //
 // El TODO de `lib.rs` (~línea 103) preguntaba si el NULL-tipado-TEXT choca con una columna de otro
-// tipo. **Sí choca**: insertar `Option::<String>::None` en una columna `BIGINT`/`DOUBLE PRECISION`
+// tipo. **Sí chocaba**: insertar `Option::<String>::None` en una columna `BIGINT`/`DOUBLE PRECISION`
 // nullable → Postgres `42804` ("column is of type bigint but expression is of type text"). SQLite no
-// tiene tipos estáticos de columna, así que lo acepta. → Divergencia REAL del adaptador.
+// tiene tipos estáticos de columna, así que lo aceptaba. → era una divergencia REAL del adaptador.
 //
-// ⚠️ [REVISAR HUMANO] — semántica de tipos del adaptador (carga pesada, NO un binding trivial). El
-// arreglo correcto es que `build_query!`, ante un `Json::Null`, NO fije el OID a TEXT sino que envíe
-// un NULL de tipo **inferido por contexto** (en Postgres, OID `unknown`/705) para que el motor lo
-// coaccione a la columna destino. sqlx 0.9 no lo expone vía `.bind()` directo → requiere un wrapper
-// `Encode` propio (o conocer el tipo de la columna). Es decisión del humano (toca el core del
-// adaptador).
+// ✅ ARREGLADO (2026-06-22) — `build_query!` ya no bindea `Json::Null` como `Option::<String>::None`
+// (OID TEXT), sino como `DynNull` (ver `lib.rs`): en Postgres emite el NULL con OID 0
+// ("inferir el tipo por contexto"), así el servidor lo coacciona a la columna destino; en SQLite es
+// un NULL plano. El MISMO command declarativo se comporta IGUAL en Local (SQLite) y Cloud (Postgres).
 //
-// ⚠️ ALCANCE REAL (verificado): NO es latente. Hay columnas nullable NUMÉRICAS en el core —
+// ALCANCE REAL (verificado): NO era latente. Hay columnas nullable NUMÉRICAS en el core —
 // `cash_register.closing_balance/expected_balance/difference` (céntimos, INTEGER nullable),
 // `kitchen.seat_number`, `pricing.min_amount/max_amount/max_quantity`. Ej. concreto:
-// `cash_register/commands/close_session.sql` hace `closing_balance = :closing_balance`; si un caller
-// cierra caja sin recuento (`closing_balance: null`), Postgres dará 42804 y SQLite no → el MISMO
-// command funciona en Local y rompe en Cloud. Es un bug alcanzable hoy, no teórico.
+// `cash_register/commands/close_session.sql` hace `closing_balance = :closing_balance`; un cierre de
+// caja sin recuento (`closing_balance: null`) ahora funciona en AMBOS motores.
 //
-// Este test FIJA la divergencia (SQLite ok, Postgres 42804). Cuando el humano arregle el binding,
-// saltará → conviértelo en `typed_null_into_text_column_parity` extendido a columnas numéricas.
+// Este test (antes `..._divergence`, fijaba el 42804) es ahora paridad normal: ambos motores aceptan
+// el NULL en una columna numérica nullable y lo leen de vuelta como NULL.
 
 #[tokio::test]
-async fn typed_null_into_non_text_column_divergence() {
+async fn typed_null_into_numeric_column_parity() {
     let b = Backends::connect().await;
     // `n INTEGER` → BIGINT en Postgres vía shim DDL; columna nullable a propósito.
     let ddl = "CREATE TABLE nullnum (id TEXT PRIMARY KEY, n INTEGER)";
     b.sqlite_batch(ddl).await;
     b.pg_batch(ddl).await;
 
-    // NULL en la columna numérica nullable: SQLite ok; Postgres rechaza por mismatch text↔bigint.
-    b.exec_known_divergence(
-        "INSERT INTO nullnum (id, n) VALUES (:id, :n)",
-        json!({ "id": "a", "n": null }),
-        "42804",
-    )
-    .await;
+    // NULL en la columna numérica nullable + una fila con valor: ambos motores deben aceptarlo igual.
+    let ins = "INSERT INTO nullnum (id, n) VALUES (:id, :n)";
+    b.exec_both(ins, json!({ "id": "a", "n": null })).await;
+    b.exec_both(ins, json!({ "id": "b", "n": 42 })).await;
+
+    // Lectura de vuelta idéntica en ambos: la fila NULL devuelve NULL, la otra el entero.
+    Case::new("typed NULL into NUMERIC (parity)")
+        .assert_parity(&b, "SELECT id, n FROM nullnum ORDER BY id", json!({}))
+        .await
+        .assert_rows(2)
+        .assert_cell(0, "n", json!(null)) // 'a'
+        .assert_cell(1, "n", json!(42)); // 'b'
 }
 
 /// Helper: `null` como `Option<&str>` para los arrays heterogéneos de arriba (evita anotar el tipo).
