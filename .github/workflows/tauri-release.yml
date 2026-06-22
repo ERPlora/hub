@@ -83,15 +83,15 @@ jobs:
             libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev
 
+      # Sin `version`: la lee de `packageManager: pnpm@10` en package.json (evita el conflicto
+      # ERR_PNPM_BAD_PM_VERSION que da fijar dos versiones).
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install JS deps
