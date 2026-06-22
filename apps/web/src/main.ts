@@ -5,6 +5,16 @@ import {
   pencil, trash, add, close, chevronBack, chevronForward,
   listOutline, gridOutline, funnelOutline, downloadOutline, cloudUploadOutline,
   appsOutline, closeOutline, arrowBackOutline, backspaceOutline,
+  // ok-kpi (DashboardPage / /system): iconos de tendencia + neutro.
+  trendingUp, trendingDown, remove,
+  // ok-kpi icon prop (DashboardPage): estas pasan directamente a <ion-icon name="…"> dentro del WC.
+  trendingUpOutline, receiptOutline, peopleOutline, warningOutline,
+  // ok-data-table / ok-empty-state: icono por defecto del estado vacío.
+  fileTrayOutline,
+  // ok-data-table: indicador de orden en cabeceras de columna.
+  swapVerticalOutline,
+  // ok-file-manager (/files): navegación por carpetas, tipo de archivo terminal.
+  chevronForwardOutline, folderOpenOutline, terminalOutline,
 } from 'ionicons/icons';
 
 import App from './App.vue';
@@ -29,6 +39,19 @@ addIcons({
   'apps-outline': appsOutline, 'close-outline': closeOutline,
   // Teclado PIN del login (ok-pinpad): borrado + tecla «cambiar usuario».
   'arrow-back-outline': arrowBackOutline, 'backspace-outline': backspaceOutline,
+  // ok-kpi (DashboardPage + /system): flecha tendencia arriba/abajo y neutro.
+  'trending-up': trendingUp, 'trending-down': trendingDown, 'remove': remove,
+  // ok-kpi `icon` prop (DashboardPage): KPI icon names passed directly to ion-icon inside the WC.
+  'trending-up-outline': trendingUpOutline, 'receipt-outline': receiptOutline,
+  'people-outline': peopleOutline, 'warning-outline': warningOutline,
+  // ok-data-table / ok-empty-state: default empty-state icon used by all module tables.
+  'file-tray-outline': fileTrayOutline,
+  // ok-data-table: sort indicator shown on every sortable column header.
+  'swap-vertical-outline': swapVerticalOutline,
+  // ok-file-manager (/files): folder navigation and terminal file-type icon.
+  'chevron-forward-outline': chevronForwardOutline,
+  'folder-open-outline': folderOpenOutline,
+  'terminal-outline': terminalOutline,
 });
 
 // CSS base de Ionic (core + utilidades). Dark mode por clase (.ion-palette-dark).

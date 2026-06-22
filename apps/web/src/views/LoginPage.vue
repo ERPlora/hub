@@ -249,8 +249,8 @@
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  IonPage, IonContent, IonCard, IonCardContent, IonButton, 
-  IonInput, IonCheckbox, IonText, IonSpinner, IonSegment, IonSegmentButton,
+  IonPage, IonContent, IonCard, IonCardContent, IonButton,
+  IonInput, IonInputPasswordToggle, IonCheckbox, IonText, IonSpinner, IonSegment, IonSegmentButton,
   IonLabel, IonPopover, IonNote
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';

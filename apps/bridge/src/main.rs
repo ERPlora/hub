@@ -9,14 +9,19 @@
 //! WebSocket + (a futuro) la bandeja del sistema. El sidecar Tauri reusará el mismo crate vía
 //! `invoke` en lugar de este servidor.
 
+mod auth;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
+use axum::http::{HeaderMap, Uri};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Json, Router};
+
+use auth::{AuthOutcome, BridgeAuth};
 
 use erplora_peripherals::discovery::{self, parse_printer_id};
 use erplora_peripherals::drawer;
@@ -40,6 +45,8 @@ struct AppState {
     registry: DeviceRegistry,
     queue: PrintQueue,
     events: broadcast::Sender<Event>,
+    /// Política de auth del handshake WS (allowlist de `Origin` + token de sesión). ADR-0050.
+    auth: BridgeAuth,
 }
 
 #[tokio::main]
@@ -56,20 +63,28 @@ async fn main() {
         registry: DeviceRegistry::load(devices_path),
         queue: PrintQueue::new(RetryPolicy::default()),
         events: events_tx,
+        // Lee `BRIDGE_TOKEN` + `BRIDGE_ALLOWED_ORIGINS` del entorno (loggea un warn si falta el token).
+        auth: BridgeAuth::from_env(),
     });
 
     spawn_queue_worker(state.clone());
     spawn_watchdog(state.clone());
 
-    let app = Router::new()
-        .route("/status", get(status))
-        .route("/ws", get(ws_upgrade))
-        .with_state(state);
+    let app = build_router(state);
 
     let bind = format!("127.0.0.1:{BRIDGE_WS_PORT}");
     let listener = tokio::net::TcpListener::bind(&bind).await.expect("bind bridge port");
     tracing::info!("erplora-bridge escuchando en http://{bind}");
     axum::serve(listener, app).await.expect("serve");
+}
+
+/// Construye el router con sus rutas (`/status` abierto, `/ws` gateado por auth). Extraído de
+/// `main` para que los tests de integración ejerzan exactamente el mismo cableado.
+fn build_router(state: Arc<AppState>) -> Router {
+    Router::new()
+        .route("/status", get(status))
+        .route("/ws", get(ws_upgrade))
+        .with_state(state)
 }
 
 /// Spawnea el worker de la cola de impresión (`PrintQueue::run`, reintentos según
@@ -135,9 +150,33 @@ async fn status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     }))
 }
 
-/// `GET /ws` → upgrade a WebSocket.
-async fn ws_upgrade(State(state): State<Arc<AppState>>, ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, state))
+/// `GET /ws` → upgrade a WebSocket, **gateado por auth** (ADR-0050 §seguridad).
+///
+/// Antes de hacer el upgrade valida el handshake con `BridgeAuth`:
+///   - `Origin` debe estar en la allowlist (loopback / `tauri://` / `https://localhost` / extras),
+///   - el token de sesión (cabecera `Authorization: Bearer` / `X-Hub-Session`, o `?token=`) debe
+///     casar con el secreto del Bridge (si `BRIDGE_TOKEN` está configurado).
+///
+/// Si falla, responde **403** (origen) o **401** (token) y NO abre el WebSocket. El `HeaderMap` y
+/// el `Uri` se extraen ANTES que `WebSocketUpgrade` (orden de extractores en axum: los que
+/// consumen el body van al final).
+async fn ws_upgrade(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    ws: WebSocketUpgrade,
+) -> axum::response::Response {
+    match state.auth.evaluate(&headers, &uri) {
+        AuthOutcome::Allowed => ws.on_upgrade(move |socket| handle_socket(socket, state)),
+        rejected => {
+            tracing::warn!(
+                outcome = ?rejected,
+                origin = ?headers.get(axum::http::header::ORIGIN),
+                "handshake WS del Bridge rechazado",
+            );
+            (rejected.status_code(), "bridge handshake rechazado").into_response()
+        }
+    }
 }
 
 /// Bucle por conexión: parsea `Command`, despacha y responde con `Event`(s) en JSON. Además
@@ -315,4 +354,156 @@ fn devices_after(result: erplora_peripherals::Result<()>, state: &AppState) -> E
 
 fn err_event(e: &erplora_peripherals::PeripheralError) -> Event {
     Event::Error { message: e.to_string(), code: "peripheral_error".into() }
+}
+
+#[cfg(test)]
+mod integration_tests {
+    //! Tests de integración del handshake WS: arrancan el router real (`build_router`) en un puerto
+    //! efímero y mandan peticiones HTTP/1.1 crudas para comprobar los códigos de estado del gate de
+    //! auth (`/ws`) y que `/status` sigue abierto sin token. Cliente TCP a mano para no depender de
+    //! un crate HTTP en los tests.
+
+    use super::*;
+    use std::time::Duration;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpStream;
+
+    /// Estado mínimo para el router con una política de auth concreta (sin watchdog/cola worker;
+    /// el handshake se rechaza/acepta antes de tocarlos).
+    fn test_state(auth: BridgeAuth) -> Arc<AppState> {
+        let (events_tx, _) = broadcast::channel(EVENT_BUS_CAPACITY);
+        Arc::new(AppState {
+            registry: DeviceRegistry::load(PathBuf::from(
+                std::env::temp_dir().join("erplora-bridge-test-devices.json"),
+            )),
+            queue: PrintQueue::new(RetryPolicy::default()),
+            events: events_tx,
+            auth,
+        })
+    }
+
+    /// Arranca el router en `127.0.0.1:0` y devuelve el puerto asignado.
+    async fn spawn_server(auth: BridgeAuth) -> u16 {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = build_router(test_state(auth));
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        // Pequeña espera a que el serve esté escuchando.
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        port
+    }
+
+    /// Manda una petición HTTP cruda y devuelve la primera línea de la respuesta (status line).
+    async fn send_request(port: u16, request: &str) -> String {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        stream.write_all(request.as_bytes()).await.unwrap();
+        stream.flush().await.unwrap();
+
+        let mut buf = Vec::new();
+        // Lee hasta el primer CRLF (status line) o un poco de cabeceras; con un timeout corto.
+        let read = tokio::time::timeout(Duration::from_secs(2), async {
+            let mut tmp = [0u8; 1024];
+            loop {
+                let n = stream.read(&mut tmp).await.unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&tmp[..n]);
+                if buf.windows(2).any(|w| w == b"\r\n") {
+                    break;
+                }
+            }
+        })
+        .await;
+        let _ = read;
+        let text = String::from_utf8_lossy(&buf);
+        text.lines().next().unwrap_or("").to_string()
+    }
+
+    /// Construye una petición de upgrade WS con cabeceras opcionales extra.
+    fn ws_upgrade_request(port: u16, path: &str, extra_headers: &[(&str, &str)]) -> String {
+        let mut req = format!(
+            "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\
+             Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        );
+        for (k, v) in extra_headers {
+            req.push_str(&format!("{k}: {v}\r\n"));
+        }
+        req.push_str("\r\n");
+        req
+    }
+
+    #[tokio::test]
+    async fn status_endpoint_is_open_without_token() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        let status = send_request(port, &format!(
+            "GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+        )).await;
+        assert!(status.contains("200"), "/status debe responder 200 sin token, fue: {status:?}");
+    }
+
+    #[tokio::test]
+    async fn ws_upgrade_succeeds_with_valid_origin_and_token() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        let req = ws_upgrade_request(port, "/ws", &[
+            ("Origin", "http://localhost:5173"),
+            ("Authorization", "Bearer s3cr3t"),
+        ]);
+        let status = send_request(port, &req).await;
+        assert!(
+            status.contains("101"),
+            "upgrade con Origin+token válidos debe dar 101 Switching Protocols, fue: {status:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn ws_upgrade_accepts_token_via_query_param() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        let req = ws_upgrade_request(port, "/ws?token=s3cr3t", &[
+            ("Origin", "http://localhost:5173"),
+        ]);
+        let status = send_request(port, &req).await;
+        assert!(status.contains("101"), "token por query param debe permitir el upgrade, fue: {status:?}");
+    }
+
+    #[tokio::test]
+    async fn ws_upgrade_rejected_without_token() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        let req = ws_upgrade_request(port, "/ws", &[("Origin", "http://localhost:5173")]);
+        let status = send_request(port, &req).await;
+        assert!(status.contains("401"), "sin token debe ser 401, fue: {status:?}");
+    }
+
+    #[tokio::test]
+    async fn ws_upgrade_rejected_with_bad_token() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        let req = ws_upgrade_request(port, "/ws", &[
+            ("Origin", "http://localhost:5173"),
+            ("Authorization", "Bearer wrong"),
+        ]);
+        let status = send_request(port, &req).await;
+        assert!(status.contains("401"), "token incorrecto debe ser 401, fue: {status:?}");
+    }
+
+    #[tokio::test]
+    async fn ws_upgrade_rejected_with_forbidden_origin() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        let req = ws_upgrade_request(port, "/ws", &[
+            ("Origin", "https://evil.example.com"),
+            ("Authorization", "Bearer s3cr3t"),
+        ]);
+        let status = send_request(port, &req).await;
+        assert!(status.contains("403"), "origen no permitido debe ser 403, fue: {status:?}");
+    }
+
+    #[tokio::test]
+    async fn ws_upgrade_open_when_token_disabled() {
+        // Sin BRIDGE_TOKEN, la barrera de token está desactivada: solo se exige buen Origin.
+        let port = spawn_server(BridgeAuth::new(None, vec![])).await;
+        let req = ws_upgrade_request(port, "/ws", &[("Origin", "http://localhost:5173")]);
+        let status = send_request(port, &req).await;
+        assert!(status.contains("101"), "sin token configurado el upgrade pasa con buen Origin, fue: {status:?}");
+    }
 }

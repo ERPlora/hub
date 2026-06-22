@@ -99,8 +99,21 @@ macro_rules! build_query {
         let mut q = sqlx::query(sqlx::AssertSqlSafe($tsql));
         for name in $names.iter() {
             q = match $params.get(name) {
-                // NULL. Note (TODO Fase 0): in Postgres, binding a NULL typed as TEXT may clash
-                // with columns of another type; validate against real Aurora. In SQLite it doesn't matter.
+                // NULL.
+                //
+                // [REVISAR HUMANO] — TODO Fase 0 CONFIRMADO contra Postgres real (tests/parity.rs::
+                // `typed_null_into_non_text_column_divergence`): bindear un NULL como `Option::<String>::None`
+                // envía un NULL con OID **TEXT**, y Postgres lo rechaza contra una columna de otro tipo
+                // (`42804`: "column is of type bigint but expression is of type text"). SQLite, sin tipos
+                // estáticos de columna, lo acepta → MISMO command, distinto resultado Local vs Cloud.
+                // Alcance real (no latente): hay columnas nullable numéricas en el core
+                // (`cash_register.closing_balance/expected_balance/difference`, `kitchen.seat_number`,
+                // `pricing.min_amount/max_amount/max_quantity`) — p.ej. `close_session.sql` bindea
+                // `:closing_balance`, que un cierre-sin-recuento pasaría como NULL.
+                // Arreglo (decisión del humano, toca el core del adaptador): emitir el NULL con tipo
+                // **inferido por contexto** (Postgres OID `unknown`/705), no TEXT — requiere un wrapper
+                // `Encode` propio o conocer el tipo de columna. Hasta entonces, la divergencia queda FIJADA
+                // por el test de paridad para que no pase desapercibida.
                 None | Some(Json::Null) => q.bind(Option::<String>::None),
                 Some(Json::Bool(b)) => q.bind(*b),
                 Some(Json::Number(n)) => {

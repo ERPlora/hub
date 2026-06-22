@@ -5,17 +5,17 @@
         <ion-card>
           <ion-card-content class="p-0">
             <ion-list lines="none">
-              <!-- System Language -->
+              <!-- Idioma del sistema -->
               <ion-item>
                 <HubIcon slot="start" name="language-outline" />
                 <ion-label>
-                  <h2>System Language</h2>
-                  <p>Default language for the Hub interface</p>
+                  <h2>Idioma del sistema</h2>
+                  <p>Idioma por defecto de la interfaz del Hub</p>
                 </ion-label>
                 <ion-select
                   v-model="hubLang"
                   interface="popover"
-                  aria-label="System Language"
+                  aria-label="Idioma del sistema"
                   slot="end"
                   @ion-change="onLangChange($event.detail.value as Locale)"
                 >
@@ -24,17 +24,17 @@
                 </ion-select>
               </ion-item>
 
-              <!-- Timezone -->
+              <!-- Zona horaria -->
               <ion-item>
                 <HubIcon slot="start" name="globe-outline" />
                 <ion-label>
-                  <h2>Timezone</h2>
-                  <p>Timezone for dates and schedules</p>
+                  <h2>Zona horaria</h2>
+                  <p>Zona horaria para fechas y horarios</p>
                 </ion-label>
                 <ion-select
                   v-model="hubTimezone"
                   interface="popover"
-                  aria-label="Timezone"
+                  aria-label="Zona horaria"
                   slot="end"
                 >
                   <ion-select-option value="madrid">Europe/Madrid</ion-select-option>
@@ -42,44 +42,44 @@
                 </ion-select>
               </ion-item>
 
-              <!-- Country -->
+              <!-- País -->
               <ion-item>
                 <HubIcon slot="start" name="business-outline" />
                 <ion-label>
-                  <h2>Country</h2>
-                  <p>Country for regional settings</p>
+                  <h2>País</h2>
+                  <p>País para la configuración regional</p>
                 </ion-label>
                 <ion-select
                   v-model="hubCountry"
                   interface="popover"
-                  aria-label="Country"
+                  aria-label="País"
                   slot="end"
                 >
-                  <ion-select-option value="spain">Spain</ion-select-option>
+                  <ion-select-option value="spain">España</ion-select-option>
                   <ion-select-option value="portugal">Portugal</ion-select-option>
                 </ion-select>
               </ion-item>
 
-              <!-- Theme -->
+              <!-- Tema -->
               <!-- El modo de tema (system/light/dark) se controla desde el toggle de la TOPBAR
                    (AppTopbar.vue), no aquí (issue #38). Cambia el modo efectivo claro↔oscuro;
                    lib/theme.ts persiste la elección. -->
               <ion-item>
                 <HubIcon slot="start" name="color-palette-outline" />
                 <ion-label>
-                  <h2>Theme</h2>
-                  <p>Appearance mode for the interface</p>
+                  <h2>Tema</h2>
+                  <p>Modo de apariencia de la interfaz</p>
                 </ion-label>
                 <ion-select
                   v-model="hubTheme"
                   interface="popover"
-                  aria-label="Theme"
+                  aria-label="Tema"
                   slot="end"
                   @ion-change="onThemeChange($event.detail.value as ThemeMode)"
                 >
-                  <ion-select-option value="system">System (auto)</ion-select-option>
-                  <ion-select-option value="light">Light</ion-select-option>
-                  <ion-select-option value="dark">Dark</ion-select-option>
+                  <ion-select-option value="system">Sistema (auto)</ion-select-option>
+                  <ion-select-option value="light">Claro</ion-select-option>
+                  <ion-select-option value="dark">Oscuro</ion-select-option>
                 </ion-select>
               </ion-item>
             </ion-list>
@@ -91,14 +91,14 @@
           Guardar ajustes
         </ion-button>
 
-        <!-- Show modules in sidebar toggle -->
+        <!-- Mostrar módulos en la barra lateral -->
         <ion-card class="mt-3">
           <ion-card-content class="p-0">
             <ion-item lines="none">
               <HubIcon slot="start" name="reader-outline" />
               <ion-label>
-                <h2>Show modules in sidebar</h2>
-                <p>Display installed modules as shortcuts in the sidebar navigation</p>
+                <h2>Mostrar módulos en la barra lateral</h2>
+                <p>Mostrar los módulos instalados como accesos directos en la navegación lateral</p>
               </ion-label>
               <ion-toggle v-model="showModulesInSidebar" slot="end" />
             </ion-item>
@@ -114,9 +114,9 @@
               <HubIcon slot="start" name="extension-puzzle-outline" />
               <ion-label>
                 <h2>ERPlora Bridge</h2>
-                <p>Printers, cash drawer, barcode scanner and bridge connection</p>
+                <p>Impresoras, cajón, escáner y conexión de hardware periférico</p>
               </ion-label>
-              <ion-note slot="end">Disabled</ion-note>
+              <ion-note slot="end">Desactivado</ion-note>
             </ion-item>
           </ion-card-content>
         </ion-card>
@@ -127,39 +127,39 @@
         <ion-card>
           <ion-card-content class="p-0">
             <ion-list lines="none">
-              <!-- Store Type -->
+              <!-- Tipo de negocio -->
               <ion-item>
                 <HubIcon slot="start" name="storefront-outline" />
                 <ion-label>
-                  <h2>Store Type</h2>
-                  <p>Default sales workflow</p>
+                  <h2>Tipo de negocio</h2>
+                  <p>Flujo de ventas por defecto</p>
                 </ion-label>
                 <ion-select
                   v-model="storeType"
                   interface="popover"
-                  aria-label="Store Type"
+                  aria-label="Tipo de negocio"
                   slot="end"
                 >
-                  <ion-select-option value="retail">Retail</ion-select-option>
-                  <ion-select-option value="food">Food Service</ion-select-option>
+                  <ion-select-option value="retail">Comercio minorista</ion-select-option>
+                  <ion-select-option value="food">Hostelería</ion-select-option>
                 </ion-select>
               </ion-item>
 
-              <!-- Locale -->
+              <!-- Formato regional -->
               <ion-item>
                 <HubIcon slot="start" name="globe-outline" />
                 <ion-label>
-                  <h2>Locale</h2>
-                  <p>Regional display format</p>
+                  <h2>Formato regional</h2>
+                  <p>Formato de visualización regional</p>
                 </ion-label>
                 <ion-select
                   v-model="storeLocale"
                   interface="popover"
-                  aria-label="Locale"
+                  aria-label="Formato regional"
                   slot="end"
                 >
-                  <ion-select-option value="es">Spain</ion-select-option>
-                  <ion-select-option value="en">United Kingdom</ion-select-option>
+                  <ion-select-option value="es">España</ion-select-option>
+                  <ion-select-option value="en">Reino Unido</ion-select-option>
                 </ion-select>
               </ion-item>
             </ion-list>
@@ -239,8 +239,8 @@
             <ion-item button detail lines="none">
               <HubIcon slot="start" name="ticket-outline" />
               <ion-label>
-                <h2>Ticket Template</h2>
-                <p>Printed and digital receipt settings</p>
+                <h2>Plantilla de tique</h2>
+                <p>Configuración del recibo impreso y digital</p>
               </ion-label>
             </ion-item>
           </ion-card-content>
@@ -257,15 +257,15 @@
           </ion-segment-button>
           <ion-segment-button value="store">
             <HubIcon name="storefront-outline" />
-            <ion-label>Store</ion-label>
+            <ion-label>Tienda</ion-label>
           </ion-segment-button>
           <ion-segment-button value="tax">
             <HubIcon name="wallet-outline" />
-            <ion-label>Tax</ion-label>
+            <ion-label>Fiscal</ion-label>
           </ion-segment-button>
           <ion-segment-button value="tickets">
             <HubIcon name="ticket-outline" />
-            <ion-label>Tickets</ion-label>
+            <ion-label>Tiques</ion-label>
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>

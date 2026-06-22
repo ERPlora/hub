@@ -24,3 +24,7 @@ notify-rust = "4"
 
 # Pendiente de fase de implementación: `tray-icon` (bandeja del sistema) — no añadido aún para
 # mantener el esqueleto compilando headless sin dependencias gráficas.
+
+# Los tests de integración del handshake WS usan un cliente TCP crudo (sin deps extra): escriben
+# la petición HTTP/1.1 de upgrade a mano y leen la línea de estado. Así se evita arrastrar un
+# backend HTTP/TLS solo para los tests.

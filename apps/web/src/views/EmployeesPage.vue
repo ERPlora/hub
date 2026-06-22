@@ -83,6 +83,7 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import { DT_LABELS_ES } from '../lib/data-table-labels';
 
 const { t } = useI18n();
 
@@ -228,6 +229,9 @@ function handleStaffPrimary(): void { onNew(); }
 function handleRolesPrimary(): void { onNewRole(); }
 
 onMounted(() => {
+  // Etiquetas en español para las tablas del shell (ok-data-table usa inglés por defecto).
+  if (staffTable.value) (staffTable.value as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+  if (rolesTable.value) (rolesTable.value as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
   staffTable.value?.addEventListener('rowAction', handleRowAction);
   rolesTable.value?.addEventListener('rowAction', handleRowAction);
   staffTable.value?.addEventListener('primaryAction', handleStaffPrimary);

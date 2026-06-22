@@ -9,12 +9,14 @@
 //! Decisión red-only (§2.7): USB/Bluetooth se descartan; el escáner por HID lo maneja el
 //! SO/navegador como teclado. Por eso aquí **no** hay `usb`/`bluetooth`/`scanner`.
 //!
-//! Estado: **esqueleto** — tipos y firmas con `todo!()`. La implementación real es la fase
-//! siguiente (ver `README.md` para el mapeo Python→Rust módulo a módulo).
+//! Estado: **implementado** — render ESC/POS (`escpos`), descubrimiento (`discovery`), registro +
+//! watchdog (`registry`), cajón (`drawer`), cola con reintentos (`queue`) e impresora por red con
+//! traits (`printer`). El mapeo Python→Rust por módulo está en `README.md`.
 
 pub mod discovery;
 pub mod drawer;
 pub mod escpos;
+pub mod printer;
 pub mod protocol;
 pub mod queue;
 pub mod registry;

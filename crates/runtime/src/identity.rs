@@ -13,6 +13,7 @@ use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, Salt
 use argon2::Argon2;
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 
 use crate::errors::Result;
 use crate::registry::{new_id, now_rfc3339, Registry};
@@ -62,16 +63,44 @@ fn hash_pin_argon2(pin: &str) -> Result<String> {
     Ok(hash.to_string())
 }
 
-/// Verifica `pin` contra el hash argon2id almacenado. `true` si coincide. Hash vacío o corrupto
+/// Verifica `pin` contra el hash almacenado. `true` si coincide. Hash vacío o corrupto
 /// ⇒ `false` (no autenticable).
+///
+/// Acepta dos formatos:
+///  - **argon2id** (string PHC `$argon2id$...`): el formato canónico que escriben
+///    `create_user`/`set_pin`.
+///  - **legacy** `salt:sha256_hex("{salt}:{pin}")` (el que usa el seed del despliegue demo,
+///    `crates/server/seeds/demo.sql`): un PHC no parsea, así que se intenta este formato como
+///    fallback. Un hub sembrado por terraform (`HUB_SEED_SQL`) puede hacer login por PIN sin
+///    re-sembrar a argon2id. El rehash perezoso a argon2id en el primer login es una optimización
+///    futura (no afecta a la verificación).
 fn check_pin(stored: &str, pin: &str) -> bool {
     if stored.is_empty() {
         return false;
     }
-    // Hash PHC argon2id: parsear y verificar; si el hash está corrupto, no autenticable.
-    PasswordHash::new(stored)
-        .map(|parsed| Argon2::default().verify_password(pin.as_bytes(), &parsed).is_ok())
-        .unwrap_or(false)
+    // 1) Hash PHC argon2id (formato canónico).
+    if let Ok(parsed) = PasswordHash::new(stored) {
+        return Argon2::default().verify_password(pin.as_bytes(), &parsed).is_ok();
+    }
+    // 2) Fallback legacy `salt:sha256_hex("{salt}:{pin}")` (seed del demo). Solo si NO era un PHC.
+    if let Some((salt, expected_hex)) = stored.split_once(':') {
+        if !salt.is_empty() && !expected_hex.is_empty() {
+            let digest = Sha256::digest(format!("{salt}:{pin}").as_bytes());
+            let actual_hex = hex_lower(&digest);
+            // Comparación tolerante a mayúsculas del hex almacenado.
+            return actual_hex.eq_ignore_ascii_case(expected_hex);
+        }
+    }
+    false
+}
+
+/// Hex en minúsculas de un buffer de bytes (sin dependencias extra).
+fn hex_lower(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
 }
 
 // ── Usuarios ────────────────────────────────────────────────────────────────────────────────
