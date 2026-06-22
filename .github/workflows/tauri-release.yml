@@ -150,11 +150,120 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  # Gate: solo intentamos Android si el repo tiene el keystore configurado (los secrets no se
+  # pueden leer en un `if` de job, así que se comprueba aquí y se expone como output).
+  check-secrets:
+    name: Check Android keystore
+    runs-on: ubuntu-latest
+    outputs:
+      has_keystore: ${{ steps.c.outputs.has_keystore }}
+    steps:
+      - id: c
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "has_keystore=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_keystore=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::ANDROID_KEYSTORE_BASE64 no configurado en este repo — se omite el build de Android."
+          fi
+
+  build-android:
+    name: Build android (APK)
+    needs: check-secrets
+    if: needs.check-secrets.outputs.has_keystore == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NDK_VERSION: "27.1.12297006"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Rust toolchain + Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+
+      - name: Setup Android SDK + NDK
+        uses: android-actions/setup-android@v3
+      - name: Install NDK
+        run: |
+          sdkmanager --install "ndk;${NDK_VERSION}" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@^2
+
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          node -e "const f='apps/tauri/src-tauri/tauri.conf.json';const c=require('./'+f);c.version='${V}';require('fs').writeFileSync(f, JSON.stringify(c,null,2)+'\n')"
+
+      - name: Build Android APK
+        working-directory: apps/tauri
+        run: |
+          tauri android init
+          tauri android build --apk
+
+      - name: Sign APK
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          BT=$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -type d | sort -V | tail -1)
+          UNSIGNED=$(find apps/tauri -path '*/outputs/apk/*release*' -name '*.apk' | grep -i 'unsigned\|release' | head -1)
+          echo "APK sin firmar: $UNSIGNED"
+          "$BT/zipalign" -p -f 4 "$UNSIGNED" "$RUNNER_TEMP/aligned.apk"
+          mkdir -p dist
+          "$BT/apksigner" sign \
+            --ks "$RUNNER_TEMP/release.keystore" \
+            --ks-pass "pass:${KS_PASS}" \
+            --ks-key-alias erplora \
+            --key-pass "pass:${KS_PASS}" \
+            --out dist/erplora-app.apk \
+            "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" verify --print-certs dist/erplora-app.apk
+          ls -la dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-android
+          path: dist/erplora-app.apk
+          if-no-files-found: error
+
   upload-s3:
     name: Upload to S3
-    needs: [build]
-    # Igual que el bridge: solo publica desde `main` o un tag `v*` (develop/PR compilan, no publican).
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    # Espera a desktop + Android, pero NO bloquea si Android se salta (sin keystore) o falla:
+    # `always()` + exigir solo que el desktop (`build`) haya ido bien.
+    needs: [build, build-android]
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # OIDC
@@ -181,7 +290,7 @@ jobs:
             VERSION="latest"
           fi
 
-          FILES="erplora-app-setup.exe erplora-app.msi erplora-app.AppImage erplora-app.deb"
+          FILES="erplora-app-setup.exe erplora-app.msi erplora-app.AppImage erplora-app.deb erplora-app.apk"
           for f in $FILES; do
             if [ -f "artifacts/$f" ]; then
               aws s3 cp "artifacts/$f" "s3://erplora-downloads/app/${VERSION}/$f"
