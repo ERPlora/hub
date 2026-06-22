@@ -83,14 +83,6 @@
             <ion-button
               fill="clear"
               size="small"
-              :aria-label="t('sidebar.reportProblem')"
-              @click="bugReportOpen = true"
-            >
-              <HubIcon slot="icon-only" name="bug-outline" />
-            </ion-button>
-            <ion-button
-              fill="clear"
-              size="small"
               :aria-label="t('sidebar.signOut')"
               @click="onLogout"
             >
@@ -104,17 +96,17 @@
       <ion-router-outlet id="main" />
     </ion-split-pane>
 
-    <!-- Drawer del asistente (lo abre el sparkles de la topbar) + modal de reporte de problemas.
-         Hermanos del split-pane: drawer/modal van por encima del shell. Solo con sesión. -->
+    <!-- Drawer del asistente (lo abre el sparkles de la topbar). Hermano del split-pane:
+         va por encima del shell. Solo con sesión. Los errores del frontend se reportan
+         AUTOMÁTICAMENTE al runtime (lib/error-report), sin modal ni acción del usuario. -->
     <template v-if="isAuthed">
       <AssistantDrawer />
-      <BugReportModal v-model:open="bugReportOpen" />
     </template>
   </ion-app>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -124,7 +116,6 @@ import {
 } from '@ionic/vue';
 import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
-import BugReportModal from './components/BugReportModal.vue';
 import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav } from './lib/nav';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
@@ -162,9 +153,6 @@ const router = useRouter();
 
 // Versión de la app (horneada por Vite, ver vite.config.ts `define`).
 const appVersion = __APP_VERSION__;
-
-// Estado del modal de reporte de problemas (footer del sidebar).
-const bugReportOpen = ref<boolean>(false);
 
 // Botón «Instalar app» (PWA): dispara el prompt nativo del navegador (lib/pwa.ts).
 async function onInstallApp(): Promise<void> {

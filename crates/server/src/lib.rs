@@ -31,6 +31,7 @@ pub mod assistant;
 pub mod auth;
 pub mod backup;
 pub mod embed;
+pub mod error_sink;
 pub mod ingest;
 pub mod install;
 pub mod logging;
@@ -224,6 +225,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         state.runtime.lock().await.set_backup_transport(transport);
     }
 
+    // Registro GLOBAL de errores ("todo controlado", un único embudo): instala el sink que reenvía
+    // al Cloud (`POST /api/v1/hub/device/error-report/`, X-Hub-Token) cada error del runtime
+    // (core + módulos), del panic hook y de la ruta local del frontend. Best-effort (spawn detached);
+    // si el hub no está enrolado el sink descarta en silencio. Se hace una sola vez al arrancar.
+    install_error_reporting(&state);
+
     // Catch-up del scheduler al arrancar (ADR-0011): un hub que estuvo apagado ejecuta UNA sola
     // vez las tareas con backlog vencido (collapse) y reprograma el resto. Se hace antes del loop.
     {
@@ -283,6 +290,61 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
+/// Instala el **registro global de errores** del runtime: el sink que reenvía al Cloud + el panic
+/// hook. Idempotente en la práctica (el `OnceLock` interno ignora un segundo `install`; el hook se
+/// re-encadena al anterior). Lo llama [`serve`] una vez al arrancar, con el `AppState` ya montado.
+fn install_error_reporting(state: &AppState) {
+    use erplora_runtime::error_registry::{ErrorEvent, ErrorRegistry};
+
+    // El sink lee el token de máquina VIVO (hot-reload) de la celda del state, así que un enrol
+    // posterior habilita el reporte sin reiniciar. La versión del hub = la del build del server.
+    let sink = error_sink::CloudErrorSink::new(
+        &state.config.cloud_base_url,
+        state.config.hub_id.clone(),
+        state.machine_token.clone(),
+        state.http.clone(),
+        format!("v{}", env!("CARGO_PKG_VERSION")),
+    );
+    ErrorRegistry::install(std::sync::Arc::new(sink));
+
+    // Panic hook: convierte cualquier `panic!` del proceso en un `ErrorEvent` (source=hub,
+    // code=panic, severity=unexpected) y lo reporta al registro global ANTES de delegar en el hook
+    // por defecto (que sigue logueando/abortando). `report` es seguro desde aquí (no hace panic!).
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        // Mensaje: el payload del panic (str/String) si es legible.
+        let message = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "panic (payload no legible)".to_string());
+        // Stack: ubicación del panic + backtrace si está habilitado (RUST_BACKTRACE).
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_default();
+        let backtrace = std::backtrace::Backtrace::capture().to_string();
+        let stack = if backtrace.is_empty() || backtrace.contains("disabled backtrace") {
+            location
+        } else {
+            format!("{location}\n{backtrace}")
+        };
+
+        let event = ErrorEvent::new(
+            erplora_runtime::error_registry::source::HUB,
+            "panic",
+            message,
+            erplora_runtime::error_registry::severity::UNEXPECTED,
+        )
+        .with_stack(stack);
+        ErrorRegistry::global().report(event);
+
+        // Conserva el comportamiento previo (log a stderr / abort según config).
+        previous(info);
+    }));
+}
+
 /// Espera Ctrl-C o (en Unix) SIGTERM. ECS envía SIGTERM al desescalar/desplegar; al recibirla,
 /// `axum::serve` deja de aceptar conexiones nuevas y drena las en vuelo antes de cerrar.
 async fn shutdown_signal() {
@@ -328,6 +390,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules/:id/uninstall", post(uninstall_module))
         .route("/api/query", post(query))
         .route("/api/command", post(command))
+        // Reporte de errores del FRONTEND (same-origin, sin auth cloud): el web app postea sus
+        // errores JS aquí y el runtime los funnelea al registro global → Cloud (el secreto de
+        // máquina nunca toca el navegador). Ver `frontend_error_report`.
+        .route("/api/error-report", post(frontend_error_report))
         .route("/api/auth/pin", post(auth_pin))
         .route("/api/auth/set-pin", post(auth_set_pin))
         .route("/api/auth/cloud", post(auth_cloud))
@@ -811,6 +877,52 @@ async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),
         Err(e) => err_response(e),
     }
+}
+
+/// Body de `POST /api/error-report` (lo postea el frontend). Forma libre del web app:
+/// `{ type, message, stack?, url?, component?, module_id? }`. `type` mapea a `error_code`.
+#[derive(Deserialize)]
+struct FrontendErrorReq {
+    /// Tipo del error JS (p. ej. `"js_error"`); se usa como `error_code` del evento.
+    #[serde(default = "default_js_error_type")]
+    r#type: String,
+    #[serde(default)]
+    message: String,
+    #[serde(default)]
+    stack: Option<String>,
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default)]
+    component: Option<String>,
+    /// Si el error vino de un Web Component de módulo, su `module_id` (atribución).
+    #[serde(default)]
+    module_id: Option<String>,
+}
+
+fn default_js_error_type() -> String {
+    "js_error".to_string()
+}
+
+/// POST /api/error-report — embudo del frontend hacia el registro global de errores.
+///
+/// Same-origin, **sin auth cloud** (el navegador nunca ve el `cloud_api_token`): el web app postea
+/// su error JS y el runtime lo normaliza a un `ErrorEvent{ source:"frontend", … }`, lo manda al
+/// registro global (que dedup/throttlea y reenvía al Cloud por el sink) y devuelve `{ "ok": true }`.
+/// Severidad fija "unexpected" (un error JS no capturado es un fallo, no una acción de usuario).
+async fn frontend_error_report(Json(req): Json<FrontendErrorReq>) -> Response {
+    use erplora_runtime::error_registry::{severity, source, ErrorEvent, ErrorRegistry};
+
+    let mut event = ErrorEvent::new(source::FRONTEND, req.r#type, req.message, severity::UNEXPECTED)
+        .with_context(json!({ "url": req.url, "component": req.component }));
+    if let Some(stack) = req.stack {
+        event = event.with_stack(stack);
+    }
+    if let Some(module_id) = req.module_id {
+        event = event.with_module(module_id);
+    }
+    ErrorRegistry::global().report(event);
+
+    Json(json!({ "ok": true })).into_response()
 }
 
 #[derive(serde::Deserialize)]

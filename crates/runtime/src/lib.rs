@@ -13,6 +13,7 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::Value as Json;
 
 pub mod commands;
+pub mod error_registry;
 pub mod errors;
 pub mod events;
 pub mod host_backup;
@@ -34,6 +35,7 @@ pub mod system_migrations;
 pub mod ui;
 pub mod wasm;
 
+pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
 pub use errors::{Result, RuntimeError};
 pub use manifest::Manifest;
 pub use registry::{EventSink, ModuleStatus, NavEntry, Registry, RequestContext};
@@ -219,7 +221,11 @@ impl Runtime {
     /// Para queries de lista devuelve solo las filas de la página (compat); usa
     /// [`Runtime::execute_query_page`] si necesitas el total para paginar.
     pub async fn execute_query(&self, name: &str, params: &Params, ctx: &RequestContext) -> Result<Vec<Json>> {
-        queries::execute(self.db.as_ref(), &self.registry, name, params, ctx).await
+        let r = queries::execute(self.db.as_ref(), &self.registry, name, params, ctx).await;
+        if let Err(e) = &r {
+            self.report_dispatch_error(e, "query", name, params);
+        }
+        r
     }
 
     /// Ejecuta una query devolviendo la página completa (`rows` + `total` + `limit`/`offset`).
@@ -230,7 +236,11 @@ impl Runtime {
         params: &Params,
         ctx: &RequestContext,
     ) -> Result<queries::QueryPage> {
-        queries::execute_page(self.db.as_ref(), &self.registry, name, params, ctx).await
+        let r = queries::execute_page(self.db.as_ref(), &self.registry, name, params, ctx).await;
+        if let Err(e) = &r {
+            self.report_dispatch_error(e, "query", name, params);
+        }
+        r
     }
 
     /// ¿La query (de un módulo activo) declara bloque `list` (es paginada)? Lo usa el server
@@ -242,7 +252,37 @@ impl Runtime {
     /// Ejecuta un command declarativo (solo si su módulo está activo). Los eventos emitidos se
     /// persisten en el outbox en la misma transacción; sus listeners los entrega el relay (§5.4).
     pub async fn execute_command(&self, name: &str, payload: &Params, ctx: &RequestContext) -> Result<Json> {
-        commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx).await
+        let r = commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx).await;
+        if let Err(e) = &r {
+            self.report_dispatch_error(e, "command", name, payload);
+        }
+        r
+    }
+
+    /// **Embudo único** de errores del dispatcher (§ error-registry). Reporta el `RuntimeError` de un
+    /// `execute_command`/`execute_query` al registro global, etiquetándolo con `source="module"` +
+    /// `module_id` cuando el nombre resuelve a un módulo registrado, o `source="hub"` si no (core /
+    /// capacidad inexistente). Capturamos aquí — no (solo) en la capa HTTP — para cubrir también los
+    /// errores de caminos no-HTTP (scheduler, relay del outbox, Tauri). Best-effort: no falla nunca.
+    ///
+    /// El contexto incluye el `kind`/`name` de la capacidad y las **claves** del payload (no los
+    /// valores, para no arrastrar PII). El `module_id` se resuelve del registry sin filtrar por
+    /// estado activo: un error sobre un command/query de un módulo desactivado igual se atribuye a él.
+    fn report_dispatch_error(&self, err: &RuntimeError, kind: &str, name: &str, payload: &Params) {
+        let module_id = self
+            .registry
+            .commands
+            .get(name)
+            .map(|c| c.module_id.clone())
+            .or_else(|| self.registry.queries.get(name).map(|q| q.module_id.clone()));
+        let source = if module_id.is_some() {
+            error_registry::source::MODULE
+        } else {
+            error_registry::source::HUB
+        };
+        let payload_keys: Vec<&String> = payload.keys().collect();
+        let context = serde_json::json!({ kind: name, "payload_keys": payload_keys });
+        error_registry::report_runtime_error(err, source, module_id, context);
     }
 
     /// Asegura + migra el **esquema de sistema** del runtime (hub#37). Dos fases:

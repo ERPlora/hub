@@ -29,7 +29,6 @@ export default {
   sidebar: {
     profile: 'Profile',
     installApp: 'Install app',
-    reportProblem: 'Report a problem',
     signOut: 'Sign out',
   },
   assistant: {
@@ -41,15 +40,6 @@ export default {
     close: 'Close',
     noReply: '(no reply)',
     error: 'Could not reach the assistant.',
-  },
-  bugReport: {
-    title: 'Report a problem',
-    description: 'Tell us what happened',
-    placeholder: 'Describe the problem in as much detail as possible…',
-    submit: 'Send',
-    cancel: 'Cancel',
-    sent: 'Thanks, we received your report.',
-    failed: 'Could not send the report. Please try again.',
   },
   files: {
     title: 'Files',

@@ -87,7 +87,6 @@ import sunnyOutline from "~icons/ion/sunny-outline?raw";
 import moonOutline from "~icons/ion/moon-outline?raw";
 import contrastOutline from "~icons/ion/contrast-outline?raw";
 import personOutline from "~icons/ion/person-outline?raw";
-import bugOutline from "~icons/ion/bug-outline?raw";
 import closeOutline from "~icons/ion/close-outline?raw";
 import stopCircleOutline from "~icons/ion/stop-circle-outline?raw";
 
@@ -178,7 +177,6 @@ const SVGS: Record<string, string> = {
   "moon-outline": moonOutline,
   "contrast-outline": contrastOutline,
   "person-outline": personOutline,
-  "bug-outline": bugOutline,
   "close-outline": closeOutline,
   "stop-circle-outline": stopCircleOutline,
   "panel-left": panelLeft,

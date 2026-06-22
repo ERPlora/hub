@@ -280,6 +280,24 @@ impl CloudClient {
         self.get(&format!("/api/v1/hub/device/backup/download/?s3_key={s3_key}"), auth)
     }
 
+    /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
+    /// registro del Hub reenvía aquí TODO error (core, módulos, panics, frontend), best-effort.
+    /// `POST /api/v1/hub/device/error-report/` con la credencial de **máquina** del hub
+    /// (`X-Hub-Token` + `X-Hub-Id`, contexto hub-scoped sin usuario: el reporte lo dispara el
+    /// runtime, no un JWT cloud fresco). El **body** es el contrato JSON
+    /// `{ source, module_id, error_code, message, stack, severity, context, occurred_at }`, lo
+    /// construye el llamador (server) a partir de su `ErrorEvent`. La respuesta
+    /// (`{ ok, report_id, fingerprint, count, deduped, issue_queued }`) se ignora: cualquier 2xx
+    /// es éxito. Espejo del estilo de [`backup_upload`]/[`notify_whatsapp`]: aquí solo se construye
+    /// la petición (método/URL/cabeceras); el I/O del POST lo hace el cliente HTTP del llamador.
+    pub fn report_error(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!("{}/api/v1/hub/device/error-report/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
     /// **DEPRECADO** — apuntaba a un endpoint ficticio `…/versions/{version}/install/` que
     /// **no existe** en el Cloud. Usa el flujo real [`CloudClient::versions`] +
     /// [`CloudClient::download`] + [`CloudClient::mark_installed`]. Se mantiene solo para no
@@ -563,6 +581,19 @@ mod tests {
         let r = c.backup_upload(&auth);
         assert_eq!(r.method, "POST");
         assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/backup/");
+        assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    #[test]
+    fn report_error_uses_machine_token() {
+        // El reporte de error lo dispara el runtime con la credencial de MÁQUINA del hub
+        // (X-Hub-Token), sin usuario logueado (registro global de errores → Cloud).
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken { hub_id: "h1".into(), token: "machine-tok".into() };
+        let r = c.report_error(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/error-report/");
         assert!(r.headers.contains(&("X-Hub-Token", "machine-tok".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
     }

@@ -1,0 +1,398 @@
+//! Registro **global** de errores del Hub — un único embudo ("todo controlado").
+//!
+//! TODO error del Hub pasa por aquí: el core del runtime, los módulos declarativos/WASM
+//! (etiquetados con su `module_id`), los `panic!` de Rust (vía el panic hook) y el frontend
+//! (vía una ruta local del server). El registro aplica un dedup/throttle local best-effort y
+//! reenvía cada evento al [`ErrorSink`] instalado por el host, que lo manda al Cloud.
+//!
+//! Reglas de oro de este módulo (es seguro llamarlo desde un panic hook):
+//!  - **NUNCA** hace `panic!`/`unwrap`/`expect` en el camino de reporte (todo va envuelto).
+//!  - **NUNCA** bloquea al llamador: el `submit` del sink debe ser fire-and-forget (el sink real
+//!    del server hace `tokio::spawn`); aquí solo tomamos un `Mutex` muy corto para el dedup.
+//!  - Si no hay sink instalado todavía (arranque temprano) el evento se **descarta en silencio**.
+//!
+//! El **contrato** que se reenvía al Cloud (lo construye el sink a partir de [`ErrorEvent`]):
+//! `POST /api/v1/hub/device/error-report/` con
+//! `{ source, module_id, error_code, message, stack, severity, context, occurred_at }`.
+
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use serde::Serialize;
+
+use crate::errors::RuntimeError;
+
+/// Ventana de dedup local: si la misma huella se reportó hace menos de esto, se omite.
+const DEDUP_WINDOW: Duration = Duration::from_secs(30);
+
+/// Tope de entradas en la tabla de dedup (defensa: no crecer sin límite ante errores muy variados).
+/// Al alcanzarlo se purgan las entradas ya expiradas; si aún así está llena, se limpia entera.
+const DEDUP_MAX_ENTRIES: usize = 1024;
+
+/// Severidad de un error reportado.
+///  - `"user"`: error esperable provocado por el llamador (payload inválido, permiso denegado,
+///    capacidad no encontrada). No es un fallo del Hub; sirve de telemetría, no de alerta.
+///  - `"unexpected"`: fallo no esperado (BD, WASM, panic, I/O…). Es lo que el Cloud agrupa y alerta.
+pub mod severity {
+    /// Error esperable provocado por el llamador (no es un bug del Hub).
+    pub const USER: &str = "user";
+    /// Fallo no esperado del Hub (lo que el Cloud agrupa/alerta).
+    pub const UNEXPECTED: &str = "unexpected";
+}
+
+/// Origen de un error reportado (campo `source` del contrato).
+pub mod source {
+    /// Core del runtime / server del Hub.
+    pub const HUB: &str = "hub";
+    /// Un módulo declarativo / handler WASM (lleva `module_id`).
+    pub const MODULE: &str = "module";
+    /// El frontend (vía la ruta local `POST /api/error-report`).
+    pub const FRONTEND: &str = "frontend";
+}
+
+/// Un evento de error normalizado, listo para reenviar al Cloud. Lo construyen el dispatcher del
+/// runtime (módulo/core), el panic hook y la ruta del frontend; el sink lo serializa al contrato.
+#[derive(Debug, Clone, Serialize)]
+pub struct ErrorEvent {
+    /// `"hub"` | `"module"` | `"frontend"` (ver [`source`]).
+    pub source: String,
+    /// `module_id` cuando el error proviene de un módulo; `None` para core/frontend sin módulo.
+    pub module_id: Option<String>,
+    /// Código corto y estable del error (variante del enum, `"panic"`, el `type` del frontend…).
+    pub error_code: String,
+    /// Mensaje legible (la `Display` del error / payload del panic).
+    pub message: String,
+    /// Stack/backtrace/ubicación si está disponible.
+    pub stack: Option<String>,
+    /// `"unexpected"` | `"user"` (ver [`severity`]).
+    pub severity: String,
+    /// Contexto adicional (nombre del command/query, claves del payload, url del frontend…).
+    /// Nunca el payload completo (evita arrastrar PII).
+    pub context: serde_json::Value,
+}
+
+impl ErrorEvent {
+    /// Constructor base con contexto vacío (`{}`) y sin `module_id`/`stack`.
+    pub fn new(
+        source: impl Into<String>,
+        error_code: impl Into<String>,
+        message: impl Into<String>,
+        severity: impl Into<String>,
+    ) -> Self {
+        Self {
+            source: source.into(),
+            module_id: None,
+            error_code: error_code.into(),
+            message: message.into(),
+            stack: None,
+            severity: severity.into(),
+            context: serde_json::Value::Object(Default::default()),
+        }
+    }
+
+    /// Fija el `module_id` (encadenable).
+    pub fn with_module(mut self, module_id: impl Into<String>) -> Self {
+        self.module_id = Some(module_id.into());
+        self
+    }
+
+    /// Fija el `stack`/backtrace (encadenable).
+    pub fn with_stack(mut self, stack: impl Into<String>) -> Self {
+        self.stack = Some(stack.into());
+        self
+    }
+
+    /// Fija el contexto (encadenable).
+    pub fn with_context(mut self, context: serde_json::Value) -> Self {
+        self.context = context;
+        self
+    }
+
+    /// Huella estable para el dedup local: source + module + code + message. (El Cloud calcula su
+    /// propio fingerprint server-side; este es solo para no martillear ante un error en bucle.)
+    fn fingerprint(&self) -> String {
+        format!(
+            "{}|{}|{}|{}",
+            self.source,
+            self.module_id.as_deref().unwrap_or(""),
+            self.error_code,
+            self.message
+        )
+    }
+}
+
+/// Sumidero de errores: lo implementa el host (server/Tauri) para reenviar al Cloud.
+///
+/// **Object-safe** y **fire-and-forget**: `submit` NO debe bloquear al llamador (el sink real del
+/// server lanza un `tokio::spawn` y devuelve al instante). Vive tras un `Arc` en el registro global.
+pub trait ErrorSink: Send + Sync {
+    /// Acepta un evento para reenviarlo (sin bloquear). Lo que falle, se ignora (best-effort).
+    fn submit(&self, event: ErrorEvent);
+}
+
+/// El registro global de errores. Único por proceso (un contenedor ECS por hub / una app Tauri).
+/// Accede a él con [`ErrorRegistry::global`].
+pub struct ErrorRegistry {
+    /// Sink instalado por el host. `None` hasta [`ErrorRegistry::install`] (eventos previos se tiran).
+    sink: OnceLock<std::sync::Arc<dyn ErrorSink>>,
+    /// Dedup/throttle local: huella → instante del último reporte. `Mutex` corto (sin await dentro).
+    recent: Mutex<HashMap<String, Instant>>,
+}
+
+impl ErrorRegistry {
+    /// Accessor del registro global (perezoso, una sola instancia por proceso).
+    pub fn global() -> &'static ErrorRegistry {
+        static REGISTRY: OnceLock<ErrorRegistry> = OnceLock::new();
+        REGISTRY.get_or_init(|| ErrorRegistry {
+            sink: OnceLock::new(),
+            recent: Mutex::new(HashMap::new()),
+        })
+    }
+
+    /// Instala el sink (lo llama el host UNA vez al arrancar). Si ya había uno, no lo reemplaza
+    /// (best-effort, no hace `panic!`).
+    pub fn install(sink: std::sync::Arc<dyn ErrorSink>) {
+        let _ = Self::global().sink.set(sink);
+    }
+
+    /// `true` si ya hay un sink instalado (útil para tests / introspección).
+    pub fn has_sink(&self) -> bool {
+        self.sink.get().is_some()
+    }
+
+    /// Reporta un evento. Si no hay sink → se descarta. Si la misma huella se vio en los últimos
+    /// ~30 s → se omite (throttle). En otro caso se entrega al sink. NUNCA hace `panic!`.
+    pub fn report(&self, event: ErrorEvent) {
+        // Sin sink (arranque temprano / proceso sin host): tirar en silencio.
+        let Some(sink) = self.sink.get() else {
+            return;
+        };
+
+        // Throttle/dedup local best-effort. Si el mutex está envenenado lo recuperamos (un panic en
+        // otro hilo no debe inutilizar el reporte de errores). Si todo falla, reportamos igualmente.
+        if self.should_throttle(&event) {
+            return;
+        }
+
+        sink.submit(event);
+    }
+
+    /// ¿Hay que omitir este evento por dedup? Actualiza la tabla de huellas recientes. Best-effort:
+    /// ante cualquier problema con el `Mutex`, devuelve `false` (mejor reportar de más que perder).
+    fn should_throttle(&self, event: &ErrorEvent) -> bool {
+        let fp = event.fingerprint();
+        let now = Instant::now();
+        let mut map = match self.recent.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+
+        // Purga perezosa si la tabla creció demasiado (entradas expiradas; si aún llena, limpia todo).
+        if map.len() >= DEDUP_MAX_ENTRIES {
+            map.retain(|_, &mut t| now.duration_since(t) < DEDUP_WINDOW);
+            if map.len() >= DEDUP_MAX_ENTRIES {
+                map.clear();
+            }
+        }
+
+        match map.get(&fp) {
+            Some(&last) if now.duration_since(last) < DEDUP_WINDOW => true,
+            _ => {
+                map.insert(fp, now);
+                false
+            }
+        }
+    }
+}
+
+/// Reporta un [`RuntimeError`] al registro global, clasificando severidad y derivando el
+/// `error_code` de la variante. Helper de conveniencia para el dispatcher del runtime.
+///
+/// Clasificación de severidad (errores "de usuario" = esperables, provocados por el llamador):
+/// `InvalidPayload` / `PermissionDenied` / `CommandNotFound` / `QueryNotFound` / `NotImplemented`
+/// → `"user"`; todo lo demás (Db, Wasm, Io, panic…) → `"unexpected"`.
+pub fn report_runtime_error(
+    err: &RuntimeError,
+    source: &str,
+    module_id: Option<String>,
+    context: serde_json::Value,
+) {
+    let mut event = ErrorEvent::new(source, error_code_of(err), err.to_string(), severity_of(err))
+        .with_context(context);
+    if let Some(id) = module_id {
+        event = event.with_module(id);
+    }
+    ErrorRegistry::global().report(event);
+}
+
+/// Severidad de un [`RuntimeError`]: "user" si es un error esperable del llamador, "unexpected" si
+/// es un fallo no esperado del Hub. Ver [`report_runtime_error`].
+pub fn severity_of(err: &RuntimeError) -> &'static str {
+    use RuntimeError as E;
+    match err {
+        E::InvalidPayload { .. }
+        | E::PermissionDenied(_)
+        | E::CommandNotFound(_)
+        | E::QueryNotFound(_)
+        | E::NotImplemented(_) => severity::USER,
+        _ => severity::UNEXPECTED,
+    }
+}
+
+/// Código corto y estable derivado de la variante de [`RuntimeError`] (snake_case del nombre).
+pub fn error_code_of(err: &RuntimeError) -> &'static str {
+    use RuntimeError as E;
+    match err {
+        E::Io(_) => "io",
+        E::Manifest { .. } => "manifest",
+        E::Db(_) => "db",
+        E::QueryNotFound(_) => "query_not_found",
+        E::CommandNotFound(_) => "command_not_found",
+        E::PermissionDenied(_) => "permission_denied",
+        E::MissingDependency { .. } => "missing_dependency",
+        E::DependencyCycle { .. } => "dependency_cycle",
+        E::EventLoop => "event_loop",
+        E::NotImplemented(_) => "not_implemented",
+        E::Wasm(_) => "wasm",
+        E::Native(_) => "native",
+        E::InvalidPayload { .. } => "invalid_payload",
+        E::Schema { .. } => "schema",
+        E::Notify(_) => "notify",
+        E::Backup(_) => "backup",
+        E::Other(_) => "other",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    /// Sink de test que cuenta cuántos eventos recibe (sin tocar red).
+    struct CountingSink(Arc<AtomicUsize>);
+    impl ErrorSink for CountingSink {
+        fn submit(&self, _event: ErrorEvent) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    /// Construye un registro AISLADO (no el global) para testear el throttle sin estado compartido.
+    fn isolated(sink: Arc<dyn ErrorSink>) -> ErrorRegistry {
+        let reg = ErrorRegistry { sink: OnceLock::new(), recent: Mutex::new(HashMap::new()) };
+        let _ = reg.sink.set(sink);
+        reg
+    }
+
+    fn event(code: &str, msg: &str) -> ErrorEvent {
+        ErrorEvent::new(source::HUB, code, msg, severity::UNEXPECTED)
+    }
+
+    #[test]
+    fn dedup_skips_same_fingerprint_within_window() {
+        let count = Arc::new(AtomicUsize::new(0));
+        let reg = isolated(Arc::new(CountingSink(count.clone())));
+
+        reg.report(event("db", "boom"));
+        reg.report(event("db", "boom")); // misma huella → throttled
+        reg.report(event("db", "boom")); // idem
+
+        assert_eq!(count.load(Ordering::SeqCst), 1, "solo el primero debe llegar al sink");
+    }
+
+    #[test]
+    fn different_fingerprints_are_not_throttled() {
+        let count = Arc::new(AtomicUsize::new(0));
+        let reg = isolated(Arc::new(CountingSink(count.clone())));
+
+        reg.report(event("db", "boom"));
+        reg.report(event("db", "otra cosa")); // distinto mensaje → pasa
+        reg.report(event("wasm", "boom")); // distinto code → pasa
+
+        assert_eq!(count.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn no_sink_drops_quietly() {
+        let reg = ErrorRegistry { sink: OnceLock::new(), recent: Mutex::new(HashMap::new()) };
+        assert!(!reg.has_sink());
+        // No debe entrar en pánico ni hacer nada observable.
+        reg.report(event("db", "boom"));
+    }
+
+    #[test]
+    fn severity_classification() {
+        // Errores "de usuario" (esperables).
+        assert_eq!(
+            severity_of(&RuntimeError::PermissionDenied("x".into())),
+            severity::USER
+        );
+        assert_eq!(
+            severity_of(&RuntimeError::CommandNotFound("c".into())),
+            severity::USER
+        );
+        assert_eq!(
+            severity_of(&RuntimeError::QueryNotFound("q".into())),
+            severity::USER
+        );
+        assert_eq!(
+            severity_of(&RuntimeError::InvalidPayload { name: "n".into(), detail: "d".into() }),
+            severity::USER
+        );
+        assert_eq!(
+            severity_of(&RuntimeError::NotImplemented("x")),
+            severity::USER
+        );
+        // Fallos no esperados.
+        assert_eq!(severity_of(&RuntimeError::Wasm("x".into())), severity::UNEXPECTED);
+        assert_eq!(severity_of(&RuntimeError::Other("x".into())), severity::UNEXPECTED);
+        assert_eq!(severity_of(&RuntimeError::EventLoop), severity::UNEXPECTED);
+    }
+
+    #[test]
+    fn error_code_derives_from_variant() {
+        assert_eq!(error_code_of(&RuntimeError::PermissionDenied("x".into())), "permission_denied");
+        assert_eq!(error_code_of(&RuntimeError::CommandNotFound("c".into())), "command_not_found");
+        assert_eq!(error_code_of(&RuntimeError::QueryNotFound("q".into())), "query_not_found");
+        assert_eq!(
+            error_code_of(&RuntimeError::InvalidPayload { name: "n".into(), detail: "d".into() }),
+            "invalid_payload"
+        );
+        assert_eq!(error_code_of(&RuntimeError::Wasm("x".into())), "wasm");
+        assert_eq!(error_code_of(&RuntimeError::EventLoop), "event_loop");
+    }
+
+    #[test]
+    fn report_runtime_error_builds_event() {
+        let count = Arc::new(AtomicUsize::new(0));
+        // Verifica que el helper construye y entrega (usa el sink aislado vía un wrapper).
+        struct CaptureSink(Arc<std::sync::Mutex<Option<ErrorEvent>>>);
+        impl ErrorSink for CaptureSink {
+            fn submit(&self, event: ErrorEvent) {
+                *self.0.lock().unwrap() = Some(event);
+            }
+        }
+        let captured = Arc::new(std::sync::Mutex::new(None));
+        let reg = isolated(Arc::new(CaptureSink(captured.clone())));
+        let _ = &count; // silencia el aviso si no se usa
+
+        let err = RuntimeError::Wasm("kaboom".into());
+        let event = ErrorEvent::new(
+            source::MODULE,
+            error_code_of(&err),
+            err.to_string(),
+            severity_of(&err),
+        )
+        .with_module("inventory")
+        .with_context(serde_json::json!({ "command": "inventory.products.create" }));
+        reg.report(event);
+
+        let got = captured.lock().unwrap().clone().expect("evento entregado");
+        assert_eq!(got.source, source::MODULE);
+        assert_eq!(got.module_id.as_deref(), Some("inventory"));
+        assert_eq!(got.error_code, "wasm");
+        assert_eq!(got.severity, severity::UNEXPECTED);
+        assert_eq!(got.context["command"], "inventory.products.create");
+    }
+}

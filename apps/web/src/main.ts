@@ -26,6 +26,7 @@ import { logout } from './lib/session';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
+import { installErrorReporting } from './lib/error-report';
 
 // Los componentes de OutfitKit (ok-data-table, etc.) usan ion-icon POR NOMBRE ('pencil', 'trash',
 // 'chevron-back'…). En @ionic/vue los iconos por nombre hay que registrarlos con addIcons (no se
@@ -98,6 +99,10 @@ bootTheme();
 bootPwa();
 
 const app = createApp(App).use(IonicVue).use(router).use(i18n);
+
+// Captura AUTOMÁTICA de errores del frontend (sin modal ni acción del usuario): errores globales,
+// promesas rechazadas y errorHandler de Vue → POST best-effort al runtime local (lib/error-report).
+installErrorReporting(app);
 
 // Cliente del runtime local (Axum) inyectado en todo el árbol (provide/inject). Las vistas y
 // ModuleView lo consumen para hablar con el runtime (query/command/eventos WS). lib/runtime.ts.

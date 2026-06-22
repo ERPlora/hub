@@ -399,19 +399,6 @@ export async function cloudMarketplaceModules(): Promise<CloudMarketplaceModule[
   return items.map((item) => normalizeMarketplaceModule(item as Record<string, unknown>));
 }
 
-// --- Reporte de problemas (bug report) --------------------------------------
-// Contrato Cloud: POST /api/v1/hub/device/bug-report/ (hub-scoped). authedFetch añade el JWT del
-// usuario + X-Hub-Id; el Cloud acepta IsHubMember | IsHubMachine. Lo usa el botón "reportar un
-// problema" del footer del sidebar (paridad con el shell de Cloud).
-export async function cloudBugReport(message: string, context?: Record<string, unknown>): Promise<void> {
-  const res = await authedFetch('/api/v1/hub/device/bug-report/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, ...(context ? { context } : {}) }),
-  });
-  if (!res.ok) throw new Error(`cloud bug-report → ${res.status}`);
-}
-
 async function meRequest(access: string): Promise<CloudUser> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);

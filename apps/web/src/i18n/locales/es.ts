@@ -30,7 +30,6 @@ export default {
   sidebar: {
     profile: 'Perfil',
     installApp: 'Instalar app',
-    reportProblem: 'Reportar un problema',
     signOut: 'Cerrar sesión',
   },
   assistant: {
@@ -42,15 +41,6 @@ export default {
     close: 'Cerrar',
     noReply: '(sin respuesta)',
     error: 'No se pudo contactar con el asistente.',
-  },
-  bugReport: {
-    title: 'Reportar un problema',
-    description: 'Cuéntanos qué ha pasado',
-    placeholder: 'Describe el problema con el mayor detalle posible…',
-    submit: 'Enviar',
-    cancel: 'Cancelar',
-    sent: 'Gracias, hemos recibido tu reporte.',
-    failed: 'No se pudo enviar el reporte. Inténtalo de nuevo.',
   },
   files: {
     title: 'Archivos',
