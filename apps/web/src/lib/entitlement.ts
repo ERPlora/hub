@@ -9,7 +9,7 @@
 //  - router (guard de /m/:moduleId y de /activation).
 import { computed, ref } from 'vue';
 
-import { cloudEntitlement, getAccessToken } from './cloud';
+import { cloudEntitlement, getAccessToken, triggerHubGone } from './cloud';
 import { config } from './config';
 import { invokeTauri } from './device';
 
@@ -47,14 +47,6 @@ export function resetEntitlement(): void {
   _status.value = 'unknown';
   _offline.value = false;
   _reason.value = '';
-}
-
-/** Hook que dispara el shell cuando el Cloud reporta que el hub fue borrado/revocado (410
- *  `hub_not_found`). El shell lo cablea para olvidar la identidad local (`forget_hub`) + logout
- *  → /login; el siguiente login re-registra por `X-Device-Id` (§2.9b). */
-let onHubGone: (() => void) | null = null;
-export function setOnHubGone(fn: () => void): void {
-  onHubGone = fn;
 }
 
 function applyOutcome(o: GateOutcome): void {
@@ -95,7 +87,7 @@ export async function resolveEntitlement(): Promise<void> {
       // local y salimos a /login. El siguiente login re-registra por X-Device-Id (§2.9b). NO
       // mostramos la pantalla de activación (no es un problema de licencia, el hub ya no existe).
       resetEntitlement();
-      onHubGone?.();
+      triggerHubGone();
       return;
     }
     applyOutcome(outcome);

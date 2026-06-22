@@ -78,6 +78,19 @@ function expireSession(): void {
   }
 }
 
+// --- Hub borrado/revocado (Cloud 410 `hub_not_found`) -----------------------
+// Distinto del fin de sesión por token caducado (401 → refresh): aquí la fila del hub ya no existe
+// en el Cloud. El shell registra el hook para olvidar la identidad de máquina local (`forget_hub`)
+// + logout → /login; el siguiente login re-registra por `X-Device-Id` (§2.9b). Lo disparan tanto el
+// gate de entitlement (Tauri) como CUALQUIER llamada hub-scoped que reciba un 410 (marketplace, etc.).
+let onHubGone: (() => void) | null = null;
+export function setOnHubGone(fn: () => void): void {
+  onHubGone = fn;
+}
+export function triggerHubGone(): void {
+  onHubGone?.();
+}
+
 /** Evita refresh-storms: si ya hay un refresh en vuelo, las demás llamadas lo esperan. */
 let refreshing: Promise<string | null> | null = null;
 
@@ -136,6 +149,8 @@ async function authedFetch(path: string, init: RequestInit, timeoutMs = 8000): P
         expireSession();
       }
     }
+    // Cloud `hub_not_found` (410): el hub fue borrado/revocado → olvidar identidad + logout.
+    if (res.status === 410) triggerHubGone();
     return res;
   } finally {
     endRequest();
@@ -174,6 +189,11 @@ async function runtimeGet<T>(path: string, timeoutMs = 8000): Promise<T> {
     if (res.status === 401) {
       const fresh = await refreshTokens();
       if (fresh) res = await call(fresh);
+    }
+    if (res.status === 410) {
+      // Cloud `hub_not_found` (hub borrado/revocado): reacciona igual que el gate de entitlement.
+      triggerHubGone();
+      throw new Error(`runtime ${path} → hub_not_found`);
     }
     if (!res.ok) throw new Error(`runtime ${path} → ${res.status}`);
     return (await res.json()) as T;
