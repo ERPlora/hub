@@ -6,7 +6,7 @@
       <!-- Botón de tema: esquina superior derecha -->
       <ion-button
         fill="clear"
-        aria-label="Cambiar tema"
+        :aria-label="t('login.toggleTheme')"
         class="theme-btn"
         @click="toggleTheme"
       >
@@ -28,9 +28,9 @@
               @error="onLogoError"
             />
             <p class="logo-sub">
-              <template v-if="step === 'setup'">Crea tu PIN de acceso</template>
-              <template v-else-if="step === 'pin'">Introduce tu PIN</template>
-              <template v-else>Inicia sesión en tu hub</template>
+              <template v-if="step === 'setup'">{{ t('login.subtitleSetup') }}</template>
+              <template v-else-if="step === 'pin'">{{ t('login.subtitlePin') }}</template>
+              <template v-else>{{ t('login.subtitleEmail') }}</template>
             </p>
           </div>
 
@@ -47,11 +47,11 @@
               >
                 <ion-segment-button value="pin">
                   <HubIcon name="keypad-outline" />
-                  <ion-label>PIN</ion-label>
+                  <ion-label>{{ t('login.tabPin') }}</ion-label>
                 </ion-segment-button>
                 <ion-segment-button value="email">
                   <HubIcon name="mail-outline" />
-                  <ion-label>Email</ion-label>
+                  <ion-label>{{ t('login.tabEmail') }}</ion-label>
                 </ion-segment-button>
               </ion-segment>
 
@@ -59,17 +59,17 @@
               <form v-if="step === 'email'" class="step-form" @submit.prevent="submitEmail">
                 <ion-input
                   v-model="emailVal"
-                  label="Email"
+                  :label="t('login.emailLabel')"
                   label-placement="stacked"
                   type="email"
                   autocomplete="username"
                   fill="outline"
-                  placeholder="tu@empresa.com"
+                  :placeholder="t('login.emailPlaceholder')"
                   @ion-input="emailVal = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"
                 />
                 <ion-input
                   v-model="passwordVal"
-                  label="Contraseña"
+                  :label="t('login.passwordLabel')"
                   label-placement="stacked"
                   type="password"
                   autocomplete="current-password"
@@ -87,13 +87,13 @@
                     label-placement="end"
                     @ion-change="trust = ($event as CustomEvent<{ checked: boolean }>).detail.checked"
                   >
-                    <span class="trust-label">Confiar en este dispositivo</span>
+                    <span class="trust-label">{{ t('login.trustDevice') }}</span>
                   </ion-checkbox>
                   <ion-button
                     id="trust-info-btn"
                     fill="clear"
                     size="small"
-                    aria-label="Más información sobre dispositivos de confianza"
+                    :aria-label="t('login.trustInfoAria')"
                     class="trust-info-btn"
                   >
                     <HubIcon slot="icon-only" name="information-circle-outline" />
@@ -105,12 +105,9 @@
                     alignment="center"
                   >
                     <div class="popover-content">
-                      <p class="popover-title">Acceso por PIN</p>
-                      <p class="popover-body">
-                        Marca esta casilla para poder entrar con un <strong>PIN</strong> en este
-                        dispositivo la próxima vez, sin escribir email y contraseña. Si no la marcas,
-                        siempre tendrás que iniciar sesión con email.
-                      </p>
+                      <p class="popover-title">{{ t('login.popoverTitle') }}</p>
+                      <!-- eslint-disable-next-line vue/no-v-html -->
+                      <p class="popover-body" v-html="t('login.popoverBody')"></p>
                     </div>
                   </ion-popover>
                 </div>
@@ -123,7 +120,7 @@
                   <ion-spinner v-if="emailLoading" name="crescent" />
                   <template v-else>
                     <HubIcon slot="start" name="log-in-outline" />
-                    Entrar
+                    {{ t('login.signIn') }}
                   </template>
                 </ion-button>
 
@@ -133,7 +130,7 @@
                   size="small"
                   @click="step = 'pin'"
                 >
-                  Usar PIN en su lugar
+                  {{ t('login.usePinInstead') }}
                 </ion-button>
               </form>
 
@@ -143,7 +140,7 @@
                 <!-- Paso 1: elegir usuario (cuando hay varios en el dispositivo) -->
                 <template v-if="!pinUser">
                   <ion-text color="medium" class="pin-choose-title">
-                    <p>Elige tu usuario</p>
+                    <p>{{ t('login.chooseUser') }}</p>
                   </ion-text>
                   <div class="user-scroll">
                     <div class="user-grid">
@@ -168,7 +165,7 @@
                     size="small"
                     @click="step = 'email'"
                   >
-                    Iniciar sesión con email
+                    {{ t('login.signInWithEmail') }}
                   </ion-button>
                 </template>
 
@@ -188,7 +185,7 @@
                       :length="4"
                       :error="pinError"
                       secondary-icon="arrow-back-outline"
-                      secondary-label="Cambiar usuario"
+                      :secondary-label="t('login.changeUser')"
                       @ok-input="onMainPinInput"
                       @ok-complete="onMainPinComplete"
                       @ok-secondary="onChangeUser"
@@ -196,7 +193,7 @@
                   </div>
 
                   <ion-note v-if="pinError" color="danger" class="error-note">
-                    PIN incorrecto
+                    {{ t('login.pinIncorrect') }}
                   </ion-note>
                   <ion-button
                     v-if="!showTabs"
@@ -204,7 +201,7 @@
                     size="small"
                     @click="onPinToEmail"
                   >
-                    Iniciar sesión con email
+                    {{ t('login.signInWithEmail') }}
                   </ion-button>
                 </template>
               </div>
@@ -212,7 +209,7 @@
               <!-- Paso: alta del PIN (primer login con "Confiar en este dispositivo") -->
               <div v-else-if="step === 'setup'" class="step-form">
                 <ion-text color="medium" class="setup-hint">
-                  <p>{{ setupPhase === 'first' ? 'Elige un PIN de 4 dígitos' : 'Confirma tu PIN' }}</p>
+                  <p>{{ setupPhase === 'first' ? t('login.setupChoosePin') : t('login.setupConfirmPin') }}</p>
                 </ion-text>
 
                 <!-- ok-pinpad reutilizado para el alta de PIN. -->
@@ -227,7 +224,7 @@
                 </div>
 
                 <ion-note v-if="setupError" color="danger" class="error-note">
-                  Los PIN no coinciden, inténtalo de nuevo
+                  {{ t('login.setupMismatch') }}
                 </ion-note>
               </div>
 
@@ -235,7 +232,7 @@
           </ion-card>
 
           <p class="footer-note">
-            ERPlora · {{ step === 'pin' ? 'dispositivo de confianza' : 'conexión segura con Cloud' }}
+            ERPlora · {{ step === 'pin' ? t('login.footerTrustedDevice') : t('login.footerSecureCloud') }}
           </p>
 
         </div>
@@ -248,6 +245,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import {
   IonPage, IonContent, IonCard, IonCardContent, IonButton,
   IonInput, IonInputPasswordToggle, IonCheckbox, IonText, IonSpinner, IonSegment, IonSegmentButton,
@@ -266,6 +264,8 @@ import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
 // Tipos
 // ---------------------------------------------------------------------------
 type Step = 'pin' | 'email' | 'setup';
+
+const { t } = useI18n();
 
 interface TrustedUser {
   id: string;
@@ -447,7 +447,7 @@ async function submitEmail(): Promise<void> {
       await router.replace(redirect);
       return;
     }
-    emailError.value = 'No se pudo iniciar sesión. Revisa tus credenciales o la conexión.';
+    emailError.value = t('login.errorSignIn');
   } finally {
     emailLoading.value = false;
   }

@@ -9,18 +9,19 @@
               <ion-item>
                 <HubIcon slot="start" name="language-outline" />
                 <ion-label>
-                  <h2>Idioma del sistema</h2>
-                  <p>Idioma por defecto de la interfaz del Hub</p>
+                  <h2>{{ t('settings.systemLanguage') }}</h2>
+                  <p>{{ t('settings.systemLanguageDesc') }}</p>
                 </ion-label>
                 <ion-select
                   v-model="hubLang"
                   interface="popover"
-                  aria-label="Idioma del sistema"
+                  :aria-label="t('settings.systemLanguage')"
                   slot="end"
                   @ion-change="onLangChange($event.detail.value as Locale)"
                 >
-                  <ion-select-option value="es">Español</ion-select-option>
-                  <ion-select-option value="en">English</ion-select-option>
+                  <ion-select-option v-for="l in availableLocales" :key="l.code" :value="l.code">
+                    {{ l.name }}
+                  </ion-select-option>
                 </ion-select>
               </ion-item>
 
@@ -28,13 +29,13 @@
               <ion-item>
                 <HubIcon slot="start" name="globe-outline" />
                 <ion-label>
-                  <h2>Zona horaria</h2>
-                  <p>Zona horaria para fechas y horarios</p>
+                  <h2>{{ t('settings.timezone') }}</h2>
+                  <p>{{ t('settings.timezoneDesc') }}</p>
                 </ion-label>
                 <ion-select
                   v-model="hubTimezone"
                   interface="popover"
-                  aria-label="Zona horaria"
+                  :aria-label="t('settings.timezone')"
                   slot="end"
                 >
                   <ion-select-option value="madrid">Europe/Madrid</ion-select-option>
@@ -46,17 +47,17 @@
               <ion-item>
                 <HubIcon slot="start" name="business-outline" />
                 <ion-label>
-                  <h2>País</h2>
-                  <p>País para la configuración regional</p>
+                  <h2>{{ t('settings.country') }}</h2>
+                  <p>{{ t('settings.countryDesc') }}</p>
                 </ion-label>
                 <ion-select
                   v-model="hubCountry"
                   interface="popover"
-                  aria-label="País"
+                  :aria-label="t('settings.country')"
                   slot="end"
                 >
-                  <ion-select-option value="spain">España</ion-select-option>
-                  <ion-select-option value="portugal">Portugal</ion-select-option>
+                  <ion-select-option value="spain">{{ t('settings.countrySpain') }}</ion-select-option>
+                  <ion-select-option value="portugal">{{ t('settings.countryPortugal') }}</ion-select-option>
                 </ion-select>
               </ion-item>
 
@@ -67,19 +68,19 @@
               <ion-item>
                 <HubIcon slot="start" name="color-palette-outline" />
                 <ion-label>
-                  <h2>Tema</h2>
-                  <p>Modo de apariencia de la interfaz</p>
+                  <h2>{{ t('settings.theme') }}</h2>
+                  <p>{{ t('settings.themeDesc') }}</p>
                 </ion-label>
                 <ion-select
                   v-model="hubTheme"
                   interface="popover"
-                  aria-label="Tema"
+                  :aria-label="t('settings.theme')"
                   slot="end"
                   @ion-change="onThemeChange($event.detail.value as ThemeMode)"
                 >
-                  <ion-select-option value="system">Sistema (auto)</ion-select-option>
-                  <ion-select-option value="light">Claro</ion-select-option>
-                  <ion-select-option value="dark">Oscuro</ion-select-option>
+                  <ion-select-option value="system">{{ t('settings.themeSystem') }}</ion-select-option>
+                  <ion-select-option value="light">{{ t('settings.themeLight') }}</ion-select-option>
+                  <ion-select-option value="dark">{{ t('settings.themeDark') }}</ion-select-option>
                 </ion-select>
               </ion-item>
             </ion-list>
@@ -88,7 +89,7 @@
 
         <ion-button class="mt-3" expand="block" @click="saveHubSettings">
           <HubIcon slot="start" name="save-outline" />
-          Guardar ajustes
+          {{ t('settings.saveSettings') }}
         </ion-button>
 
         <!-- Mostrar módulos en la barra lateral -->
@@ -97,15 +98,15 @@
             <ion-item lines="none">
               <HubIcon slot="start" name="reader-outline" />
               <ion-label>
-                <h2>Mostrar módulos en la barra lateral</h2>
-                <p>Mostrar los módulos instalados como accesos directos en la navegación lateral</p>
+                <h2>{{ t('settings.showModulesInSidebar') }}</h2>
+                <p>{{ t('settings.showModulesInSidebarDesc') }}</p>
               </ion-label>
               <ion-toggle v-model="showModulesInSidebar" slot="end" />
             </ion-item>
           </ion-card-content>
         </ion-card>
 
-        <h2 class="text-base font-semibold mt-4 mb-2 px-1">Hardware</h2>
+        <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('settings.hardware') }}</h2>
 
         <!-- ERPlora Bridge -->
         <ion-card>
@@ -114,9 +115,9 @@
               <HubIcon slot="start" name="extension-puzzle-outline" />
               <ion-label>
                 <h2>ERPlora Bridge</h2>
-                <p>Impresoras, cajón, escáner y conexión de hardware periférico</p>
+                <p>{{ t('settings.bridgeDesc') }}</p>
               </ion-label>
-              <ion-note slot="end">Desactivado</ion-note>
+              <ion-note slot="end">{{ t('settings.disabled') }}</ion-note>
             </ion-item>
           </ion-card-content>
         </ion-card>
@@ -131,17 +132,17 @@
               <ion-item>
                 <HubIcon slot="start" name="storefront-outline" />
                 <ion-label>
-                  <h2>Tipo de negocio</h2>
-                  <p>Flujo de ventas por defecto</p>
+                  <h2>{{ t('settings.businessType') }}</h2>
+                  <p>{{ t('settings.businessTypeDesc') }}</p>
                 </ion-label>
                 <ion-select
                   v-model="storeType"
                   interface="popover"
-                  aria-label="Tipo de negocio"
+                  :aria-label="t('settings.businessType')"
                   slot="end"
                 >
-                  <ion-select-option value="retail">Comercio minorista</ion-select-option>
-                  <ion-select-option value="food">Hostelería</ion-select-option>
+                  <ion-select-option value="retail">{{ t('settings.businessRetail') }}</ion-select-option>
+                  <ion-select-option value="food">{{ t('settings.businessFood') }}</ion-select-option>
                 </ion-select>
               </ion-item>
 
@@ -149,17 +150,17 @@
               <ion-item>
                 <HubIcon slot="start" name="globe-outline" />
                 <ion-label>
-                  <h2>Formato regional</h2>
-                  <p>Formato de visualización regional</p>
+                  <h2>{{ t('settings.regionalFormat') }}</h2>
+                  <p>{{ t('settings.regionalFormatDesc') }}</p>
                 </ion-label>
                 <ion-select
                   v-model="storeLocale"
                   interface="popover"
-                  aria-label="Formato regional"
+                  :aria-label="t('settings.regionalFormat')"
                   slot="end"
                 >
-                  <ion-select-option value="es">España</ion-select-option>
-                  <ion-select-option value="en">Reino Unido</ion-select-option>
+                  <ion-select-option value="es">{{ t('settings.countrySpain') }}</ion-select-option>
+                  <ion-select-option value="en">{{ t('settings.countryUk') }}</ion-select-option>
                 </ion-select>
               </ion-item>
             </ion-list>
@@ -176,18 +177,18 @@
               <ion-item>
                 <HubIcon slot="start" name="wallet-outline" />
                 <ion-label>
-                  <h2>IVA por defecto</h2>
-                  <p>Tipo aplicado a productos nuevos</p>
+                  <h2>{{ t('settings.defaultVat') }}</h2>
+                  <p>{{ t('settings.defaultVatDesc') }}</p>
                 </ion-label>
                 <ion-select
                   v-model="taxIva"
                   interface="popover"
-                  aria-label="IVA por defecto"
+                  :aria-label="t('settings.defaultVat')"
                   slot="end"
                 >
-                  <ion-select-option value="21">21% (general)</ion-select-option>
-                  <ion-select-option value="10">10% (reducido)</ion-select-option>
-                  <ion-select-option value="4">4% (superreducido)</ion-select-option>
+                  <ion-select-option value="21">{{ t('settings.vatGeneral') }}</ion-select-option>
+                  <ion-select-option value="10">{{ t('settings.vatReduced') }}</ion-select-option>
+                  <ion-select-option value="4">{{ t('settings.vatSuperReduced') }}</ion-select-option>
                 </ion-select>
               </ion-item>
 
@@ -195,17 +196,17 @@
               <ion-item>
                 <HubIcon slot="start" name="business-outline" />
                 <ion-label>
-                  <h2>Régimen fiscal</h2>
-                  <p>Régimen de facturación</p>
+                  <h2>{{ t('settings.taxRegime') }}</h2>
+                  <p>{{ t('settings.taxRegimeDesc') }}</p>
                 </ion-label>
                 <ion-select
                   v-model="taxRegime"
                   interface="popover"
-                  aria-label="Régimen fiscal"
+                  :aria-label="t('settings.taxRegime')"
                   slot="end"
                 >
-                  <ion-select-option value="general">Régimen general</ion-select-option>
-                  <ion-select-option value="recargo">Recargo de equivalencia</ion-select-option>
+                  <ion-select-option value="general">{{ t('settings.regimeGeneral') }}</ion-select-option>
+                  <ion-select-option value="recargo">{{ t('settings.regimeEquivalence') }}</ion-select-option>
                 </ion-select>
               </ion-item>
             </ion-list>
@@ -219,7 +220,7 @@
               <HubIcon slot="start" name="ticket-outline" />
               <ion-label>
                 <h2>VeriFactu</h2>
-                <p>Reporte de facturas conforme a la normativa</p>
+                <p>{{ t('settings.verifactuDesc') }}</p>
               </ion-label>
               <ion-toggle v-model="taxVerifactu" slot="end" />
             </ion-item>
@@ -228,7 +229,7 @@
 
         <ion-button class="mt-3" expand="block" @click="saveTaxSettings">
           <HubIcon slot="start" name="save-outline" />
-          Guardar cambios
+          {{ t('settings.saveChanges') }}
         </ion-button>
       </template>
 
@@ -239,8 +240,8 @@
             <ion-item button detail lines="none">
               <HubIcon slot="start" name="ticket-outline" />
               <ion-label>
-                <h2>Plantilla de tique</h2>
-                <p>Configuración del recibo impreso y digital</p>
+                <h2>{{ t('settings.receiptTemplate') }}</h2>
+                <p>{{ t('settings.receiptTemplateDesc') }}</p>
               </ion-label>
             </ion-item>
           </ion-card-content>
@@ -253,19 +254,19 @@
         <ion-segment :value="tab" @ion-change="tab = ($event.detail.value as Tab)">
           <ion-segment-button value="hub">
             <HubIcon name="business-outline" />
-            <ion-label>Hub</ion-label>
+            <ion-label>{{ t('settings.tabHub') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="store">
             <HubIcon name="storefront-outline" />
-            <ion-label>Tienda</ion-label>
+            <ion-label>{{ t('settings.tabStore') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="tax">
             <HubIcon name="wallet-outline" />
-            <ion-label>Fiscal</ion-label>
+            <ion-label>{{ t('settings.tabTax') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="tickets">
             <HubIcon name="ticket-outline" />
-            <ion-label>Tiques</ion-label>
+            <ion-label>{{ t('settings.tabTickets') }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
@@ -296,7 +297,7 @@ import {
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import { themeMode, setThemeMode, type ThemeMode } from '../lib/theme';
-import { setLocale, type Locale } from '../i18n';
+import { setLocale, availableLocales, type Locale } from '../i18n';
 
 const { t, locale } = useI18n();
 

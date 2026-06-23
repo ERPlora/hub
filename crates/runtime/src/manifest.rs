@@ -24,6 +24,14 @@ pub struct Manifest {
     pub queries: HashMap<String, QueryDef>,
     #[serde(default)]
     pub commands: HashMap<String, CommandDef>,
+    /// Widgets de dashboard que aporta el módulo (ADR-0054). Mapa `id.completo → WidgetDef`,
+    /// misma convención que `queries`/`commands`. El shell del Hub los recolecta de TODOS los
+    /// manifests instalados y los pinta en `<ok-widget-board>`. Vía declarativa (`kind`+`query`,
+    /// render genérico del shell) o escape hatch a `component` (WC del propio módulo). El runtime
+    /// no ejecuta nada por widget: solo transporta el contrato (el shell fetchea el `module.json`
+    /// crudo, igual que `navigation`/`provides_slots`). Ver `architecture/hub/dashboard/widgets.md`.
+    #[serde(default)]
+    pub widgets: HashMap<String, WidgetDef>,
     #[serde(default)]
     pub events: Events,
     /// Resumen del módulo para el routing del asistente (nivel 1). ARQUITECTURA.md §9.2b.
@@ -143,6 +151,97 @@ pub struct NavAction {
     /// Permiso para MOSTRAR el botón (show/hide de UI; Rust revalida siempre el command real).
     #[serde(default)]
     pub permission: Option<String>,
+}
+
+/// Un widget de dashboard declarado en el manifest (ADR-0054). Espejo de `$defs/widget` en
+/// `schemas/module.schema.json`. El módulo declara metadatos (título/icono/categoría/tamaño,
+/// `sectors`+`default` para la diferenciación por tipo de negocio) y EXACTAMENTE UNA de las dos
+/// vías de render: declarativa (`kind` + `query` + `map`/`options`/`params`) o `component` (WC
+/// propio). El runtime no ejecuta nada por widget; solo parsea y transporta el contrato (el shell
+/// fetchea el `module.json` crudo y construye el `WidgetDef` de `ok-widget-board`).
+///
+/// CERO MOCKS (directriz del proyecto): la vía declarativa SIEMPRE se alimenta de una `query` real
+/// del módulo; un widget sin datos reales no se inventa, se omite. La regla "exactamente uno de
+/// { kind, component }" la valida el JSON Schema (no este struct, permisivo por compat hacia
+/// adelante igual que el resto del fichero).
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct WidgetDef {
+    /// Título mostrado en el board y en el selector. OBLIGATORIO.
+    pub title: String,
+    /// Nombre de icono ionicons para el selector (p. ej. `trending-up-outline`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Grupo en el selector (p. ej. "Ventas", "Inventario").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// Tamaño en la rejilla de 12 columnas (`sm`=3, `md`=6, `lg`=8). Por defecto `md`.
+    #[serde(default)]
+    pub size: WidgetSize,
+    /// Permiso para ver el widget (se filtra en cliente; la `query` lo revalida server-side).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission: Option<String>,
+    /// Tipos de negocio a los que aplica (`hosteleria`/`retail`/`gestoria`/`rrhh`/`general`).
+    /// Ausente/vacío = todos.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sectors: Vec<String>,
+    /// Sugerido ACTIVO cuando el sector del hub coincide con `sectors` (preset "Recomendado").
+    #[serde(default)]
+    pub default: bool,
+    /// Tipo de render declarativo. Mutuamente excluyente con `component` (lo valida el schema).
+    /// Si está presente, `query` es obligatoria.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<WidgetKind>,
+    /// Query YA declarada del módulo que alimenta el widget (vía declarativa). Nombre completo
+    /// namespaced (p. ej. `sales.metrics.today`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    /// Params estáticos pasados a la `query` (opcional).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub params: Option<serde_json::Value>,
+    /// Mapeo COLUMNA del resultado → prop del widget (`prop → nombreColumna`). Las props válidas
+    /// dependen del `kind` (ver `architecture/hub/dashboard/widgets.md`). Permisivo aquí.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub map: Option<serde_json::Value>,
+    /// Props LITERALES estáticas (label, icon, format, currency, …). El shell parte de `options`
+    /// y luego sobreescribe con lo resuelto por `map` desde los datos.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<serde_json::Value>,
+    /// Escape hatch: custom element del propio módulo (de su `ui.entry`). Mutuamente excluyente
+    /// con `kind`. El shell lo carga con la misma maquinaria que `provides_slots`/`module-loader`
+    /// y el WC consulta sus datos vía el cliente del Hub.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub component: Option<String>,
+}
+
+/// Tamaño de un widget en la rejilla de 12 columnas del dashboard. `sm`=3, `md`=6, `lg`=8.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WidgetSize {
+    Sm,
+    #[default]
+    Md,
+    Lg,
+}
+
+/// Tipo de render declarativo de un widget → componente OutfitKit que el shell construye.
+/// Cada `kind` acepta un conjunto distinto de columnas en `map` y props en `options`
+/// (contrato en `architecture/hub/dashboard/widgets.md`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WidgetKind {
+    /// `ok-kpi` — valor único con delta/trend.
+    Kpi,
+    /// `ok-stat` — valor único con label/severity.
+    Stat,
+    /// `ok-kpi`+`ok-sparkline` (o `ok-sparkline` suelto) — serie numérica por filas.
+    Sparkline,
+    /// `ok-bar-list` — lista label/valor.
+    #[serde(rename = "bar-list")]
+    BarList,
+    /// `ok-timeline` — eventos cronológicos.
+    Timeline,
+    /// `ok-chart` — serie única (multi-serie → usar `component`).
+    Chart,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -279,5 +378,130 @@ impl Manifest {
             path: path.display().to_string(),
             source,
         })
+    }
+
+    /// Carga las traducciones del módulo desde `<dir>/locales/*.json` → `lang → ModuleLocale`
+    /// (ADR-0055). Best-effort: si no hay carpeta o un fichero está roto, se omite (un locale
+    /// inválido NUNCA rompe la instalación; siempre queda el fallback al manifest).
+    pub fn load_locales(dir: &Path) -> HashMap<String, ModuleLocale> {
+        let mut out: HashMap<String, ModuleLocale> = HashMap::new();
+        let Ok(entries) = std::fs::read_dir(dir.join("locales")) else {
+            return out;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            let Some(lang) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                if let Ok(loc) = serde_json::from_str::<ModuleLocale>(&text) {
+                    out.insert(lang.to_string(), loc);
+                }
+            }
+        }
+        out
+    }
+}
+
+/// Catálogo de traducciones de un módulo para UN idioma (`locales/<lang>.json`, ADR-0055). El
+/// runtime solo resuelve `name` y `navigation[].label`; el bloque `ui` lo consume el Web Component
+/// (lo hornea el toolkit en el `dist`), por eso aquí se ignora.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct ModuleLocale {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub navigation: HashMap<String, NavLocale>,
+}
+
+/// Traducción de una entrada de navegación (`navigation.<id>` en el locale del módulo).
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct NavLocale {
+    #[serde(default)]
+    pub label: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Parsea un manifest con un bloque `widgets` (uno por la vía declarativa `kind`+`query` y
+    /// uno por el escape hatch `component`) y verifica que se deserializa y RE-SERIALIZA sin
+    /// perder campos (ADR-0054).
+    #[test]
+    fn parses_and_roundtrips_widgets_block() {
+        let json = r#"{
+            "id": "sales",
+            "name": "Sales",
+            "version": "1.2.3",
+            "queries": {
+                "sales.metrics.today": { "permission": "sales.read", "sql": "SELECT 1" }
+            },
+            "widgets": {
+                "sales.today": {
+                    "title": "Ventas de hoy",
+                    "icon": "trending-up-outline",
+                    "category": "Ventas",
+                    "size": "md",
+                    "permission": "sales.read",
+                    "sectors": ["hosteleria", "retail"],
+                    "default": true,
+                    "kind": "kpi",
+                    "query": "sales.metrics.today",
+                    "params": { "period": "day" },
+                    "map": { "value": "total", "delta": "delta_pct", "trend": "trend" },
+                    "options": { "label": "Hoy", "format": "currency", "currency": "EUR" }
+                },
+                "sales.live_feed": {
+                    "title": "Actividad en vivo",
+                    "size": "lg",
+                    "component": "erp-sales-live-feed"
+                }
+            }
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        assert_eq!(manifest.widgets.len(), 2);
+
+        let kpi = manifest.widgets.get("sales.today").expect("kpi widget present");
+        assert_eq!(kpi.title, "Ventas de hoy");
+        assert_eq!(kpi.size, WidgetSize::Md);
+        assert_eq!(kpi.kind, Some(WidgetKind::Kpi));
+        assert_eq!(kpi.query.as_deref(), Some("sales.metrics.today"));
+        assert!(kpi.default);
+        assert_eq!(kpi.sectors, vec!["hosteleria".to_string(), "retail".to_string()]);
+        assert!(kpi.component.is_none());
+        assert!(kpi.options.is_some());
+        assert!(kpi.map.is_some());
+
+        let custom = manifest.widgets.get("sales.live_feed").expect("component widget present");
+        assert_eq!(custom.size, WidgetSize::Lg);
+        assert_eq!(custom.component.as_deref(), Some("erp-sales-live-feed"));
+        assert!(custom.kind.is_none());
+        assert!(custom.query.is_none());
+
+        // Re-serializa y vuelve a parsear: ningún campo del contrato se pierde en el round-trip.
+        let serialized = serde_json::to_value(&manifest.widgets).expect("widgets serialize");
+        let kpi_json = &serialized["sales.today"];
+        assert_eq!(kpi_json["title"], "Ventas de hoy");
+        assert_eq!(kpi_json["kind"], "kpi");
+        assert_eq!(kpi_json["size"], "md");
+        assert_eq!(kpi_json["query"], "sales.metrics.today");
+        assert_eq!(kpi_json["default"], true);
+        assert_eq!(kpi_json["sectors"][0], "hosteleria");
+        assert_eq!(kpi_json["options"]["currency"], "EUR");
+        assert_eq!(kpi_json["map"]["value"], "total");
+
+        let custom_json = &serialized["sales.live_feed"];
+        assert_eq!(custom_json["component"], "erp-sales-live-feed");
+        assert_eq!(custom_json["size"], "lg");
+        // `bar-list` se serializa con su rename, no como `barlist`.
+        assert_eq!(
+            serde_json::to_value(WidgetKind::BarList).unwrap(),
+            serde_json::Value::String("bar-list".to_string())
+        );
     }
 }

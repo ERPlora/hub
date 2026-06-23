@@ -19,7 +19,7 @@
         :views="['cards', 'table']"
         :searchKeys="['name']"
         :actions="mineActions"
-        search-placeholder="Buscar módulo instalado…"
+        :search-placeholder="t('marketplace.searchInstalled')"
         page-size="10"
         column-picker
       ></ok-data-table>
@@ -34,7 +34,7 @@
         :views="['cards', 'table']"
         :searchKeys="['name', 'desc', 'cat']"
         :actions="catalogActions"
-        search-placeholder="Buscar en el catálogo…"
+        :search-placeholder="t('marketplace.searchCatalog')"
         page-size="10"
         column-picker
       ></ok-data-table>
@@ -55,15 +55,15 @@
         <ion-segment :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="mine">
             <HubIcon name="cube-outline" />
-            <ion-label>Mis módulos</ion-label>
+            <ion-label>{{ t('marketplace.tabMine') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="all">
             <HubIcon name="storefront-outline" />
-            <ion-label>Catálogo</ion-label>
+            <ion-label>{{ t('marketplace.tabCatalog') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="paid">
             <HubIcon name="wallet-outline" />
-            <ion-label>Pago</ion-label>
+            <ion-label>{{ t('marketplace.tabPaid') }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
@@ -165,29 +165,30 @@ const filteredModules = computed<Row[]>(() => {
 const installedRows = computed<Row[]>(() => installedModules.value as unknown as Row[]);
 
 // --- Columnas + acciones ---
-const mineColumns: DataTableColumn[] = [
-  { key: 'name', header: 'Módulo' },
-  { key: 'version', header: 'Versión', format: (r) => `v${String(r.version ?? '')}` },
+// `computed` para que cabeceras/labels/celdas se recalculen al cambiar de idioma en caliente.
+const mineColumns = computed<DataTableColumn[]>(() => [
+  { key: 'name', header: t('marketplace.colModule') },
+  { key: 'version', header: t('marketplace.colVersion'), format: (r) => `v${String(r.version ?? '')}` },
   {
-    key: 'status', header: 'Estado', filterable: true, filterType: 'select',
-    render: (r) => badgeCell(r.status === 'active' ? 'Activo' : 'Inactivo', r.status === 'active' ? 'success' : 'medium'),
+    key: 'status', header: t('marketplace.colStatus'), filterable: true, filterType: 'select',
+    render: (r) => badgeCell(r.status === 'active' ? t('marketplace.statusActive') : t('marketplace.statusInactive'), r.status === 'active' ? 'success' : 'medium'),
   },
-];
-const mineActions: DataTableAction[] = [
-  { id: 'toggle', label: 'Activar/Desactivar', icon: 'power-outline' },
-  { id: 'uninstall', label: 'Desinstalar', icon: 'trash', color: 'danger' },
-];
+]);
+const mineActions = computed<DataTableAction[]>(() => [
+  { id: 'toggle', label: t('marketplace.actionToggle'), icon: 'power-outline' },
+  { id: 'uninstall', label: t('marketplace.actionUninstall'), icon: 'trash', color: 'danger' },
+]);
 
-const catalogColumns: DataTableColumn[] = [
-  { key: 'name', header: 'Módulo' },
-  { key: 'cat', header: 'Categoría', filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.cat ?? ''), 'medium') },
-  { key: 'desc', header: 'Descripción' },
-  { key: 'price', header: 'Precio', filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price ?? ''), r.price === 'Gratis' ? 'success' : 'medium') },
-  { key: 'installed', header: 'Instalado', align: 'center', filterable: true, filterType: 'select', format: (r) => (r.installed ? 'Sí' : 'No') },
-];
-const catalogActions: DataTableAction[] = [
-  { id: 'install', label: 'Instalar', icon: 'download-outline' },
-];
+const catalogColumns = computed<DataTableColumn[]>(() => [
+  { key: 'name', header: t('marketplace.colModule') },
+  { key: 'cat', header: t('marketplace.colCategory'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.cat ?? ''), 'medium') },
+  { key: 'desc', header: t('marketplace.colDescription') },
+  { key: 'price', header: t('marketplace.colPrice'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price ?? ''), r.price === 'Gratis' ? 'success' : 'medium') },
+  { key: 'installed', header: t('marketplace.colInstalled'), align: 'center', filterable: true, filterType: 'select', format: (r) => (r.installed ? t('marketplace.yes') : t('marketplace.no')) },
+]);
+const catalogActions = computed<DataTableAction[]>(() => [
+  { id: 'install', label: t('marketplace.actionInstall'), icon: 'download-outline' },
+]);
 
 // --- Handlers ---
 function onTabChange(ev: Event): void {
@@ -215,19 +216,19 @@ const client = inject(clientInjectionKey) ?? getClient();
 let unsubInstalled: (() => void) | null = null;
 
 async function installModule(mod: Mod): Promise<void> {
-  if (mod.installed) { notify(`${mod.name} ya está instalado.`, 'primary'); return; }
+  if (mod.installed) { notify(t('marketplace.alreadyInstalled', { name: mod.name }), 'primary'); return; }
   // Persistente (duration 0) mientras corre la instalación en background (descarga+verifica+migra);
   // el resultado (éxito/fallo o el evento WS `module.installed`) lo cierra y muestra el suyo.
   // Además la barra de progreso de la topbar se enciende vía requestInstall (inFlight del shell).
-  notify(`Instalando ${mod.name}…`, 'primary', 0);
+  notify(t('marketplace.installing', { name: mod.name }), 'primary', 0);
   try {
     // Pide la instalación al runtime: descarga el zip firmado (marketplace Cloud), verifica
     // SHA256 y aplica migraciones. La confirmación llega por el evento WS `module.installed`.
     // Default de versión: 'latest' (el runtime resuelve la última publicada). flag → humano.
     await requestInstall(mod.id, mod.version ?? 'latest');
-    notify(`${mod.name} instalado correctamente.`, 'success');
+    notify(t('marketplace.installSuccess', { name: mod.name }), 'success');
   } catch {
-    notify(`No se pudo iniciar la instalación de ${mod.name}.`, 'danger');
+    notify(t('marketplace.installError', { name: mod.name }), 'danger');
   }
 }
 
@@ -245,15 +246,15 @@ async function toggleModule(m: InstalledModule): Promise<void> {
   try {
     if (m.status === 'active') {
       await deactivateModule(m.id);
-      notify(`${m.name} desactivado.`, 'primary');
+      notify(t('marketplace.deactivated', { name: m.name }), 'primary');
     } else {
       await activateModule(m.id);
-      notify(`${m.name} activado.`, 'success');
+      notify(t('marketplace.activated', { name: m.name }), 'success');
     }
     await loadInstalled();
     void refreshModuleNav();
   } catch {
-    notify(`No se pudo cambiar el estado de ${m.name}.`, 'danger');
+    notify(t('marketplace.toggleError', { name: m.name }), 'danger');
   }
 }
 
@@ -261,11 +262,11 @@ async function toggleModule(m: InstalledModule): Promise<void> {
 async function removeModule(m: InstalledModule): Promise<void> {
   try {
     await uninstallModule(m.id);
-    notify(`${m.name} desinstalado.`, 'primary');
+    notify(t('marketplace.uninstalled', { name: m.name }), 'primary');
     await Promise.all([loadInstalled(), loadCatalog()]);
     void refreshModuleNav();
   } catch {
-    notify(`No se pudo desinstalar ${m.name}.`, 'danger');
+    notify(t('marketplace.uninstallError', { name: m.name }), 'danger');
   }
 }
 
@@ -274,7 +275,7 @@ function toViewModule(m: CloudMarketplaceModule): Mod {
     id: m.id,
     name: m.name,
     desc: m.description,
-    price: m.priceLabel || 'Consultar',
+    price: m.priceLabel || t('marketplace.priceOnRequest'),
     installed: m.installed,
     cat: m.category,
   };
@@ -329,7 +330,7 @@ onMounted(() => {
   unsubInstalled = client.on('module.installed', (payload) => {
     const id = (payload as { module_id?: string } | null)?.module_id;
     const found = modules.value.find((m) => m.id === id);
-    notify(found ? `${found.name} instalado.` : 'Módulo instalado.', 'success');
+    notify(found ? t('marketplace.moduleInstalledNamed', { name: found.name }) : t('marketplace.moduleInstalled'), 'success');
     void loadCatalog();
     void loadInstalled();
     void refreshModuleNav();

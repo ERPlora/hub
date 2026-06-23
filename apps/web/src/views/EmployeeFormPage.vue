@@ -1,34 +1,34 @@
 <template>
-  <AppPage :title="isEdit ? 'Editar empleado' : 'Nuevo empleado'" back-href="/employees">
+  <AppPage :title="isEdit ? t('employeeForm.titleEdit') : t('employeeForm.titleNew')" back-href="/employees">
       <ion-card class="ion-no-margin">
         <ion-card-content>
           <ion-list>
             <ion-item>
               <ion-input
                 v-model="form.name"
-                label="Nombre"
+                :label="t('employeeForm.name')"
                 label-placement="stacked"
-                placeholder="Nombre y apellidos"
+                :placeholder="t('employeeForm.namePlaceholder')"
               />
             </ion-item>
 
             <ion-item>
               <ion-input
                 v-model="form.email"
-                label="Email"
+                :label="t('employeeForm.email')"
                 label-placement="stacked"
                 type="email"
-                placeholder="empleado@empresa.com"
+                :placeholder="t('employeeForm.emailPlaceholder')"
               />
             </ion-item>
 
             <ion-item>
               <ion-select
                 v-model="form.role"
-                label="Rol"
+                :label="t('employeeForm.role')"
                 label-placement="stacked"
               >
-                <ion-select-option v-for="r in ROLES" :key="r" :value="r">{{ r }}</ion-select-option>
+                <ion-select-option v-for="r in ROLES" :key="r" :value="r">{{ roleLabel(r) }}</ion-select-option>
               </ion-select>
             </ion-item>
 
@@ -37,14 +37,14 @@
                 :checked="form.active"
                 @ion-change="form.active = ($event as CustomEvent<{ checked: boolean }>).detail.checked"
               >
-                Activo
+                {{ t('employeeForm.active') }}
               </ion-toggle>
             </ion-item>
           </ion-list>
 
           <div class="mt-4 flex justify-end gap-2">
-            <ion-button fill="outline" @click="onCancel">Cancelar</ion-button>
-            <ion-button @click="onSave">{{ isEdit ? 'Guardar' : 'Crear' }}</ion-button>
+            <ion-button fill="outline" @click="onCancel">{{ t('employeeForm.cancel') }}</ion-button>
+            <ion-button @click="onSave">{{ isEdit ? t('employeeForm.save') : t('employeeForm.create') }}</ion-button>
           </div>
         </ion-card-content>
       </ion-card>
@@ -54,14 +54,28 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import {
   IonCard, IonCardContent, IonList, IonItem, IonInput, IonSelect, IonSelectOption,
   IonToggle, IonButton,
 } from '@ionic/vue';
 import AppPage from '../components/AppPage.vue';
 
+const { t } = useI18n();
+
 const ROLES = ['Administrador', 'Encargado', 'Cajero', 'Almacén'] as const;
 type Role = typeof ROLES[number];
+
+const ROLE_LABEL_KEYS: Record<Role, string> = {
+  'Administrador': 'employeeForm.roleAdmin',
+  'Encargado': 'employeeForm.roleManager',
+  'Cajero': 'employeeForm.roleCashier',
+  'Almacén': 'employeeForm.roleWarehouse',
+};
+
+function roleLabel(role: Role): string {
+  return t(ROLE_LABEL_KEYS[role]);
+}
 
 interface EmployeeForm {
   name: string;

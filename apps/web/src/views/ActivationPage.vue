@@ -7,19 +7,18 @@
           <i class="erp-w" /><i class="erp-hub" /><i class="erp-e" />
           <i class="erp-sw" /><i class="erp-s" /><i class="erp-se" />
         </span>
-        <h1>Activación requerida</h1>
+        <h1>{{ t('activation.title') }}</h1>
         <p class="activation-lead">
-          Este dispositivo necesita validar su licencia de módulos con el Cloud para desbloquear
-          el negocio. Conéctate a internet y reintenta.
+          {{ t('activation.lead') }}
         </p>
         <p v-if="reason" class="activation-reason">{{ reason }}</p>
 
         <ion-button expand="block" :disabled="loading" @click="retry">
           <ion-spinner v-if="loading" name="crescent" slot="start" />
-          Reintentar
+          {{ t('activation.retry') }}
         </ion-button>
         <ion-button expand="block" fill="clear" color="medium" @click="onLogout">
-          Cerrar sesión
+          {{ t('activation.logout') }}
         </ion-button>
       </div>
     </ion-content>
@@ -29,11 +28,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { IonPage, IonContent, IonButton, IonSpinner } from '@ionic/vue';
 
 import { entitlementReason, needsActivation, resolveEntitlement } from '../lib/entitlement';
 import { logout } from '../lib/session';
 
+const { t } = useI18n();
 const router = useRouter();
 const loading = ref<boolean>(false);
 const reason = entitlementReason;

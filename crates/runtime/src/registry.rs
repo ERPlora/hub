@@ -3,7 +3,7 @@
 //! INACTIVO; solo los activos exponen menú/queries/commands/eventos (hot-plug, §4 paso 11).
 use std::collections::{HashMap, HashSet};
 
-use crate::manifest::{CommandDef, Manifest, Nav, QueryDef};
+use crate::manifest::{CommandDef, Manifest, ModuleLocale, Nav, QueryDef};
 
 /// Estado de un módulo instalado en este hub (equivalente a la tabla `hub_module`, §2.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -103,6 +103,10 @@ pub struct Registry {
     /// evento → lista de commands a ejecutar cuando se emite.
     pub listeners: HashMap<String, Vec<String>>,
     pub navigation: Vec<NavEntry>,
+    /// Traducciones por módulo: `module_id → (lang → ModuleLocale)` (ADR-0055). Se cargan de
+    /// `locales/*.json` del paquete al instalar/re-hidratar. Vacío = el módulo no trae i18n
+    /// (se usan los valores del manifest, en inglés canónico).
+    pub locales: HashMap<String, HashMap<String, ModuleLocale>>,
     /// Observador opcional de eventos (lo pone el server para el WS).
     pub event_sink: Option<std::sync::Arc<dyn EventSink>>,
     /// Plugins **nativos first-party** (ADR-0009): `module_id` → motor horneado en el
@@ -175,6 +179,43 @@ impl Registry {
         self.navigation.iter().filter(|n| self.is_active(&n.module_id)).collect()
     }
 
+    /// Registra las traducciones de un módulo (ADR-0055). Vacío = se olvida cualquier i18n previa.
+    pub fn set_locales(&mut self, module_id: &str, locales: HashMap<String, ModuleLocale>) {
+        if locales.is_empty() {
+            self.locales.remove(module_id);
+        } else {
+            self.locales.insert(module_id.to_string(), locales);
+        }
+    }
+
+    /// Catálogo del idioma pedido para un módulo, con fallback `locale → en` (ADR-0055).
+    fn locale_for(&self, module_id: &str, locale: &str) -> Option<&ModuleLocale> {
+        let by_lang = self.locales.get(module_id)?;
+        by_lang.get(locale).or_else(|| by_lang.get("en"))
+    }
+
+    /// Nombre del módulo traducido. Fallback: `locale → en → fallback` (el `name` del manifest).
+    pub fn module_name_localized(&self, module_id: &str, fallback: &str, locale: &str) -> String {
+        self.locale_for(module_id, locale)
+            .and_then(|l| l.name.clone())
+            .unwrap_or_else(|| fallback.to_string())
+    }
+
+    /// Label de una entrada de navegación traducido. Fallback: `locale → en → fallback`
+    /// (el `label` del manifest).
+    pub fn nav_label_localized(
+        &self,
+        module_id: &str,
+        nav_id: &str,
+        fallback: &str,
+        locale: &str,
+    ) -> String {
+        self.locale_for(module_id, locale)
+            .and_then(|l| l.navigation.get(nav_id))
+            .and_then(|n| n.label.clone())
+            .unwrap_or_else(|| fallback.to_string())
+    }
+
     /// Cambia el estado de un módulo instalado. Devuelve `false` si no existe.
     pub fn set_status(&mut self, module_id: &str, status: ModuleStatus) -> bool {
         if !self.is_installed(module_id) {
@@ -194,6 +235,7 @@ impl Registry {
         self.queries.retain(|_, q| q.module_id != module_id);
         self.commands.retain(|_, c| c.module_id != module_id);
         self.navigation.retain(|n| n.module_id != module_id);
+        self.locales.remove(module_id);
         for cmds in self.listeners.values_mut() {
             cmds.retain(|name| self.commands.contains_key(name));
         }

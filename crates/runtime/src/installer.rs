@@ -107,6 +107,9 @@ pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: 
     for nav in &manifest.navigation {
         registry.navigation.push(NavEntry { module_id: manifest.id.clone(), nav: nav.clone() });
     }
+    // Traducciones del módulo (ADR-0055): `locales/*.json` del paquete → registry. Best-effort;
+    // si el módulo no trae i18n, el runtime sirve los valores del manifest (inglés canónico).
+    registry.set_locales(&manifest.id, Manifest::load_locales(dir));
 
     // Vuelca las scheduled tasks del manifest a `_scheduled_tasks` (ADR-0011). Idempotente:
     // preserva el reloj (next_run/last_run) de las tareas ya existentes en una reinstalación y

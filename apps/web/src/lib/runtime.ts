@@ -18,6 +18,7 @@ import { config } from './config';
 import { getAccessToken } from './cloud';
 import { getHubSession } from './session';
 import { beginRequest, endRequest } from './shell';
+import { getLocale } from '../i18n';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -43,6 +44,25 @@ export interface HubContext {
   user: unknown | null;
   /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
   pin_users?: PinUser[];
+  /**
+   * Sector / tipo de negocio del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`general`). Lo usa
+   * el dashboard para derivar el preset "Recomendado" de widgets (ADR-0054). Opcional: el runtime
+   * lo expondrá cuando se cablee el setting del hub; hasta entonces llega ausente y el preset
+   * queda vacío (el board sigue funcionando). Acepta `sector` o `business_type` (alias).
+   */
+  sector?: string | null;
+  business_type?: string | null;
+}
+
+/**
+ * Sector configurado del hub, resuelto en el boot (`GET /api/hub/context`). `null` mientras no se
+ * sepa: el dashboard degrada (preset "Recomendado" vacío, el usuario activa widgets a mano).
+ */
+export const hubSector = ref<string | null>(null);
+
+/** Sector actual del hub (o `null` si aún no se conoce). Lo usa la recolección de widgets. */
+export function getHubSector(): string | null {
+  return hubSector.value;
 }
 
 /**
@@ -125,7 +145,10 @@ export interface InstalledModule {
 
 /** Lista los módulos instalados en el runtime (fuente de verdad local, no el catálogo Cloud). */
 export async function listInstalledModules(): Promise<InstalledModule[]> {
-  const res = await fetch(`${RUNTIME_URL}/api/modules`, { headers: runtimeHeaders() });
+  // `?locale=` (ADR-0055): el runtime devuelve el `name` de cada módulo ya traducido.
+  const res = await fetch(`${RUNTIME_URL}/api/modules?locale=${encodeURIComponent(getLocale())}`, {
+    headers: runtimeHeaders(),
+  });
   if (!res.ok) throw new Error(`modules → ${res.status}`);
   const env = (await res.json()) as { ok: boolean; data?: InstalledModule[] };
   return env.ok && env.data ? env.data : [];
@@ -161,6 +184,10 @@ export async function bootHubContext(): Promise<HubContext | null> {
     const ctx = (await res.json()) as HubContext;
     if (ctx.hub_id) config.hubId = ctx.hub_id;
     if (Array.isArray(ctx.pin_users)) pinUsers.value = ctx.pin_users;
+    // Sector del hub para el preset "Recomendado" del dashboard. Acepta `sector` o el alias
+    // `business_type`; ausente → queda null (degradación elegante en la recolección de widgets).
+    const sector = ctx.sector ?? ctx.business_type ?? null;
+    hubSector.value = typeof sector === 'string' && sector.trim() ? sector.trim() : null;
     return ctx;
   } catch {
     return null;

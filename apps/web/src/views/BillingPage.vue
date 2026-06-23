@@ -2,7 +2,7 @@
   <AppPage :title="t('nav.billing')">
       <!-- Facturas -->
       <template v-if="tab === 'invoices'">
-        <h2 class="text-lg font-semibold mb-3">Facturas</h2>
+        <h2 class="text-lg font-semibold mb-3">{{ t('billing.invoices') }}</h2>
 
         <div v-if="loadingInvoices" class="flex justify-center py-10">
           <ion-spinner name="dots" />
@@ -14,11 +14,11 @@
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-[color:var(--ion-border-color)]">
-                  <th class="text-left py-2 px-3 font-medium opacity-60">Factura</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">Fecha</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">Vencimiento</th>
-                  <th class="text-right py-2 px-3 font-medium opacity-60">Importe</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">Estado</th>
+                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colInvoice') }}</th>
+                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colDate') }}</th>
+                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colDueDate') }}</th>
+                  <th class="text-right py-2 px-3 font-medium opacity-60">{{ t('billing.colAmount') }}</th>
+                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colStatus') }}</th>
                   <th class="py-2 px-3"></th>
                 </tr>
               </thead>
@@ -36,7 +36,7 @@
                     <ion-badge :color="statusColor(inv.status)">{{ statusLabel(inv.status) }}</ion-badge>
                   </td>
                   <td class="py-2 px-3 text-right">
-                    <ion-button fill="clear" size="small" :aria-label="`Descargar ${inv.number}`" @click="downloadInvoice(inv.id)">
+                    <ion-button fill="clear" size="small" :aria-label="t('billing.downloadInvoiceAria', { number: inv.number })" @click="downloadInvoice(inv.id)">
                       <HubIcon slot="icon-only" name="download-outline" />
                     </ion-button>
                   </td>
@@ -60,11 +60,11 @@
                   <ion-badge :color="statusColor(inv.status)">{{ statusLabel(inv.status) }}</ion-badge>
                 </div>
                 <p class="text-xs opacity-60">
-                  Emitida {{ fmtDate(inv.issueDate) }} · Vence {{ fmtDate(inv.dueDate) }}
+                  {{ t('billing.issuedOn', { date: fmtDate(inv.issueDate) }) }} · {{ t('billing.duesOn', { date: fmtDate(inv.dueDate) }) }}
                 </p>
                 <ion-button fill="clear" size="small" class="mt-2 -ml-2" @click="downloadInvoice(inv.id)">
                   <HubIcon slot="start" name="download-outline" />
-                  Descargar
+                  {{ t('billing.download') }}
                 </ion-button>
               </ion-card-content>
             </ion-card>
@@ -73,13 +73,13 @@
 
         <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
           <HubIcon name="receipt-outline" style="font-size: 2.5rem;" />
-          <p>No hay facturas</p>
+          <p>{{ t('billing.noInvoices') }}</p>
         </div>
       </template>
 
       <!-- Suscripciones -->
       <template v-else-if="tab === 'subscriptions'">
-        <h2 class="text-lg font-semibold mb-3">Suscripciones</h2>
+        <h2 class="text-lg font-semibold mb-3">{{ t('billing.subscriptions') }}</h2>
 
         <div v-if="loadingSubs" class="flex justify-center py-10">
           <ion-spinner name="dots" />
@@ -91,10 +91,10 @@
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-[color:var(--ion-border-color)]">
-                  <th class="text-left py-2 px-3 font-medium opacity-60">Suscripción</th>
-                  <th class="text-right py-2 px-3 font-medium opacity-60">Precio</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">Renueva</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">Estado</th>
+                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colSubscription') }}</th>
+                  <th class="text-right py-2 px-3 font-medium opacity-60">{{ t('billing.colPrice') }}</th>
+                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colRenews') }}</th>
+                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colStatus') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -105,7 +105,7 @@
                 >
                   <td class="py-2 px-3">{{ sub.planName }}</td>
                   <td class="py-2 px-3 text-right font-medium">
-                    {{ fmtMoney(sub.planPrice, 'EUR') }}/{{ sub.billingCycle || 'mes' }}
+                    {{ fmtMoney(sub.planPrice, 'EUR') }}/{{ sub.billingCycle || t('billing.month') }}
                   </td>
                   <td class="py-2 px-3">{{ fmtDate(sub.currentPeriodEnd ?? '') }}</td>
                   <td class="py-2 px-3">
@@ -127,11 +127,11 @@
               </ion-card-header>
               <ion-card-content>
                 <p class="font-semibold mb-1">
-                  {{ fmtMoney(sub.planPrice, 'EUR') }}/{{ sub.billingCycle || 'mes' }}
+                  {{ fmtMoney(sub.planPrice, 'EUR') }}/{{ sub.billingCycle || t('billing.month') }}
                 </p>
                 <ion-badge :color="statusColor(sub.status)">{{ statusLabel(sub.status) }}</ion-badge>
                 <p v-if="sub.currentPeriodEnd" class="text-xs opacity-60 mt-2">
-                  {{ sub.cancelAtPeriodEnd ? 'Finaliza' : 'Renueva' }} {{ fmtDate(sub.currentPeriodEnd) }}
+                  {{ sub.cancelAtPeriodEnd ? t('billing.ends') : t('billing.renews') }} {{ fmtDate(sub.currentPeriodEnd) }}
                 </p>
               </ion-card-content>
             </ion-card>
@@ -140,14 +140,14 @@
 
         <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
           <HubIcon name="refresh-outline" style="font-size: 2.5rem;" />
-          <p>No hay suscripciones activas</p>
+          <p>{{ t('billing.noSubscriptions') }}</p>
         </div>
       </template>
 
       <!-- Pagos -->
       <template v-else>
         <div class="flex items-center justify-center py-16 text-center opacity-60">
-          <p>La gestión del método de pago se realiza desde el portal de facturación.</p>
+          <p>{{ t('billing.paymentsPortalNotice') }}</p>
         </div>
       </template>
     <!-- Tabs en footer -->
@@ -157,15 +157,15 @@
         <ion-segment :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="invoices">
             <HubIcon name="receipt-outline" />
-            <ion-label>Facturas</ion-label>
+            <ion-label>{{ t('billing.invoices') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="subscriptions">
             <HubIcon name="refresh-outline" />
-            <ion-label>Suscripciones</ion-label>
+            <ion-label>{{ t('billing.subscriptions') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="payments">
             <HubIcon name="card-outline" />
-            <ion-label>Pagos</ion-label>
+            <ion-label>{{ t('billing.payments') }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
@@ -218,13 +218,13 @@ function fmtMoney(n: number, currency: string): string {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: currency || 'EUR' }).format(n);
 }
 
-// Estado → etiqueta / color Ionic
-const STATUS_LABEL: Record<CloudInvoice['status'], string> = {
-  draft: 'Borrador',
-  open: 'Abierta',
-  paid: 'Pagada',
-  void: 'Anulada',
-  uncollectible: 'Incobrable'
+// Estado → clave i18n / color Ionic
+const STATUS_LABEL_KEY: Record<CloudInvoice['status'], string> = {
+  draft: 'billing.statusDraft',
+  open: 'billing.statusOpen',
+  paid: 'billing.statusPaid',
+  void: 'billing.statusVoid',
+  uncollectible: 'billing.statusUncollectible'
 };
 
 const STATUS_COLOR: Record<CloudInvoice['status'], string> = {
@@ -236,7 +236,8 @@ const STATUS_COLOR: Record<CloudInvoice['status'], string> = {
 };
 
 function statusLabel(s: CloudInvoice['status']): string {
-  return STATUS_LABEL[s] ?? s;
+  const key = STATUS_LABEL_KEY[s];
+  return key ? t(key) : s;
 }
 
 function statusColor(s: CloudInvoice['status']): string {

@@ -15,7 +15,7 @@
         :searchKeys="['name', 'email', 'role']"
         :actions="rowActions"
         :primaryAction="newEmployeeAction"
-        search-placeholder="Buscar empleado…"
+        :search-placeholder="t('employees.searchEmployee')"
         page-size="10"
         views
         csv
@@ -25,7 +25,7 @@
 
       <!-- Usuarios: placeholder (igual que el original) -->
       <div v-show="tab === 'users'" class="grid place-items-center h-full text-center opacity-60">
-        El acceso de usuarios (PIN, cuentas) se gestionará aquí.
+        {{ t('employees.usersPlaceholder') }}
       </div>
 
       <!-- Roles: segunda tabla -->
@@ -38,7 +38,7 @@
         :searchKeys="['name', 'scope']"
         :actions="rowActions"
         :primaryAction="newRoleAction"
-        search-placeholder="Buscar rol…"
+        :search-placeholder="t('employees.searchRole')"
         page-size="10"
         views
         csv
@@ -56,15 +56,15 @@
         >
           <ion-segment-button value="staff">
             <HubIcon name="people-outline" />
-            <ion-label>Staff</ion-label>
+            <ion-label>{{ t('employees.tabStaff') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="users">
             <HubIcon name="person-circle-outline" />
-            <ion-label>Usuarios</ion-label>
+            <ion-label>{{ t('employees.tabUsers') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="roles">
             <HubIcon name="shield-checkmark-outline" />
-            <ion-label>Roles</ion-label>
+            <ion-label>{{ t('employees.tabRoles') }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
@@ -74,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -147,16 +147,17 @@ const employees: Row[] = [
   { id: '6', name: 'Sara Díaz', email: null, role: 'Cocina', status: 'Activo', createdAt: '2025-05-01' },
 ];
 
-const employeeColumns: DataTableColumn[] = [
-  { key: 'name', header: 'Empleado', render: nameCell },
-  { key: 'email', header: 'Email', format: (r) => String(r.email ?? '—') },
-  { key: 'role', header: 'Rol', filterable: true, filterType: 'select' },
+// `computed` para que las cabeceras se recalculen al cambiar de idioma en caliente.
+const employeeColumns = computed<DataTableColumn[]>(() => [
+  { key: 'name', header: t('employees.colEmployee'), render: nameCell },
+  { key: 'email', header: t('employees.colEmail'), format: (r) => String(r.email ?? '—') },
+  { key: 'role', header: t('employees.colRole'), filterable: true, filterType: 'select' },
   {
-    key: 'status', header: 'Estado', filterable: true, filterType: 'select',
+    key: 'status', header: t('employees.colStatus'), filterable: true, filterType: 'select',
     render: (r) => badgeCell(String(r.status), r.status === 'Activo' ? 'success' : 'medium')
   },
-  { key: 'createdAt', header: 'Alta', filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.createdAt)) },
-];
+  { key: 'createdAt', header: t('employees.colCreatedAt'), filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.createdAt)) },
+]);
 
 // ── Roles (dataset mayor para ver paginación) ───────────────────────────────────────────────
 interface RoleBase { id: string; name: string; scope: 'Sistema' | 'Personalizado'; members: number; permissions: number; createdAt: string }
@@ -181,26 +182,27 @@ const roles: Row[] = Array.from({ length: 58 }, (_, i) => {
     : { ...base, id: `${base.id}-${i}`, name: `${base.name} ${Math.floor(i / BASE_ROLES.length) + 1}` };
 });
 
-const roleColumns: DataTableColumn[] = [
-  { key: 'name', header: 'Rol' },
+const roleColumns = computed<DataTableColumn[]>(() => [
+  { key: 'name', header: t('employees.colRole') },
   {
-    key: 'scope', header: 'Ámbito', filterable: true, filterType: 'select',
+    key: 'scope', header: t('employees.colScope'), filterable: true, filterType: 'select',
     render: (r) => badgeCell(String(r.scope), r.scope === 'Sistema' ? 'primary' : 'medium')
   },
-  { key: 'members', header: 'Miembros', align: 'center' },
-  { key: 'permissions', header: 'Permisos', align: 'center' },
-  { key: 'createdAt', header: 'Creado', filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.createdAt)) },
-];
+  { key: 'members', header: t('employees.colMembers'), align: 'center' },
+  { key: 'permissions', header: t('employees.colPermissions'), align: 'center' },
+  { key: 'createdAt', header: t('employees.colCreated'), filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.createdAt)) },
+]);
 
-// Acciones de fila (editar / borrar) → evento `rowAction`.
-const rowActions: DataTableAction[] = [
-  { id: 'edit', label: 'Editar', icon: 'pencil' },
-  { id: 'delete', label: 'Borrar', icon: 'trash', color: 'danger' },
-];
+// Acciones de fila (editar / borrar) → evento `rowAction`. `computed` para que las etiquetas
+// se recalculen al cambiar de idioma en caliente.
+const rowActions = computed<DataTableAction[]>(() => [
+  { id: 'edit', label: t('employees.actionEdit'), icon: 'pencil' },
+  { id: 'delete', label: t('employees.actionDelete'), icon: 'trash', color: 'danger' },
+]);
 
 // Acción primaria (botón "Nuevo") dentro de la propia tabla → evento `primaryAction`.
-const newEmployeeAction: DataTablePrimaryAction = { label: 'Nuevo empleado', icon: 'add' };
-const newRoleAction: DataTablePrimaryAction = { label: 'Nuevo rol', icon: 'add' };
+const newEmployeeAction = computed<DataTablePrimaryAction>(() => ({ label: t('employees.newEmployee'), icon: 'add' }));
+const newRoleAction = computed<DataTablePrimaryAction>(() => ({ label: t('employees.newRole'), icon: 'add' }));
 
 function onNew(): void {
   void router.push('/employees/new');

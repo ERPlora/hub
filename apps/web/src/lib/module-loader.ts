@@ -14,6 +14,7 @@ import type { ModuleManifest, NavigationItem } from '@erplora/module-types';
 
 import { isModuleEntitled } from './entitlement';
 import { RUNTIME_URL } from './runtime';
+import { getLocale } from '../i18n';
 
 export interface MenuEntry {
   moduleId: string;
@@ -33,6 +34,8 @@ export interface MenuEntry {
 /** Una entrada de `GET /api/navigation` del runtime (un item por pestaña de navegación). */
 interface RuntimeNavItem {
   module_id: string;
+  /** Nombre del módulo ya traducido al idioma activo (ADR-0055; fallback locale→en→manifest). */
+  module_name: string;
   id: string;
   label: string;
   icon?: string | null;
@@ -49,7 +52,8 @@ const MODULES_BASE = '/modules';
  * El runtime ya filtra por módulos activos; aquí no se vuelve a filtrar por estado.
  */
 async function fetchNavigation(): Promise<RuntimeNavItem[]> {
-  const res = await fetch(`${RUNTIME_URL}/api/navigation`);
+  // `?locale=` (ADR-0055): el runtime devuelve los labels ya traducidos (fallback locale→en→manifest).
+  const res = await fetch(`${RUNTIME_URL}/api/navigation?locale=${encodeURIComponent(getLocale())}`);
   if (!res.ok) throw new Error(`navigation → ${res.status}`);
   const env = (await res.json()) as { ok: boolean; data?: RuntimeNavItem[] };
   return env.ok && env.data ? env.data : [];
@@ -69,7 +73,7 @@ async function loadIconMap(base: string, entry: string): Promise<Record<string, 
 }
 
 /** Lee el `module.json` de un módulo instalado (`/modules/<id>/module.json`). `null` si falla. */
-async function loadManifest(moduleId: string): Promise<ModuleManifest | null> {
+export async function loadManifest(moduleId: string): Promise<ModuleManifest | null> {
   try {
     const res = await fetch(`${MODULES_BASE}/${moduleId}/module.json`);
     if (!res.ok) return null;
@@ -115,7 +119,8 @@ export async function loadMenu(): Promise<MenuEntry[]> {
     for (const item of items) {
       entries.push({
         moduleId,
-        moduleName: manifest.name,
+        // Nombre traducido que da el runtime (ADR-0055); fallback al del manifest si faltara.
+        moduleName: item.module_name || manifest.name,
         nav: {
           id: item.id,
           label: item.label,
@@ -136,9 +141,76 @@ export async function loadMenu(): Promise<MenuEntry[]> {
  * permitido — sin `unsafe-inline`/`unsafe-eval`.
  */
 export async function loadComponent(entry: MenuEntry): Promise<string> {
-  if (!loadedEntries.has(entry.entryUrl)) {
-    await import(/* @vite-ignore */ entry.entryUrl);
-    loadedEntries.add(entry.entryUrl);
-  }
+  // Carga el bundle (registra el custom element) y devuelve el TAG a instanciar — NO la URL.
+  // `loadEntryUrl` devuelve el entryUrl (lo necesita la recolección de widgets); aquí el llamador
+  // (ModuleView) hace `document.createElement(tag)`, así que debe recibir `nav.component`.
+  await loadEntryUrl(entry.entryUrl);
   return entry.nav.component;
+}
+
+/**
+ * Carga (una sola vez) el ESM de un `entryUrl` ya resuelto y devuelve. Idempotente: misma
+ * deduplicación que `loadComponent`. Lo usa la recolección de widgets de dashboard para la vía
+ * `component` (cargar el bundle del módulo dueño del widget antes de `createElement(tag)`).
+ */
+async function loadEntryUrl(entryUrl: string): Promise<string> {
+  if (!loadedEntries.has(entryUrl)) {
+    await import(/* @vite-ignore */ entryUrl);
+    loadedEntries.add(entryUrl);
+  }
+  return entryUrl;
+}
+
+/** Un módulo instalado + su manifest crudo (incluye `widgets`, `provides_slots`, etc.). */
+export interface InstalledManifest {
+  moduleId: string;
+  manifest: ModuleManifest;
+  /** URL del bundle ESM del WC del módulo (`/modules/<id>/<ui.entry>`). */
+  entryUrl: string;
+}
+
+/**
+ * Reúne los manifests CRUDOS de TODOS los módulos instalados, ACTIVOS y con entitlement
+ * (misma fuente que `loadMenu`: `GET /api/navigation`). Devuelve un manifest por módulo (no por
+ * pestaña), leído del `module.json` servido por `ServeDir` — así sobreviven campos que la API
+ * NO re-sirve (`widgets`, `provides_slots`, `chrome`; ADR-0043/0048/0054). `[]` si el runtime no
+ * responde aún (boot temprano) — la recolección degrada con elegancia.
+ */
+export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
+  let navItems: RuntimeNavItem[];
+  try {
+    navItems = await fetchNavigation();
+  } catch {
+    return [];
+  }
+
+  const moduleIds: string[] = [];
+  const seen = new Set<string>();
+  for (const item of navItems) {
+    if (!isModuleEntitled(item.module_id)) continue;
+    if (seen.has(item.module_id)) continue;
+    seen.add(item.module_id);
+    moduleIds.push(item.module_id);
+  }
+
+  const out: InstalledManifest[] = [];
+  for (const moduleId of moduleIds) {
+    const manifest = await loadManifest(moduleId);
+    if (!manifest) continue;
+    out.push({
+      moduleId,
+      manifest,
+      entryUrl: `${MODULES_BASE}/${moduleId}/${manifest.ui.entry}`,
+    });
+  }
+  return out;
+}
+
+/**
+ * Asegura cargado el ESM del módulo dueño de un widget `component` (misma maquinaria CSP-safe que
+ * `loadComponent`/`provides_slots`) y devuelve el tag a montar. El WC consulta sus datos él mismo.
+ */
+export async function loadModuleComponent(mod: InstalledManifest, tag: string): Promise<string> {
+  await loadEntryUrl(mod.entryUrl);
+  return tag;
 }

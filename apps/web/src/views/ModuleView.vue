@@ -1,10 +1,10 @@
 <template>
   <AppPage :title="moduleName">
     <div v-if="status === 'loading'" class="flex items-center gap-2 py-8 opacity-70">
-      <ion-spinner name="crescent" /> Cargando módulo…
+      <ion-spinner name="crescent" /> {{ t('moduleView.loading') }}
     </div>
     <p v-else-if="status === 'error'" class="text-[color:var(--ion-color-danger)]">
-      No se pudo cargar el módulo.
+      {{ t('moduleView.loadError') }}
     </p>
     <!-- El WebComponent (Lit) de la pestaña activa se monta aquí en runtime (createElement + append). -->
     <div ref="outlet" class="outlet" v-show="status === 'ready'" />
@@ -32,6 +32,7 @@
 
 <script setup lang="ts">
 import { inject, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar,
@@ -42,6 +43,7 @@ import AppPage from '../components/AppPage.vue';
 import { loadMenu, loadComponent, type MenuEntry } from '../lib/module-loader';
 import { clientInjectionKey, getClient } from '../lib/runtime';
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 // Cliente del runtime inyectado en el boot (provide en main.ts); fallback al singleton.

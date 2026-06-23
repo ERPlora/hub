@@ -17,7 +17,7 @@
 
 use axum::body::Body;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
@@ -451,7 +451,8 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
 /// GET /api/hub/context — el `hub_id` inyectado por el despliegue (env `HUB_ID`) + el usuario
 /// activo (hoy `null`; el frontend resuelve la sesión por separado) + `pin_users`: usuarios activos
 /// con PIN del hub, para que el shell muestre el grid de login local directamente (sin depender de
-/// un flag en localStorage). Contrato del frontend.
+/// un flag en localStorage) + `business_type`/`sector`: el sector del hub (env `HUB_SECTOR`) para
+/// que el dashboard derive el preset "Recomendado" de widgets (ADR-0054). Contrato del frontend.
 async fn hub_context(State(st): State<AppState>) -> Response {
     let pin_users: Vec<Value> = {
         let rt = st.runtime.lock().await;
@@ -460,8 +461,17 @@ async fn hub_context(State(st): State<AppState>) -> Response {
     .into_iter()
     .map(|(id, name, role)| json!({ "id": id, "name": name, "role": role }))
     .collect();
-    Json(json!({ "hub_id": st.config.hub_id, "user": Value::Null, "pin_users": pin_users }))
-        .into_response()
+    // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
+    // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
+    let sector = st.config.sector.clone();
+    Json(json!({
+        "hub_id": st.config.hub_id,
+        "user": Value::Null,
+        "pin_users": pin_users,
+        "business_type": sector,
+        "sector": sector,
+    }))
+    .into_response()
 }
 
 #[derive(Deserialize)]
@@ -786,14 +796,34 @@ fn unauthorized(e: auth::AuthError) -> Response {
         .into_response()
 }
 
-async fn navigation(State(st): State<AppState>) -> Response {
+/// Query param de idioma para los endpoints localizables (ADR-0055). `?locale=es`; default `en`.
+#[derive(serde::Deserialize)]
+struct LocaleQuery {
+    locale: Option<String>,
+}
+
+async fn navigation(State(st): State<AppState>, Query(q): Query<LocaleQuery>) -> Response {
+    let locale = q.locale.as_deref().unwrap_or("en");
     let rt = st.runtime.lock().await;
+    let reg = rt.registry();
     let items: Vec<Value> = rt
         .navigation()
         .iter()
         .map(|n| {
+            let mod_fallback = reg
+                .installed
+                .iter()
+                .find(|m| m.id == n.module_id)
+                .map(|m| m.name.as_str())
+                .unwrap_or(n.module_id.as_str());
             json!({
-                "module_id": n.module_id, "id": n.nav.id, "label": n.nav.label,
+                "module_id": n.module_id,
+                // Nombre del módulo traducido (ADR-0055): lo usa el shell para el sidebar y las
+                // tarjetas del dashboard (un ítem por módulo).
+                "module_name": reg.module_name_localized(&n.module_id, mod_fallback, locale),
+                "id": n.nav.id,
+                // Label de la pestaña traducido (ADR-0055): locale → en → label del manifest.
+                "label": reg.nav_label_localized(&n.module_id, &n.nav.id, &n.nav.label, locale),
                 "icon": n.nav.icon, "component": n.nav.component,
             })
         })
@@ -801,9 +831,24 @@ async fn navigation(State(st): State<AppState>) -> Response {
     Json(json!({ "ok": true, "data": items })).into_response()
 }
 
-async fn list_modules(State(st): State<AppState>) -> Response {
+async fn list_modules(State(st): State<AppState>, Query(q): Query<LocaleQuery>) -> Response {
+    let locale = q.locale.as_deref().unwrap_or("en");
     let rt = st.runtime.lock().await;
-    Json(json!({ "ok": true, "data": rt.modules() })).into_response()
+    let reg = rt.registry();
+    let items: Vec<Value> = rt
+        .modules()
+        .into_iter()
+        .map(|m| {
+            json!({
+                "id": m.id,
+                // Nombre traducido (ADR-0055): locale → en → name del manifest.
+                "name": reg.module_name_localized(&m.id, &m.name, locale),
+                "version": m.version,
+                "status": m.status,
+            })
+        })
+        .collect();
+    Json(json!({ "ok": true, "data": items })).into_response()
 }
 
 async fn install_module(State(st): State<AppState>, Json(req): Json<InstallReq>) -> Response {

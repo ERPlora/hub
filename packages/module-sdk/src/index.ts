@@ -559,6 +559,44 @@ export class ErploraClient {
   notify(n: Notification): void {
     this.opts.notifier?.(n);
   }
+
+  /**
+   * Idioma activo del shell (ADR-0055). El shell lo persiste en `localStorage('erplora.locale')`
+   * al cambiarlo (y emite `erplora:locale-changed`); por defecto `'es'` (el producto nace en
+   * España, igual que el i18n del shell). Los Web Components de módulo lo leen para `t()`.
+   */
+  get locale(): string {
+    try {
+      return localStorage.getItem('erplora.locale') || 'es';
+    } catch {
+      return 'es';
+    }
+  }
+
+  /**
+   * Traduce una clave del catálogo `ui` del MÓDULO (ADR-0055). `catalog` = `{ <lang>: { ui: {…} } }`
+   * (lo importa el WC de sus `locales/*.json`; el bundler lo inlinea en el `dist`). Resuelve por
+   * el idioma activo con fallback `locale → 'en' → la clave cruda`. Interpola `{param}`.
+   *
+   * Uso en el WC (Lit):
+   *   import es from '../../locales/es.json'; import en from '../../locales/en.json';
+   *   const C = { es, en };
+   *   …  ${erplora.t(C, 'ui.addProduct')}  …  ${erplora.t(C, 'ui.greet', { name })}
+   */
+  t(catalog: Record<string, unknown>, key: string, params?: Record<string, unknown>): string {
+    const dict = (catalog[this.locale] ?? catalog.en ?? {}) as Record<string, unknown>;
+    let cur: unknown = dict;
+    for (const part of key.split('.')) {
+      cur = cur && typeof cur === 'object' ? (cur as Record<string, unknown>)[part] : undefined;
+    }
+    let out = typeof cur === 'string' ? cur : key;
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        out = out.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+      }
+    }
+    return out;
+  }
 }
 
 /**
