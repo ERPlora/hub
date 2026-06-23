@@ -76,6 +76,14 @@ pub struct HubConfig {
     /// romper dev/local: un cliente que no manda `device_id` nunca se ve afectado.
     /// TODO(humano): el host (Tauri/web) debe aportar un `device_id` estable; cerrar el diseño en §2.9.
     pub device_trust_enforce: bool,
+    /// **Sector / tipo de negocio** del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`general`), lo
+    /// inyecta el despliegue vía env `HUB_SECTOR` (hermano de `HUB_LANGUAGE`/`HUB_CURRENCY`). Lo
+    /// expone `GET /api/hub/context` para que el dashboard derive el preset "Recomendado" de widgets
+    /// (ADR-0054). `None` = sector no determinable → el board degrada (preset vacío, el usuario activa
+    /// widgets a mano). FLAG(humano): hoy el Cloud NO persiste el sector en el modelo `Hub` ni lo pasa
+    /// al provisioning; este env es la **fuente nueva** propuesta para el contrato runtime↔Cloud —
+    /// confirmar dónde lo elige el tenant (onboarding) y cablearlo en la inyección ECS de `aws.py`.
+    pub sector: Option<String>,
 }
 
 /// UUID fijo de desarrollo si no se inyecta `HUB_ID` (decisión tomada — flag para humano).
@@ -101,6 +109,12 @@ impl HubConfig {
             std::env::var("HUB_CLOUD_API_TOKEN").ok().filter(|s| !s.trim().is_empty());
         let device_trust_enforce =
             matches!(std::env::var("HUB_DEVICE_TRUST").as_deref(), Ok("enforce"));
+        // Sector / tipo de negocio del hub (preset "Recomendado" del dashboard, ADR-0054). Vacío o
+        // ausente → `None` (degradación elegante; el board sigue funcionando sin preset).
+        let sector = std::env::var("HUB_SECTOR")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
         // Carpeta media por defecto: **co-localizada con la BD del hub** (`<dir de
         // HUB_SQLITE_PATH>/media`), no relativa al CWD del proceso (frágil). Así el path es estable
         // y predecible en local/Tauri (vive junto a `erplora.db`). Override explícito: `HUB_MEDIA_DIR`.
@@ -120,6 +134,7 @@ impl HubConfig {
             cloud_api_token,
             device_trust_enforce,
             media_dir,
+            sector,
         }
     }
 }
