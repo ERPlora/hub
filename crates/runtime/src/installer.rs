@@ -195,6 +195,36 @@ pub async fn installed_status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<
     Ok(out)
 }
 
+/// Como [`installed_status`] pero incluye también la `version` instalada de cada módulo (para
+/// localizar su carpeta en la caché de descargas `<cache>/<id>/<version>/` al RE-HIDRATAR el
+/// Registry tras un reinicio). Filtra por `hub_id` (BD compartida por org). `(id, version, status)`.
+pub async fn installed_status_versioned(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<Vec<(String, String, ModuleStatus)>> {
+    ensure_hub_module_table(db).await?;
+    crate::system_migrations::apply(db, hub_id).await?;
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT module_id, version, status FROM hub_module WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await?;
+    let mut out = Vec::with_capacity(res.rows.len());
+    for row in &res.rows {
+        let id = row["module_id"].as_str().unwrap_or_default().to_string();
+        let version = row["version"].as_str().unwrap_or_default().to_string();
+        let status = match row["status"].as_str() {
+            Some("inactive") => ModuleStatus::Inactive,
+            _ => ModuleStatus::Active,
+        };
+        out.push((id, version, status));
+    }
+    Ok(out)
+}
+
 /// Ordena módulos topológicamente por `depends_on` (hub#16): una dependencia va **antes** que
 /// quien la declara, sin importar el orden del sistema de ficheros. Las dependencias **fuera del
 /// lote** (ya instaladas, o que se validarán en `install()`) se ignoran a efectos de orden.

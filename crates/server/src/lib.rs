@@ -179,6 +179,20 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
+    // Re-hidrata el Registry tras un reinicio: re-registra los módulos ya instalados de este hub
+    // desde la caché de descargas (`module_cache/<id>/<version>/`). Sin esto, un runtime con
+    // `modules_dir: None` (el caso descarga-desde-marketplace, p. ej. el shell Tauri) arrancaría
+    // con el Registry vacío aunque `hub_module` + las tablas del módulo persistan → el módulo
+    // "desaparecería" del runtime al reiniciar (no expondría queries/commands/nav). Tolerante.
+    {
+        let cache_root = state.config.module_cache.clone();
+        match state.runtime.lock().await.rehydrate_installed(&cache_root).await {
+            Ok(ids) if !ids.is_empty() => eprintln!("módulos re-hidratados: {}", ids.join(", ")),
+            Ok(_) => {}
+            Err(e) => eprintln!("✗ re-hidratación de módulos: {e}"),
+        }
+    }
+
     // Seed de configuración inicial (hub#36): SQL idempotente que se aplica UNA vez al arrancar,
     // tras las tablas de sistema. Mecanismo genérico (NO "modo demo"): el host lo pasa por env —
     // `HUB_SEED_SQL` (SQL inline, p. ej. el del despliegue demo) o `HUB_SEED_SQL_PATH` (fichero).

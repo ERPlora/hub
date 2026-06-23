@@ -155,6 +155,42 @@ impl Runtime {
         Ok(installed)
     }
 
+    /// Re-hidrata el Registry tras un REINICIO: re-registra los módulos ya instalados de ESTE hub
+    /// leyéndolos de la caché de descargas (`cache_root/<id>/<version>/`). Necesario para el caso
+    /// "descarga desde marketplace" (`modules_dir: None`): el estado persiste en `hub_module` + las
+    /// tablas del módulo + la caché, pero el Registry en memoria arranca vacío, así que sin esto un
+    /// módulo instalado "desaparece" del runtime al reiniciar (no expone queries/commands/nav).
+    ///
+    /// Idempotente y tolerante: salta los ya registrados (p. ej. los de `modules_dir`); un módulo
+    /// cuya carpeta falte o cuyo install falle se omite con log (no tumba el arranque). `install_from_dir`
+    /// reaplica migraciones sin efecto (registradas en `_hub_migrations`). Respeta el estado inactivo
+    /// persistido. Devuelve los ids re-hidratados.
+    pub async fn rehydrate_installed(&mut self, cache_root: &Path) -> Result<Vec<String>> {
+        let persisted = installer::installed_status_versioned(self.db.as_ref(), &self.hub_id).await?;
+        let mut out = Vec::new();
+        for (id, version, status) in persisted {
+            if self.registry.is_installed(&id) {
+                continue; // ya re-registrado (p. ej. por modules_dir): no dupliques
+            }
+            let dir = cache_root.join(&id).join(&version);
+            if !dir.join("module.json").exists() {
+                eprintln!("✗ rehidratación {id}@{version}: sin module.json en caché ({})", dir.display());
+                continue;
+            }
+            match self.install_from_dir(&dir).await {
+                Ok(rid) => {
+                    if status == ModuleStatus::Inactive {
+                        let _ = self.deactivate(&rid).await; // repón inactivo (install lo dejó active)
+                    }
+                    eprintln!("✓ módulo re-hidratado: {rid}@{version}");
+                    out.push(rid);
+                }
+                Err(e) => eprintln!("✗ rehidratación {id}@{version}: {e}"),
+            }
+        }
+        Ok(out)
+    }
+
     /// Activa un módulo instalado (sus capacidades vuelven a estar disponibles).
     pub async fn activate(&mut self, module_id: &str) -> Result<()> {
         installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id, ModuleStatus::Active).await
