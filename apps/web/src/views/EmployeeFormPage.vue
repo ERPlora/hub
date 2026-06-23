@@ -7,7 +7,7 @@
               <ion-input
                 v-model="form.name"
                 :label="t('employeeForm.name')"
-                label-placement="stacked"
+                label-placement="floating"
                 :placeholder="t('employeeForm.namePlaceholder')"
               />
             </ion-item>
@@ -16,7 +16,7 @@
               <ion-input
                 v-model="form.email"
                 :label="t('employeeForm.email')"
-                label-placement="stacked"
+                label-placement="floating"
                 type="email"
                 :placeholder="t('employeeForm.emailPlaceholder')"
               />
@@ -26,7 +26,7 @@
               <ion-select
                 v-model="form.role"
                 :label="t('employeeForm.role')"
-                label-placement="stacked"
+                label-placement="floating"
               >
                 <ion-select-option v-for="r in ROLES" :key="r" :value="r">{{ roleLabel(r) }}</ion-select-option>
               </ion-select>
