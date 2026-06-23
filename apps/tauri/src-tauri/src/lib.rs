@@ -561,6 +561,7 @@ fn embedded_serve_config(
 ) -> erplora_server::ServeConfig {
     erplora_server::ServeConfig {
         sqlite_path: cache_dir.join("erplora.db").to_string_lossy().into_owned(),
+        database_url: None, // Tauri/local = SQLite embebido (offline-first); Postgres solo en hub AWS cloud
         bind: "127.0.0.1:8787".to_string(),
         modules_dir: None, // los módulos se descargan en runtime desde el marketplace (no horneados)
         hub: erplora_server::HubConfig {

@@ -51,8 +51,11 @@ pub use tenant::{
 /// **Tauri in-process** (§11). Envuelve la [`HubConfig`] de despliegue + parámetros de proceso.
 #[derive(Clone, Debug)]
 pub struct ServeConfig {
-    /// Ruta del fichero SQLite (se crea si no existe).
+    /// Ruta del fichero SQLite (se crea si no existe). Solo se usa en backend SQLite (demo/local).
     pub sqlite_path: String,
+    /// DSN de Postgres/Aurora (`HUB_DATABASE_URL`). `Some` ⇒ backend Postgres (hub AWS cloud);
+    /// `None` ⇒ SQLite (demo.erplora.com en contenedor + local/Tauri). Decisión del humano §1.
+    pub database_url: Option<String>,
     /// Dirección de escucha. Por defecto `127.0.0.1:8787`.
     pub bind: String,
     /// Carpeta opcional de módulos a instalar al arrancar (hub vacío / dev).
@@ -70,6 +73,7 @@ impl ServeConfig {
     pub fn from_env() -> Self {
         Self {
             sqlite_path: std::env::var("HUB_SQLITE_PATH").unwrap_or_else(|_| "erplora.db".into()),
+            database_url: std::env::var("HUB_DATABASE_URL").ok().filter(|s| !s.trim().is_empty()),
             bind: std::env::var("HUB_BIND").unwrap_or_else(|_| "127.0.0.1:8787".into()),
             modules_dir: std::env::var("HUB_MODULES_DIR").ok().filter(|s| !s.is_empty()),
             hub: HubConfig::from_env(),
@@ -108,6 +112,17 @@ fn load_seed_sql() -> Result<Option<String>, Box<dyn std::error::Error>> {
     Ok(None)
 }
 
+/// Normaliza el DSN de `HUB_DATABASE_URL` para sqlx. El Cloud lo inyecta en forma SQLAlchemy
+/// (`postgresql+asyncpg://user:pass@host:5432/db`), pero sqlx (`PgPool::connect`) espera el esquema
+/// estándar `postgresql://`/`postgres://` (sin el sufijo de driver `+asyncpg`/`+psycopg`). Se quita
+/// solo ese sufijo; el resto del DSN (credenciales/host/db) se respeta tal cual.
+fn normalize_pg_dsn(url: &str) -> String {
+    url.replacen("postgresql+asyncpg://", "postgresql://", 1)
+        .replacen("postgres+asyncpg://", "postgres://", 1)
+        .replacen("postgresql+psycopg://", "postgresql://", 1)
+        .replacen("postgresql+psycopg2://", "postgresql://", 1)
+}
+
 /// Arranca el runtime completo y **sirve Axum** en `cfg.bind` hasta que termina. Punto de entrada
 /// único del binario y del shell Tauri (in-process, §11): abre SQLite, instala los módulos del dir
 /// si se indica, resuelve la clave pública del Cloud si falta, monta el [`AppState`], lanza el
@@ -125,14 +140,33 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     let _log_guard = logging::init(&cfg.hub.media_dir);
 
     // Path del SQLite del hub: fuente del dump de backup (`VACUUM INTO`); se captura antes de mover
-    // `cfg` al state.
+    // `cfg` al state. Solo relevante en backend SQLite (demo/local).
     let sqlite_path = cfg.sqlite_path.clone();
     // sqlx-style URL: `sqlite://<path>?mode=rwc` crea el fichero si falta.
     let sqlite_url = format!("sqlite://{}?mode=rwc", sqlite_path);
-    let db = SqliteAdapter::connect(&sqlite_url).await?;
+
+    // Backend de datos (decisión del humano, ARQUITECTURA §1):
+    //  - hub AWS cloud  → SIEMPRE Aurora/Postgres (`HUB_DATABASE_URL`).
+    //  - demo.erplora.com → SQLite en el contenedor (volumen efímero del propio contenedor).
+    //  - local / Tauri  → SQLite + carpeta media local.
+    // El runtime es agnóstico al motor: recibe `Box<dyn DatabaseAdapter>` y traduce SQL por dialecto.
+    let use_postgres = cfg.database_url.is_some();
+    let db: Box<dyn erplora_db::DatabaseAdapter> = match &cfg.database_url {
+        Some(url) => {
+            // El Cloud inyecta el DSN en forma SQLAlchemy (`postgresql+asyncpg://…`); sqlx quiere
+            // `postgresql://…` → se normaliza (ver `normalize_pg_dsn`).
+            let dsn = normalize_pg_dsn(url);
+            eprintln!("db: backend Postgres (Aurora) vía HUB_DATABASE_URL");
+            Box::new(erplora_db::PgAdapter::connect(&dsn).await?)
+        }
+        None => {
+            eprintln!("db: backend SQLite ({sqlite_path})");
+            Box::new(SqliteAdapter::connect(&sqlite_url).await?)
+        }
+    };
     // El runtime se construye con el `hub_id` del despliegue (config, no spoofable): scope del
     // estado de módulos (`hub_module`) y de las migraciones de sistema (hub#31 / hub#37).
-    let mut runtime = Runtime::with_hub_id(Box::new(db), cfg.hub.hub_id.clone());
+    let mut runtime = Runtime::with_hub_id(db, cfg.hub.hub_id.clone());
 
     // Plugins nativos first-party (ADR-0009): motores compliance-crítico horneados en el
     // runtime. Hoy solo `verifactu` (cadena fiscal + transmisión AEAT TLS-mutua).
@@ -165,17 +199,25 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // tabla SQLite + coseno por fuerza bruta, sobre una conexión propia al MISMO fichero del hub
     // (la tabla `knowledge_chunk` es independiente de los datos de negocio). La generación de
     // embeddings sigue yendo SIEMPRE por el Cloud (§9.3); este store solo guarda/busca vectores.
-    let vector_db = SqliteAdapter::connect(&sqlite_url).await?;
-    let vector_store = SqliteVectorStore::new(vector_db);
-    vector_store.ensure_schema().await?;
-    let vector_store: state::SharedVectorStore = std::sync::Arc::new(vector_store);
+    // SOLO en backend SQLite: en Postgres aún no hay store pgvector → `None` y el asistente degrada
+    // a "todos los tools" (§9.5). TODO(humano): `PgVectorStore` (pgvector) para hubs cloud.
+    let vector_store: Option<state::SharedVectorStore> = if use_postgres {
+        None
+    } else {
+        let vector_db = SqliteAdapter::connect(&sqlite_url).await?;
+        let vs = SqliteVectorStore::new(vector_db);
+        vs.ensure_schema().await?;
+        Some(std::sync::Arc::new(vs) as state::SharedVectorStore)
+    };
 
     // Celda del token de máquina: externa (compartida con el shell Tauri para hot-reload) o propia.
-    let state = match cfg.machine_token_cell.take() {
+    let mut state = match cfg.machine_token_cell.take() {
         Some(cell) => AppState::with_config_cell(runtime, cfg.hub, cell),
         None => AppState::with_config(runtime, cfg.hub),
+    };
+    if let Some(vs) = vector_store {
+        state = state.with_vector(vs);
     }
-    .with_vector(vector_store);
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
     state.runtime.lock().await.ensure_system_tables().await?;
 
@@ -219,23 +261,32 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // el transporte REAL (`backup::CloudBackupTransport`); si no, el MOCK (que "streamea" un dump
     // sintético) para que la mecánica Outbox (reintentos/dead-letter) siga real en dev/sin Cloud.
     {
-        let real = backup::build_transport(
-            sqlite_path.clone(),
-            &state.config.cloud_base_url,
-            state.config.hub_id.clone(),
-            state.machine_token.clone(),
-            state.http.clone(),
-        );
-        let transport: std::sync::Arc<dyn erplora_runtime::host_backup::BackupTransport> = match real {
-            Some(t) => {
-                eprintln!("backup: transporte real (dump + stream al Cloud) activo");
-                t
-            }
-            None => {
-                eprintln!("backup: hub sin enrolar → transporte MOCK (no sube al Cloud)");
+        // En Postgres (Aurora) el backup/restore lo gestiona el Cloud (snapshots de Aurora + SSE a
+        // S3), NO el runtime: no hay dump SQLite local que subir. Se registra el MOCK para que la
+        // mecánica del Outbox (reintentos/dead-letter) siga real. En SQLite (demo/local) sí se usa
+        // el transporte real (`VACUUM INTO` + stream al Cloud) cuando el hub está enrolado.
+        let transport: std::sync::Arc<dyn erplora_runtime::host_backup::BackupTransport> =
+            if use_postgres {
+                eprintln!("backup: backend Postgres → backups gestionados por el Cloud (sin dump local)");
                 std::sync::Arc::new(erplora_runtime::host_backup::MockTransport::new())
-            }
-        };
+            } else {
+                match backup::build_transport(
+                    sqlite_path.clone(),
+                    &state.config.cloud_base_url,
+                    state.config.hub_id.clone(),
+                    state.machine_token.clone(),
+                    state.http.clone(),
+                ) {
+                    Some(t) => {
+                        eprintln!("backup: transporte real (dump + stream al Cloud) activo");
+                        t
+                    }
+                    None => {
+                        eprintln!("backup: hub sin enrolar → transporte MOCK (no sube al Cloud)");
+                        std::sync::Arc::new(erplora_runtime::host_backup::MockTransport::new())
+                    }
+                }
+            };
         state.runtime.lock().await.set_backup_transport(transport);
     }
 
