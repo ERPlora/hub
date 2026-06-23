@@ -15,6 +15,8 @@ import {
   swapVerticalOutline,
   // ok-file-manager (/files): navegación por carpetas, tipo de archivo terminal.
   chevronForwardOutline, folderOpenOutline, terminalOutline,
+  // Marketplace (ok-data-table): acción activar/desactivar de un módulo instalado.
+  powerOutline,
 } from 'ionicons/icons';
 
 import App from './App.vue';
@@ -55,6 +57,8 @@ addIcons({
   'chevron-forward-outline': chevronForwardOutline,
   'folder-open-outline': folderOpenOutline,
   'terminal-outline': terminalOutline,
+  // Marketplace: acción activar/desactivar (ok-data-table rowAction).
+  'power-outline': powerOutline,
 });
 
 // CSS base de Ionic (core + utilidades). Dark mode por clase (.ion-palette-dark).

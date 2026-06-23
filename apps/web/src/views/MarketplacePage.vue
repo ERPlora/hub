@@ -1,108 +1,53 @@
 <template>
   <AppPage :title="t('nav.marketplace')">
-      <h2 class="text-lg font-semibold mb-3">{{ tabTitle }}</h2>
+    <div v-if="loading" class="flex justify-center py-10">
+      <ion-spinner name="dots" />
+    </div>
 
-      <div v-if="loading" class="flex justify-center py-10">
-        <ion-spinner name="dots" />
-      </div>
+    <!-- `.fill` fija el alto al área de ion-content para que cabecera/pager de la tabla queden
+         fijos y el scroll viva solo en el cuerpo (mismo patrón que EmployeesPage/ModuleView). -->
+    <!-- 100% de ancho; el padding lo aporta el `ion-content` de AppPage (un solo ion-padding,
+         como todas las vistas). La vista por defecto es GRID (tarjetas) — se fija en onMounted. -->
+    <div v-else class="fill">
+      <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida. -->
+      <ok-data-table
+        v-show="tab === 'mine'"
+        ref="mineTable"
+        fill
+        :columns="mineColumns"
+        :rows="installedRows"
+        :views="['cards', 'table']"
+        :searchKeys="['name']"
+        :actions="mineActions"
+        search-placeholder="Buscar módulo instalado…"
+        page-size="10"
+        column-picker
+      ></ok-data-table>
 
-      <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida -->
-      <template v-else-if="tab === 'mine'">
-        <ion-list v-if="installedModules.length > 0" lines="full">
-          <ion-item v-for="m in installedModules" :key="m.id">
-            <HubIcon
-              slot="start"
-              :name="iconForModule(m.id, '')"
-              class="text-[color:var(--ion-color-primary)]"
-            />
-            <ion-label>
-              <h2 class="text-base font-medium">{{ m.name }}</h2>
-              <p class="text-sm">
-                v{{ m.version }} ·
-                <ion-text :color="m.status === 'active' ? 'success' : 'medium'">
-                  {{ m.status === 'active' ? 'Activo' : 'Inactivo' }}
-                </ion-text>
-              </p>
-            </ion-label>
-            <ion-button slot="end" fill="clear" size="small" @click="toggleModule(m)">
-              {{ m.status === 'active' ? 'Desactivar' : 'Activar' }}
-            </ion-button>
-            <ion-button slot="end" fill="clear" size="small" color="danger" @click="removeModule(m)">
-              Desinstalar
-            </ion-button>
-          </ion-item>
-        </ion-list>
-        <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
-          <HubIcon name="cube-outline" style="font-size: 2.5rem;" />
-          <p>No tienes módulos instalados</p>
-        </div>
-      </template>
+      <!-- Catálogo / Pago: módulos del Cloud. -->
+      <ok-data-table
+        v-show="tab !== 'mine'"
+        ref="catalogTable"
+        fill
+        :columns="catalogColumns"
+        :rows="filteredModules"
+        :views="['cards', 'table']"
+        :searchKeys="['name', 'desc', 'cat']"
+        :actions="catalogActions"
+        search-placeholder="Buscar en el catálogo…"
+        page-size="10"
+        column-picker
+      ></ok-data-table>
+    </div>
 
-      <template v-else-if="filteredModules.length > 0">
-        <!-- Vista tarjetas (catálogo / pago) -->
-        <ion-grid>
-          <ion-row>
-            <ion-col
-              v-for="mod in filteredModules"
-              :key="mod.id"
-              size="12"
-              size-sm="6"
-              size-lg="4"
-            >
-              <ion-card class="h-full m-0">
-                <ion-card-header>
-                  <ion-card-title class="flex items-center gap-2 text-base">
-                    <HubIcon
-                      :name="iconForModule(mod.id, mod.cat)"
-                      class="shrink-0 text-[color:var(--ion-color-primary)]"
-                      style="font-size: 1.15rem;"
-                    />
-                    <span class="truncate">{{ mod.name }}</span>
-                  </ion-card-title>
-                </ion-card-header>
-                <ion-card-content class="flex flex-col gap-2">
-                  <ion-badge color="light">{{ mod.cat }}</ion-badge>
-                  <p class="text-sm text-[color:var(--ion-color-medium)]">{{ mod.desc }}</p>
-                  <div class="flex items-center justify-between mt-2">
-                    <ion-badge :color="mod.price === 'Gratis' ? 'success' : 'medium'">
-                      {{ mod.price }}
-                    </ion-badge>
-                    <ion-button
-                      v-if="mod.installed"
-                      fill="outline"
-                      size="small"
-                      disabled
-                    >
-                      Instalado
-                    </ion-button>
-                    <ion-button
-                      v-else
-                      size="small"
-                      @click="installModule(mod)"
-                    >
-                      Instalar
-                    </ion-button>
-                  </div>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
-          </ion-row>
-        </ion-grid>
-      </template>
-
-      <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
-        <HubIcon name="cube-outline" style="font-size: 2.5rem;" />
-        <p>Sin módulos</p>
-      </div>
-
-      <!-- Toast simple (Ionic IonToast no requiere importaciones extra en el template) -->
-      <ion-toast
-        :is-open="toastOpen"
-        :message="toastMsg"
-        :color="toastColor"
-        :duration="2500"
-        @did-dismiss="toastOpen = false"
-      />
+    <!-- Toast simple (Ionic IonToast no requiere importaciones extra en el template) -->
+    <ion-toast
+      :is-open="toastOpen"
+      :message="toastMsg"
+      :color="toastColor"
+      :duration="toastDuration"
+      @did-dismiss="toastOpen = false"
+    />
     <!-- Tabs en footer -->
     <template #footer>
       <ion-footer class="ion-no-border">
@@ -128,16 +73,16 @@
 </template>
 
 <script setup lang="ts">
-import { inject, ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { inject, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
-  IonFooter, IonSegment, IonSegmentButton, IonLabel,  IonBadge,
-  IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSpinner,
-  IonGrid, IonRow, IonCol, IonToast, IonList, IonItem, IonText
+  IonFooter, IonSegment, IonSegmentButton, IonLabel,
+  IonSpinner, IonToast
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import { DT_LABELS_ES } from '../lib/data-table-labels';
 
 const { t } = useI18n();
 import { cloudMarketplaceModules, type CloudMarketplaceModule } from '../lib/cloud';
@@ -163,7 +108,20 @@ interface Mod {
 
 type MarketplaceTab = 'mine' | 'all' | 'paid';
 
-// --- Datos demo (igual que el original React) ---
+// ok-data-table (OutfitKit) está registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
+type Row = Record<string, unknown>;
+interface DataTableColumn {
+  key: string;
+  header: string;
+  align?: 'left' | 'right' | 'center';
+  filterable?: boolean;
+  filterType?: 'text' | 'select' | 'number' | 'date' | 'range' | 'daterange';
+  format?: (row: Row) => string;
+  render?: (row: Row) => Node | string;
+}
+interface DataTableAction { id: string; label: string; icon?: string; color?: string }
+
+// --- Datos demo (solo si config.demo y el Cloud no responde) ---
 const MODULES_DEMO: Mod[] = [
   { id: 'inventory', name: 'Inventario', desc: 'Productos, stock y movimientos', price: 'Gratis', installed: true, cat: 'Operación' },
   { id: 'pos', name: 'TPV / POS', desc: 'Punto de venta y caja', price: 'Gratis', installed: true, cat: 'Ventas' },
@@ -183,42 +141,53 @@ const loading = ref(true);
 const toastOpen = ref(false);
 const toastMsg = ref('');
 const toastColor = ref<'primary' | 'success' | 'danger'>('primary');
+// Duración del toast (ms). 0 = persistente (lo usamos para "Instalando…" mientras corre la
+// instalación en background; el resultado lo cierra y muestra el suyo). Por defecto 2.5s.
+const toastDuration = ref<number>(2500);
 
-// --- Helpers ---
-function iconForModule(id: string, category: string): string {
-  const key = `${id} ${category}`.toLowerCase();
-  if (key.includes('pos') || key.includes('tpv') || key.includes('venta')) return 'cart-outline';
-  if (key.includes('client') || key.includes('crm')) return 'people-outline';
-  if (key.includes('fact') || key.includes('invoice')) return 'document-text-outline';
-  if (key.includes('env') || key.includes('courier') || key.includes('log')) return 'send-outline';
-  if (key.includes('reserva') || key.includes('agenda') || key.includes('appointment')) return 'calendar-outline';
-  if (key.includes('message') || key.includes('whatsapp') || key.includes('comun')) return 'chatbubble-outline';
-  if (key.includes('analytic') || key.includes('bi')) return 'bar-chart-outline';
-  return 'cube-outline';
+// --- Celdas ricas: pill de tinte suave con tokens Ionic (cruzan el shadow de la tabla) ---
+function badgeCell(text: string, tone: 'success' | 'medium' | 'primary' | 'danger'): Node {
+  const span = document.createElement('span');
+  span.textContent = text;
+  span.style.cssText =
+    'display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;' +
+    `background:rgba(var(--ion-color-${tone}-rgb), 0.14);` +
+    `color:var(--ion-color-${tone}-shade, var(--ion-color-${tone}))`;
+  return span;
 }
 
-function toViewModule(m: CloudMarketplaceModule): Mod {
-  return {
-    id: m.id,
-    name: m.name,
-    desc: m.description,
-    price: m.priceLabel || 'Consultar',
-    installed: m.installed,
-    cat: m.category
-  };
-}
-
-const filteredModules = computed<Mod[]>(() => {
-  if (tab.value === 'mine') return modules.value.filter((m) => m.installed);
+const filteredModules = computed<Row[]>(() => {
   if (tab.value === 'paid') return modules.value.filter((m) => m.price !== 'Gratis');
   return modules.value;
 });
 
-const tabTitle = computed<string>(() => {
-  if (tab.value === 'mine') return 'Mis módulos';
-  if (tab.value === 'paid') return 'Módulos de pago';
-  return 'Catálogo';
-});
+// Instalados desde el runtime, como filas de la tabla.
+const installedRows = computed<Row[]>(() => installedModules.value as unknown as Row[]);
+
+// --- Columnas + acciones ---
+const mineColumns: DataTableColumn[] = [
+  { key: 'name', header: 'Módulo' },
+  { key: 'version', header: 'Versión', format: (r) => `v${String(r.version ?? '')}` },
+  {
+    key: 'status', header: 'Estado', filterable: true, filterType: 'select',
+    render: (r) => badgeCell(r.status === 'active' ? 'Activo' : 'Inactivo', r.status === 'active' ? 'success' : 'medium'),
+  },
+];
+const mineActions: DataTableAction[] = [
+  { id: 'toggle', label: 'Activar/Desactivar', icon: 'power-outline' },
+  { id: 'uninstall', label: 'Desinstalar', icon: 'trash', color: 'danger' },
+];
+
+const catalogColumns: DataTableColumn[] = [
+  { key: 'name', header: 'Módulo' },
+  { key: 'cat', header: 'Categoría', filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.cat ?? ''), 'medium') },
+  { key: 'desc', header: 'Descripción' },
+  { key: 'price', header: 'Precio', filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price ?? ''), r.price === 'Gratis' ? 'success' : 'medium') },
+  { key: 'installed', header: 'Instalado', align: 'center', filterable: true, filterType: 'select', format: (r) => (r.installed ? 'Sí' : 'No') },
+];
+const catalogActions: DataTableAction[] = [
+  { id: 'install', label: 'Instalar', icon: 'download-outline' },
+];
 
 // --- Handlers ---
 function onTabChange(ev: Event): void {
@@ -228,23 +197,37 @@ function onTabChange(ev: Event): void {
   }
 }
 
+function notify(msg: string, color: 'primary' | 'success' | 'danger', duration = 2500): void {
+  // Cerrar + reabrir en el siguiente tick: un ion-toast declarativo NO actualiza su mensaje/
+  // duración mientras sigue abierto, así que para encadenar toasts (p. ej. "Instalando…" →
+  // "instalado") hay que dismiss + re-present.
+  toastOpen.value = false;
+  void nextTick(() => {
+    toastMsg.value = msg;
+    toastColor.value = color;
+    toastDuration.value = duration;
+    toastOpen.value = true;
+  });
+}
+
 // Cliente del runtime (provide en main.ts; fallback al singleton) para escuchar `module.installed`.
 const client = inject(clientInjectionKey) ?? getClient();
 let unsubInstalled: (() => void) | null = null;
 
 async function installModule(mod: Mod): Promise<void> {
-  toastMsg.value = `Instalando ${mod.name}…`;
-  toastColor.value = 'primary';
-  toastOpen.value = true;
+  if (mod.installed) { notify(`${mod.name} ya está instalado.`, 'primary'); return; }
+  // Persistente (duration 0) mientras corre la instalación en background (descarga+verifica+migra);
+  // el resultado (éxito/fallo o el evento WS `module.installed`) lo cierra y muestra el suyo.
+  // Además la barra de progreso de la topbar se enciende vía requestInstall (inFlight del shell).
+  notify(`Instalando ${mod.name}…`, 'primary', 0);
   try {
     // Pide la instalación al runtime: descarga el zip firmado (marketplace Cloud), verifica
     // SHA256 y aplica migraciones. La confirmación llega por el evento WS `module.installed`.
     // Default de versión: 'latest' (el runtime resuelve la última publicada). flag → humano.
     await requestInstall(mod.id, mod.version ?? 'latest');
+    notify(`${mod.name} instalado correctamente.`, 'success');
   } catch {
-    toastMsg.value = `No se pudo iniciar la instalación de ${mod.name}.`;
-    toastColor.value = 'danger';
-    toastOpen.value = true;
+    notify(`No se pudo iniciar la instalación de ${mod.name}.`, 'danger');
   }
 }
 
@@ -255,12 +238,6 @@ async function loadInstalled(): Promise<void> {
   } catch {
     installedModules.value = [];
   }
-}
-
-function notify(msg: string, color: 'primary' | 'success' | 'danger'): void {
-  toastMsg.value = msg;
-  toastColor.value = color;
-  toastOpen.value = true;
 }
 
 /** Activa o desactiva un módulo (hot-plug) y refresca la lista + la nav del shell. */
@@ -292,6 +269,17 @@ async function removeModule(m: InstalledModule): Promise<void> {
   }
 }
 
+function toViewModule(m: CloudMarketplaceModule): Mod {
+  return {
+    id: m.id,
+    name: m.name,
+    desc: m.description,
+    price: m.priceLabel || 'Consultar',
+    installed: m.installed,
+    cat: m.category,
+  };
+}
+
 /** Recarga el catálogo (estados de instalado) desde el Cloud, con fallback demo. */
 async function loadCatalog(): Promise<void> {
   loading.value = true;
@@ -305,10 +293,38 @@ async function loadCatalog(): Promise<void> {
   }
 }
 
+// --- Wiring de eventos de las tablas (rowAction es camelCase → addEventListener) ---
+const mineTable = ref<HTMLElement | null>(null);
+const catalogTable = ref<HTMLElement | null>(null);
+
+function handleMineAction(e: Event): void {
+  const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
+  const m = row as unknown as InstalledModule;
+  if (actionId === 'toggle') void toggleModule(m);
+  else if (actionId === 'uninstall') void removeModule(m);
+}
+function handleCatalogAction(e: Event): void {
+  const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
+  if (actionId === 'install') void installModule(row as unknown as Mod);
+}
+
 // --- Fetch + suscripción al evento de instalación al montar ---
 onMounted(() => {
   void loadCatalog();
   void loadInstalled();
+  // Vista por defecto = GRID (tarjetas). `views` (prop) habilita el toggle; `viewMode` es @state
+  // interno del WC (default 'table') sin prop pública, así que lo fijamos por referencia tras
+  // montar. Cast: viewMode no está en el tipo público pero es una propiedad reactiva de Lit.
+  if (mineTable.value) {
+    (mineTable.value as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+    (mineTable.value as unknown as { viewMode: string }).viewMode = 'cards';
+    mineTable.value.addEventListener('rowAction', handleMineAction);
+  }
+  if (catalogTable.value) {
+    (catalogTable.value as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+    (catalogTable.value as unknown as { viewMode: string }).viewMode = 'cards';
+    catalogTable.value.addEventListener('rowAction', handleCatalogAction);
+  }
   // Cuando el runtime termina de instalar un módulo, refrescamos catálogo, instalados y nav.
   unsubInstalled = client.on('module.installed', (payload) => {
     const id = (payload as { module_id?: string } | null)?.module_id;
@@ -322,5 +338,15 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unsubInstalled?.();
+  mineTable.value?.removeEventListener('rowAction', handleMineAction);
+  catalogTable.value?.removeEventListener('rowAction', handleCatalogAction);
 });
 </script>
+
+<style scoped>
+/* Fija el alto al área de ion-content (no min-height): las tablas en modo `fill` resuelven su
+   :host{height:100%} contra este contenedor → cabecera + pager fijos y scroll solo en el cuerpo. */
+.fill {
+  height: 100%;
+}
+</style>
