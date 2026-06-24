@@ -122,12 +122,17 @@ import { resolveEntitlement, needsActivation } from './lib/entitlement';
 import { railCollapsed } from './lib/shell';
 import { PROFILE_ROUTE } from './lib/routes';
 import { canInstall, promptInstall } from './lib/pwa';
+import { apiDocsEnabled } from './lib/api-docs';
+import { getHubSettings } from './lib/hub-settings';
+import { bootHubLanguage } from './i18n';
 
 interface NavItem { path: string; labelKey: string; icon: string }
 interface NavSection { titleKey: string; items: NavItem[] }
 
 // Etiquetas de la nav del shell por CLAVE i18n (EN/ES, ver src/i18n). Antes hardcoded en español.
-const nav: NavSection[] = [
+// `computed`: la entrada «Documentación de la API» (ADR-0057 §4) aparece SOLO con el toggle de
+// Ajustes activo (apiDocsEnabled). El resto es fijo.
+const nav = computed<NavSection[]>(() => [
   {
     titleKey: 'nav.general',
     items: [
@@ -142,10 +147,13 @@ const nav: NavSection[] = [
       { path: '/billing', labelKey: 'nav.billing', icon: 'card-outline' },
       { path: '/marketplace', labelKey: 'nav.marketplace', icon: 'storefront-outline' },
       { path: '/system', labelKey: 'nav.system', icon: 'hardware-chip-outline' },
+      ...(apiDocsEnabled.value
+        ? [{ path: '/api-docs', labelKey: 'nav.apiDocs', icon: 'code-slash-outline' }]
+        : []),
       { path: '/settings', labelKey: 'nav.settings', icon: 'settings-outline' },
     ]
   },
-];
+]);
 
 const { t } = useI18n();
 const route = useRoute();
@@ -177,6 +185,15 @@ const initials = computed<string>(() => {
 async function gateAndRefresh(): Promise<void> {
   await resolveEntitlement();
   await refreshModuleNav();
+  // Settings del hub (moneda/idioma/doc-API): GET exige sesión, así que se carga aquí (post-login),
+  // no en el boot anónimo. Best-effort: si falla, sigue lo sembrado por /api/hub/context y la doc de
+  // la API queda OFF. Refresca también la moneda/idioma efectivos por si cambiaron.
+  try {
+    const s = await getHubSettings();
+    bootHubLanguage(s.language);
+  } catch {
+    /* el hub puede no exponer settings aún; degrada a lo ya sembrado */
+  }
 }
 onMounted(() => {
   if (isAuthed.value) void gateAndRefresh();

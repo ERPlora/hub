@@ -20,6 +20,16 @@ export interface Notification {
   message: string;
 }
 
+/** Opciones de formateo de dinero (ADR-0059). Mismo shape que `apps/web/src/lib/money.ts`. */
+export interface FormatMoneyOptions {
+  /** ISO-4217. Por defecto, la moneda del hub (`erplora.currency`). */
+  currency?: string;
+  /** Locale BCP-47 para los separadores. Por defecto, el locale activo (`erplora.locale`). */
+  locale?: string;
+  /** Dígitos decimales (por defecto, los de la divisa: 2 para EUR/USD). */
+  maximumFractionDigits?: number;
+}
+
 // ── Queries de lista (paginadas) — contrato del motor de listas del runtime (§4, §8.2) ──────
 
 /** Rango para un filtro `range` (números o fechas ISO). Campos vacíos = sin límite por ese lado. */
@@ -508,6 +518,14 @@ export class ErploraClient {
     private readonly opts: {
       permissions?: () => ReadonlySet<string>;
       notifier?: (n: Notification) => void;
+      /**
+       * Moneda ISO-4217 del hub (ADR-0059), inyectada por el shell (fuente: `/api/hub/context` →
+       * `lib/money.ts → hubCurrency()`). El módulo NUNCA la hardcodea: lee `erplora.currency` o
+       * formatea con `erplora.formatMoney` / `erplora.formatAmount`. Si el shell no la inyecta, el
+       * cliente degrada a la moneda publicada en `globalThis.__erploraCurrency` o, en último término,
+       * a `'EUR'` (igual que `locale` degrada a `'es'`). Inyectable para tests.
+       */
+      currency?: () => string;
     } = {},
     bridge?: BridgeTransport,
   ) {
@@ -571,6 +589,56 @@ export class ErploraClient {
     } catch {
       return 'es';
     }
+  }
+
+  /**
+   * Moneda ISO-4217 del HUB (ADR-0059). Global del hub (sin override por usuario; decisión del
+   * humano). El shell la inyecta vía `opts.currency` (fuente: `/api/hub/context`, misma que el
+   * dashboard/billing). Si no se inyecta, lee la que el shell publica en
+   * `globalThis.__erploraCurrency` (mirror de cómo `locale` lee `localStorage`) y, en último
+   * término, degrada a `'EUR'`. Los Web Components de módulo la leen para formatear dinero en vez
+   * de hardcodear `€`/`EUR`.
+   */
+  get currency(): string {
+    try {
+      const injected = this.opts.currency?.();
+      if (injected && injected.trim()) return injected.trim().toUpperCase();
+      const published = (globalThis as { __erploraCurrency?: string }).__erploraCurrency;
+      if (typeof published === 'string' && published.trim()) return published.trim().toUpperCase();
+    } catch {
+      /* noop — degradación elegante */
+    }
+    return 'EUR';
+  }
+
+  /** `Intl.NumberFormat` de moneda con la moneda del hub (o `opts.currency`) y el locale activo. */
+  private moneyFmt(opts?: FormatMoneyOptions): Intl.NumberFormat {
+    return new Intl.NumberFormat(opts?.locale ?? this.locale, {
+      style: 'currency',
+      currency: opts?.currency ?? this.currency,
+      ...(opts?.maximumFractionDigits != null
+        ? { maximumFractionDigits: opts.maximumFractionDigits }
+        : {}),
+    });
+  }
+
+  /**
+   * Formatea un importe en CÉNTIMOS (entero) con la MONEDA DEL HUB (ADR-0059). El runtime guarda
+   * dinero en céntimos para no arrastrar errores de coma flotante; esta es la entrada canónica para
+   * los Web Components de módulo. `opts.currency` sobreescribe (p. ej. una factura en otra divisa).
+   * Mismo contrato que `apps/web/src/lib/money.ts` del shell, así Cloud↔Hub formatean igual.
+   */
+  formatMoney(cents: number, opts?: FormatMoneyOptions): string {
+    return this.moneyFmt(opts).format((cents || 0) / 100);
+  }
+
+  /**
+   * Formatea un importe ya en UNIDADES mayores (euros, no céntimos) con la moneda del hub. Para
+   * datos que llegan en unidades (totales de factura, KPIs). Misma resolución de moneda/locale que
+   * `formatMoney`.
+   */
+  formatAmount(units: number, opts?: FormatMoneyOptions): string {
+    return this.moneyFmt(opts).format(units || 0);
   }
 
   /**

@@ -49,6 +49,25 @@ pub(crate) async fn execute_at(
         return Err(RuntimeError::EventLoop);
     }
 
+    // Identidad de NEGOCIO GLOBAL del hub (fuente única país-agnóstica, `hub_settings` — ADR-0061) →
+    // contexto, una sola vez en la raíz (depth 0). Así `system_params` la expone como
+    // `:business_tax_id`/`:business_legal_name`/`:business_address` a todo el SQL del comando (p.ej.
+    // invoice resuelve el emisor sin que el caller lo pase). En cascadas (depth>0) el ctx ya viene
+    // enriquecido. Degrada a vacío si los settings fallan.
+    let enriched_ctx;
+    let ctx = if depth == 0 && ctx.business_tax_id.is_empty() {
+        let f = crate::settings::get_all(db, &ctx.hub_id).await.unwrap_or(Json::Null);
+        let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
+        enriched_ctx = ctx.clone().with_business(
+            get("business_tax_id"),
+            get("business_legal_name"),
+            get("business_address"),
+        );
+        &enriched_ctx
+    } else {
+        ctx
+    };
+
     let cmd = registry
         .get_command(name)
         .ok_or_else(|| RuntimeError::CommandNotFound(name.to_string()))?;
@@ -307,6 +326,7 @@ mod tests {
             handler: None,
             ai: None,
             schema: None,
+            expose_api: false,
         }
     }
 

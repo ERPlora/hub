@@ -169,6 +169,7 @@ async fn hub_context_returns_configured_hub_id() {
         cloud_api_token: None,
         device_trust_enforce: false,
         media_dir: std::env::temp_dir().join("erplora-test-media"),
+        sector: Some("hosteleria".into()),
     };
     let app = app(AppState::with_config(rt, cfg));
     let resp = app
@@ -179,6 +180,9 @@ async fn hub_context_returns_configured_hub_id() {
     let j = body_json(resp).await;
     assert_eq!(j["hub_id"], json!("hub-xyz"));
     assert_eq!(j["user"], Value::Null);
+    // El sector se expone como `business_type` + alias `sector` (ADR-0054, contrato del frontend).
+    assert_eq!(j["business_type"], json!("hosteleria"));
+    assert_eq!(j["sector"], json!("hosteleria"));
 }
 
 #[tokio::test]

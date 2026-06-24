@@ -18,7 +18,9 @@ import { config } from './config';
 import { getAccessToken } from './cloud';
 import { getHubSession } from './session';
 import { beginRequest, endRequest } from './shell';
-import { getLocale } from '../i18n';
+import { getLocale, bootHubLanguage } from '../i18n';
+import { hubSettings } from './hub-settings';
+import { hubCurrency, publishHubCurrency } from './money';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -52,6 +54,16 @@ export interface HubContext {
    */
   sector?: string | null;
   business_type?: string | null;
+  /**
+   * Moneda ISO-4217 del hub (lectura barata en el boot; misma fuente que `GET /api/settings`).
+   * La consume money.ts para formatear dinero. Ausente → degrada a EUR.
+   */
+  currency?: string | null;
+  /**
+   * Idioma DEFAULT del hub (código de locale). Se reconcilia con el override personal del usuario
+   * en el boot (i18n → bootHubLanguage). Ausente → degrada a 'es'.
+   */
+  language?: string | null;
 }
 
 /**
@@ -97,7 +109,10 @@ export function getClient(): ErploraClient {
       baseUrl: RUNTIME_URL,
       headers: runtimeHeaders,
     });
-    _client = new ErploraClient(transport);
+    // Inyecta la MONEDA DEL HUB (ADR-0059) al cliente que consumen los Web Components de módulo
+    // (`globalThis.erplora.currency` / `formatMoney` / `formatAmount`). Misma fuente que el shell
+    // (money.ts → hubCurrency, de /api/hub/context); así módulos y dashboard formatean igual.
+    _client = new ErploraClient(transport, { currency: hubCurrency });
   }
   return _client;
 }
@@ -141,6 +156,12 @@ export interface InstalledModule {
   name: string;
   status: 'active' | 'inactive';
   version: string;
+  /**
+   * ADITIVO (ADR-0057): `true` si el módulo expone al menos una query/command `expose_api`.
+   * Lo usa la matriz de scope de las API keys para listar solo módulos que conceden algo.
+   * Ausente en runtimes antiguos → se trata como `false` (no expone API).
+   */
+  has_public_api?: boolean;
 }
 
 /** Lista los módulos instalados en el runtime (fuente de verdad local, no el catálogo Cloud). */
@@ -171,6 +192,37 @@ export const deactivateModule = (id: string): Promise<void> => moduleAction(id, 
 export const uninstallModule = (id: string): Promise<void> => moduleAction(id, 'uninstall');
 
 /**
+ * Siembra la cache de settings del hub con la lectura barata del context (`currency`/`language`).
+ * El context NO trae `api_docs_enabled` (eso vive en /api/settings, que se carga aparte tras el
+ * login); preservamos el valor previo o degradamos a OFF. Así money.ts ya tiene moneda en el boot
+ * sin un GET /api/settings extra.
+ */
+function seedHubSettingsFromContext(ctx: HubContext): void {
+  const currency =
+    typeof ctx.currency === 'string' && ctx.currency.trim()
+      ? ctx.currency.trim().toUpperCase()
+      : (hubSettings.value?.currency ?? 'EUR');
+  const language =
+    typeof ctx.language === 'string' && ctx.language.trim()
+      ? ctx.language.trim()
+      : (hubSettings.value?.language ?? 'es');
+  hubSettings.value = {
+    currency,
+    language,
+    api_docs_enabled: hubSettings.value?.api_docs_enabled ?? false,
+    // El contexto del hub solo trae moneda/idioma; la identidad de negocio la rellena el GET completo
+    // de /api/settings (getHubSettings). Preservamos lo ya cacheado para no pisarlo con vacío.
+    business_tax_id: hubSettings.value?.business_tax_id ?? '',
+    business_legal_name: hubSettings.value?.business_legal_name ?? '',
+    business_address: hubSettings.value?.business_address ?? '',
+  };
+  // Publica la moneda a `globalThis.__erploraCurrency` para los Web Components de módulo (ADR-0059):
+  // el SDK la lee de ahí como fallback cuando el shell no inyecta el getter (mirror de cómo `locale`
+  // lee `localStorage`), y queda fresca tras un cambio de settings.
+  publishHubCurrency(currency);
+}
+
+/**
  * Obtiene el hub_id del runtime (`GET /api/hub/context`) y lo fija en `config.hubId`.
  * Se llama una vez en el boot (main.ts). Si el runtime no responde, deja el fallback
  * (VITE_HUB_ID) que ya trae `config`. No lanza: el boot del shell no debe romperse aquí.
@@ -188,6 +240,11 @@ export async function bootHubContext(): Promise<HubContext | null> {
     // `business_type`; ausente → queda null (degradación elegante en la recolección de widgets).
     const sector = ctx.sector ?? ctx.business_type ?? null;
     hubSector.value = typeof sector === 'string' && sector.trim() ? sector.trim() : null;
+    // Moneda + idioma del hub (lectura barata del context). Siembra la cache de settings para que
+    // money.ts ya tenga la moneda y reconcilia el idioma DEFAULT del hub con el override del usuario
+    // (i18n → bootHubLanguage), sin esperar a un GET /api/settings explícito.
+    seedHubSettingsFromContext(ctx);
+    bootHubLanguage(typeof ctx.language === 'string' ? ctx.language : null);
     return ctx;
   } catch {
     return null;

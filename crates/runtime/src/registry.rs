@@ -16,8 +16,15 @@ pub enum ModuleStatus {
 /// JSON Schema **compilado** del payload de una query/command. Se compila UNA vez al
 /// instalar el módulo (no por petición) y se cachea aquí; la validación por petición es
 /// solo el `validate` sobre el validador ya compilado (§5.2, hub#27).
+///
+/// Conserva también el JSON crudo del schema (`raw`) para que el generador OpenAPI (ADR-0057)
+/// pueda emitirlo tal cual en el `requestBody` (OpenAPI 3.1 = JSON Schema directo) sin
+/// re-serializar desde el validador.
 #[derive(Clone)]
-pub struct CompiledSchema(pub std::sync::Arc<jsonschema::Validator>);
+pub struct CompiledSchema {
+    pub validator: std::sync::Arc<jsonschema::Validator>,
+    pub raw: std::sync::Arc<serde_json::Value>,
+}
 
 impl std::fmt::Debug for CompiledSchema {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -26,17 +33,20 @@ impl std::fmt::Debug for CompiledSchema {
 }
 
 impl CompiledSchema {
-    /// Compila `schema` (el JSON del fichero `schemas/*.json` del módulo).
+    /// Compila `schema` (el JSON del fichero `schemas/*.json` del módulo) y conserva su JSON crudo.
     pub fn compile(schema: &serde_json::Value) -> Result<Self, String> {
         jsonschema::validator_for(schema)
-            .map(|v| Self(std::sync::Arc::new(v)))
+            .map(|v| Self {
+                validator: std::sync::Arc::new(v),
+                raw: std::sync::Arc::new(schema.clone()),
+            })
             .map_err(|e| e.to_string())
     }
 
     /// Valida `instance`; `Err` lleva el detalle legible de las violaciones (máx. 5).
     pub fn validate(&self, instance: &serde_json::Value) -> Result<(), String> {
         let errors: Vec<String> = self
-            .0
+            .validator
             .iter_errors(instance)
             .take(5)
             .map(|e| {
@@ -216,6 +226,87 @@ impl Registry {
             .unwrap_or_else(|| fallback.to_string())
     }
 
+    // ── API pública por módulo (ADR-0057, public-api.md) ─────────────────────────────────────
+
+    /// Queries de un módulo **activo** marcadas `expose_api` → `(nombre, &RegisteredQuery)`.
+    /// Fuente de la "lectura" del scope de una API key y de los `path` GET del OpenAPI.
+    pub fn exposed_queries<'a>(&'a self, module_id: &str) -> Vec<(&'a str, &'a RegisteredQuery)> {
+        if !self.is_active(module_id) {
+            return Vec::new();
+        }
+        self.queries
+            .iter()
+            .filter(|(_, q)| q.module_id == module_id && q.def.expose_api)
+            .map(|(name, q)| (name.as_str(), q))
+            .collect()
+    }
+
+    /// Commands de un módulo **activo** marcados `expose_api` → `(nombre, &RegisteredCommand)`.
+    /// Fuente de la "escritura" del scope de una API key y de los `path` POST del OpenAPI.
+    pub fn exposed_commands<'a>(&'a self, module_id: &str) -> Vec<(&'a str, &'a RegisteredCommand)> {
+        if !self.is_active(module_id) {
+            return Vec::new();
+        }
+        self.commands
+            .iter()
+            .filter(|(_, c)| c.module_id == module_id && c.def.expose_api)
+            .map(|(name, c)| (name.as_str(), c))
+            .collect()
+    }
+
+    /// Nombre legible de un módulo instalado (el `name` del manifest), o el `module_id` si no
+    /// está instalado. Lo usa el generador OpenAPI para los `tags`.
+    pub fn module_display_name(&self, module_id: &str) -> String {
+        self.installed
+            .iter()
+            .find(|m| m.id == module_id)
+            .map(|m| m.name.clone())
+            .unwrap_or_else(|| module_id.to_string())
+    }
+
+    /// Versión instalada de un módulo (del manifest), o `"0.0.0"` si no está instalado.
+    pub fn module_version(&self, module_id: &str) -> String {
+        self.installed
+            .iter()
+            .find(|m| m.id == module_id)
+            .map(|m| m.version.clone())
+            .unwrap_or_else(|| "0.0.0".to_string())
+    }
+
+    /// Ids de los módulos **activos** que exponen al menos una query/command `expose_api`
+    /// (orden estable por id). Lo usan el generador OpenAPI y la matriz de scope de la UI.
+    pub fn modules_with_public_api(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .installed
+            .iter()
+            .map(|m| m.id.clone())
+            .filter(|id| {
+                self.is_active(id)
+                    && (!self.exposed_queries(id).is_empty()
+                        || !self.exposed_commands(id).is_empty())
+            })
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    /// ¿Es `name` una query de `module_id`, marcada `expose_api`, de un módulo activo? La **doble
+    /// puerta** del data-surface: la ruta `POST /api/v1/{module}/q/{query}` solo deja pasar si esto
+    /// es `true` (luego el gate de permisos del runtime revalida igual). Comprueba además que la
+    /// operación **pertenece** al módulo de la ruta (evita cruzar namespaces).
+    pub fn is_query_exposed(&self, module_id: &str, name: &str) -> bool {
+        self.get_query(name)
+            .map(|q| q.module_id == module_id && q.def.expose_api)
+            .unwrap_or(false)
+    }
+
+    /// Espejo de [`is_query_exposed`] para commands (`POST /api/v1/{module}/c/{command}`).
+    pub fn is_command_exposed(&self, module_id: &str, name: &str) -> bool {
+        self.get_command(name)
+            .map(|c| c.module_id == module_id && c.def.expose_api)
+            .unwrap_or(false)
+    }
+
     /// Cambia el estado de un módulo instalado. Devuelve `false` si no existe.
     pub fn set_status(&mut self, module_id: &str, status: ModuleStatus) -> bool {
         if !self.is_installed(module_id) {
@@ -251,6 +342,16 @@ pub struct RequestContext {
     pub hub_id: String,
     pub user_id: String,
     pub permissions: HashSet<String>,
+    /// Identidad de NEGOCIO GLOBAL del hub (FUENTE ÚNICA país-agnóstica, `hub_settings`:
+    /// business_tax_id/legal_name/address — ADR-0061). La inyecta el dispatcher
+    /// (`commands::execute_at`, profundidad 0) leyendo los settings, y `system_params` la expone como
+    /// `:business_tax_id`/`:business_legal_name`/`:business_address` a TODO el SQL (incl. las
+    /// operaciones que emiten los handlers WASM/nativos) para que los módulos (p.ej. invoice como
+    /// emisor) usen el identificador fiscal del obligado sin que el caller lo pase. Vacío si no se ha
+    /// configurado o fuera del flujo de comandos.
+    pub business_tax_id: String,
+    pub business_legal_name: String,
+    pub business_address: String,
 }
 
 impl RequestContext {
@@ -263,7 +364,24 @@ impl RequestContext {
             hub_id: hub_id.into(),
             user_id: user_id.into(),
             permissions: permissions.into_iter().collect(),
+            business_tax_id: String::new(),
+            business_legal_name: String::new(),
+            business_address: String::new(),
         }
+    }
+
+    /// Devuelve una copia con la identidad de negocio global rellena (la usa el dispatcher tras leer
+    /// `hub_settings`). Builder para no romper los `new(...)` existentes.
+    pub fn with_business(
+        mut self,
+        tax_id: impl Into<String>,
+        legal_name: impl Into<String>,
+        address: impl Into<String>,
+    ) -> Self {
+        self.business_tax_id = tax_id.into();
+        self.business_legal_name = legal_name.into();
+        self.business_address = address.into();
+        self
     }
 }
 

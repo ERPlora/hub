@@ -13,10 +13,15 @@ import { defineCustomElement as ionModal } from '@ionic/core/components/ion-moda
 import { defineCustomElement as ionActionSheet } from '@ionic/core/components/ion-action-sheet.js';
 import { defineCustomElement as ionToast } from '@ionic/core/components/ion-toast.js';
 import { defineCustomElement as ionAlert } from '@ionic/core/components/ion-alert.js';
+// ok-data-table (vista tarjetas) renderiza ion-card NATIVO de Ionic por dentro.
+import { defineCustomElement as ionCard } from '@ionic/core/components/ion-card.js';
+import { defineCustomElement as ionCardHeader } from '@ionic/core/components/ion-card-header.js';
+import { defineCustomElement as ionCardContent } from '@ionic/core/components/ion-card-content.js';
 
 export function registerOutfitkitIonicDeps(): void {
   [
     ionButton, ionIcon, ionInput, ionSearchbar, ionSelect, ionSelectOption,
     ionModal, ionActionSheet, ionToast, ionAlert,
+    ionCard, ionCardHeader, ionCardContent,
   ].forEach((def) => def());
 }

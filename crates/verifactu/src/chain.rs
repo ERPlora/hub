@@ -77,11 +77,35 @@ fn sha256_upper(input: &str) -> String {
     format!("{:X}", hasher.finalize())
 }
 
-/// URL de verificación del QR AEAT (WASM-TODO.md §4). Solo el string; el render
-/// PNG/data-URI es capacidad de host (issue verifactu#8).
-pub fn qr_url(issuer_nif: &str, invoice_number: &str, invoice_date_iso: &str, total: f64) -> String {
+/// Una huella VeriFactu válida es **64 caracteres hex** (SHA-256). Se usa al importar/recuperar
+/// un hash de otra aplicación o de la AEAT (`recover_manual`) — no aceptar basura como ancla.
+pub fn is_valid_hash(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Normaliza una huella importada a la forma canónica del módulo (hex en MAYÚSCULAS).
+pub fn normalize_hash(s: &str) -> String {
+    s.trim().to_ascii_uppercase()
+}
+
+/// URL de verificación del QR AEAT (WASM-TODO.md §4). El **host depende del entorno** (igual que el
+/// Cloud, `verifactu_qr.py`): `production` → www2.agenciatributaria.gob.es; testing → prewww2.aeat.es.
+/// Un QR de pruebas con el host de producción NO validaría. Solo el string; el render lo hace la UI
+/// (`ok-qr`, JS puro CSP-safe).
+pub fn qr_url(
+    issuer_nif: &str,
+    invoice_number: &str,
+    invoice_date_iso: &str,
+    total: f64,
+    environment: &str,
+) -> String {
+    let host = if environment == "production" {
+        "https://www2.agenciatributaria.gob.es"
+    } else {
+        "https://prewww2.aeat.es"
+    };
     format!(
-        "https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?nif={}&numserie={}&fecha={}&importe={}",
+        "{host}/wlpl/TIKE-CONT/ValidarQR?nif={}&numserie={}&fecha={}&importe={}",
         url_encode(issuer_nif),
         url_encode(invoice_number),
         url_encode(&format_date(invoice_date_iso)),

@@ -60,7 +60,7 @@
                 <ion-input
                   v-model="emailVal"
                   :label="t('login.emailLabel')"
-                  label-placement="stacked"
+                  label-placement="floating"
                   type="email"
                   autocomplete="username"
                   fill="outline"
@@ -70,7 +70,7 @@
                 <ion-input
                   v-model="passwordVal"
                   :label="t('login.passwordLabel')"
-                  label-placement="stacked"
+                  label-placement="floating"
                   type="password"
                   autocomplete="current-password"
                   fill="outline"
@@ -401,7 +401,9 @@ async function submitEmail(): Promise<void> {
       id: result.user.id,
       name: result.user.name,
       email: result.user.email,
-      avatarUrl: result.user.avatarUrl ?? null
+      avatarUrl: result.user.avatarUrl ?? null,
+      // Rol LOCAL resuelto por el runtime (autoridad de permisos, §2.9) → gatea la UI admin.
+      role: sess.user.role
     });
 
     // Si el usuario eligió "Confiar en este dispositivo", registramos el usuario localmente y
@@ -501,7 +503,8 @@ async function checkPin(pin: string): Promise<void> {
     const u = pinUser.value;
     const sess = await runtimePinLogin(u.name, pin);
     setHubSession(sess.token);
-    setUser({ id: u.id, name: u.name, email: u.email ?? '' });
+    // Rol LOCAL del runtime (mismo que el gate del backend) → gatea la UI admin (pestaña API keys).
+    setUser({ id: u.id, name: u.name, email: u.email ?? '', role: sess.user.role });
     const redirect = (router.currentRoute.value.query.redirect as string) || '/';
     await router.replace(redirect);
   } catch {

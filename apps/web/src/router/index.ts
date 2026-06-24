@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from '@ionic/vue-router';
 import type { RouteRecordRaw } from 'vue-router';
 import { isAuthed } from '../lib/session';
 import { isModuleEntitled, needsActivation } from '../lib/entitlement';
+import { apiDocsEnabled } from '../lib/api-docs';
 
 // Rutas del Hub (port de HubShell.tsx). Cada vista es un SFC Vue cargado de forma diferida.
 // `/m/:moduleId` monta el Web Component (Lit) del módulo en runtime (ModuleView).
@@ -17,6 +18,10 @@ const routes: RouteRecordRaw[] = [
   { path: '/marketplace', name: 'marketplace', component: () => import('../views/MarketplacePage.vue'), meta: { auth: true } },
   { path: '/system', name: 'system', component: () => import('../views/SystemPage.vue'), meta: { auth: true } },
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsPage.vue'), meta: { auth: true } },
+  // Documentación de la API pública (ADR-0057 §4): vista Vue interna que renderiza Swagger sobre el
+  // spec del runtime. Visible a cualquier usuario logueado; la entrada de menú/página la habilita
+  // el toggle de Ajustes (apiDocsEnabled). Acceso por URL directa también gateado abajo.
+  { path: '/api-docs', name: 'api-docs', component: () => import('../views/ApiDocsPage.vue'), meta: { auth: true } },
   // `:navId?` = pestaña del tabbar secundario (entrada de `navigation[]` del manifest);
   // sin él, ModuleView abre la primera. Deep-link: /m/inventory/products.
   { path: '/m/:moduleId/:navId?', name: 'module', component: () => import('../views/ModuleView.vue'), meta: { auth: true } },
@@ -47,6 +52,10 @@ router.beforeEach((to) => {
   }
   // Un módulo concreto solo se monta si el hub tiene derecho (acceso por URL directa).
   if (to.name === 'module' && !isModuleEntitled(String(to.params.moduleId))) {
+    return { name: 'dashboard' };
+  }
+  // La doc de la API solo es navegable con el toggle de Ajustes activo (también por URL directa).
+  if (to.name === 'api-docs' && !apiDocsEnabled.value) {
     return { name: 'dashboard' };
   }
   return true;

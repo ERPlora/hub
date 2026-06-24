@@ -45,6 +45,12 @@
         csv-name="roles"
         column-picker
       ></ok-data-table>
+
+      <!-- API keys: credenciales de máquina del Hub (ADR-0057), gestionadas junto a los usuarios.
+           Panel propio (lista + crear + rotar + revocar); v-show conserva su estado al cambiar de
+           pestaña, igual que las tablas de arriba. Solo owner/admin (mismo gate que el backend):
+           si no es admin, ni se monta el panel. -->
+      <ApiKeysPanel v-if="isAdmin" v-show="tab === 'apikeys'" />
     </div>
     <!-- Tabs en footer (staff / usuarios / roles) -->
     <template #footer>
@@ -66,6 +72,12 @@
             <HubIcon name="shield-checkmark-outline" />
             <ion-label>{{ t('employees.tabRoles') }}</ion-label>
           </ion-segment-button>
+          <!-- API keys: solo owner/admin (gestión de credenciales del Hub). El backend exige el
+               mismo rol en cada endpoint; aquí ocultamos la pestaña a quien no pueda gestionarlas. -->
+          <ion-segment-button v-if="isAdmin" value="apikeys">
+            <HubIcon name="keypad-outline" />
+            <ion-label>{{ t('employees.tabApiKeys') }}</ion-label>
+          </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
       </ion-footer>
@@ -74,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -83,7 +95,10 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import ApiKeysPanel from './ApiKeysPanel.vue';
 import { DT_LABELS_ES } from '../lib/data-table-labels';
+// `isAdmin` (owner/admin) gatea la pestaña «API keys» — mismo criterio que el backend.
+import { isAdmin } from '../lib/session';
 
 const { t } = useI18n();
 
@@ -101,10 +116,16 @@ interface DataTableColumn {
 interface DataTableAction { id: string; label: string; icon?: string; color?: string }
 interface DataTablePrimaryAction { label: string; icon?: string }
 
-type EmployeeTab = 'staff' | 'users' | 'roles';
+type EmployeeTab = 'staff' | 'users' | 'roles' | 'apikeys';
 
 const router = useRouter();
 const tab = ref<EmployeeTab>('staff');
+
+// Defensa: si el usuario deja de ser admin (logout/cambio de sesión) estando en «API keys»,
+// volvemos a «staff» para no dejar una pestaña vacía seleccionada. La autoridad real es el backend.
+watch(isAdmin, (admin) => {
+  if (!admin && tab.value === 'apikeys') tab.value = 'staff';
+});
 
 const fmtDate = (iso: string): string =>
   new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });

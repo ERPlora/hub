@@ -1,0 +1,33 @@
+{
+  "id": "catalog",
+  "name": "Catalog",
+  "version": "1.0.0",
+  "permissions": ["catalog.read", "catalog.write", "catalog.secret"],
+  "role_permissions": { "admin": ["*"] },
+  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
+  "queries": {
+    "catalog.items.list": {
+      "permission": "catalog.read",
+      "sql": "queries/items_list.sql",
+      "list": { "search": ["name"], "sort": ["name"], "default_sort": "name" },
+      "expose_api": true
+    },
+    "catalog.items.secret": {
+      "permission": "catalog.secret",
+      "sql": "queries/items_list.sql"
+    }
+  },
+  "commands": {
+    "catalog.item.create": {
+      "permission": "catalog.write",
+      "transaction": true,
+      "sql": ["commands/item_create.sql"],
+      "expose_api": true
+    },
+    "catalog.item.purge": {
+      "permission": "catalog.secret",
+      "transaction": true,
+      "sql": ["commands/item_create.sql"]
+    }
+  }
+}

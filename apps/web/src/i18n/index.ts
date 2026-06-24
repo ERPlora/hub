@@ -39,17 +39,22 @@ export const availableLocales: { code: string; name: string }[] = Object.entries
   }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
-function detectLocale(): Locale {
+/** ¿Hay un override de idioma PERSONAL del usuario (escrito por él en localStorage)? */
+function userOverride(): Locale | null {
   try {
     const saved = localStorage.getItem(LS_KEY);
-    if (saved && messages[saved]) return saved;
+    return saved && messages[saved] ? saved : null;
   } catch {
-    /* noop */
+    return null;
   }
-  // El producto arranca en español. Solo el ajuste explícito del usuario (SettingsPage →
-  // setLocale) cambia el idioma; el idioma del navegador NO se usa como fallback porque el
-  // Hub está localizado en ES y mostrar otro idioma por defecto rompe la UX.
-  return DEFAULT;
+}
+
+function detectLocale(): Locale {
+  // El override personal del usuario (si lo puso) manda en el primer render. Si no, arranca en el
+  // DEFAULT (español); el idioma DEFAULT del HUB se reconcilia luego en el boot vía bootHubLanguage()
+  // cuando el runtime ya respondió (/api/hub/context). El idioma del navegador NO se usa como
+  // fallback: el Hub está localizado en ES y mostrar otro idioma por defecto rompe la UX.
+  return userOverride() ?? DEFAULT;
 }
 
 export const i18n = createI18n({
@@ -81,4 +86,33 @@ export function setLocale(locale: Locale): void {
  *  `?locale=` — ADR-0055). En componentes Vue usa `useI18n().locale`. */
 export function getLocale(): Locale {
   return i18n.global.locale.value;
+}
+
+/** ¿El usuario tiene un override de idioma PERSONAL? (true = ignora el default del hub). */
+export function hasUserLocaleOverride(): boolean {
+  return userOverride() != null;
+}
+
+/**
+ * Reconciliación idioma DEFAULT-del-hub ↔ override-del-usuario (decisión del humano):
+ *   locale efectivo = override del usuario (localStorage) ?? language del hub ?? 'es'.
+ *
+ * Aplica el idioma DEFAULT del hub (de /api/hub/context o /api/settings) en caliente SOLO si el
+ * usuario NO tiene override personal. NO escribe en localStorage: así sigue siendo el "default del
+ * hub" y no se confunde con una elección del usuario (si el usuario luego elige idioma, ese SÍ se
+ * persiste vía setLocale y prevalece en el próximo arranque).
+ *
+ * Idempotente y no destructivo: idioma desconocido / igual al activo → no-op.
+ */
+export function bootHubLanguage(hubDefault: string | null | undefined): void {
+  if (hasUserLocaleOverride()) return; // el override personal manda
+  if (!hubDefault || !messages[hubDefault]) return; // sin default válido del hub → deja 'es'
+  if (i18n.global.locale.value === hubDefault) return;
+  i18n.global.locale.value = hubDefault;
+  // Notifica el cambio a los Web Components de módulo montados (ADR-0055), igual que setLocale.
+  try {
+    window.dispatchEvent(new CustomEvent('erplora:locale-changed', { detail: { locale: hubDefault } }));
+  } catch {
+    /* noop */
+  }
 }

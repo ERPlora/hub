@@ -41,6 +41,36 @@ pub fn session_token(headers: &HeaderMap) -> Option<String> {
     header(headers, "x-hub-session")
 }
 
+/// Bearer `erpl_live_<id>_<secret>` de una **API key** (`Authorization: Bearer …`), si viene y
+/// tiene el prefijo de API key. Distinto del JWT de usuario (que también va en `Authorization:
+/// Bearer` pero NO empieza por `erpl_live_`): así un endpoint sabe qué tipo de bearer le llega.
+pub fn api_key_token(headers: &HeaderMap) -> Option<String> {
+    bearer(headers).filter(|t| t.starts_with(erplora_runtime::api_keys::TOKEN_PREFIX))
+}
+
+/// **Tercer camino de auth** (ADR-0057, public-api.md §6): resuelve una **API key** a su
+/// `RequestContext { hub_id, user_id="apikey:<id>", permissions }` — el MISMO contexto que ya
+/// consume el dispatcher. Verifica el bearer `erpl_live_…` contra `hub_api_key` (secret argon2id +
+/// status='active'), actualiza `last_used_at` y expande el scope a permisos contra el Registry.
+/// El `hub_id` viene del despliegue (config, no spoofable), igual que en `Session`.
+///
+/// `Err(MissingSession)` si no hay un bearer de API key en la petición; `Err(Invalid)` si lo hay
+/// pero no resuelve (token mal formado, key inexistente, revocada o secreto incorrecto) — el
+/// handler lo mapea a 401. Es independiente del `auth_mode` (Dev/Session): la API pública se
+/// autentica SIEMPRE por la key, no por cabeceras de dev ni por sesión local.
+pub async fn api_key_context(
+    headers: &HeaderMap,
+    config: &HubConfig,
+    rt: &Runtime,
+) -> Result<RequestContext, AuthError> {
+    let token = api_key_token(headers).ok_or(AuthError::MissingSession)?;
+    let _ = config; // hub_id lo aporta el runtime (despliegue); aquí solo documentamos el plano.
+    rt.resolve_api_key(&token)
+        .await
+        .map_err(|e| AuthError::Invalid(e.to_string()))?
+        .ok_or_else(|| AuthError::Invalid("API key inválida o revocada".into()))
+}
+
 /// Autentica la petición y construye el `RequestContext` según el modo configurado.
 /// - `Dev`: confía en cabeceras (`X-User-Id`/`X-Permissions`).
 /// - `Session`: resuelve la sesión server-side → `hub_user` → permisos del rol (autoridad local).
@@ -49,6 +79,13 @@ pub async fn authenticate(
     config: &HubConfig,
     rt: &Runtime,
 ) -> Result<RequestContext, AuthError> {
+    // **Tercer camino** (ADR-0057): una petición con bearer de API key (`erpl_live_…`) se resuelve
+    // SIEMPRE como API key, sea cual sea el `auth_mode`. Va primero porque su contexto (permisos =
+    // scope expandido) es independiente de Dev/Session. Si el bearer no es de API key, sigue el
+    // flujo normal de abajo (sesión / cabeceras dev).
+    if api_key_token(headers).is_some() {
+        return api_key_context(headers, config, rt).await;
+    }
     match config.auth_mode {
         AuthMode::Dev => Ok(context_from_headers(headers)),
         AuthMode::Session => {
@@ -63,6 +100,88 @@ pub async fn authenticate(
             Ok(RequestContext::new(config.hub_id.clone(), user.id, perms))
         }
     }
+}
+
+/// Resuelve una **sesión de usuario válida** (interna), SIN exigir rol admin (ADR-0057 §4 refinado,
+/// 2026-06-24): la usa el OpenAPI interno (`GET /api/v1/openapi.json`). Ver la doc del spec es
+/// inofensivo (usarlo exige una API key con permiso, no la sesión); por eso cualquier usuario
+/// logueado puede verlo, pero el anónimo no, y **el principal API-key tampoco** (un holder de key no
+/// saca el spec interno completo por aquí — ese es el caso "integraciones" futuro, fuera de alcance).
+///
+/// - **API key** (`Authorization: Bearer erpl_live_…`): **rechaza** (`Err`). Aunque resolviese a un
+///   contexto válido, esta puerta es para usuarios humanos logueados, no para el principal de máquina.
+/// - **Dev**: concede (el modo dev ya confía en el frontend; sin sesión que resolver).
+/// - **Session**: exige `X-Hub-Session` válido → `hub_user` (cualquier rol). Anónimo → `Err`.
+pub async fn require_user_session(
+    headers: &HeaderMap,
+    config: &HubConfig,
+    rt: &Runtime,
+) -> Result<RequestContext, AuthError> {
+    // Un bearer de API key NO da acceso al spec interno: se rechaza explícitamente.
+    if api_key_token(headers).is_some() {
+        return Err(AuthError::Invalid(
+            "el spec interno requiere una sesión de usuario, no una API key".into(),
+        ));
+    }
+    match config.auth_mode {
+        AuthMode::Dev => Ok(context_from_headers(headers)),
+        AuthMode::Session => {
+            let token = session_token(headers).ok_or(AuthError::MissingSession)?;
+            let user = rt
+                .resolve_session(&token)
+                .await
+                .map_err(|e| AuthError::Invalid(e.to_string()))?
+                .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
+            let perms = rt.permissions_for_role(&user.role);
+            Ok(RequestContext::new(config.hub_id.clone(), user.id, perms))
+        }
+    }
+}
+
+/// Resuelve la **sesión admin** (owner/admin) que gestiona las API keys (ADR-0057 §6/§7): las
+/// rutas de gestión de keys NO se autentican con una API key, sino con la **sesión local** del
+/// admin (`X-Hub-Session`), igual que el resto del dashboard. Devuelve el `HubUser` si la sesión es
+/// válida **y** su rol es owner/admin; si no, `Err`.
+///
+/// En `AuthMode::Dev` (sin Cloud, sin sesiones) se concede al usuario de dev: el modo dev ya
+/// confía en el frontend (`X-Permissions=*` por defecto), así que no tiene sentido un gate de rol
+/// más estricto que el resto de endpoints en ese modo.
+pub async fn require_admin_session(
+    headers: &HeaderMap,
+    config: &HubConfig,
+    rt: &Runtime,
+) -> Result<erplora_runtime::identity::HubUser, AuthError> {
+    if config.auth_mode == AuthMode::Dev {
+        // Dev: identidad de cabecera, rol "admin" simbólico (no hay sesión server-side que resolver).
+        let ctx = context_from_headers(headers);
+        return Ok(erplora_runtime::identity::HubUser {
+            id: ctx.user_id,
+            name: "dev".into(),
+            role: "admin".into(),
+            cloud_user_id: None,
+            is_active: true,
+        });
+    }
+    let token = session_token(headers).ok_or(AuthError::MissingSession)?;
+    let user = rt
+        .resolve_session(&token)
+        .await
+        .map_err(|e| AuthError::Invalid(e.to_string()))?
+        .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
+    if is_admin_role(&user.role) {
+        Ok(user)
+    } else {
+        Err(AuthError::Invalid(format!(
+            "se requiere rol owner/admin para gestionar API keys (rol actual: {})",
+            user.role
+        )))
+    }
+}
+
+/// ¿El rol gestiona API keys? owner/admin (insensible a mayúsculas). Conjunto cerrado y conservador
+/// (ADR-0057 §6: "gestionado por owner/admin").
+fn is_admin_role(role: &str) -> bool {
+    matches!(role.to_ascii_lowercase().as_str(), "owner" | "admin")
 }
 
 /// Modo Dev: confía en las cabeceras que pone el frontend (sin verificación). Solo desarrollo.

@@ -22,6 +22,21 @@ pub fn endpoint(environment: &str) -> &'static str {
     }
 }
 
+/// Endpoint SOAP del **servicio de consulta** VERI*FACTU (`ConsultaFactuSistemaFacturacion`)
+/// por entorno. Es un endpoint DISTINTO al de alta (`VerifactuSOAP`): sirve para recuperar de
+/// la AEAT los registros ya presentados de un emisor.
+///
+/// ⚠️ Verificar la ruta exacta contra el WSDL vigente de la AEAT antes de producción (las URLs
+/// de los servicios web pueden cambiar; aquí se sigue el patrón de `endpoint()`).
+pub fn consult_endpoint(environment: &str) -> &'static str {
+    match environment {
+        "production" => {
+            "https://www1.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/ConsultaFactuSistemaFacturacion"
+        }
+        _ => "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/ConsultaFactuSistemaFacturacion",
+    }
+}
+
 /// Escapa texto para XML.
 fn esc(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -67,6 +82,29 @@ fn encadenamiento(record: &Json, prev: Option<&Json>) -> String {
             esc(&s(p, "record_hash")),
         ),
     }
+}
+
+/// Bloque `Destinatarios` (XSD: va tras `DescripcionOperacion` y antes de `Desglose`).
+/// La AEAT lo exige para `TipoFactura` F1/F3/R1-R4 (error 1189 si falta); las facturas
+/// **simplificadas** (F2) van **sin** destinatario. Se emite solo si el registro trae
+/// `recipient_nif` (cliente identificado); si no, devuelve vacío.
+fn destinatarios(record: &Json) -> String {
+    let nif = s(record, "recipient_nif");
+    if nif.is_empty() {
+        return String::new();
+    }
+    let name = {
+        let n = s(record, "recipient_name");
+        if n.is_empty() { nif.clone() } else { n }
+    };
+    format!(
+        "<sum1:Destinatarios><sum1:IDDestinatario>\
+         <sum1:NombreRazon>{name}</sum1:NombreRazon>\
+         <sum1:NIF>{nif}</sum1:NIF>\
+         </sum1:IDDestinatario></sum1:Destinatarios>",
+        name = esc(&name),
+        nif = esc(&nif),
+    )
 }
 
 /// Bloque `SistemaInformatico` (identificación del software, config del hub).
@@ -128,6 +166,7 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
              <sum1:NombreRazonEmisor>{issuer_name}</sum1:NombreRazonEmisor>\
              <sum1:TipoFactura>{tipo}</sum1:TipoFactura>\
              <sum1:DescripcionOperacion>{desc}</sum1:DescripcionOperacion>\
+             {destinatarios}\
              <sum1:Desglose><sum1:DetalleDesglose>\
              <sum1:Impuesto>01</sum1:Impuesto>\
              <sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
@@ -149,6 +188,7 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
             issuer_name = esc(&s(record, "issuer_name")),
             tipo = esc(&s(record, "invoice_type")),
             desc = esc(&s(record, "description")),
+            destinatarios = destinatarios(record),
             // tax_rate es % (REAL) → se formatea tal cual. Los importes están en CÉNTIMOS
             // (INTEGER, ADR-0007) y la AEAT exige euros con 2 decimales → /100.0 en el límite.
             tax_rate = format_amount(f(record, "tax_rate")),
@@ -182,37 +222,98 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
     )
 }
 
-/// Identidad TLS cliente desde un contenedor PKCS#12: parsea clave + cadena de
-/// certificados (Rust puro, `p12-keystore`) y la entrega a rustls como PEM.
+/// Identidad TLS cliente desde un contenedor PKCS#12. Se **parsea en memoria con OpenSSL**
+/// (acepta los `.p12` BER reales de FNMT/Windows que un parser DER estricto rechaza) y se entrega
+/// a **rustls** como PEM (clave + certificado + cadena). A diferencia de `native-tls`, OpenSSL no
+/// importa la clave al Llavero del SO, así que no aparecen diálogos de autorización en macOS.
 pub fn identity_from_pkcs12(der: &[u8], password: &str) -> Result<reqwest::Identity, VerifactuError> {
-    use base64::Engine as _;
-    let store = p12_keystore::KeyStore::from_pkcs12(der, password)
+    ensure_legacy_provider();
+    let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
         .map_err(|e| VerifactuError::Certificate(format!("PKCS#12 inválido: {e}")))?;
-    let (_alias, chain) = store
-        .private_key_chain()
+    let parsed = pkcs12
+        .parse2(password)
+        .map_err(|e| VerifactuError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    let key = parsed
+        .pkey
         .ok_or_else(|| VerifactuError::Certificate("el PKCS#12 no contiene clave privada".into()))?;
+    let cert = parsed
+        .cert
+        .ok_or_else(|| VerifactuError::Certificate("el PKCS#12 no contiene certificado".into()))?;
 
-    let b64 = |data: &[u8]| -> String {
-        let raw = base64::engine::general_purpose::STANDARD.encode(data);
-        raw.as_bytes()
-            .chunks(64)
-            .map(|c| std::str::from_utf8(c).unwrap_or_default())
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
-
-    let mut pem = format!(
-        "-----BEGIN PRIVATE KEY-----\n{}\n-----END PRIVATE KEY-----\n",
-        b64(chain.key())
+    let mut pem = key
+        .private_key_to_pem_pkcs8()
+        .map_err(|e| VerifactuError::Certificate(format!("clave privada: {e}")))?;
+    pem.extend_from_slice(
+        &cert.to_pem().map_err(|e| VerifactuError::Certificate(format!("certificado: {e}")))?,
     );
-    for cert in chain.chain() {
-        pem.push_str(&format!(
-            "-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----\n",
-            b64(cert.as_der())
-        ));
+    // Cadena intermedia (si el .p12 la incluye) — la AEAT valida la cadena hasta la raíz FNMT.
+    if let Some(chain) = parsed.ca {
+        for c in chain {
+            if let Ok(b) = c.to_pem() {
+                pem.extend_from_slice(&b);
+            }
+        }
     }
-    reqwest::Identity::from_pem(pem.as_bytes())
+
+    reqwest::Identity::from_pem(&pem)
         .map_err(|e| VerifactuError::Certificate(format!("identidad TLS inválida: {e}")))
+}
+
+/// Carga (una sola vez) el proveedor **`legacy`** de OpenSSL 3 junto al `default`, para poder
+/// descifrar los PKCS#12 con algoritmos PBE antiguos (RC2-40-CBC, 3DES) que usan muchos
+/// certificados reales (FNMT, exportados de Windows). OpenSSL 3 los movió fuera del proveedor por
+/// defecto, así que sin esto fallan con `RC2-40-CBC : unsupported`. El `Provider` se mantiene vivo
+/// durante todo el proceso (lo guarda el `OnceLock`).
+fn ensure_legacy_provider() {
+    use std::sync::OnceLock;
+    static LEGACY: OnceLock<Option<openssl::provider::Provider>> = OnceLock::new();
+    LEGACY.get_or_init(|| openssl::provider::Provider::try_load(None, "legacy", true).ok());
+}
+
+/// Caducidad (notAfter) del certificado de un PKCS#12, como ISO `YYYY-MM-DD`. Reutiliza el provider
+/// legacy para los `.p12` con cifrado antiguo (FNMT/Windows). `Ok(None)` si el contenedor no trae
+/// certificado o la fecha no se puede interpretar.
+pub fn certificate_expiry_iso(der: &[u8], password: &str) -> Result<Option<String>, VerifactuError> {
+    ensure_legacy_provider();
+    let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
+        .map_err(|e| VerifactuError::Certificate(format!("PKCS#12 inválido: {e}")))?;
+    let parsed = pkcs12
+        .parse2(password)
+        .map_err(|e| VerifactuError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    match parsed.cert {
+        // El Display de Asn1Time es "MMM DD HH:MM:SS YYYY GMT" (p.ej. "Jun 10 00:00:00 2028 GMT").
+        Some(cert) => Ok(asn1_time_to_iso(&cert.not_after().to_string())),
+        None => Ok(None),
+    }
+}
+
+/// "Jun 10 00:00:00 2028 GMT" → "2028-06-10". `None` si el formato no casa.
+fn asn1_time_to_iso(s: &str) -> Option<String> {
+    let parts: Vec<&str> = s.split_whitespace().collect();
+    if parts.len() < 4 {
+        return None;
+    }
+    let month = match parts[0] {
+        "Jan" => "01", "Feb" => "02", "Mar" => "03", "Apr" => "04",
+        "May" => "05", "Jun" => "06", "Jul" => "07", "Aug" => "08",
+        "Sep" => "09", "Oct" => "10", "Nov" => "11", "Dec" => "12",
+        _ => return None,
+    };
+    let day = parts[1];
+    let day = if day.len() == 1 { format!("0{day}") } else { day.to_string() };
+    Some(format!("{}-{}-{}", parts[3], month, day))
+}
+
+#[cfg(test)]
+mod expiry_tests {
+    use super::asn1_time_to_iso;
+
+    #[test]
+    fn parses_openssl_asn1_time() {
+        assert_eq!(asn1_time_to_iso("Jun 10 00:00:00 2028 GMT").as_deref(), Some("2028-06-10"));
+        assert_eq!(asn1_time_to_iso("Mar 3 23:59:59 2027 GMT").as_deref(), Some("2027-03-03"));
+        assert_eq!(asn1_time_to_iso("garbage").as_deref(), None);
+    }
 }
 
 /// Respuesta AEAT parseada (subconjunto que persiste el módulo).
@@ -248,6 +349,112 @@ pub fn parse_response(body: &str) -> AeatResponse {
         codigo_error: xml_text(body, "CodigoErrorRegistro"),
         descripcion_error: xml_text(body, "DescripcionErrorRegistro"),
     }
+}
+
+// ── Consulta de registros a la AEAT (ConsultaFactuSistemaFacturacion) ─────────────────────
+
+/// Un registro tal como lo devuelve el servicio de **consulta** de la AEAT.
+/// `invoice_date` llega en formato AEAT (`DD-MM-YYYY`); el caller lo normaliza a ISO.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ConsultRecord {
+    pub issuer_nif: String,
+    pub invoice_number: String,
+    pub invoice_date: String,
+    pub record_hash: String,
+    pub csv: String,
+    pub estado: String,
+}
+
+/// Construye el sobre SOAP de **consulta** para un emisor y periodo (`ejercicio` = año YYYY,
+/// `periodo` = mes MM). ⚠️ Namespaces/elementos según el patrón del servicio de suministro;
+/// verificar contra el WSDL `ConsultaLR.xsd` vigente de la AEAT antes de producción.
+pub fn build_consult_soap(issuer_nif: &str, issuer_name: &str, ejercicio: &str, periodo: &str) -> String {
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+         <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \
+         xmlns:con=\"https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/ConsultaLR.xsd\" \
+         xmlns:sum1=\"https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd\">\
+         <soapenv:Header/><soapenv:Body>\
+         <con:ConsultaFactuSistemaFacturacion>\
+         <con:Cabecera>\
+         <sum1:IDVersion>1.0</sum1:IDVersion>\
+         <sum1:ObligadoEmision>\
+         <sum1:NombreRazon>{name}</sum1:NombreRazon>\
+         <sum1:NIF>{nif}</sum1:NIF>\
+         </sum1:ObligadoEmision>\
+         </con:Cabecera>\
+         <con:FiltroConsulta>\
+         <con:PeriodoImputacion>\
+         <sum1:Ejercicio>{ejercicio}</sum1:Ejercicio>\
+         <sum1:Periodo>{periodo}</sum1:Periodo>\
+         </con:PeriodoImputacion>\
+         </con:FiltroConsulta>\
+         </con:ConsultaFactuSistemaFacturacion>\
+         </soapenv:Body></soapenv:Envelope>",
+        name = esc(issuer_name),
+        nif = esc(issuer_nif),
+        ejercicio = esc(ejercicio),
+        periodo = esc(periodo),
+    )
+}
+
+/// Texto de todas las apariciones del elemento con **nombre local** `tag` (ignora el prefijo de
+/// namespace) en orden de documento. Reconoce SOLO etiquetas de apertura (las de cierre `</…>`
+/// se saltan); sin dependencia XML completa, como `xml_text`.
+fn xml_all(body: &str, tag: &str) -> Vec<String> {
+    let bytes = body.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while let Some(rel) = body[i..].find('<') {
+        let lt = i + rel;
+        // Etiqueta de cierre `</…>` → no es apertura.
+        if bytes.get(lt + 1) == Some(&b'/') {
+            i = lt + 1;
+            continue;
+        }
+        let after = &body[lt + 1..];
+        let name_end = after.find(['>', ' ', '/', '\t', '\n']).unwrap_or(after.len());
+        let raw_name = &after[..name_end];
+        let local = raw_name.rsplit(':').next().unwrap_or(raw_name);
+        if local == tag {
+            if let Some(gt) = after.find('>') {
+                let val_start = lt + 1 + gt + 1;
+                if let Some(j) = body[val_start..].find('<') {
+                    out.push(body[val_start..val_start + j].trim().to_string());
+                    i = val_start + j;
+                    continue;
+                }
+            }
+        }
+        i = lt + 1;
+    }
+    out
+}
+
+/// Parsea la respuesta de consulta en una lista de registros. Best-effort: alinea por posición
+/// los campos presentes una vez por registro (`NumSerieFactura`/`Huella`/…). El caller ordena y
+/// recorta a los últimos N. Verificar nombres de elementos contra el WSDL de la AEAT.
+pub fn parse_consult_response(body: &str) -> Vec<ConsultRecord> {
+    let nifs = xml_all(body, "IDEmisorFactura");
+    let nums = xml_all(body, "NumSerieFactura");
+    let dates = xml_all(body, "FechaExpedicionFactura");
+    let huellas = xml_all(body, "Huella");
+    let csvs = xml_all(body, "CSV");
+    let estados = {
+        let e = xml_all(body, "EstadoRegistro");
+        if e.is_empty() { xml_all(body, "EstadoRegistroFactura") } else { e }
+    };
+    let n = nums.len().max(huellas.len());
+    (0..n)
+        .map(|i| ConsultRecord {
+            issuer_nif: nifs.get(i).cloned().unwrap_or_default(),
+            invoice_number: nums.get(i).cloned().unwrap_or_default(),
+            invoice_date: dates.get(i).cloned().unwrap_or_default(),
+            record_hash: huellas.get(i).cloned().unwrap_or_default(),
+            csv: csvs.get(i).cloned().unwrap_or_default(),
+            estado: estados.get(i).cloned().unwrap_or_default(),
+        })
+        .collect()
 }
 
 /// POST TLS-mutua del sobre SOAP al endpoint AEAT. Devuelve el cuerpo de la respuesta

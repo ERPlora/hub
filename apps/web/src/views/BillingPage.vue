@@ -1,155 +1,49 @@
 <template>
   <AppPage :title="t('nav.billing')">
-      <!-- Facturas -->
-      <template v-if="tab === 'invoices'">
-        <h2 class="text-lg font-semibold mb-3">{{ t('billing.invoices') }}</h2>
+    <!-- Facturas -->
+    <div v-show="tab === 'invoices'" class="fill">
+      <div v-if="loadingInvoices" class="flex justify-center py-10">
+        <ion-spinner name="dots" />
+      </div>
+      <!-- `fill` fija el alto al área de ion-content (cabecera/pager fijos, scroll solo en el
+           cuerpo) — mismo patrón que MarketplacePage/EmployeesPage. -->
+      <ok-data-table
+        v-show="!loadingInvoices"
+        ref="invoicesTable"
+        fill
+        :columns="invoiceColumns"
+        :rows="invoices"
+        :views="['table', 'cards']"
+        :searchKeys="['number']"
+        :actions="invoiceActions"
+        page-size="10"
+        column-picker
+      ></ok-data-table>
+    </div>
 
-        <div v-if="loadingInvoices" class="flex justify-center py-10">
-          <ion-spinner name="dots" />
-        </div>
+    <!-- Suscripciones -->
+    <div v-show="tab === 'subscriptions'" class="fill">
+      <div v-if="loadingSubs" class="flex justify-center py-10">
+        <ion-spinner name="dots" />
+      </div>
+      <ok-data-table
+        v-show="!loadingSubs"
+        ref="subsTable"
+        fill
+        :columns="subColumns"
+        :rows="subscriptions"
+        :views="['table', 'cards']"
+        :searchKeys="['planName']"
+        page-size="10"
+        column-picker
+      ></ok-data-table>
+    </div>
 
-        <template v-else-if="invoices.length > 0">
-          <!-- Tabla (pantallas medianas+) -->
-          <div class="hidden sm:block overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-[color:var(--ion-border-color)]">
-                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colInvoice') }}</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colDate') }}</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colDueDate') }}</th>
-                  <th class="text-right py-2 px-3 font-medium opacity-60">{{ t('billing.colAmount') }}</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colStatus') }}</th>
-                  <th class="py-2 px-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="inv in invoices"
-                  :key="inv.id"
-                  class="border-b border-[color:var(--ion-border-color)] last:border-0"
-                >
-                  <td class="py-2 px-3">{{ inv.number }}</td>
-                  <td class="py-2 px-3">{{ fmtDate(inv.issueDate) }}</td>
-                  <td class="py-2 px-3">{{ fmtDate(inv.dueDate) }}</td>
-                  <td class="py-2 px-3 text-right font-medium">{{ fmtMoney(inv.total, inv.currency) }}</td>
-                  <td class="py-2 px-3">
-                    <ion-badge :color="statusColor(inv.status)">{{ statusLabel(inv.status) }}</ion-badge>
-                  </td>
-                  <td class="py-2 px-3 text-right">
-                    <ion-button fill="clear" size="small" :aria-label="t('billing.downloadInvoiceAria', { number: inv.number })" @click="downloadInvoice(inv.id)">
-                      <HubIcon slot="icon-only" name="download-outline" />
-                    </ion-button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+    <!-- Pagos -->
+    <div v-show="tab === 'payments'" class="flex items-center justify-center py-16 text-center opacity-60">
+      <p>{{ t('billing.paymentsPortalNotice') }}</p>
+    </div>
 
-          <!-- Tarjetas (móvil) -->
-          <div class="flex flex-col gap-3 sm:hidden">
-            <ion-card v-for="inv in invoices" :key="inv.id">
-              <ion-card-header>
-                <ion-card-title class="flex items-center gap-2 text-base">
-                  <HubIcon name="document-text-outline" class="text-[color:var(--ion-color-medium)]" />
-                  {{ inv.number }}
-                </ion-card-title>
-              </ion-card-header>
-              <ion-card-content>
-                <div class="flex items-center justify-between mb-2">
-                  <span class="font-semibold">{{ fmtMoney(inv.total, inv.currency) }}</span>
-                  <ion-badge :color="statusColor(inv.status)">{{ statusLabel(inv.status) }}</ion-badge>
-                </div>
-                <p class="text-xs opacity-60">
-                  {{ t('billing.issuedOn', { date: fmtDate(inv.issueDate) }) }} · {{ t('billing.duesOn', { date: fmtDate(inv.dueDate) }) }}
-                </p>
-                <ion-button fill="clear" size="small" class="mt-2 -ml-2" @click="downloadInvoice(inv.id)">
-                  <HubIcon slot="start" name="download-outline" />
-                  {{ t('billing.download') }}
-                </ion-button>
-              </ion-card-content>
-            </ion-card>
-          </div>
-        </template>
-
-        <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
-          <HubIcon name="receipt-outline" style="font-size: 2.5rem;" />
-          <p>{{ t('billing.noInvoices') }}</p>
-        </div>
-      </template>
-
-      <!-- Suscripciones -->
-      <template v-else-if="tab === 'subscriptions'">
-        <h2 class="text-lg font-semibold mb-3">{{ t('billing.subscriptions') }}</h2>
-
-        <div v-if="loadingSubs" class="flex justify-center py-10">
-          <ion-spinner name="dots" />
-        </div>
-
-        <template v-else-if="subscriptions.length > 0">
-          <!-- Tabla (pantallas medianas+) -->
-          <div class="hidden sm:block overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-[color:var(--ion-border-color)]">
-                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colSubscription') }}</th>
-                  <th class="text-right py-2 px-3 font-medium opacity-60">{{ t('billing.colPrice') }}</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colRenews') }}</th>
-                  <th class="text-left py-2 px-3 font-medium opacity-60">{{ t('billing.colStatus') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="sub in subscriptions"
-                  :key="sub.id"
-                  class="border-b border-[color:var(--ion-border-color)] last:border-0"
-                >
-                  <td class="py-2 px-3">{{ sub.planName }}</td>
-                  <td class="py-2 px-3 text-right font-medium">
-                    {{ fmtMoney(sub.planPrice, 'EUR') }}/{{ sub.billingCycle || t('billing.month') }}
-                  </td>
-                  <td class="py-2 px-3">{{ fmtDate(sub.currentPeriodEnd ?? '') }}</td>
-                  <td class="py-2 px-3">
-                    <ion-badge :color="statusColor(sub.status)">{{ statusLabel(sub.status) }}</ion-badge>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Tarjetas (móvil) -->
-          <div class="flex flex-col gap-3 sm:hidden">
-            <ion-card v-for="sub in subscriptions" :key="sub.id">
-              <ion-card-header>
-                <ion-card-title class="flex items-center gap-2 text-base">
-                  <HubIcon name="card-outline" class="text-[color:var(--ion-color-medium)]" />
-                  {{ sub.planName }}
-                </ion-card-title>
-              </ion-card-header>
-              <ion-card-content>
-                <p class="font-semibold mb-1">
-                  {{ fmtMoney(sub.planPrice, 'EUR') }}/{{ sub.billingCycle || t('billing.month') }}
-                </p>
-                <ion-badge :color="statusColor(sub.status)">{{ statusLabel(sub.status) }}</ion-badge>
-                <p v-if="sub.currentPeriodEnd" class="text-xs opacity-60 mt-2">
-                  {{ sub.cancelAtPeriodEnd ? t('billing.ends') : t('billing.renews') }} {{ fmtDate(sub.currentPeriodEnd) }}
-                </p>
-              </ion-card-content>
-            </ion-card>
-          </div>
-        </template>
-
-        <div v-else class="flex flex-col items-center justify-center py-16 gap-2 opacity-50">
-          <HubIcon name="refresh-outline" style="font-size: 2.5rem;" />
-          <p>{{ t('billing.noSubscriptions') }}</p>
-        </div>
-      </template>
-
-      <!-- Pagos -->
-      <template v-else>
-        <div class="flex items-center justify-center py-16 text-center opacity-60">
-          <p>{{ t('billing.paymentsPortalNotice') }}</p>
-        </div>
-      </template>
     <!-- Tabs en footer -->
     <template #footer>
       <ion-footer class="ion-no-border">
@@ -175,15 +69,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
-  IonFooter, IonSegment, IonSegmentButton, IonLabel,  IonBadge,
-  IonButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSpinner
+  IonFooter, IonSegment, IonSegmentButton, IonLabel, IonSpinner
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import { DT_LABELS_ES } from '../lib/data-table-labels';
 
 const { t } = useI18n();
 import {
@@ -191,8 +85,22 @@ import {
   type CloudInvoice, type CloudSubscription
 } from '../lib/cloud';
 import { config } from '../lib/config';
+import { formatAmount } from '../lib/money';
 
 type BillingTab = 'invoices' | 'subscriptions' | 'payments';
+
+// ok-data-table (OutfitKit) está registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
+type Row = Record<string, unknown>;
+interface DataTableColumn {
+  key: string;
+  header: string;
+  align?: 'left' | 'right' | 'center';
+  filterable?: boolean;
+  filterType?: 'text' | 'select' | 'number' | 'date' | 'range' | 'daterange';
+  format?: (row: Row) => string;
+  render?: (row: Row) => Node | string;
+}
+interface DataTableAction { id: string; label: string; icon?: string; color?: string }
 
 const tab = ref<BillingTab>('invoices');
 const invoices = ref<CloudInvoice[]>([]);
@@ -214,8 +122,10 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function fmtMoney(n: number, currency: string): string {
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: currency || 'EUR' }).format(n);
+// Formateo con la moneda DE LA FACTURA (las facturas del Cloud traen su propia divisa); sin divisa
+// explícita cae a la moneda del hub (money.ts). Locale = el activo del shell.
+function fmtMoney(n: number, currency?: string): string {
+  return formatAmount(n, currency ? { currency } : undefined);
 }
 
 // Estado → clave i18n / color Ionic
@@ -240,11 +150,56 @@ function statusLabel(s: CloudInvoice['status']): string {
   return key ? t(key) : s;
 }
 
-function statusColor(s: CloudInvoice['status']): string {
-  return STATUS_COLOR[s] ?? 'medium';
+// Pill de estado: las clases .ion-color-* NO penetran el shadow del data-table, así que el color
+// va por vars inline (heredan al shadow). Mismo recurso que MarketplacePage.badgeCell.
+function statusCell(s: CloudInvoice['status']): Node {
+  const tone = STATUS_COLOR[s] ?? 'medium';
+  const span = document.createElement('span');
+  span.textContent = statusLabel(s);
+  span.style.cssText =
+    'display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;' +
+    `background:rgba(var(--ion-color-${tone}-rgb), 0.14);` +
+    `color:var(--ion-color-${tone}-shade, var(--ion-color-${tone}))`;
+  return span;
 }
 
-// --- Fetch al montar ---
+// Importe en negrita (las facturas se escanean por importe).
+function moneyCell(text: string): Node {
+  const span = document.createElement('span');
+  span.style.fontWeight = '600';
+  span.textContent = text;
+  return span;
+}
+
+// --- Columnas + acciones (computed → recalculan cabeceras/celdas al cambiar de idioma) ---
+const invoiceColumns = computed<DataTableColumn[]>(() => [
+  { key: 'number', header: t('billing.colInvoice') },
+  { key: 'issueDate', header: t('billing.colDate'), format: (r) => fmtDate(String(r.issueDate ?? '')) },
+  { key: 'dueDate', header: t('billing.colDueDate'), format: (r) => fmtDate(String(r.dueDate ?? '')) },
+  { key: 'total', header: t('billing.colAmount'), align: 'right', render: (r) => moneyCell(fmtMoney(Number(r.total), r.currency ? String(r.currency) : undefined)) },
+  { key: 'status', header: t('billing.colStatus'), filterable: true, filterType: 'select', render: (r) => statusCell(r.status as CloudInvoice['status']) },
+]);
+const invoiceActions = computed<DataTableAction[]>(() => [
+  { id: 'download', label: t('billing.download'), icon: 'download-outline' },
+]);
+
+const subColumns = computed<DataTableColumn[]>(() => [
+  { key: 'planName', header: t('billing.colSubscription') },
+  { key: 'planPrice', header: t('billing.colPrice'), align: 'right', format: (r) => `${fmtMoney(Number(r.planPrice), 'EUR')}/${String(r.billingCycle || t('billing.month'))}` },
+  { key: 'currentPeriodEnd', header: t('billing.colRenews'), format: (r) => fmtDate(String(r.currentPeriodEnd ?? '')) },
+  { key: 'status', header: t('billing.colStatus'), filterable: true, filterType: 'select', render: (r) => statusCell(r.status as CloudInvoice['status']) },
+]);
+
+// --- Wiring de la acción de fila (rowAction es camelCase → addEventListener) ---
+const invoicesTable = ref<HTMLElement | null>(null);
+const subsTable = ref<HTMLElement | null>(null);
+
+function handleInvoiceAction(e: Event): void {
+  const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
+  if (actionId === 'download') void downloadInvoice(Number((row as unknown as CloudInvoice).id));
+}
+
+// --- Fetch + labels ES al montar (refs vivos por v-show, aunque la tabla esté oculta) ---
 onMounted(() => {
   cloudInvoices()
     .then((data) => { invoices.value = data; })
@@ -255,6 +210,27 @@ onMounted(() => {
     .then((data) => { subscriptions.value = data; })
     .catch(() => { subscriptions.value = []; })
     .finally(() => { loadingSubs.value = false; });
+
+  // Vista por defecto responsive: tarjetas en móvil (≤768px), tabla en escritorio — recupera el
+  // fallback a tarjetas del listado original. `views` habilita el toggle; `viewMode` es @state
+  // interno del WC (default 'table') sin prop pública, así que lo fijamos por referencia.
+  const initialView = window.matchMedia('(max-width: 768px)').matches ? 'cards' : 'table';
+
+  if (invoicesTable.value) {
+    const el = invoicesTable.value as HTMLElement & { labels: Record<string, string>; viewMode: string };
+    el.labels = { ...DT_LABELS_ES, empty: t('billing.noInvoices') };
+    el.viewMode = initialView;
+    invoicesTable.value.addEventListener('rowAction', handleInvoiceAction);
+  }
+  if (subsTable.value) {
+    const el = subsTable.value as HTMLElement & { labels: Record<string, string>; viewMode: string };
+    el.labels = { ...DT_LABELS_ES, empty: t('billing.noSubscriptions') };
+    el.viewMode = initialView;
+  }
+});
+
+onBeforeUnmount(() => {
+  invoicesTable.value?.removeEventListener('rowAction', handleInvoiceAction);
 });
 
 // --- Descarga PDF de factura (endpoint real del Cloud) ---
@@ -282,3 +258,11 @@ async function downloadInvoice(id: number): Promise<void> {
   }
 }
 </script>
+
+<style scoped>
+/* Fija el alto al área de ion-content (no min-height): las tablas en modo `fill` resuelven su
+   :host{height:100%} contra este contenedor → cabecera + pager fijos y scroll solo en el cuerpo. */
+.fill {
+  height: 100%;
+}
+</style>

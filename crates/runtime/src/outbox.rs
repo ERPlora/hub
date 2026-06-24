@@ -346,6 +346,7 @@ mod tests {
                 handler: None,
                 ai: None,
                 schema: None,
+                expose_api: false,
             },
             sql: vec![sql.to_string()],
             wasm: None,

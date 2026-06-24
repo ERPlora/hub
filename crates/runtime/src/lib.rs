@@ -12,6 +12,7 @@ use std::sync::Arc;
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::Value as Json;
 
+pub mod api_keys;
 pub mod commands;
 pub mod error_registry;
 pub mod errors;
@@ -31,6 +32,7 @@ pub mod queries;
 pub mod registry;
 pub mod scheduler;
 pub mod seed;
+pub mod settings;
 pub mod system_migrations;
 pub mod ui;
 pub mod wasm;
@@ -424,6 +426,60 @@ impl Runtime {
         identity::permissions_for_role(&self.registry, role)
     }
 
+    // ── API pública por módulo: API keys (ADR-0057, public-api.md) ──────────────────────────
+
+    /// Crea una API key para el `hub_id` del despliegue con `scope` (matriz módulo×{r,w}). Devuelve
+    /// el token en claro **una sola vez**. `created_by` = identidad del admin que la crea.
+    pub async fn create_api_key(
+        &self,
+        name: &str,
+        scope: &[api_keys::ScopeEntry],
+        created_by: &str,
+    ) -> Result<api_keys::ApiKeySecret> {
+        api_keys::create(self.db.as_ref(), &self.hub_id, name, scope, created_by).await
+    }
+
+    /// Lista las API keys del hub (sin secreto), recientes primero.
+    pub async fn list_api_keys(&self) -> Result<Vec<api_keys::ApiKeyInfo>> {
+        api_keys::list(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Rota el secreto de una key (nuevo secreto, invalida el anterior). `None` si no existe.
+    pub async fn rotate_api_key(&self, id: &str) -> Result<Option<api_keys::ApiKeySecret>> {
+        api_keys::rotate(self.db.as_ref(), &self.hub_id, id).await
+    }
+
+    /// Revoca una key (kill-switch inmediato). `false` si no existía.
+    pub async fn revoke_api_key(&self, id: &str) -> Result<bool> {
+        api_keys::revoke(self.db.as_ref(), &self.hub_id, id).await
+    }
+
+    /// Verifica un token `erpl_live_…` y lo resuelve al `RequestContext` (con los permisos del
+    /// scope expandido contra el Registry). `None` = token inválido/revocado (el server → 401).
+    pub async fn resolve_api_key(&self, token: &str) -> Result<Option<RequestContext>> {
+        api_keys::verify_and_resolve(self.db.as_ref(), &self.registry, &self.hub_id, token).await
+    }
+
+    // ── Settings del hub (store key/value de sistema, scoped por hub_id) ────────────────────────
+
+    /// Lee TODOS los settings conocidos del hub del despliegue: filas persistidas mezcladas sobre
+    /// los defaults de las claves conocidas (objeto JSON completo). Lectura barata sin gate de rol;
+    /// el server la expone a cualquier sesión de usuario válida.
+    pub async fn get_settings(&self) -> Result<Json> {
+        settings::get_all(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Aplica un mapa parcial de settings (valida cada clave conocida; rechaza desconocidas o
+    /// valores inválidos antes de tocar la BD) y devuelve el objeto completo actualizado. El gate
+    /// de rol (owner/admin) lo aplica el server. `updated_by` audita quién hizo el cambio.
+    pub async fn set_settings(
+        &self,
+        updates: &serde_json::Map<String, Json>,
+        updated_by: &str,
+    ) -> Result<Json> {
+        settings::set_many(self.db.as_ref(), &self.hub_id, updates, updated_by).await
+    }
+
     /// Un ciclo del relay de eventos: entrega los eventos vencidos del outbox a sus listeners.
     /// Lo llama el bucle de background del server. Devuelve cuántas filas tomó (0 = nada vencido).
     pub async fn process_outbox(&self) -> Result<usize> {
@@ -468,5 +524,12 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
     p.insert("current_user_id".into(), Json::String(ctx.user_id.clone()));
     p.insert("now".into(), Json::String(registry::now_rfc3339()));
     p.insert("new_id".into(), Json::String(registry::new_id()));
+    // Identidad de NEGOCIO GLOBAL del hub (fuente única país-agnóstica, hub_settings — ADR-0061) —
+    // disponible como `:business_tax_id`/`:business_legal_name`/`:business_address` en TODO el SQL de
+    // comandos (incl. operaciones de handlers WASM/nativos), para que los módulos resuelvan el emisor
+    // sin que el caller lo pase.
+    p.insert("business_tax_id".into(), Json::String(ctx.business_tax_id.clone()));
+    p.insert("business_legal_name".into(), Json::String(ctx.business_legal_name.clone()));
+    p.insert("business_address".into(), Json::String(ctx.business_address.clone()));
     p
 }

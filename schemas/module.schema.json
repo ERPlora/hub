@@ -70,9 +70,21 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$",
             "description": "Nombre del custom element (Web Component) a montar."
+          },
+          "chrome": {
+            "type": "array",
+            "default": [],
+            "items": { "type": "string", "enum": ["fullscreen"] },
+            "description": "Controles de chrome del shell que esta entrada de navegación pide en la topbar, por nombre (ADR-0048, Nivel 1). El botón y su lógica los pone y maneja el SHELL (no viajan en el módulo) → respeta ADR-0022; el módulo solo opta-in a una capacidad que ya es del shell, no inyecta chrome. Enum CERRADA que crece en el shell: añadir un control nuevo es tocar el shell, no solo el manifest. Hoy soportado: `fullscreen` (Fullscreen API sobre el documento; el botón se muestra solo en la vista que lo pide y solo si el navegador la soporta). El shell lo lee del `module.json` crudo (la API aún no lo re-sirve)."
           }
         }
       }
+    },
+    "provides_slots": {
+      "type": "array",
+      "default": [],
+      "description": "Slots de UI cross-módulo que ESTE módulo rellena en pantallas de OTROS módulos (ADR-0043, tercera vía de composición — de UI). Acoplamiento por NOMBRE de slot (contrato), nunca por import de código; mismo principio que queries/commands/eventos. El `component` lo define el `ui.entry` del propio módulo (viaja en su bundle). El módulo NO declara `depends_on` del host: si el host no expone el slot, el filler simplemente no se monta. El shell lo lee del `module.json` crudo (igual que `navigation`).",
+      "items": { "$ref": "#/$defs/slotProvision" }
     },
     "migrations": {
       "type": "object",
@@ -92,7 +104,12 @@
           "sql": { "type": "string" },
           "schema": { "type": "string" },
           "list": { "$ref": "#/$defs/listSpec" },
-          "ai": { "$ref": "#/$defs/aiTool" }
+          "ai": { "$ref": "#/$defs/aiTool" },
+          "expose_api": {
+            "type": "boolean",
+            "default": false,
+            "description": "Opt-in: expone esta query en la API pública REST/OpenAPI por módulo (ADR-0057, `architecture/hub/public-api.md`). Doble puerta: además de estar marcada, la API key debe tener el `permission` de la query (lectura del módulo). Por defecto false → la query NO es accesible vía API key aunque la key tuviera el permiso. Espejo del flag `external` de los hooks de salida (ADR-0049)."
+          }
         }
       }
     },
@@ -106,6 +123,11 @@
           "transaction": { "type": "boolean", "default": false },
           "sql": { "type": "array", "items": { "type": "string" } },
           "schema": { "type": "string" },
+          "expose_api": {
+            "type": "boolean",
+            "default": false,
+            "description": "Opt-in: expone este command en la API pública REST/OpenAPI por módulo (ADR-0057, `architecture/hub/public-api.md`). Doble puerta: además de estar marcado, la API key debe tener el `permission` del command (escritura del módulo). Por defecto false → el command NO es accesible vía API key aunque la key tuviera el permiso. Espejo del flag `external` de los hooks de salida (ADR-0049)."
+          },
           "handler": {
             "type": "object",
             "required": ["type", "function"],
@@ -133,6 +155,41 @@
             "properties": { "command": { "type": "string" } }
           }
         }
+      }
+    },
+    "widgets": {
+      "type": "object",
+      "description": "Widgets de dashboard que aporta el módulo (ADR-0054). Clave = id COMPLETO namespaced del widget (p. ej. `sales.today`, `inventory.low_stock`), misma convención que `queries`/`commands`. El shell del Hub recolecta los widgets de TODOS los manifests instalados y los pinta en `<ok-widget-board>`. CERO MOCKS: la vía declarativa (`kind`) SIEMPRE se alimenta de una `query` real del módulo. El Hub solo TRANSPORTA este bloque (el shell fetchea el `module.json` crudo, igual que `navigation`/`provides_slots`); el runtime no ejecuta nada por widget.",
+      "default": {},
+      "additionalProperties": { "$ref": "#/$defs/widget" }
+    },
+    "setup": {
+      "type": "object",
+      "description": "Chequeo de CONFIGURACIÓN del módulo (ADR-0063). El shell evalúa, para cada módulo instalado, si está configurado: corre `query` (lectura del módulo), toma la 1ª fila y comprueba `configured_when`; si NO lo está, lo surfacea como alerta (campana + dashboard) con un CTA a `route`. Genérico: el Hub no conoce módulos concretos; cada uno se autodeclara. El Hub solo TRANSPORTA este bloque (lo lee el shell del `module.json` crudo, igual que `widgets`/`navigation`).",
+      "required": ["query", "configured_when", "title", "route"],
+      "additionalProperties": false,
+      "properties": {
+        "query": { "type": "string", "description": "Query namespaced que devuelve el estado de configuración (se evalúa la 1ª fila)." },
+        "params": { "type": "object", "description": "Params estáticos para la query." },
+        "configured_when": {
+          "type": "array",
+          "description": "Configurado ⇔ TODOS estos checks pasan sobre la primera fila (sin fila → no configurado).",
+          "items": {
+            "type": "object",
+            "required": ["field"],
+            "additionalProperties": false,
+            "properties": {
+              "field": { "type": "string", "description": "Columna del resultado a evaluar." },
+              "truthy": { "type": "boolean", "description": "Pasa si el campo es verdadero (no vacío/0/false)." },
+              "equals": { "description": "Pasa si el campo es igual a este valor (comparación laxa)." }
+            }
+          }
+        },
+        "title": { "type": "string", "description": "Título de la alerta (p. ej. \"Configura VeriFactu\")." },
+        "description": { "type": "string", "description": "Texto de ayuda corto." },
+        "icon": { "type": "string", "description": "Icono ionicons para la alerta." },
+        "route": { "type": "string", "description": "Ruta de la pantalla de configuración del módulo." },
+        "permission": { "type": "string", "description": "Permiso para configurarlo (solo se alerta a quien puede)." }
       }
     },
     "network": {
@@ -254,6 +311,77 @@
           }
         },
         "page_size": { "type": "integer", "default": 50, "description": "Tamaño de página por defecto si el llamador no envía `limit`." }
+      }
+    },
+    "widget": {
+      "type": "object",
+      "description": "Un widget de dashboard (ADR-0054). Metadatos (título/icono/categoría/tamaño/permiso) + diferenciación por tipo de negocio (`sectors`+`default`) + EXACTAMENTE UNA vía de render: declarativa (`kind`+`query`+`map`/`options`/`params`) o escape hatch (`component`). El shell construye el `WidgetDef` de `ok-widget-board` y, en la vía `kind`, ejecuta la `query` real (cero mocks) y aplica `options`+`map` sobre el componente OutfitKit del `kind`.",
+      "required": ["title"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "description": "Título mostrado en el board y el selector. OBLIGATORIO." },
+        "icon": { "type": "string", "description": "Nombre de icono ionicons para el selector (p. ej. `trending-up-outline`)." },
+        "category": { "type": "string", "description": "Grupo en el selector (p. ej. `Ventas`, `Inventario`)." },
+        "size": {
+          "type": "string",
+          "enum": ["sm", "md", "lg"],
+          "default": "md",
+          "description": "Tamaño en la rejilla de 12 columnas: sm=3, md=6, lg=8."
+        },
+        "permission": { "type": "string", "description": "Permiso para VER el widget (se filtra en cliente para mostrar/ocultar; la `query` lo revalida server-side)." },
+        "sectors": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["hosteleria", "retail", "gestoria", "rrhh", "general"] },
+          "description": "Tipos de negocio a los que aplica el widget. Ausente/vacío = todos. Alimenta el preset `Recomendado` derivado del sector del hub."
+        },
+        "default": { "type": "boolean", "default": false, "description": "Sugerido ACTIVO en el preset `Recomendado` cuando el sector del hub coincide con `sectors` (o `sectors` está ausente)." },
+        "kind": {
+          "type": "string",
+          "enum": ["kpi", "stat", "sparkline", "bar-list", "timeline", "chart"],
+          "description": "Vía DECLARATIVA: tipo de render → componente OutfitKit que construye el shell. Mutuamente excluyente con `component`. Si está presente, `query` es obligatoria."
+        },
+        "query": { "type": "string", "description": "Query YA declarada del módulo que alimenta el widget (vía declarativa). Nombre completo namespaced." },
+        "params": { "type": "object", "description": "Params estáticos pasados a la `query` (opcional)." },
+        "map": { "type": "object", "description": "Mapeo `propWidget → nombreColumna` del resultado de la query. Props válidas según el `kind` (ver `architecture/hub/dashboard/widgets.md`)." },
+        "options": { "type": "object", "description": "Props LITERALES estáticas del componente (label, icon, format, currency, …). El shell parte de `options` y sobreescribe con lo resuelto por `map`." },
+        "component": { "type": "string", "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$", "description": "Escape hatch: custom element del propio módulo (de su `ui.entry`). Mutuamente excluyente con `kind`. El shell lo carga con la maquinaria de `provides_slots`/`module-loader` y el WC consulta sus datos vía el cliente del Hub." }
+      },
+      "oneOf": [
+        {
+          "title": "Vía declarativa (kind + query)",
+          "required": ["kind", "query"],
+          "not": { "required": ["component"] }
+        },
+        {
+          "title": "Escape hatch (component)",
+          "required": ["component"],
+          "not": { "anyOf": [{ "required": ["kind"] }, { "required": ["query"] }] }
+        }
+      ]
+    },
+    "slotProvision": {
+      "type": "object",
+      "description": "Un slot de UI cross-módulo que el módulo rellena (ADR-0043). Declara QUÉ Web Component monta en un slot namespaced que expone la pantalla de OTRO módulo.",
+      "required": ["slot", "component"],
+      "additionalProperties": false,
+      "properties": {
+        "slot": {
+          "type": "string",
+          "description": "Nombre namespaced del slot del host que se rellena (p. ej. `sales.pos.order_context`, `shell.topbar:<modulo>.<pantalla>`). Contrato por nombre — lo expone la pantalla del host en su código, no su manifest."
+        },
+        "component": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$",
+          "description": "Nombre del custom element (Web Component) del PROPIO módulo (de su `ui.entry`) que se monta en el slot."
+        },
+        "permission": {
+          "type": "string",
+          "description": "Permiso para que el shell muestre el filler (show/hide en cliente; la seguridad real la revalida el runtime al ejecutar queries/commands)."
+        },
+        "priority": {
+          "type": "integer",
+          "description": "Orden cuando varios módulos rellenan el mismo slot (mayor = primero, desc)."
+        }
       }
     },
     "aiTool": {

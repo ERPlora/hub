@@ -194,7 +194,8 @@ fn anulacion_hash_coincide_con_formula_aeat() {
 
 #[test]
 fn qr_url_lleva_parametros_aeat_correctos() {
-    let url = chain::qr_url(NIF, NUM1, FECHA_ISO, 1331.0);
+    // En producción el host es www2.agenciatributaria.gob.es.
+    let url = chain::qr_url(NIF, NUM1, FECHA_ISO, 1331.0, "production");
     assert!(url.starts_with(
         "https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?"
     ));
@@ -209,9 +210,18 @@ fn qr_url_lleva_parametros_aeat_correctos() {
 }
 
 #[test]
+fn qr_url_host_segun_entorno() {
+    // testing → prewww2.aeat.es (un QR de pruebas con el host de producción no validaría).
+    let test = chain::qr_url(NIF, NUM1, FECHA_ISO, 1331.0, "testing");
+    assert!(test.starts_with("https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?"), "{test}");
+    let prod = chain::qr_url(NIF, NUM1, FECHA_ISO, 1331.0, "production");
+    assert!(prod.starts_with("https://www2.agenciatributaria.gob.es/"), "{prod}");
+}
+
+#[test]
 fn qr_importe_en_euros_no_centimos() {
     // El `create_record` pasa total en EUROS al qr_url; confirmamos el formato resultante.
-    let url = chain::qr_url(NIF, NUM1, FECHA_ISO, 23100.0 / 100.0);
+    let url = chain::qr_url(NIF, NUM1, FECHA_ISO, 23100.0 / 100.0, "testing");
     assert!(url.contains("importe=231.00"), "{url}");
 }
 
@@ -319,4 +329,34 @@ fn xml_anulacion_estructura() {
     // La anulación NO lleva importes ni TipoFactura.
     assert!(!xml.contains("<sum1:ImporteTotal>"));
     assert!(!xml.contains("<sum1:TipoFactura>"));
+}
+
+// ── Destinatarios (error AEAT 1189): obligatorio en F1/F3/R1-R4, ausente en simplificadas ──
+
+#[test]
+fn xml_alta_con_destinatario_emite_bloque_destinatarios() {
+    // Una F1 con cliente identificado debe llevar <Destinatarios> (si no, la AEAT da 1189).
+    let hash = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
+    let mut record = record_alta_centimos(&hash);
+    record["recipient_nif"] = json!("B87654321");
+    record["recipient_name"] = json!("Cliente S.L.");
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+
+    assert!(xml.contains("<sum1:Destinatarios><sum1:IDDestinatario>"), "{xml}");
+    assert!(xml.contains("<sum1:NombreRazon>Cliente S.L.</sum1:NombreRazon>"), "{xml}");
+    assert!(xml.contains("<sum1:NIF>B87654321</sum1:NIF>"), "{xml}");
+    // Posición XSD: Destinatarios va ANTES de Desglose.
+    let pos_dest = xml.find("<sum1:Destinatarios>").expect("Destinatarios presente");
+    let pos_desglose = xml.find("<sum1:Desglose>").expect("Desglose presente");
+    assert!(pos_dest < pos_desglose, "Destinatarios debe ir antes de Desglose: {xml}");
+}
+
+#[test]
+fn xml_alta_sin_destinatario_omite_bloque() {
+    // Sin recipient_nif (p.ej. F2 simplificada / ticket de POS) NO se emite Destinatarios.
+    let hash = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
+    let record = record_alta_centimos(&hash); // sin recipient_*
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+
+    assert!(!xml.contains("<sum1:Destinatarios>"), "no debe emitir Destinatarios vacío: {xml}");
 }

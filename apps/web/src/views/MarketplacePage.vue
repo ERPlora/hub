@@ -17,6 +17,7 @@
         :columns="mineColumns"
         :rows="installedRows"
         :views="['cards', 'table']"
+        default-view="cards"
         :searchKeys="['name']"
         :actions="mineActions"
         :search-placeholder="t('marketplace.searchInstalled')"
@@ -32,6 +33,7 @@
         :columns="catalogColumns"
         :rows="filteredModules"
         :views="['cards', 'table']"
+        default-view="cards"
         :searchKeys="['name', 'desc', 'cat']"
         :actions="catalogActions"
         :search-placeholder="t('marketplace.searchCatalog')"
@@ -73,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { inject, ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
@@ -309,23 +311,37 @@ function handleCatalogAction(e: Event): void {
   if (actionId === 'install') void installModule(row as unknown as Mod);
 }
 
+// Cablea una tabla (labels en ES + listener de rowAction). La vista inicial = tarjetas la fija el
+// propio WC vía el atributo `default-view="cards"` (robusto, no depende del ref).
+function wireTable(el: HTMLElement | null, handler: (e: Event) => void): void {
+  if (!el) return;
+  (el as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+  el.addEventListener('rowAction', handler);
+}
+
+// Las tablas viven detrás de `v-else` (loading): al ejecutarse onMounted, loading=true y los refs
+// aún son null, así que cablear ahí no hacía nada (labels en inglés + acciones muertas). Cableamos
+// cuando loading pasa a false y las tablas ya existen, una sola vez (loadCatalog re-togglea loading
+// en cada refresco; el flag evita duplicar listeners).
+let tablesWired = false;
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading || tablesWired) return;
+    void nextTick(() => {
+      if (!mineTable.value && !catalogTable.value) return;
+      wireTable(mineTable.value, handleMineAction);
+      wireTable(catalogTable.value, handleCatalogAction);
+      tablesWired = true;
+    });
+  },
+  { immediate: true },
+);
+
 // --- Fetch + suscripción al evento de instalación al montar ---
 onMounted(() => {
   void loadCatalog();
   void loadInstalled();
-  // Vista por defecto = GRID (tarjetas). `views` (prop) habilita el toggle; `viewMode` es @state
-  // interno del WC (default 'table') sin prop pública, así que lo fijamos por referencia tras
-  // montar. Cast: viewMode no está en el tipo público pero es una propiedad reactiva de Lit.
-  if (mineTable.value) {
-    (mineTable.value as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
-    (mineTable.value as unknown as { viewMode: string }).viewMode = 'cards';
-    mineTable.value.addEventListener('rowAction', handleMineAction);
-  }
-  if (catalogTable.value) {
-    (catalogTable.value as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
-    (catalogTable.value as unknown as { viewMode: string }).viewMode = 'cards';
-    catalogTable.value.addEventListener('rowAction', handleCatalogAction);
-  }
   // Cuando el runtime termina de instalar un módulo, refrescamos catálogo, instalados y nav.
   unsubInstalled = client.on('module.installed', (payload) => {
     const id = (payload as { module_id?: string } | null)?.module_id;

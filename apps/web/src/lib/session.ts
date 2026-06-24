@@ -8,6 +8,14 @@ export interface SessionUser {
   name: string;
   email: string;
   avatarUrl?: string | null;
+  /**
+   * Rol LOCAL del usuario en el hub, tal cual lo devuelve el runtime al hacer login
+   * (`/api/auth/{pin,cloud}` → `user.role`). Es la MISMA fuente que usa el gate del backend; el
+   * frontend solo lo refleja para mostrar/ocultar UI (la autoridad sigue siendo el runtime, que
+   * revalida owner/admin en cada endpoint de gestión de keys). Opcional: las sesiones legacy /
+   * el fallback demo no lo traen.
+   */
+  role?: string | null;
 }
 
 const LS_KEY = 'erplora.session';
@@ -30,6 +38,16 @@ const _user = ref<SessionUser | null>(read());
 
 export const user = computed(() => _user.value);
 export const isAuthed = computed(() => _user.value != null);
+
+/**
+ * ¿El usuario actual gestiona usuarios/keys (owner o admin)? Espejo EXACTO del gate del backend
+ * (`is_admin_role` en `crates/server/src/auth.rs`: owner/admin, insensible a mayúsculas). Solo para
+ * mostrar/ocultar UI admin (pestaña «API keys»); el runtime revalida el rol en cada endpoint.
+ */
+export const isAdmin = computed(() => {
+  const role = _user.value?.role?.toLowerCase();
+  return role === 'owner' || role === 'admin';
+});
 
 export function setUser(u: SessionUser | null): void {
   _user.value = u;

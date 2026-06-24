@@ -17,6 +17,10 @@ import {
   chevronForwardOutline, folderOpenOutline, terminalOutline,
   // Marketplace (ok-data-table): acción activar/desactivar de un módulo instalado.
   powerOutline,
+  // ok-widget-board (DashboardPage): botón ⋮ de "Personalizar panel".
+  ellipsisVertical,
+  // Usuarios → API keys (ok-data-table rowAction): rotar una key (devuelve secreto nuevo).
+  refreshOutline,
 } from 'ionicons/icons';
 
 import App from './App.vue';
@@ -59,6 +63,10 @@ addIcons({
   'terminal-outline': terminalOutline,
   // Marketplace: acción activar/desactivar (ok-data-table rowAction).
   'power-outline': powerOutline,
+  // ok-widget-board: botón ⋮ "Personalizar panel" del dashboard de inicio.
+  'ellipsis-vertical': ellipsisVertical,
+  // Usuarios → API keys (ok-data-table): acción "Rotar" de una key.
+  'refresh-outline': refreshOutline,
 });
 
 // CSS base de Ionic (core + utilidades). Dark mode por clase (.ion-palette-dark).
@@ -82,6 +90,15 @@ import '@erplora/outfitkit/ok-stat';
 import '@erplora/outfitkit/ok-sparkline';
 import '@erplora/outfitkit/ok-status-pill';
 import '@erplora/outfitkit/ok-empty-state';
+// Usuarios → API keys: aviso "el secreto no se volverá a mostrar" en el modal del token.
+import '@erplora/outfitkit/ok-inline-feedback';
+// Dashboard de inicio (DashboardPage): tablero de widgets de módulos (ADR-0054) + los kinds del
+// render genérico que aún no estaban registrados (bar-list, timeline, chart). ok-kpi/ok-stat/
+// ok-sparkline/ok-empty-state ya se importan arriba.
+import '@erplora/outfitkit/ok-widget-board';
+import '@erplora/outfitkit/ok-bar-list';
+import '@erplora/outfitkit/ok-timeline';
+import '@erplora/outfitkit/ok-chart';
 // Gestor de archivos (Drive-like) de la carpeta media del Hub — pantalla /files.
 import '@erplora/outfitkit/ok-file-manager';
 // Login (LoginPage): teclado PIN (con pantalla de círculos + tecla «cambiar usuario») y avatares.

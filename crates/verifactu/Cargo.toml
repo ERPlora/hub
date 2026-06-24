@@ -17,9 +17,17 @@ async-trait = "0.1"
 serde_json = "1"
 sha2 = "0.10"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-# POST TLS-mutua a la AEAT. rustls (sin openssl); la identidad cliente entra como PEM.
+# POST TLS-mutua a la AEAT con **rustls** (sin tocar el Llavero del SO). La identidad cliente
+# entra como PEM (clave + cadena), extraída del PKCS#12 por OpenSSL (abajo).
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
-# Parseo del contenedor PKCS#12 (clave + cadena de certificados) en Rust puro.
-p12-keystore = "0.2"
+# OpenSSL (vendored: compila su propio libcrypto, sin dependencia del sistema) SOLO para PARSEAR
+# el .p12 en memoria: acepta los .p12 BER reales (FNMT/Windows) que un parser DER puro rechaza,
+# y a diferencia de native-tls NO importa la clave al Llavero de macOS (sin popups).
+openssl = { version = "0.10", features = ["vendored"] }
+# base64: decodifica los bytes del .p12 guardados en BD (certificate_pkcs12).
 base64 = "0.22"
 thiserror = "1"
+
+[dev-dependencies]
+# Runtime mínimo para los tests async de los handlers (validate_chain / recover_manual).
+tokio = { version = "1", features = ["macros", "rt"] }

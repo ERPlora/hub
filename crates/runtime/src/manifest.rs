@@ -259,6 +259,12 @@ pub struct QueryDef {
     /// schema se heredan de la propia query, no se redeclaran. ARQUITECTURA.md §9.2.
     #[serde(default)]
     pub ai: Option<AiTool>,
+    /// Opt-in: expone esta query en la **API pública REST/OpenAPI** por módulo (ADR-0057,
+    /// `architecture/hub/public-api.md`). Doble puerta: además de este flag, la API key debe
+    /// tener el `permission` de la query (lectura del módulo). Por defecto `false` → la query no
+    /// es accesible vía API key aunque la key tuviera el permiso. El gate del runtime no cambia.
+    #[serde(default)]
+    pub expose_api: bool,
 }
 
 /// Contrato declarativo de una query de lista (`list` en `module.json`). Espejo de
@@ -338,6 +344,12 @@ pub struct CommandDef {
     /// schema se heredan del propio command, no se redeclaran. ARQUITECTURA.md §9.2.
     #[serde(default)]
     pub ai: Option<AiTool>,
+    /// Opt-in: expone este command en la **API pública REST/OpenAPI** por módulo (ADR-0057,
+    /// `architecture/hub/public-api.md`). Doble puerta: además de este flag, la API key debe
+    /// tener el `permission` del command (escritura del módulo). Por defecto `false` → el command
+    /// no es accesible vía API key aunque la key tuviera el permiso. El gate del runtime no cambia.
+    #[serde(default)]
+    pub expose_api: bool,
 }
 
 /// Referencia al handler de un command. ARQUITECTURA.md §5.3, §9.2.

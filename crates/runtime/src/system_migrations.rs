@@ -97,6 +97,59 @@ CREATE TABLE hub_trusted_device (\
 CREATE TABLE hub_trusted_device (\
   device_id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL);",
     },
+    // ── v3 — ADR-0057 / public-api.md: API keys de la API pública por módulo ─────────────────
+    // Credencial LOCAL del hub (hermana del login por PIN, NO un plano Hub↔Cloud). Un token
+    // bearer opaco `erpl_live_<id>_<secret>`: se guarda solo el `secret_hash` (argon2id, mismo
+    // helper que el PIN, identity.rs) + un `prefix` visible para la UI; el secreto en claro se
+    // muestra UNA sola vez al crear/rotar. `scope_json` = array de {module, read, write} (matriz
+    // módulo × {lectura, escritura}, §7); el runtime lo EXPANDE a los `permission` de las
+    // queries/commands `expose_api` de cada módulo al resolver la key a un RequestContext. Tabla
+    // hub-scoped (`hub_id`) como el resto del esquema: en BD compartida por org cada hub tiene sus
+    // keys. `status` = 'active'|'revoked' (revocar = kill-switch inmediato). `created_by` audita
+    // quién la creó (`apikey:<id>` no, un hub_user/sesión admin). Va versionada (no CREATE IF NOT
+    // EXISTS) para llegar también a una `erplora.db` ya existente.
+    SystemMigration {
+        version: 3,
+        name: "hub_api_key",
+        sqlite: "\
+CREATE TABLE hub_api_key (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
+  secret_hash TEXT NOT NULL, scope_json TEXT NOT NULL DEFAULT '[]', \
+  status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL, \
+  last_used_at TEXT, created_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_hub_api_key_hub ON hub_api_key (hub_id);",
+        postgres: "\
+CREATE TABLE hub_api_key (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
+  secret_hash TEXT NOT NULL, scope_json TEXT NOT NULL DEFAULT '[]', \
+  status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL, \
+  last_used_at TEXT, created_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_hub_api_key_hub ON hub_api_key (hub_id);",
+    },
+    // ── v4 — settings del hub: store key/value de SISTEMA (scoped por hub_id) ───────────────────
+    // Tabla genérica key/value de configuración del hub (moneda, idioma, flag de docs API…). El
+    // CONJUNTO de claves conocidas + su validador + su default vive en el SERVER (`settings.rs`),
+    // NO en la BD: añadir una clave nueva = una entrada en el registro del runtime, sin migración.
+    // PK compuesta `(hub_id, key)`, hub-scoped como el resto del esquema: en BD compartida por org
+    // cada hub tiene sus propios settings. `updated_by` audita quién hizo el último cambio (un
+    // `hub_user:<id>` admin). Va versionada (no CREATE IF NOT EXISTS) para llegar también a una
+    // `erplora.db` ya existente.
+    SystemMigration {
+        version: 4,
+        name: "hub_settings",
+        sqlite: "\
+CREATE TABLE hub_settings (\
+  hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (hub_id, key));",
+        postgres: "\
+CREATE TABLE hub_settings (\
+  hub_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (hub_id, key));",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -219,6 +272,26 @@ mod tests {
         assert!(max_applied_version(&db).await.unwrap() >= 2, "v2 registrada");
 
         // Re-aplicar es idempotente (no re-crea la tabla → no falla por 'table exists').
+        apply(&db, "hub-test").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn apply_creates_hub_settings_table_v4() {
+        use erplora_db::SqliteAdapter;
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        apply(&db, "hub-test").await.unwrap();
+
+        // La tabla `hub_settings` existe (insert/select sin error) y la migración v4 quedó registrada.
+        db.execute_batch(
+            "INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
+             VALUES ('hub-test', 'currency', 'EUR', '2026-01-01T00:00:00Z', 'hub_user:1');",
+        )
+        .await
+        .unwrap();
+        assert!(max_applied_version(&db).await.unwrap() >= 4, "v4 registrada");
+
+        // Re-aplicar es idempotente.
         apply(&db, "hub-test").await.unwrap();
     }
 }

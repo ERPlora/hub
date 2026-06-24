@@ -1,7 +1,7 @@
 // Cliente del Cloud Portal. hub NUNCA habla con LLMs directamente; auth/marketplace/
 // billing van por aquí (ARQUITECTURA.md §2.1–2.3). Si el Cloud no es accesible (sandbox),
 // las llamadas lanzan y la capa de auth degrada a modo demo.
-import { config } from './config';
+import { config, isLocalHub } from './config';
 import { loginHeaders } from './device';
 import { beginRequest, endRequest } from './shell';
 
@@ -84,10 +84,21 @@ function expireSession(): void {
 // + logout → /login; el siguiente login re-registra por `X-Device-Id` (§2.9b). Lo disparan tanto el
 // gate de entitlement (Tauri) como CUALQUIER llamada hub-scoped que reciba un 410 (marketplace, etc.).
 let onHubGone: (() => void) | null = null;
+let warnedHubGoneLocal = false;
 export function setOnHubGone(fn: () => void): void {
   onHubGone = fn;
 }
 export function triggerHubGone(): void {
+  // ADR-0064: un hub LOCAL/dev NO debe autoexpulsarse ante `hub_not_found` (el Cloud no gobierna su
+  // registro). Se degrada a offline (el gate de entitlement queda permisivo) en vez de logout en
+  // bucle, que dejaba al usuario sin shell (sin menú). Solo los hubs CLOUD reales hacen logout.
+  if (isLocalHub()) {
+    if (!warnedHubGoneLocal) {
+      console.warn('[hub] entitlement: hub_not_found en hub local → modo offline (sin logout)');
+      warnedHubGoneLocal = true;
+    }
+    return;
+  }
   onHubGone?.();
 }
 

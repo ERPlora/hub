@@ -25,8 +25,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/module-types
       '@erplora/outfitkit':
-        specifier: ^0.1.9
-        version: 0.1.9
+        specifier: ^0.1.11
+        version: 0.1.11
       '@iconify/vue':
         specifier: ^5.0.1
         version: 5.0.1(vue@3.5.35(typescript@5.9.3))
@@ -42,6 +42,9 @@ importers:
       ionicons:
         specifier: ^8.0.13
         version: 8.0.13
+      swagger-ui-dist:
+        specifier: ^5.17.14
+        version: 5.32.8
       vue:
         specifier: ^3.5.13
         version: 3.5.35(typescript@5.9.3)
@@ -112,8 +115,8 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
-  '@erplora/outfitkit@0.1.9':
-    resolution: {integrity: sha512-O3bj72AqFsApAi0hO1226Gm7+izJHxxZIQildqPVunLPc1Fv3wKhHfHN98m9ISRTDt86gGqLsQ/aYp25OiTERA==}
+  '@erplora/outfitkit@0.1.11':
+    resolution: {integrity: sha512-61fB2uQB+D8GzdnBgB0LSBXtwOE6o73cxHO6S1SkqP7tfHAeP8k53PoPT6BWz6oF1iCr83XQsIy014P027gHww==}
 
   '@esbuild/aix-ppc64@0.24.2':
     resolution: {integrity: sha512-thpVCb/rhxE/BnMLQ7GReQLLN8q9qbHmI55F4489/ByVg2aQaQ6kbcLb6FHkocZzQhxc4gx0sCk0tJkKBFzDhA==}
@@ -648,6 +651,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@scarf/scarf@1.4.0':
+    resolution: {integrity: sha512-xxeapPiUXdZAE3che6f3xogoJPeZgig6omHEy1rIY5WVsB3H2BHNnZH+gHG6x91SCWyQCzWGsuL2Hh3ClO5/qQ==}
+
   '@stencil/core@4.43.5':
     resolution: {integrity: sha512-cgWD+GeuvJpTe1WQn40p02+BJ2j0j1YJ17GdkF2qKIQ23s2e3Zivq5yISXS3dcuV6oUJFN93jprdk+nk/sq99Q==}
     engines: {node: '>=16.0.0', npm: '>=7.10.0'}
@@ -1051,6 +1057,9 @@ packages:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
 
+  swagger-ui-dist@5.32.8:
+    resolution: {integrity: sha512-dgMdWXIgnI4zX4OPhKEdWnlDODbgm8W3AX0Ivn/BBqcUh6xZsBxhZMnvk6DJyRz1BTrj8dPxtarmEGgkz30oyA==}
+
   tailwindcss@4.3.0:
     resolution: {integrity: sha512-y6nxMGB1nMW9R6k96e5gdIFzcfL/gTJRNaqGes1YvkLnPVXzWgbqFF2yLC0T8G774n24cx3Pe8XrKoniCOAH+Q==}
 
@@ -1192,7 +1201,7 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@erplora/outfitkit@0.1.9':
+  '@erplora/outfitkit@0.1.11':
     dependencies:
       lit: 3.3.3
 
@@ -1531,6 +1540,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.60.4':
     optional: true
+
+  '@scarf/scarf@1.4.0': {}
 
   '@stencil/core@4.43.5':
     optionalDependencies:
@@ -1978,6 +1989,10 @@ snapshots:
       fsevents: 2.3.3
 
   source-map-js@1.2.1: {}
+
+  swagger-ui-dist@5.32.8:
+    dependencies:
+      '@scarf/scarf': 1.4.0
 
   tailwindcss@4.3.0: {}
 

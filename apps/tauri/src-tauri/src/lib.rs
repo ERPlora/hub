@@ -573,6 +573,7 @@ fn embedded_serve_config(
             cloud_api_token: None, // la celda compartida es la fuente del token (hot-reload)
             device_trust_enforce: false, // hub#15: gate de login por PIN; el host debe aportar device_id antes de activarlo
             media_dir: cache_dir.join("media"), // ficheros/documentos locales en el app data dir (junto a SQLite y módulos)
+            sector: None, // sector/tipo de negocio (ADR-0054): no cableado en local/Tauri → preset de widgets degrada
         },
         machine_token_cell: Some(machine_token_cell),
     }

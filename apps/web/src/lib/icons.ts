@@ -89,6 +89,8 @@ import contrastOutline from "~icons/ion/contrast-outline?raw";
 import personOutline from "~icons/ion/person-outline?raw";
 import closeOutline from "~icons/ion/close-outline?raw";
 import stopCircleOutline from "~icons/ion/stop-circle-outline?raw";
+import copyOutline from "~icons/ion/copy-outline?raw";
+import codeSlashOutline from "~icons/ion/code-slash-outline?raw";
 
 // `panel-left` (lucide) — NO hay equivalente en el set `ion:`; se hornea a mano para dar paridad
 // exacta con el rail-toggle de Cloud (que usa `lucide:panel-left`). SVG inline = offline/CSP-safe,
@@ -179,6 +181,8 @@ const SVGS: Record<string, string> = {
   "person-outline": personOutline,
   "close-outline": closeOutline,
   "stop-circle-outline": stopCircleOutline,
+  "copy-outline": copyOutline,
+  "code-slash-outline": codeSlashOutline,
   "panel-left": panelLeft,
 };
 

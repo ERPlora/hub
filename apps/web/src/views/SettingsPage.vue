@@ -5,7 +5,8 @@
         <ion-card>
           <ion-card-content class="p-0">
             <ion-list lines="none">
-              <!-- Idioma del sistema -->
+              <!-- Idioma del sistema (PERSONAL del usuario): override local que prevalece sobre el
+                   default del hub. Cambia el shell en caliente y persiste en este dispositivo. -->
               <ion-item>
                 <HubIcon slot="start" name="language-outline" />
                 <ion-label>
@@ -13,11 +14,11 @@
                   <p>{{ t('settings.systemLanguageDesc') }}</p>
                 </ion-label>
                 <ion-select
-                  v-model="hubLang"
+                  v-model="userLang"
                   interface="popover"
                   :aria-label="t('settings.systemLanguage')"
                   slot="end"
-                  @ion-change="onLangChange($event.detail.value as Locale)"
+                  @ion-change="onUserLangChange($event.detail.value as Locale)"
                 >
                   <ion-select-option v-for="l in availableLocales" :key="l.code" :value="l.code">
                     {{ l.name }}
@@ -87,6 +88,60 @@
           </ion-card-content>
         </ion-card>
 
+        <!-- Ajustes GLOBALES del hub (server-side, /api/settings): moneda + idioma DEFAULT + doc API.
+             Solo editables por admin (PUT exige owner/admin); para el resto, valores en solo-lectura. -->
+        <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('settings.hubWide') }}</h2>
+        <ion-card>
+          <ion-card-content class="p-0">
+            <ion-list lines="none">
+              <!-- Moneda del hub (GLOBAL, sin override por usuario). -->
+              <ion-item>
+                <HubIcon slot="start" name="cash-outline" />
+                <ion-label>
+                  <h2>{{ t('settings.currency') }}</h2>
+                  <p>{{ t('settings.currencyDesc') }}</p>
+                </ion-label>
+                <ion-select
+                  v-if="isAdmin"
+                  v-model="hubCurrency"
+                  interface="popover"
+                  :aria-label="t('settings.currency')"
+                  slot="end"
+                  @ion-change="onCurrencyChange($event.detail.value as string)"
+                >
+                  <ion-select-option v-for="c in CURRENCIES" :key="c.code" :value="c.code">
+                    {{ c.code }} · {{ c.name }}
+                  </ion-select-option>
+                </ion-select>
+                <ion-note v-else slot="end">{{ hubCurrency }}</ion-note>
+              </ion-item>
+
+              <!-- Idioma DEFAULT del hub (server). Distinto del idioma PERSONAL de arriba: este es el
+                   que ven los usuarios sin override propio. -->
+              <ion-item>
+                <HubIcon slot="start" name="globe-outline" />
+                <ion-label>
+                  <h2>{{ t('settings.hubLanguage') }}</h2>
+                  <p>{{ t('settings.hubLanguageDesc') }}</p>
+                </ion-label>
+                <ion-select
+                  v-if="isAdmin"
+                  v-model="hubLanguage"
+                  interface="popover"
+                  :aria-label="t('settings.hubLanguage')"
+                  slot="end"
+                  @ion-change="onHubLanguageChange($event.detail.value as Locale)"
+                >
+                  <ion-select-option v-for="l in availableLocales" :key="l.code" :value="l.code">
+                    {{ l.name }}
+                  </ion-select-option>
+                </ion-select>
+                <ion-note v-else slot="end">{{ hubLanguageName }}</ion-note>
+              </ion-item>
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
+
         <ion-button class="mt-3" expand="block" @click="saveHubSettings">
           <HubIcon slot="start" name="save-outline" />
           {{ t('settings.saveSettings') }}
@@ -102,6 +157,27 @@
                 <p>{{ t('settings.showModulesInSidebarDesc') }}</p>
               </ion-label>
               <ion-toggle v-model="showModulesInSidebar" slot="end" />
+            </ion-item>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Mostrar documentación de la API (ADR-0057 §4): setting GLOBAL del hub (server-side) que
+             muestra/oculta la entrada de menú + la página Swagger. Solo lo cambia un admin; la
+             seguridad real es el gate de sesión sobre openapi.json en el runtime. -->
+        <ion-card class="mt-3">
+          <ion-card-content class="p-0">
+            <ion-item lines="none">
+              <HubIcon slot="start" name="code-slash-outline" />
+              <ion-label>
+                <h2>{{ t('settings.showApiDocs') }}</h2>
+                <p>{{ t('settings.showApiDocsDesc') }}</p>
+              </ion-label>
+              <ion-toggle
+                :checked="showApiDocs"
+                :disabled="!isAdmin"
+                @ion-change="onApiDocsToggle($event)"
+                slot="end"
+              />
             </ion-item>
           </ion-card-content>
         </ion-card>
@@ -168,66 +244,48 @@
         </ion-card>
       </template>
 
-      <!-- ── Tab: Tax ── -->
+      <!-- ── Tab: Negocio (identidad fiscal genérica) ── -->
       <template v-else-if="tab === 'tax'">
+        <!-- Identidad de NEGOCIO GLOBAL (fuente única país-agnóstica, ADR-0061): identificador fiscal
+             (NIF/CIF/VAT…) + razón social + dirección. La leen invoice (emisor) y los módulos fiscales
+             por país. Lo específico de país (IVA/IGIC, e-factura) vive en módulos, no aquí. Solo admin. -->
         <ion-card>
-          <ion-card-content class="p-0">
-            <ion-list lines="none">
-              <!-- IVA por defecto -->
-              <ion-item>
-                <HubIcon slot="start" name="wallet-outline" />
-                <ion-label>
-                  <h2>{{ t('settings.defaultVat') }}</h2>
-                  <p>{{ t('settings.defaultVatDesc') }}</p>
-                </ion-label>
-                <ion-select
-                  v-model="taxIva"
-                  interface="popover"
-                  :aria-label="t('settings.defaultVat')"
-                  slot="end"
-                >
-                  <ion-select-option value="21">{{ t('settings.vatGeneral') }}</ion-select-option>
-                  <ion-select-option value="10">{{ t('settings.vatReduced') }}</ion-select-option>
-                  <ion-select-option value="4">{{ t('settings.vatSuperReduced') }}</ion-select-option>
-                </ion-select>
-              </ion-item>
-
-              <!-- Régimen fiscal -->
-              <ion-item>
-                <HubIcon slot="start" name="business-outline" />
-                <ion-label>
-                  <h2>{{ t('settings.taxRegime') }}</h2>
-                  <p>{{ t('settings.taxRegimeDesc') }}</p>
-                </ion-label>
-                <ion-select
-                  v-model="taxRegime"
-                  interface="popover"
-                  :aria-label="t('settings.taxRegime')"
-                  slot="end"
-                >
-                  <ion-select-option value="general">{{ t('settings.regimeGeneral') }}</ion-select-option>
-                  <ion-select-option value="recargo">{{ t('settings.regimeEquivalence') }}</ion-select-option>
-                </ion-select>
-              </ion-item>
-            </ion-list>
+          <ion-card-content>
+            <ion-label>
+              <h2>{{ t('settings.fiscalIdentity') }}</h2>
+              <p>{{ t('settings.fiscalIdentityDesc') }}</p>
+            </ion-label>
+            <ion-input
+              class="mt-2"
+              fill="outline"
+              label-placement="floating"
+              :label="t('settings.fiscalNif')"
+              :readonly="!isAdmin"
+              v-model="businessTaxId"
+              placeholder="B12345678 · FR…"
+            />
+            <ion-input
+              class="mt-2"
+              fill="outline"
+              label-placement="floating"
+              :label="t('settings.fiscalName')"
+              :readonly="!isAdmin"
+              v-model="businessLegalName"
+              placeholder="Mi Empresa SL"
+            />
+            <ion-textarea
+              class="mt-2"
+              fill="outline"
+              label-placement="floating"
+              :label="t('settings.fiscalAddress')"
+              :readonly="!isAdmin"
+              auto-grow
+              v-model="businessAddress"
+            />
           </ion-card-content>
         </ion-card>
 
-        <!-- VeriFactu toggle -->
-        <ion-card class="mt-3">
-          <ion-card-content class="p-0">
-            <ion-item lines="none">
-              <HubIcon slot="start" name="ticket-outline" />
-              <ion-label>
-                <h2>VeriFactu</h2>
-                <p>{{ t('settings.verifactuDesc') }}</p>
-              </ion-label>
-              <ion-toggle v-model="taxVerifactu" slot="end" />
-            </ion-item>
-          </ion-card-content>
-        </ion-card>
-
-        <ion-button class="mt-3" expand="block" @click="saveTaxSettings">
+        <ion-button v-if="isAdmin" class="mt-3" expand="block" @click="saveTaxSettings">
           <HubIcon slot="start" name="save-outline" />
           {{ t('settings.saveChanges') }}
         </ion-button>
@@ -276,7 +334,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
@@ -293,11 +351,18 @@ import {
   IonSelectOption,
   IonToggle,
   IonButton,
+  IonInput,
+  IonTextarea,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import { themeMode, setThemeMode, type ThemeMode } from '../lib/theme';
-import { setLocale, availableLocales, type Locale } from '../i18n';
+import { setLocale, bootHubLanguage, availableLocales, type Locale } from '../i18n';
+import { apiDocsEnabled } from '../lib/api-docs';
+import { isAdmin } from '../lib/session';
+import { hubSettings, getHubSettings, updateHubSettings, type HubSettings } from '../lib/hub-settings';
+import { publishHubCurrency } from '../lib/money';
+import { toastSuccess, toastError } from '../lib/toast';
 
 const { t, locale } = useI18n();
 
@@ -305,22 +370,67 @@ type Tab = 'hub' | 'store' | 'tax' | 'tickets';
 
 const tab = ref<Tab>('hub');
 
-// ── Estado: Hub ──
-// El idioma arranca del locale activo del shell; el tema, del modo persistido (lib/theme).
-const hubLang = ref<Locale>(locale.value as Locale);
+// Monedas ISO-4217 ofrecidas (lista razonable; EUR por defecto). El runtime acepta cualquier ISO.
+const CURRENCIES: { code: string; name: string }[] = [
+  { code: 'EUR', name: 'Euro' },
+  { code: 'USD', name: 'US Dollar' },
+  { code: 'GBP', name: 'Pound Sterling' },
+  { code: 'CHF', name: 'Swiss Franc' },
+  { code: 'SEK', name: 'Swedish Krona' },
+  { code: 'NOK', name: 'Norwegian Krone' },
+  { code: 'DKK', name: 'Danish Krone' },
+  { code: 'PLN', name: 'Polish Złoty' },
+  { code: 'MXN', name: 'Mexican Peso' },
+  { code: 'BRL', name: 'Brazilian Real' },
+];
+
+// ── Estado: Hub (local-only por ahora) ──
+// Idioma PERSONAL del usuario (override local): arranca del locale activo del shell.
+const userLang = ref<Locale>(locale.value as Locale);
 const hubTimezone = ref<string>('madrid');
 const hubCountry = ref<string>('spain');
 const hubTheme = ref<ThemeMode>(themeMode.value);
 const showModulesInSidebar = ref<boolean>(false);
 
+// ── Estado: Hub-wide (server-side, /api/settings) ──
+// Moneda GLOBAL del hub e idioma DEFAULT del hub. Se siembran de la cache (boot) y se refrescan en
+// onMounted; persisten al cambiar (solo admin) vía updateHubSettings.
+const hubCurrency = ref<string>(hubSettings.value?.currency ?? 'EUR');
+const hubLanguage = ref<Locale>(hubSettings.value?.language ?? 'es');
+// Doc de la API: deriva del setting server-side (lib/api-docs → hubSettings.api_docs_enabled).
+const showApiDocs = apiDocsEnabled;
+
+/** Nombre legible del idioma DEFAULT del hub (para la vista solo-lectura de no-admin). */
+const hubLanguageName = computed<string>(
+  () => availableLocales.find((l) => l.code === hubLanguage.value)?.name ?? hubLanguage.value,
+);
+
+// Mantiene los refs locales en sync si la cache de settings cambia (p.ej. carga post-login en App).
+watch(hubSettings, (s) => {
+  if (!s) return;
+  hubCurrency.value = s.currency;
+  hubLanguage.value = s.language;
+  businessTaxId.value = s.business_tax_id;
+  businessLegalName.value = s.business_legal_name;
+  businessAddress.value = s.business_address;
+});
+
+// Refresca los settings del hub al abrir Ajustes (best-effort; degrada a la cache sembrada).
+onMounted(() => {
+  void getHubSettings().catch(() => null);
+});
+
 // ── Estado: Store ──
 const storeType = ref<string>('retail');
 const storeLocale = ref<string>('es');
 
-// ── Estado: Tax ──
-const taxIva = ref<string>('21');
-const taxRegime = ref<string>('general');
-const taxVerifactu = ref<boolean>(true);
+// ── Estado: Negocio (identidad fiscal genérica, server-side /api/settings — ADR-0061) ──
+// FUENTE ÚNICA país-agnóstica que usan invoice (emisor) y los módulos fiscales por país. Se siembra
+// de la cache y se sincroniza con el watch de abajo. (IVA/régimen/VeriFactu salieron del core: el
+// Hub es internacional → viven en el módulo `taxes` y en los módulos de compliance por país.)
+const businessTaxId = ref<string>(hubSettings.value?.business_tax_id ?? '');
+const businessLegalName = ref<string>(hubSettings.value?.business_legal_name ?? '');
+const businessAddress = ref<string>(hubSettings.value?.business_address ?? '');
 
 // Tema: delega en lib/theme (persiste + aplica al <html>). Comparte estado con el toggle de la
 // topbar — cambiar aquí se refleja allí y viceversa.
@@ -329,29 +439,89 @@ function onThemeChange(value: ThemeMode): void {
   setThemeMode(value);
 }
 
-// Idioma del shell: cambia el locale i18n en caliente y lo persiste (lib/i18n → setLocale).
-function onLangChange(value: Locale): void {
-  hubLang.value = value;
+// Idioma PERSONAL del usuario: cambia el locale i18n en caliente y lo persiste como OVERRIDE local
+// (localStorage). Prevalece sobre el default del hub. NO toca el server.
+function onUserLangChange(value: Locale): void {
+  userLang.value = value;
   setLocale(value);
 }
 
-function saveHubSettings(): void {
-  // En producción: llamada al endpoint del Hub.
-  console.info('[SettingsPage] Hub settings saved', {
-    lang: hubLang.value,
-    timezone: hubTimezone.value,
-    country: hubCountry.value,
-    theme: hubTheme.value,
-    showModulesInSidebar: showModulesInSidebar.value,
+// Persiste un cambio parcial en los settings del hub (server). Solo admin (el runtime revalida).
+// Revierte el ref en error para no mentir al usuario, y muestra toast de éxito/fallo.
+async function persistHubSettings(
+  partial: Partial<HubSettings>,
+  revert: () => void,
+): Promise<void> {
+  try {
+    await updateHubSettings(partial);
+    await toastSuccess(t('settings.saved'));
+  } catch {
+    revert();
+    await toastError(t('settings.saveError'));
+  }
+}
+
+// Moneda del hub (GLOBAL): persiste al instante. money.ts la lee de la cache → todo el dinero se
+// re-formatea sin recargar.
+function onCurrencyChange(value: string): void {
+  const prev = hubSettings.value?.currency ?? 'EUR';
+  hubCurrency.value = value;
+  // Mantén fresca la moneda que leen los Web Components de módulo vía el fallback del SDK (ADR-0059)
+  // sin recargar; si el guardado falla, el revert la vuelve a la previa.
+  publishHubCurrency(value);
+  void persistHubSettings({ currency: value }, () => {
+    hubCurrency.value = prev;
+    publishHubCurrency(prev);
   });
 }
 
-function saveTaxSettings(): void {
-  // En producción: llamada al endpoint del Hub.
-  console.info('[SettingsPage] Ajustes fiscales guardados', {
-    iva: taxIva.value,
-    regime: taxRegime.value,
-    verifactu: taxVerifactu.value,
+// Idioma DEFAULT del hub (server): persiste al instante y reconcilia en caliente — si el usuario NO
+// tiene override personal, el shell cambia de idioma ahora; si lo tiene, su elección manda.
+function onHubLanguageChange(value: Locale): void {
+  const prev = hubSettings.value?.language ?? 'es';
+  hubLanguage.value = value;
+  void persistHubSettings({ language: value }, () => {
+    hubLanguage.value = prev;
   });
+  bootHubLanguage(value);
+}
+
+// Toggle "Mostrar documentación de la API": setting GLOBAL del hub (solo admin). Persiste vía
+// updateHubSettings; reactivo en la nav (App.vue) y el gate de la ruta (router) sin recargar.
+function onApiDocsToggle(e: Event): void {
+  if (!isAdmin.value) return; // defensa: el toggle ya está disabled para no-admin
+  const checked = (e as CustomEvent<{ checked: boolean }>).detail.checked;
+  if (checked === apiDocsEnabled.value) return; // evita re-disparo al re-sincronizar :checked
+  void persistHubSettings({ api_docs_enabled: checked }, () => {
+    /* la cache no se tocó: el :checked vuelve solo al valor server */
+  });
+}
+
+function saveHubSettings(): void {
+  // Los ajustes server-side (moneda/idioma/doc-API) ya persisten al cambiar. Este botón confirma los
+  // que aún son local-only (zona horaria, país, "mostrar módulos") — pendientes de cablear server.
+  void toastSuccess(t('settings.saved'));
+}
+
+async function saveTaxSettings(): Promise<void> {
+  // Persiste la identidad de NEGOCIO GLOBAL (server-side, /api/settings — ADR-0061). Solo admin (el
+  // runtime revalida); el tax_id se normaliza en el runtime. Impuestos/e-factura ya no viven aquí.
+  const prev = {
+    business_tax_id: hubSettings.value?.business_tax_id ?? '',
+    business_legal_name: hubSettings.value?.business_legal_name ?? '',
+    business_address: hubSettings.value?.business_address ?? '',
+  };
+  await persistHubSettings(
+    {
+      business_tax_id: businessTaxId.value.trim(),
+      business_legal_name: businessLegalName.value.trim(),
+      business_address: businessAddress.value.trim(),
+    },
+    () => {
+      businessTaxId.value = prev.business_tax_id;
+      businessLegalName.value = prev.business_legal_name;
+      businessAddress.value = prev.business_address;
+    },
+  );
 }
 </script>

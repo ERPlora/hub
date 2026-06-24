@@ -56,11 +56,33 @@ pub struct HubUser {
 /// Hash argon2id (string PHC) de un PIN con sal aleatoria. Parámetros = `Argon2::default()`
 /// (argon2id, v=19) — razonables; el PIN es corto, ver nota arriba.
 fn hash_pin_argon2(pin: &str) -> Result<String> {
+    hash_secret_argon2(pin)
+}
+
+/// Hash argon2id (string PHC `$argon2id$v=19$...`) de un secreto arbitrario con sal aleatoria.
+/// **El mismo helper que usa el PIN** (decisión humano hub#15); lo reusan otras credenciales
+/// locales hasheadas, p. ej. el `secret_hash` de las API keys (`api_keys.rs`, ADR-0057). A
+/// diferencia del PIN, el secreto de una API key es largo/aleatorio (alta entropía), así que el
+/// coste de argon2 cubre de sobra el ataque offline si se filtra la BD.
+pub(crate) fn hash_secret_argon2(secret: &str) -> Result<String> {
     let salt = SaltString::generate(&mut argon2::password_hash::rand_core::OsRng);
     let hash = Argon2::default()
-        .hash_password(pin.as_bytes(), &salt)
+        .hash_password(secret.as_bytes(), &salt)
         .map_err(|e| crate::errors::RuntimeError::Other(format!("argon2 hash: {e}")))?;
     Ok(hash.to_string())
+}
+
+/// Verifica un secreto contra su hash argon2id PHC (`$argon2id$...`). `false` si el hash está
+/// vacío/corrupto o no encaja. Espejo de `check_pin` pero **solo** para hashes PHC argon2id (sin
+/// el fallback legacy `salt:sha256` del seed demo, que solo aplica al PIN). Lo usa `api_keys.rs`.
+pub(crate) fn verify_secret_argon2(stored: &str, secret: &str) -> bool {
+    if stored.is_empty() {
+        return false;
+    }
+    match PasswordHash::new(stored) {
+        Ok(parsed) => Argon2::default().verify_password(secret.as_bytes(), &parsed).is_ok(),
+        Err(_) => false,
+    }
 }
 
 /// Verifica `pin` contra el hash almacenado. `true` si coincide. Hash vacío o corrupto

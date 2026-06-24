@@ -181,3 +181,45 @@ test('createClient ipc requiere bridge de Tauri', () => {
   const c = createClient('http+ws', { http: { baseUrl: '' } });
   assert.ok(c instanceof ErploraClient);
 });
+
+// ── ErploraClient: moneda del hub + formateo (ADR-0059) ─────────────────────
+
+test('currency usa el getter inyectado por el shell (normaliza a mayúsculas)', () => {
+  const c = new ErploraClient({} as never, { currency: () => 'usd' });
+  assert.equal(c.currency, 'USD');
+});
+
+test('currency degrada a EUR sin getter ni publicación global', () => {
+  const prev = (globalThis as { __erploraCurrency?: string }).__erploraCurrency;
+  delete (globalThis as { __erploraCurrency?: string }).__erploraCurrency;
+  try {
+    const c = new ErploraClient({} as never, {});
+    assert.equal(c.currency, 'EUR');
+  } finally {
+    if (prev !== undefined) (globalThis as { __erploraCurrency?: string }).__erploraCurrency = prev;
+  }
+});
+
+test('currency lee globalThis.__erploraCurrency cuando no hay getter (fallback del shell)', () => {
+  const prev = (globalThis as { __erploraCurrency?: string }).__erploraCurrency;
+  (globalThis as { __erploraCurrency?: string }).__erploraCurrency = 'gbp';
+  try {
+    const c = new ErploraClient({} as never, {});
+    assert.equal(c.currency, 'GBP');
+  } finally {
+    if (prev === undefined) delete (globalThis as { __erploraCurrency?: string }).__erploraCurrency;
+    else (globalThis as { __erploraCurrency?: string }).__erploraCurrency = prev;
+  }
+});
+
+test('formatMoney convierte céntimos→unidades con la moneda del hub', () => {
+  // Locale fijo para que el separador/símbolo sea determinista entre entornos.
+  const c = new ErploraClient({} as never, { currency: () => 'USD' });
+  assert.equal(c.formatMoney(123450, { locale: 'en-US' }), '$1,234.50');
+  assert.equal(c.formatMoney(0, { locale: 'en-US' }), '$0.00');
+});
+
+test('formatAmount formatea unidades; opts.currency sobreescribe la del hub', () => {
+  const c = new ErploraClient({} as never, { currency: () => 'EUR' });
+  assert.equal(c.formatAmount(1234.5, { locale: 'en-US', currency: 'USD' }), '$1,234.50');
+});

@@ -27,6 +27,7 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
+pub mod api_keys;
 pub mod assistant;
 pub mod auth;
 pub mod backup;
@@ -36,8 +37,10 @@ pub mod ingest;
 pub mod install;
 pub mod logging;
 pub mod media;
+pub mod openapi;
 pub mod router;
 pub mod session;
+pub mod settings;
 pub mod state;
 pub mod system;
 pub mod tenant;
@@ -438,6 +441,9 @@ pub fn app(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/api/hub/context", get(hub_context))
         .route("/api/system", get(system::system_info))
+        // Settings del hub (store key/value de sistema, tabla `hub_settings`). GET = cualquier
+        // sesión de usuario; PUT = sesión admin (owner/admin). Contrato del frontend.
+        .route("/api/settings", get(settings::get_settings).put(settings::put_settings))
         // Gestor de la carpeta `media/` (pantalla /files). Browse + raw + upload + delete + mkdir.
         .route("/api/media", get(media::media_list).delete(media::media_delete))
         .route("/api/media/raw", get(media::media_raw))
@@ -455,6 +461,19 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules/:id/uninstall", post(uninstall_module))
         .route("/api/query", post(query))
         .route("/api/command", post(command))
+        // ── API pública por módulo (ADR-0057, public-api.md) ────────────────────────────────
+        // Gestión de keys (auth = sesión admin owner/admin; NO una api key).
+        .route("/api/keys", get(api_keys::list_keys).post(api_keys::create_key))
+        .route("/api/keys/:id/rotate", post(api_keys::rotate_key))
+        .route("/api/keys/:id", axum::routing::delete(api_keys::revoke_key))
+        // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
+        .route("/api/v1/:module/q/:query", post(api_keys::data_query))
+        .route("/api/v1/:module/c/:command", post(api_keys::data_command))
+        // OpenAPI 3.1 dinámico per-hub, **gateado por sesión de usuario** (interno, no público —
+        // ADR-0057 §4 refinado 2026-06-24). El Swagger UI YA NO lo sirve el server: lo renderiza una
+        // vista Vue interna del Hub (`apps/web/ApiDocsPage.vue`, `swagger-ui-dist` de npm) que pide
+        // este spec con el fetch autenticado del web app (`X-Hub-Session`).
+        .route("/api/v1/openapi.json", get(openapi::openapi_json))
         // Reporte de errores del FRONTEND (same-origin, sin auth cloud): el web app postea sus
         // errores JS aquí y el runtime los funnelea al registro global → Cloud (el secreto de
         // máquina nunca toca el navegador). Ver `frontend_error_report`.
@@ -503,15 +522,33 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
 /// activo (hoy `null`; el frontend resuelve la sesión por separado) + `pin_users`: usuarios activos
 /// con PIN del hub, para que el shell muestre el grid de login local directamente (sin depender de
 /// un flag en localStorage) + `business_type`/`sector`: el sector del hub (env `HUB_SECTOR`) para
-/// que el dashboard derive el preset "Recomendado" de widgets (ADR-0054). Contrato del frontend.
+/// que el dashboard derive el preset "Recomendado" de widgets (ADR-0054) + `currency`/`language`:
+/// settings del hub (tabla `hub_settings` ∪ defaults), lectura barata en el arranque del SPA para no
+/// pegar a `/api/settings` por separado. Contrato del frontend.
 async fn hub_context(State(st): State<AppState>) -> Response {
-    let pin_users: Vec<Value> = {
+    // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
+    let (pin_users, currency, language) = {
         let rt = st.runtime.lock().await;
-        rt.list_pin_users().await.unwrap_or_default()
-    }
-    .into_iter()
-    .map(|(id, name, role)| json!({ "id": id, "name": name, "role": role }))
-    .collect();
+        let pin_users: Vec<Value> = rt
+            .list_pin_users()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(id, name, role)| json!({ "id": id, "name": name, "role": role }))
+            .collect();
+        // Settings del hub: si la lectura falla (no debería), cae a los defaults del contrato para
+        // no romper el arranque del SPA.
+        let settings = rt.get_settings().await.unwrap_or_else(|_| json!({}));
+        let currency = settings
+            .get("currency")
+            .cloned()
+            .unwrap_or_else(|| json!("EUR"));
+        let language = settings
+            .get("language")
+            .cloned()
+            .unwrap_or_else(|| json!("es"));
+        (pin_users, currency, language)
+    };
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
     // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
     let sector = st.config.sector.clone();
@@ -521,6 +558,10 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         "pin_users": pin_users,
         "business_type": sector,
         "sector": sector,
+        // Settings de arranque (tabla `hub_settings` ∪ defaults). El SPA los usa para formato de
+        // moneda + locale sin un fetch extra a `/api/settings`.
+        "currency": currency,
+        "language": language,
     }))
     .into_response()
 }
@@ -809,7 +850,7 @@ struct InstallReq {
     dir: String,
 }
 
-fn err_response(e: erplora_runtime::RuntimeError) -> Response {
+pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     use erplora_runtime::RuntimeError as E;
     let (status, code) = match &e {
         E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied"),
@@ -827,7 +868,7 @@ fn err_response(e: erplora_runtime::RuntimeError) -> Response {
 ///    intento de acceso cruzado o un hub no provisionado. **No** se cae a ninguna BD.
 ///  - `PoolLimit` → `503`: back-pressure (techo de orgs por proceso alcanzado), reintenta luego.
 ///  - `Connect`   → `502`: la Aurora de la org no responde (failover/credencial).
-fn tenant_rejected(e: tenant::TenantError) -> Response {
+pub(crate) fn tenant_rejected(e: tenant::TenantError) -> Response {
     use tenant::TenantError as T;
     let (status, code) = match &e {
         T::UnknownOrg(_) => (StatusCode::FORBIDDEN, "unknown_org"),
@@ -886,6 +927,11 @@ async fn list_modules(State(st): State<AppState>, Query(q): Query<LocaleQuery>) 
     let locale = q.locale.as_deref().unwrap_or("en");
     let rt = st.runtime.lock().await;
     let reg = rt.registry();
+    // Ids de módulos (activos) que exponen al menos una op `expose_api` (ADR-0057). Se calcula UNA
+    // vez y se consulta por pertenencia → campo aditivo `has_public_api` por módulo, que usa la
+    // matriz de scope de las API keys para listar solo módulos que conceden algo.
+    let public_api: std::collections::HashSet<String> =
+        reg.modules_with_public_api().into_iter().collect();
     let items: Vec<Value> = rt
         .modules()
         .into_iter()
@@ -896,6 +942,8 @@ async fn list_modules(State(st): State<AppState>, Query(q): Query<LocaleQuery>) 
                 "name": reg.module_name_localized(&m.id, &m.name, locale),
                 "version": m.version,
                 "status": m.status,
+                // ADITIVO (ADR-0057): true si el módulo expone alguna query/command `expose_api`.
+                "has_public_api": public_api.contains(&m.id),
             })
         })
         .collect();
