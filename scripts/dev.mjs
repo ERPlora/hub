@@ -38,6 +38,10 @@ const DEFAULTS = {
   // En modo `dev` (sin esto) el runtime no descarga la clave pública del Cloud y `/api/auth/cloud`
   // devuelve 503 ("login cloud no disponible (sin clave pública)") → la pantalla de login no funciona.
   HUB_AUTH: 'session',
+  // Seed de dev: usuario "Demo" (PIN 0000) + dispositivo de confianza, para que el login local por
+  // PIN funcione sin enrolar online (ADR-0065). Sin esto un arranque fresco no tiene usuario con PIN
+  // y la pantalla de login no deja entrar. En prod/ECS el seed llega por HUB_SEED_SQL (terraform).
+  HUB_SEED_SQL_PATH: join(HUB_ROOT, 'crates', 'server', 'seeds', 'demo.sql'),
 };
 
 const env = { ...process.env };
