@@ -25,3 +25,11 @@ erplora.db-shm
 # La infra UI compartida (ok-data-table) vive en packages/outfitkit; el list-controller
 # y el SDK en packages/module-sdk; modules/ ya no contiene nada versionado.
 modules/*
+
+# Puente de DEV del shell web: sync-modules.mjs copia module.json + dist/<id>.esm.js + icons.json
+# desde modules-workspace/ (la FUENTE — cada módulo su repo) a public/modules/ para que el dev
+# server (Vite) los sirva. Es un ARTEFACTO GENERADO (regenerable), NO fuente; en producción NO
+# existe (el runtime Rust sirve /modules/** descargados del marketplace, ver sync-modules.mjs).
+# Los bundles ya caían por `dist/`; los module.json estaban trackeados por error → ruido en git
+# + se horneaban en el dist de la imagen (contra el principio de imagen módulo-less).
+apps/web/public/modules/
