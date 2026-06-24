@@ -185,6 +185,19 @@ ion-split-pane.rail {
   --side-width: 68px;
 }
 
+/* Suaviza el colapso/expansión del rail: Ionic aplica el ancho al host del ion-menu
+   (width/min-width/max-width: var(--side-*)), así que animamos esas props para que no
+   salte. Solo escritorio (el rail solo existe ≥lg) y respetando reduced-motion. El
+   contenido (flex:1) reflueye solo siguiendo el borde animado del panel. */
+@media (min-width: 992px) {
+  ion-menu.dash-menu.menu-pane-visible {
+    transition: width 0.25s ease, min-width 0.25s ease, max-width 0.25s ease;
+  }
+}
+@media (min-width: 992px) and (prefers-reduced-motion: reduce) {
+  ion-menu.dash-menu.menu-pane-visible { transition: none; }
+}
+
 ion-menu.dash-menu {
   --background: var(--ok-surface-muted);
   --width: 280px; /* ancho del drawer en móvil */
@@ -208,11 +221,19 @@ ion-menu.dash-menu ion-content.sidebar-content { --background: var(--ok-surface-
 
 /* Lista de navegación */
 .nav-list { background: transparent; padding: 0.25rem 0; }
+/* Separador de secciones = divisor (no etiqueta de texto). Idéntico expandido y recogido,
+   así no hay salto al colapsar. El texto i18n ("General"/"Cuenta") se mantiene en el DOM
+   (lectura por a11y/agrupación) pero se oculta visualmente. La línea la pinta el background
+   del host del ion-list-header (su .list-header-inner es transparente y deja verlo). */
 .nav-section-label {
-  font-size: 0.68rem; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase;
-  color: color-mix(in oklab, var(--ion-text-color) 50%, transparent);
-  min-height: 1.9rem; padding-inline: 1rem; margin-top: 0.35rem;
-  --color: color-mix(in oklab, var(--ion-text-color) 50%, transparent);
+  min-height: 0;
+  height: 1px;
+  width: auto;            /* Ionic fuerza width:100% en el host; con auto los márgenes definen el ancho */
+  margin: 0.6rem 1rem;
+  padding: 0;
+  background: var(--ion-border-color);
+  font-size: 0; line-height: 0; overflow: hidden;
+  --color: transparent;
 }
 .nav-item {
   --background: transparent;
@@ -265,8 +286,13 @@ ion-menu.dash-menu ion-content.sidebar-content { --background: var(--ok-surface-
 @media (min-width: 992px) { .rail-toggle { display: inline-flex; } }
 ion-split-pane.rail .erp-wordmark,
 ion-split-pane.rail .nav-label,
-ion-split-pane.rail .nav-section-label,
 ion-split-pane.rail .sidebar-user-meta { display: none; }
+/* El menu-toggle del logo encoge a su contenido (~32px) y, con el toolbar-container
+   de Ionic en space-between, se ancla a la izquierda del rail (68px). Forzarlo a ocupar
+   todo el ancho deja que el lockup (que ya se centra abajo) caiga en el centro del rail. */
+ion-split-pane.rail .brand-toolbar ion-menu-toggle[slot="start"] {
+  display: flex; width: 100%; justify-content: center;
+}
 ion-split-pane.rail .brand-link { padding-inline-start: 0; justify-content: center; width: 100%; }
 ion-split-pane.rail .nav-item { --inner-padding-end: 0; }
 ion-split-pane.rail .nav-item::part(native) { justify-content: center; }
