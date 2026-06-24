@@ -96,7 +96,13 @@ ion-list {
   background: transparent;
   padding: 0;
 }
-ion-list.list-inset {
+/* Hay que ganar en especificidad a la regla propia de Ionic `.list-md/.list-ios.list-inset`
+   (0,2,0): si no, impone su `margin-inline: 16px` y su `border-radius: 2px`. El margen lateral
+   descuadra la lista respecto a los componentes flush (ok-widget-board, ion-button) que ya van
+   dentro del `.ion-padding` del ion-content (quedaba sangrada 32px en vez de 16px). Queremos
+   tarjeta flush (margen solo vertical) con el radio --ok. Cubrimos ambos modos (md/ios). */
+ion-list.list-md.list-inset,
+ion-list.list-ios.list-inset {
   margin: 16px 0;
   border-radius: var(--ok-radius);
   box-shadow: var(--ok-shadow-sm);
@@ -173,8 +179,12 @@ ion-searchbar {
 /* (clases .nav-*, .sidebar-*, .brand-* adaptadas de cloud/static/css/dashboard-shell.css;
    markup en App.vue. Targetean light DOM, por eso van como CSS global, no scoped.) */
 
-/* Split-pane: ancho cómodo; .rail (escritorio, icon-only) lo estrecha. */
+/* Split-pane: ancho cómodo; .rail (escritorio, icon-only) lo estrecha. El lienzo del shell
+   (--ion-background-color) y SIN divisor: el borde entre panel y contenido lo da el radio de la
+   tarjeta del ion-content, no una línea. */
 ion-split-pane {
+  --background: var(--ion-background-color);
+  --border: none;
   --side-min-width: 232px;
   --side-max-width: 248px;
   --side-width: 240px;
@@ -198,18 +208,24 @@ ion-split-pane.rail {
   ion-menu.dash-menu.menu-pane-visible { transition: none; }
 }
 
+/* Shell unificado: menú = topbar = tabbar = lienzo (--ion-background-color), sin divisor.
+   Antes el menú usaba la superficie atenuada (--ok-surface-muted = #f3f4f6), distinta del lienzo
+   del shell; ahora comparte exactamente el color con la topbar (AppTopbar → ion-header) y el tabbar
+   (ion-footer), que ya resuelven a --ion-background-color. Dark mode automático (el token conmuta
+   en variables.css, .ion-palette-dark). El divisor menú↔contenido se elimina (--border + border-right):
+   la separación visual la da el radio de la tarjeta del ion-content. */
 ion-menu.dash-menu {
-  --background: var(--ok-surface-muted);
+  --background: var(--ion-background-color);
+  --border: none;
   --width: 280px; /* ancho del drawer en móvil */
-  border-right: 1px solid var(--ion-border-color);
+  border-right: 0;
 }
 ion-menu.dash-menu ion-header,
 ion-menu.dash-menu ion-content,
 ion-menu.dash-menu ion-toolbar {
-  --background: var(--ok-surface-muted);
-  --ion-background-color: var(--ok-surface-muted);
+  --background: var(--ion-background-color);
 }
-ion-menu.dash-menu ion-content.sidebar-content { --background: var(--ok-surface-muted); }
+ion-menu.dash-menu ion-content.sidebar-content { --background: var(--ion-background-color); }
 
 /* Brand (logo + wordmark) */
 .brand-toolbar { --min-height: 60px; }
@@ -258,8 +274,9 @@ ion-menu.dash-menu ion-content.sidebar-content { --background: var(--ok-surface-
 }
 .nav-icon { flex: none; opacity: 0.9; margin-inline-end: 0.7rem; color: inherit; }
 
-/* Footer: tarjeta de usuario (avatar iniciales + nombre/email + logout) */
-.sidebar-foot { --background: var(--ok-surface-muted); }
+/* Footer: tarjeta de usuario (avatar iniciales + nombre/email + logout) — mismo lienzo que el
+   resto del menú (--ion-background-color), para que header/contenido/footer del menú sean uniformes. */
+.sidebar-foot { --background: var(--ion-background-color); }
 .sidebar-user {
   display: flex; align-items: center; gap: 0.5rem;
   padding: 0.5rem 0.6rem 0.7rem;
@@ -298,6 +315,34 @@ ion-split-pane.rail .nav-item { --inner-padding-end: 0; }
 ion-split-pane.rail .nav-item::part(native) { justify-content: center; }
 ion-split-pane.rail .nav-icon { margin-inline-end: 0; }
 ion-split-pane.rail .sidebar-user { justify-content: center; }
+
+/* ── Área de contenido = superficie tipo tarjeta (unificación del shell) ───────────────────── */
+/* Cada página del shell monta su contenido en el ion-content del outlet principal
+   (AppPage → ion-page > AppTopbar + ion-content + tabbar; el outlet es #main y Ionic le añade
+   `.split-pane-main`). Lo separamos del lienzo como una TARJETA redondeada: superficie por tema
+   (--ion-card-background: blanco / zinc oscuro), radio grande y padding interno por las CSS vars
+   NATIVAS de Ionic (no offsets manuales: Ionic posiciona el ion-content entre header y footer y
+   el scroll vive dentro de su ::part(scroll)). Como el menú/topbar/tabbar comparten el lienzo
+   (--ion-background-color), las esquinas redondeadas dejan ver el lienzo alrededor. Dark mode
+   automático: los tokens conmutan en variables.css (.ion-palette-dark). */
+ion-router-outlet#main.split-pane-main > .ion-page > ion-content {
+  --background: var(--ion-card-background);
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-top: 16px;
+  --padding-bottom: 16px;
+  border-radius: 25px;
+  overflow: hidden;
+}
+/* El fondo y el scroller del ion-content viven en su Shadow DOM: redondeamos sus ::part para que
+   la tarjeta recorte limpio. El color del ::part(background) ya lo pinta --background (arriba),
+   así que aquí solo se redondea. */
+ion-router-outlet#main.split-pane-main > .ion-page > ion-content::part(background) {
+  border-radius: 25px;
+}
+ion-router-outlet#main.split-pane-main > .ion-page > ion-content::part(scroll) {
+  border-radius: 25px;
+}
 
 /* ── ok-data-table (OutfitKit): alinea sus tokens con el theme del Hub ────────────────────── */
 ok-data-table {

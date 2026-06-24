@@ -25,7 +25,11 @@
       </template>
     </AppTopbar>
 
-    <ion-content :fullscreen="true" class="ion-padding">
+    <!-- fullscreen=false: el ion-content se asienta ESTRICTAMENTE entre la topbar y el tabbar
+         (no scrollea por detrás de ellos). Necesario para la tarjeta redondeada del shell
+         (polish.css): con fullscreen las 2 esquinas superiores quedaban ocultas tras la topbar
+         opaca; así las 4 esquinas de la tarjeta son visibles sobre el lienzo del shell. -->
+    <ion-content :fullscreen="false" class="ion-padding">
       <slot />
     </ion-content>
 
