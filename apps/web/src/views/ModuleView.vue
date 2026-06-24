@@ -6,22 +6,30 @@
     <p v-else-if="status === 'error'" class="text-[color:var(--ion-color-danger)]">
       {{ t('moduleView.loadError') }}
     </p>
+    <!-- Pestaña sintética "Plan" (auto-inyectada para módulos con `billing`): panel del SHELL,
+         no un WC del módulo. Se muestra en vez del outlet del WC cuando está activa. -->
+    <ModulePlanPanel
+      v-if="status === 'ready' && isPlanTab && billing"
+      :module-id="params().moduleId"
+      :billing="billing"
+    />
     <!-- El WebComponent (Lit) de la pestaña activa se monta aquí en runtime (createElement + append). -->
-    <div ref="outlet" class="outlet" v-show="status === 'ready'" />
+    <div ref="outlet" class="outlet" v-show="status === 'ready' && !isPlanTab" />
 
     <!-- Tabbar secundario del módulo: las pestañas salen de `navigation[]` del manifest
          (module.json) — el módulo solo aporta el contenido (su WC), el shell pinta la nav.
+         Si el módulo tiene `billing`, el shell AÑADE una pestaña sintética "Plan" (id `__plan__`).
          Mismo patrón que DashboardPage (ion-footer > ion-toolbar > ion-segment). -->
     <template #footer>
-      <ion-footer v-if="tabs.length > 1" class="ion-no-border">
+      <ion-footer v-if="segmentTabs.length > 1" class="ion-no-border">
       <ion-toolbar>
         <ion-segment
           :value="activeNavId"
           @ion-change="onTabChange($event as CustomEvent<{ value: string }>)"
         >
-          <ion-segment-button v-for="t in tabs" :key="t.nav.id" :value="t.nav.id">
-            <HubIcon :name="t.iconSvg ?? t.nav.icon" />
-            <ion-label>{{ t.nav.label }}</ion-label>
+          <ion-segment-button v-for="tb in segmentTabs" :key="tb.id" :value="tb.id">
+            <HubIcon :name="tb.iconSvg ?? tb.icon" />
+            <ion-label>{{ tb.label }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
@@ -31,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onMounted, ref, watch } from 'vue';
+import { computed, inject, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
@@ -40,8 +48,21 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
-import { loadMenu, loadComponent, type MenuEntry } from '../lib/module-loader';
+import ModulePlanPanel from '../components/ModulePlanPanel.vue';
+import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
 import { clientInjectionKey, getClient } from '../lib/runtime';
+import type { ModuleBilling } from '@erplora/module-types';
+
+/** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
+const PLAN_TAB_ID = '__plan__';
+
+/** Una pestaña del ion-segment: las del módulo + la sintética "Plan". */
+interface SegmentTab {
+  id: string;
+  label: string;
+  icon?: string;
+  iconSvg?: string;
+}
 
 const { t } = useI18n();
 const route = useRoute();
@@ -54,6 +75,24 @@ const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
 const tabs = ref<MenuEntry[]>([]);
 const activeNavId = ref<string>('');
+/** Bloque `billing` del manifest del módulo activo (si lo trae) → habilita la pestaña "Plan". */
+const billing = ref<ModuleBilling | null>(null);
+/** ¿Está activa la pestaña sintética "Plan"? */
+const isPlanTab = computed(() => activeNavId.value === PLAN_TAB_ID);
+
+/** Pestañas del ion-segment = las del módulo + (si hay `billing`) la sintética "Plan". */
+const segmentTabs = computed<SegmentTab[]>(() => {
+  const list: SegmentTab[] = tabs.value.map((e) => ({
+    id: e.nav.id,
+    label: e.nav.label,
+    icon: e.nav.icon,
+    iconSvg: e.iconSvg,
+  }));
+  if (billing.value) {
+    list.push({ id: PLAN_TAB_ID, label: t('modulePlan.tab'), icon: 'pricetag' });
+  }
+  return list;
+});
 
 function params(): { moduleId: string; navId: string } {
   return {
@@ -68,8 +107,22 @@ async function mount(): Promise<void> {
   try {
     const menu = await loadMenu();
     tabs.value = menu.filter((m) => m.moduleId === moduleId);
+    // El bloque `billing` del manifest decide si auto-inyectamos la pestaña "Plan" (sin tocar el
+    // module.json de cada módulo). El manifest se sirve completo desde `/modules/<id>/module.json`.
+    const manifest = await loadManifest(moduleId);
+    billing.value = manifest?.billing ?? null;
+
+    // Pestaña "Plan": panel del shell, no un WC del módulo → no se monta nada en el outlet.
+    if (navId === PLAN_TAB_ID && billing.value) {
+      moduleName.value = manifest?.name ?? tabs.value[0]?.moduleName ?? moduleId;
+      activeNavId.value = PLAN_TAB_ID;
+      if (outlet.value) outlet.value.innerHTML = ''; // el WC previo no debe quedar montado
+      status.value = 'ready';
+      return;
+    }
+
     const entry: MenuEntry | undefined =
-      tabs.value.find((t) => t.nav.id === navId) ?? tabs.value[0];
+      tabs.value.find((tb) => tb.nav.id === navId) ?? tabs.value[0];
     if (!entry) {
       status.value = 'error';
       return;

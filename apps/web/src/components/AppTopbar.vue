@@ -67,8 +67,10 @@
           <HubIcon slot="icon-only" name="sparkles-outline" />
         </ion-button>
 
-        <!-- Notificaciones: campana + badge. Contador = nº de módulos pendientes de configurar
-             (ADR-0063, lib/setup-status). Al pulsar abre un popover con la lista + CTA "Configurar". -->
+        <!-- Notificaciones: campana + badge. Central de notificaciones de EVENTOS (placeholder):
+             el contador es un STUB a 0 (lib/shell, sin backend de notificaciones todavía) y el
+             popover muestra un estado vacío. NO está acoplada a la configuración pendiente de los
+             módulos — eso vive SOLO en el dashboard (ADR-0063, banner). -->
         <ion-button
           id="topbar-notif-btn"
           fill="clear"
@@ -81,25 +83,11 @@
             {{ notificationCount }}
           </ion-badge>
         </ion-button>
-        <ion-popover ref="notifPopover" trigger="topbar-notif-btn" trigger-action="click">
+        <ion-popover trigger="topbar-notif-btn" trigger-action="click">
           <ion-content>
             <ion-list lines="full">
-              <ion-item v-if="pendingSetups.length === 0" lines="none">
+              <ion-item lines="none">
                 <ion-label class="ion-text-wrap" style="opacity:.6">{{ t('topbar.noNotifications') }}</ion-label>
-              </ion-item>
-              <ion-item
-                v-for="s in pendingSetups"
-                :key="s.moduleId"
-                button
-                :detail="false"
-                @click="goConfigure(s.route)"
-              >
-                <HubIcon slot="start" :name="s.icon" />
-                <ion-label class="ion-text-wrap">
-                  <h3>{{ s.title }}</h3>
-                  <p v-if="s.description">{{ s.description }}</p>
-                  <p style="color: var(--ion-color-primary)">{{ t('topbar.configure') }} →</p>
-                </ion-label>
               </ion-item>
             </ion-list>
           </ion-content>
@@ -135,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -146,7 +134,6 @@ import HubIcon from './HubIcon.vue';
 import { user } from '../lib/session';
 import { isDark, toggleTheme } from '../lib/theme';
 import { assistantAvailable, toggleAssistant, notificationCount, isLoading, railCollapsed } from '../lib/shell';
-import { pendingSetups } from '../lib/setup-status';
 import { moduleNav } from '../lib/nav';
 import { resolveIcon } from '../lib/icons';
 import { PROFILE_ROUTE } from '../lib/routes';
@@ -221,14 +208,6 @@ function goBack(): void {
 
 function goProfile(): void {
   void router.push(PROFILE_ROUTE);
-}
-
-// Notificaciones (ADR-0063): al pulsar "Configurar" en un módulo pendiente, cierra el popover y
-// navega a su pantalla de ajustes.
-const notifPopover = ref<{ $el: HTMLIonPopoverElement } | null>(null);
-function goConfigure(route: string): void {
-  void notifPopover.value?.$el?.dismiss?.();
-  void router.push(route);
 }
 </script>
 

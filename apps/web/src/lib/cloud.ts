@@ -430,6 +430,148 @@ export async function cloudMarketplaceModules(): Promise<CloudMarketplaceModule[
   return items.map((item) => normalizeMarketplaceModule(item as Record<string, unknown>));
 }
 
+// --- Plan de un módulo: suscripción + compra/upgrade/cancelación (plano "compra = usuario") ---
+// Contrato Cloud (auth JWT de usuario + X-Hub-Id, DIRECTO al Cloud, NO al runtime):
+//   GET  /api/v1/hub/device/module-subscription/?module=<slug>
+//   POST /api/v1/marketplace/modules/{module}/purchase/           (module = pk|slug|module_id)
+//   POST /api/v1/marketplace/modules/{module}/cancel-subscription/
+//   GET  /api/v1/marketplace/modules/{module}/check_ownership/
+// El ViewSet del Cloud resuelve `{module}` por pk numérico, slug o module_id (api_views.get_object),
+// así que aquí pasamos el SLUG del módulo (lo que conoce el Hub) tal cual.
+
+/** Estado de la suscripción de un módulo (GET module-subscription). */
+export type ModuleSubscriptionStatus =
+  | 'active'
+  | 'trialing'
+  | 'expired'
+  | 'none'
+  | 'canceled'
+  | 'past_due';
+
+export interface CloudModuleSubscription {
+  status: ModuleSubscriptionStatus;
+  /** Fin del periodo de prueba (ISO) o null. */
+  trialEnd: string | null;
+  /** Fin del periodo de facturación actual (ISO) o null. */
+  periodEnd: string | null;
+}
+
+const SUB_STATUS = ['active', 'trialing', 'expired', 'none', 'canceled', 'past_due'] as const;
+function normSubStatus(s: unknown): ModuleSubscriptionStatus {
+  return (SUB_STATUS as readonly string[]).includes(String(s)) ? (s as ModuleSubscriptionStatus) : 'none';
+}
+
+/** Estado de plan del módulo para ESTE hub (auth usuario + X-Hub-Id). */
+export async function cloudModuleSubscription(moduleSlug: string): Promise<CloudModuleSubscription> {
+  const data = await get<{ status?: string; trial_end?: string | null; period_end?: string | null }>(
+    `/api/v1/hub/device/module-subscription/?module=${encodeURIComponent(moduleSlug)}`,
+  );
+  return {
+    status: normSubStatus(data.status),
+    trialEnd: data.trial_end ?? null,
+    periodEnd: data.period_end ?? null,
+  };
+}
+
+export interface PurchaseModuleOptions {
+  /** Tier a comprar/mejorar. UPGRADE = mismo endpoint con otro `tierSlug`. */
+  tierSlug?: string;
+  /** URL del Hub a la que vuelve Stripe tras pagar. */
+  successUrl: string;
+  /** URL del Hub a la que vuelve Stripe si cancela el checkout. */
+  cancelUrl: string;
+  /** Modo del checkout de Stripe (por defecto "hosted" → checkout_url). */
+  uiMode?: 'hosted' | 'embedded';
+}
+
+/** Resultado de iniciar una compra/upgrade. Discriminado por `isFree`. */
+export type PurchaseModuleResult =
+  | { isFree: true; purchaseId: number | null; message: string }
+  | {
+      isFree: false;
+      sessionId: string;
+      /** URL del checkout alojado de Stripe (modo "hosted"). Vacía en modo "embedded". */
+      checkoutUrl: string;
+      mode: string;
+      currency: string;
+    };
+
+/** Compra / upgrade de un módulo (plano "compra = usuario"). Devuelve free o datos de checkout. */
+export async function cloudPurchaseModule(
+  moduleSlug: string,
+  opts: PurchaseModuleOptions,
+): Promise<PurchaseModuleResult> {
+  const data = await post<{
+    is_free?: boolean;
+    purchase_id?: number | null;
+    message?: string;
+    session_id?: string;
+    checkout_url?: string;
+    mode?: string;
+    currency?: string;
+  }>(`/api/v1/marketplace/modules/${encodeURIComponent(moduleSlug)}/purchase/`, {
+    success_url: opts.successUrl,
+    cancel_url: opts.cancelUrl,
+    ...(opts.tierSlug ? { tier_slug: opts.tierSlug } : {}),
+    ui_mode: opts.uiMode ?? 'hosted',
+  });
+  if (data.is_free) {
+    return { isFree: true, purchaseId: data.purchase_id ?? null, message: String(data.message ?? '') };
+  }
+  return {
+    isFree: false,
+    sessionId: String(data.session_id ?? ''),
+    checkoutUrl: String(data.checkout_url ?? ''),
+    mode: String(data.mode ?? ''),
+    currency: String(data.currency ?? 'EUR'),
+  };
+}
+
+export interface CancelModuleSubscriptionResult {
+  success: boolean;
+  message: string;
+  /** Fecha (ISO) en la que se cancelará (fin del periodo) o null. */
+  canceledAt: string | null;
+}
+
+/** Cancela la suscripción de un módulo (al final del periodo). */
+export async function cloudCancelModuleSubscription(moduleSlug: string): Promise<CancelModuleSubscriptionResult> {
+  const data = await post<{ success?: boolean; message?: string; canceled_at?: string | null }>(
+    `/api/v1/marketplace/modules/${encodeURIComponent(moduleSlug)}/cancel-subscription/`,
+    {},
+  );
+  return {
+    success: Boolean(data.success),
+    message: String(data.message ?? ''),
+    canceledAt: data.canceled_at ?? null,
+  };
+}
+
+export interface CloudModuleOwnership {
+  owned: boolean;
+  /** "purchase" | "subscription" | "free" | null. El Cloud NO expone el slug del tier actual. */
+  purchaseType: string | null;
+  purchaseId: number | null;
+  purchasedAt: string | null;
+}
+
+/** ¿Posee el hub este módulo? (check_ownership). NO devuelve el tier exacto (v1 pragmático). */
+export async function cloudModuleOwnership(moduleSlug: string): Promise<CloudModuleOwnership> {
+  const data = await get<{
+    owned?: boolean;
+    is_owned?: boolean;
+    purchase_type?: string | null;
+    purchase_id?: number | null;
+    purchased_at?: string | null;
+  }>(`/api/v1/marketplace/modules/${encodeURIComponent(moduleSlug)}/check_ownership/`);
+  return {
+    owned: Boolean(data.owned ?? data.is_owned),
+    purchaseType: data.purchase_type ?? null,
+    purchaseId: data.purchase_id ?? null,
+    purchasedAt: data.purchased_at ?? null,
+  };
+}
+
 async function meRequest(access: string): Promise<CloudUser> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);

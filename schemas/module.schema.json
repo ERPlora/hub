@@ -169,6 +169,7 @@
       "required": ["query", "configured_when", "title", "route"],
       "additionalProperties": false,
       "properties": {
+        "required": { "type": "boolean", "default": true, "description": "Si true (por defecto) la configuración pendiente alerta en el DASHBOARD; si false es opcional y NO alerta." },
         "query": { "type": "string", "description": "Query namespaced que devuelve el estado de configuración (se evalúa la 1ª fila)." },
         "params": { "type": "object", "description": "Params estáticos para la query." },
         "configured_when": {

@@ -31,7 +31,46 @@ export interface ModuleManifest {
    * Ver `architecture/hub/setup-status.md`.
    */
   setup?: ModuleSetupDef;
+  /**
+   * Monetización del módulo (ADR-0006/0013). El manifest es la fuente del pricing + los tiers; la
+   * clasificación de marketplace (sectores, business types, is_published) vive en el Cloud, NO aquí.
+   * El shell lo usa para auto-inyectar una pestaña "Plan" en la navegación del módulo (compra =
+   * usuario: JWT + X-Hub-Id, directo al Cloud). Ver `architecture/modules/`.
+   */
+  billing?: ModuleBilling;
   // queries/commands/events/ai_tools/network/scheduled_tasks → ver schemas/module.schema.json
+}
+
+/** Un tier (plano) de un módulo dentro de `billing.tiers`. */
+export interface BillingTierDef {
+  /** Slug estable del tier (`basic`, `essential`, `premium`…). Se manda al Cloud como `tier_slug`. */
+  slug: string;
+  /** Nombre legible del tier. */
+  name: string;
+  /** Precio por intervalo (en la divisa del módulo/Cloud). 0 = gratis. */
+  price: number;
+  /** Periodo de facturación del precio. */
+  interval?: 'month' | 'year' | 'one_time';
+  /** Días de prueba gratis del tier. */
+  trial_days?: number;
+  /** Cuota incluida (p. ej. nº de operaciones/mes). Texto o número para mostrar. */
+  quota?: number | string;
+  /** Si el tier es medido por uso (pago por consumo). */
+  metered?: boolean;
+  /** Precio por unidad excedida sobre la cuota (cuando `metered`/`quota`). */
+  overage_price?: number;
+}
+
+/** Bloque `billing` del manifest (ADR-0006/0013). */
+export interface ModuleBilling {
+  /** Tier por defecto del módulo (`basic`…). */
+  tier?: string;
+  /** Modelo de cobro del módulo. */
+  type?: 'free' | 'one_time' | 'subscription' | string;
+  /** Días de prueba gratis a nivel de módulo (si no se declaran por tier). */
+  trial_days?: number;
+  /** Lista de tiers/planos ofertados. El shell pinta uno por tarjeta. */
+  tiers?: BillingTierDef[];
 }
 
 /** Un chequeo sobre una fila del resultado de la query de `setup`. "Configurado" exige que TODOS
@@ -52,6 +91,8 @@ export interface ModuleSetupCheck {
  * NO configurado → alerta con CTA a `route`.
  */
 export interface ModuleSetupDef {
+  /** Si true (por defecto) la config pendiente alerta en el DASHBOARD; si false es opcional y NO alerta. */
+  required?: boolean;
   /** Query namespaced que devuelve el estado de configuración (1 fila). */
   query: string;
   /** Params estáticos para la query. */

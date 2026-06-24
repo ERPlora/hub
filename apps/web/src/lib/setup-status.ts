@@ -1,12 +1,16 @@
 // Subsistema "estado de configuración" (ADR-0063): detecta MÓDULOS instalados que aún NO están
-// configurados y los surfacea como alertas (campana de la topbar + banner del dashboard) con un CTA
-// a su pantalla de ajustes.
+// configurados y los surfacea como alerta SOLO en el DASHBOARD (banner) con un CTA a su pantalla
+// de ajustes. Es un ESTADO DERIVADO que se cura solo: en cuanto el módulo queda configurado, deja
+// de alertar. NO alimenta la campana de la topbar (esa es una central de notificaciones de EVENTOS
+// futura, aparte — ver lib/shell.notificationCount).
 //
 // GENÉRICO (el Hub es internacional y no conoce módulos concretos): cada módulo declara su propio
 // chequeo en `module.json` (`setup`, ver @erplora/module-types). El shell lo recolecta de los
 // manifests instalados (misma fuente que los widgets, ADR-0054), corre la query REAL del módulo
-// (CERO mocks) y evalúa `configured_when`. Solo se alerta a ADMIN (configurar módulos es tarea de
-// admin) y solo de lo que la query confirme; si la query falla (sin permiso/boot) se omite.
+// (CERO mocks) y evalúa `configured_when`. Solo se alerta de configuración REQUERIDA (`required`
+// ausente = true; `required: false` = opcional, no molesta), a quien tiene permiso para configurar
+// (gate ADMIN + `permission` del módulo) y solo de lo que la query confirme; si la query falla
+// (sin permiso/boot) se omite.
 
 import { computed, ref } from 'vue';
 import type { ErploraClient } from '@erplora/module-sdk';
@@ -14,7 +18,6 @@ import type { ModuleSetupCheck, ModuleSetupDef } from '@erplora/module-types';
 
 import { loadInstalledManifests } from './module-loader';
 import { isAdmin } from './session';
-import { setNotificationCount } from './shell';
 
 /** Un módulo instalado pendiente de configurar (lo que ve el usuario en la campana/dashboard). */
 export interface PendingSetup {
@@ -52,14 +55,14 @@ function isConfigured(row: Row | undefined, def: ModuleSetupDef): boolean {
 }
 
 /**
- * Recalcula la lista de módulos pendientes de configurar y actualiza el contador de la campana.
+ * Recalcula la lista de módulos pendientes de configurar (banner del dashboard).
  * Best-effort: cualquier fallo (red, permiso, boot temprano) degrada a "no alertar por ese módulo".
  * No-op para usuarios no-admin (no ven alertas de configuración).
+ * NO toca la campana de la topbar: esa es una central de notificaciones de EVENTOS futura, aparte.
  */
 export async function refreshSetupStatus(client: ErploraClient): Promise<void> {
   if (!isAdmin.value) {
     _pending.value = [];
-    setNotificationCount(0);
     return;
   }
   let manifests;
@@ -73,6 +76,14 @@ export async function refreshSetupStatus(client: ErploraClient): Promise<void> {
   for (const { moduleId, manifest } of manifests) {
     const def = manifest.setup;
     if (!def?.query || !def.route || !Array.isArray(def.configured_when)) continue;
+    // Solo alerta la configuración REQUERIDA: `required` ausente = requerido (por defecto);
+    // `required: false` = opcional → no molesta en el dashboard.
+    if (def.required === false) continue;
+    // Filtra por PERMISO de configurar: el gate ADMIN (arriba) ya restringe el grueso; si el módulo
+    // declara un `permission` específico, además debe tenerlo el usuario actual. Sin un helper de
+    // permisos finos en cliente hoy (session.ts solo expone el rol), el gate efectivo es ADMIN; la
+    // query REAL (más abajo) revalida el permiso server-side y descarta lo que no pueda leer.
+    if (def.permission && !hasSetupPermission(def.permission)) continue;
     let row: Row | undefined;
     try {
       const res = await client.query<Row | Row[]>(def.query, def.params ?? {});
@@ -92,5 +103,14 @@ export async function refreshSetupStatus(client: ErploraClient): Promise<void> {
   }
 
   _pending.value = out;
-  setNotificationCount(out.length);
+}
+
+/**
+ * ¿Puede el usuario actual configurar un módulo que pide `perm`? Hoy session.ts no expone un set de
+ * permisos finos en cliente (la autoridad es el runtime, que revalida cada query), así que el gate
+ * efectivo es ADMIN — owner/admin configura módulos. Cuando el shell exponga un `hasPermission(perm)`
+ * limpio, basta con consultarlo aquí.
+ */
+function hasSetupPermission(_perm: string): boolean {
+  return isAdmin.value;
 }
