@@ -305,13 +305,13 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             invoice_date: str_field(&inv, "issue_date"),
             invoice_type,
             description,
-            // ⚠️ El módulo invoice guarda importes en EUROS (decimales); `build_record_output`
-            // espera CÉNTIMOS (ADR-0007, igual que create_record) y divide /100 al formatear para la
-            // AEAT/QR. Convertimos euros→céntimos aquí para no enviar 1,21 € en vez de 121,00 €.
-            base_amount: (num_field(&inv, "base_amount", 0.0) * 100.0).round(),
-            tax_rate: 21.0,
-            tax_amount: (num_field(&inv, "tax_amount", 0.0) * 100.0).round(),
-            total_amount: (num_field(&inv, "total_amount", 0.0) * 100.0).round(),
+            // El módulo invoice guarda importes en CÉNTIMOS (ADR-0007), igual que `create_record`;
+            // `build_record_output` espera céntimos y divide /100 al formatear para la AEAT/QR.
+            // NO convertir aquí (el `* 100.0` previo declaraba importes ×100 a la AEAT — QA 2026-06-25).
+            base_amount: num_field(&inv, "base_amount", 0.0),
+            tax_rate: 21.0, // TODO(humano): derivar del tax_breakdown (hoy fijo 21% — incorrecto en facturas a 10%).
+            tax_amount: num_field(&inv, "tax_amount", 0.0),
+            total_amount: num_field(&inv, "total_amount", 0.0),
             invoice_id: Json::String(invoice_id),
             // Destinatario para el bloque XML Destinatarios (F1/F3/R1-R4). Tiquets (F2) sin cliente
             // → vacío → sin Destinatarios. Evita el error AEAT 1189 en facturas completas.

@@ -29,6 +29,8 @@ fn wasm_present() -> bool {
 async fn fresh() -> Runtime {
     let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
+    // inventory depende de taxes (ADR-0066): instalar taxes primero.
+    rt.install_from_dir(&inventory_dir().parent().unwrap().join("taxes")).await.expect("instalar taxes");
     rt.install_from_dir(&inventory_dir()).await.expect("instalar inventory");
     rt
 }

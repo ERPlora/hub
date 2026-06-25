@@ -106,6 +106,7 @@ async fn auto_f2_on_sale_completed() {
     if !mdir("sales").join("dist/handler.wasm").exists() || !wasm() { eprintln!("SKIP"); return; }
     let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap();
     rt.install_from_dir(&mdir("invoice")).await.unwrap();
@@ -129,4 +130,47 @@ async fn auto_f2_on_sale_completed() {
     // céntimos: base 3*200 = 600, tax 21% = 126.
     assert_eq!(inv["base_amount"].as_i64().unwrap(), 600);
     assert_eq!(inv["tax_amount"].as_i64().unwrap(), 126);
+}
+
+#[tokio::test]
+async fn auto_f2_propagates_business_issuer_via_outbox() {
+    // REGRESIÓN QA (2026-06-25): la identidad fiscal del hub (hub_settings, ADR-0061) debe llegar a
+    // la factura F2 que se crea de forma ASÍNCRONA por el relay del Outbox (sale.completed →
+    // invoice.create_from_sale, depth>0). Antes la enriquecedora del dispatcher solo corría a
+    // depth==0, así que las facturas del relay salían con issuer_nif='' → VeriFactu no encadenaba.
+    if !mdir("sales").join("dist/handler.wasm").exists() || !wasm() { eprintln!("SKIP"); return; }
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(&mdir("taxes")).await.unwrap();
+    rt.install_from_dir(&mdir("inventory")).await.unwrap();
+    rt.install_from_dir(&mdir("customers")).await.unwrap();
+    rt.install_from_dir(&mdir("invoice")).await.unwrap();
+    rt.install_from_dir(&mdir("sales")).await.unwrap();
+    // El ctx debe compartir hub_id con el Runtime (DEV_HUB_ID) para que set_settings y la
+    // enriquecedora lean la MISMA fila de hub_settings.
+    let ctx = RequestContext::new(erplora_runtime::DEV_HUB_ID, "u1", ["*".to_string()]);
+
+    // Identidad fiscal de negocio del hub (la pondría el setup fiscal guiado / PUT /api/settings).
+    let mut up = serde_json::Map::new();
+    up.insert("business_tax_id".into(), json!("B12345674"));
+    up.insert("business_legal_name".into(), json!("Peluquería Demo SL"));
+    rt.set_settings(&up, "u1").await.expect("set business identity");
+
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "customer_name": "Cliente", "tax_included": true,
+        "items": [{ "product_name": "Corte", "price": 2500, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.unwrap();
+    rt.drain_outbox().await.unwrap();
+
+    let invs = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(invs.len(), 1);
+    // invoice.list no proyecta issuer_nif → leemos el detalle con invoice.get.
+    let mut gp = Params::new();
+    gp.insert("invoice_id".into(), invs[0]["id"].clone());
+    let detail = rt.execute_query("invoice.get", &gp, &ctx).await.unwrap();
+    assert_eq!(
+        detail[0]["issuer_nif"].as_str().unwrap(),
+        "B12345674",
+        "la factura auto-F2 del relay debe llevar el NIF emisor de hub_settings"
+    );
 }

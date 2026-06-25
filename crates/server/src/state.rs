@@ -76,13 +76,14 @@ pub struct HubConfig {
     /// romper dev/local: un cliente que no manda `device_id` nunca se ve afectado.
     /// TODO(humano): el host (Tauri/web) debe aportar un `device_id` estable; cerrar el diseño en §2.9.
     pub device_trust_enforce: bool,
-    /// **Sector / tipo de negocio** del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`general`), lo
+    /// **Sector / tipo de negocio** del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`belleza`|`general`), lo
     /// inyecta el despliegue vía env `HUB_SECTOR` (hermano de `HUB_LANGUAGE`/`HUB_CURRENCY`). Lo
     /// expone `GET /api/hub/context` para que el dashboard derive el preset "Recomendado" de widgets
     /// (ADR-0054). `None` = sector no determinable → el board degrada (preset vacío, el usuario activa
-    /// widgets a mano). FLAG(humano): hoy el Cloud NO persiste el sector en el modelo `Hub` ni lo pasa
-    /// al provisioning; este env es la **fuente nueva** propuesta para el contrato runtime↔Cloud —
-    /// confirmar dónde lo elige el tenant (onboarding) y cablearlo en la inyección ECS de `aws.py`.
+    /// widgets a mano). El Cloud captura el tipo de negocio en el onboarding y lo traduce a este env en
+    /// la inyección ECS (`aws.py::BUSINESS_TYPE_TO_SECTOR`, ADR-0071); `belleza` = preset del vertical
+    /// servicios/peluquería. El sector NO se persiste en el modelo `Hub` (vive en
+    /// `pending_metadata['business_type']`): este env es la fuente del contrato runtime↔Cloud.
     pub sector: Option<String>,
 }
 

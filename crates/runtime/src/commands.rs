@@ -54,8 +54,14 @@ pub(crate) async fn execute_at(
     // `:business_tax_id`/`:business_legal_name`/`:business_address` a todo el SQL del comando (p.ej.
     // invoice resuelve el emisor sin que el caller lo pase). En cascadas (depth>0) el ctx ya viene
     // enriquecido. Degrada a vacío si los settings fallan.
+    // FIX QA (2026-06-25): la condición original `depth == 0` dejaba SIN enriquecer las commands
+    // entregadas por el relay del Outbox (listeners de eventos), que corren a depth>0 con un ctx
+    // RECONSTRUIDO (reconstruct_ctx) cuyo business_tax_id está vacío. El caso real: `sale.completed`
+    // (depth 1) → `invoice.create_from_sale` (listener, depth 1) generaba facturas con issuer_nif
+    // vacío → VeriFactu (`ingest_invoice`) no-op (no encadena, 0 registros, 0 QR). Enriquecemos
+    // SIEMPRE que falte la identidad fiscal (la cascada con ctx ya enriquecido salta el get_all).
     let enriched_ctx;
-    let ctx = if depth == 0 && ctx.business_tax_id.is_empty() {
+    let ctx = if ctx.business_tax_id.is_empty() {
         let f = crate::settings::get_all(db, &ctx.hub_id).await.unwrap_or(Json::Null);
         let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
         enriched_ctx = ctx.clone().with_business(
@@ -77,11 +83,24 @@ pub(crate) async fn execute_at(
 
     // Validación del payload contra el JSON Schema declarado (compilado al instalar y
     // cacheado en el Registry): rechaza ANTES de tocar la BD o invocar handlers (hub#27).
-    if let Some(schema) = &cmd.schema {
+    // Tras validar, inyectamos los `default` del schema en las claves AUSENTES (causa raíz,
+    // decision-log 2026-06-25): así un campo opcional con `default` omitido por el caller llega
+    // bindeado con su valor por defecto y el SQL no peta con `NOT NULL constraint failed` — hace
+    // redundante (no obsoleto) el COALESCE por-módulo. Solo claves ausentes; un valor aportado
+    // (incl. `null` explícito) nunca se sobreescribe. `payload` pasa a ser el payload "defaulteado"
+    // para TODOS los tiers de abajo (SQL declarativo, WASM, nativo), que bindean por nombre.
+    let defaulted;
+    let payload = if let Some(schema) = &cmd.schema {
         schema
             .validate(&Json::Object(payload.clone()))
             .map_err(|detail| RuntimeError::InvalidPayload { name: name.to_string(), detail })?;
-    }
+        let mut p = payload.clone();
+        schema.apply_defaults(&mut p);
+        defaulted = p;
+        &defaulted
+    } else {
+        payload
+    };
 
     // ── Plugin nativo first-party (ADR-0009) ────────────────────────────────
     if let Some(handler) = &cmd.def.handler {

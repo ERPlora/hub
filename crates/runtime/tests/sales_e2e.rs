@@ -38,6 +38,7 @@ async fn fresh() -> (Runtime, Arc<Sink>) {
     let mut rt = Runtime::new(Box::new(db));
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
+    rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes"); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.expect("instalar inventory");
     rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
     rt.install_from_dir(&mdir("sales")).await.expect("instalar sales");
@@ -120,7 +121,7 @@ async fn sale_decrements_stock_via_event() {
     rt.execute_command("inventory.products.create", &params(json!({
         "name": "Café", "sku": "CAF", "price": 121, "cost": 50, "stock": 10,
         "low_stock_threshold": 5, "product_type": "physical",
-        "ean13": null, "description": "", "tax_class_id": null, "image": ""
+        "ean13": null, "description": "", "tax_rate_id": null, "image": ""
     })), &ctx).await.unwrap();
     let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
@@ -134,6 +135,97 @@ async fn sale_decrements_stock_via_event() {
 
     let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": pid})), &ctx).await.unwrap();
     assert_eq!(p[0]["stock"].as_f64().unwrap(), 7.0, "el evento sale.completed debe descontar stock");
+}
+
+#[tokio::test]
+async fn sale_persists_staff_id_and_breaks_down_by_staff() {
+    // Atribución por profesional: la venta guarda staff_id (≠ employee_id), lo expone en
+    // sales.get/list, y sales.by_staff lo agrega por profesional para el cierre del día.
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    // dos ventas atribuidas a staff-A, una a staff-B.
+    let mk = |staff: &str, price: i64| params(json!({
+        "tax_included": true, "amount_tendered": 0, "staff_id": staff,
+        "items": [{ "product_name": "Corte", "price": price, "quantity": 1, "tax_rate": 21.0, "is_service": true }]
+    }));
+    rt.execute_command("sales.complete_sale", &mk("staff-A", 2000), &ctx).await.unwrap();
+    rt.execute_command("sales.complete_sale", &mk("staff-A", 3000), &ctx).await.unwrap();
+    rt.execute_command("sales.complete_sale", &mk("staff-B", 1000), &ctx).await.unwrap();
+
+    // sales.get expone staff_id.
+    let sale = &rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap()[0];
+    let got = rt.execute_query("sales.get", &params(json!({"sale_id": sale["id"]})), &ctx).await.unwrap();
+    assert!(got[0]["staff_id"].is_string(), "sales.get debe exponer staff_id");
+
+    // sales.by_staff: 2 filas (A y B), A con gross 50€ (5000 céntimos) y 2 ventas, B con 10€.
+    let by_staff = rt.execute_query("sales.by_staff", &params(json!({
+        "date_from": "2026-01-01", "date_to": "2030-12-31"
+    })), &ctx).await.unwrap();
+    assert_eq!(by_staff.len(), 2, "una fila por profesional: {by_staff:?}");
+    let a = by_staff.iter().find(|r| r["staff_id"] == json!("staff-A")).unwrap();
+    assert_eq!(a["sales_count"].as_i64().unwrap(), 2);
+    assert_eq!(a["gross_total"].as_i64().unwrap(), 5000); // 20€ + 30€ = 50.00€
+    let b = by_staff.iter().find(|r| r["staff_id"] == json!("staff-B")).unwrap();
+    assert_eq!(b["gross_total"].as_i64().unwrap(), 1000);
+}
+
+#[tokio::test]
+async fn by_staff_respects_date_range_and_excludes_unattributed() {
+    // Ventas sin staff_id NO aparecen en by_staff; el rango de fechas acota.
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    // venta SIN staff (TPV normal) + venta CON staff.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.unwrap();
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "staff_id": "staff-X",
+        "items": [{ "product_name": "Corte", "price": 2000, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.unwrap();
+
+    // rango amplio: solo la atribuida.
+    let rows = rt.execute_query("sales.by_staff", &params(json!({
+        "date_from": "2026-01-01", "date_to": "2030-12-31"
+    })), &ctx).await.unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["staff_id"], json!("staff-X"));
+
+    // rango en el pasado: ninguna venta (las de hoy quedan fuera).
+    let none = rt.execute_query("sales.by_staff", &params(json!({
+        "date_from": "2020-01-01", "date_to": "2020-12-31"
+    })), &ctx).await.unwrap();
+    assert_eq!(none.len(), 0, "el rango pasado no debe incluir ventas de hoy");
+}
+
+#[tokio::test]
+async fn create_from_appointment_tags_sale_and_emits_conversion() {
+    // Cita→venta: pasar appointment_id construye una venta atribuida al profesional de la cita
+    // y EMITE sales.sale.created_from_appointment (traza para que appointments la marque
+    // convertida en SU listener — sales no toca appointments).
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, sink) = fresh().await;
+    let ctx = admin();
+    // El POS arma los items desde la cita (servicio, precio) y pasa staff_id + appointment_id.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "tax_included": true, "amount_tendered": 0,
+        "staff_id": "stylist-1", "appointment_id": "appt-42",
+        "customer_id": "cust-9", "customer_name": "Ana",
+        "items": [{ "product_name": "Tinte", "price": 4500, "quantity": 1, "tax_rate": 21.0, "is_service": true }]
+    })), &ctx).await.expect("create_from_appointment via complete_sale");
+
+    let sale = &rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap()[0];
+    let got = rt.execute_query("sales.get", &params(json!({"sale_id": sale["id"]})), &ctx).await.unwrap();
+    assert_eq!(got[0]["staff_id"], json!("stylist-1"));
+    assert_eq!(got[0]["appointment_id"], json!("appt-42"));
+
+    // se emitió el evento de conversión con el appointment_id.
+    let evs = sink.events.lock().unwrap();
+    let conv = evs.iter().find(|(n, _)| n == "sales.sale.created_from_appointment")
+        .expect("debe emitir sales.sale.created_from_appointment");
+    assert_eq!(conv.1["appointment_id"], json!("appt-42"));
+    assert_eq!(conv.1["staff_id"], json!("stylist-1"));
 }
 
 #[tokio::test]

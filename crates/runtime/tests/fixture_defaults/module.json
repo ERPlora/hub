@@ -1,0 +1,19 @@
+{
+  "id": "defaults",
+  "name": "Defaults Fixture",
+  "version": "1.0.0",
+  "permissions": ["defaults.write", "defaults.read"],
+  "role_permissions": { "admin": ["*"] },
+  "migrations": { "sqlite": ["migrations/sqlite/001_init.sql"] },
+  "queries": {
+    "defaults.items.list": { "permission": "defaults.read", "sql": "queries/items_list.sql" }
+  },
+  "commands": {
+    "defaults.items.create": {
+      "permission": "defaults.write",
+      "transaction": true,
+      "sql": ["commands/items_create.sql"],
+      "schema": "schemas/items_create.json"
+    }
+  }
+}

@@ -43,6 +43,37 @@ impl CompiledSchema {
             .map_err(|e| e.to_string())
     }
 
+    /// Inyecta los `default` del JSON Schema en `params` para cada propiedad **ausente**
+    /// (causa raíz, decision-log 2026-06-25): el SQL declarativo bindea `:campo` por nombre, y un
+    /// campo opcional omitido por el caller no llegaba con valor → `NOT NULL constraint failed`
+    /// salvo que el módulo lo parchease con `COALESCE`. Aplicar el `default` del schema aquí hace
+    /// ese COALESCE redundante (pero inofensivo): el caller que omite la clave obtiene el valor por
+    /// defecto declarado.
+    ///
+    /// Reglas (conservadoras, JSON-Schema-fieles):
+    /// - **Solo claves ausentes.** Un valor aportado por el caller NUNCA se sobreescribe.
+    /// - **`null` explícito se respeta** (es un valor presente, no una ausencia): no se toca, igual
+    ///   que cualquier otro valor aportado. El COALESCE/`NOT NULL` del SQL sigue mandando sobre el
+    ///   `null` exactamente como hoy — este cambio no altera el trato del `null` explícito.
+    /// - Solo `properties.<k>.default` de primer nivel (los `default` del estándar son por-propiedad;
+    ///   no resolvemos `$ref`/`allOf`/anidados — alcance mínimo y suficiente para los schemas planos
+    ///   de los commands declarativos).
+    ///
+    /// Se llama tras [`Self::validate`], así que el `default` ya pasó el contrato; solo se materializa.
+    pub fn apply_defaults(&self, params: &mut crate::Params) {
+        let Some(props) = self.raw.get("properties").and_then(|p| p.as_object()) else {
+            return;
+        };
+        for (key, prop) in props {
+            if params.contains_key(key) {
+                continue; // valor aportado (incl. `null` explícito) → no tocar
+            }
+            if let Some(default) = prop.get("default") {
+                params.insert(key.clone(), default.clone());
+            }
+        }
+    }
+
     /// Valida `instance`; `Err` lleva el detalle legible de las violaciones (máx. 5).
     pub fn validate(&self, instance: &serde_json::Value) -> Result<(), String> {
         let errors: Vec<String> = self
