@@ -59,7 +59,7 @@ async fn product_crud_and_low_stock() {
         &params(json!({
             "name": "Café", "sku": "CAF", "price": 450, "cost": 200,
             "stock": 3, "low_stock_threshold": 5, "product_type": "physical",
-            "ean13": null, "description": "", "tax_class_id": null, "image": ""
+            "ean13": null, "description": "", "tax_rate_id": null, "image": ""
         })),
         &ctx,
     ).await
@@ -92,7 +92,7 @@ async fn stock_adjust_clamps_at_zero() {
         "inventory.products.create",
         &params(json!({ "name": "X", "sku": "X1", "price": 1, "cost": 0, "stock": 2,
                         "low_stock_threshold": 10, "product_type": "physical",
-                        "ean13": null, "description": "", "tax_class_id": null, "image": "" })),
+                        "ean13": null, "description": "", "tax_rate_id": null, "image": "" })),
         &ctx,
     ).await.unwrap();
     let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
@@ -150,7 +150,7 @@ async fn receive_stock_wasm_increments_existing() {
         "inventory.products.create",
         &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10,
                         "low_stock_threshold": 5, "product_type": "physical",
-                        "ean13": null, "description": "", "tax_class_id": null, "image": "" })),
+                        "ean13": null, "description": "", "tax_rate_id": null, "image": "" })),
         &ctx,
     ).await.unwrap();
     let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
