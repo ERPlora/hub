@@ -43,12 +43,13 @@ fn admin() -> RequestContext {
 async fn rt_appts() -> Runtime {
     let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
-    // appointments `depends_on` customers + services (FK lógicas cross-módulo) y services
-    // `depends_on` taxes (ADR-0066); el installer valida la cadena, así que las instalamos
-    // en orden topológico primero.
+    // appointments `depends_on` customers + services + staff (FK lógicas cross-módulo; staff por
+    // ADR-0074, selector de profesional) y services `depends_on` taxes (ADR-0066); el installer
+    // valida la cadena, así que las instalamos en orden topológico primero (staff no depende de nada).
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");
     rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
     rt.install_from_dir(&mdir("services")).await.expect("instalar services");
+    rt.install_from_dir(&mdir("staff")).await.expect("instalar staff");
     rt.install_from_dir(&mdir("appointments")).await.expect("instalar appointments");
     rt
 }

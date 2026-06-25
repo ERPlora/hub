@@ -80,7 +80,9 @@ async fn session_summary_aggregates_by_type() {
     }
     let sum = rt.execute_query("cash_register.session.summary", &params(json!({"session_id": sid})), &ctx).await.unwrap();
     assert_eq!(sum[0]["total_sales"].as_i64().unwrap(), 5000);
-    assert_eq!(sum[0]["total_refunds"].as_i64().unwrap(), -1000);
+    // FIX SIGNO (QA 2026-06-25): el desglose se presenta como MAGNITUD POSITIVA — un refund
+    // almacenado en -1000 se reporta como 1000 (la query niega el SUM de salidas).
+    assert_eq!(sum[0]["total_refunds"].as_i64().unwrap(), 1000);
     assert_eq!(sum[0]["movement_count"], json!(4));
 }
 

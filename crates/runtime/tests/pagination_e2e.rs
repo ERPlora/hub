@@ -10,8 +10,10 @@ fn params(v: serde_json::Value) -> Params {
     v.as_object().cloned().unwrap_or_default()
 }
 
-fn inventory_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/inventory")
+fn mdir(n: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../modules-workspace/modules")
+        .join(n)
 }
 
 fn ctx() -> RequestContext {
@@ -21,14 +23,15 @@ fn ctx() -> RequestContext {
 async fn fresh_with_products(names_prices: &[(&str, f64)]) -> Runtime {
     let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&inventory_dir()).await.expect("instalar inventory");
+    rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes"); // inventory depends_on taxes (ADR-0066)
+    rt.install_from_dir(&mdir("inventory")).await.expect("instalar inventory");
     for (i, (name, price)) in names_prices.iter().enumerate() {
         rt.execute_command(
             "inventory.products.create",
             &params(json!({
                 "name": name, "sku": format!("SKU-{i}"), "price": price, "cost": 0,
                 "stock": (i as i64) + 1, "low_stock_threshold": 5, "product_type": "physical",
-                "ean13": null, "description": "", "tax_class_id": null, "image": ""
+                "ean13": null, "description": "", "tax_rate_id": null, "image": ""
             })),
             &ctx(),
         )
