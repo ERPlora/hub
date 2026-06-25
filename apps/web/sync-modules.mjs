@@ -19,7 +19,7 @@ const PUBLIC_DST = join(HERE, 'public/modules');
 // En prod esto no existe (el runtime sirve los módulos del marketplace) — aquí es el puente del dev.
 const MODULES = [
   'appointments', 'cart_checkout', 'cash_register', 'customers', 'inventory',
-  'invoice', 'invoice_series', 'kitchen', 'kitchen_orders', 'online_booking',
+  'invoice', 'invoice_series', 'kitchen', 'online_booking',
   'orders', 'payment_gateways', 'payments', 'pricing', 'reservations',
   'sales', 'schedules', 'services', 'staff', 'tables',
   'tasks', 'taxes', 'tickets', 'verifactu', 'whatsapp_inbox',
