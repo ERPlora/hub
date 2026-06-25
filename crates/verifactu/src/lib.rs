@@ -92,6 +92,33 @@ fn int_field(v: &Json, k: &str, default: i64) -> i64 {
     }
 }
 
+/// Deriva el **TipoImpositivo** (% IVA) para el DesgloseIVA del registro VeriFactu a partir del
+/// desglose real de la factura. El registro lleva un **único** `tax_rate` (un solo bloque de
+/// desglose), así que:
+/// - Si el `tax_breakdown` de la factura (JSON `{"21.00":{base,tax}, …}`, importes en céntimos)
+///   tiene **un único tipo** → se usa ESE tipo exacto (lo correcto y el caso normal del POS).
+/// - Si tiene **varios tipos** (factura mixta 21%+10%) o está vacío/inválido → se cae al **tipo
+///   efectivo** `tax/base*100` redondeado a 2 decimales.
+///
+/// El desglose multi-tipo REAL (varias líneas DesgloseIVA en el XML) queda pendiente de diseño del
+/// humano (TODO §G / decision-log). Antes esto era fijo 21% — incorrecto en facturas a 10% (QA 2026-06-25).
+fn derive_tax_rate(tax_breakdown: &str, base_cents: f64, tax_cents: f64) -> f64 {
+    if let Ok(Json::Object(map)) = serde_json::from_str::<Json>(tax_breakdown) {
+        if map.len() == 1 {
+            if let Some(rate) = map.keys().next().and_then(|k| k.trim().parse::<f64>().ok()) {
+                return rate;
+            }
+        }
+    }
+    // Fallback (multi-tipo o sin desglose): tipo efectivo redondeado a 2 decimales. La división
+    // conserva el signo en rectificativas (base y cuota negativas → ratio positivo).
+    if base_cents != 0.0 {
+        (tax_cents / base_cents * 10_000.0).round() / 100.0
+    } else {
+        0.0
+    }
+}
+
 struct Ctx {
     hub_id: String,
     now: String,
@@ -262,7 +289,7 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
         .read(
             "SELECT invoice_type, number, issue_date, issuer_nif, issuer_name, \
              customer_tax_id, customer_name, description, \
-             base_amount, tax_amount, total_amount FROM invoice_invoice \
+             base_amount, tax_amount, total_amount, tax_breakdown FROM invoice_invoice \
              WHERE id = :invoice_id AND hub_id = :hub_id AND is_deleted = 0 LIMIT 1",
             &params(json!({ "invoice_id": invoice_id, "hub_id": ctx.hub_id })),
         )
@@ -309,7 +336,13 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             // `build_record_output` espera céntimos y divide /100 al formatear para la AEAT/QR.
             // NO convertir aquí (el `* 100.0` previo declaraba importes ×100 a la AEAT — QA 2026-06-25).
             base_amount: num_field(&inv, "base_amount", 0.0),
-            tax_rate: 21.0, // TODO(humano): derivar del tax_breakdown (hoy fijo 21% — incorrecto en facturas a 10%).
+            // Tipo IVA derivado del desglose REAL de la factura (un único tipo → ese; mixto/vacío →
+            // efectivo). Antes era fijo 21% — incorrecto en facturas a 10% (QA 2026-06-25).
+            tax_rate: derive_tax_rate(
+                &str_field(&inv, "tax_breakdown"),
+                num_field(&inv, "base_amount", 0.0),
+                num_field(&inv, "tax_amount", 0.0),
+            ),
             tax_amount: num_field(&inv, "tax_amount", 0.0),
             total_amount: num_field(&inv, "total_amount", 0.0),
             invoice_id: Json::String(invoice_id),
@@ -1342,4 +1375,49 @@ async fn recover_manual(input: &Json, host: &dyn NativeHost) -> Result<Output> {
                 "timestamp": ctx.now,
             }),
         )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::derive_tax_rate;
+
+    #[test]
+    fn tipo_unico_se_toma_del_desglose() {
+        // Factura a 10% (peluquería/restaurante): el desglose tiene un único tipo → 10, no 21.
+        let tb = r#"{"10.00":{"base":1100,"tax":110}}"#;
+        assert_eq!(derive_tax_rate(tb, 1100.0, 110.0), 10.0);
+        // Factura a 21% estándar.
+        let tb21 = r#"{"21.00":{"base":10000,"tax":2100}}"#;
+        assert_eq!(derive_tax_rate(tb21, 10000.0, 2100.0), 21.0);
+        // Tipo reducido 4% (libros/alimentos).
+        let tb4 = r#"{"4.00":{"base":500,"tax":20}}"#;
+        assert_eq!(derive_tax_rate(tb4, 500.0, 20.0), 4.0);
+    }
+
+    #[test]
+    fn mixto_o_vacio_cae_al_tipo_efectivo() {
+        // Mixto 21%+10%: el registro es de tipo único → efectivo (no es un tipo real, limitación
+        // documentada; el desglose multi-línea queda para el humano).
+        let mixto = r#"{"21.00":{"base":10000,"tax":2100},"10.00":{"base":1000,"tax":100}}"#;
+        let r = derive_tax_rate(mixto, 11000.0, 2200.0); // 2200/11000 = 20%
+        assert_eq!(r, 20.0);
+        // Desglose vacío (facturas antiguas '{}'): efectivo desde base/cuota.
+        assert_eq!(derive_tax_rate("{}", 1000.0, 100.0), 10.0);
+        // JSON inválido → efectivo.
+        assert_eq!(derive_tax_rate("", 1000.0, 210.0), 21.0);
+    }
+
+    #[test]
+    fn base_cero_no_divide_por_cero() {
+        assert_eq!(derive_tax_rate("{}", 0.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn rectificativa_negativa_conserva_signo_del_tipo() {
+        // R1 con importes negativos: 2100/10000 = 21% (positivo), el desglose de tipo único manda.
+        let tb = r#"{"21.00":{"base":-10000,"tax":-2100}}"#;
+        assert_eq!(derive_tax_rate(tb, -10000.0, -2100.0), 21.0);
+        // Sin desglose, efectivo de negativos: (-210)/(-1000) → 21%.
+        assert_eq!(derive_tax_rate("{}", -1000.0, -210.0), 21.0);
+    }
 }
