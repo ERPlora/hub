@@ -38,6 +38,7 @@ async fn fresh() -> (Runtime, Arc<Sink>) {
     let mut rt = Runtime::new(Box::new(db));
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
+    rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");
     rt.install_from_dir(&mdir("inventory")).await.expect("instalar inventory");
     rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
     rt.install_from_dir(&mdir("sales")).await.expect("instalar sales");
@@ -98,6 +99,66 @@ async fn complete_sale_creates_header_and_lines() {
 }
 
 #[tokio::test]
+async fn keystone_resolves_tax_from_catalog_ignoring_client_hint() {
+    // ADR-0069 E2E real: el handler resuelve el % desde `taxes` (pre-cargado por el runtime
+    // vía `reads`), NO del cliente. Prueba la cadena completa keystone + taxes + sales.
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    // Siembra IVA General 21% (ES) en el catálogo.
+    rt.execute_command("taxes.rates.create", &params(json!({
+        "code": "es-std", "name": "IVA General", "country_code": "ES", "rate_pct": 21.0
+    })), &ctx).await.expect("crear tipo");
+    let std_id = rt.execute_query("taxes.rates.list", &Params::new(), &ctx).await.unwrap()
+        .iter().find(|r| r["code"] == json!("es-std")).unwrap()["id"].as_str().unwrap().to_string();
+
+    // Venta: `tax_rate_id` del catálogo + un hint MENTIROSO del cliente (99). El servidor usa 21.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "tax_included": false,
+        "items": [{ "product_name": "Café", "price": 1000, "quantity": 1, "tax_rate": 99.0, "tax_rate_id": std_id }]
+    })), &ctx).await.expect("venta");
+
+    let sales = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    let lines = rt.execute_query("sales.lines", &params(json!({"sale_id": sales[0]["id"]})), &ctx).await.unwrap();
+    let l = &lines[0];
+    assert_eq!(l["net_amount"].as_i64().unwrap(), 1000);
+    assert_eq!(l["tax_amount"].as_i64().unwrap(), 210, "21% del catálogo, NO el 99 del cliente");
+    assert_eq!(l["tax_rate"].as_f64().unwrap(), 21.0);
+}
+
+#[tokio::test]
+async fn keystone_group_tax_expands_to_components() {
+    // ADR-0069 E2E: un `tax_rate_id` de tipo "group" se expande a sus componentes (IVA + recargo).
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    // Grupo "IVA 21 + RE 5,2": el grupo (rate 0, tax_type=group) + dos hijos con parent_id.
+    rt.execute_command("taxes.rates.create", &params(json!({
+        "code": "es-iva-re", "name": "IVA+RE", "country_code": "ES", "rate_pct": 0.0, "tax_type": "group"
+    })), &ctx).await.expect("crear grupo");
+    let gid = rt.execute_query("taxes.rates.list", &Params::new(), &ctx).await.unwrap()
+        .iter().find(|r| r["code"] == json!("es-iva-re")).unwrap()["id"].as_str().unwrap().to_string();
+    rt.execute_command("taxes.rates.create", &params(json!({
+        "code": "es-iva", "name": "IVA", "country_code": "ES", "rate_pct": 21.0, "parent_id": gid
+    })), &ctx).await.unwrap();
+    rt.execute_command("taxes.rates.create", &params(json!({
+        "code": "es-re", "name": "RE", "country_code": "ES", "rate_pct": 5.2, "parent_id": gid
+    })), &ctx).await.unwrap();
+
+    // Venta de 100€ (10000 céntimos) sin IVA incluido → IVA 2100 + RE 520 = 2620.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "tax_included": false,
+        "items": [{ "product_name": "Camiseta", "price": 10000, "quantity": 1, "tax_rate_id": gid }]
+    })), &ctx).await.expect("venta grupo");
+
+    let sales = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    let lines = rt.execute_query("sales.lines", &params(json!({"sale_id": sales[0]["id"]})), &ctx).await.unwrap();
+    let l = &lines[0];
+    assert_eq!(l["net_amount"].as_i64().unwrap(), 10000);
+    assert_eq!(l["tax_amount"].as_i64().unwrap(), 2620, "grupo IVA 21 + RE 5,2 sobre 100€ = 26,20€");
+}
+
+#[tokio::test]
 async fn second_sale_increments_number() {
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
@@ -120,7 +181,7 @@ async fn sale_decrements_stock_via_event() {
     rt.execute_command("inventory.products.create", &params(json!({
         "name": "Café", "sku": "CAF", "price": 121, "cost": 50, "stock": 10,
         "low_stock_threshold": 5, "product_type": "physical",
-        "ean13": null, "description": "", "tax_class_id": null, "image": ""
+        "ean13": null, "description": "", "tax_rate_id": null, "image": ""
     })), &ctx).await.unwrap();
     let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();

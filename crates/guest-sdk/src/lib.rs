@@ -155,6 +155,14 @@ pub struct Output {
     /// Eventos a emitir tras ejecutar las operaciones.
     #[serde(default)]
     pub events: Vec<Event>,
+    /// **Canal de resultado** del handler (ADR-0069): el desglose calculado que el guest devuelve al
+    /// host (p. ej. el impuesto resuelto server-side: base/cuota/líneas). Es **forward-compatible**
+    /// (`#[serde(default)]`): un handler viejo que no lo manda deserializa a `Value::Null`; el host
+    /// **lo conserva** (antes lo descartaba). No describe intenciones de BD —eso son `operations`—
+    /// sino datos que el host puede devolver al llamador o congelar en el desglose. Arbitrario por
+    /// diseño (cada módulo define su forma).
+    #[serde(default)]
+    pub result: Value,
 }
 
 impl Output {

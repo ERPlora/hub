@@ -18,6 +18,11 @@ fn inventory_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/inventory")
 }
 
+fn taxes_dir() -> PathBuf {
+    // `inventory` declara `depends_on:["taxes"]` (ADR-0069) → hay que instalar taxes antes.
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/taxes")
+}
+
 fn admin_ctx() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
 }
@@ -29,6 +34,7 @@ fn wasm_present() -> bool {
 async fn fresh() -> Runtime {
     let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(&taxes_dir()).await.expect("instalar taxes");
     rt.install_from_dir(&inventory_dir()).await.expect("instalar inventory");
     rt
 }
@@ -57,7 +63,7 @@ async fn product_crud_and_low_stock() {
         &params(json!({
             "name": "Café", "sku": "CAF", "price": 450, "cost": 200,
             "stock": 3, "low_stock_threshold": 5, "product_type": "physical",
-            "ean13": null, "description": "", "tax_class_id": null, "image": ""
+            "ean13": null, "description": "", "tax_rate_id": null, "image": ""
         })),
         &ctx,
     ).await
@@ -90,7 +96,7 @@ async fn stock_adjust_clamps_at_zero() {
         "inventory.products.create",
         &params(json!({ "name": "X", "sku": "X1", "price": 1, "cost": 0, "stock": 2,
                         "low_stock_threshold": 10, "product_type": "physical",
-                        "ean13": null, "description": "", "tax_class_id": null, "image": "" })),
+                        "ean13": null, "description": "", "tax_rate_id": null, "image": "" })),
         &ctx,
     ).await.unwrap();
     let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
@@ -148,7 +154,7 @@ async fn receive_stock_wasm_increments_existing() {
         "inventory.products.create",
         &params(json!({ "name": "Café", "sku": "CAF", "price": 450, "cost": 200, "stock": 10,
                         "low_stock_threshold": 5, "product_type": "physical",
-                        "ean13": null, "description": "", "tax_class_id": null, "image": "" })),
+                        "ean13": null, "description": "", "tax_rate_id": null, "image": "" })),
         &ctx,
     ).await.unwrap();
     let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]

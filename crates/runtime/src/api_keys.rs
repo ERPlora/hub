@@ -361,6 +361,7 @@ mod tests {
             permission: permission.to_string(),
             transaction: false,
             sql: vec![],
+            reads: vec![],
             schema: None,
             emit: vec![],
             handler: None,

@@ -106,6 +106,7 @@ async fn auto_f2_on_sale_completed() {
     if !mdir("sales").join("dist/handler.wasm").exists() || !wasm() { eprintln!("SKIP"); return; }
     let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(&mdir("taxes")).await.unwrap();
     rt.install_from_dir(&mdir("inventory")).await.unwrap();
     rt.install_from_dir(&mdir("customers")).await.unwrap();
     rt.install_from_dir(&mdir("invoice")).await.unwrap();

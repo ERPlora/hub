@@ -410,6 +410,7 @@ mod tests {
                 permission: String::new(),
                 transaction: true,
                 sql: vec![sql.to_string()],
+                reads: vec![],
                 emit: vec![],
                 handler: None,
                 ai: None,

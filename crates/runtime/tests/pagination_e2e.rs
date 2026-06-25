@@ -14,6 +14,11 @@ fn inventory_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/inventory")
 }
 
+fn taxes_dir() -> PathBuf {
+    // `inventory` declara `depends_on:["taxes"]` (ADR-0069) → instalar taxes antes.
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules/taxes")
+}
+
 fn ctx() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
 }
@@ -21,6 +26,7 @@ fn ctx() -> RequestContext {
 async fn fresh_with_products(names_prices: &[(&str, f64)]) -> Runtime {
     let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(&taxes_dir()).await.expect("instalar taxes");
     rt.install_from_dir(&inventory_dir()).await.expect("instalar inventory");
     for (i, (name, price)) in names_prices.iter().enumerate() {
         rt.execute_command(
@@ -28,7 +34,7 @@ async fn fresh_with_products(names_prices: &[(&str, f64)]) -> Runtime {
             &params(json!({
                 "name": name, "sku": format!("SKU-{i}"), "price": price, "cost": 0,
                 "stock": (i as i64) + 1, "low_stock_threshold": 5, "product_type": "physical",
-                "ean13": null, "description": "", "tax_class_id": null, "image": ""
+                "ean13": null, "description": "", "tax_rate_id": null, "image": ""
             })),
             &ctx(),
         )
