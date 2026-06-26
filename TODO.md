@@ -2,7 +2,7 @@
 
 > **Qué es esto:** lista de trabajo específica del **Hub** (runtime Rust + `apps/web` Vue3 + Ionic +
 > OutfitKit). Se ordena por prioridad; el item **#1** es lo que atacamos ahora. El backlog amplio del
-> núcleo sigue en [`BACKLOG.md`](BACKLOG.md); el backlog cross-component, en el [`TODO.md` raíz](../TODO.md).
+> núcleo sigue en [`BACKLOG.md`](BACKLOG.md); el backlog cross-component, en el [`roadmap/TODO.md`](../roadmap/TODO.md).
 >
 > **Convenciones:** `[ ]` pendiente · `[~]` en curso · `[x]` hecho · `[H]` requiere al humano
 > (core/decisión) · `[IA]` la IA puede acelerar (tests/docs/boilerplate). Toda decisión de
