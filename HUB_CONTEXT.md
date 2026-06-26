@@ -56,11 +56,19 @@ tenant que sustituira progresivamente al hub actual.
   `hub_id` y payload en cada query/command.
 - Los modulos declaran contrato tecnico en `module.json`. La clasificacion de
   marketplace vive en Cloud, no en el modulo.
-- Dos ejes ortogonales (ARQUITECTURA.md §1): backend de datos (`single`/SQLite vs
-  `cloud`/Aurora) x shell (`tauri` vs `web-pwa`). No atar Tauri a "local".
-- Transport de datos por backend: `cloud` usa HTTP (query/command) + WebSocket (solo
-  eventos); `single` usa Tauri `invoke` + events. En cualquier shell Tauri, `invoke`
-  es ademas el canal de hardware local (independiente del backend) -> combo `cloud + Tauri`.
+- Dos productos (ARQUITECTURA.md §1; ADR-0080, `../architecture/00-overview/decision-log.md`):
+  **Local** (backend `single`/SQLite + shell `tauri`) y **Hub PWA** (backend `cloud`/Aurora +
+  shell `PWA`). `single ⟺ Local/Tauri`, `cloud ⟺ Hub PWA`. (El combo `cloud + Tauri`
+  quedó RETIRADO — ADR-0080.)
+- Transport de datos (modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md), app
+  unificada): **AMBOS** productos usan **HTTP (query/command) + WebSocket (solo eventos)** contra el
+  runtime Axum — embebido en loopback `127.0.0.1:8787` en **Local**, en ECS en **Hub PWA**. Se
+  **elimina** `invoke`/IPC para datos; el SDK ya no tiene `IpcTransport`. La única diferencia entre
+  productos es el `DatabaseAdapter` (SQLite ↔ Aurora) y los ficheros (disco ↔ S3). En **Local**, el
+  shell Tauri **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA, reusando
+  `crates/peripherals`), **no** por `invoke`; `invoke` queda **solo** para lo nativo (keychain,
+  device_id, ciclo de vida). *(pendiente doc↔código: el runtime/shell puede ir aún por
+  `invoke→HTTP`; la migración es columna core.)*
 - **Dos productos, SIN sync ni Cloud DB remota** (ADR-0040, 2026-06-13; supera el
   "local-first + sync" de ADR-0031 y el tier "Cloud DB" de ADR-0030, ambos RETIRADOS):
   - **Local** (gratis): backend `single`, **SQLite local autoritativo**, un dispositivo,
@@ -70,8 +78,8 @@ tenant que sustituira progresivamente al hub actual.
     multi-dispositivo / web, *online-only*.
   - No existe migración Local→Cloud, ni RDS Proxy/NLB, ni crate `datasync`. El crate `sync`
     que sigue vivo es **solo** el cliente WebSocket de eventos en vivo, NO un motor de datos.
-- El `bridge/` no se elimina: sidecar de hardware en Tauri, o standalone opcional
-  para `cloud + web-PWA` (§2.7).
+- El `bridge/` no se elimina: sidecar de hardware en **Local** (Tauri), o standalone opcional
+  para **Hub PWA** (§2.7).
 - AI y embeddings siempre pasan por el proxy del Cloud Portal, no directo desde
   hub.
 

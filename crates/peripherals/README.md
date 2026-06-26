@@ -6,9 +6,9 @@ ARQUITECTURA.md §2.7. Es el reemplazo en Rust del Bridge Python
 
 ## Consumidores
 
-- **`apps/bridge`** — bridge standalone (combo `cloud + web-PWA`): servidor Axum
+- **`apps/bridge`** — bridge standalone (producto **Hub PWA**): servidor Axum
   `GET /status` + `WS /ws` que envuelve este crate.
-- **`apps/tauri`** — sidecar (combos Tauri): handlers `invoke` que llaman a este crate
+- **`apps/tauri`** — sidecar (producto **Local**): handlers `invoke` que llaman a este crate
   (pendiente; ver `apps/tauri`).
 
 Ambos hablan el **mismo protocolo JSON** que `hub/static/js/bridge.js` ya consume.

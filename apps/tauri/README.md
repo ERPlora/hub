@@ -47,9 +47,9 @@ Flujo (`src/lib.rs::EntitlementGate`):
 
 ## Hardware local = sidecar de `erplora-peripherals` (§2.7)
 
-En los combos Tauri, el shell **es el bridge**: no hay proceso aparte ni segundo install. La
+En el producto **Local** (Tauri), el shell **es el bridge**: no hay proceso aparte ni segundo install. La
 lógica de hardware ya vive en el crate compartido **`crates/peripherals`** (red-only, ESC/POS
-sobre TCP:9100), el mismo que usa el bridge standalone (`apps/bridge`) para `cloud + web-PWA`.
+sobre TCP:9100), el mismo que usa el bridge standalone (`apps/bridge`) en **Hub PWA**.
 
 Cuando se levante este `apps/tauri`, además de `erplora_query`/`erplora_command` (→ `crates/runtime`),
 registrar handlers `invoke` de hardware que delegan en `erplora-peripherals` (en vez del servidor

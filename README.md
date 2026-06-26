@@ -106,8 +106,8 @@ pnpm -F @erplora/web typecheck                  # TS estricto
 
 - **TypeScript** en todo · **Vue 3 + Ionic 8.8 + Tailwind + Iconify** (sin Capacitor; nativo = Tauri).
 - **Lit** para los Web Components de módulos · **pnpm** + Cargo workspaces (raíz compartida).
-- **Dos ejes ortogonales** (§1): backend `single` (SQLite) / `cloud` (Aurora) × shell `tauri` / `web-pwa`.
-- Transporte de datos **HTTP (RPC) + WS (eventos)** con backend cloud / **IPC** con backend single.
-- Multi-tenant **`hub_id` por fila**, BD por organización. Hardware vía **shell Tauri** (Bridge como sidecar) o **Bridge standalone opcional** para `cloud + web-PWA` (§2.7).
+- **Dos productos** (§1; ADR-0080): **Local** (backend `single`/SQLite + shell `tauri`) y **Hub PWA** (backend `cloud`/Aurora + shell `web-pwa`). `single ⟺ Local/Tauri`, `cloud ⟺ Hub PWA`.
+- Transporte de datos **HTTP (RPC) + WS (eventos)** en **Hub PWA** (`cloud`) / **IPC** en **Local** (`single`).
+- Multi-tenant **`hub_id` por fila**, BD por organización. Hardware vía **shell Tauri** (Bridge como sidecar) en **Local**, o **Bridge standalone opcional** en **Hub PWA** (§2.7).
 - Red de módulos: **`http.fetch` mediado** (Opción A). Migración **POS-first**, gradual.
 - Auth: email (1er login) → dispositivo de confianza → PIN; usuarios cloud y solo-locales.

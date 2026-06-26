@@ -36,7 +36,7 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
    (p. ej. `ok-data-table`). `apps/web` = Vue 3 + Ionic Vue + Vite. Rail colapsable por CSS. Dark por
    `.ion-palette-dark`. Detalle de UI en §3.1/§7.7. `[✓ verificado]`
 
-2. **Camino de datos (Eje A) — local-first, config-driven** — `apps/web` habla con el runtime vía
+2. **Camino de datos (backend de datos) — local-first, config-driven** — `apps/web` habla con el runtime vía
    `ErploraClient` (`@erplora/module-sdk`, `HttpWsTransport`) → **`erplora-server` (Axum)** en
    `VITE_RUNTIME_URL` (def `http://127.0.0.1:8787`) → **SQLite**; la misma config apunta luego al
    modo `cloud` (Aurora) sin tocar módulos (§7.6). `ModuleView` **inyecta el cliente** en el Web
@@ -85,50 +85,58 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 
 ---
 
-## 1. Visión: "un solo modelo mental" — dos ejes ortogonales
+## 1. Visión: "un solo modelo mental" — dos productos
 
-hub es **una sola app base** (misma UI, mismo modelo de módulos, mismo runtime). Lo que
-varía se reduce a **dos ejes independientes** — *no* una "topología" única. Confundirlos (atar
-Tauri↔local↔SQLite y navegador↔cloud↔Aurora en un solo interruptor) es el error que esta sección
-corrige:
+hub es **una sola app base** (misma UI, mismo modelo de módulos, mismo runtime). Se entrega en
+**dos productos** con configuración fija — *no* en una matriz de ejes (framing retirado por
+[ADR-0080](../architecture/00-overview/decision-log.md)):
 
-- **Eje A — Backend de datos** (lo que se compra como producto): `single` (SQLite embebido,
-  offline-first, monousuario) · `cloud` (Aurora/Postgres en un contenedor ECS por hub,
-  multiusuario/multitienda). Selecciona el *adaptador de BD* y el *transport de datos*.
-- **Eje B — Shell / empaquetado** (cómo se ejecuta ese día): `tauri` (desktop/móvil; **da acceso
-  a recursos locales** — hardware, filesystem) · `web-pwa` (navegador; sin hardware directo).
+> **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md), app unificada,
+> aceptada 2026-06-17):** **un solo runtime Axum en AMBOS productos**, **mismo transporte de datos**
+> = **HTTP (RPC) + WebSocket (solo eventos)**. Se **elimina** `invoke`/IPC **para datos**: en Local,
+> el runtime Axum corre **embebido como servidor loopback** (`127.0.0.1:8787`) y la UI le habla por
+> HTTP+WS igual que la PWA. La **única diferencia** entre productos es el `DatabaseAdapter` (SQLite
+> Local ↔ Postgres/Aurora Hub PWA) y el almacenamiento de ficheros (disco local ↔ S3).
+> *(pendiente doc↔código: el runtime/shell puede ir aún por el camino híbrido `invoke→HTTP`; la
+> migración es columna core.)*
 
-Los dos ejes **no están acoplados**: un shell Tauri puede envolver *cualquiera* de los dos
-backends. Combos válidos:
+- **Local** (alias **Tauri**) — **1 dispositivo, multiusuario** (varios PINs/roles sobre el mismo
+  equipo). **SQLite** embebido como autoridad, **offline**, **gratis**, empaquetado como
+  **ejecutable Tauri**. El **puente** (Bridge) viaja **dentro del instalable**: el shell Tauri
+  **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA, reusando
+  `crates/peripherals`).
+  Transport de datos = **HTTP (RPC) + WebSocket (solo eventos)** contra el runtime Axum embebido
+  (loopback `127.0.0.1:8787`).
+- **Hub PWA** (alias **PWA**) — **multidispositivo, multiusuario**. **Aurora/Postgres** en un
+  contenedor ECS por hub, **online-only**, **de pago**, servido como **PWA** en el navegador. El
+  **puente** se instala **standalone** (`hub/apps/bridge`, WS `localhost:12321`) para el hardware.
+  Transport de datos = **HTTP (RPC) + WebSocket (solo eventos)**.
 
 ```
-single + Tauri     IPC → runtime embebido → SQLite        (producto "independiente", offline-first)
-cloud  + web-PWA   Browser → Rust/Axum (ECS) → Aurora      (producto "cloud", sin hardware local directo)
-cloud  + Tauri     HTTP+WS → Rust/Axum (ECS) → Aurora      (cloud con hardware local vía el shell)
-──────────────────────────────────────────────────────────
-single + web-PWA   no aplica: `single` exige runtime embebido ⇒ siempre Tauri
+Local (Tauri)   HTTP+WS → runtime Axum embebido (127.0.0.1:8787) → SQLite   1 dispositivo · offline · gratis · puente=bridge embebido
+Hub PWA (PWA)   HTTP+WS → Rust/Axum (ECS)                         → Aurora   multidispositivo · online · de pago · puente=standalone
 ```
 
-Asimetría a recordar: **`single` ⟹ Tauri** (forzado); **Tauri no ⟹ single** (puede ser cliente
-cloud); **`web-pwa` ⟹ cloud** (forzado).
+Reglas: **`single` ⟺ Local/Tauri** y **`cloud` ⟺ Hub PWA**. **No existe** el combo "shell Tauri
+sobre backend cloud" (`cloud + tauri`, retirado en ADR-0080). El término **`dev`/`develop`** se
+**reserva** para la app de **desarrollo local**, distinta del producto **Local**.
 
 - **UI idéntica**: Vue 3 + Ionic como *shell*; cada módulo aporta su pantalla como Web
-  Component (Lit, §3.1), cargado dinámicamente. El **hardware es una capacidad solo-Tauri**:
-  presente en el build Tauri, ausente en el build web (se modela con un *capabilities descriptor*
-  que el runtime expone y la UI usa solo para mostrar/ocultar).
-- **Transport de datos intercambiable** (Eje A): backend `single` → `Tauri invoke` (IPC) +
-  Tauri events; backend `cloud` → **HTTP (RPC) + WebSocket (solo eventos)**. El SDK oculta la
-  diferencia y el cambio no requiere nada adicional (§7.5, §7.6).
-- **Canal de recursos locales** (Eje B): en cualquier shell Tauri, `invoke` a plugins nativos
-  para hardware/FS — **independiente del transport de datos**. En `cloud + Tauri` los datos van
-  por HTTP+WS y `invoke` se usa **solo** para este canal local (§2.7, §7.5).
-- **DB intercambiable**: `DatabaseAdapter` con backends SQLite y PostgreSQL (§8).
-- **Offline (modelo decidido, ADR-0040 — sin sync en fase 1)**: **dos productos sin puente**.
-  **Local** (`single`+Tauri, SQLite local = autoridad, gratis, 100% offline, un dispositivo) y **Cloud**
-  (`cloud`: ECS hub + Aurora por org, multi-dispositivo/web, **online-only**). Un dispositivo ⇒ Local;
-  ¿varios? ⇒ Cloud. **No hay sincronización local↔cloud**; el respaldo del Local es el módulo `backup`
-  premium (export lógico cifrado a S3, no es sync). Se retiró el tier "Cloud DB local-first + sync" y el
-  motor de sync (ver §2.8, OBSOLETO). El web-PWA/iOS es online-only.
+  Component (Lit, §3.1), cargado dinámicamente. El **hardware** lo aporta el **puente** (sidecar en
+  Local, standalone en Hub PWA); la UI lo modela con un *capabilities descriptor* que el runtime
+  expone y usa solo para mostrar/ocultar.
+- **Transport de datos unificado (modelo decidido, [ADR-0050](../architecture/00-overview/decision-log.md))**:
+  **los dos productos** usan **HTTP (RPC) + WebSocket (solo eventos)** contra el runtime Axum —
+  embebido en loopback `127.0.0.1:8787` en Local, en ECS en Hub PWA. Se **eliminó** `invoke`/IPC
+  para datos; el SDK ya no expone `IpcTransport`. La única diferencia es el `DatabaseAdapter` y los
+  ficheros (§7.5, §7.6). *(pendiente doc↔código: el runtime/shell puede ir aún por `invoke→HTTP`;
+  la migración es columna core.)*
+- **DB intercambiable**: `DatabaseAdapter` con backends SQLite (Local) y PostgreSQL (Hub PWA) (§8).
+- **Offline (modelo decidido, ADR-0040 — sin sync)**: **dos productos sin puente de datos**.
+  Un dispositivo ⇒ **Local** (SQLite local = autoridad, gratis, 100% offline); ¿varios? ⇒ **Hub PWA**
+  (ECS + Aurora por org, multidispositivo/web, **online-only**). **No hay sincronización local↔cloud**;
+  el respaldo del Local es el módulo `backup` premium (export lógico cifrado a S3, no es sync). Se
+  retiró el tier "Cloud DB local-first + sync" y el motor de sync (ver §2.8, OBSOLETO).
 - **Rust es la autoridad**: valida permisos, tenant (`hub_id`), payload y ejecuta. La UI
   nunca toca la base de datos.
 
@@ -145,7 +153,7 @@ cloud); **`web-pwa` ⟹ cloud** (forzado).
 |-------|--------|-----------|----------|
 | **Cloud Portal** | `erplora.com`: landing, dashboard, **marketplace**, **billing Stripe**, **provisioning** (boto3 → ECS+Aurora), **proxy AI** | Django 6 + htmx | **NO** |
 | **hub (modo cloud)** | El **runtime del tenant** en ECS. Sirve la app Ionic y ejecuta módulos | Rust + Axum | **SÍ** |
-| **hub (modo local)** | El mismo runtime **embebido** en un shell Tauri (desktop/móvil), offline-first con SQLite. El shell Tauri también puede actuar como **cliente del modo cloud** (datos en Aurora, hardware local vía `invoke`) — los ejes backend/shell son ortogonales (§1) | Rust + Tauri | Nuevo |
+| **hub (modo local)** | El mismo runtime **embebido** en un shell Tauri (desktop/móvil), offline-first con SQLite. Es el producto **Local** (1 dispositivo, multiusuario por PINs/roles); el hardware local va por sidecar Bridge (§1, §2.7) | Rust + Tauri | Nuevo |
 
 > El Cloud Portal **orquesta y cobra**; hub **ejecuta** el negocio del tenant. El
 > "Axum cloud" de la visión es hub en modo cloud, **no** el Portal.
@@ -249,26 +257,29 @@ tools). Igual que la política actual con `module.py`.
 > ✅ **Decisión (actualizada): el `bridge/` NO se elimina.** Deja de ser un *producto separado de
 > instalación obligatoria* y pasa a ser un **componente de hardware compartido**, enviado de dos
 > formas con **un solo código**: (a) **sidecar** empotrado en el shell Tauri (install único,
-> transparente) y (b) **instalador standalone opcional** para el combo `cloud + web-PWA`.
+> transparente) y (b) **instalador standalone opcional** para **Hub PWA**.
 
-**Cómo obtiene hardware cada combo (§1):**
-- **`single + Tauri`** y **`cloud + Tauri`**: vía `invoke` → plugins nativos del shell (o el
-  Bridge como **sidecar** dentro del binario Tauri). **El shell Tauri *es* el bridge** — no hay
-  proceso aparte ni segundo install. (En `cloud + Tauri` los datos van por HTTP+WS; `invoke` es
-  **solo** el canal de hardware.)
-- **`cloud + web-PWA`**: el navegador **no puede** abrir TCP crudo (puerto 9100), USB ni
+**Cómo obtiene hardware cada producto (§1):** modelo decidido
+[ADR-0050](../architecture/00-overview/decision-log.md) — el bridge usa el **mismo canal localhost
+(HTTP/WS) en los dos productos**. *(pendiente doc↔código: el shell puede ir aún por el camino
+híbrido `invoke→HTTP`; la migración es columna core.)*
+
+- **Local (Tauri)**: el shell Tauri **arranca el bridge embebido** (servidor localhost, mismo canal
+  que la PWA, reusando `crates/peripherals`) — **no** por handlers `invoke`. **El shell Tauri *es* el
+  bridge** — no hay proceso aparte ni segundo install.
+- **Hub PWA**: el navegador **no puede** abrir TCP crudo (puerto 9100), USB ni
   Bluetooth clásico. Si ese usuario necesita hardware físico, instala el **Bridge standalone**
   (opcional); la PWA lo detecta por WebSocket en `localhost`. Si no lo necesita, imprime por
   PDF/email o impresora **ePOS-HTTP** (alcanzable por navegador). *Pega conocida: una PWA
-  `https://` ↔ `ws://localhost` arrastra fricción de mixed-content/pairing — el camino `invoke`
-  de Tauri no la tiene.*
+  `https://` ↔ `ws://localhost` arrastra fricción de mixed-content/pairing — el bridge embebido del
+  shell Tauri (loopback) no la tiene.*
 
 **Transportes de impresora** — ✅ **Decidido: SOLO RED (TCP/IP ESC/POS, puerto 9100) — 100% LAN.**
 USB y Bluetooth **se descartan**: exigen drivers + mantenimiento por dispositivo/SO que no compensa.
-La red es además el caso más simple (un socket TCP, trivial en Rust) y el más estable; en `single +
-Tauri` el runtime abre el socket al puerto 9100 directamente. El Bridge es **red-only por
-construcción**: el crate `crates/peripherals` no incluye USB ni Bluetooth. Consecuencia para `cloud +
-web-PWA`: como el navegador no abre TCP crudo, **imprimir requiere el Bridge** (sidecar Tauri o
+La red es además el caso más simple (un socket TCP, trivial en Rust) y el más estable; en **Local
+(Tauri)** el runtime abre el socket al puerto 9100 directamente. El Bridge es **red-only por
+construcción**: el crate `crates/peripherals` no incluye USB ni Bluetooth. Consecuencia para **Hub
+PWA**: como el navegador no abre TCP crudo, **imprimir requiere el Bridge** (sidecar Tauri o
 standalone) o una impresora **ePOS-HTTP**; no hay atajo WebUSB/WebBluetooth porque el hardware es
 de red.
 
@@ -284,11 +295,11 @@ un proceso de instalación obligatoria):
 
 **Lo que sí cambia vs el análisis anterior**: ya no hay un *proceso Bridge separado de
 instalación obligatoria* — el hardware viaja **dentro** del shell Tauri (sidecar) y el Bridge
-standalone queda **opcional**, solo para `cloud + web-PWA`. El escáner por HID lo maneja el
+standalone queda **opcional**, solo para **Hub PWA**. El escáner por HID lo maneja el
 SO/navegador como teclado.
 
-> El escenario **`cloud + web-PWA` + hardware físico** ya **no** queda fuera de alcance: se cubre
-> con el **Bridge standalone opcional**. El POS en navegador es un combo de primera clase (§1),
+> El escenario **Hub PWA + hardware físico** ya **no** queda fuera de alcance: se cubre
+> con el **Bridge standalone opcional**. El POS en navegador es un producto de primera clase (§1),
 > no una excepción.
 
 #### 2.7.1 Estado de implementación (2026-06-09) — el Bridge ya es **Rust** (fuente de verdad)
@@ -304,9 +315,12 @@ SO/navegador como teclado.
   Tauri.
 - **Dos entregas, un crate:**
   - **Standalone** `hub/apps/bridge` — binario **Axum** que expone `GET /status` + `WS /ws` en
-    `localhost:12321`. Es el del combo **`cloud + web-PWA`**.
-  - **Sidecar Tauri** `hub/apps/tauri` — registrará handlers **`invoke`** que llaman al mismo crate
-    (sin WS, sin proceso aparte). Es el de los combos **Tauri**.
+    `localhost:12321`. Es el de **Hub PWA**.
+  - **Bridge embebido en Tauri** `hub/apps/tauri` — el shell **arranca el bridge embebido** (servidor
+    localhost, mismo canal HTTP/WS que la PWA, reusando el mismo crate), **no** por handlers `invoke`
+    (modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md); `invoke` solo nativo).
+    Es el de **Local (Tauri)**. *(pendiente doc↔código: el shell puede ir aún por `invoke→HTTP`; la
+    migración es columna core.)*
 - **Contrato WS estable.** Mismo JSON que consume el frontend (`bridge.js`/cliente del Hub). Se
   **dejan de exponer** USB/BT y el escáner (`barcode`/`toggle_keyboard`): el escáner HID lo maneja el
   SO/navegador como teclado. `printer_id` es siempre `network:{ip}:{port}`.
@@ -389,7 +403,7 @@ SO/navegador como teclado.
 | --- | --- | --- | --- |
 | **Local — gratis** | SQLite local | No | Sí |
 | **Cloud DB — 14,99 €/hub** | SQLite local **+ sync** a Aurora | Sí (sync rápido) | Sí |
-| **Cloud completo — starter/standard** | ECS hub + Aurora | Sí | Nativo=local-first; web-PWA/iOS=online |
+| **Cloud completo — starter/standard** | ECS hub + Aurora | Sí | Nativo=local-first; PWA/iOS=online |
 
 - **Topología = estrella, el nodo cloud (ECS/Aurora) es el master** (sin caja-master física → sin
   SPOF). La convergencia LAN-offline entre cajas de una tienda = fase posterior.
@@ -447,16 +461,16 @@ Flujo:
 - "Dispositivo de confianza" = credencial de dispositivo persistida tras el primer login
   online (habilita PIN offline). *Decisión abierta: formato/rotación de esa credencial (§14).*
 
-**Tauri-como-hub vs Tauri-como-cliente** (consecuencia de los dos ejes, §1 — y la respuesta a
+**Origen de la credencial de máquina por producto** (§1 — y la respuesta a
 "¿el local necesita login?": **sí, una vez y online**, porque es lo que provisiona la identidad y
 los entitlements para descargar módulos):
-- **`single + Tauri`**: la app **es el hub**. El primer login online **auto-provisiona** su
+- **Local (Tauri)**: la app **es el hub**. El primer login online **auto-provisiona** su
   identidad de máquina (el `cloud_api_token` / `X-Hub-Token` de §2.3) en el dispositivo y la
   persiste como credencial de dispositivo (*decisión abierta §14*). Tras eso opera offline.
-- **`cloud + Tauri`**: la app es **cliente de un hub remoto** ya provisionado por el Portal
-  (boto3 → ECS+Aurora). **No** auto-provisiona identidad de máquina: solo autentica al **usuario**
-  (JWT + `X-Hub-Id`) y usa `invoke` para hardware local. El `cloud_api_token` vive en ECS, no en
-  el dispositivo. → el "origen de la credencial de máquina" depende del **Eje A**, no de que sea Tauri.
+- **Hub PWA**: el hub remoto lo provisiona el Portal (boto3 → ECS+Aurora) y el despliegue
+  **inyecta** el `cloud_api_token` en ECS (env `HUB_CLOUD_API_TOKEN`), nunca en el navegador. El
+  navegador solo autentica al **usuario** (JWT + `X-Hub-Id`); el hardware local va por el Bridge
+  standalone (§2.7). → el "origen de la credencial de máquina" depende del **producto**.
 
 ### 2.9b Tenencia: organización por usuario y un hub por dispositivo (decisión 2026-06-09)
 
@@ -545,7 +559,7 @@ filtro de módulos + pantalla de activación; typecheck + build verdes).
 | Shell frontend | **Vue 3 + Ionic (`@ionic/vue` 8.8) + vue-router + Vite + TS + Tailwind v4 + Iconify (`unplugin-icons`, build-inline)** | Componentes Ionic reales; **sin Capacitor** (runtime nativo = Tauri). Tematizado por `--ion-*` (§3.1, §15) |
 | UI de módulos | **Web Components** (Lit recomendado, §3.1) | WC estándar, cargables dinámicamente; default 2026 |
 | Runtime/backend | **Rust + Axum** | Runtime ligero/portátil, una sola autoridad, sin Node en prod local |
-| Desktop/móvil | **Tauri v2** | Empaqueta la misma UI; binario pequeño; `invoke` = transport de datos (backend `single`) **y/o** canal de hardware local (cualquier backend, §2.7); puede actuar como cliente del backend cloud |
+| Desktop/móvil | **Tauri v2** | Empaqueta la misma UI; binario pequeño. **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** el shell **arranca el runtime Axum embebido** (loopback `127.0.0.1:8787`) y el **bridge embebido**; la UI le habla por **HTTP+WS** (no por `invoke` para datos ni hardware). `invoke` queda **solo** para lo nativo sin equivalente HTTP (keychain, device_id, ciclo de vida, §2.7). *(pendiente doc↔código: puede ir aún por `invoke→HTTP`; migración = core.)* |
 | DB local | **SQLite** | Offline-first, embebible en Tauri |
 | DB cloud | **PostgreSQL / Aurora** | Igual que hoy; soporta `pgvector` (clave para RAG, §9) |
 | Lógica avanzada | **WASM (Extism)** | Sandbox + ABI lista; evita diseñar una ABI propia al inicio |
@@ -848,9 +862,11 @@ interface ErploraTransport {
   command(name: string, payload: unknown): Promise<unknown>;
   subscribe(event: string, cb: (e: unknown) => void): void;
 }
-// IpcTransport    → invoke('erplora_query', { name, params }) + Tauri events       (local)
-// HttpWsTransport → HTTP POST query/command + WebSocket solo para eventos          (cloud)
+// Modelo decidido (ADR-0050): el SDK ya NO tiene IpcTransport (eliminado); AMBOS productos
+// usan HTTP+WS contra el runtime Axum — embebido en loopback 127.0.0.1:8787 (Local) o ECS (PWA).
+// HttpWsTransport → HTTP POST query/command + WebSocket solo para eventos          (Local y Hub PWA)
 // (WsTransport — todo por un WS — queda como alternativa, no por defecto; §7.5)
+// (pendiente doc↔código: el runtime/shell puede ir aún por invoke→HTTP; la migración es columna core.)
 ```
 
 > `hasPermission` en JS es **solo** para mostrar/ocultar UI. La seguridad real está siempre
@@ -890,30 +906,33 @@ erplora module publish <id>     # sube al marketplace del Cloud Portal (§2.2)
 
 ### 7.5 Transporte y comunicación — ¿todo por WebSocket?
 
-**No.** El IPC local ya son **dos mecanismos**: `invoke` (RPC) + Tauri events (push). El
-espejo fiel en cloud es **HTTP para RPC + WebSocket solo para eventos**, no "todo por un WS".
-WS-only obligaría a reimplementar el framing RPC (correlación de IDs, timeouts, replay) que
+**No.** El transporte de datos es **HTTP para RPC + WebSocket solo para eventos**, no "todo por un
+WS". WS-only obligaría a reimplementar el framing RPC (correlación de IDs, timeouts, replay) que
 HTTP da gratis.
 
-Esta tabla es por **backend de datos** (Eje A, §1), **no** por shell. La columna "single" usa
-IPC porque `single ⟹ Tauri`; pero un shell Tauri sobre backend `cloud` usa la columna "cloud".
+**Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** **AMBOS productos**
+usan el **mismo transporte de datos** (HTTP+WS) contra el runtime Axum; en **Local** ese runtime
+corre **embebido como servidor loopback** (`127.0.0.1:8787`), en **Hub PWA** en ECS. Se **eliminó**
+`invoke`/IPC para datos. La diferencia entre productos es **solo** el `DatabaseAdapter` (SQLite ↔
+Aurora) y los ficheros (disco ↔ S3). *(pendiente doc↔código: el runtime/shell puede ir aún por el
+camino híbrido `invoke→HTTP`; la migración es columna core.)*
 
-| Qué | Backend `single` (IPC) | Backend `cloud` (Axum) |
+| Qué | Local — runtime Axum embebido (loopback) | Hub PWA — Axum (ECS) |
 |-----|------------------------|------------------------|
-| `query` / `command` (RPC) | `invoke` | **HTTP POST** (`/api/query`, `/api/command`) |
-| Eventos / push | Tauri events | **WebSocket** (`/ws`, solo push) |
+| `query` / `command` (RPC) | **HTTP POST** (`/api/query`, `/api/command`) | **HTTP POST** (`/api/query`, `/api/command`) |
+| Eventos / push | **WebSocket** (`/ws`, solo push) | **WebSocket** (`/ws`, solo push) |
 | App Ionic + assets | filesystem | **HTTP/CDN** |
 | Bundles UI de módulos | filesystem | **HTTP/CDN** |
 | Descarga `module.zip` | **HTTP** (S3) | **HTTP** (S3) |
 | Exports PDF/Excel | **HTTP** | **HTTP** |
 | Cloud Portal (marketplace, billing, embeddings/LLM) | **HTTP REST** (user-JWT + `X-Hub-Id`) | **HTTP REST** |
 
-> **Ortogonal a la tabla — canal de recursos locales (Eje B):** en cualquier shell Tauri,
-> `invoke` a plugins nativos para **hardware/FS** (impresora, cajón, escáner). Está **siempre**
-> disponible si el shell es Tauri, **independientemente del backend**. En `cloud + Tauri` los
-> datos van por la columna "cloud" (HTTP+WS) y `invoke` se usa **solo** para este canal local
-> (§2.7). En `cloud + web-PWA` ese canal lo aporta el **Bridge standalone opcional** por
-> `ws://localhost`.
+> **Canal de hardware (modelo decidido, [ADR-0050](../architecture/00-overview/decision-log.md)):**
+> el bridge usa el **mismo canal localhost (HTTP/WS) en los dos productos**. En **Local (Tauri)** el
+> shell **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA, reusando
+> `crates/peripherals`) — **NO** por handlers `invoke`. En **Hub PWA** ese canal lo aporta el
+> **Bridge standalone opcional** por `ws://localhost` (§2.7). `invoke` queda **solo** para lo nativo
+> sin equivalente HTTP (keychain, device_id, ciclo de vida), no para hardware.
 
 **Escala**: un hub tiene **1–5 usuarios (máx ~30)**, con tolerancia a crecer. A esa escala
 el rendimiento **no decide**; deciden resiliencia y simplicidad:
@@ -922,32 +941,45 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
   por HTTP**; solo se pierden las actualizaciones en vivo. Con WS-only, si el socket falla, **todo** falla.
 - **Más simple**: HTTP no necesita framing RPC sobre WS. **Tooling estándar** (reintentos,
   idempotencia, `curl`, proxies/CDN). WebSocket queda **solo para push**.
-- **En local NO hay WebSocket**: `invoke` (IPC directo) + Tauri events.
+- **Mismo transporte en Local y Hub PWA** (modelo decidido, ADR-0050): HTTP (RPC) + WebSocket
+  (solo push) contra el runtime Axum, embebido en loopback en Local. *(pendiente doc↔código: el
+  runtime/shell puede ir aún por `invoke→HTTP`; la migración es columna core.)*
 
-> **Decisión: cloud = HTTP (RPC) + WebSocket (solo eventos).** WS-only queda como
+> **Decisión: ambos productos = HTTP (RPC) + WebSocket (solo eventos).** WS-only queda como
 > alternativa (todo por un solo canal), pero no por defecto.
 
-### 7.6 Garantía: cambiar de IPC a HTTP/WS no requiere nada adicional
+### 7.6 Garantía: el mismo módulo corre en ambos productos sin trabajo adicional
+
+> **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** ambos productos
+> usan **HTTP+WS** contra el runtime Axum (embebido en loopback en Local). El SDK ya **no** tiene
+> `IpcTransport`. *(pendiente doc↔código: el runtime/shell puede ir aún por `invoke→HTTP`; la
+> migración es columna core.)*
 
 1. **Envelope único agnóstico al cable** (`schemas/envelope.schema.json`):
    `Request{ id, kind, name, params }`, `Response{ id, ok, data|error }`, `Event{ name, payload }`.
 2. **Core del runtime agnóstico al transporte**: `handle(Request) -> Response` + stream
-   `events`. No sabe si lo invocó IPC, HTTP o WS.
-3. **Una sola interfaz** `ErploraTransport` con 3 impls (`IpcTransport`, `HttpWsTransport`, `WsTransport`).
-4. **Flag de arranque para el transport de datos** `RUNTIME_TRANSPORT=ipc|http+ws|ws` (Eje A).
-   Ningún campo de `module.json`, ni código de módulo, ni lógica de permisos depende del transporte.
-5. **El shell (Eje B) es una dimensión de *build/boot* independiente**: el mismo frontend se
-   empaqueta como Tauri o como web-PWA. `cloud + Tauri` = transport `http+ws` **+** shell Tauri
-   (con su canal `invoke` de hardware, §2.7). **No hay acoplamiento shell↔backend.**
+   `events`. No sabe si lo invocó HTTP o WS.
+3. **Una sola interfaz** `ErploraTransport`: el impl por defecto es `HttpWsTransport` (HTTP RPC +
+   WS push), usado por **los dos** productos; `WsTransport` (todo por un WS) queda como alternativa.
+   `IpcTransport` se **eliminó** (ADR-0050).
+4. **Flag de arranque** `RUNTIME_TRANSPORT=http+ws|ws` (detalle de impl del transporte, no de
+   negocio). Ningún campo de `module.json`, ni código de módulo, ni lógica de permisos depende del
+   transporte.
+5. **El mismo frontend se empaqueta como Tauri (Local) o como PWA (Hub PWA)**: el shell es una
+   dimensión de *build/boot*. **Local (Tauri)** arranca el runtime Axum embebido (loopback
+   `127.0.0.1:8787`) y el bridge embebido; **Hub PWA** apunta al Axum en ECS. `invoke` queda **solo**
+   para lo nativo (keychain, device_id, ciclo de vida, §2.7), no para datos ni hardware.
 
-→ El mismo módulo y la misma UI corren con **cualquier** combinación de backend (Eje A) y shell
-(Eje B) **cambiando solo los adaptadores en el boot**. Cero trabajo adicional.
+→ El mismo módulo y la misma UI corren en **los dos productos** (Local y Hub PWA)
+**cambiando solo los adaptadores en el boot**. Cero trabajo adicional.
 
 ### 7.7 Reactividad de la UI (decidido: eventos WS → el WC re-consulta)
 
 > ✅ **Decisión.** El Web Component mantiene su **estado en el cliente**. Cuando llega un
-> **evento** relevante (p. ej. `inventory.stock.updated`) por **WebSocket (cloud)** o **Tauri
-> events (local)**, el WC **vuelve a hacer la query** afectada y se repinta.
+> **evento** relevante (p. ej. `inventory.stock.updated`) por **WebSocket** (mismo canal en ambos
+> productos, modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md); en Local el WS
+> va contra el runtime Axum embebido en loopback), el WC **vuelve a hacer la query** afectada y se
+> repinta.
 
 - Es el modelo natural del SDK (§7.1): `erplora.on(evento, …)` → `erplora.query(…)` → render.
 - **No hay render en servidor**: la UI es cliente (Lit) y el servidor solo emite eventos
@@ -1230,8 +1262,11 @@ hub/
    style-src 'self'; …`) en **Chrome headless: menú Ionic, WC montado, shadow DOM, 3 productos,
    0 violaciones de CSP** (`pnpm -F @erplora/web verify`). Hallazgos: **@ionic/react no rompe
    CSP estricta** y **Lit** queda confirmado como UI de módulos (§3.1).
-2. **Tauri v2 `invoke` → crate `runtime` compartido**: que `apps/tauri` y `crates/server`
-   llamen al **mismo** runtime.
+2. **Runtime Axum embebido (loopback) ↔ Axum (ECS) sobre el crate `runtime` compartido**: que
+   `apps/tauri` (Axum embebido en `127.0.0.1:8787`) y `crates/server` sirvan el **mismo** runtime por
+   HTTP+WS (modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md), sin `invoke` para
+   datos). *(pendiente doc↔código: el shell puede ir aún por `invoke→HTTP`; la migración es columna
+   core.)*
 3. **`DatabaseAdapter` + `VectorStore`** con el mismo contrato en SQLite y Postgres
    (incluida la degradación vectorial local).
 4. **Handshake con el contrato del Cloud**: cliente Rust que se autentique (`X-Hub-Token`
@@ -1240,15 +1275,19 @@ hub/
    ejecutadas en transacción (`sale_lines`).
 
 ### Fase 1 — Walking skeleton (lo mínimo end-to-end)
-1 módulo + menú dinámico + 1 query + 1 command + 1 evento, sobre SQLite, con Tauri `invoke`
-+ Axum sirviendo Ionic. Prueba el modelo completo en pequeño.
+1 módulo + menú dinámico + 1 query + 1 command + 1 evento, sobre SQLite, por **HTTP+WS contra el
+runtime Axum embebido** (loopback `127.0.0.1:8787`; modelo decidido
+[ADR-0050](../architecture/00-overview/decision-log.md), sin `invoke` para datos) sirviendo Ionic.
+Prueba el modelo completo en pequeño. *(pendiente doc↔código: el runtime/shell puede ir aún por
+`invoke→HTTP`; la migración es columna core.)*
 - 🟡 **Runtime Rust implementado (code-complete, sin compilar aún)**: `crates/db` (SQLite vía
   rusqlite) + `crates/runtime` (manifest → migraciones idempotentes → registry → permisos →
   queries/commands en transacción → bus de eventos), con **scope `hub_id`** e inyección de
   `:hub_id/:current_user_id/:now/:new_id`. Módulo `modules/inventory` con SQL real (migración,
   query, 2 commands, listener). Ejemplo `walking_skeleton` + tests de integración. **Falta
   compilar/ejecutar** (no hay toolchain Rust en el entorno; el sandbox bloquea rustup).
-- Pendiente de la fase: `apps/tauri` (`invoke` → mismo `runtime`) y `crates/server` (Axum).
+- Pendiente de la fase: `apps/tauri` (Axum embebido en loopback → mismo `runtime`, sin `invoke` para
+  datos; ADR-0050) y `crates/server` (Axum).
 
 ### Fase 2 — Núcleo declarativo
 commands/queries/permisos/migrations/eventos + validación por schema + topo-sort/lifecycle.
@@ -1295,7 +1334,7 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
   (`inventory.products.*`) y escucha sus eventos, **nunca** toca el `product.stock` privado. No se
   implementa ahora; se construye cuando aparezca demanda real (manufactura/distribución).
 - **Reubicación del Bridge (§2.7)**: el `bridge/` **no** se retira — se convierte en componente de
-  hardware compartido (**sidecar** en Tauri | **standalone opcional** para `cloud + web-PWA`).
+  hardware compartido (**sidecar** en Tauri/Local | **standalone opcional** para Hub PWA).
   Migrar su lógica (registro/watchdog/cola/routing de impresión) al shell Tauri y empaquetarla
   como sidecar; mantener el standalone para el combo navegador. Resolver multi-dispositivo (§2.7b).
 - **Agrupación de módulos**: se conserva la misma clasificación/grupos del catálogo; la
@@ -1316,7 +1355,7 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 | **Entrega/fiabilidad de eventos** | ✅ **Decidido (2026-06-09)**: **transactional outbox** — escritura atómica en `_event_outbox`, **relay asíncrono** at-least-once con backoff + dead-letter, idempotencia vía `_event_delivery` (§4.1). Sustituye el dispatch inline. **Implementado + verificado** (`crates/runtime/src/outbox.rs` + relay en server). |
 | **Documentos de venta / POS** | ✅ **Decidido (2026-06-09)**: tiquet/factura = **FORMATO** de render (`ok-receipt` 80mm / `ok-invoice` A4 en OutfitKit), no módulo; `sales` = libro mayor; pantallas POS **seleccionables** por el negocio; impresión térmica por bridge ESC/POS (§15). |
 | **Red saliente de módulos** | ✅ **Decidido (Opción A)**: `http.fetch` mediado (allowlist + creds inyectadas + auditoría §5.5) para terceros; **B (nativo)** para fiscal. |
-| **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware compartido (sidecar en Tauri \| standalone opcional para `cloud + web-PWA`), §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
+| **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware compartido (sidecar en Tauri/Local \| standalone opcional para Hub PWA), §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
 | **Modelo de módulos** | ✅ **Decidido**: híbrido (declarativo + WASM + SDK). |
 | **Offline** | ✅ **Decidido (ADR-0040): dos productos, SIN sync.** **Local** (SQLite local autoridad, gratis, 100% offline, un dispositivo) y **Cloud** (ECS+Aurora, online-only, multi-dispositivo). Sin puente; respaldo del Local = módulo `backup` (export cifrado a S3, no sync). Retira el motor de sync y el tier "Cloud DB" de ADR-0029/0031 (§2.8). |
 | **Login de usuario** | ✅ **Decidido**: 1er login email+password online → dispositivo de confianza → PIN (offline a futuro); usuarios cloud y solo-locales (§2.9). |
@@ -1412,17 +1451,17 @@ WebComponent = pantalla del módulo (Lit; §3.1)
 Rust = autoridad / runtime genérico (execute_command / execute_query)
 SQLite (local) / Postgres-Aurora (cloud) = solo Rust accede; hub_id (UUID) por fila + PK = UUID v4 (TEXT)
 WASM (Extism) = lógica avanzada y batch, en sandbox (sin red/BD libres)
-SDK TS = puente para la UI (IpcTransport local / HttpWsTransport cloud)
+SDK TS = puente para la UI (HttpWsTransport en AMBOS productos; IpcTransport eliminado por ADR-0050; en Local va contra el runtime Axum embebido en loopback 127.0.0.1:8787)
 Offline = dos productos SIN sync (ADR-0040): Local (SQLite local autoridad, gratis, offline, un dispositivo) y Cloud (ECS+Aurora, online-only, multi-dispositivo); sin puente. Respaldo del Local = módulo `backup` (export cifrado a S3). Retira el motor de sync y el tier Cloud DB de ADR-0029/0031
 Login = email+password online (setup) → dispositivo de confianza → PIN (offline a futuro)
-Reactividad = evento (WS/Tauri) → el WC re-consulta (no server-render)
+Reactividad = evento (WS, mismo canal en ambos productos; ADR-0050) → el WC re-consulta (no server-render)
 Eventos = transactional outbox (escritura atómica + relay async at-least-once + _event_delivery); WS solo push UI (§4.1)
 Venta = sales (libro mayor) → sale.completed; tiquet/factura = FORMATO (ok-receipt/ok-invoice), no módulo; pantallas POS seleccionables (§15)
 RAG = solo conocimiento (docs); vector en cloud (pgvector), degradado en local
 AI = embeddings + generación SIEMPRE por el proxy del Cloud Portal (medido)
 Red de módulos = http.fetch mediado por el host (Opción A) / nativo para fiscal
-2 ejes = backend (single/SQLite · cloud/Aurora) × shell (Tauri/hardware · web-PWA); ortogonales (§1)
-Impresión/hardware = vía shell Tauri (Bridge como sidecar) o Bridge standalone opcional (web-PWA); §2.7
+2 productos = Local (single/SQLite, Tauri, offline, gratis) · Hub PWA (cloud/Aurora, PWA, online, de pago) (§1)
+Impresión/hardware = Local: Bridge como sidecar Tauri · Hub PWA: Bridge standalone opcional; §2.7
 Primary/Satellite = varios terminales del mismo hub; cobrar/imprimir solo el primario
 Migración = gradual, POS-first, manteniendo la agrupación actual de módulos
 Cloud Portal (Django) = marketplace + billing + provisioning + proxy AI (no cambia)
