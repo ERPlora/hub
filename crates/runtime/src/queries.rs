@@ -60,6 +60,26 @@ pub async fn execute_page(
             .map_err(|detail| RuntimeError::InvalidPayload { name: name.to_string(), detail })?;
     }
 
+    // Identidad de NEGOCIO GLOBAL del hub (fuente única país-agnóstica, `hub_settings` — ADR-0061) →
+    // contexto, igual que en `commands::execute` (depth 0). El path de queries NO la cargaba, así que
+    // `system_params` inyectaba `:business_tax_id`/`:business_legal_name`/`:business_address` VACÍOS y
+    // un `config_get` (p.ej. VeriFactu) no podía resolver el obligado global hasta el siguiente save.
+    // Enriquecemos aquí cuando falte, para que TODA query (no solo los commands) vea la identidad EN
+    // VIVO. Degrada a vacío si los settings fallan.
+    let enriched_ctx;
+    let ctx = if ctx.business_tax_id.is_empty() {
+        let f = crate::settings::get_all(db, &ctx.hub_id).await.unwrap_or(Json::Null);
+        let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
+        enriched_ctx = ctx.clone().with_business(
+            get("business_tax_id"),
+            get("business_legal_name"),
+            get("business_address"),
+        );
+        &enriched_ctx
+    } else {
+        ctx
+    };
+
     let bound = crate::system_params(params, ctx);
 
     match &q.def.list {
