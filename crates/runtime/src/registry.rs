@@ -383,6 +383,11 @@ pub struct RequestContext {
     pub business_tax_id: String,
     pub business_legal_name: String,
     pub business_address: String,
+    /// ¿El hub tiene cargado el certificado fiscal del negocio (`_hub_certificate`, core — ADR-0081)?
+    /// Lo rellena el dispatcher junto a la identidad de negocio; `system_params` lo expone como
+    /// `:has_certificate` (0/1) para que los módulos con capability `certificate` (p.ej. verifactu)
+    /// muestren el estado SIN leer la tabla de sistema directamente.
+    pub has_certificate: bool,
 }
 
 impl RequestContext {
@@ -398,6 +403,7 @@ impl RequestContext {
             business_tax_id: String::new(),
             business_legal_name: String::new(),
             business_address: String::new(),
+            has_certificate: false,
         }
     }
 
@@ -412,6 +418,13 @@ impl RequestContext {
         self.business_tax_id = tax_id.into();
         self.business_legal_name = legal_name.into();
         self.business_address = address.into();
+        self
+    }
+
+    /// Copia con el flag de presencia del certificado fiscal del negocio (`_hub_certificate`, core).
+    /// Lo rellena el dispatcher junto a `with_business`. Builder para no romper los `new(...)`/tests.
+    pub fn with_certificate(mut self, present: bool) -> Self {
+        self.has_certificate = present;
         self
     }
 }

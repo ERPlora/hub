@@ -565,5 +565,9 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
     p.insert("business_tax_id".into(), Json::String(ctx.business_tax_id.clone()));
     p.insert("business_legal_name".into(), Json::String(ctx.business_legal_name.clone()));
     p.insert("business_address".into(), Json::String(ctx.business_address.clone()));
+    // Presencia del certificado fiscal del negocio (`_hub_certificate`, core — ADR-0081), como 0/1
+    // para que el SQL del módulo lo use sin leer la tabla de sistema (p.ej. verifactu.config.get →
+    // has_certificate / gate de "Probar" / setup.configured_when).
+    p.insert("has_certificate".into(), Json::from(if ctx.has_certificate { 1 } else { 0 }));
     p
 }

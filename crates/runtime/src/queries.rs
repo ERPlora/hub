@@ -70,11 +70,19 @@ pub async fn execute_page(
     let ctx = if ctx.business_tax_id.is_empty() {
         let f = crate::settings::get_all(db, &ctx.hub_id).await.unwrap_or(Json::Null);
         let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
-        enriched_ctx = ctx.clone().with_business(
-            get("business_tax_id"),
-            get("business_legal_name"),
-            get("business_address"),
-        );
+        let has_cert = crate::certificate::status(db, &ctx.hub_id)
+            .await
+            .ok()
+            .and_then(|s| s.get("present").and_then(|v| v.as_bool()))
+            .unwrap_or(false);
+        enriched_ctx = ctx
+            .clone()
+            .with_business(
+                get("business_tax_id"),
+                get("business_legal_name"),
+                get("business_address"),
+            )
+            .with_certificate(has_cert);
         &enriched_ctx
     } else {
         ctx
