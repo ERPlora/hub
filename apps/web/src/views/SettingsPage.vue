@@ -289,6 +289,85 @@
           <HubIcon slot="start" name="save-outline" />
           {{ t('settings.saveChanges') }}
         </ion-button>
+
+        <!-- Certificado fiscal (.p12): recurso del NEGOCIO/hub (no del módulo verifactu). Se sube
+             aquí, junto al VAT y el nombre de la tienda. El runtime es la autoridad: solo guarda el
+             estado vía GET, nunca devuelve los bytes; PUT/DELETE son solo admin (401 si no). -->
+        <ion-card class="mt-3">
+          <ion-card-content>
+            <ion-label>
+              <h2>{{ t('settings.certTitle') }}</h2>
+              <p>{{ t('settings.certDesc') }}</p>
+            </ion-label>
+
+            <ion-item lines="none" class="mt-2">
+              <HubIcon
+                slot="start"
+                :name="cert.present ? 'shield-checkmark-outline' : 'shield-outline'"
+              />
+              <ion-label>
+                <p v-if="cert.present">
+                  {{ t('settings.certPresent', { date: certUploadedLabel }) }}
+                </p>
+                <p v-else>{{ t('settings.certAbsent') }}</p>
+                <p v-if="cert.present && cert.subject">{{ cert.subject }}</p>
+              </ion-label>
+            </ion-item>
+
+            <!-- Selector de fichero oculto disparado por un ion-button (patrón estándar CSP-safe). -->
+            <input
+              ref="certFileInput"
+              type="file"
+              accept=".p12,.pfx"
+              style="display: none"
+              @change="onCertFileChange"
+            />
+
+            <ion-button
+              expand="block"
+              fill="outline"
+              class="mt-2"
+              :disabled="!isAdmin"
+              @click="triggerCertFilePicker"
+            >
+              <HubIcon slot="start" name="document-attach-outline" />
+              {{ certFileName || t('settings.certChooseFile') }}
+            </ion-button>
+
+            <ion-input
+              class="mt-2"
+              type="password"
+              fill="outline"
+              label-placement="floating"
+              :label="t('settings.certPassword')"
+              :disabled="!isAdmin"
+              v-model="certPassword"
+            />
+
+            <ion-button
+              expand="block"
+              class="mt-3"
+              :disabled="!isAdmin || certBusy"
+              @click="uploadCert"
+            >
+              <HubIcon slot="start" name="cloud-upload-outline" />
+              {{ t('settings.certUpload') }}
+            </ion-button>
+
+            <ion-button
+              v-if="cert.present"
+              expand="block"
+              color="danger"
+              fill="outline"
+              class="mt-2"
+              :disabled="!isAdmin || certBusy"
+              @click="removeCert"
+            >
+              <HubIcon slot="start" name="trash-outline" />
+              {{ t('settings.certDelete') }}
+            </ion-button>
+          </ion-card-content>
+        </ion-card>
       </template>
 
       <!-- ── Tab: Tickets ── -->
@@ -302,6 +381,57 @@
                 <p>{{ t('settings.receiptTemplateDesc') }}</p>
               </ion-label>
             </ion-item>
+          </ion-card-content>
+        </ion-card>
+      </template>
+
+      <!-- ── Tab: Permisos (capabilities de módulo, default-deny) ── -->
+      <!-- Lista los módulos instalados que DECLARAN permisos; por cada uno, un toggle por capability.
+           El runtime es la autoridad (PUT solo admin → 401 si no); aquí el gate `:disabled` es solo
+           cosmético. La gestión autoritativa de permisos vive AQUÍ (el modal del marketplace es un
+           atajo de consentimiento al instalar). -->
+      <template v-else-if="tab === 'permissions'">
+        <ion-card>
+          <ion-card-content>
+            <ion-label>
+              <h2>{{ t('settings.permissionsTitle') }}</h2>
+              <p>{{ t('settings.permissionsDesc') }}</p>
+              <p v-if="!isAdmin" class="mt-1">{{ t('settings.permissionsAdminOnly') }}</p>
+            </ion-label>
+          </ion-card-content>
+        </ion-card>
+
+        <div v-if="permsLoading" class="flex justify-center py-6">
+          <ion-spinner name="dots" />
+        </div>
+
+        <ion-card v-else-if="modulesWithCaps.length === 0">
+          <ion-card-content>
+            <ion-label>
+              <p>{{ t('settings.permissionsNoModules') }}</p>
+            </ion-label>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card v-for="m in modulesWithCaps" :key="m.moduleId" class="mt-3">
+          <ion-card-content class="p-0">
+            <ion-list-header>
+              <ion-label>{{ m.name }}</ion-label>
+            </ion-list-header>
+            <ion-list lines="none">
+              <ion-item v-for="cap in m.capabilities" :key="cap.id">
+                <ion-label>
+                  <h2>{{ cap.label }}</h2>
+                  <p>{{ cap.description }}</p>
+                </ion-label>
+                <ion-toggle
+                  :checked="cap.granted"
+                  :disabled="!isAdmin"
+                  slot="end"
+                  @ion-change="onCapabilityToggle(m, cap, $event)"
+                />
+              </ion-item>
+            </ion-list>
           </ion-card-content>
         </ion-card>
       </template>
@@ -325,6 +455,10 @@
           <ion-segment-button value="tickets">
             <HubIcon name="ticket-outline" />
             <ion-label>{{ t('settings.tabTickets') }}</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="permissions">
+            <HubIcon name="shield-checkmark-outline" />
+            <ion-label>{{ t('settings.tabPermissions') }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
@@ -353,6 +487,8 @@ import {
   IonButton,
   IonInput,
   IonTextarea,
+  IonSpinner,
+  IonListHeader,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -363,10 +499,20 @@ import { isAdmin } from '../lib/session';
 import { hubSettings, getHubSettings, updateHubSettings, type HubSettings } from '../lib/hub-settings';
 import { publishHubCurrency } from '../lib/money';
 import { toastSuccess, toastError } from '../lib/toast';
+import {
+  listInstalledModules,
+  getModuleCapabilities,
+  putModuleCapabilities,
+  getBusinessCertificate,
+  putBusinessCertificate,
+  deleteBusinessCertificate,
+  type ModuleCapability,
+  type BusinessCertificate,
+} from '../lib/runtime';
 
 const { t, locale } = useI18n();
 
-type Tab = 'hub' | 'store' | 'tax' | 'tickets';
+type Tab = 'hub' | 'store' | 'tax' | 'tickets' | 'permissions';
 
 const tab = ref<Tab>('hub');
 
@@ -523,5 +669,176 @@ async function saveTaxSettings(): Promise<void> {
       businessAddress.value = prev.business_address;
     },
   );
+}
+
+// ── Estado: Certificado fiscal del negocio (server-side /api/business/certificate) ──
+// El certificado de empresa (.p12) es un recurso del NEGOCIO/hub (salió del módulo verifactu): se
+// sube aquí junto al VAT y el nombre de la tienda. El runtime nunca devuelve los bytes; solo el
+// estado. Subir/eliminar es solo admin (el runtime revalida → 401 si no).
+const cert = ref<BusinessCertificate>({ present: false });
+const certFileInput = ref<HTMLInputElement | null>(null);
+const certFile = ref<File | null>(null);
+const certFileName = ref<string>('');
+const certPassword = ref<string>('');
+const certBusy = ref<boolean>(false);
+
+/** Fecha de subida formateada para el estado "Certificado configurado (subido el …)". */
+const certUploadedLabel = computed<string>(() => {
+  const raw = cert.value.uploaded_at;
+  if (!raw) return '';
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? raw : d.toLocaleString();
+});
+
+// Lee el estado del certificado al abrir Ajustes (best-effort; degrada a "Sin certificado").
+onMounted(() => {
+  void getBusinessCertificate()
+    .then((c) => {
+      cert.value = c;
+    })
+    .catch(() => null);
+});
+
+function triggerCertFilePicker(): void {
+  certFileInput.value?.click();
+}
+
+function onCertFileChange(e: Event): void {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  certFile.value = file;
+  certFileName.value = file?.name ?? '';
+}
+
+/** Lee un fichero como base64 (sin el prefijo dataURL `data:...;base64,`). */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('FileReader error'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Sube/reemplaza el certificado: lee el .p12 como base64 y hace PUT con {pkcs12_b64, password}.
+// Solo admin (el runtime revalida). Refresca el estado y limpia el formulario al terminar.
+async function uploadCert(): Promise<void> {
+  if (!isAdmin.value) return; // defensa: los botones ya están disabled para no-admin
+  if (!certFile.value) {
+    await toastError(t('settings.certNoFile'));
+    return;
+  }
+  certBusy.value = true;
+  try {
+    const b64 = await fileToBase64(certFile.value);
+    await putBusinessCertificate(b64, certPassword.value);
+    await toastSuccess(t('settings.certUploaded'));
+    certFile.value = null;
+    certFileName.value = '';
+    certPassword.value = '';
+    if (certFileInput.value) certFileInput.value.value = '';
+    cert.value = await getBusinessCertificate().catch(() => ({ present: true }));
+  } catch {
+    await toastError(t('settings.certUploadError'));
+  } finally {
+    certBusy.value = false;
+  }
+}
+
+// Elimina el certificado (DELETE). Solo admin. Refresca el estado al terminar.
+async function removeCert(): Promise<void> {
+  if (!isAdmin.value) return;
+  certBusy.value = true;
+  try {
+    await deleteBusinessCertificate();
+    await toastSuccess(t('settings.certDeleted'));
+    cert.value = await getBusinessCertificate().catch(() => ({ present: false }));
+  } catch {
+    await toastError(t('settings.certDeleteError'));
+  } finally {
+    certBusy.value = false;
+  }
+}
+
+// ── Estado: Permisos (capabilities de módulo, default-deny) ──
+// Gestión AUTORITATIVA de los permisos que declara cada módulo instalado. El runtime es la
+// autoridad (PUT solo admin → 401 si no); el `:disabled` del toggle es solo cosmético.
+interface ModulePermissions {
+  moduleId: string;
+  name: string;
+  /** Solo las que el módulo DECLARA (`requested:true`); el resto no se muestra. */
+  capabilities: ModuleCapability[];
+}
+
+const permsLoading = ref<boolean>(false);
+const modulesWithCaps = ref<ModulePermissions[]>([]);
+
+/**
+ * Carga, por cada módulo instalado, sus capabilities declaradas. Best-effort: si un módulo falla
+ * al leer sus permisos lo omite. Solo aparecen módulos que declaran al menos una capability.
+ */
+async function loadPermissions(): Promise<void> {
+  permsLoading.value = true;
+  try {
+    const installed = await listInstalledModules();
+    const results = await Promise.all(
+      installed.map(async (m) => {
+        try {
+          const caps = await getModuleCapabilities(m.id);
+          const declared = caps.capabilities.filter((c) => c.requested);
+          return declared.length ? { moduleId: m.id, name: m.name, capabilities: declared } : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    modulesWithCaps.value = results.filter((r): r is ModulePermissions => r !== null);
+  } catch {
+    modulesWithCaps.value = [];
+    await toastError(t('settings.permissionsLoadError'));
+  } finally {
+    permsLoading.value = false;
+  }
+}
+
+// Carga perezosa al entrar en la pestaña Permisos (una vez; el watch evita recargar en cada cambio).
+let permsLoaded = false;
+watch(
+  tab,
+  (current) => {
+    if (current === 'permissions' && !permsLoaded) {
+      permsLoaded = true;
+      void loadPermissions();
+    }
+  },
+  { immediate: true },
+);
+
+/**
+ * Concede/revoca una capability de un módulo (PUT default-deny, solo admin). Optimista con revert:
+ * actualiza el estado local al instante y lo revierte si el runtime rechaza (p. ej. 401 no-admin).
+ */
+async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e: Event): Promise<void> {
+  if (!isAdmin.value) return; // defensa: el toggle ya está disabled para no-admin
+  const checked = (e as CustomEvent<{ checked: boolean }>).detail.checked;
+  if (checked === cap.granted) return; // evita re-disparo al re-sincronizar :checked
+  const prev = cap.granted;
+  cap.granted = checked;
+  try {
+    await putModuleCapabilities(m.moduleId, { [cap.id]: checked });
+    await toastSuccess(
+      t(checked ? 'settings.permissionGranted' : 'settings.permissionRevoked', {
+        cap: cap.label,
+        module: m.name,
+      }),
+    );
+  } catch {
+    cap.granted = prev;
+    await toastError(t('settings.permissionSaveError'));
+  }
 }
 </script>

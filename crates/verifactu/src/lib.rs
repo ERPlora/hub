@@ -150,6 +150,13 @@ fn op(command: &str, p: Json) -> Operation {
 }
 
 /// Lee la config VeriFactu del hub (fila singleton; `None` si no se ha guardado nunca).
+///
+/// **Certificado (ADR-0079):** el PKCS#12 del negocio ya NO vive en `verifactu_config`, sino en el
+/// core (`_hub_certificate`, subido en Ajustes → Negocio). Si existe, se **superpone** sobre la
+/// config (`certificate_pkcs12`/`certificate_password`, precedencia sobre lo del módulo), con
+/// fallback a las columnas legacy de `verifactu_config` para instalaciones antiguas. El acceso ya
+/// está gateado por la capability `certificate` (el dispatcher la exige antes del handler nativo),
+/// así que llegar aquí implica que el usuario la concedió.
 async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>> {
     let rows = host
         .read(
@@ -157,7 +164,31 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
             &params(json!({ "hub_id": hub_id })),
         )
         .await?;
-    Ok(rows.into_iter().next())
+    let mut config = rows.into_iter().next();
+
+    // Certificado del core (precedencia). Tolerante: si la tabla/columna falta, mantiene el legacy.
+    if let Ok(cert_rows) = host
+        .read(
+            "SELECT pkcs12_b64, password FROM _hub_certificate WHERE hub_id = :hub_id LIMIT 1",
+            &params(json!({ "hub_id": hub_id })),
+        )
+        .await
+    {
+        if let Some(c) = cert_rows.into_iter().next() {
+            let b64 = c.get("pkcs12_b64").and_then(|v| v.as_str()).unwrap_or("");
+            if !b64.is_empty() {
+                let obj = config.get_or_insert_with(|| json!({}));
+                if let Some(m) = obj.as_object_mut() {
+                    m.insert("certificate_pkcs12".into(), json!(b64));
+                    m.insert(
+                        "certificate_password".into(),
+                        json!(c.get("password").and_then(|v| v.as_str()).unwrap_or("")),
+                    );
+                }
+            }
+        }
+    }
+    Ok(config)
 }
 
 /// Carga los bytes del contenedor PKCS#12: **primero de la BD** (`certificate_pkcs12`, base64

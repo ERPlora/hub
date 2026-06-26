@@ -193,6 +193,19 @@
         "permission": { "type": "string", "description": "Permiso para configurarlo (solo se alerta a quien puede)." }
       }
     },
+    "settings": {
+      "type": "object",
+      "description": "Pantalla de AJUSTES declarativa del módulo (estilo widgets). El shell pinta un formulario genérico a partir del `schema` (JSON Schema: campos/tipos/`default`/`title`/`enum`), lo carga con la query `get` y lo guarda con el command `set` (ambos del propio módulo, que ya existen). Si `component` está presente, el shell pinta ESE Web Component en vez del form genérico (escape-hatch para ajustes estructurales). El Hub solo TRANSPORTA este bloque (lo lee el shell del `module.json` crudo, igual que `widgets`/`setup`); el runtime no ejecuta nada por settings.",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "description": "Título de la sección de ajustes (legible)." },
+        "icon": { "type": "string", "description": "Icono ionicons para la sección/pestaña." },
+        "schema": { "type": "string", "description": "Ruta (relativa al paquete del módulo) del JSON Schema que describe el formulario." },
+        "get": { "type": "string", "description": "Query namespaced del módulo que devuelve los valores actuales (fila singleton). P.ej. `cash_register.settings.get`." },
+        "set": { "type": "string", "description": "Command namespaced del módulo que persiste el snapshot (upsert). P.ej. `cash_register.settings.update`." },
+        "component": { "type": "string", "description": "Escape-hatch: Web Component propio que el shell pinta en vez del form genérico (lo estructural)." }
+      }
+    },
     "network": {
       "type": "object",
       "description": "Capacidad `http.fetch` mediada por el host (ADR-0012, ARQUITECTURA.md §5.5, Opción A). El WASM no tiene red: el runtime hace la llamada saliente, valida el host contra `allow` (allowlist) e inyecta los `secrets` por nombre (el módulo nunca ve su valor).",
@@ -211,6 +224,44 @@
           "type": "array",
           "items": { "type": "string", "enum": ["email", "sms", "whatsapp"] },
           "description": "Canales de alto nivel que necesita el módulo. Conjunto cerrado (añadir uno = tocar el runtime)."
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "Permisos que el módulo SOLICITA al host (ADR-0079, estilo permisos de Android). El core posee los primitivos peligrosos (certificado, red, impresora); el módulo declara qué necesita, el USUARIO los concede explícitamente (toggle en Settings → Permisos) y el host media la operación (el módulo nunca recibe la clave privada). Bloque vacío o ausente = el módulo no pide ningún permiso. NO confundir con `permissions` (RBAC de usuario, otro eje). Consolida los antiguos `network`/`notify` de ADR-0012.",
+      "additionalProperties": false,
+      "properties": {
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Salida HTTP mediada por el host hacia los hosts de `allow` (ADR-0012). El WASM no tiene red: el runtime hace la llamada e inyecta los `secrets` por nombre.",
+          "properties": {
+            "allow": { "type": "array", "items": { "type": "string" }, "description": "Hosts/patrones permitidos (allowlist). Fuera de la lista = rechazado." },
+            "secrets": { "type": "array", "items": { "type": "string" }, "description": "Nombres de secretos del hub que el host inyecta (el módulo declara el nombre, no el valor)." }
+          }
+        },
+        "certificate": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Acceso al certificado PKCS#12 del negocio para firmar/transmitir (p.ej. VeriFactu y futuros B2B fiscales). El host firma; el módulo NUNCA recibe la clave privada.",
+          "properties": {
+            "purpose": { "type": "string", "description": "Para qué se usa el certificado (texto legible, p.ej. `fiscal-sign`)." }
+          }
+        },
+        "printer": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Enviar a impresora ESC/POS vía el bridge/peripherals (TCP raw a la cola de impresión).",
+          "properties": {}
+        },
+        "notify": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Canales de notificación de alto nivel (ADR-0012).",
+          "properties": {
+            "channels": { "type": "array", "items": { "type": "string", "enum": ["email", "sms", "whatsapp"] }, "description": "Canales que necesita el módulo." }
+          }
         }
       }
     },

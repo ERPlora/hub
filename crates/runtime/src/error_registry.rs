@@ -250,6 +250,7 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::QueryNotFound(_) => "query_not_found",
         E::CommandNotFound(_) => "command_not_found",
         E::PermissionDenied(_) => "permission_denied",
+        E::CapabilityDenied { .. } => "capability_denied",
         E::MissingDependency { .. } => "missing_dependency",
         E::DependencyCycle { .. } => "dependency_cycle",
         E::EventLoop => "event_loop",

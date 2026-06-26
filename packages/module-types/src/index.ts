@@ -38,7 +38,54 @@ export interface ModuleManifest {
    * usuario: JWT + X-Hub-Id, directo al Cloud). Ver `architecture/modules/`.
    */
   billing?: ModuleBilling;
+  /**
+   * Pantalla de ajustes declarativa del módulo (settings-as-widgets). El shell la renderiza con un
+   * formulario GENÉRICO a partir del JSON Schema (`schema`), cargando los valores con `get` (query
+   * singleton) y persistiendo el snapshot completo con `set` (command upsert). Si se declara
+   * `component`, el shell pinta ESE Web Component en su lugar (escape-hatch). Sustituye al WC de la
+   * pestaña `settings` del módulo cuando no hay `component`.
+   */
+  settings?: ModuleSettingsDef;
   // queries/commands/events/ai_tools/network/scheduled_tasks → ver schemas/module.schema.json
+}
+
+/** Bloque `settings` del manifest (settings declarativos estilo widgets). */
+export interface ModuleSettingsDef {
+  /** Título de la pantalla de ajustes. */
+  title?: string;
+  /** Icono ionicons para la pantalla/cabecera. */
+  icon?: string;
+  /** Ruta (relativa al paquete del módulo) del JSON Schema del formulario. */
+  schema: string;
+  /** Query namespaced que devuelve la fila singleton de ajustes del hub. */
+  get: string;
+  /** Command namespaced que persiste el snapshot COMPLETO de ajustes (upsert). */
+  set: string;
+  /** Escape-hatch: si está, el shell monta ESE custom element en vez del form genérico. */
+  component?: string;
+}
+
+/** Una propiedad del JSON Schema de ajustes (subset que el form genérico entiende). */
+export interface SettingsSchemaProperty {
+  /** Tipo del campo → control: boolean=toggle, string=input (o select si `enum`), integer/number=number input. */
+  type?: 'boolean' | 'string' | 'integer' | 'number' | string;
+  /** Label del campo (si falta, el shell humaniza la clave). */
+  title?: string;
+  /** Texto de ayuda mostrado bajo el label. */
+  description?: string;
+  /** Opciones cerradas (string) → `ion-select`. */
+  enum?: (string | number)[];
+  /** Valor por defecto cuando la fila de ajustes no trae la clave. */
+  default?: unknown;
+  /** Longitud máxima (string) → `maxlength` del input. */
+  maxLength?: number;
+}
+
+/** JSON Schema (subset) del formulario de ajustes de un módulo. */
+export interface SettingsSchema {
+  type?: string;
+  properties?: Record<string, SettingsSchemaProperty>;
+  required?: string[];
 }
 
 /** Un tier (plano) de un módulo dentro de `billing.tiers`. */

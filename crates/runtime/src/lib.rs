@@ -13,6 +13,8 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::Value as Json;
 
 pub mod api_keys;
+pub mod capabilities;
+pub mod certificate;
 pub mod commands;
 pub mod error_registry;
 pub mod errors;
@@ -478,6 +480,38 @@ impl Runtime {
         updated_by: &str,
     ) -> Result<Json> {
         settings::set_many(self.db.as_ref(), &self.hub_id, updates, updated_by).await
+    }
+
+    /// Capabilities DECLARADAS por un módulo con su estado de grant (ADR-0079). Para
+    /// `GET /api/modules/:id/capabilities`. Lista vacía = el módulo no pide permisos.
+    pub async fn module_capabilities(&self, module_id: &str) -> Result<Vec<(String, bool)>> {
+        capabilities::list_for_module(self.db.as_ref(), &self.registry, &self.hub_id, module_id).await
+    }
+
+    /// Concede/revoca una capability de un módulo (ADR-0079). `by` = `hub_user:<id>` admin.
+    pub async fn set_module_capability(
+        &self,
+        module_id: &str,
+        capability: &str,
+        granted: bool,
+        by: &str,
+    ) -> Result<()> {
+        capabilities::set_grant(self.db.as_ref(), &self.registry, &self.hub_id, module_id, capability, granted, by).await
+    }
+
+    /// Sube/reemplaza el certificado fiscal del negocio (ADR-0079). `by` = `hub_user:<id>` admin.
+    pub async fn set_business_certificate(&self, pkcs12_b64: &str, password: &str, by: &str) -> Result<()> {
+        certificate::set(self.db.as_ref(), &self.hub_id, pkcs12_b64, password, by).await
+    }
+
+    /// Estado del certificado del negocio (presente/ausente + metadatos; sin bytes ni contraseña).
+    pub async fn business_certificate_status(&self) -> Result<Json> {
+        certificate::status(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Elimina el certificado del negocio.
+    pub async fn delete_business_certificate(&self) -> Result<()> {
+        certificate::delete(self.db.as_ref(), &self.hub_id).await
     }
 
     /// Un ciclo del relay de eventos: entrega los eventos vencidos del outbox a sus listeners.

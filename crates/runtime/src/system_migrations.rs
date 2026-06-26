@@ -150,6 +150,50 @@ CREATE TABLE hub_settings (\
   updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (hub_id, key));",
     },
+    // ── v5 — grants de capabilities por módulo (ADR-0079) ───────────────────────────────────────
+    // Permisos módulo→host que el USUARIO concede explícitamente (estilo Android): un módulo declara
+    // en su `module.json` las `capabilities` que necesita (red/certificado/impresora/notify) y el
+    // dueño/admin las concede en Ajustes → Permisos. **Default-deny**: sin fila `granted=1` = NO
+    // concedido. PK `(hub_id, module_id, capability)`, hub-scoped. `granted_by` audita quién (un
+    // `hub_user:<id>` admin) y `granted_at` cuándo. El CONJUNTO de capabilities conocidas vive en el
+    // runtime (`capabilities.rs` / `manifest::CapabilityKind`), no en la BD: añadir una = tocar el
+    // runtime, sin migración. ERPlora SQL (TEXT pk, INTEGER bool), idéntico SQLite/Postgres.
+    SystemMigration {
+        version: 5,
+        name: "module_capability_grants",
+        sqlite: "\
+CREATE TABLE _module_capability_grants (\
+  hub_id TEXT NOT NULL, module_id TEXT NOT NULL, capability TEXT NOT NULL, \
+  granted INTEGER NOT NULL DEFAULT 0, granted_at TEXT, granted_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (hub_id, module_id, capability));",
+        postgres: "\
+CREATE TABLE _module_capability_grants (\
+  hub_id TEXT NOT NULL, module_id TEXT NOT NULL, capability TEXT NOT NULL, \
+  granted INTEGER NOT NULL DEFAULT 0, granted_at TEXT, granted_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (hub_id, module_id, capability));",
+    },
+    // ── v6 — certificado fiscal del NEGOCIO en el core (ADR-0079) ────────────────────────────────
+    // El certificado PKCS#12 del negocio (identidad fiscal: VeriFactu y futuros B2B) deja de vivir
+    // en la tabla del módulo verifactu y pasa a ser un **recurso del HUB**, subido en Ajustes →
+    // Negocio (junto al NIF y el nombre). Un módulo solo lo USA si tiene la capability `certificate`
+    // concedida (el host media; la clave nunca cruza al sandbox). Singleton por hub (PK `hub_id`).
+    // `password` en claro **de momento** (mismo estado que verifactu hoy; el cifrado at-rest de
+    // secretos es decisión pendiente — ADR-0016). `uploaded_by` audita. ERPlora SQL, idéntico
+    // SQLite/Postgres.
+    SystemMigration {
+        version: 6,
+        name: "hub_certificate",
+        sqlite: "\
+CREATE TABLE _hub_certificate (\
+  hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
+  uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (hub_id));",
+        postgres: "\
+CREATE TABLE _hub_certificate (\
+  hub_id TEXT NOT NULL, pkcs12_b64 TEXT NOT NULL, password TEXT NOT NULL DEFAULT '', \
+  uploaded_at TEXT, uploaded_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (hub_id));",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).

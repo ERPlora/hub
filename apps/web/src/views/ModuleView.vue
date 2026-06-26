@@ -13,8 +13,20 @@
       :module-id="params().moduleId"
       :billing="billing"
     />
+    <!-- Pantalla de ajustes declarativa (settings-as-widgets): cuando la pestaña activa es la de
+         `settings` y el módulo declara el bloque `settings` SIN `component`, el shell pinta el FORM
+         GENÉRICO (a partir del JSON Schema) en vez del WC de ajustes del módulo. ADR settings declarativos. -->
+    <ModuleSettingsForm
+      v-else-if="status === 'ready' && isGenericSettingsTab && settings"
+      :module-id="params().moduleId"
+      :settings="settings"
+    />
     <!-- El WebComponent (Lit) de la pestaña activa se monta aquí en runtime (createElement + append). -->
-    <div ref="outlet" class="outlet" v-show="status === 'ready' && !isPlanTab" />
+    <div
+      ref="outlet"
+      class="outlet"
+      v-show="status === 'ready' && !isPlanTab && !isGenericSettingsTab"
+    />
 
     <!-- Tabbar secundario del módulo: las pestañas salen de `navigation[]` del manifest
          (module.json) — el módulo solo aporta el contenido (su WC), el shell pinta la nav.
@@ -49,9 +61,10 @@ import {
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import ModulePlanPanel from '../components/ModulePlanPanel.vue';
+import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
 import { clientInjectionKey, getClient } from '../lib/runtime';
-import type { ModuleBilling } from '@erplora/module-types';
+import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
 const PLAN_TAB_ID = '__plan__';
@@ -77,10 +90,22 @@ const tabs = ref<MenuEntry[]>([]);
 const activeNavId = ref<string>('');
 /** Bloque `billing` del manifest del módulo activo (si lo trae) → habilita la pestaña "Plan". */
 const billing = ref<ModuleBilling | null>(null);
+/**
+ * Bloque `settings` del manifest (settings declarativos). Si está y NO trae `component`, la pestaña
+ * `settings` del módulo se pinta con el FORM GENÉRICO (ModuleSettingsForm) en vez del WC declarado.
+ */
+const settings = ref<ModuleSettingsDef | null>(null);
 /** ¿Está activa la pestaña sintética "Plan"? */
 const isPlanTab = computed(() => activeNavId.value === PLAN_TAB_ID);
+/**
+ * ¿La pestaña activa es la de ajustes Y el módulo declara `settings` sin `component`? Entonces el
+ * shell pinta el form genérico. Con `settings.component`, en cambio, se monta ese WC (vía outlet).
+ */
+const isGenericSettingsTab = computed(
+  () => activeNavId.value === 'settings' && !!settings.value && !settings.value.component,
+);
 
-/** Pestañas del ion-segment = las del módulo + (si hay `billing`) la sintética "Plan". */
+/** Pestañas del ion-segment = las del módulo + las SINTÉTICAS del shell (Ajustes, Plan). */
 const segmentTabs = computed<SegmentTab[]>(() => {
   const list: SegmentTab[] = tabs.value.map((e) => ({
     id: e.nav.id,
@@ -88,6 +113,14 @@ const segmentTabs = computed<SegmentTab[]>(() => {
     icon: e.nav.icon,
     iconSvg: e.iconSvg,
   }));
+  // Pestaña de ajustes SINTÉTICA: la coloca el shell a partir del bloque `settings` (igual que los
+  // widgets, que no viven en `navigation[]`). Su label/icono salen del propio bloque. Se omite si el
+  // módulo ya declara una entrada `navigation` con id `settings` (compatibilidad durante la migración).
+  if (settings.value && !tabs.value.some((e) => e.nav.id === 'settings')) {
+    // La pestaña SIEMPRE se llama "Ajustes" con icono de engranaje (no el nombre del módulo): es la
+    // pestaña de settings, no una pantalla más. `settings.title` se usa como cabecera DENTRO del form.
+    list.push({ id: 'settings', label: t('moduleSettings.tab'), icon: 'settings-outline' });
+  }
   if (billing.value) {
     list.push({ id: PLAN_TAB_ID, label: t('modulePlan.tab'), icon: 'pricetag' });
   }
@@ -111,12 +144,35 @@ async function mount(): Promise<void> {
     // module.json de cada módulo). El manifest se sirve completo desde `/modules/<id>/module.json`.
     const manifest = await loadManifest(moduleId);
     billing.value = manifest?.billing ?? null;
+    settings.value = manifest?.settings ?? null;
 
     // Pestaña "Plan": panel del shell, no un WC del módulo → no se monta nada en el outlet.
     if (navId === PLAN_TAB_ID && billing.value) {
       moduleName.value = manifest?.name ?? tabs.value[0]?.moduleName ?? moduleId;
       activeNavId.value = PLAN_TAB_ID;
       if (outlet.value) outlet.value.innerHTML = ''; // el WC previo no debe quedar montado
+      status.value = 'ready';
+      return;
+    }
+
+    // Pestaña de AJUSTES del bloque `settings` (la coloca el shell; NO vive en `navigation[]`, igual
+    // que los widgets). Sin `component` → ModuleSettingsForm pinta el form genérico (limpiar outlet).
+    // Con `component` (escape-hatch) → montamos ESE WC del módulo, cargando su bundle vía cualquier
+    // entry de su nav. Se maneja ANTES del lookup de `entry` porque no hay entrada de nav para settings.
+    if (navId === 'settings' && settings.value) {
+      moduleName.value = manifest?.name ?? tabs.value[0]?.moduleName ?? moduleId;
+      activeNavId.value = 'settings';
+      if (settings.value.component) {
+        if (tabs.value[0]) await loadComponent(tabs.value[0]); // registra el custom element del bundle
+        if (outlet.value) {
+          outlet.value.innerHTML = '';
+          const el = document.createElement(settings.value.component) as HTMLElement & { client?: unknown };
+          el.client = client;
+          outlet.value.appendChild(el);
+        }
+      } else if (outlet.value) {
+        outlet.value.innerHTML = '';
+      }
       status.value = 'ready';
       return;
     }
@@ -129,6 +185,7 @@ async function mount(): Promise<void> {
     }
     moduleName.value = entry.moduleName;
     activeNavId.value = entry.nav.id;
+
     const tag = await loadComponent(entry);
     if (outlet.value) {
       outlet.value.innerHTML = '';

@@ -105,6 +105,11 @@ pub(crate) async fn execute_at(
     // ── Plugin nativo first-party (ADR-0009) ────────────────────────────────
     if let Some(handler) = &cmd.def.handler {
         if handler.kind == "native" {
+            // Gate de capabilities (ADR-0079): un handler nativo es donde vive el acceso real a
+            // certificado/red (verifactu→AEAT). Default-deny: si el módulo declara capabilities que
+            // el usuario no ha concedido → CapabilityDenied y el motor nativo NO corre (el cert no
+            // se lee ni se toca la AEAT). Ortogonal al RBAC de usuario ya chequeado arriba.
+            crate::capabilities::enforce(db, registry, &cmd.module_id, &ctx.hub_id).await?;
             return execute_native(db, registry, cmd, payload, ctx, depth, extra_ops).await;
         }
     }

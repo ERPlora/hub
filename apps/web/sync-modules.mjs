@@ -53,5 +53,21 @@ for (const id of MODULES) {
     copyFileSync(iconsPath, join(dstDir, dirname(entry), 'icons.json'));
     iconsNote = ' + icons.json';
   }
-  console.log(`✓ sync ${id}: module.json + ${entry}${iconsNote} → public/modules/${id}/`);
+
+  // Schema del bloque `settings` (settings declarativos estilo widgets): el shell lo fetchea en
+  // runtime (`/modules/<id>/<settings.schema>`) para renderizar el form genérico de ajustes. En prod
+  // el runtime sirve el paquete completo del módulo; aquí, el puente del dev solo copia ese fichero.
+  let settingsNote = '';
+  const schemaRel = manifest.settings?.schema;
+  if (schemaRel) {
+    const schemaSrc = join(src, schemaRel);
+    if (existsSync(schemaSrc)) {
+      mkdirSync(join(dstDir, dirname(schemaRel)), { recursive: true });
+      copyFileSync(schemaSrc, join(dstDir, schemaRel));
+      settingsNote = ` + ${schemaRel}`;
+    } else {
+      console.warn(`! módulo ${id}: settings.schema declara ${schemaRel} pero no existe`);
+    }
+  }
+  console.log(`✓ sync ${id}: module.json + ${entry}${iconsNote}${settingsNote} → public/modules/${id}/`);
 }

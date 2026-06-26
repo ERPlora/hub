@@ -32,6 +32,13 @@ pub struct Manifest {
     /// crudo, igual que `navigation`/`provides_slots`). Ver `architecture/hub/dashboard/widgets.md`.
     #[serde(default)]
     pub widgets: HashMap<String, WidgetDef>,
+    /// Pantalla de **ajustes declarativa** del módulo (estilo widgets, ADR nuevo). El módulo declara
+    /// el formulario (un JSON Schema) + a qué `get`/`set` del propio módulo llama; el shell lo pinta
+    /// genéricamente. Escape-hatch a un Web Component propio (`component`) para lo estructural. El
+    /// runtime no ejecuta nada por settings: solo transporta el contrato (el shell fetchea el
+    /// `module.json` crudo, igual que `widgets`). Ausente = el módulo no expone ajustes declarativos.
+    #[serde(default)]
+    pub settings: Option<SettingsDef>,
     #[serde(default)]
     pub events: Events,
     /// Resumen del módulo para el routing del asistente (nivel 1). ARQUITECTURA.md §9.2b.
@@ -52,8 +59,14 @@ pub struct Manifest {
     pub notify: Option<NotifyCapability>,
     /// Capacidad `http.fetch` mediada (ADR-0012, campo `network` ya en el schema): allowlist de
     /// hosts y secretos que el host inyecta. El WASM no tiene red; el runtime hace la llamada.
+    /// **Deprecado** a favor de `capabilities.network`; se pliega en `capabilities` al cargar.
     #[serde(default)]
     pub network: Option<NetworkCapability>,
+    /// Permisos que el módulo SOLICITA al host (ADR-0079, estilo Android). Bloque vacío/ausente =
+    /// el módulo no pide nada. NO confundir con `permissions` (RBAC de usuario). El usuario los
+    /// concede explícitamente; el host media. Consolida los `network`/`notify` de ADR-0012.
+    #[serde(default)]
+    pub capabilities: Capabilities,
 }
 
 /// Una tarea programada declarada en el manifest (ADR-0011). Espejo de `$defs/scheduledTask`
@@ -106,6 +119,120 @@ pub struct NetworkCapability {
     /// Nombres de secretos del hub que el host inyecta en las llamadas (no su valor).
     #[serde(default)]
     pub secrets: Vec<String>,
+}
+
+/// Bloque `capabilities` del manifest (ADR-0079): los permisos que el módulo SOLICITA al host.
+/// Consolida los antiguos `network`/`notify` (ADR-0012) y añade `certificate`/`printer`. El
+/// usuario los concede explícitamente (toggle en Settings); el host media. Vacío = no pide nada.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct Capabilities {
+    #[serde(default)]
+    pub network: Option<NetworkCapability>,
+    #[serde(default)]
+    pub certificate: Option<CertificateCapability>,
+    #[serde(default)]
+    pub printer: Option<PrinterCapability>,
+    #[serde(default)]
+    pub notify: Option<NotifyCapability>,
+}
+
+/// Acceso al certificado PKCS#12 del negocio (firma/transmisión fiscal). El host firma; el
+/// módulo nunca recibe la clave privada.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct CertificateCapability {
+    /// Para qué se usa (texto legible, p.ej. `fiscal-sign`).
+    #[serde(default)]
+    pub purpose: Option<String>,
+}
+
+/// Acceso a impresora ESC/POS vía el bridge/peripherals. Marcador sin parámetros (de momento).
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct PrinterCapability {}
+
+/// Clases de capability que el host conoce y puede gatear (ADR-0079). El nombre canónico (kebab)
+/// es la clave de grant en `_module_capability_grants` y la etiqueta de la UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CapabilityKind {
+    Network,
+    Certificate,
+    Printer,
+    Notify,
+}
+
+impl CapabilityKind {
+    /// Nombre canónico estable (clave de grant + de UI).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CapabilityKind::Network => "network",
+            CapabilityKind::Certificate => "certificate",
+            CapabilityKind::Printer => "printer",
+            CapabilityKind::Notify => "notify",
+        }
+    }
+    /// Parsea un nombre canónico; `None` si no es una capability conocida.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "network" => Some(CapabilityKind::Network),
+            "certificate" => Some(CapabilityKind::Certificate),
+            "printer" => Some(CapabilityKind::Printer),
+            "notify" => Some(CapabilityKind::Notify),
+            _ => None,
+        }
+    }
+}
+
+impl Manifest {
+    /// Capabilities que el módulo SOLICITA, plegando los campos `network`/`notify` top-level
+    /// deprecados (ADR-0012) dentro del modelo `capabilities` (ADR-0079). El bloque
+    /// `capabilities` tiene precedencia. Orden estable para UI.
+    pub fn requested_capabilities(&self) -> Vec<CapabilityKind> {
+        let mut out = Vec::new();
+        if self.capabilities.network.is_some() || self.network.is_some() {
+            out.push(CapabilityKind::Network);
+        }
+        if self.capabilities.certificate.is_some() {
+            out.push(CapabilityKind::Certificate);
+        }
+        if self.capabilities.printer.is_some() {
+            out.push(CapabilityKind::Printer);
+        }
+        if self.capabilities.notify.is_some() || self.notify.is_some() {
+            out.push(CapabilityKind::Notify);
+        }
+        out
+    }
+
+    /// ¿El módulo declara necesitar esta capability? (incluye los alias deprecados).
+    pub fn requests_capability(&self, kind: CapabilityKind) -> bool {
+        self.requested_capabilities().contains(&kind)
+    }
+}
+
+/// Bloque `settings` del manifest: la pantalla de ajustes declarativa del módulo. El shell pinta un
+/// formulario genérico a partir del `schema` (JSON Schema: campos/tipos/defaults/`title`/`enum`),
+/// lo carga con la query `get` y lo guarda con el command `set` (ambos del propio módulo, que ya
+/// existen). Si `component` está presente, el shell pinta ese Web Component en vez del form genérico
+/// (escape-hatch para ajustes estructurales, p.ej. la estructura del ticket).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct SettingsDef {
+    /// Título de la sección de ajustes (legible).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Icono ionicons para la sección/pestaña.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Ruta (relativa al paquete del módulo) del JSON Schema que describe el formulario.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    /// Query del propio módulo que devuelve los valores actuales (fila singleton). P.ej. `cash_register.settings.get`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub get: Option<String>,
+    /// Command del propio módulo que persiste (upsert del snapshot). P.ej. `cash_register.settings.update`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub set: Option<String>,
+    /// Escape-hatch: Web Component propio que el shell pinta en vez del form genérico (lo estructural).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub component: Option<String>,
 }
 
 /// Bloque `agent` del manifest: descripción del módulo (en inglés) para el routing del

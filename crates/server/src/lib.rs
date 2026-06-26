@@ -444,6 +444,13 @@ pub fn app(state: AppState) -> Router {
         // Settings del hub (store key/value de sistema, tabla `hub_settings`). GET = cualquier
         // sesión de usuario; PUT = sesión admin (owner/admin). Contrato del frontend.
         .route("/api/settings", get(settings::get_settings).put(settings::put_settings))
+        // Certificado fiscal del negocio (ADR-0079): recurso del hub, subido en Ajustes → Negocio.
+        .route(
+            "/api/business/certificate",
+            get(settings::get_business_certificate)
+                .put(settings::put_business_certificate)
+                .delete(settings::delete_business_certificate),
+        )
         // Gestor de la carpeta `media/` (pantalla /files). Browse + raw + upload + delete + mkdir.
         .route("/api/media", get(media::media_list).delete(media::media_delete))
         .route("/api/media/raw", get(media::media_raw))
@@ -459,6 +466,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules/:id/activate", post(activate_module))
         .route("/api/modules/:id/deactivate", post(deactivate_module))
         .route("/api/modules/:id/uninstall", post(uninstall_module))
+        .route(
+            "/api/modules/:id/capabilities",
+            get(settings::get_module_capabilities).put(settings::put_module_capabilities),
+        )
         .route("/api/query", post(query))
         .route("/api/command", post(command))
         // ── API pública por módulo (ADR-0057, public-api.md) ────────────────────────────────

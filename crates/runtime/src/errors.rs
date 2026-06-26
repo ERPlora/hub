@@ -15,6 +15,11 @@ pub enum RuntimeError {
     CommandNotFound(String),
     #[error("permiso denegado: requiere `{0}`")]
     PermissionDenied(String),
+    /// El módulo necesita una **capability** (ADR-0079: red/certificado/impresora/notify) que el
+    /// usuario NO ha concedido (default-deny). Distinto de `PermissionDenied` (RBAC de usuario):
+    /// esto es el permiso módulo→host, gestionado en Settings → Permisos.
+    #[error("permiso del módulo `{module}` denegado: requiere la capability `{capability}` (concédela en Ajustes → Permisos)")]
+    CapabilityDenied { module: String, capability: String },
     #[error("dependencia no satisfecha: el módulo `{module}` requiere `{dep}`")]
     MissingDependency { module: String, dep: String },
     #[error("ciclo de dependencias entre módulos en `{module}` (depends_on cíclico)")]

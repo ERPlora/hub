@@ -42,6 +42,41 @@
       ></ok-data-table>
     </div>
 
+    <!-- Modal de consentimiento de permisos al instalar (best-effort). Solo aparece si el módulo a
+         instalar DECLARA capabilities; instalar concede todas (PUT a true). La gestión autoritativa
+         posterior vive en Ajustes → Permisos. Si no declara ninguna, se instala directo (sin modal). -->
+    <ion-modal :is-open="consentOpen" @did-dismiss="closeConsent">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ t('marketplace.consentTitle') }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="closeConsent">
+              <HubIcon name="close-outline" />
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <p class="mb-3">{{ t('marketplace.consentIntro') }}</p>
+        <ion-list lines="full">
+          <ion-item v-for="cap in consentCaps" :key="cap.id">
+            <HubIcon slot="start" name="shield-checkmark-outline" />
+            <ion-label class="ion-text-wrap">
+              <h2>{{ cap.label }}</h2>
+              <p>{{ cap.description }}</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+        <ion-button class="mt-3" expand="block" @click="confirmConsentInstall">
+          <HubIcon slot="start" name="download-outline" />
+          {{ t('marketplace.consentInstallGrant') }}
+        </ion-button>
+        <ion-button class="mt-2" expand="block" fill="outline" @click="closeConsent">
+          {{ t('marketplace.consentCancel') }}
+        </ion-button>
+      </ion-content>
+    </ion-modal>
+
     <!-- Toast simple (Ionic IonToast no requiere importaciones extra en el template) -->
     <ion-toast
       :is-open="toastOpen"
@@ -80,7 +115,9 @@ import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel,
-  IonSpinner, IonToast
+  IonSpinner, IonToast,
+  IonModal, IonHeader, IonTitle, IonButtons, IonButton, IonContent,
+  IonList, IonItem,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -92,7 +129,8 @@ import { config } from '../lib/config';
 import {
   clientInjectionKey, getClient, requestInstall,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
-  type InstalledModule
+  getModuleCapabilities, putModuleCapabilities,
+  type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { refreshModuleNav } from '../lib/nav';
 
@@ -217,8 +255,55 @@ function notify(msg: string, color: 'primary' | 'success' | 'danger', duration =
 const client = inject(clientInjectionKey) ?? getClient();
 let unsubInstalled: (() => void) | null = null;
 
+// --- Consentimiento de permisos al instalar (modal best-effort) ---
+// Si el módulo a instalar DECLARA capabilities, las mostramos antes de instalar y al confirmar las
+// concedemos todas (PUT a true). La gestión autoritativa posterior está en Ajustes → Permisos; el
+// catálogo Cloud no expone capabilities pre-instalación, así que las leemos del runtime tras
+// instalar (mismo contrato `GET /api/modules/{id}/capabilities` que declara el manifest del zip).
+const consentOpen = ref(false);
+const consentCaps = ref<ModuleCapability[]>([]);
+const consentMod = ref<Mod | null>(null);
+
+function closeConsent(): void {
+  consentOpen.value = false;
+  consentMod.value = null;
+  consentCaps.value = [];
+}
+
+/** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
 async function installModule(mod: Mod): Promise<void> {
   if (mod.installed) { notify(t('marketplace.alreadyInstalled', { name: mod.name }), 'primary'); return; }
+  // Best-effort: intentamos conocer los permisos que declara el módulo ANTES de instalar. El catálogo
+  // Cloud no los expone, así que esto solo encuentra algo si el módulo ya estuvo instalado (runtime lo
+  // recuerda); si no, instalamos directo y los permisos se gestionan luego en Ajustes → Permisos.
+  let declared: ModuleCapability[] = [];
+  try {
+    const caps = await getModuleCapabilities(mod.id);
+    declared = caps.capabilities.filter((c) => c.requested);
+  } catch {
+    declared = [];
+  }
+  if (declared.length) {
+    consentMod.value = mod;
+    consentCaps.value = declared;
+    consentOpen.value = true;
+    return;
+  }
+  await doInstall(mod);
+}
+
+/** Confirma el modal: instala y, al terminar, concede todas las capabilities declaradas. */
+async function confirmConsentInstall(): Promise<void> {
+  const mod = consentMod.value;
+  const caps = consentCaps.value;
+  if (!mod) return;
+  consentOpen.value = false;
+  await doInstall(mod, caps);
+  closeConsent();
+}
+
+/** Instalación real: pide al runtime instalar y (opcional) concede las capabilities pasadas. */
+async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<void> {
   // Persistente (duration 0) mientras corre la instalación en background (descarga+verifica+migra);
   // el resultado (éxito/fallo o el evento WS `module.installed`) lo cierra y muestra el suyo.
   // Además la barra de progreso de la topbar se enciende vía requestInstall (inFlight del shell).
@@ -228,6 +313,12 @@ async function installModule(mod: Mod): Promise<void> {
     // SHA256 y aplica migraciones. La confirmación llega por el evento WS `module.installed`.
     // Default de versión: 'latest' (el runtime resuelve la última publicada). flag → humano.
     await requestInstall(mod.id, mod.version ?? 'latest');
+    // Concede los permisos consentidos (PUT solo admin → el runtime revalida). Best-effort: si falla
+    // no rompe la instalación; el usuario puede ajustarlos en Ajustes → Permisos.
+    if (grantCaps.length) {
+      const grants = Object.fromEntries(grantCaps.map((c) => [c.id, true]));
+      await putModuleCapabilities(mod.id, grants).catch(() => null);
+    }
     notify(t('marketplace.installSuccess', { name: mod.name }), 'success');
   } catch {
     notify(t('marketplace.installError', { name: mod.name }), 'danger');

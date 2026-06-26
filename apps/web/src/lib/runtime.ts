@@ -192,6 +192,124 @@ export const deactivateModule = (id: string): Promise<void> => moduleAction(id, 
 export const uninstallModule = (id: string): Promise<void> => moduleAction(id, 'uninstall');
 
 /**
+ * Una capability (permiso) que declara un módulo. El runtime es la autoridad (default-deny):
+ * `requested` = el módulo la pide en su manifest; `granted` = el hub se la ha concedido.
+ * Contrato: `GET /api/modules/{id}/capabilities`. ADR de permisos de módulo.
+ */
+export interface ModuleCapability {
+  id: string;
+  label: string;
+  description: string;
+  requested: boolean;
+  granted: boolean;
+}
+
+/** Respuesta de `GET /api/modules/{id}/capabilities`. */
+export interface ModuleCapabilities {
+  module_id: string;
+  capabilities: ModuleCapability[];
+}
+
+/**
+ * Catálogo de respaldo de labels de capability (por si el runtime no las devuelve traducidas).
+ * Espejo del catálogo del backend; solo se usa como fallback de presentación.
+ */
+export const CAPABILITY_LABELS: Record<string, string> = {
+  network: 'Acceso a internet',
+  certificate: 'Certificado del negocio (firma fiscal)',
+  printer: 'Impresora',
+  notify: 'Notificaciones',
+};
+
+/**
+ * Lee las capabilities (permisos) que declara un módulo instalado y su estado de concesión.
+ * Cualquier sesión puede leerlas; conceder/revocar es solo admin (`putModuleCapabilities`).
+ */
+export async function getModuleCapabilities(moduleId: string): Promise<ModuleCapabilities> {
+  const res = await fetch(
+    `${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/capabilities`,
+    { headers: runtimeHeaders() },
+  );
+  if (!res.ok) throw new Error(`capabilities ${moduleId} → ${res.status}`);
+  const body = (await res.json()) as ModuleCapabilities;
+  return { module_id: body.module_id ?? moduleId, capabilities: body.capabilities ?? [] };
+}
+
+/**
+ * Concede / revoca capabilities de un módulo (default-deny). Solo admin: el runtime devuelve 401
+ * si la sesión no es admin (el gate de UI es solo cosmético; aquí revalida Rust). `grants` mapea
+ * `capabilityId → granted`.
+ */
+export async function putModuleCapabilities(
+  moduleId: string,
+  grants: Record<string, boolean>,
+): Promise<void> {
+  const res = await fetch(
+    `${RUNTIME_URL}/api/modules/${encodeURIComponent(moduleId)}/capabilities`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ grants }),
+    },
+  );
+  if (!res.ok) throw new Error(`put-capabilities ${moduleId} → ${res.status}`);
+}
+
+/**
+ * Estado del certificado fiscal del negocio (`GET /api/business/certificate`). NO devuelve los
+ * bytes del .p12; solo si hay uno y metadatos. El certificado dejó de ser del módulo verifactu:
+ * ahora es un recurso del NEGOCIO/hub, se sube donde se configura el VAT y el nombre de la tienda.
+ */
+export interface BusinessCertificate {
+  present: boolean;
+  uploaded_at?: string | null;
+  subject?: string | null;
+}
+
+/**
+ * Lee el estado del certificado fiscal del negocio. Cualquier sesión puede leerlo. Degrada a
+ * `{ present: false }` si el endpoint todavía no existe (404) o el runtime no responde, para que
+ * la UI muestre "Sin certificado" en vez de romper.
+ */
+export async function getBusinessCertificate(): Promise<BusinessCertificate> {
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/business/certificate`, {
+      headers: runtimeHeaders(),
+    });
+    if (!res.ok) return { present: false };
+    return (await res.json()) as BusinessCertificate;
+  } catch {
+    return { present: false };
+  }
+}
+
+/**
+ * Sube / reemplaza el certificado fiscal del negocio (`PUT /api/business/certificate`). El .p12 va
+ * en base64 + su contraseña. Solo admin: el runtime devuelve 401 si la sesión no lo es (el gate de
+ * UI es solo cosmético; aquí revalida Rust). Lanza si el runtime rechaza.
+ */
+export async function putBusinessCertificate(pkcs12_b64: string, password: string): Promise<void> {
+  const res = await fetch(`${RUNTIME_URL}/api/business/certificate`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+    body: JSON.stringify({ pkcs12_b64, password }),
+  });
+  if (!res.ok) throw new Error(`put-business-certificate → ${res.status}`);
+}
+
+/**
+ * Elimina el certificado fiscal del negocio (`DELETE /api/business/certificate`). Solo admin (401
+ * si no). Lanza si el runtime rechaza.
+ */
+export async function deleteBusinessCertificate(): Promise<void> {
+  const res = await fetch(`${RUNTIME_URL}/api/business/certificate`, {
+    method: 'DELETE',
+    headers: runtimeHeaders(),
+  });
+  if (!res.ok) throw new Error(`delete-business-certificate → ${res.status}`);
+}
+
+/**
  * Siembra la cache de settings del hub con la lectura barata del context (`currency`/`language`).
  * El context NO trae `api_docs_enabled` (eso vive en /api/settings, que se carga aparte tras el
  * login); preservamos el valor previo o degradamos a OFF. Así money.ts ya tiene moneda en el boot
