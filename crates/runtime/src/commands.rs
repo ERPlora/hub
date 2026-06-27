@@ -572,6 +572,7 @@ mod tests {
             role_permissions: Default::default(),
             navigation: vec![],
             migrations: Default::default(),
+            seed: Default::default(),
             queries: Default::default(),
             commands: Default::default(),
             widgets: Default::default(),

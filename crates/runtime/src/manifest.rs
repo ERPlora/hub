@@ -20,6 +20,10 @@ pub struct Manifest {
     pub navigation: Vec<Nav>,
     #[serde(default)]
     pub migrations: Migrations,
+    /// Seed de datos iniciales por hub (ADR-0085): DML idempotente que el instalador aplica tras
+    /// las migraciones con `:hub_id`/`:now` inyectados. Ver [`Seed`].
+    #[serde(default)]
+    pub seed: Seed,
     #[serde(default)]
     pub queries: HashMap<String, QueryDef>,
     #[serde(default)]
@@ -253,6 +257,19 @@ pub struct Agent {
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct Migrations {
+    #[serde(default)]
+    pub sqlite: Vec<String>,
+    #[serde(default)]
+    pub postgres: Vec<String>,
+}
+
+/// Seed de **datos iniciales por hub** que el instalador aplica DESPUÉS de las migraciones,
+/// con `:hub_id`/`:now` inyectados (ADR-0085). A diferencia de las migraciones (DDL idempotente
+/// por `_hub_migrations`), el seed es DML idempotente **por sí mismo** (`WHERE NOT EXISTS`/
+/// `ON CONFLICT`): se re-ejecuta en cada install/rehydrate sin duplicar. Por dialecto, igual que
+/// `migrations`. Caso de uso: `taxes` siembra el catálogo canónico + alias + reglas por país.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct Seed {
     #[serde(default)]
     pub sqlite: Vec<String>,
     #[serde(default)]

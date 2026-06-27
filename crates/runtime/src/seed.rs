@@ -12,9 +12,51 @@
 //! Se aplica sobre la **misma conexión del runtime** (mismo adaptador → funciona en SQLite y
 //! Postgres). Se parte en sentencias con [`crate::system_migrations`]-style split (`;`).
 
-use erplora_db::DatabaseAdapter;
+use std::path::Path;
+
+use erplora_db::{DatabaseAdapter, Dialect, Params};
+use serde_json::json;
 
 use crate::errors::{Result, RuntimeError};
+use crate::manifest::Manifest;
+
+/// Aplica el **seed de datos por hub** declarado por un módulo (ADR-0085), DESPUÉS de migrar. A
+/// diferencia de [`apply`] (host-level, sin params), inyecta `:hub_id`/`:now`/`:current_user_id`
+/// (sistema) en cada sentencia, para que el SQL del módulo siembre filas **scoped por hub**
+/// (catálogo de `taxes`, alias, reglas…). Idempotente por el propio SQL (`WHERE NOT EXISTS`/
+/// `ON CONFLICT`): se re-ejecuta en cada install/rehydrate sin duplicar. Selecciona el fichero del
+/// **dialecto activo** (igual que las migraciones). Devuelve cuántas sentencias aplicó.
+pub async fn apply_module(db: &dyn DatabaseAdapter, dir: &Path, manifest: &Manifest, hub_id: &str) -> Result<usize> {
+    let files = match db.dialect() {
+        Dialect::Sqlite => &manifest.seed.sqlite,
+        Dialect::Postgres => &manifest.seed.postgres,
+    };
+    if files.is_empty() {
+        return Ok(0);
+    }
+    let now = crate::registry::now_rfc3339();
+    let mut applied = 0usize;
+    for rel in files {
+        let path = dir.join(rel);
+        let sql = std::fs::read_to_string(&path)
+            .map_err(|e| RuntimeError::Other(format!("seed: no se pudo leer `{}`: {e}", path.display())))?;
+        for (i, stmt) in split_statements(&sql).iter().enumerate() {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
+            p.insert("now".into(), json!(now));
+            p.insert("current_user_id".into(), json!("system"));
+            db.execute(stmt, &p).await.map_err(|e| {
+                RuntimeError::Other(format!(
+                    "seed `{}` ({rel}): fallo en la sentencia #{}: {e}\n  SQL: {stmt}",
+                    manifest.id,
+                    i + 1
+                ))
+            })?;
+            applied += 1;
+        }
+    }
+    Ok(applied)
+}
 
 /// Aplica `sql` (un batch de sentencias separadas por `;`) sobre `db`, una por una.
 ///

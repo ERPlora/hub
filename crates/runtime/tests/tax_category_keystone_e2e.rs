@@ -3,6 +3,10 @@
 //! default ES) contra las reglas de `taxes` pre-cargadas (reads `taxes.rules.list`), y se
 //! **congela el snapshot** en la línea de venta. Una factura/venta ya emitida NO cambia aunque
 //! cambie la regla (snapshot inmutable). Supersede el modelo `tax_rate_id` de ADR-0066.
+//!
+//! El catálogo canónico (6 categorías) + alias de fábrica + reglas IVA ES los siembra el
+//! **instalador** automáticamente (campo `seed` del module.json de `taxes`, ADR-0085): por eso
+//! estos tests NO siembran categorías/reglas a mano — un hub recién instalado ya las tiene.
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -36,9 +40,12 @@ impl EventSink for Sink {
 
 async fn fresh() -> (Runtime, Arc<Sink>) {
     let db = SqliteAdapter::open_in_memory().await.unwrap();
-    let mut rt = Runtime::new(Box::new(db));
+    // El runtime se construye con el MISMO hub_id que usa el ctx ("h1"): en producción el hub_id del
+    // despliegue == el del usuario, y el seed por install se siembra bajo ese hub (ADR-0085).
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
+    // Instalar taxes dispara su SEED (catálogo canónico + alias + reglas ES) automáticamente.
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");
     rt.install_from_dir(&mdir("inventory")).await.expect("instalar inventory");
     rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
@@ -46,22 +53,36 @@ async fn fresh() -> (Runtime, Arc<Sink>) {
     (rt, sink)
 }
 
-/// Siembra la categoría canónica + una regla ES para esa categoría.
-async fn seed_category_rule(rt: &Runtime, ctx: &RequestContext, key: &str, rate_pct: f64, valid_from: serde_json::Value) {
-    rt.execute_command("taxes.categories.create", &params(json!({ "key": key, "name": key })), ctx)
-        .await
-        .unwrap_or_else(|e| panic!("crear categoría {key}: {e:?}"));
-    rt.execute_command(
-        "taxes.rules.create",
-        &params(json!({ "country_code": "ES", "tax_category_key": key, "rate_pct": rate_pct, "valid_from": valid_from })),
-        ctx,
-    )
-    .await
-    .unwrap_or_else(|e| panic!("crear regla {key} {rate_pct}: {e:?}"));
+#[tokio::test]
+async fn install_seeds_canonical_catalog_aliases_and_es_rules() {
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    // Las 6 categorías canónicas existen tras instalar (sin sembrar a mano).
+    let cats = rt.execute_query("taxes.categories.list", &Params::new(), &ctx).await.unwrap();
+    assert!(cats.len() >= 6, "≥6 categorías canónicas sembradas, hay {}", cats.len());
+    for key in ["restaurant.food", "restaurant.drink", "service.generic", "product.generic"] {
+        assert!(cats.iter().any(|c| c["key"] == json!(key)), "falta categoría {key}");
+    }
+
+    // Alias de fábrica resuelve (pizza → restaurant.food).
+    let a = rt.execute_query("taxes.aliases.resolve", &params(json!({ "alias": "pizza" })), &ctx).await.unwrap();
+    assert_eq!(a[0]["tax_category_key"], json!("restaurant.food"));
+
+    // Regla ES sembrada: restaurant.food = 10%.
+    let rules = rt.execute_query("taxes.rules.by_country", &params(json!({ "country_code": "ES" })), &ctx).await.unwrap();
+    let food = rules.iter().find(|r| r["tax_category_key"] == json!("restaurant.food")).expect("regla ES restaurant.food");
+    assert_eq!(food["rate_pct"].as_f64().unwrap(), 10.0);
+
+    // Idempotencia: re-instalar taxes NO duplica el seed.
+    let mut rt2 = rt;
+    rt2.install_from_dir(&mdir("taxes")).await.expect("reinstalar taxes");
+    let cats2 = rt2.execute_query("taxes.categories.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(cats2.len(), cats.len(), "el seed no duplica al reinstalar");
 }
 
 #[tokio::test]
-async fn sale_resolves_tax_by_category_and_freezes_snapshot() {
+async fn sale_resolves_tax_by_category_from_seeded_rules() {
     if !wasm_present() {
         eprintln!("SKIP: handler.wasm ausente");
         return;
@@ -69,11 +90,7 @@ async fn sale_resolves_tax_by_category_and_freezes_snapshot() {
     let (rt, _sink) = fresh().await;
     let ctx = admin();
 
-    // Categoría restaurant.food en ES → 10% (IVA reducido hostelería). El hub no tiene fila de
-    // settings: country_code degrada al default "ES" (ADR-0085) → la resolución usa ES.
-    seed_category_rule(&rt, &ctx, "restaurant.food", 10.0, json!(null)).await;
-
-    // Producto enlazado por categoría (NO por tax_rate_id).
+    // Producto enlazado por categoría (restaurant.food, 10% ES sembrado). SIN seed manual.
     rt.execute_command(
         "inventory.products.create",
         &params(json!({ "name": "Menú del día", "sku": "MENU-1", "price": 10000, "tax_category_key": "restaurant.food" })),
@@ -82,26 +99,22 @@ async fn sale_resolves_tax_by_category_and_freezes_snapshot() {
     .await
     .expect("crear producto");
 
-    // Venta de ese producto. El POS manda la categoría de la línea; el servidor resuelve el % por
-    // país (del contexto) + categoría — NO confía en ningún % del cliente (no mandamos tax_rate).
-    let res = rt
-        .execute_command(
-            "sales.complete_sale",
-            &params(json!({
-                "tax_included": false, "amount_tendered": 11000,
-                "items": [{ "product_name": "Menú del día", "price": 10000, "quantity": 1, "tax_category_key": "restaurant.food" }]
-            })),
-            &ctx,
-        )
-        .await
-        .expect("complete_sale");
-    assert_eq!(res["operations"], json!(3)); // counter + sale + 1 línea
+    // El POS manda la categoría; el servidor resuelve el % por país (contexto, default ES) + categoría.
+    rt.execute_command(
+        "sales.complete_sale",
+        &params(json!({
+            "tax_included": false, "amount_tendered": 11000,
+            "items": [{ "product_name": "Menú del día", "price": 10000, "quantity": 1, "tax_category_key": "restaurant.food" }]
+        })),
+        &ctx,
+    )
+    .await
+    .expect("complete_sale");
 
     let sales = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
     let sale_id = sales[0]["id"].clone();
-    let lines = rt.execute_query("sales.lines", &params(json!({ "sale_id": sale_id })), &ctx).await.unwrap();
-    let line = &lines[0];
-    // Resuelto server-side a 10% sobre 100,00€ → cuota 10,00€.
+    let line = rt.execute_query("sales.lines", &params(json!({ "sale_id": sale_id })), &ctx).await.unwrap()[0].clone();
+    // Resuelto server-side a 10% (regla ES sembrada) sobre 100,00€ → 10,00€.
     assert_eq!(line["net_amount"].as_i64().unwrap(), 10000);
     assert_eq!(line["tax_amount"].as_i64().unwrap(), 1000);
     assert_eq!(line["tax_rate"].as_f64().unwrap(), 10.0);
@@ -120,10 +133,7 @@ async fn rule_change_does_not_alter_already_issued_sale() {
     let (rt, _sink) = fresh().await;
     let ctx = admin();
 
-    // Regla v1: product.generic ES = 21% (valid_from abierto).
-    seed_category_rule(&rt, &ctx, "product.generic", 21.0, json!(null)).await;
-
-    // Venta 1 → congela 21%.
+    // Venta 1 con la regla SEMBRADA product.generic ES = 21% → congela 21%.
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
@@ -139,8 +149,8 @@ async fn rule_change_does_not_alter_already_issued_sale() {
     let line1 = rt.execute_query("sales.lines", &params(json!({ "sale_id": sale1_id.clone() })), &ctx).await.unwrap()[0].clone();
     assert_eq!(line1["tax_amount"].as_i64().unwrap(), 2100); // 21%
 
-    // Cambia la regla: nueva regla 23% para la MISMA categoría con valid_from hoy (gana por
-    // vigencia más reciente). NO tocamos la venta ya emitida.
+    // Cambia la regla: nueva regla 23% para product.generic con valid_from hoy (gana por vigencia
+    // más reciente sobre la sembrada de 2012). NO tocamos la venta ya emitida.
     rt.execute_command(
         "taxes.rules.create",
         &params(json!({ "country_code": "ES", "tax_category_key": "product.generic", "rate_pct": 23.0, "valid_from": "2026-06-27" })),

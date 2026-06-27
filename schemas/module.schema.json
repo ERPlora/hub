@@ -100,6 +100,15 @@
         "postgres": { "type": "array", "items": { "type": "string" } }
       }
     },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per-hub initial data (ADR-0085): idempotent DML the installer runs AFTER migrations with :hub_id/:now injected. Per dialect, like migrations. Used by taxes to seed the canonical category catalog + aliases + per-country rules.",
+      "properties": {
+        "sqlite": { "type": "array", "items": { "type": "string" } },
+        "postgres": { "type": "array", "items": { "type": "string" } }
+      }
+    },
     "queries": {
       "type": "object",
       "additionalProperties": {

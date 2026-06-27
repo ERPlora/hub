@@ -58,6 +58,12 @@ pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: 
 
     migrations::apply(db, dir, &manifest).await?;
 
+    // Seed de datos por hub (ADR-0085): DML idempotente que el módulo declara en `seed` y el
+    // instalador aplica tras migrar, con `:hub_id` inyectado. Caso de uso: `taxes` siembra el
+    // catálogo canónico de categorías + alias + reglas ES, así que un hub nuevo SIEMPRE tiene
+    // `restaurant.food`/aliases/reglas (no depende de que se corra un seed externo).
+    crate::seed::apply_module(db, dir, &manifest, hub_id).await?;
+
     for perm in &manifest.permissions {
         registry.permissions.insert(perm.clone());
     }
