@@ -119,6 +119,12 @@ pub(crate) async fn execute_at(
         payload
     };
 
+    // Validación referencial (ADR-0085): los campos del payload que apuntan a entidades de OTRO
+    // módulo (p.ej. `tax_category_key` → `taxes_category`) se comprueban AQUÍ, server-side, antes de
+    // tocar la BD o invocar handlers — en TODO camino de escritura (UI, API, importador). Sustituye
+    // a una FK física cross-módulo (prohibida por el aislamiento modular). Rechaza si no existe.
+    validate_refs(db, registry, name, cmd, payload, ctx).await?;
+
     // ── Plugin nativo first-party (ADR-0009) ────────────────────────────────
     if let Some(handler) = &cmd.def.handler {
         if handler.kind == "native" {
@@ -398,6 +404,72 @@ pub(crate) fn validate_operation(
 ///
 /// Devuelve un `Json::Object` (posiblemente vacío). Nunca falla: un problema con una read concreta
 /// no debe tumbar el command.
+/// Valida las **referencias declaradas** del command (`validates`, ADR-0085): por cada `RefCheck`,
+/// resuelve el valor del `field` del payload con su `query` (≥1 fila = válida). Integridad
+/// referencial cross-módulo SIN FK física (preserva el aislamiento modular): se valida por el
+/// contrato de query pública, server-side, así que aplica a TODO camino de escritura (UI/API/import).
+///
+/// - **Opcional**: un `field` ausente/`null`/`""` con `optional` (default) **salta** la comprobación
+///   (FK nullable). Con `optional:false`, vacío se rechaza.
+/// - **Alcance**: la query debe ser del propio módulo o de un `depends_on` (igual que `reads`);
+///   fuera de alcance → error de contrato del autor (se rechaza, no se silencia).
+/// - **Fail-closed**: si la query devuelve 0 filas → `InvalidPayload` ("no existe"); si la query
+///   ERRORA, se propaga (la escritura se bloquea: la validación es **obligatoria**).
+async fn validate_refs(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    name: &str,
+    cmd: &RegisteredCommand,
+    payload: &Params,
+    ctx: &RequestContext,
+) -> Result<()> {
+    if cmd.def.validates.is_empty() {
+        return Ok(());
+    }
+    // Contexto de sistema efímero (como en `preload_reads`): la query de validación corre gateada por
+    // `depends_on`, no por el permiso de usuario (un cajero sin `taxes.view_tax` igual valida).
+    let mut system_ctx = ctx.clone();
+    system_ctx.permissions = std::iter::once("*".to_string()).collect();
+
+    for check in &cmd.def.validates {
+        // Valor del campo como string (vacío si ausente/null).
+        let value = match payload.get(&check.field) {
+            Some(Json::String(s)) => s.clone(),
+            Some(Json::Null) | None => String::new(),
+            Some(other) => other.to_string(),
+        };
+        if value.is_empty() {
+            if check.optional {
+                continue; // referencia opcional no aportada → no se valida (FK nullable)
+            }
+            return Err(RuntimeError::InvalidPayload {
+                name: name.to_string(),
+                detail: format!("`{}` es obligatorio (referencia a {})", check.field, check.query),
+            });
+        }
+        // Alcance: la query debe ser del propio módulo o de un depends_on (contrato del autor).
+        if !read_in_scope(registry, &cmd.module_id, &check.query) {
+            return Err(RuntimeError::InvalidPayload {
+                name: name.to_string(),
+                detail: format!(
+                    "validación `{}`→`{}` fuera de alcance: la query no es del módulo `{}` ni de un depends_on",
+                    check.field, check.query, cmd.module_id
+                ),
+            });
+        }
+        let mut p = erplora_db::Params::new();
+        p.insert(check.param.clone(), Json::String(value.clone()));
+        let rows = queries::execute(db, registry, &check.query, &p, &system_ctx).await?;
+        if rows.is_empty() {
+            return Err(RuntimeError::InvalidPayload {
+                name: name.to_string(),
+                detail: format!("`{}` = '{value}' no existe (referencia inválida)", check.field),
+            });
+        }
+    }
+    Ok(())
+}
+
 async fn preload_reads(
     db: &dyn DatabaseAdapter,
     registry: &Registry,

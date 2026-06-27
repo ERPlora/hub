@@ -149,6 +149,22 @@
             "default": false,
             "description": "Opt-in: expone este command en la API pública REST/OpenAPI por módulo (ADR-0057, `architecture/hub/public-api.md`). Doble puerta: además de estar marcado, la API key debe tener el `permission` del command (escritura del módulo). Por defecto false → el command NO es accesible vía API key aunque la key tuviera el permiso. Espejo del flag `external` de los hooks de salida (ADR-0049)."
           },
+          "validates": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["field", "query", "param"],
+              "properties": {
+                "field": { "type": "string", "description": "Payload field whose value must reference an existing entity (e.g. tax_category_key)." },
+                "query": { "type": "string", "description": "Query (own module or a depends_on) that resolves the reference: ≥1 row = valid (e.g. taxes.categories.get)." },
+                "param": { "type": "string", "description": "Param name the query expects with the field value (e.g. key)." },
+                "optional": { "type": "boolean", "default": true, "description": "If true (default), an absent/null/empty field skips the check (nullable FK). If false, empty is rejected." }
+              }
+            },
+            "description": "Referential validation (ADR-0085): before executing (any tier), the runtime checks each field's value EXISTS by resolving it with a public query of the referenced module — server-side integrity without a cross-module physical FK (which would break module isolation), enforced on ALL write paths (UI, API, importer)."
+          },
           "handler": {
             "type": "object",
             "required": ["type", "function"],

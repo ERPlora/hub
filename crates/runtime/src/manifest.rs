@@ -80,6 +80,27 @@ pub struct Manifest {
     pub required_tax_categories: Vec<String>,
 }
 
+/// Una validación referencial de un campo del payload (ADR-0085). Mirror de `$defs/refCheck` en
+/// `schemas/module.schema.json`. Reemplaza una FK física cross-módulo (prohibida por el aislamiento
+/// modular) por una comprobación server-side vía una **query pública** del módulo referenciado.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RefCheck {
+    /// Campo del payload a validar (p. ej. `tax_category_key`).
+    pub field: String,
+    /// Query (del propio módulo o de un `depends_on`) que resuelve la referencia: ≥1 fila = válida.
+    pub query: String,
+    /// Nombre del parámetro que la query espera con el valor del campo (p. ej. `key`).
+    pub param: String,
+    /// Si `true` (por defecto), un campo ausente/`null`/`""` **salta** la validación (referencia
+    /// opcional, como una FK nullable). Si `false`, el campo es obligatorio y vacío se rechaza.
+    #[serde(default = "default_true")]
+    pub optional: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 /// Una tarea programada declarada en el manifest (ADR-0011). Espejo de `$defs/scheduledTask`
 /// en `schemas/module.schema.json`. El `command` debe pertenecer al **propio módulo** (mismo
 /// aislamiento que el handler WASM); se valida al volcar la tarea a `_scheduled_tasks`.
@@ -491,6 +512,15 @@ pub struct CommandDef {
     /// los commands existentes (backward-compat). Ver `commands::preload_reads`.
     #[serde(default)]
     pub reads: Vec<String>,
+    /// **Validación referencial** del payload (ADR-0085): antes de ejecutar (cualquier tier), el
+    /// runtime comprueba que el valor de cada `field` EXISTA resolviéndolo con una `query` (del propio
+    /// módulo o de un `depends_on`) que devuelve ≥1 fila si es válido. Sustituye a una FK física
+    /// cross-módulo (que rompería el aislamiento): la integridad se valida por el **contrato de query
+    /// pública**, server-side, en TODO camino de escritura (UI, API, importador). Caso de uso:
+    /// `tax_category_key` de producto/servicio debe existir en `taxes_category`. Alcance/ejecución
+    /// como las `reads` (sistema, gateado por `depends_on`). Vacío por defecto → sin cambios.
+    #[serde(default)]
+    pub validates: Vec<RefCheck>,
     /// Ruta (relativa a la carpeta del módulo) del JSON Schema del payload. Si está
     /// presente, el runtime valida el payload del llamador contra él ANTES de ejecutar
     /// (se compila una vez al instalar y se cachea en el `Registry`). §5.2, hub#27.

@@ -125,6 +125,46 @@ async fn sale_resolves_tax_by_category_from_seeded_rules() {
 }
 
 #[tokio::test]
+async fn product_create_validates_tax_category_reference() {
+    // ADR-0085 ("Ojo con esto"): aunque no hay FK física, el runtime valida server-side que
+    // `tax_category_key` EXISTA en taxes_category — en TODO comando (no solo el importador).
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    // Categoría inexistente → RECHAZO (referencia inválida), sin tocar la BD.
+    let bad = rt
+        .execute_command(
+            "inventory.products.create",
+            &params(json!({ "name": "X", "sku": "X1", "price": 100, "tax_category_key": "does.not.exist" })),
+            &ctx,
+        )
+        .await;
+    assert!(bad.is_err(), "una tax_category_key inexistente debe rechazarse");
+
+    // Categoría canónica sembrada → OK.
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({ "name": "Y", "sku": "Y1", "price": 100, "tax_category_key": "restaurant.food" })),
+        &ctx,
+    )
+    .await
+    .expect("una categoría válida se acepta");
+
+    // Sin categoría (null) → OK (referencia opcional, FK nullable).
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({ "name": "Z", "sku": "Z1", "price": 100, "tax_category_key": null })),
+        &ctx,
+    )
+    .await
+    .expect("categoría null (sin clasificar) se acepta");
+
+    // Solo se crearon los 2 productos válidos (el inválido NO entró).
+    let prods = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(prods.len(), 2, "el producto con categoría inválida no se persistió");
+}
+
+#[tokio::test]
 async fn rule_change_does_not_alter_already_issued_sale() {
     if !wasm_present() {
         eprintln!("SKIP");
