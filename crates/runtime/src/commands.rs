@@ -575,12 +575,15 @@ mod tests {
             queries: Default::default(),
             commands: Default::default(),
             widgets: Default::default(),
+            settings: None,
             events: Default::default(),
             agent: None,
             ai_context: None,
             scheduled_tasks: vec![],
             notify: None,
             network: None,
+            capabilities: Default::default(),
+            required_tax_categories: vec![],
         };
         reg.installed.push(manifest);
     }
