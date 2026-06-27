@@ -21,6 +21,11 @@ import {
   ellipsisVertical,
   // Usuarios → API keys (ok-data-table rowAction): rotar una key (devuelve secreto nuevo).
   refreshOutline,
+  // Iconos por NOMBRE usados INLINE por los WC de módulos (sobre todo el POS), que se renderizan
+  // offline/CSP solo si están registrados aquí (no hay fallback a CDN). Sin esto salen rotos
+  // (visible en móvil/TPV táctil): carrito, navegación de categorías, pantalla completa, invitación
+  // (comp), e impresión. Mantener en sync si un módulo usa un ion-icon name nuevo.
+  cartOutline, chevronBackOutline, contractOutline, expandOutline, gift, giftOutline, printOutline,
 } from 'ionicons/icons';
 
 import App from './App.vue';
@@ -68,6 +73,12 @@ addIcons({
   'ellipsis-vertical': ellipsisVertical,
   // Usuarios → API keys (ok-data-table): acción "Rotar" de una key.
   'refresh-outline': refreshOutline,
+  // Iconos inline de los WC de módulos (POS y otros): sin registrar salían ROTOS offline/CSP,
+  // sobre todo en la vista móvil/táctil del TPV (carrito, flechas de categoría, pantalla completa,
+  // botón 🎁 de invitación/comp, imprimir).
+  'cart-outline': cartOutline, 'chevron-back-outline': chevronBackOutline,
+  'contract-outline': contractOutline, 'expand-outline': expandOutline,
+  gift, 'gift-outline': giftOutline, 'print-outline': printOutline,
 });
 
 // CSS base de Ionic (core + utilidades). Dark mode por clase (.ion-palette-dark).
