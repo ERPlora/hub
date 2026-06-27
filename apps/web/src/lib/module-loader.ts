@@ -227,3 +227,40 @@ export async function loadModuleComponent(mod: InstalledManifest, tag: string): 
   await loadEntryUrl(mod.entryUrl);
   return tag;
 }
+
+/**
+ * Resuelve los componentes que los módulos instalados aportan a un SLOT cross-módulo (ADR-0043,
+ * `provides_slots`). Reúne las entradas que matchean `slot` de TODOS los manifests, las ordena por
+ * `priority` ascendente, asegura cargado el ESM de cada módulo dueño (CSP-safe, registra su WC) y
+ * devuelve los tags a montar. El WC consulta sus datos él mismo y el permiso se revalida en server
+ * (misma filosofía que la recolección de widgets). Lo consume `globalThis.erplora.loadSlot` que
+ * llaman los WC de módulo (p.ej. el POS monta el picker de mesa/cliente). `[]` si el runtime no
+ * responde, ningún módulo aporta al slot, o el ESM de un aportante falla (ese se omite).
+ */
+export async function loadSlotComponents(slot: string): Promise<{ component: string }[]> {
+  type SlotDef = { slot?: string; component?: string; priority?: number };
+  let manifests: InstalledManifest[];
+  try {
+    manifests = await loadInstalledManifests();
+  } catch {
+    return [];
+  }
+  const entries: Array<{ def: SlotDef; mod: InstalledManifest }> = [];
+  for (const mod of manifests) {
+    const slots = (mod.manifest as unknown as { provides_slots?: SlotDef[] }).provides_slots ?? [];
+    for (const def of slots) {
+      if (def && def.slot === slot && def.component) entries.push({ def, mod });
+    }
+  }
+  entries.sort((a, b) => (a.def.priority ?? 100) - (b.def.priority ?? 100));
+  const out: { component: string }[] = [];
+  for (const { def, mod } of entries) {
+    try {
+      await loadModuleComponent(mod, def.component as string);
+      out.push({ component: def.component as string });
+    } catch {
+      /* un aportante cuyo ESM falle se omite (no rompe el resto del slot) */
+    }
+  }
+  return out;
+}
