@@ -362,6 +362,7 @@ mod tests {
             transaction: false,
             sql: vec![],
             reads: vec![],
+            validates: vec![],
             schema: None,
             emit: vec![],
             handler: None,

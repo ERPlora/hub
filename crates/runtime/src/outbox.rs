@@ -343,6 +343,7 @@ mod tests {
                 transaction: true,
                 sql: vec![sql.to_string()],
                 reads: vec![],
+                validates: vec![],
                 emit,
                 handler: None,
                 ai: None,

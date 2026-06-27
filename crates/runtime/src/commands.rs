@@ -547,6 +547,7 @@ mod tests {
             transaction: true,
             sql: vec!["INSERT INTO x VALUES (1);".to_string()],
             reads: vec![],
+            validates: vec![],
             emit: vec![],
             handler: None,
             ai: None,
