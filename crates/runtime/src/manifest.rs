@@ -455,6 +455,18 @@ pub struct CommandDef {
     pub transaction: bool,
     #[serde(default)]
     pub sql: Vec<String>,
+    /// Queries que el runtime **pre-ejecuta** e **inyecta** en `context.reads[<query>]` antes de
+    /// invocar el handler (WASM/nativo), para que la lógica del sandbox —que NO puede leer la BD ni
+    /// otros módulos— disponga de filas de confianza (ADR-0069, el "keystone" del impuesto). Cada
+    /// nombre es una query namespaced (`modulo.entidad.accion`). **Alcance**: queries del propio
+    /// módulo o de los declarados en `depends_on` (gateado por la **dependencia**, no por permiso de
+    /// usuario); una read fuera de alcance se **omite con warn**. **Ejecución interna**: como el
+    /// sistema (el permiso del command ya se comprobó; las reads son contrato vouched por el autor),
+    /// **sin params** y **sin re-gatear por permiso de usuario** por-query. Una read que falle se
+    /// omite (el handler degrada con su fallback al `payload`). Por defecto vacío → ningún cambio para
+    /// los commands existentes (backward-compat). Ver `commands::preload_reads`.
+    #[serde(default)]
+    pub reads: Vec<String>,
     /// Ruta (relativa a la carpeta del módulo) del JSON Schema del payload. Si está
     /// presente, el runtime valida el payload del llamador contra él ANTES de ejecutar
     /// (se compila una vez al instalar y se cachea en el `Registry`). §5.2, hub#27.
