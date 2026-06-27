@@ -31,6 +31,7 @@ import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
+import { loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
 import { bootActionFeedback } from './lib/toast';
@@ -138,7 +139,13 @@ app.provide(clientInjectionKey, getClient());
 // Los Web Components de módulo (Lit) leen el cliente de `globalThis.erplora` (datos por
 // .query/.command, hardware por .peripherals). El shell es el ÚNICO dueño de la conexión al
 // Bridge — los módulos nunca lo abren ellos mismos (ARQUITECTURA.md §2.7).
-(globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = getClient();
+// `loadSlot` (ADR-0043): el shell resuelve los componentes que otros módulos aportan a un slot
+// cross-módulo (p.ej. el POS monta el picker de mesa/cliente que aportan `tables`/`customers`).
+// El WC ya lo llama (`globalThis.erplora.loadSlot(slot)`); aquí se lo cableamos al cliente.
+const erploraClient = getClient();
+(erploraClient as unknown as { loadSlot?: (slot: string) => Promise<{ component: string }[]> }).loadSlot =
+  loadSlotComponents;
+(globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
 
 // Auto-impresión del ticket al cerrar venta (escucha `sale.completed` en el shell, no en sales).
 bootPrintOnSale(getClient());
