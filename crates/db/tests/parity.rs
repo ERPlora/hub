@@ -168,49 +168,53 @@ async fn inventory_stock_decrease_clamp_parity() {
 // número vuelve idéntico en JSON.
 
 #[tokio::test]
-async fn taxes_rate_real_and_active_filter_parity() {
+async fn taxes_rule_rate_pct_real_roundtrip_parity() {
+    // ADR-0085: el % vive en `taxes_rule.rate_pct` (REAL), enlazado por categoría. La paridad que
+    // importa sigue siendo el roundtrip REAL fraccionario↔entero entre SQLite y Postgres.
     let b = Backends::connect().await;
     b.migrate("taxes").await;
 
-    // Categoría + dos tipos (uno activo al 21%, otro inactivo al 10%).
+    // Categoría canónica (la clave enlazable es `key`).
     let cat = b.command_sql("taxes", "category_create");
     b.exec_both(
         &cat,
         json!({
             "new_id": "cat-std", "hub_id": "h1", "current_user_id": "u1", "now": "2026-06-22T10:00:00Z",
-            "code": "STD", "name": "IVA general", "description": ""
+            "key": "product.generic", "name": "Producto general", "description": "", "is_system": 1
         }),
     )
     .await;
 
-    let rate = b.command_sql("taxes", "rate_create");
-    for (rid, code, pct, from, until) in [
-        ("r-21", "IVA21", 21.0, "2026-01-01", null_str()),
-        ("r-10", "IVA10", 10.5, "2025-01-01", Some("2025-12-31")),
+    // Dos reglas de tipo: 21% (entero-como-real) y 10.5% (fraccionario), distinta categoría/región
+    // para no chocar (la unicidad de resolución la decide el handler, no un índice).
+    let rule = b.command_sql("taxes", "rule_create");
+    for (rid, region, pct, from, to) in [
+        ("r-21", null_str(), 21.0, "2026-01-01", null_str()),
+        ("r-10", Some("ES-CN"), 10.5, "2025-01-01", Some("2025-12-31")),
     ] {
         b.exec_both(
-            &rate,
+            &rule,
             json!({
                 "new_id": rid, "hub_id": "h1", "current_user_id": "u1", "now": "2026-06-22T10:00:00Z",
-                "code": code, "name": code, "category_id": "cat-std",
-                "country_code": "ES", "region_code": "", "rate_pct": pct, "tax_type": "vat",
-                "applies_from": from, "applies_until": until
+                "country_code": "ES", "region_code": region, "tax_category_key": "product.generic",
+                "rate_pct": pct, "tax_type": "vat", "parent_id": null_str(), "component_label": null_str(),
+                "valid_from": from, "valid_to": to
             }),
         )
         .await;
     }
 
     // REAL fraccionario (10.5) y entero-como-real (21.0) deben volver idénticos en ambos motores.
-    Case::new("taxes rate_pct REAL roundtrip")
+    Case::new("taxes_rule rate_pct REAL roundtrip")
         .assert_parity(
             &b,
-            "SELECT code, rate_pct FROM taxes_rate WHERE hub_id = :hub_id ORDER BY code",
+            "SELECT id, rate_pct FROM taxes_rule WHERE hub_id = :hub_id ORDER BY id",
             json!({ "hub_id": "h1" }),
         )
         .await
         .assert_rows(2)
-        // `rate_pct` es REAL; el arnés normaliza floats-enteros (21.0 → 21) para que la celda sea
-        // comparable byte a byte entre motores. 10.5 es fraccionario y se mantiene.
+        // `rate_pct` es REAL; el arnés normaliza floats-enteros (21.0 → 21). 10.5 se mantiene.
+        // Orden por id: r-10 (10.5) antes que r-21 (21).
         .assert_cell(0, "rate_pct", json!(10.5))
         .assert_cell(1, "rate_pct", json!(21));
 }
