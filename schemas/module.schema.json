@@ -49,6 +49,12 @@
       "additionalProperties": true
     },
     "depends_on": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "required_tax_categories": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_.]*$" },
+      "default": [],
+      "description": "Fiscal category keys (tax_category_key) the module needs present in the hub's taxes catalog (ADR-0085), e.g. [\"restaurant.food\", \"restaurant.drink\"]. The system guarantees they exist (taxes canonical defaults + per-country seed)."
+    },
     "permissions": { "type": "array", "items": { "type": "string" }, "default": [] },
     "role_permissions": {
       "type": "object",

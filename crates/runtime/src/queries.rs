@@ -82,7 +82,14 @@ pub async fn execute_page(
                 get("business_legal_name"),
                 get("business_address"),
             )
-            .with_certificate(has_cert);
+            .with_certificate(has_cert)
+            // Identidad FISCAL del hub (ADR-0085): país/región/modo/zona también en el path de queries.
+            .with_fiscal_identity(
+                get("country_code"),
+                get("region_code"),
+                get("tax_mode"),
+                get("timezone"),
+            );
         &enriched_ctx
     } else {
         ctx

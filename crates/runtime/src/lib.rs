@@ -569,5 +569,13 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
     // para que el SQL del módulo lo use sin leer la tabla de sistema (p.ej. verifactu.config.get →
     // has_certificate / gate de "Probar" / setup.configured_when).
     p.insert("has_certificate".into(), Json::from(if ctx.has_certificate { 1 } else { 0 }));
+    // Identidad FISCAL del hub (hub_settings — ADR-0085) — disponible como `:country_code`/
+    // `:region_code`/`:tax_mode`/`:timezone` en TODO el SQL de comandos, para que el módulo `taxes`
+    // (y el snapshot de la línea de venta/factura) resuelvan el país/región del obligado sin que el
+    // caller (POS) los pase. `region_code` vacío = todo el país.
+    p.insert("country_code".into(), Json::String(ctx.country_code.clone()));
+    p.insert("region_code".into(), Json::String(ctx.region_code.clone()));
+    p.insert("tax_mode".into(), Json::String(ctx.tax_mode.clone()));
+    p.insert("timezone".into(), Json::String(ctx.timezone.clone()));
     p
 }

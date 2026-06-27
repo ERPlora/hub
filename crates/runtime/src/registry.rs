@@ -388,6 +388,15 @@ pub struct RequestContext {
     /// `:has_certificate` (0/1) para que los módulos con capability `certificate` (p.ej. verifactu)
     /// muestren el estado SIN leer la tabla de sistema directamente.
     pub has_certificate: bool,
+    /// Identidad FISCAL del hub (`hub_settings`: country_code/region_code/tax_mode/timezone — ADR-0085).
+    /// La inyecta el dispatcher junto a la identidad de negocio; `system_params` la expone como
+    /// `:country_code`/`:region_code`/`:tax_mode`/`:timezone` al SQL, y el dispatcher la pasa también al
+    /// `context` del handler WASM (keystone ADR-0069/0085) para que `taxes.calculate` resuelva el tipo
+    /// por (país+región+categoría) sin que el caller (POS) aporte el país. `region_code` vacío = país.
+    pub country_code: String,
+    pub region_code: String,
+    pub tax_mode: String,
+    pub timezone: String,
 }
 
 impl RequestContext {
@@ -404,6 +413,10 @@ impl RequestContext {
             business_legal_name: String::new(),
             business_address: String::new(),
             has_certificate: false,
+            country_code: String::new(),
+            region_code: String::new(),
+            tax_mode: String::new(),
+            timezone: String::new(),
         }
     }
 
@@ -425,6 +438,22 @@ impl RequestContext {
     /// Lo rellena el dispatcher junto a `with_business`. Builder para no romper los `new(...)`/tests.
     pub fn with_certificate(mut self, present: bool) -> Self {
         self.has_certificate = present;
+        self
+    }
+
+    /// Copia con la identidad FISCAL del hub rellena (`hub_settings`, ADR-0085). La usa el dispatcher
+    /// tras leer los settings, junto a `with_business`. Builder para no romper los `new(...)`/tests.
+    pub fn with_fiscal_identity(
+        mut self,
+        country_code: impl Into<String>,
+        region_code: impl Into<String>,
+        tax_mode: impl Into<String>,
+        timezone: impl Into<String>,
+    ) -> Self {
+        self.country_code = country_code.into();
+        self.region_code = region_code.into();
+        self.tax_mode = tax_mode.into();
+        self.timezone = timezone.into();
         self
     }
 }

@@ -84,6 +84,34 @@ const KNOWN: &[Setting] = &[
         validate: validate_text,
         parse_stored: |s| json!(s),
     },
+    // Identidad FISCAL del hub (ADR-0085): país/región/modo/zona horaria del obligado tributario.
+    // El módulo `taxes` SOLO la consume (es identidad del negocio, no config del módulo): el runtime
+    // la inyecta en el contexto de command/query (keystone ADR-0069/0085) para resolver el tipo por
+    // (país+región+categoría). Fase 1 = ES (ADR-0072); el onboarding fija el país real del cliente.
+    Setting {
+        key: "country_code",
+        default: || json!("ES"),
+        validate: validate_country_code,
+        parse_stored: |s| json!(s),
+    },
+    Setting {
+        key: "region_code",
+        default: || json!(""),
+        validate: validate_region_code,
+        parse_stored: |s| json!(s),
+    },
+    Setting {
+        key: "tax_mode",
+        default: || json!("VAT"),
+        validate: validate_tax_mode,
+        parse_stored: |s| json!(s),
+    },
+    Setting {
+        key: "timezone",
+        default: || json!("Europe/Madrid"),
+        validate: validate_timezone,
+        parse_stored: |s| json!(s),
+    },
 ];
 
 /// Locales soportados por el hub (espejo del contrato del frontend, ADR-0055).
@@ -139,6 +167,64 @@ fn validate_tax_id(v: &Value) -> std::result::Result<String, String> {
         return Err("identificador fiscal demasiado largo".into());
     }
     Ok(up)
+}
+
+/// `country_code`: ISO-3166-1 alpha-2 (2 letras), normalizado a MAYÚSCULAS. La identidad fiscal del
+/// hub (ADR-0085); resuelve el tipo por país. Vacío no se acepta (el país es obligatorio para el IVA).
+fn validate_country_code(v: &Value) -> std::result::Result<String, String> {
+    let s = v.as_str().ok_or("debe ser un string ISO-3166-1 alpha-2 (p. ej. \"ES\")")?;
+    let up = s.trim().to_ascii_uppercase();
+    if up.len() == 2 && up.chars().all(|c| c.is_ascii_alphabetic()) {
+        Ok(up)
+    } else {
+        Err(format!("país inválido `{s}`: se espera un código ISO-3166-1 de 2 letras (p. ej. ES)"))
+    }
+}
+
+/// `region_code`: opcional (vacío = todo el país). Si se da, código de subdivisión ISO-3166-2 tipo
+/// `ES-CN` (afina por región, p. ej. IGIC Canarias). Normalizado a MAYÚSCULAS.
+fn validate_region_code(v: &Value) -> std::result::Result<String, String> {
+    let s = v.as_str().ok_or("debe ser un string (vacío o ISO-3166-2 tipo \"ES-CN\")")?;
+    let up = s.trim().to_ascii_uppercase();
+    if up.is_empty() {
+        return Ok(String::new());
+    }
+    let ok = up.len() >= 4
+        && up.len() <= 6
+        && up.contains('-')
+        && up.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+    if ok {
+        Ok(up)
+    } else {
+        Err(format!("región inválida `{s}`: vacío o código ISO-3166-2 (p. ej. ES-CN)"))
+    }
+}
+
+/// `tax_mode`: modo fiscal del hub. Hoy soportado `VAT` (IVA UE); reservado para `GST`/`SALES_TAX`…
+fn validate_tax_mode(v: &Value) -> std::result::Result<String, String> {
+    let s = v.as_str().ok_or("debe ser un string (p. ej. \"VAT\")")?;
+    let up = s.trim().to_ascii_uppercase();
+    const MODES: &[&str] = &["VAT", "GST", "SALES_TAX", "NONE"];
+    if MODES.contains(&up.as_str()) {
+        Ok(up)
+    } else {
+        Err(format!("modo fiscal no soportado `{s}`: {}", MODES.join(", ")))
+    }
+}
+
+/// `timezone`: IANA tz (p. ej. `Europe/Madrid`). Validación laxa (no embebemos la tz database):
+/// no vacío, con `/`, caracteres de tz. La resolución real la hace el cliente/SO.
+fn validate_timezone(v: &Value) -> std::result::Result<String, String> {
+    let s = v.as_str().ok_or("debe ser un string IANA (p. ej. \"Europe/Madrid\")")?;
+    let t = s.trim();
+    let ok = t.contains('/')
+        && t.len() <= 64
+        && t.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '+'));
+    if ok {
+        Ok(t.to_string())
+    } else {
+        Err(format!("zona horaria inválida `{s}`: se espera IANA (p. ej. Europe/Madrid)"))
+    }
 }
 
 /// Boolean. Acepta solo un JSON `true`/`false`; se persiste como `"true"`/`"false"`.

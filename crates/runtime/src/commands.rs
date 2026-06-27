@@ -77,7 +77,15 @@ pub(crate) async fn execute_at(
                 get("business_legal_name"),
                 get("business_address"),
             )
-            .with_certificate(has_cert);
+            .with_certificate(has_cert)
+            // Identidad FISCAL del hub (ADR-0085): país/región/modo/zona → contexto, para que el
+            // keystone (`taxes.calculate` vía `sales.complete_sale`) resuelva el tipo por categoría.
+            .with_fiscal_identity(
+                get("country_code"),
+                get("region_code"),
+                get("tax_mode"),
+                get("timezone"),
+            );
         &enriched_ctx
     } else {
         ctx
@@ -197,6 +205,12 @@ async fn execute_wasm(
             "now": crate::registry::now_rfc3339(),
             "new_ids": new_ids,
             "reads": reads,
+            // Identidad fiscal del hub (ADR-0085, keystone ADR-0069): el handler `taxes.calculate`
+            // resuelve el tipo por (país+región+categoría) leyendo país/región DEL CONTEXTO (no del
+            // payload del cliente, que no es de confianza). `region_code` vacío = todo el país.
+            "country_code": ctx.country_code,
+            "region_code": ctx.region_code,
+            "tax_mode": ctx.tax_mode,
         },
     });
 
@@ -247,6 +261,12 @@ async fn execute_native(
             "now": crate::registry::now_rfc3339(),
             "new_ids": new_ids,
             "reads": reads,
+            // Identidad fiscal del hub (ADR-0085, keystone ADR-0069): el handler `taxes.calculate`
+            // resuelve el tipo por (país+región+categoría) leyendo país/región DEL CONTEXTO (no del
+            // payload del cliente, que no es de confianza). `region_code` vacío = todo el país.
+            "country_code": ctx.country_code,
+            "region_code": ctx.region_code,
+            "tax_mode": ctx.tax_mode,
         },
     });
 

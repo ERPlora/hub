@@ -67,6 +67,13 @@ pub struct Manifest {
     /// concede explícitamente; el host media. Consolida los `network`/`notify` de ADR-0012.
     #[serde(default)]
     pub capabilities: Capabilities,
+    /// Categorías fiscales que el módulo NECESITA que existan en el catálogo del hub (ADR-0085):
+    /// claves canónicas (`tax_category_key`) tipo `["restaurant.food", "restaurant.drink"]`. El
+    /// sistema garantiza que existan (las canónicas del módulo `taxes` + el seed por país). Permite
+    /// que un módulo de marketplace enlace productos por categoría sabiendo que la categoría existe.
+    /// Vacío/ausente = el módulo no requiere ninguna categoría concreta.
+    #[serde(default)]
+    pub required_tax_categories: Vec<String>,
 }
 
 /// Una tarea programada declarada en el manifest (ADR-0011). Espejo de `$defs/scheduledTask`
