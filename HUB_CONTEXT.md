@@ -85,7 +85,7 @@ tenant que sustituira progresivamente al hub actual.
 
 ## Referencia visual
 
-Lenguaje visual y patrones de marca: ver el SaaS (`../cloud/`) y `apps/web`.
+Lenguaje visual y patrones de marca: ver el SaaS (`../saas/`) y `apps/web`.
 
 La referencia visual no obliga a copiar implementacion. En hub se traduce a
 Ionic: listas, items, selects, toggles, cards, modals y segmentos nativos.

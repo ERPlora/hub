@@ -341,7 +341,7 @@ SO/navegador como teclado.
     `upload-s3` falla.
   - Android → su propio repo (`build.yml`): APK/AAB **firmado** → mismo bucket, con claves AWS estáticas.
 - **Descarga desde el SaaS (siempre la última):** `GET /bridge/download/<platform>/`
-  (`cloud/apps/public/bridge`) redirige a `bridge/latest/<fichero>` en S3. El CI rellena ese `latest/`.
+  (`saas/apps/public/bridge`) redirige a `bridge/latest/<fichero>` en S3. El CI rellena ese `latest/`.
 - **Detección en el Hub Cloud (PWA shell):** `hub/apps/web/src/lib/bridge-client.ts` — `detectBridge()` sondea
   `localhost:12321/status`; `bridgeDownloadUrl()` apunta al SaaS. `SystemPage.vue` muestra estado real
   (Conectado/Desconectado + versión) y los botones de descarga (Windows/Linux/Android).
@@ -485,7 +485,7 @@ los entitlements para descargar módulos):
 - **Org por defecto al crear la cuenta**: cuando un usuario **crea su cuenta** se le crea una
   **organización personal por defecto** (editable después: nombre, datos fiscales…). No se espera al
   primer arranque del hub. *(Hoy se crea de forma perezosa en el primer login desde Tauri —
-  `_register_hub` en `cloud/apps/auth/users/api/serializers.py`; la decisión lo adelanta al signup —
+  `_register_hub` en `saas/apps/auth/users/api/serializers.py`; la decisión lo adelanta al signup —
   `apps/auth/users/services.py::create_user`, reutilizando
   `organizations.services.lifecycle.create_organization`.)*
 - **Un hub por dispositivo**: cada instalación Tauri (desktop/Android) registra **su propio `hub_id`**
@@ -504,7 +504,7 @@ los entitlements para descargar módulos):
 > es la **versión ligera** (gratis, publicitaria) para captar clientes; el upsell es **subir a cloud**
 > (donde está el multidevice). Lo que abre funcionalidad es un **entitlement por tiers de módulo**.
 
-**Tiers de módulo** (`Module.tier` en el SaaS, `cloud/apps/public/modules/models.py`; se edita en el
+**Tiers de módulo** (`Module.tier` en el SaaS, `saas/apps/public/modules/models.py`; se edita en el
 vendor portal como el resto de la clasificación, §2.4):
 
 | Tier | Qué es | Hub Local (Tauri gratis) | Hub Cloud (ECS/Aurora) |
@@ -519,7 +519,7 @@ vendor portal como el resto de la clasificación, §2.4):
 - **Pago** = `module_type` (`free`/`one_time`/`subscription`): los `free` no requieren compra; los de
   pago sí — con una **excepción de bundle**: `standard` va **incluido gratis en hubs cloud**.
 - **Fuente única de verdad**: `is_module_entitled(hub, module)` en
-  `cloud/apps/public/modules/entitlement.py`, reutilizada por el permiso de descarga
+  `saas/apps/public/modules/entitlement.py`, reutilizada por el permiso de descarga
   (`CanDownloadModule`) y por el listado del marketplace (los hubs locales no ven `premium`).
 
 **Gate de arranque (la app pregunta "¿qué puedo montar?")**:

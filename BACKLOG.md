@@ -55,4 +55,4 @@ migración legacy (§13) · Bridge/periféricos multi-dispositivo.
 1. Distribución de `guest-sdk`/`module-stencil` para repos por módulo.
 2. Bucket exacto para los ejecutables Tauri ("S3 privado para comercialización").
 3. Lista exacta del set POS.
-4. Endpoint vendor de subida en el Cloud (no existe; coordinar con `cloud/`).
+4. Endpoint vendor de subida en el SaaS (no existe; coordinar con `saas/`).

@@ -18,7 +18,7 @@
 > (modo *push*: empuja el contenido, sin scrim, como un segundo panel / `ion-menu side="end"`). En
 > **móvil** funciona como **overlay con backdrop** (igual que `ion-menu`/`ion-drawer` por defecto).
 > Misma conducta y misma estética que en el Cloud (**paridad obligatoria** — ver
-> [`cloud/TODO.md` #1](../cloud/TODO.md)).
+> [`saas/TODO.md` #1](../saas/TODO.md)).
 
 **Estado hoy:** es un drawer overlay custom (slide-over `translateX`) con scrim:
 - Componente → [hub/apps/web/src/components/AssistantDrawer.vue](hub/apps/web/src/components/AssistantDrawer.vue) (drawer propio en CSS, no usa `ok-drawer`).

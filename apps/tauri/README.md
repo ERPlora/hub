@@ -34,7 +34,7 @@ Flujo (`src/lib.rs::EntitlementGate`):
    (`/api/v1/hub/device/entitlement/`), lo **verifica** (`erplora-cloud-client::verify_entitlement`,
    RS256) y lo **cachea** en `app_data_dir` (`entitlement.jwt` + `cloud_public_key.pem`).
 3. **Sin red**: verifica el token cacheado **offline** y sigue dentro de la ventana de gracia
-   (`grace_until`, lo emite el SaaS — `cloud/apps/public/modules/entitlement.py`).
+   (`grace_until`, lo emite el SaaS — `saas/apps/public/modules/entitlement.py`).
 4. Devuelve `GateOutcome`: `unlocked { modules, deployment_mode, offline }` → el frontend monta
    SOLO esos módulos; o `needs_activation { reason }` → pantalla de login/activación, sin negocio.
 
