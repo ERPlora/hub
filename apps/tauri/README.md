@@ -25,20 +25,20 @@ SQLite en `app_data_dir`. Sin red salvo marketplace/AI/primer-login (§2.8).
 
 Ya scaffoldeado en `src-tauri/` (`Cargo.toml`, `tauri.conf.json`, `src/lib.rs`). La app de
 escritorio/Android **no se compra**: es la versión ligera (basic + compliance) para captar
-clientes. Lo que desbloquea módulos es un **entitlement por tiers** servido por el Cloud.
+clientes. Lo que desbloquea módulos es un **entitlement por tiers** servido por el SaaS.
 
 Flujo (`src/lib.rs::EntitlementGate`):
 
 1. El frontend (`apps/web`), tras el login, llama a `invoke('validate_entitlement', { hubId, accessToken })`.
-2. El gate pide al Cloud la clave pública (`/api/v1/auth/public-key/`) + el token firmado
+2. El gate pide al SaaS la clave pública (`/api/v1/auth/public-key/`) + el token firmado
    (`/api/v1/hub/device/entitlement/`), lo **verifica** (`erplora-cloud-client::verify_entitlement`,
    RS256) y lo **cachea** en `app_data_dir` (`entitlement.jwt` + `cloud_public_key.pem`).
 3. **Sin red**: verifica el token cacheado **offline** y sigue dentro de la ventana de gracia
-   (`grace_until`, lo emite el Cloud — `cloud/apps/public/modules/entitlement.py`).
+   (`grace_until`, lo emite el SaaS — `cloud/apps/public/modules/entitlement.py`).
 4. Devuelve `GateOutcome`: `unlocked { modules, deployment_mode, offline }` → el frontend monta
    SOLO esos módulos; o `needs_activation { reason }` → pantalla de login/activación, sin negocio.
 
-`HUB_CLOUD_API_URL` sobreescribe la base del Cloud (por defecto `https://erplora.com`).
+`HUB_CLOUD_API_URL` sobreescribe la base del SaaS (por defecto `https://erplora.com`).
 
 > **No está en `members` del workspace raíz** (necesita el toolchain Tauri v2 + el `dist` de
 > `apps/web`). Cuando se estabilice el arranque, añadir `"apps/tauri/src-tauri"` a `members` en
@@ -47,9 +47,9 @@ Flujo (`src/lib.rs::EntitlementGate`):
 
 ## Hardware local = sidecar de `erplora-peripherals` (§2.7)
 
-En el producto **Local** (Tauri), el shell **es el bridge**: no hay proceso aparte ni segundo install. La
+En el producto **Hub Local** (Tauri), el shell **es el bridge**: no hay proceso aparte ni segundo install. La
 lógica de hardware ya vive en el crate compartido **`crates/peripherals`** (red-only, ESC/POS
-sobre TCP:9100), el mismo que usa el bridge standalone (`apps/bridge`) en **Hub PWA**.
+sobre TCP:9100), el mismo que usa el bridge standalone (`apps/bridge`) en **Hub Cloud**.
 
 Cuando se levante este `apps/tauri`, además de `erplora_query`/`erplora_command` (→ `crates/runtime`),
 registrar handlers `invoke` de hardware que delegan en `erplora-peripherals` (en vez del servidor

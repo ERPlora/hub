@@ -19,7 +19,7 @@
 
 Este documento describe **qué** queremos construir y **por qué**, reconciliando la
 visión técnica (Rust/Ionic/Tauri/module.json) con la **realidad de producción** de
-ERPlora (Cloud Portal en Django, marketplace, billing Stripe, provisioning AWS,
+ERPlora (SaaS en Django, marketplace, billing Stripe, provisioning AWS,
 contrato S3 + SHA256, auth, asistente AI con RAG).
 
 ---
@@ -30,7 +30,7 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 > Consúltese esto primero para saber "cómo tiene que funcionar". Cada punto enlaza con la sección
 > que lo detalla y con los ficheros/endpoints reales. `[✓ verificado]` = probado E2E en este repo.
 
-1. **UI / shell unificado Cloud↔Hub** — mismo esqueleto Ionic canónico (`ion-app > ion-split-pane
+1. **UI / shell unificado SaaS↔Hub** — mismo esqueleto Ionic canónico (`ion-app > ion-split-pane
    content-id="main" when="lg" > ion-menu (sidebar: brand+nav por secciones+tarjeta de usuario) +
    ion-router-outlet#main`). Componentes **Ionic (`ion-*`)**; OutfitKit (`ok-*`) **solo para huecos**
    (p. ej. `ok-data-table`). `apps/web` = Vue 3 + Ionic Vue + Vite. Rail colapsable por CSS. Dark por
@@ -49,30 +49,30 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
    (`bootHubContext`) y lo envía como **`X-Hub-Id`** en toda llamada. **No hay selector de hub.** Liga
    con la tenancy de §2.5. `[✓ verificado]`
 
-4. **Login de usuario real contra Cloud** — `POST /api/v1/auth/login/` + `GET /api/v1/auth/me/`;
+4. **Login de usuario real contra el SaaS** — `POST /api/v1/auth/login/` + `GET /api/v1/auth/me/`;
    tokens en `localStorage` (`erplora.access`/`erplora.refresh`); **interceptor refresh-en-401** con
    rotación de ambos tokens y un reintento (`POST /api/v1/auth/refresh/`); `X-Hub-Id` en todas. El
    **fallback demo** queda SOLO tras `VITE_DEMO=1` (producción falla duro). Contrato en §2.3. **Server-side (modelo decidido + implementado, §2.9):** la autoridad de identidad/permisos es **local**. Login por **PIN** o por **JWT de usuario cloud** (verificado RS256 → mapeado a un `hub_user` local) abre una **sesión server-side** (`HUB_AUTH=session`); cada petición lleva `X-Hub-Session` y el runtime resuelve `hub_user` → **permisos del rol** (`role_permissions` de los módulos activos). `hub_id` del despliegue. Verificado vivo: gate por rol real (employee `list`→200, `create`→403). Pendiente menor: argon2id para el PIN; gestión de usuarios/roles (UI admin); credencial de dispositivo de confianza (§14).
 
-5. **Instalación de módulos por el marketplace (API real de Cloud)** — flujo: `GET
+5. **Instalación de módulos por el marketplace (API real del SaaS)** — flujo: `GET
    /api/v1/marketplace/modules/{id}/versions/` (sha256) → `GET .../download/?version=` (zip binario) →
    **verificar SHA256** → unzip seguro (anti zip-slip) → `install_from_dir` → `POST .../mark_installed/`.
    En el Hub lo orquesta **`POST /api/modules/request-install {module_id, version}`** (cloud-client +
    source + installer) y emite WS `{"type":"module.installed","module_id"}` → el shell refresca el menú.
-   Detalle/contrato en §2.2. **⚠️ Pendiente (Cloud):** `ModuleVersionSerializer` no expone `sha256` por
+   Detalle/contrato en §2.2. **⚠️ Pendiente (SaaS):** `ModuleVersionSerializer` no expone `sha256` por
    `versions/` (solo el endpoint sync) → hoy, si falta, se instala SIN verificación de integridad;
-   **arreglar en Cloud** (añadir `sha256` al serializer) para cumplir el contrato §2.2.
+   **arreglar en el SaaS** (añadir `sha256` al serializer) para cumplir el contrato §2.2.
 
 6. **El asistente AI es una CAPACIDAD CORE del Hub, no un módulo de marketplace** (ADR-0033,
    2026-06-13; supera la decisión 2026-06-09 de "módulo instalable"). Está **siempre presente** por
    defecto (✨ del topbar): el proxy está **horneado en el binario** (`crates/server/src/assistant.rs`)
    y el RAG en `apps/ai/knowledge/` — no hay `module.zip`, ni install, ni fila `Module` en el catálogo.
    Su billing es **propio** (`AssistantTier`/`AssistantUsage`, capa gratis con tope + upgrade), fuera de
-   `ModulePurchase`/`is_module_entitled`. Su WC alcanza el LLM de Cloud por una **capacidad de host**:
-   `POST /api/assistant/chat/stream` del runtime, que hace de **proxy SSE** hacia Cloud
+   `ModulePurchase`/`is_module_entitled`. Su WC alcanza el LLM del SaaS por una **capacidad de host**:
+   `POST /api/assistant/chat/stream` del runtime, que hace de **proxy SSE** hacia el SaaS
    (`/api/v1/hub/device/assistant/chat/stream/`, reenvía `Authorization: Bearer` + `X-Hub-Id`)
    con **ensamblado de tools por permiso** (solo queries/commands con bloque `ai:` que el usuario puede
-   ejecutar, §9.2). El Hub nunca habla con el LLM directo (§9.3); embeddings/RAG por el proxy de Cloud
+   ejecutar, §9.2). El Hub nunca habla con el LLM directo (§9.3); embeddings/RAG por el proxy del SaaS
    (§9.4/§9.6). La UI de chat de referencia quedó en `apps/web/src/parked/AssistantChat.vue`.
 
 7. **Modelo de eventos del runtime = Outbox transaccional (entrega asíncrona at-least-once)** — ver
@@ -93,49 +93,49 @@ hub es **una sola app base** (misma UI, mismo modelo de módulos, mismo runtime)
 
 > **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md), app unificada,
 > aceptada 2026-06-17):** **un solo runtime Axum en AMBOS productos**, **mismo transporte de datos**
-> = **HTTP (RPC) + WebSocket (solo eventos)**. Se **elimina** `invoke`/IPC **para datos**: en Local,
+> = **HTTP (RPC) + WebSocket (solo eventos)**. Se **elimina** `invoke`/IPC **para datos**: en Hub Local,
 > el runtime Axum corre **embebido como servidor loopback** (`127.0.0.1:8787`) y la UI le habla por
-> HTTP+WS igual que la PWA. La **única diferencia** entre productos es el `DatabaseAdapter` (SQLite
-> Local ↔ Postgres/Aurora Hub PWA) y el almacenamiento de ficheros (disco local ↔ S3).
+> HTTP+WS igual que la PWA shell. La **única diferencia** entre productos es el `DatabaseAdapter` (SQLite
+> Hub Local ↔ Postgres/Aurora Hub Cloud) y el almacenamiento de ficheros (disco local ↔ S3).
 > *(pendiente doc↔código: el runtime/shell puede ir aún por el camino híbrido `invoke→HTTP`; la
 > migración es columna core.)*
 
-- **Local** (alias **Tauri**) — **1 dispositivo, multiusuario** (varios PINs/roles sobre el mismo
+- **Hub Local** (alias **Local**) — **1 dispositivo, multiusuario** (varios PINs/roles sobre el mismo
   equipo). **SQLite** embebido como autoridad, **offline**, **gratis**, empaquetado como
   **ejecutable Tauri**. El **puente** (Bridge) viaja **dentro del instalable**: el shell Tauri
-  **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA, reusando
+  **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA shell, reusando
   `crates/peripherals`).
   Transport de datos = **HTTP (RPC) + WebSocket (solo eventos)** contra el runtime Axum embebido
   (loopback `127.0.0.1:8787`).
-- **Hub PWA** (alias **PWA**) — **multidispositivo, multiusuario**. **Aurora/Postgres** en un
+- **Hub Cloud** (alias **Cloud**) — **multidispositivo, multiusuario**. **Aurora/Postgres** en un
   contenedor ECS por hub, **online-only**, **de pago**, servido como **PWA** en el navegador. El
   **puente** se instala **standalone** (`hub/apps/bridge`, WS `localhost:12321`) para el hardware.
   Transport de datos = **HTTP (RPC) + WebSocket (solo eventos)**.
 
 ```
-Local (Tauri)   HTTP+WS → runtime Axum embebido (127.0.0.1:8787) → SQLite   1 dispositivo · offline · gratis · puente=bridge embebido
-Hub PWA (PWA)   HTTP+WS → Rust/Axum (ECS)                         → Aurora   multidispositivo · online · de pago · puente=standalone
+Hub Local (Tauri)  HTTP+WS → runtime Axum embebido (127.0.0.1:8787) → SQLite   1 dispositivo · offline · gratis · puente=bridge embebido
+Hub Cloud (PWA)    HTTP+WS → Rust/Axum (ECS)                         → Aurora   multidispositivo · online · de pago · puente=standalone
 ```
 
-Reglas: **`single` ⟺ Local/Tauri** y **`cloud` ⟺ Hub PWA**. **No existe** el combo "shell Tauri
+Reglas: **`single` ⟺ Hub Local** y **`cloud` ⟺ Hub Cloud**. **No existe** el combo "shell Tauri
 sobre backend cloud" (`cloud + tauri`, retirado en ADR-0080). El término **`dev`/`develop`** se
-**reserva** para la app de **desarrollo local**, distinta del producto **Local**.
+**reserva** para la app de **desarrollo local**, distinta del producto **Hub Local**.
 
 - **UI idéntica**: Vue 3 + Ionic como *shell*; cada módulo aporta su pantalla como Web
   Component (Lit, §3.1), cargado dinámicamente. El **hardware** lo aporta el **puente** (sidecar en
-  Local, standalone en Hub PWA); la UI lo modela con un *capabilities descriptor* que el runtime
+  Hub Local, standalone en Hub Cloud); la UI lo modela con un *capabilities descriptor* que el runtime
   expone y usa solo para mostrar/ocultar.
 - **Transport de datos unificado (modelo decidido, [ADR-0050](../architecture/00-overview/decision-log.md))**:
   **los dos productos** usan **HTTP (RPC) + WebSocket (solo eventos)** contra el runtime Axum —
-  embebido en loopback `127.0.0.1:8787` en Local, en ECS en Hub PWA. Se **eliminó** `invoke`/IPC
+  embebido en loopback `127.0.0.1:8787` en Hub Local, en ECS en Hub Cloud. Se **eliminó** `invoke`/IPC
   para datos; el SDK ya no expone `IpcTransport`. La única diferencia es el `DatabaseAdapter` y los
   ficheros (§7.5, §7.6). *(pendiente doc↔código: el runtime/shell puede ir aún por `invoke→HTTP`;
   la migración es columna core.)*
-- **DB intercambiable**: `DatabaseAdapter` con backends SQLite (Local) y PostgreSQL (Hub PWA) (§8).
+- **DB intercambiable**: `DatabaseAdapter` con backends SQLite (Hub Local) y PostgreSQL (Hub Cloud) (§8).
 - **Offline (modelo decidido, ADR-0040 — sin sync)**: **dos productos sin puente de datos**.
-  Un dispositivo ⇒ **Local** (SQLite local = autoridad, gratis, 100% offline); ¿varios? ⇒ **Hub PWA**
+  Un dispositivo ⇒ **Hub Local** (SQLite local = autoridad, gratis, 100% offline); ¿varios? ⇒ **Hub Cloud**
   (ECS + Aurora por org, multidispositivo/web, **online-only**). **No hay sincronización local↔cloud**;
-  el respaldo del Local es el módulo `backup` premium (export lógico cifrado a S3, no es sync). Se
+  el respaldo del Hub Local es el módulo `backup` premium (export lógico cifrado a S3, no es sync). Se
   retiró el tier "Cloud DB local-first + sync" y el motor de sync (ver §2.8, OBSOLETO).
 - **Rust es la autoridad**: valida permisos, tenant (`hub_id`), payload y ejecuta. La UI
   nunca toca la base de datos.
@@ -147,34 +147,34 @@ sobre backend cloud" (`cloud + tauri`, retirado en ADR-0080). El término **`dev
 
 ## 2. Reconciliación con la realidad de producción (sección crítica)
 
-### 2.1 Hay DOS "Clouds" — no confundirlos
+### 2.1 SaaS ≠ Hub Cloud — no confundirlos
 
 | Pieza | Qué es | Tecnología | ¿Cambia? |
 |-------|--------|-----------|----------|
-| **Cloud Portal** | `erplora.com`: landing, dashboard, **marketplace**, **billing Stripe**, **provisioning** (boto3 → ECS+Aurora), **proxy AI** | Django 6 + htmx | **NO** |
-| **hub (modo cloud)** | El **runtime del tenant** en ECS. Sirve la app Ionic y ejecuta módulos | Rust + Axum | **SÍ** |
-| **hub (modo local)** | El mismo runtime **embebido** en un shell Tauri (desktop/móvil), offline-first con SQLite. Es el producto **Local** (1 dispositivo, multiusuario por PINs/roles); el hardware local va por sidecar Bridge (§1, §2.7) | Rust + Tauri | Nuevo |
+| **SaaS** | `erplora.com`: landing, dashboard, **marketplace**, **billing Stripe**, **provisioning** (boto3 → ECS+Aurora), **proxy AI** | Django 6 + htmx | **NO** |
+| **Hub Cloud** | El **runtime del tenant** en ECS. Sirve la app Ionic y ejecuta módulos | Rust + Axum | **SÍ** |
+| **Hub Local** | El mismo runtime **embebido** en un shell Tauri (desktop/móvil), offline-first con SQLite. Es el producto **Hub Local** (1 dispositivo, multiusuario por PINs/roles); el hardware local va por sidecar Bridge (§1, §2.7) | Rust + Tauri | Nuevo |
 
-> El Cloud Portal **orquesta y cobra**; hub **ejecuta** el negocio del tenant. El
-> "Axum cloud" de la visión es hub en modo cloud, **no** el Portal.
+> El SaaS **orquesta y cobra**; hub **ejecuta** el negocio del tenant. El
+> "Axum cloud" de la visión es el **Hub Cloud**, **no** el SaaS.
 
-### 2.2 La instalación de módulos pasa por el marketplace del Cloud Portal
+### 2.2 La instalación de módulos pasa por el marketplace del SaaS
 
 La visión describe un `/api/modules/install` contra un "registry" genérico. En ERPlora
 hay un **marketplace con compra, entitlement y reparto de ingresos** (Stripe Connect).
 hub respeta ese contrato:
 
 1. El admin instala desde el marketplace.
-2. hub pide al **Cloud Portal** la instalación → el Portal valida **compra/
+2. hub pide al **SaaS** la instalación → el SaaS valida **compra/
    suscripción** y devuelve la **URL S3 firmada** + metadatos (versión, SHA256).
 3. hub descarga el zip, **verifica SHA256**, descomprime, valida manifest, resuelve
    dependencias, aplica migraciones, registra capacidades, monta UI.
-4. hub reporta estado al Portal (instalado/activo/error).
+4. hub reporta estado al SaaS (instalado/activo/error).
 
 **Contrato S3 fijo** (producción, no se cambia): ruta inmutable `modules/{module_id}/v{version}.zip`,
 integridad por `ModuleVersion.sha256`, README extraído a `s3://erplora-docs/...`.
 
-### 2.3 Autenticación Hub ↔ Cloud (verificado en código)
+### 2.3 Autenticación Hub ↔ SaaS (verificado en código)
 
 > El token de máquina **no se eliminó: se cableó** (ADR-0003, 2026-06-10) como identidad de la
 > propia máquina del hub para las llamadas **hub-scoped**. Conviven **tres credenciales**, cada
@@ -182,15 +182,15 @@ integridad por `ModuleVersion.sha256`, README extraído a `s3://erplora-docs/...
 
 1. **Token de máquina del hub (`cloud_api_token`)** — identidad de la **propia máquina**. Se
    **genera al crear el hub** (`Hub.save()` → `secrets.token_hex(32)`), guardado **cifrado** en
-   Cloud (`Hub.cloud_api_token`), validado con `compare_digest` (`IsHubMachine`). Viaja como
+   el SaaS (`Hub.cloud_api_token`), validado con `compare_digest` (`IsHubMachine`). Viaja como
    header **`X-Hub-Token`** + `X-Hub-Id`. Es la credencial **por defecto de todo lo hub-scoped**:
    marketplace (browse/versions/download/mark_installed), entitlement, install, asistente,
    métricas — endpoints ampliados a `IsHubMember | IsHubMachine`. Necesario porque el día a día
    es sesión local/PIN (con usuarios solo-locales) y offline-first: casi nunca hay un JWT cloud
-   fresco, pero el hub debe poder hablar con Cloud **a sí mismo**.
+   fresco, pero el hub debe poder hablar con el SaaS **a sí mismo**.
    - **Es un secreto del hub**: vive solo en el runtime Rust (`HubConfig.cloud_api_token`), **nunca
      en el navegador**. El web pega a rutas proxy del runtime (`/api/entitlement`,
-     `/api/marketplace/catalog`) y el runtime firma hacia Cloud (`auth::hub_scoped_auth`).
+     `/api/marketplace/catalog`) y el runtime firma hacia el SaaS (`auth::hub_scoped_auth`).
    - **Entrega:** env `HUB_CLOUD_API_TOKEN` (ECS); `GET /api/v1/hub/device/enroll/`
      (owner/admin) para Tauri/local. Un hub pertenece siempre a una **organización**.
 2. **JWT del usuario activo** — **solo** llamadas atribuidas a usuario: compra, checkout, billing,
@@ -203,7 +203,7 @@ integridad por `ModuleVersion.sha256`, README extraído a `s3://erplora-docs/...
 ### 2.4 La clasificación del marketplace NO vive en el módulo
 
 `sectors`, `business_types`, `functional_unit`, subcategorías, `pricing`, `is_published`…
-se editan en el **vendor portal del Cloud** y **se preservan entre syncs**. El
+se editan en el **vendor portal del SaaS** y **se preservan entre syncs**. El
 `module.json` declara **solo lo técnico** (capacidades, permisos, dependencias, UI, AI
 tools). Igual que la política actual con `module.py`.
 
@@ -226,60 +226,60 @@ tools). Igual que la política actual con `module.py`.
 - **Topología confirmada**: **un contenedor ECS por hub**, BD **por organización**
   (`Organization.database_name`, p. ej. `org_abc123…`) compartida por los hubs de la org.
 - **Estado de módulos** (igual que hoy): `hub_module` (instalado/activo/... +
-  `checksum_sha256` + `manifest` + `version`) y `hub_module_version` (catálogo del Portal).
-- **Local (Tauri/SQLite)**: un solo hub por dispositivo; `hub_id` se mantiene por
+  `checksum_sha256` + `manifest` + `version`) y `hub_module_version` (catálogo del SaaS).
+- **Hub Local (Tauri/SQLite)**: un solo hub por dispositivo; `hub_id` se mantiene por
   consistencia (un módulo corre igual en local y en cloud).
 - ✅ **IDs de fila (decidido — ADR-0035, supera la PK numérica de ADR-0007/§2.5)**: los datos de
   negocio del hub (Aurora por-org **y** SQLite local) usan **PK = UUID v4 (`TEXT`) en TODO** — el
   runtime ya inyecta `:new_id` como UUID v4. **No** hay autoincremental numérico. El `hub_id` (UUID,
-  viene del Cloud) sigue siendo el **discriminador de tenant** por fila. Como el UUID es
+  viene del SaaS) sigue siendo el **discriminador de tenant** por fila. Como el UUID es
   **globalmente único**, **NO hay remapeo de PKs ni reescritura de FKs** al fusionar local↔cloud:
   los ids se conservan tal cual aunque varios hubs compartan la BD de la org. El append offline
   (pedidos creados sin red) **no colisiona** por construcción. *(Esto resuelve el punto abierto del
   motor de sync que §2.8/ADR-0031 tenían sobre el remapeo de PKs numéricas.)*
 
-### 2.6 El sync Git del Cloud lee `module.json` (formato único)
+### 2.6 El sync Git del SaaS lee `module.json` (formato único)
 
 **Decisión (2026-06-01): no hay formato legacy.** Todos los módulos son declarativos
-(`module.json`). El sync Git del Cloud lee **solo `module.json`**:
+(`module.json`). El sync Git del SaaS lee **solo `module.json`**:
 
 - Se eliminó el discriminador `manifest_kind` (modelo, schema, parser TS/Rust) y todo el
-  parser Python del Cloud (`parse_module_py`/`parse_ai_context_py`/`_extract_ast_value`).
+  parser Python del SaaS (`parse_module_py`/`parse_ai_context_py`/`_extract_ast_value`).
   `parse_module_json` es el único parser; el sync ya no hace fallback a `module.py`.
 - El contexto RAG (`ai_context`) ahora vive como campo de `module.json` (antes salía del
   `CONTEXT` de `ai_context.py`).
 - **Inmutabilidad S3**: el publish debe usar la ruta versionada *create-only*
   (`ModuleVersion.create_from_zip`); reescribir un `v{ver}.zip` existente rompe el SHA256
-  de clientes desplegados (el Cloud ya lo bloquea).
+  de clientes desplegados (el SaaS ya lo bloquea).
 
 ### 2.7 Periféricos / hardware local — el Bridge pasa a componente compartido
 
 > ✅ **Decisión (actualizada): el `bridge/` NO se elimina.** Deja de ser un *producto separado de
 > instalación obligatoria* y pasa a ser un **componente de hardware compartido**, enviado de dos
 > formas con **un solo código**: (a) **sidecar** empotrado en el shell Tauri (install único,
-> transparente) y (b) **instalador standalone opcional** para **Hub PWA**.
+> transparente) y (b) **instalador standalone opcional** para **Hub Cloud**.
 
 **Cómo obtiene hardware cada producto (§1):** modelo decidido
 [ADR-0050](../architecture/00-overview/decision-log.md) — el bridge usa el **mismo canal localhost
 (HTTP/WS) en los dos productos**. *(pendiente doc↔código: el shell puede ir aún por el camino
 híbrido `invoke→HTTP`; la migración es columna core.)*
 
-- **Local (Tauri)**: el shell Tauri **arranca el bridge embebido** (servidor localhost, mismo canal
-  que la PWA, reusando `crates/peripherals`) — **no** por handlers `invoke`. **El shell Tauri *es* el
+- **Hub Local (Tauri)**: el shell Tauri **arranca el bridge embebido** (servidor localhost, mismo canal
+  que la PWA shell, reusando `crates/peripherals`) — **no** por handlers `invoke`. **El shell Tauri *es* el
   bridge** — no hay proceso aparte ni segundo install.
-- **Hub PWA**: el navegador **no puede** abrir TCP crudo (puerto 9100), USB ni
+- **Hub Cloud**: el navegador **no puede** abrir TCP crudo (puerto 9100), USB ni
   Bluetooth clásico. Si ese usuario necesita hardware físico, instala el **Bridge standalone**
-  (opcional); la PWA lo detecta por WebSocket en `localhost`. Si no lo necesita, imprime por
+  (opcional); la PWA shell lo detecta por WebSocket en `localhost`. Si no lo necesita, imprime por
   PDF/email o impresora **ePOS-HTTP** (alcanzable por navegador). *Pega conocida: una PWA
   `https://` ↔ `ws://localhost` arrastra fricción de mixed-content/pairing — el bridge embebido del
   shell Tauri (loopback) no la tiene.*
 
 **Transportes de impresora** — ✅ **Decidido: SOLO RED (TCP/IP ESC/POS, puerto 9100) — 100% LAN.**
 USB y Bluetooth **se descartan**: exigen drivers + mantenimiento por dispositivo/SO que no compensa.
-La red es además el caso más simple (un socket TCP, trivial en Rust) y el más estable; en **Local
+La red es además el caso más simple (un socket TCP, trivial en Rust) y el más estable; en **Hub Local
 (Tauri)** el runtime abre el socket al puerto 9100 directamente. El Bridge es **red-only por
 construcción**: el crate `crates/peripherals` no incluye USB ni Bluetooth. Consecuencia para **Hub
-PWA**: como el navegador no abre TCP crudo, **imprimir requiere el Bridge** (sidecar Tauri o
+Cloud**: como el navegador no abre TCP crudo, **imprimir requiere el Bridge** (sidecar Tauri o
 standalone) o una impresora **ePOS-HTTP**; no hay atajo WebUSB/WebBluetooth porque el hardware es
 de red.
 
@@ -295,10 +295,10 @@ un proceso de instalación obligatoria):
 
 **Lo que sí cambia vs el análisis anterior**: ya no hay un *proceso Bridge separado de
 instalación obligatoria* — el hardware viaja **dentro** del shell Tauri (sidecar) y el Bridge
-standalone queda **opcional**, solo para **Hub PWA**. El escáner por HID lo maneja el
+standalone queda **opcional**, solo para **Hub Cloud**. El escáner por HID lo maneja el
 SO/navegador como teclado.
 
-> El escenario **Hub PWA + hardware físico** ya **no** queda fuera de alcance: se cubre
+> El escenario **Hub Cloud + hardware físico** ya **no** queda fuera de alcance: se cubre
 > con el **Bridge standalone opcional**. El POS en navegador es un producto de primera clase (§1),
 > no una excepción.
 
@@ -315,11 +315,11 @@ SO/navegador como teclado.
   Tauri.
 - **Dos entregas, un crate:**
   - **Standalone** `hub/apps/bridge` — binario **Axum** que expone `GET /status` + `WS /ws` en
-    `localhost:12321`. Es el de **Hub PWA**.
+    `localhost:12321`. Es el de **Hub Cloud**.
   - **Bridge embebido en Tauri** `hub/apps/tauri` — el shell **arranca el bridge embebido** (servidor
-    localhost, mismo canal HTTP/WS que la PWA, reusando el mismo crate), **no** por handlers `invoke`
+    localhost, mismo canal HTTP/WS que la PWA shell, reusando el mismo crate), **no** por handlers `invoke`
     (modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md); `invoke` solo nativo).
-    Es el de **Local (Tauri)**. *(pendiente doc↔código: el shell puede ir aún por `invoke→HTTP`; la
+    Es el de **Hub Local (Tauri)**. *(pendiente doc↔código: el shell puede ir aún por `invoke→HTTP`; la
     migración es columna core.)*
 - **Contrato WS estable.** Mismo JSON que consume el frontend (`bridge.js`/cliente del Hub). Se
   **dejan de exponer** USB/BT y el escáner (`barcode`/`toggle_keyboard`): el escáner HID lo maneja el
@@ -329,7 +329,7 @@ SO/navegador como teclado.
 - **Borrados (Fase 1, mínimo ruido):** `bridge/ERPlora-Bridge-desktop` (Python) y `bridge/ERPloraKiosk`
   (Ionic/Capacitor — redundante con PWA + Tauri). **Sin Python, sin Ionic/Capacitor.**
 - **Plataformas distribuidas:** **Windows + Linux + Android**. **macOS = solo desarrollo local**
-  (`cargo build`), no se distribuye (se quitó de la web `/bridge/` del Cloud).
+  (`cargo build`), no se distribuye (se quitó de la web `/bridge/` del SaaS).
 - **Empaquetado (v1):** **binarios sueltos** (`erplora-bridge.exe`, `erplora-bridge-linux`). Instalador
   (.msi/.deb) + **bandeja del sistema** + **autostart** + **firma de código** quedan como pulido
   posterior.
@@ -340,10 +340,10 @@ SO/navegador como teclado.
     el *trust policy* del rol a `repo:ERPlora/hub:*` (vive en `aws/`, Terraform) — hasta entonces el job
     `upload-s3` falla.
   - Android → su propio repo (`build.yml`): APK/AAB **firmado** → mismo bucket, con claves AWS estáticas.
-- **Descarga desde el Cloud (siempre la última):** `GET /bridge/download/<platform>/`
+- **Descarga desde el SaaS (siempre la última):** `GET /bridge/download/<platform>/`
   (`cloud/apps/public/bridge`) redirige a `bridge/latest/<fichero>` en S3. El CI rellena ese `latest/`.
-- **Detección en el Hub (PWA):** `hub/apps/web/src/lib/bridge-client.ts` — `detectBridge()` sondea
-  `localhost:12321/status`; `bridgeDownloadUrl()` apunta al Cloud. `SystemPage.vue` muestra estado real
+- **Detección en el Hub Cloud (PWA shell):** `hub/apps/web/src/lib/bridge-client.ts` — `detectBridge()` sondea
+  `localhost:12321/status`; `bridgeDownloadUrl()` apunta al SaaS. `SystemPage.vue` muestra estado real
   (Conectado/Desconectado + versión) y los botones de descarga (Windows/Linux/Android).
 - **Mixed-content:** una PWA `https://` puede llamar a `http://localhost:12321` porque los navegadores
   tratan `localhost`/`127.0.0.1` como **origen seguro** (exento del bloqueo). **iOS/Safari queda fuera
@@ -378,19 +378,19 @@ SO/navegador como teclado.
 > (`crates/datasync`, relay, LWW, conflictos de stock, remapeo). Lo de abajo (tres tiers, sync, LWW)
 > queda **histórico**; borrado físico en [`todo/F-remove-sync-clouddb-execution.md`](../todo/F-remove-sync-clouddb-execution.md).
 
-> ✅ **Decisión (ADR-0040): dos productos sin puente.** **Local** (`single`+Tauri, SQLite local =
-> autoridad, gratis, 100% offline, **un dispositivo**) y **Cloud** (`cloud`: ECS hub + Aurora por org,
-> **online-only**, multi-dispositivo/web). Un dispositivo ⇒ Local; ¿necesitas varios? ⇒ Cloud (online).
-> **No se sincroniza dato** entre ambos en fase 1. El respaldo del Local es el módulo **`backup`** premium
-> (export lógico cifrado a S3 vía endpoint Cloud, [modules/backup.md](../architecture/modules/backup.md)) —
+> ✅ **Decisión (ADR-0040): dos productos sin puente.** **Hub Local** (`single`+Tauri, SQLite local =
+> autoridad, gratis, 100% offline, **un dispositivo**) y **Hub Cloud** (`cloud`: ECS hub + Aurora por org,
+> **online-only**, multi-dispositivo/web). Un dispositivo ⇒ Hub Local; ¿necesitas varios? ⇒ Hub Cloud (online).
+> **No se sincroniza dato** entre ambos en fase 1. El respaldo del Hub Local es el módulo **`backup`** premium
+> (export lógico cifrado a S3 vía endpoint del SaaS, [modules/backup.md](../architecture/modules/backup.md)) —
 > copia unidireccional, **no** sync.
 
 **Dos productos** (detalle en [overview.md](../architecture/hub/overview.md)):
 
 | Producto | Datos | Multi-device | Offline |
 | --- | --- | --- | --- |
-| **Local — gratis** | SQLite local (autoridad) + `backup` a S3 | No | Sí (100%) |
-| **Cloud — starter/standard** | ECS hub + Aurora por org | Sí | **Online-only** |
+| **Hub Local — gratis** | SQLite local (autoridad) + `backup` a S3 | No | Sí (100%) |
+| **Hub Cloud — starter/standard** | ECS hub + Aurora por org | Sí | **Online-only** |
 
 ---
 
@@ -433,12 +433,12 @@ SO/navegador como teclado.
 
 ### 2.9 Login de usuario, dispositivos de confianza y tipos de usuario
 
-> Esto es la **auth de usuario** (distinta de la auth máquina Hub↔Cloud, §2.3). Hereda y
+> Esto es la **auth de usuario** (distinta de la auth máquina Hub↔SaaS, §2.3). Hereda y
 > extiende el modelo actual del hub (PIN local + JWT de usuario).
 
 Flujo:
 1. **Primera configuración (requiere internet)**: el usuario se loguea con **email +
-   password** contra el Cloud Portal → se establece la sesión y se **marca el dispositivo
+   password** contra el SaaS → se establece la sesión y se **marca el dispositivo
    como de confianza**, provisionando la identidad en el hub local.
 2. **Dispositivo de confianza → PIN**: una vez confiable, el acceso diario es por **PIN**
    local (rápido, como hoy).
@@ -448,7 +448,7 @@ Flujo:
    oportunista** cuando el usuario hace alguna petición al cloud (no en un ciclo aparte).
 
 **Dos tipos de usuario**:
-- **Usuarios cloud**: gestionados en el Cloud Portal (miembros de la org); identidad/roles
+- **Usuarios cloud**: gestionados en el SaaS (miembros de la org); identidad/roles
   vienen del cloud. Pueden operar en varios hubs de la org.
 - **Usuarios solo-locales**: existen **únicamente en el hub** (no en el cloud); útiles para
   personal de tienda que nunca necesita el portal.
@@ -464,10 +464,10 @@ Flujo:
 **Origen de la credencial de máquina por producto** (§1 — y la respuesta a
 "¿el local necesita login?": **sí, una vez y online**, porque es lo que provisiona la identidad y
 los entitlements para descargar módulos):
-- **Local (Tauri)**: la app **es el hub**. El primer login online **auto-provisiona** su
+- **Hub Local (Tauri)**: la app **es el hub**. El primer login online **auto-provisiona** su
   identidad de máquina (el `cloud_api_token` / `X-Hub-Token` de §2.3) en el dispositivo y la
   persiste como credencial de dispositivo (*decisión abierta §14*). Tras eso opera offline.
-- **Hub PWA**: el hub remoto lo provisiona el Portal (boto3 → ECS+Aurora) y el despliegue
+- **Hub Cloud**: el hub remoto lo provisiona el SaaS (boto3 → ECS+Aurora) y el despliegue
   **inyecta** el `cloud_api_token` en ECS (env `HUB_CLOUD_API_TOKEN`), nunca en el navegador. El
   navegador solo autentica al **usuario** (JWT + `X-Hub-Id`); el hardware local va por el Bridge
   standalone (§2.7). → el "origen de la credencial de máquina" depende del **producto**.
@@ -479,8 +479,8 @@ los entitlements para descargar módulos):
 > sigue siendo por organización.
 
 - **La organización es la frontera de datos** (§2.5): **una BD por organización** (hoy SQLite local;
-  en el futuro una **Aurora en la nube vendida vía Cloud-proxy**, nunca expuesta directamente — el
-  Cloud hace de proxy). **Varios hubs comparten la BD de su organización**, discriminados por `hub_id`
+  en el futuro una **Aurora en la nube vendida vía proxy del SaaS**, nunca expuesta directamente — el
+  SaaS hace de proxy). **Varios hubs comparten la BD de su organización**, discriminados por `hub_id`
   por fila. Por eso el vínculo natural es hub→organización, no hub→usuario.
 - **Org por defecto al crear la cuenta**: cuando un usuario **crea su cuenta** se le crea una
   **organización personal por defecto** (editable después: nombre, datos fiscales…). No se espera al
@@ -492,7 +492,7 @@ los entitlements para descargar módulos):
   bajo la organización del usuario, por **identidad de dispositivo**. El shell Tauri genera y persiste
   un id estable por instalación en `app_data_dir` y lo expone por el comando `device_context`
   (`apps/tauri/src-tauri/src/lib.rs`); el frontend lo lee (`apps/web/src/lib/device.ts`) y lo manda en
-  el login como `X-Client-Type` + **`X-Device-Id`**. El Cloud hace get-or-create por `(org, device_id)`
+  el login como `X-Client-Type` + **`X-Device-Id`**. El SaaS hace get-or-create por `(org, device_id)`
   (`_register_hub`), con fallback legacy por `(org, deployment_mode)` para clientes sin device-id. Dos
   máquinas del mismo usuario = **dos hubs** que **comparten la BD de la org** → habilita el
   multi-terminal primary/satélite (§2.7b) de forma natural.
@@ -504,10 +504,10 @@ los entitlements para descargar módulos):
 > es la **versión ligera** (gratis, publicitaria) para captar clientes; el upsell es **subir a cloud**
 > (donde está el multidevice). Lo que abre funcionalidad es un **entitlement por tiers de módulo**.
 
-**Tiers de módulo** (`Module.tier` en el Cloud, `cloud/apps/public/modules/models.py`; se edita en el
+**Tiers de módulo** (`Module.tier` en el SaaS, `cloud/apps/public/modules/models.py`; se edita en el
 vendor portal como el resto de la clasificación, §2.4):
 
-| Tier | Qué es | Local (Tauri gratis) | Cloud (ECS/Aurora) |
+| Tier | Qué es | Hub Local (Tauri gratis) | Hub Cloud (ECS/Aurora) |
 |------|--------|----------------------|--------------------|
 | `basic` | Núcleo POS + **compliance** (operar y cumplir normativa vigente) | **Gratis** | **Gratis** |
 | `standard` | Funcionalidad extra que **sí corre en local** | **Suscripción**, comprada desde la propia app (Fase 2) | **Gratis** (incluida en el plan cloud) |
@@ -524,7 +524,7 @@ vendor portal como el resto de la clasificación, §2.4):
 
 **Gate de arranque (la app pregunta "¿qué puedo montar?")**:
 1. Tras el login del usuario, el hub pide `GET /api/v1/hub/device/entitlement/` (user-JWT + `X-Hub-Id`,
-   permiso `IsHubMember`). El Cloud devuelve un **token firmado RS256** con el **mismo par de claves que
+   permiso `IsHubMember`). El SaaS devuelve un **token firmado RS256** con el **mismo par de claves que
    el JWT de usuario** (`settings.PRIVATE_KEY/PUBLIC_KEY`; pública en `/api/v1/auth/public-key/`), con la
    lista de módulos permitidos + `exp` (24 h) y `grace_until` (gracia offline, 7 d).
 2. El hub **cachea** token + clave pública y los **verifica OFFLINE**
@@ -533,7 +533,7 @@ vendor portal como el resto de la clasificación, §2.4):
 3. Sin token válido ni cacheado → **pantalla de login/activación** (`apps/web/src/views/ActivationPage.vue`):
    el shell arranca pero **no monta el runtime de negocio**. Con token válido → monta **solo** los
    módulos del entitlement. El cableado del frontend vive en `apps/web/src/lib/entitlement.ts`
-   (resuelve en boot/login: comando Tauri si lo hay, si no el endpoint Cloud), `lib/module-loader.ts`
+   (resuelve en boot/login: comando Tauri si lo hay, si no el endpoint del SaaS), `lib/module-loader.ts`
    (filtra los instalados a los entitled) y el guard del `router`.
 4. Glue Tauri: `apps/tauri/src-tauri` (comando `validate_entitlement`). *(El crate aún no está en el
    workspace Cargo: requiere toolchain Tauri v2 + el `dist` de `apps/web`.)*
@@ -544,7 +544,7 @@ entitlement firmado, gating por `deployment_mode`, `entitlement()` + verificaci�
 filtro de módulos + pantalla de activación; typecheck + build verdes).
 
 **Fase 2 (diferida — decisión explícita: no complicar la Fase 1)**:
-- **Compra in-app de módulos `standard`** desde la app Tauri (deep-link al checkout Stripe del Cloud)
+- **Compra in-app de módulos `standard`** desde la app Tauri (deep-link al checkout Stripe del SaaS)
   ejecutándose en local; al volver, re-`entitlement()`.
 - **Eje `requires_cloud`** como flag separado de `tier` (hoy se deriva: `premium ⇒ solo-cloud`).
 - **Clasificación por "tipo de hub"**: registrar el tipo de hub y casar tipo↔módulos de pago, si
@@ -863,8 +863,8 @@ interface ErploraTransport {
   subscribe(event: string, cb: (e: unknown) => void): void;
 }
 // Modelo decidido (ADR-0050): el SDK ya NO tiene IpcTransport (eliminado); AMBOS productos
-// usan HTTP+WS contra el runtime Axum — embebido en loopback 127.0.0.1:8787 (Local) o ECS (PWA).
-// HttpWsTransport → HTTP POST query/command + WebSocket solo para eventos          (Local y Hub PWA)
+// usan HTTP+WS contra el runtime Axum — embebido en loopback 127.0.0.1:8787 (Hub Local) o ECS (Hub Cloud).
+// HttpWsTransport → HTTP POST query/command + WebSocket solo para eventos          (Hub Local y Hub Cloud)
 // (WsTransport — todo por un WS — queda como alternativa, no por defecto; §7.5)
 // (pendiente doc↔código: el runtime/shell puede ir aún por invoke→HTTP; la migración es columna core.)
 ```
@@ -901,7 +901,7 @@ erplora module build <id>       # compila WC (Lit) + WASM, valida SQL/schema
 erplora module validate <id>    # valida manifest contra JSON Schema + linters
 erplora module pack <id>        # genera manifest.lock + module.zip
 erplora module sign <id>        # firma + SHA256
-erplora module publish <id>     # sube al marketplace del Cloud Portal (§2.2)
+erplora module publish <id>     # sube al marketplace del SaaS (§2.2)
 ```
 
 ### 7.5 Transporte y comunicación — ¿todo por WebSocket?
@@ -911,13 +911,13 @@ WS". WS-only obligaría a reimplementar el framing RPC (correlación de IDs, tim
 HTTP da gratis.
 
 **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** **AMBOS productos**
-usan el **mismo transporte de datos** (HTTP+WS) contra el runtime Axum; en **Local** ese runtime
-corre **embebido como servidor loopback** (`127.0.0.1:8787`), en **Hub PWA** en ECS. Se **eliminó**
+usan el **mismo transporte de datos** (HTTP+WS) contra el runtime Axum; en **Hub Local** ese runtime
+corre **embebido como servidor loopback** (`127.0.0.1:8787`), en **Hub Cloud** en ECS. Se **eliminó**
 `invoke`/IPC para datos. La diferencia entre productos es **solo** el `DatabaseAdapter` (SQLite ↔
 Aurora) y los ficheros (disco ↔ S3). *(pendiente doc↔código: el runtime/shell puede ir aún por el
 camino híbrido `invoke→HTTP`; la migración es columna core.)*
 
-| Qué | Local — runtime Axum embebido (loopback) | Hub PWA — Axum (ECS) |
+| Qué | Hub Local — runtime Axum embebido (loopback) | Hub Cloud — Axum (ECS) |
 |-----|------------------------|------------------------|
 | `query` / `command` (RPC) | **HTTP POST** (`/api/query`, `/api/command`) | **HTTP POST** (`/api/query`, `/api/command`) |
 | Eventos / push | **WebSocket** (`/ws`, solo push) | **WebSocket** (`/ws`, solo push) |
@@ -925,12 +925,12 @@ camino híbrido `invoke→HTTP`; la migración es columna core.)*
 | Bundles UI de módulos | filesystem | **HTTP/CDN** |
 | Descarga `module.zip` | **HTTP** (S3) | **HTTP** (S3) |
 | Exports PDF/Excel | **HTTP** | **HTTP** |
-| Cloud Portal (marketplace, billing, embeddings/LLM) | **HTTP REST** (user-JWT + `X-Hub-Id`) | **HTTP REST** |
+| SaaS (marketplace, billing, embeddings/LLM) | **HTTP REST** (user-JWT + `X-Hub-Id`) | **HTTP REST** |
 
 > **Canal de hardware (modelo decidido, [ADR-0050](../architecture/00-overview/decision-log.md)):**
-> el bridge usa el **mismo canal localhost (HTTP/WS) en los dos productos**. En **Local (Tauri)** el
-> shell **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA, reusando
-> `crates/peripherals`) — **NO** por handlers `invoke`. En **Hub PWA** ese canal lo aporta el
+> el bridge usa el **mismo canal localhost (HTTP/WS) en los dos productos**. En **Hub Local (Tauri)** el
+> shell **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA shell, reusando
+> `crates/peripherals`) — **NO** por handlers `invoke`. En **Hub Cloud** ese canal lo aporta el
 > **Bridge standalone opcional** por `ws://localhost` (§2.7). `invoke` queda **solo** para lo nativo
 > sin equivalente HTTP (keychain, device_id, ciclo de vida), no para hardware.
 
@@ -941,8 +941,8 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
   por HTTP**; solo se pierden las actualizaciones en vivo. Con WS-only, si el socket falla, **todo** falla.
 - **Más simple**: HTTP no necesita framing RPC sobre WS. **Tooling estándar** (reintentos,
   idempotencia, `curl`, proxies/CDN). WebSocket queda **solo para push**.
-- **Mismo transporte en Local y Hub PWA** (modelo decidido, ADR-0050): HTTP (RPC) + WebSocket
-  (solo push) contra el runtime Axum, embebido en loopback en Local. *(pendiente doc↔código: el
+- **Mismo transporte en Hub Local y Hub Cloud** (modelo decidido, ADR-0050): HTTP (RPC) + WebSocket
+  (solo push) contra el runtime Axum, embebido en loopback en Hub Local. *(pendiente doc↔código: el
   runtime/shell puede ir aún por `invoke→HTTP`; la migración es columna core.)*
 
 > **Decisión: ambos productos = HTTP (RPC) + WebSocket (solo eventos).** WS-only queda como
@@ -951,7 +951,7 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
 ### 7.6 Garantía: el mismo módulo corre en ambos productos sin trabajo adicional
 
 > **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** ambos productos
-> usan **HTTP+WS** contra el runtime Axum (embebido en loopback en Local). El SDK ya **no** tiene
+> usan **HTTP+WS** contra el runtime Axum (embebido en loopback en Hub Local). El SDK ya **no** tiene
 > `IpcTransport`. *(pendiente doc↔código: el runtime/shell puede ir aún por `invoke→HTTP`; la
 > migración es columna core.)*
 
@@ -965,19 +965,19 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
 4. **Flag de arranque** `RUNTIME_TRANSPORT=http+ws|ws` (detalle de impl del transporte, no de
    negocio). Ningún campo de `module.json`, ni código de módulo, ni lógica de permisos depende del
    transporte.
-5. **El mismo frontend se empaqueta como Tauri (Local) o como PWA (Hub PWA)**: el shell es una
-   dimensión de *build/boot*. **Local (Tauri)** arranca el runtime Axum embebido (loopback
-   `127.0.0.1:8787`) y el bridge embebido; **Hub PWA** apunta al Axum en ECS. `invoke` queda **solo**
+5. **El mismo frontend se empaqueta como Tauri (Hub Local) o como PWA (Hub Cloud)**: el shell es una
+   dimensión de *build/boot*. **Hub Local (Tauri)** arranca el runtime Axum embebido (loopback
+   `127.0.0.1:8787`) y el bridge embebido; **Hub Cloud** apunta al Axum en ECS. `invoke` queda **solo**
    para lo nativo (keychain, device_id, ciclo de vida, §2.7), no para datos ni hardware.
 
-→ El mismo módulo y la misma UI corren en **los dos productos** (Local y Hub PWA)
+→ El mismo módulo y la misma UI corren en **los dos productos** (Hub Local y Hub Cloud)
 **cambiando solo los adaptadores en el boot**. Cero trabajo adicional.
 
 ### 7.7 Reactividad de la UI (decidido: eventos WS → el WC re-consulta)
 
 > ✅ **Decisión.** El Web Component mantiene su **estado en el cliente**. Cuando llega un
 > **evento** relevante (p. ej. `inventory.stock.updated`) por **WebSocket** (mismo canal en ambos
-> productos, modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md); en Local el WS
+> productos, modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md); en Hub Local el WS
 > va contra el runtime Axum embebido en loopback), el WC **vuelve a hacer la query** afectada y se
 > repinta.
 
@@ -1046,16 +1046,16 @@ en un sitio.
 
 El adapter se elige y configura **en el boot** desde variables de entorno/config:
 
-- **Cloud (ECS)**: cada hub recibe su **DSN de Postgres en `HUB_DATABASE_URL`** (inyectada
+- **Hub Cloud (ECS)**: cada hub recibe su **DSN de Postgres en `HUB_DATABASE_URL`** (inyectada
   por ECS al crear la task). Los hubs de la **misma organización comparten el mismo DSN**
   (misma Aurora de la org); `hub_id` desambigua por fila (§2.5).
-- **Local (Tauri)**: recibe el **path del fichero SQLite** (p. ej. `HUB_SQLITE_PATH`).
+- **Hub Local (Tauri)**: recibe el **path del fichero SQLite** (p. ej. `HUB_SQLITE_PATH`).
 - Misma interfaz `DatabaseAdapter`; **solo cambia la config del entorno**.
 
 **Sizing del `PgPool` (`max_connections`, etc.) — decisión abierta.** Depende del plan
 contratado y del modelo "una Aurora compartida por org / un contenedor ECS por hub": el
 límite real es agregado (`Σ pools de los hubs de la org ≤ conexiones de su Aurora`). El
-Cloud Portal ya gestionaba esto con la app FastAPI; **a revisar cómo se traslada a
+SaaS ya gestionaba esto con la app FastAPI; **a revisar cómo se traslada a
 hub** (probablemente env inyectada por el provisioning + clamp/fail-fast al boot,
 y `acquire_timeout`/`max_lifetime`/`idle_timeout` fijos por ser operacionales, no de plan).
 Pendiente, no bloquea la Fase 0/1.
@@ -1129,14 +1129,14 @@ módulo(s) cargar** según el contexto de la petición — uno o varios, no todo
 **Mecanismo = búsqueda vectorial** (reusa la infra de §9.4/§9.5, no es infra nueva):
 
 1. **Al instalar un módulo** (lifecycle, §9.6): se calcula el *embedding* de su
-   `agent.description` (vía el proxy Cloud, §9.3) y se **registra** en el índice vectorial.
+   `agent.description` (vía el proxy del SaaS, §9.3) y se **registra** en el índice vectorial.
 2. **En cada petición**: se embebe lo que pide el usuario → se **busca** en el índice → salen
    los **1–N módulos relevantes** → solo de esos se cargan los tools `ai`.
 
 El **tool-assembly** queda en dos fases:
 - **(router)** embeber petición → buscar en el índice → top módulos.
 - **(assembler)** de esos módulos: filtrar tools por **permiso del usuario** → empaquetar en el
-  formato function-calling del Cloud (`{type:function, function:{name, description, parameters}}`,
+  formato function-calling del SaaS (`{type:function, function:{name, description, parameters}}`,
   ver contrato §9.3) → enviar.
 
 **Dos usos del vector — NO confundir** (misma infraestructura, distinto contenido):
@@ -1148,7 +1148,7 @@ El **tool-assembly** queda en dos fases:
 
 Routing decide *qué herramientas*; RAG responde *cómo se hace algo*.
 
-**Coste honesto:** embeber necesita el Cloud (§9.3), así que el routing añade una llamada de
+**Coste honesto:** embeber necesita el SaaS (§9.3), así que el routing añade una llamada de
 embedding **por petición** antes de la principal. Con **pocos** módulos instalados es más barato
 mandar las `agent.description` como texto y que el LLM elija; el **vector gana a escala** (muchos
 módulos). El `keywords` opcional de `agent` permite un pre-filtro léxico barato antes del vector.
@@ -1159,7 +1159,7 @@ módulos). El `keywords` opcional de `agent` permite un pre-filtro léxico barat
 
 ### 9.3 El hub NUNCA habla con LLMs directamente
 
-**Embeddings** (ingesta + pregunta) y **generación** van por el **proxy del Cloud Portal**,
+**Embeddings** (ingesta + pregunta) y **generación** van por el **proxy del SaaS**,
 medido en `AssistantUsage` (`POST /api/v1/hub/device/assistant/embeddings/` + orquestador
 two-step multi-provider, cuotas por hub/mes).
 
@@ -1167,7 +1167,7 @@ two-step multi-provider, cuotas por hub/mes).
 > 2026-06-09 de "módulo instalable").** Siempre presente por defecto (✨ del topbar), con el proxy
 > horneado en el binario (`crates/server/src/assistant.rs`) y el RAG en `apps/ai/knowledge/`; no hay
 > `module.zip`, ni install, ni fila `Module`. Billing propio (`AssistantTier`, fuera de
-> `ModulePurchase`/`is_module_entitled`). Su WC alcanza a Cloud por una **capacidad de host** del
+> `ModulePurchase`/`is_module_entitled`). Su WC alcanza al SaaS por una **capacidad de host** del
 > runtime: `POST /api/assistant/chat/stream` (proxy SSE → `/api/v1/hub/device/assistant/chat/stream/`,
 > reenvía `Bearer` + `X-Hub-Id`), con **ensamblado de tools por permiso** (queries/commands con bloque
 > `ai:` que el usuario puede ejecutar). Así se mantiene "el hub nunca habla con el LLM directamente".
@@ -1175,11 +1175,11 @@ two-step multi-provider, cuotas por hub/mes).
 
 ### 9.4 Base vectorial: SOLO cloud (pgvector)
 
-Cloud (Aurora): tabla `knowledge_chunk` con `embedding vector(1536)` + índice **HNSW**
+Hub Cloud (Aurora): tabla `knowledge_chunk` con `embedding vector(1536)` + índice **HNSW**
 `vector_cosine_ops`, por hub y **por versión** (los docs viajan en el `module.zip`; se
 indexan en install/update). Evita el *version skew* entre tenants.
 
-### 9.5 Local (SQLite) no tiene base vectorial — estrategia de degradación
+### 9.5 Hub Local (SQLite) no tiene base vectorial — estrategia de degradación
 
 - **Opción A (recomendada offline):** índice vectorial **embebido en Rust** — vectores en
   BLOB de SQLite + coseno por fuerza bruta (corpus pequeño) o crate HNSW (`hnsw_rs`/
@@ -1187,7 +1187,7 @@ indexan en install/update). Evita el *version skew* entre tenants.
 - **Opción B:** búsqueda **léxica/BM25** totalmente offline (sin embeddings).
 - **Opción C:** RAG **requiere conectividad** (vector store solo en cloud).
 
-> La **generación de embeddings siempre necesita Cloud** (claves LLM). Sin red no hay
+> La **generación de embeddings siempre necesita el SaaS** (claves LLM). Sin red no hay
 > embeddings nuevos; A/B permiten buscar lo ya indexado; sin índice previo, degrada con
 > aviso ("no inventar"). `query`/`command` siguen 100% locales.
 
@@ -1228,7 +1228,7 @@ hub/
 │  ├─ db/                     # DatabaseAdapter (sqlite, postgres)
 │  ├─ vector/                 # VectorStore (sqlite-bruteforce/HNSW, pgvector)
 │  ├─ source/                 # adquisición de artefactos: S3 + SHA256 + cache local
-│  ├─ cloud-client/           # cliente HTTP del Cloud Portal (JWT+X-Hub-Id, marketplace, assistant)
+│  ├─ cloud-client/           # cliente HTTP del SaaS (JWT+X-Hub-Id, marketplace, assistant)
 │  ├─ guest-sdk/              # SDK guest WASM (macro #[command] + host functions)
 │  ├─ wasm-host/              # host Extism (sandbox, capacidades, fuel/timeouts)
 │  └─ sync/                   # WebSocket / sync
@@ -1269,7 +1269,7 @@ hub/
    core.)*
 3. **`DatabaseAdapter` + `VectorStore`** con el mismo contrato en SQLite y Postgres
    (incluida la degradación vectorial local).
-4. **Handshake con el contrato del Cloud**: cliente Rust que se autentique (`X-Hub-Token`
+4. **Handshake con el contrato del SaaS**: cliente Rust que se autentique (`X-Hub-Token`
    bootstrap + `Bearer`), liste el marketplace y **descargue + verifique SHA256** un zip real.
 5. **ABI WASM con Extism** [spike]: un command WASM que reciba JSON y devuelva *intenciones*
    ejecutadas en transacción (`sale_lines`).
@@ -1300,10 +1300,10 @@ del CLI** (lint SQL + namespacing + predicado `hub_id`).
 POS usa `inventory.products.list`, emite `pos.sale.completed`, Inventory descuenta stock.
 Primer WASM (batch `sale_lines`) o forma *for-each* Tier 1.
 
-### Fase 4 — Modo cloud
-Axum + PostgresAdapter + Docker + transport HTTP/WS, integrado con el Cloud Portal sin
+### Fase 4 — Hub Cloud
+Axum + PostgresAdapter + Docker + transport HTTP/WS, integrado con el SaaS sin
 cambios. Instalación desde el marketplace real (`source/s3_source` + `cloud-client`).
-- **Cloud-side**: enseñar al **sync Git a leer `module.json`** (`manifest_kind`, §2.6) y
+- **SaaS-side**: enseñar al **sync Git a leer `module.json`** (`manifest_kind`, §2.6) y
   enchufar instalaciones en `Module`/`ModulePurchase`/`HubModuleInstallation`. Exponer
   `ai_tools` por el proxy de asistente existente.
 
@@ -1334,12 +1334,12 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
   (`inventory.products.*`) y escucha sus eventos, **nunca** toca el `product.stock` privado. No se
   implementa ahora; se construye cuando aparezca demanda real (manufactura/distribución).
 - **Reubicación del Bridge (§2.7)**: el `bridge/` **no** se retira — se convierte en componente de
-  hardware compartido (**sidecar** en Tauri/Local | **standalone opcional** para Hub PWA).
+  hardware compartido (**sidecar** en Tauri/Hub Local | **standalone opcional** para Hub Cloud).
   Migrar su lógica (registro/watchdog/cola/routing de impresión) al shell Tauri y empaquetarla
   como sidecar; mantener el standalone para el combo navegador. Resolver multi-dispositivo (§2.7b).
 - **Agrupación de módulos**: se conserva la misma clasificación/grupos del catálogo; la
-  clasificación vive en el Cloud Portal, no en el `module.json` (§2.4).
-- **Contrato marketplace intacto**: el Portal descarga el zip + verifica SHA256; la ruta S3 y la
+  clasificación vive en el SaaS, no en el `module.json` (§2.4).
+- **Contrato marketplace intacto**: el SaaS descarga el zip + verifica SHA256; la ruta S3 y la
   integridad no cambian.
 
 ---
@@ -1355,9 +1355,9 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 | **Entrega/fiabilidad de eventos** | ✅ **Decidido (2026-06-09)**: **transactional outbox** — escritura atómica en `_event_outbox`, **relay asíncrono** at-least-once con backoff + dead-letter, idempotencia vía `_event_delivery` (§4.1). Sustituye el dispatch inline. **Implementado + verificado** (`crates/runtime/src/outbox.rs` + relay en server). |
 | **Documentos de venta / POS** | ✅ **Decidido (2026-06-09)**: tiquet/factura = **FORMATO** de render (`ok-receipt` 80mm / `ok-invoice` A4 en OutfitKit), no módulo; `sales` = libro mayor; pantallas POS **seleccionables** por el negocio; impresión térmica por bridge ESC/POS (§15). |
 | **Red saliente de módulos** | ✅ **Decidido (Opción A)**: `http.fetch` mediado (allowlist + creds inyectadas + auditoría §5.5) para terceros; **B (nativo)** para fiscal. |
-| **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware compartido (sidecar en Tauri/Local \| standalone opcional para Hub PWA), §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
+| **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware compartido (sidecar en Tauri/Hub Local \| standalone opcional para Hub Cloud), §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
 | **Modelo de módulos** | ✅ **Decidido**: híbrido (declarativo + WASM + SDK). |
-| **Offline** | ✅ **Decidido (ADR-0040): dos productos, SIN sync.** **Local** (SQLite local autoridad, gratis, 100% offline, un dispositivo) y **Cloud** (ECS+Aurora, online-only, multi-dispositivo). Sin puente; respaldo del Local = módulo `backup` (export cifrado a S3, no sync). Retira el motor de sync y el tier "Cloud DB" de ADR-0029/0031 (§2.8). |
+| **Offline** | ✅ **Decidido (ADR-0040): dos productos, SIN sync.** **Hub Local** (SQLite local autoridad, gratis, 100% offline, un dispositivo) y **Hub Cloud** (ECS+Aurora, online-only, multi-dispositivo). Sin puente; respaldo del Hub Local = módulo `backup` (export cifrado a S3, no sync). Retira el motor de sync y el tier "Cloud DB" de ADR-0029/0031 (§2.8). |
 | **Login de usuario** | ✅ **Decidido**: 1er login email+password online → dispositivo de confianza → PIN (offline a futuro); usuarios cloud y solo-locales (§2.9). |
 | **Reactividad UI** | ✅ **Decidido**: eventos WS/Tauri → el WC re-consulta (§7.7). Sustituye a LiveComponent. |
 | **ABI WASM** | Extism (recomendado) vs WASI vs propia. Validar en Fase 0. |
@@ -1369,12 +1369,12 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 | **UI de módulos (Lit vs Stencil)** | ✅ **Recomendado Lit** (§3.1, default 2026; no necesitamos wrappers multi-framework). Confirmar con PoC de ambos en Fase 0. |
 | **Guest WASM lenguaje** | Rust-only (recomendado, WASM pequeño/rápido) vs multi-lenguaje (JS/Go/Python vía Extism, baja la barrera de autoría). |
 | **Impresión / primary-satellite** | ✅ Impresoras de red por terminal; hardware vía shell Tauri (sidecar) o Bridge standalone opcional (§2.7). Abierto: descubrimiento primary↔satellite y promoción si cae el primario (§2.7b). |
-| **Agrupación de módulos** | ✅ Se conserva la clasificación/grupos del catálogo (vive en el Cloud Portal, §2.4/§13). |
+| **Agrupación de módulos** | ✅ Se conserva la clasificación/grupos del catálogo (vive en el SaaS, §2.4/§13). |
 | **Esfuerzo total** | Cambio de plataforma completo; plan de recursos/tiempo realista. |
 
 **Riesgos concretos a vigilar:**
-- **El sync Git del Cloud parsea `module.py`** (§2.6) → sin `manifest_kind`, no ingiere `module.json`.
-- **Inmutabilidad S3**: republicar un `v{ver}.zip` rompe SHA256 de clientes (el Cloud lo bloquea).
+- **El sync Git del SaaS parsea `module.py`** (§2.6) → sin `manifest_kind`, no ingiere `module.json`.
+- **Inmutabilidad S3**: republicar un `v{ver}.zip` rompe SHA256 de clientes (el SaaS lo bloquea).
 - **WC dinámico + CSP estricta**: el JS de módulo no puede exigir `unsafe-inline`/`eval`.
   ✅ Validado en `apps/web` (Vue 3 + Ionic 8.8 + Vite + TS + Tailwind + Iconify) +
   `modules/inventory` (Lit + ESM + `import()` dinámico): **0 violaciones de CSP de script** en
@@ -1426,7 +1426,7 @@ El comprobante es un **formato de presentación**, no un módulo nuevo:
 Un **único contrato** (`ReceiptData`/`InvoiceData`) alimenta:
 - **Tiquet 80mm físico → bridge (ESC/POS)** por `document_type` (`crates/peripherals`,
   `erplora_print`). `ok-receipt` (HTML) se usa para **previsualización/PDF**, no para la térmica.
-- **Factura A4 física / PDF → `ok-invoice` (HTML)** vía `window.print()` / WeasyPrint (Cloud).
+- **Factura A4 física / PDF → `ok-invoice` (HTML)** vía `window.print()` / WeasyPrint (SaaS).
 
 ### 15.5 Pantallas de venta seleccionables por el negocio
 El POS no es una sola pantalla: el negocio **elige la que encaja con su negocio**
@@ -1446,25 +1446,25 @@ con ella; viaja en `sale.completed` para que `invoice` emita F1/F2).
 ## Resumen mental
 
 ```
-module.json = contrato del módulo (lo técnico; la clasificación vive en el Cloud Portal)
+module.json = contrato del módulo (lo técnico; la clasificación vive en el SaaS)
 WebComponent = pantalla del módulo (Lit; §3.1)
 Rust = autoridad / runtime genérico (execute_command / execute_query)
 SQLite (local) / Postgres-Aurora (cloud) = solo Rust accede; hub_id (UUID) por fila + PK = UUID v4 (TEXT)
 WASM (Extism) = lógica avanzada y batch, en sandbox (sin red/BD libres)
-SDK TS = puente para la UI (HttpWsTransport en AMBOS productos; IpcTransport eliminado por ADR-0050; en Local va contra el runtime Axum embebido en loopback 127.0.0.1:8787)
-Offline = dos productos SIN sync (ADR-0040): Local (SQLite local autoridad, gratis, offline, un dispositivo) y Cloud (ECS+Aurora, online-only, multi-dispositivo); sin puente. Respaldo del Local = módulo `backup` (export cifrado a S3). Retira el motor de sync y el tier Cloud DB de ADR-0029/0031
+SDK TS = puente para la UI (HttpWsTransport en AMBOS productos; IpcTransport eliminado por ADR-0050; en Hub Local va contra el runtime Axum embebido en loopback 127.0.0.1:8787)
+Offline = dos productos SIN sync (ADR-0040): Hub Local (SQLite local autoridad, gratis, offline, un dispositivo) y Hub Cloud (ECS+Aurora, online-only, multi-dispositivo); sin puente. Respaldo del Hub Local = módulo `backup` (export cifrado a S3). Retira el motor de sync y el tier Cloud DB de ADR-0029/0031
 Login = email+password online (setup) → dispositivo de confianza → PIN (offline a futuro)
 Reactividad = evento (WS, mismo canal en ambos productos; ADR-0050) → el WC re-consulta (no server-render)
 Eventos = transactional outbox (escritura atómica + relay async at-least-once + _event_delivery); WS solo push UI (§4.1)
 Venta = sales (libro mayor) → sale.completed; tiquet/factura = FORMATO (ok-receipt/ok-invoice), no módulo; pantallas POS seleccionables (§15)
 RAG = solo conocimiento (docs); vector en cloud (pgvector), degradado en local
-AI = embeddings + generación SIEMPRE por el proxy del Cloud Portal (medido)
+AI = embeddings + generación SIEMPRE por el proxy del SaaS (medido)
 Red de módulos = http.fetch mediado por el host (Opción A) / nativo para fiscal
-2 productos = Local (single/SQLite, Tauri, offline, gratis) · Hub PWA (cloud/Aurora, PWA, online, de pago) (§1)
-Impresión/hardware = Local: Bridge como sidecar Tauri · Hub PWA: Bridge standalone opcional; §2.7
+2 productos = Hub Local (single/SQLite, Tauri, offline, gratis) · Hub Cloud (cloud/Aurora, PWA, online, de pago) (§1)
+Impresión/hardware = Hub Local: Bridge como sidecar Tauri · Hub Cloud: Bridge standalone opcional; §2.7
 Primary/Satellite = varios terminales del mismo hub; cobrar/imprimir solo el primario
 Migración = gradual, POS-first, manteniendo la agrupación actual de módulos
-Cloud Portal (Django) = marketplace + billing + provisioning + proxy AI (no cambia)
+SaaS (Django) = marketplace + billing + provisioning + proxy AI (no cambia)
 hub = el runtime del tenant
 ```
 

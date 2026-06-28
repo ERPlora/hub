@@ -21,7 +21,7 @@ Lo que **ya funciona** (validado en Chrome headless; sin Rust todavía):
   en `apps/web/snapshots/`.
 - **AUTH** ([apps/web/src/pages/auth](apps/web/src/pages/auth) + `src/lib/auth.tsx`):
   email+password (1er login) → dispositivo de confianza → PIN + setup. Degrada a modo demo
-  si el Cloud no es accesible.
+  si el SaaS no es accesible.
 - **Piezas propias mínimas** ([apps/web/src/ui](apps/web/src/ui)): `Logo` (SVG inline) y
   `PinPad` — lo único que Ionic no trae. El resto es **Ionic + Tailwind**.
   (`packages/ui` queda solo como **ejemplo**, no es dependencia.)
@@ -106,8 +106,8 @@ pnpm -F @erplora/web typecheck                  # TS estricto
 
 - **TypeScript** en todo · **Vue 3 + Ionic 8.8 + Tailwind + Iconify** (sin Capacitor; nativo = Tauri).
 - **Lit** para los Web Components de módulos · **pnpm** + Cargo workspaces (raíz compartida).
-- **Dos productos** (§1; ADR-0080): **Local** (backend `single`/SQLite + shell `tauri`) y **Hub PWA** (backend `cloud`/Aurora + shell `web-pwa`). `single ⟺ Local/Tauri`, `cloud ⟺ Hub PWA`.
-- Transporte de datos **HTTP (RPC) + WS (eventos)** en **Hub PWA** (`cloud`) / **IPC** en **Local** (`single`).
-- Multi-tenant **`hub_id` por fila**, BD por organización. Hardware vía **shell Tauri** (Bridge como sidecar) en **Local**, o **Bridge standalone opcional** en **Hub PWA** (§2.7).
+- **Dos productos** (§1; ADR-0080): **Hub Local** (backend `single`/SQLite + shell `tauri`) y **Hub Cloud** (backend `cloud`/Aurora + shell `web-pwa`). `single ⟺ Hub Local`, `cloud ⟺ Hub Cloud`.
+- Transporte de datos **HTTP (RPC) + WS (eventos)** en **Hub Cloud** (`cloud`) / **IPC** en **Hub Local** (`single`).
+- Multi-tenant **`hub_id` por fila**, BD por organización. Hardware vía **shell Tauri** (Bridge como sidecar) en **Hub Local**, o **Bridge standalone opcional** en **Hub Cloud** (§2.7).
 - Red de módulos: **`http.fetch` mediado** (Opción A). Migración **POS-first**, gradual.
 - Auth: email (1er login) → dispositivo de confianza → PIN; usuarios cloud y solo-locales.

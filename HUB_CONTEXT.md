@@ -4,12 +4,12 @@
 
 `hub` es la nueva generación del Hub de ERPlora. La UI es una shell
 **Vue 3 + Ionic 8 + Vite + TypeScript + Tailwind v4**, sin Capacitor. La misma shell
-debe servir para cloud y para Tauri. Los módulos se cargan en runtime como Web
+debe servir para Hub Cloud y para Hub Local (Tauri). Los módulos se cargan en runtime como Web
 Components, actualmente con **Lit**.
 
 El producto que representa ERPlora es un ERP modular para pymes y autonomos:
 TPV, inventario, facturacion, agenda/reservas, empleados, marketplace,
-billing, sistema y asistente AI. El Cloud Portal Django sigue existiendo para
+billing, sistema y asistente AI. El SaaS Django sigue existiendo para
 marketplace, billing, provisioning y proxy AI. `hub` es el runtime/UI del
 tenant que sustituira progresivamente al hub actual.
 
@@ -55,37 +55,37 @@ tenant que sustituira progresivamente al hub actual.
 - La seguridad real no esta en `hasPermission()` de JS; Rust revalida permisos,
   `hub_id` y payload en cada query/command.
 - Los modulos declaran contrato tecnico en `module.json`. La clasificacion de
-  marketplace vive en Cloud, no en el modulo.
+  marketplace vive en el SaaS, no en el modulo.
 - Dos productos (ARQUITECTURA.md §1; ADR-0080, `../architecture/00-overview/decision-log.md`):
-  **Local** (backend `single`/SQLite + shell `tauri`) y **Hub PWA** (backend `cloud`/Aurora +
-  shell `PWA`). `single ⟺ Local/Tauri`, `cloud ⟺ Hub PWA`. (El combo `cloud + Tauri`
+  **Hub Local** (backend `single`/SQLite + shell `tauri`) y **Hub Cloud** (backend `cloud`/Aurora +
+  PWA shell). `single ⟺ Hub Local`, `cloud ⟺ Hub Cloud`. (El combo `cloud + Tauri`
   quedó RETIRADO — ADR-0080.)
 - Transport de datos (modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md), app
   unificada): **AMBOS** productos usan **HTTP (query/command) + WebSocket (solo eventos)** contra el
-  runtime Axum — embebido en loopback `127.0.0.1:8787` en **Local**, en ECS en **Hub PWA**. Se
+  runtime Axum — embebido en loopback `127.0.0.1:8787` en **Hub Local**, en ECS en **Hub Cloud**. Se
   **elimina** `invoke`/IPC para datos; el SDK ya no tiene `IpcTransport`. La única diferencia entre
-  productos es el `DatabaseAdapter` (SQLite ↔ Aurora) y los ficheros (disco ↔ S3). En **Local**, el
-  shell Tauri **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA, reusando
+  productos es el `DatabaseAdapter` (SQLite ↔ Aurora) y los ficheros (disco ↔ S3). En **Hub Local**, el
+  shell Tauri **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA shell, reusando
   `crates/peripherals`), **no** por `invoke`; `invoke` queda **solo** para lo nativo (keychain,
   device_id, ciclo de vida). *(pendiente doc↔código: el runtime/shell puede ir aún por
   `invoke→HTTP`; la migración es columna core.)*
 - **Dos productos, SIN sync ni Cloud DB remota** (ADR-0040, 2026-06-13; supera el
   "local-first + sync" de ADR-0031 y el tier "Cloud DB" de ADR-0030, ambos RETIRADOS):
-  - **Local** (gratis): backend `single`, **SQLite local autoritativo**, un dispositivo,
+  - **Hub Local** (gratis): backend `single`, **SQLite local autoritativo**, un dispositivo,
     100% offline. El respaldo a la nube (cifrado a S3, manual o programado) lo da el módulo
     **`backup`** premium — no hay base de datos remota intermedia ni motor de sincronización.
-  - **Cloud** (online): backend `cloud`, **Aurora por organización** + 1 contenedor ECS por hub,
+  - **Hub Cloud** (online): backend `cloud`, **Aurora por organización** + 1 contenedor ECS por hub,
     multi-dispositivo / web, *online-only*.
-  - No existe migración Local→Cloud, ni RDS Proxy/NLB, ni crate `datasync`. El crate `sync`
+  - No existe migración Hub Local→Hub Cloud, ni RDS Proxy/NLB, ni crate `datasync`. El crate `sync`
     que sigue vivo es **solo** el cliente WebSocket de eventos en vivo, NO un motor de datos.
-- El `bridge/` no se elimina: sidecar de hardware en **Local** (Tauri), o standalone opcional
-  para **Hub PWA** (§2.7).
-- AI y embeddings siempre pasan por el proxy del Cloud Portal, no directo desde
+- El `bridge/` no se elimina: sidecar de hardware en **Hub Local** (Tauri), o standalone opcional
+  para **Hub Cloud** (§2.7).
+- AI y embeddings siempre pasan por el proxy del SaaS, no directo desde
   hub.
 
 ## Referencia visual
 
-Lenguaje visual y patrones de marca: ver el Cloud Portal (`../cloud/`) y `apps/web`.
+Lenguaje visual y patrones de marca: ver el SaaS (`../cloud/`) y `apps/web`.
 
 La referencia visual no obliga a copiar implementacion. En hub se traduce a
 Ionic: listas, items, selects, toggles, cards, modals y segmentos nativos.
@@ -123,7 +123,7 @@ Toda modificacion visual debe revisarse con Playwright. Flujo recomendado:
 
 - Sustituir selects, toggles, tabs, listas y acciones custom por componentes Ionic.
 - Mantener marketplace alineado con el hub actual: el Hub expone/proxy
-  `/api/v1/modules/marketplace/catalog/`, que a su vez consulta el Cloud Portal en
+  `/api/v1/modules/marketplace/catalog/`, que a su vez consulta el SaaS en
   `/api/v1/marketplace/modules/`.
 - Reducir HTML/CSS artesanal repetido creando pocas clases semanticas en
   `styles.css`.

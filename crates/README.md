@@ -5,7 +5,7 @@ tenant (`hub_id`) y payload, y ejecuta queries/commands declarados por los módu
 no tiene lógica de negocio hardcodeada.
 
 > ✅ **`cargo test --workspace` → 62 tests verdes, 0 warnings.** Todo compila. El server
-> arranca y responde por HTTP real; el flujo de instalación E2E (Cloud→descarga→runtime) y
+> arranca y responde por HTTP real; el flujo de instalación E2E (SaaS→descarga→runtime) y
 > el hot-plug (install/activate/deactivate/uninstall) están probados.
 
 ## Estado
@@ -15,9 +15,9 @@ no tiene lógica de negocio hardcodeada.
 | `erplora-db` | `DatabaseAdapter` + **SQLite** (rusqlite) + **Postgres** (feature `postgres`, traductor `:n`→`$n`). | ✅ 8 tests |
 | `erplora-runtime` | Host genérico: manifest → migraciones → permisos → query/command/eventos (scope `hub_id`) + ciclo de vida (estado en `hub_module`). | ✅ 10 tests + ejemplo |
 | `erplora-server` | **Axum**: query/command, navigation, gestión de módulos, `/ws`, `/healthz`. | ✅ 5 tests + binario |
-| `erplora-cloud-client` | Cliente del Cloud Portal: auth (X-Hub-Token/JWT/webhook), marketplace, **SHA256**. | ✅ 4 tests |
+| `erplora-cloud-client` | Cliente del SaaS: auth (X-Hub-Token/JWT/webhook), marketplace, **SHA256**. | ✅ 4 tests |
 | `erplora-source` | Descarga `module.zip` (S3, fetcher inyectable) + verifica SHA256 + descomprime (anti zip-slip) + cache. | ✅ 6 tests |
-| `erplora-installer` | **Flujo E2E**: grant(Cloud) → descarga/verifica(source) → instala(runtime). | ✅ 3 tests |
+| `erplora-installer` | **Flujo E2E**: grant(SaaS) → descarga/verifica(source) → instala(runtime). | ✅ 3 tests |
 | `erplora-vector` | `VectorStore` para RAG local (embeddings en SQLite + coseno). | ✅ 7 tests |
 | `erplora-guest-sdk` | Contrato host↔guest WASM (Input/Operation/Event/Output) para autores de plugins. | ✅ 6 tests |
 | `erplora-wasm-host` | **Tier 2**: ejecuta handlers WASM en sandbox (Extism), devuelve *intenciones*. | ✅ 6 tests |
@@ -49,7 +49,7 @@ node demos/hotplug/run.mjs
 - **`apps/tauri`**: `invoke` → el mismo `runtime` (modo local).
 - **Transportes reales**: inyectar reqwest en `cloud-client`/`source`/`installer`; cliente WS
   real (tungstenite) en `erplora-sync`.
-- **Auth server-side real**: validar JWT/`X-Hub-Token` contra el Cloud (hoy lee cabeceras en dev).
+- **Auth server-side real**: validar JWT/`X-Hub-Token` contra el SaaS (hoy lee cabeceras en dev).
 
 ## Notas de diseño
 
