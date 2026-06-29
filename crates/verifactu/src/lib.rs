@@ -656,7 +656,7 @@ async fn transmit_one(
 
     let xml = aeat::build_soap(record, config, prev.as_ref(), &ctx.hub_id);
     let environment = environment_of(config);
-    let identity = aeat::identity_from_pkcs12(der, password)?;
+    let identity = host.certificate_identity_from(der, password).await?;
 
     match aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await {
         Ok(body) => {
@@ -880,7 +880,7 @@ async fn inspect_certificate(input: &Json, host: &dyn NativeHost) -> Result<Outp
         Err(_) => return Ok(Output::new()), // sin cert almacenado: nada que inspeccionar
     };
     let password = str_field(&config, "certificate_password");
-    match aeat::certificate_expiry_iso(&der, &password).ok().flatten() {
+    match host.certificate_expiry_from(&der, &password).await.ok().flatten() {
         Some(iso) => Ok(Output::new().with_operation(op(
             "verifactu._set_certificate_expiry",
             json!({ "certificate_expiry": iso }),
@@ -940,7 +940,7 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
     let mut aeat = Json::Null;
 
     match load_pkcs12(&config) {
-        Ok(der) => match aeat::identity_from_pkcs12(&der, &password) {
+        Ok(der) => match host.certificate_identity_from(&der, &password).await {
             Ok(identity) => {
                 cert_ok = true;
                 cert_message = "Certificado PKCS#12 cargado correctamente con la contraseña.".into();
@@ -1094,10 +1094,15 @@ async fn next_sequence(host: &dyn NativeHost, hub_id: &str, issuer_nif: &str) ->
 
 /// Consulta a la AEAT (TLS mutua con el cert de la config) los registros del emisor en el
 /// periodo actual y los parsea. Red real — sin cert/red devuelve error (no silencioso).
-async fn run_consult(config: &Json, issuer_nif: &str, now: &str) -> Result<Vec<aeat::ConsultRecord>> {
+async fn run_consult(
+    host: &dyn NativeHost,
+    config: &Json,
+    issuer_nif: &str,
+    now: &str,
+) -> Result<Vec<aeat::ConsultRecord>> {
     let password = str_field(config, "certificate_password");
     let der = load_pkcs12(config)?;
-    let identity = aeat::identity_from_pkcs12(&der, &password)?;
+    let identity = host.certificate_identity_from(&der, &password).await?;
     let issuer_name = str_field(config, "software_name");
     let (ejercicio, periodo) = year_month(now);
     let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo);
@@ -1253,7 +1258,7 @@ async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> Result<Outpu
     if issuer_nif.is_empty() {
         return Err(VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into());
     }
-    let records = run_consult(&config, &issuer_nif, &ctx.now).await?;
+    let records = run_consult(host, &config, &issuer_nif, &ctx.now).await?;
     let (ops, limit) = aeat_snapshot_ops(&ctx, &issuer_nif, &records);
     let mut out = Output::new();
     for o in ops {
@@ -1288,7 +1293,7 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
     if issuer_nif.is_empty() {
         return Err(VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into());
     }
-    let records = run_consult(&config, &issuer_nif, &ctx.now).await?;
+    let records = run_consult(host, &config, &issuer_nif, &ctx.now).await?;
     if records.is_empty() {
         return Err(RuntimeError::Native(
             "la AEAT no devolvió registros para este emisor/periodo; nada que recuperar".into(),

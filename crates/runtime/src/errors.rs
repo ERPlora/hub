@@ -50,6 +50,12 @@ pub enum RuntimeError {
     /// dead-letter — exactamente como `host.notify`.
     #[error("host.backup: {0}")]
     Backup(String),
+    /// Fallo de la capacidad de host `host.certificate` (ADR-0079): el primitivo de firma/identidad
+    /// con el certificado del negocio (`_hub_certificate`, parse PKCS#12 + identidad mTLS) no pudo
+    /// completar — certificado ausente, contraseña incorrecta, PKCS#12 inválido. La clave nunca sale
+    /// del core: el módulo (verifactu, B2B…) solo PIDE la operación, no ve el `.p12`.
+    #[error("host.certificate: {0}")]
+    Certificate(String),
     /// Error genérico que no encaja en una variante específica (p. ej. fallo del hasher argon2id
     /// al fijar un PIN, hub#15). Mensaje libre.
     #[error("{0}")]

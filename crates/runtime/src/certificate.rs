@@ -11,7 +11,7 @@
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value};
 
-use crate::errors::Result;
+use crate::errors::{Result, RuntimeError};
 use crate::registry::now_rfc3339;
 
 /// Sube/reemplaza el certificado del negocio (upsert). `by` = `hub_user:<id>` admin.
@@ -67,6 +67,144 @@ pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
     db.execute("DELETE FROM _hub_certificate WHERE hub_id = :hub_id", &p)
         .await?;
     Ok(())
+}
+
+// ── Firma/identidad MEDIADA por el host (ADR-0079) ────────────────────────────
+// El core posee el certificado y hace TODA la cripto PKCS#12 (OpenSSL) en UN solo sitio. Los
+// módulos (verifactu, futuro B2B…) solo PIDEN la operación (`NativeHost::certificate_*`); la clave
+// privada NUNCA cruza al módulo (no ve los bytes del `.p12`). Reutilizable por cualquier esquema
+// fiscal/firma. El módulo solo necesita la capability `certificate` concedida.
+
+/// Lee los bytes del PKCS#12 del negocio desde `_hub_certificate` (base64 → DER) + contraseña.
+/// `None` si el hub no tiene certificado cargado.
+async fn load_pkcs12(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<(Vec<u8>, String)>> {
+    use base64::Engine as _;
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT pkcs12_b64, password FROM _hub_certificate WHERE hub_id = :hub_id LIMIT 1",
+            &p,
+        )
+        .await?;
+    let Some(row) = res.rows.into_iter().next() else {
+        return Ok(None);
+    };
+    let b64 = row.get("pkcs12_b64").and_then(|v| v.as_str()).unwrap_or("");
+    if b64.is_empty() {
+        return Ok(None);
+    }
+    let password = row.get("password").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let der = base64::engine::general_purpose::STANDARD
+        .decode(b64.trim())
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 base64 inválido en _hub_certificate: {e}")))?;
+    Ok(Some((der, password)))
+}
+
+/// Identidad TLS-cliente (mTLS) del negocio, para que un módulo con la capability `certificate`
+/// transmita a Hacienda **sin ver el `.p12`**. Error si no hay certificado o no parsea.
+pub async fn identity(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<reqwest::Identity> {
+    let (der, password) = load_pkcs12(db, hub_id).await?.ok_or_else(|| {
+        RuntimeError::Certificate("no hay certificado del negocio cargado (Ajustes → Negocio)".into())
+    })?;
+    identity_from_der(&der, &password)
+}
+
+/// Caducidad (notAfter) del certificado del negocio como ISO `YYYY-MM-DD`. `Ok(None)` si no hay
+/// certificado o la fecha no se puede interpretar.
+pub async fn expiry(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<String>> {
+    match load_pkcs12(db, hub_id).await? {
+        Some((der, password)) => expiry_from_der(&der, &password),
+        None => Ok(None),
+    }
+}
+
+/// Parsea el PKCS#12 **en memoria con OpenSSL** (acepta los `.p12` BER reales de FNMT/Windows que un
+/// parser DER estricto rechaza) y lo entrega a **rustls** como PEM (clave + certificado + cadena).
+/// A diferencia de `native-tls`, OpenSSL no importa la clave al Llavero del SO (sin diálogos macOS).
+/// `pub` para `certificate_*_from` (cert provisto en memoria, p.ej. validar uno recién subido) — la
+/// cripto sigue viviendo SOLO aquí, en el core.
+pub fn identity_from_der(der: &[u8], password: &str) -> Result<reqwest::Identity> {
+    ensure_legacy_provider();
+    let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
+    let parsed = pkcs12
+        .parse2(password)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    let key = parsed
+        .pkey
+        .ok_or_else(|| RuntimeError::Certificate("el PKCS#12 no contiene clave privada".into()))?;
+    let cert = parsed
+        .cert
+        .ok_or_else(|| RuntimeError::Certificate("el PKCS#12 no contiene certificado".into()))?;
+    let mut pem = key
+        .private_key_to_pem_pkcs8()
+        .map_err(|e| RuntimeError::Certificate(format!("clave privada: {e}")))?;
+    pem.extend_from_slice(
+        &cert.to_pem().map_err(|e| RuntimeError::Certificate(format!("certificado: {e}")))?,
+    );
+    // Cadena intermedia (si el `.p12` la incluye) — la AEAT valida hasta la raíz FNMT.
+    if let Some(chain) = parsed.ca {
+        for c in chain {
+            if let Ok(b) = c.to_pem() {
+                pem.extend_from_slice(&b);
+            }
+        }
+    }
+    reqwest::Identity::from_pem(&pem)
+        .map_err(|e| RuntimeError::Certificate(format!("identidad TLS inválida: {e}")))
+}
+
+/// Caducidad (notAfter) de un PKCS#12 en DER como ISO `YYYY-MM-DD`. `pub` para `certificate_*_from`.
+pub fn expiry_from_der(der: &[u8], password: &str) -> Result<Option<String>> {
+    ensure_legacy_provider();
+    let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
+    let parsed = pkcs12
+        .parse2(password)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    match parsed.cert {
+        // El Display de Asn1Time es "MMM DD HH:MM:SS YYYY GMT" (p.ej. "Jun 10 00:00:00 2028 GMT").
+        Some(cert) => Ok(asn1_time_to_iso(&cert.not_after().to_string())),
+        None => Ok(None),
+    }
+}
+
+/// Carga (una sola vez) el proveedor **`legacy`** de OpenSSL 3 junto al `default`, para descifrar
+/// PKCS#12 con PBE antiguos (RC2-40-CBC, 3DES) de certificados reales (FNMT, exportados de Windows).
+/// OpenSSL 3 los movió fuera del proveedor por defecto; sin esto fallan con `RC2-40-CBC : unsupported`.
+fn ensure_legacy_provider() {
+    use std::sync::OnceLock;
+    static LEGACY: OnceLock<Option<openssl::provider::Provider>> = OnceLock::new();
+    LEGACY.get_or_init(|| openssl::provider::Provider::try_load(None, "legacy", true).ok());
+}
+
+/// "Jun 10 00:00:00 2028 GMT" → "2028-06-10". `None` si el formato no casa.
+fn asn1_time_to_iso(s: &str) -> Option<String> {
+    let parts: Vec<&str> = s.split_whitespace().collect();
+    if parts.len() < 4 {
+        return None;
+    }
+    let month = match parts[0] {
+        "Jan" => "01", "Feb" => "02", "Mar" => "03", "Apr" => "04",
+        "May" => "05", "Jun" => "06", "Jul" => "07", "Aug" => "08",
+        "Sep" => "09", "Oct" => "10", "Nov" => "11", "Dec" => "12",
+        _ => return None,
+    };
+    let day = parts[1];
+    let day = if day.len() == 1 { format!("0{day}") } else { day.to_string() };
+    Some(format!("{}-{}-{}", parts[3], month, day))
+}
+
+#[cfg(test)]
+mod asn1_tests {
+    use super::asn1_time_to_iso;
+    #[test]
+    fn parses_openssl_asn1_time() {
+        assert_eq!(asn1_time_to_iso("Jun 10 00:00:00 2028 GMT").as_deref(), Some("2028-06-10"));
+        assert_eq!(asn1_time_to_iso("Mar 3 23:59:59 2027 GMT").as_deref(), Some("2027-03-03"));
+        assert_eq!(asn1_time_to_iso("garbage").as_deref(), None);
+    }
 }
 
 #[cfg(test)]

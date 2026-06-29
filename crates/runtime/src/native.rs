@@ -23,6 +23,41 @@ use crate::errors::{Result, RuntimeError};
 pub trait NativeHost: Send + Sync {
     /// Ejecuta un `SELECT` con parámetros nombrados (`:name`) y devuelve las filas JSON.
     async fn read(&self, sql: &str, params: &Params) -> Result<Vec<Json>>;
+
+    /// **Capacidad de host `certificate` (ADR-0079).** Identidad TLS-cliente (mTLS) del certificado
+    /// del negocio (`_hub_certificate`) para que el módulo transmita a Hacienda **sin ver el `.p12`**:
+    /// la clave nunca cruza al módulo, el core hace toda la cripto. El gate de la capability lo aplica
+    /// el dispatcher. Default: no disponible (host sin certificado).
+    async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+        Err(RuntimeError::Certificate(
+            "la capability `certificate` no está disponible en este host".to_string(),
+        ))
+    }
+
+    /// Caducidad (notAfter, ISO `YYYY-MM-DD`) del certificado del negocio. `Ok(None)` si no hay.
+    async fn certificate_expiry(&self, _hub_id: &str) -> Result<Option<String>> {
+        Ok(None)
+    }
+
+    /// Igual que [`certificate_identity`](Self::certificate_identity) pero sobre un `.p12` **provisto
+    /// en memoria** (DER + contraseña) — validar/usar un certificado recién subido. La cripto PKCS#12
+    /// (OpenSSL) vive SOLO en el core; el módulo no la implementa. Default = la cripto del core.
+    async fn certificate_identity_from(
+        &self,
+        pkcs12_der: &[u8],
+        password: &str,
+    ) -> Result<reqwest::Identity> {
+        crate::certificate::identity_from_der(pkcs12_der, password)
+    }
+
+    /// Caducidad de un `.p12` provisto en memoria (DER + contraseña). Cripto en el core.
+    async fn certificate_expiry_from(
+        &self,
+        pkcs12_der: &[u8],
+        password: &str,
+    ) -> Result<Option<String>> {
+        crate::certificate::expiry_from_der(pkcs12_der, password)
+    }
 }
 
 /// Un plugin nativo first-party: el motor de un módulo, horneado en el runtime y
@@ -48,5 +83,13 @@ impl NativeHost for DbHost<'_> {
             ));
         }
         Ok(self.db.query(sql, params).await?.rows)
+    }
+
+    async fn certificate_identity(&self, hub_id: &str) -> Result<reqwest::Identity> {
+        crate::certificate::identity(self.db, hub_id).await
+    }
+
+    async fn certificate_expiry(&self, hub_id: &str) -> Result<Option<String>> {
+        crate::certificate::expiry(self.db, hub_id).await
     }
 }

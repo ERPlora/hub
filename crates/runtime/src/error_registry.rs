@@ -261,6 +261,7 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::Schema { .. } => "schema",
         E::Notify(_) => "notify",
         E::Backup(_) => "backup",
+        E::Certificate(_) => "certificate",
         E::Other(_) => "other",
     }
 }

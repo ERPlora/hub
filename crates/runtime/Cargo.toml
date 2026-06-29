@@ -24,6 +24,13 @@ argon2 = "0.5"
 # Validación del payload contra el JSON Schema declarado por cada query/command (§5.2).
 # Sin resolución de $ref externos (offline): los schemas de módulo son autocontenidos.
 jsonschema = { version = "0.33", default-features = false }
+# Capacidad de host `certificate` (ADR-0079): el core posee el `.p12` del negocio y hace TODA la
+# cripto PKCS#12 en UN solo sitio (`certificate.rs`), entregando una `reqwest::Identity` (mTLS) a los
+# módulos sin exponerles la clave. OpenSSL parsea los `.p12` BER reales (FNMT/Windows) que un parser
+# DER puro rechaza; `reqwest` (rustls) construye la identidad desde PEM; `base64` decodifica el `.p12`.
+openssl = { version = "0.10", features = ["vendored"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+base64 = "0.22"
 
 [dev-dependencies]
 # Async test harness for the integration tests/example (db + runtime are async now).
