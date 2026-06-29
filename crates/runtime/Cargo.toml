@@ -26,11 +26,19 @@ argon2 = "0.5"
 jsonschema = { version = "0.33", default-features = false }
 # Capacidad de host `certificate` (ADR-0079): el core posee el `.p12` del negocio y hace TODA la
 # cripto PKCS#12 en UN solo sitio (`certificate.rs`), entregando una `reqwest::Identity` (mTLS) a los
-# módulos sin exponerles la clave. OpenSSL parsea los `.p12` BER reales (FNMT/Windows) que un parser
-# DER puro rechaza; `reqwest` (rustls) construye la identidad desde PEM; `base64` decodifica el `.p12`.
-openssl = { version = "0.10", features = ["vendored"] }
+# módulos sin exponerles la clave. `reqwest` (rustls) construye la identidad desde PEM; `base64`
+# decodifica el `.p12`. (OpenSSL — solo non-Android, ver `[target...]` abajo.)
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 base64 = "0.22"
+
+# OpenSSL parsea los `.p12` BER reales (FNMT/Windows) que un parser DER puro rechaza — pero
+# `openssl-sys` (vendored) NO cross-compila para Android (el NDK r23+ no trae los wrappers
+# `aarch64-linux-android-ranlib` que su build de OpenSSL espera). Como el shell **Android** aún no
+# hace la transmisión fiscal (la firma vive en Hub Cloud/Local), se **excluye openssl del target
+# Android**: el primitivo `certificate_*` devuelve `host.certificate` no-disponible allí (stub en
+# `certificate.rs`), y el resto del workspace (rustls/ring) sí compila para Android.
+[target.'cfg(not(target_os = "android"))'.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
 
 [dev-dependencies]
 # Async test harness for the integration tests/example (db + runtime are async now).

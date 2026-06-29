@@ -123,7 +123,8 @@ pub async fn expiry(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<Str
 /// parser DER estricto rechaza) y lo entrega a **rustls** como PEM (clave + certificado + cadena).
 /// A diferencia de `native-tls`, OpenSSL no importa la clave al Llavero del SO (sin diálogos macOS).
 /// `pub` para `certificate_*_from` (cert provisto en memoria, p.ej. validar uno recién subido) — la
-/// cripto sigue viviendo SOLO aquí, en el core.
+/// cripto sigue viviendo SOLO aquí, en el core. (OpenSSL → solo non-Android; ver stub abajo.)
+#[cfg(not(target_os = "android"))]
 pub fn identity_from_der(der: &[u8], password: &str) -> Result<reqwest::Identity> {
     ensure_legacy_provider();
     let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
@@ -155,7 +156,17 @@ pub fn identity_from_der(der: &[u8], password: &str) -> Result<reqwest::Identity
         .map_err(|e| RuntimeError::Certificate(format!("identidad TLS inválida: {e}")))
 }
 
+/// Stub Android: sin OpenSSL no se puede parsear el `.p12` (ver `Cargo.toml`). El shell Android no
+/// hace transmisión fiscal todavía; la firma vive en Hub Cloud/Local.
+#[cfg(target_os = "android")]
+pub fn identity_from_der(_der: &[u8], _password: &str) -> Result<reqwest::Identity> {
+    Err(RuntimeError::Certificate(
+        "firma con certificado fiscal no disponible en Android (sin OpenSSL)".into(),
+    ))
+}
+
 /// Caducidad (notAfter) de un PKCS#12 en DER como ISO `YYYY-MM-DD`. `pub` para `certificate_*_from`.
+#[cfg(not(target_os = "android"))]
 pub fn expiry_from_der(der: &[u8], password: &str) -> Result<Option<String>> {
     ensure_legacy_provider();
     let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
@@ -170,9 +181,16 @@ pub fn expiry_from_der(der: &[u8], password: &str) -> Result<Option<String>> {
     }
 }
 
+/// Stub Android: sin OpenSSL no se puede leer la caducidad del `.p12` (ver `Cargo.toml`).
+#[cfg(target_os = "android")]
+pub fn expiry_from_der(_der: &[u8], _password: &str) -> Result<Option<String>> {
+    Ok(None)
+}
+
 /// Carga (una sola vez) el proveedor **`legacy`** de OpenSSL 3 junto al `default`, para descifrar
 /// PKCS#12 con PBE antiguos (RC2-40-CBC, 3DES) de certificados reales (FNMT, exportados de Windows).
 /// OpenSSL 3 los movió fuera del proveedor por defecto; sin esto fallan con `RC2-40-CBC : unsupported`.
+#[cfg(not(target_os = "android"))]
 fn ensure_legacy_provider() {
     use std::sync::OnceLock;
     static LEGACY: OnceLock<Option<openssl::provider::Provider>> = OnceLock::new();
@@ -180,6 +198,7 @@ fn ensure_legacy_provider() {
 }
 
 /// "Jun 10 00:00:00 2028 GMT" → "2028-06-10". `None` si el formato no casa.
+#[cfg(not(target_os = "android"))]
 fn asn1_time_to_iso(s: &str) -> Option<String> {
     let parts: Vec<&str> = s.split_whitespace().collect();
     if parts.len() < 4 {
@@ -196,7 +215,7 @@ fn asn1_time_to_iso(s: &str) -> Option<String> {
     Some(format!("{}-{}-{}", parts[3], month, day))
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "android")))]
 mod asn1_tests {
     use super::asn1_time_to_iso;
     #[test]
