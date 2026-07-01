@@ -21,7 +21,7 @@ axum = { version = "0.7", features = ["ws", "multipart"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
 tower = "0.5"
 # Servir el frontend estático (dist de Vite) con fallback SPA para el combo cloud + web-PWA (§3).
-tower-http = { version = "0.6", features = ["fs", "trace"] }
+tower-http = { version = "0.6", features = ["fs", "trace", "set-header"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"

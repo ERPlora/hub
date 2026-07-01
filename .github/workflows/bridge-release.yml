@@ -9,8 +9,8 @@
 #   push main/develop ─► build (Windows + Linux) ─► S3 bridge/latest/
 #   push tag v*        ─► build (Windows + Linux) ─► S3 bridge/v{version}/ + latest/
 #
-# S3 layout (mismo bucket/prefijo que el Android y que espera el Cloud
-#   `apps/public/bridge/views.py`):
+# Object Storage layout (Hetzner, bucket `erplora-downloads`, mismo prefijo que el Android
+#   y que espera el Cloud `apps/public/bridge/views.py`):
 #   s3://erplora-downloads/bridge/
 #   ├── latest/
 #   │   ├── erplora-bridge.exe      (Windows x64)
@@ -20,8 +20,9 @@
 # macOS NO se construye aquí: es solo para desarrollo local (`cargo build`),
 # no se distribuye.
 #
-# AWS auth: OIDC (rol github-actions-deploy), igual que los repos cloud y aws.
-# El rol debe confiar también en este repo (ERPlora/hub) — ver §nota al final.
+# Almacenamiento: Hetzner Object Storage (S3-compatible, `fsn1.your-objectstorage.com`).
+# Sustituye a AWS S3/OIDC (AWS apagado). Credenciales estáticas en secrets del repo:
+#   HETZNER_S3_ACCESS_KEY · HETZNER_S3_SECRET_KEY · HETZNER_S3_ENDPOINT
 # ==============================================================================
 
 name: Build Bridge Desktop
@@ -78,15 +79,18 @@ jobs:
           path: dist/${{ matrix.out_name }}
 
   upload-s3:
-    name: Upload to S3
+    name: Upload to Object Storage
     needs: [build]
-    # El rol OIDC `github-actions-deploy` solo confía en `ERPlora/hub` en `main` (y tags por
-    # extensión vía el patrón de subs). `develop` compila pero NO publica ("develop never deploys").
+    # `develop` compila pero NO publica ("develop never deploys"): solo main y tags v*.
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # OIDC
       contents: read
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_S3_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
+      AWS_DEFAULT_REGION: fsn1
+      S3_ENDPOINT: ${{ secrets.HETZNER_S3_ENDPOINT }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -94,13 +98,7 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::363427305647:role/github-actions-deploy
-          aws-region: eu-west-1
-
-      - name: Upload to S3
+      - name: Upload to Hetzner Object Storage
         run: |
           set -euo pipefail
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
@@ -111,7 +109,8 @@ jobs:
 
           for f in erplora-bridge.exe erplora-bridge-linux; do
             if [ -f "artifacts/$f" ]; then
-              aws s3 cp "artifacts/$f" "s3://erplora-downloads/bridge/${VERSION}/$f"
+              aws s3 cp "artifacts/$f" "s3://erplora-downloads/bridge/${VERSION}/$f" \
+                --endpoint-url "$S3_ENDPOINT"
             fi
           done
 
@@ -119,16 +118,16 @@ jobs:
           if [[ "$VERSION" != "latest" ]]; then
             for f in erplora-bridge.exe erplora-bridge-linux; do
               aws s3 cp "s3://erplora-downloads/bridge/${VERSION}/$f" \
-                "s3://erplora-downloads/bridge/latest/$f" 2>/dev/null || true
+                "s3://erplora-downloads/bridge/latest/$f" \
+                --endpoint-url "$S3_ENDPOINT" 2>/dev/null || true
             done
           fi
 
-          echo "Subido a s3://erplora-downloads/bridge/${VERSION}/"
+          echo "Subido a s3://erplora-downloads/bridge/${VERSION}/ (Hetzner Object Storage)"
 
 # ==============================================================================
-# Trust OIDC (rol `github-actions-deploy`, en aws/terraform/github_actions_oidc.tf):
-#   - `repo:ERPlora/hub:ref:refs/heads/main`  → YA presente (push a main publica).
-#   - `repo:ERPlora/hub:ref:refs/tags/v*`     → AÑADIR para publicar versiones por tag
-#     (mismo patrón que ya tiene ERPlora/ux). El rol ya tiene S3 vía AdministratorAccess.
+# Almacenamiento: Hetzner Object Storage (bucket `erplora-downloads`), S3-compatible vía
+# `aws s3 --endpoint-url $HETZNER_S3_ENDPOINT`. Credenciales en secrets del repo ERPlora/hub:
+# HETZNER_S3_ACCESS_KEY · HETZNER_S3_SECRET_KEY · HETZNER_S3_ENDPOINT.
 # `develop` compila pero NO publica (gate `if` arriba); coherente con "develop never deploys".
 # ==============================================================================

@@ -1,9 +1,11 @@
 // @erplora/module-sdk — puente que usan los Web Components (Stencil). ARQUITECTURA.md §7.1, §7.5–7.6.
 //
-// El transporte es intercambiable y se elige en el boot (RUNTIME_TRANSPORT):
-//   - IpcTransport     → Tauri invoke + Tauri events            (backend `single`, local)
-//   - HttpWsTransport  → HTTP POST query/command + WS eventos    (backend `cloud`)
-// El módulo solo ve la interfaz `ErploraTransport`; nada de su código depende del transporte.
+// Transporte de DATOS (ADR-0050): HTTP (RPC) + WebSocket (eventos) en AMBOS productos, contra el
+// runtime Axum (embebido en loopback 127.0.0.1:8787 en Hub Local, ECS en Hub Cloud). NO hay
+// `invoke`/IPC para datos — se eliminó `IpcTransport`. El módulo solo ve la interfaz
+// `ErploraTransport`; nada de su código depende del transporte.
+//   - HttpWsTransport  → HTTP POST query/command + WS eventos    (def., ambos productos)
+//   - WsTransport      → todo por un solo WS                      (alternativa)
 //
 // Principio (decisión 2026-05-31): el 90% de la lógica vive en **Rust** (el runtime es la
 // autoridad: valida permiso, hub_id, payload y ejecuta). El WC es una mini-app que llama a
@@ -465,45 +467,16 @@ function deriveWsUrl(baseUrl: string): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Transporte local (Tauri): invoke para RPC + listen para eventos.
-// La app Tauri expone `query`/`command` como comandos invoke que llaman al MISMO
-// runtime Rust embebido; los eventos llegan por el bus de Tauri. ARQUITECTURA.md §7.6.
+// Bridge nativo de Tauri (`invoke` + `listen`). ADR-0050: NO se usa para DATOS (eso va por
+// HttpWsTransport, mismo origen). Queda para lo genuinamente nativo sin equivalente HTTP — hoy el
+// HARDWARE en Hub Local (`IpcBridgeTransport`, más abajo: el shell Tauri ES el bridge, §2.7) y
+// caprichos nativos (keychain, device_id). El transporte de datos `IpcTransport` se ELIMINÓ.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Subconjunto de la API de Tauri que necesita el transporte (inyectable para tests). */
+/** Subconjunto de la API de Tauri que necesita el bridge nativo (inyectable para tests). */
 export interface TauriBridge {
   invoke(cmd: string, args: Record<string, unknown>): Promise<unknown>;
   listen(event: string, cb: (e: { payload: unknown }) => void): Promise<() => void>;
-}
-
-export class IpcTransport implements ErploraTransport {
-  constructor(private readonly tauri: TauriBridge) {}
-
-  async query(name: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    const env = (await this.tauri.invoke('erplora_query', { name, params })) as Envelope;
-    return unwrap(env);
-  }
-
-  async command(name: string, payload: Record<string, unknown> = {}): Promise<unknown> {
-    const env = (await this.tauri.invoke('erplora_command', { name, payload })) as Envelope;
-    return unwrap(env);
-  }
-
-  subscribe(event: string, cb: (payload: unknown) => void): () => void {
-    // listen es async; devolvemos un unsub síncrono que espera al handle real.
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    this.tauri
-      .listen(event, (e) => cb(e.payload))
-      .then((fn) => {
-        if (cancelled) fn();
-        else unlisten = fn;
-      });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -672,19 +645,19 @@ export class ErploraClient {
  * mismo RPC por HTTP y solo difieren en el canal push de eventos (WebSocket vs Server-Sent
  * Events, hub#19); `ws` es alias histórico de `http+ws`. Nombre `http+sse` = decisión del humano.
  */
-export type TransportKind = 'ipc' | 'http+ws' | 'http+sse' | 'ws';
+export type TransportKind = 'http+ws' | 'http+sse' | 'ws';
 
-/** Fábrica: construye el cliente según el flag de transporte del boot. */
+/**
+ * Fábrica: construye el cliente según el flag de transporte del boot. ADR-0050: los DATOS van
+ * siempre por HTTP+WS (mismo origen que el runtime, embebido en loopback en Hub Local) — ya no hay
+ * variante `ipc`. El transporte de HARDWARE en Tauri (`IpcBridgeTransport`, el shell ES el bridge)
+ * lo compone el shell aparte; aquí el bridge por defecto es WS-localhost (combo PWA).
+ */
 export function createClient(
   kind: TransportKind,
   deps: { http?: HttpWsOptions; tauri?: TauriBridge } = {},
   clientOpts?: ConstructorParameters<typeof ErploraClient>[1],
 ): ErploraClient {
-  if (kind === 'ipc') {
-    if (!deps.tauri) throw new Error('IpcTransport requiere el bridge de Tauri');
-    // Datos por invoke + hardware por invoke (el shell Tauri ES el bridge, §2.7).
-    return new ErploraClient(new IpcTransport(deps.tauri), clientOpts, new IpcBridgeTransport(deps.tauri));
-  }
   // Datos por HTTP + push por WS (def.) o SSE (hub#19); hardware por WS-localhost (Bridge §2.7).
   const httpOpts: HttpWsOptions = { ...deps.http, push: kind === 'http+sse' ? 'sse' : (deps.http?.push ?? 'ws') };
   return new ErploraClient(new HttpWsTransport(httpOpts), clientOpts, new BridgeClient());

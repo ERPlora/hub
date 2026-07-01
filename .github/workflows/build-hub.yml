@@ -1,39 +1,25 @@
 # ==============================================================================
-# ERPlora Hub (Rust) — Build & Push image to ECR  (erplora-hub:latest)
+# ERPlora Hub (Rust) — Build & Push image to GHCR  (ghcr.io/erplora/hub:latest)
 # ==============================================================================
 #
 # Construye la imagen del runtime del Hub (docker/Dockerfile: pnpm build del shell web +
-# cargo release de erplora-server → debian-slim) y la publica en ECR.
+# cargo release de erplora-server → debian-slim) y la publica en el GitHub Container
+# Registry (GHCR). Sustituye a ECR (AWS apagado, migración a Hetzner/Dokploy).
 #
-# Tags publicados (mismo repo ECR que ya existe, `erplora-hub`, account 363427305647):
-#   - erplora-hub:latest          (tag móvil que consumen los HUBS REALES: el provisioning
-#                                  del Cloud registra la task def con `…/erplora-hub:latest`,
-#                                  cloud/apps/dashboard/hubs/servers/services/providers/aws.py).
-#                                  ESTE es el tag canónico — sin él, ECS no puede hacer pull.
-#   - erplora-hub:<git-sha>       (tag inmutable por commit, para pin/rollback)
+# Tags publicados (repo GHCR `ghcr.io/erplora/hub`, PRIVADO):
+#   - ghcr.io/erplora/hub:latest      (tag móvil que consumen los HUBS REALES: el provisioning
+#                                      del Cloud/Dokploy registra el servicio con `…/hub:latest`).
+#                                      ESTE es el tag canónico — sin él no se puede hacer pull.
+#   - ghcr.io/erplora/hub:<git-sha>   (tag inmutable por commit, para pin/rollback)
 #
 # Pipeline:
-#   push a main      ─► build ─► push ECR  (:latest + :<sha>)
-#   tag v*           ─► build ─► push ECR  (:latest + :<sha>)  [versión por tag]
-#   workflow_dispatch ─► build ─► push ECR (manual)
+#   push a main       ─► build ─► push GHCR (:latest + :<sha>)
+#   tag v*            ─► build ─► push GHCR (:latest + :<sha>)  [versión por tag]
+#   workflow_dispatch ─► build ─► push GHCR (manual)
 #
-# AWS auth: OIDC (rol `github-actions-deploy`, sin claves estáticas) — igual patrón que
-# `bridge-release.yml` (este repo) y los workflows de los repos `cloud` y `aws`. El rol
-# ya confía en `repo:ERPlora/hub:ref:refs/heads/main` y tiene ECR vía AdministratorAccess.
-# Para publicar por tag, el rol debe confiar además en `repo:ERPlora/hub:ref:refs/tags/v*`
-# (ver nota al final — mismo pendiente que bridge-release.yml).
-#
-# ──────────────────────────────────────────────────────────────────────────────
-# Variables/secrets de GitHub Actions usados (configurables a nivel repo/org):
-#   vars.AWS_ROLE_ARN     (opcional)  ARN del rol OIDC a asumir.
-#                                     Default si no se define: el rol estándar del proyecto
-#                                     arn:aws:iam::363427305647:role/github-actions-deploy
-#   vars.AWS_ACCOUNT_ID   (opcional)  Cuenta AWS. Default: 363427305647.
-#   vars.AWS_REGION       (opcional)  Región. Default: eu-west-1.
-#   vars.ECR_REPO         (opcional)  Nombre del repo ECR. Default: erplora-hub.
-# Si se quieren parametrizar de verdad, definirlos con:  gh variable set <NAME> --body <val>
-# (a nivel repo ERPlora/hub o a nivel org ERPlora). Mientras no existan, se usan los defaults
-# de arriba — los mismos valores ya hardcodeados en los otros workflows del proyecto.
+# Auth: `GITHUB_TOKEN` del propio workflow (permiso `packages: write`). No hacen falta claves
+# estáticas ni OIDC de AWS. El paquete queda PRIVADO por defecto; para que Dokploy/provisioning
+# haga pull necesita un PAT con `read:packages` (o dar acceso al paquete a esas cajas).
 # ==============================================================================
 
 name: Build Hub Image (latest)
@@ -53,50 +39,45 @@ permissions:
 
 jobs:
   build-and-push:
-    name: Build & Push erplora-hub
+    name: Build & Push erplora/hub
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      id-token: write   # OIDC
       contents: read
+      packages: write   # push a GHCR con GITHUB_TOKEN
 
     env:
-      # Resuelve a la variable de repo/org si existe; si no, al default del proyecto.
-      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || 'arn:aws:iam::363427305647:role/github-actions-deploy' }}
-      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID || '363427305647' }}
-      AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
-      ECR_REPO: ${{ vars.ECR_REPO || 'erplora-hub' }}
+      # Nombre del paquete GHCR. Minúsculas obligatorio. Default: ghcr.io/<owner>/hub.
+      IMAGE: ghcr.io/${{ github.repository_owner }}/hub
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute image tags
         id: tags
         run: |
           set -euo pipefail
-          IMAGE="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
-          # :latest  → tag canónico que consumen los hubs reales (provisioning del Cloud).
+          IMAGE_LC=$(echo "${IMAGE}" | tr '[:upper:]' '[:lower:]')
+          # :latest  → tag canónico que consumen los hubs reales (provisioning del Cloud/Dokploy).
           # :<sha>   → tag inmutable por commit, para pin/rollback.
           {
             echo "tags<<EOF"
-            echo "${IMAGE}:latest"
-            echo "${IMAGE}:${GITHUB_SHA}"
+            echo "${IMAGE_LC}:latest"
+            echo "${IMAGE_LC}:${GITHUB_SHA}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE_LC}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -112,30 +93,22 @@ jobs:
             OUTFITKIT_CACHEBUST=${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # Un único manifest por build (sin índice OCI ni attestation-manifest sin tag).
-          # Con la lifecycle policy `imageCountMoreThan: 1` los sub-manifests sin tag que crea
-          # provenance/sbom se expirarían y dejarían `:latest` como referencia colgante
-          # (docker pull → "manifest unknown"). Sin ellos, "la última" = 1 imagen limpia.
+          # Un único manifest por build (sin índice OCI ni attestation-manifest sin tag), para que
+          # `:latest` no quede como referencia colgante si una retention policy expira sub-manifests.
           provenance: false
           sbom: false
 
       - name: Output image URIs
         run: |
-          echo "Imagen publicada:"
-          echo "  ${{ steps.tags.outputs.image }}:latest   (hubs reales — Cloud provisioning)"
+          echo "Imagen publicada (GHCR, privada):"
+          echo "  ${{ steps.tags.outputs.image }}:latest   (hubs reales — Cloud/Dokploy provisioning)"
           echo "  ${{ steps.tags.outputs.image }}:${GITHUB_SHA}"
           echo ""
-          echo "Los contenedores de hub los aprovisiona el Cloud Portal (boto3) y tiran de :latest."
+          echo "Para pull desde Dokploy/provisioning: PAT con read:packages, o dar acceso al paquete."
 
 # ==============================================================================
-# Pendiente de confirmación humana / infra (OIDC, en aws/terraform/github_actions_oidc.tf):
-#   - `repo:ERPlora/hub:ref:refs/heads/main`  → YA presente (push a main publica :latest + :sha).
-#   - `repo:ERPlora/hub:ref:refs/tags/v*`     → AÑADIR si se quiere publicar por tag de versión
-#     (mismo pendiente que bridge-release.yml). El rol ya tiene ECR vía AdministratorAccess.
-#
-# Relación con aws/.github/workflows/deploy-hub.yml: ese workflow (en el repo `aws`) hace
-# checkout de ERPlora/hub y construye la MISMA imagen con `context: .` esperando un Dockerfile
-# en la RAÍZ; ahora el Dockerfile vive en `docker/Dockerfile`. Si se quiere seguir usando
-# deploy-hub.yml habría que apuntarlo a `-f docker/Dockerfile` (o moverlo a este workflow).
-# DECISIÓN del humano: cuál de los dos es el canónico para publicar la imagen del Hub.
+# Pendiente de columna del humano (provisioning es core):
+#   - El provisioning del Cloud/Dokploy debe apuntar la task/servicio del hub a
+#     `ghcr.io/erplora/hub:latest` (antes era el URI de ECR) y hacer login en GHCR con un PAT
+#     `read:packages` (el paquete es PRIVADO). Alternativa: hacer el paquete público.
 # ==============================================================================

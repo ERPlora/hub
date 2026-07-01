@@ -25,7 +25,7 @@
               <ion-card class="ion-no-margin metric-card">
                 <ion-card-content class="metric-card__content">
                   <ok-gauge type="ring" label="CPU" :value="cpuPct" unit="%" :thresholds="usageThresholds"
-                    :sublabel="cpuSub" size="128"></ok-gauge>
+                    size="128"></ok-gauge>
                 </ion-card-content>
               </ion-card>
             </ion-col>
@@ -34,7 +34,7 @@
               <ion-card class="ion-no-margin metric-card">
                 <ion-card-content class="metric-card__content">
                   <ok-gauge type="ring" :label="t('system.memory')" :value="memPct" unit="%" :thresholds="usageThresholds"
-                    :sublabel="memSub" size="128"></ok-gauge>
+                    size="128"></ok-gauge>
                 </ion-card-content>
               </ion-card>
             </ion-col>
@@ -372,15 +372,9 @@ const dbEngineLabel = computed<string>(() => {
 const cpu = computed(() => info.value?.cpu ?? null);
 const memory = computed(() => info.value?.memory ?? null);
 
-// Gauges: % de uso (0 sin datos) + subetiqueta con el valor absoluto.
+// Gauges: SOLO el % de uso (sin valores absolutos de vCPU/RAM — el cliente ve % de capacidad).
 const cpuPct = computed<number>(() => Math.round((cpu.value?.fraction ?? 0) * 100));
 const memPct = computed<number>(() => Math.round((memory.value?.fraction ?? 0) * 100));
-const cpuSub = computed<string>(() =>
-  cpu.value ? [cpu.value.usedLabel, cpu.value.limitLabel].filter(Boolean).join(' · ') : '—'
-);
-const memSub = computed<string>(() =>
-  memory.value ? [memory.value.usedLabel, memory.value.limitLabel].filter(Boolean).join(' · ') : '—'
-);
 // Zonas de color del gauge de uso (verde→ámbar→rojo). Hex Ionic para que el SVG las pinte fiable.
 const usageThresholds = [
   { to: 70, color: '#2dd36f' },

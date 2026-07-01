@@ -69,6 +69,16 @@ pub struct ServeConfig {
     /// el shell Tauri, que la actualiza tras enrolar/rotar sin reiniciar la app. Si `None`, el
     /// runtime crea la suya sembrada con `hub.cloud_api_token` (caso binario/ECS).
     pub machine_token_cell: Option<state::MachineToken>,
+    /// Ruta del `dist/` de Vite a servir en el **MISMO origen** que `/api` (ADR-0050, Hub Local
+    /// mismo-origen). `Some` ⇒ el runtime monta el front con fallback SPA (`with_static_frontend`),
+    /// de modo que `HttpWsTransport` (RUNTIME_URL='') alcance el loopback sin CORS; en Tauri lo
+    /// resuelve el shell vía `resource_dir()`, en ECS/binario lo vuelca `from_env` desde `HUB_WEB_DIR`.
+    /// `None` ⇒ solo API (dev con Vite, que proxya, o binario sin front).
+    pub web_dir: Option<String>,
+    /// Valor del header `Content-Security-Policy` a emitir (ADR-0050). Cuando el doc lo sirve Axum
+    /// (mismo origen), la CSP de `tauri.conf` deja de aplicar al doc → el runtime la emite. `None` ⇒
+    /// no se añade header (estado previo). El contenido es columna de seguridad/humano.
+    pub csp: Option<String>,
 }
 
 impl ServeConfig {
@@ -81,6 +91,10 @@ impl ServeConfig {
             modules_dir: std::env::var("HUB_MODULES_DIR").ok().filter(|s| !s.is_empty()),
             hub: HubConfig::from_env(),
             machine_token_cell: None,
+            // ECS/binario: el `dist/` se sirve de disco por `HUB_WEB_DIR` (paridad Hub Cloud).
+            web_dir: std::env::var("HUB_WEB_DIR").ok().filter(|s| !s.is_empty()),
+            // CSP opcional vía env (None por defecto = comportamiento previo). En Tauri la fija el shell.
+            csp: std::env::var("HUB_CSP").ok().filter(|s| !s.is_empty()),
         }
     }
 }
@@ -89,7 +103,19 @@ impl ServeConfig {
 /// usuario offline. `None` si el Cloud no responde o no la trae.
 async fn fetch_jwt_public_key(cloud_base_url: &str) -> Option<String> {
     let url = format!("{}/api/v1/auth/public-key/", cloud_base_url.trim_end_matches('/'));
-    let resp = reqwest::Client::new().get(&url).send().await.ok()?;
+    // Timeout ACOTADO: esta llamada corre ANTES de bindear el listener en `serve()`. Sin límite, una
+    // red hostil (captive portal / DNS lento / host inalcanzable) retrasaría el arranque del servidor
+    // mucho más que el `wait_for_runtime` del shell Tauri → la ventana cargaría un loopback que aún no
+    // escucha (ADR-0050). El login cloud degrada a "no disponible" si no llega; el PIN no la necesita.
+    let client = match reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(3))
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return None,
+    };
+    let resp = client.get(&url).send().await.ok()?;
     if !resp.status().is_success() {
         return None;
     }
@@ -335,17 +361,18 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
-    // Router de API + (opcional) frontend estático. Si `HUB_WEB_DIR` apunta al `dist/` de Vite,
-    // se sirve con fallback SPA a `index.html` (combo cloud + web-PWA, §3): /api, /ws y /healthz
-    // los resuelve el router; cualquier otra ruta cae al `ServeDir`. Sin `HUB_WEB_DIR` (Tauri,
-    // que sirve su propio webview) solo se montan las rutas de API.
-    let router = match std::env::var("HUB_WEB_DIR").ok().filter(|s| !s.is_empty()) {
-        Some(dir) => {
-            eprintln!("sirviendo frontend estático desde {dir} (fallback SPA → index.html)");
-            with_static_frontend(app(state), &dir)
-        }
-        None => app(state),
-    };
+    // Router de API + (opcional) frontend estático en el MISMO origen (`cfg.web_dir`). En ECS/binario
+    // lo vuelca `from_env` desde `HUB_WEB_DIR`; en Tauri (Hub Local, ADR-0050) lo fija el shell con la
+    // ruta del `dist/` empaquetado (`resource_dir()`), para que el webview cargue front + datos del
+    // mismo origen. `None` ⇒ solo API (dev con Vite, que proxya).
+    if let Some(dir) = cfg.web_dir.as_deref() {
+        eprintln!("sirviendo frontend estático desde {dir} (fallback SPA → index.html)");
+    }
+    let mut router = build_router(state, cfg.web_dir.as_deref());
+    // CSP (ADR-0050): con el doc servido por Axum, la CSP de `tauri.conf` no aplica → la emitimos aquí.
+    if let Some(csp) = cfg.csp.as_deref() {
+        router = with_csp(router, csp);
+    }
 
     let listener = tokio::net::TcpListener::bind(&cfg.bind).await?;
     eprintln!("erplora-server escuchando en http://{}", cfg.bind);
@@ -527,6 +554,41 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
     use tower_http::services::{ServeDir, ServeFile};
     let index = format!("{}/index.html", web_dir.trim_end_matches('/'));
     router.fallback_service(ServeDir::new(web_dir).fallback(ServeFile::new(index)))
+}
+
+/// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). Cuando el documento
+/// lo sirve el propio Axum (Hub Local mismo-origen, o Hub Cloud), la CSP de `tauri.conf` ya **no**
+/// aplica al doc (solo la inyecta el protocolo de assets de Tauri), así que el runtime debe emitirla.
+/// En las respuestas de API el header es inocuo. El valor lo decide el llamador (es columna de
+/// seguridad/humano): en Tauri lo fija `embedded_serve_config`; en ECS sale de `HUB_CSP` (o `None`).
+pub fn with_csp(router: Router, csp: &str) -> Router {
+    use axum::http::header::CONTENT_SECURITY_POLICY;
+    use axum::http::HeaderValue;
+    // No abortar el arranque por una CSP mal formada (p. ej. `HUB_CSP` de ECS con un salto de línea o
+    // byte no-ASCII): se loguea y se sigue SIN header en vez de panicar. En Tauri el input es la const
+    // `LOOPBACK_CSP` (siempre válida); este guard protege el camino ECS (`HUB_CSP` del entorno).
+    match HeaderValue::from_str(csp) {
+        Ok(value) => router.layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
+            CONTENT_SECURITY_POLICY,
+            value,
+        )),
+        Err(e) => {
+            eprintln!("CSP inválida ignorada (no se emite header Content-Security-Policy): {e}");
+            router
+        }
+    }
+}
+
+/// Compone el router de API (`app`) con, opcionalmente, el frontend estático servido en el **MISMO
+/// origen** (ADR-0050). Es el camino REAL que monta tanto [`serve`] (ECS/binario, desde `HUB_WEB_DIR`)
+/// como el runtime embebido del shell Tauri (Hub Local, desde `resource_dir()`), extraído aquí para
+/// poder testearlo sin bindear puerto (`tower::ServiceExt::oneshot`). `web_dir = Some` ⇒ front + API
+/// en un solo router; `None` ⇒ solo API (dev con Vite, que proxya).
+pub fn build_router(state: AppState, web_dir: Option<&str>) -> Router {
+    match web_dir.filter(|s| !s.is_empty()) {
+        Some(dir) => with_static_frontend(app(state), dir),
+        None => app(state),
+    }
 }
 
 /// GET /api/hub/context — el `hub_id` inyectado por el despliegue (env `HUB_ID`) + el usuario

@@ -67,8 +67,7 @@ tenant que sustituira progresivamente al hub actual.
   productos es el `DatabaseAdapter` (SQLite ↔ Aurora) y los ficheros (disco ↔ S3). En **Hub Local**, el
   shell Tauri **arranca el bridge embebido** (servidor localhost, mismo canal que la PWA shell, reusando
   `crates/peripherals`), **no** por `invoke`; `invoke` queda **solo** para lo nativo (keychain,
-  device_id, ciclo de vida). *(pendiente doc↔código: el runtime/shell puede ir aún por
-  `invoke→HTTP`; la migración es columna core.)*
+  device_id, ciclo de vida). *(estado código 2026-06-30: data-IPC eliminado —SDK `IpcTransport` + handlers `invoke` de datos del shell `erplora_query`/`erplora_command`—; pendiente, columna core: en Hub Local el front y el runtime embebido deben compartir ORIGEN —el runtime sirve el `dist/` y la ventana Tauri carga de `127.0.0.1:8787`— para que `HttpWsTransport` alcance el loopback sin CORS.)*
 - **Dos productos, SIN sync ni Cloud DB remota** (ADR-0040, 2026-06-13; supera el
   "local-first + sync" de ADR-0031 y el tier "Cloud DB" de ADR-0030, ambos RETIRADOS):
   - **Hub Local** (gratis): backend `single`, **SQLite local autoritativo**, un dispositivo,

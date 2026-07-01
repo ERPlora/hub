@@ -45,7 +45,7 @@ este fichero se actualiza desde él. Plan completo en `ARQUITECTURA.md` + el pla
       → router (embed query → búsqueda vectorial → top módulos).
 - [ ] `P1` `[TÚ·IA guía]` **cloud-client AI**: `embeddings` + `chat`/tool-call loop + auth (§9.3).
 - [ ] `P1` `[TÚ·IA guía]` Registro de embeddings de `agent.description` al instalar (§9.6).
-- [ ] `P1` `[TÚ·IA guía]` **`apps/tauri`** (Tauri v2 + `invoke` → runtime; reusa `IpcTransport`).
+- [ ] `P1` `[TÚ·IA guía]` **`apps/tauri`** (ADR-0050: datos por HTTP+WS al runtime embebido — runtime sirve el `dist/` + ventana carga de `127.0.0.1:8787`, mismo origen, sin CORS; `invoke` solo nativo + hardware `IpcBridgeTransport`).
 
 ## Fuera de Fase 1 (`fase:later`)
 ~90 módulos no-POS · RAG de docs (`ai_context`) · `PgVectorStore` · firma asimétrica de módulos ·
