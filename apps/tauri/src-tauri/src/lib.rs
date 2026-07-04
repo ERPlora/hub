@@ -211,106 +211,21 @@ async fn validate_entitlement(
     Ok(gate.resolve(&hub_id, &access_token, now_unix()).await)
 }
 
-// ── Camino de datos: handlers `invoke` → runtime embebido (issue #5) ────────────────────────────
+// ── Camino de datos: HTTP+WS directo al runtime embebido (ADR-0050) ──────────────────────────────
 //
-// El runtime de negocio corre embebido como servidor Axum por loopback (`127.0.0.1:8787`, ver
-// `embedded_serve_config`/`spawn_embedded_runtime`). El `IpcTransport` del SDK
-// (`packages/module-sdk/src/index.ts:425`) invoca `erplora_query`/`erplora_command` con
-// `{name, params}` / `{name, payload}` y espera de vuelta el **envelope** `{ok, data?, error?}`.
+// Ya NO hay handlers `invoke` de datos: `erplora_query`/`erplora_command` + `forward_to_runtime` +
+// `IpcError` se ELIMINARON, y con ellos el `IpcTransport` del SDK. El front (`apps/web`) habla
+// HTTP+WS al runtime Axum embebido por loopback (`127.0.0.1:8787`, ver `embedded_serve_config`/
+// `spawn_embedded_runtime`) vía `HttpWsTransport`, igual que la PWA de Hub Cloud contra ECS.
 //
-// La forma más simple y correcta de delegar (sin tocar la API pública de `erplora-server`, que es
-// columna de otro worker) es **reenviar la invocación al mismo servidor loopback** por HTTP
-// (`reqwest`, ya en el árbol de deps) hacia `POST /api/query` y `/api/command`, y devolver su JSON
-// tal cual — exactamente lo que ya hace hoy `HttpWsTransport` desde `apps/web` (que en Tauri apunta
-// a este mismo loopback). Así el envelope sale ya formado por el runtime (rutas en
-// `crates/server/src/lib.rs:290-291`).
+// PENDIENTE (columna core/humano) para CERRAR ADR-0050 en Hub Local: que el front y el runtime
+// compartan ORIGEN, para que ese `HttpWsTransport` (mismo origen, sin URL absoluta) alcance el
+// loopback sin CORS — p. ej. que el runtime embebido sirva el `dist/` (`with_static_frontend`, ver
+// `crates/server/src/lib.rs`; contrato cubierto por `crates/server/tests/spa_frontend.rs`) y la
+// ventana Tauri cargue de `http://127.0.0.1:8787` en vez del protocolo de assets.
 //
-// Auth: en modo `Session` (el de `embedded_serve_config`) el runtime gatea query/command por la
-// cabecera `X-Hub-Session` (más `X-Hub-Id` / `Authorization: Bearer` opcionales) —
-// `crates/server/src/auth.rs::authenticate`. El contrato `invoke` del `IpcTransport` hoy NO viaja
-// con esas cabeceras; para no CAMBIAR el contrato del SDK (columna del humano) estos handlers las
-// aceptan como argumentos `invoke` **opcionales** (`Option<String>`), de modo que el frontend pueda
-// adjuntar la sesión sin romper el shape `{name, params}` existente. Sin sesión, el runtime
-// responde 401 en modo Session (comportamiento correcto). Ver nota de diseño en el reporte.
-
-/// URL base del runtime embebido por loopback. Coincide con `embedded_serve_config().bind`.
-const EMBEDDED_RUNTIME_URL: &str = "http://127.0.0.1:8787";
-
-/// Error de los handlers de datos `invoke`. Se serializa como string para el frontend.
-#[derive(Debug, thiserror::Error)]
-pub enum IpcError {
-    #[error("transporte loopback: {0}")]
-    Transport(String),
-}
-
-impl serde::Serialize for IpcError {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.to_string())
-    }
-}
-
-/// Reenvía un POST JSON al runtime embebido (loopback) y devuelve el **envelope** crudo
-/// (`{ok, data?, error?}`) como `serde_json::Value`. Adjunta las cabeceras de auth que el shell
-/// haya recibido por `invoke` (sesión/hub/bearer), igual que `HttpWsTransport` desde `apps/web`.
-async fn forward_to_runtime(
-    path: &str,
-    body: serde_json::Value,
-    session: Option<String>,
-    hub_id: Option<String>,
-    bearer: Option<String>,
-) -> Result<serde_json::Value, IpcError> {
-    let client = reqwest::Client::new();
-    let mut builder = client
-        .post(format!("{EMBEDDED_RUNTIME_URL}{path}"))
-        .header("Content-Type", "application/json");
-    if let Some(s) = session.as_deref().filter(|s| !s.is_empty()) {
-        builder = builder.header("X-Hub-Session", s);
-    }
-    if let Some(h) = hub_id.as_deref().filter(|s| !s.is_empty()) {
-        builder = builder.header("X-Hub-Id", h);
-    }
-    if let Some(b) = bearer.as_deref().filter(|s| !s.is_empty()) {
-        builder = builder.header("Authorization", format!("Bearer {b}"));
-    }
-    let resp = builder
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| IpcError::Transport(e.to_string()))?;
-    // El runtime ya forma el envelope (incluso en 4xx: `{ok:false,error:…}`), así que devolvemos
-    // el cuerpo tal cual sin tratar el status como error de transporte.
-    resp.json::<serde_json::Value>().await.map_err(|e| IpcError::Transport(e.to_string()))
-}
-
-/// Handler `invoke` del camino de datos: ejecuta una **query** en el runtime embebido y devuelve
-/// el envelope `{ok, data?, error?}`. Contrato del `IpcTransport` (`invoke('erplora_query',
-/// {name, params})`). `session`/`hub_id`/`bearer` son opcionales (auth, ver nota arriba).
-#[tauri::command]
-async fn erplora_query(
-    name: String,
-    params: Option<serde_json::Value>,
-    session: Option<String>,
-    hub_id: Option<String>,
-    bearer: Option<String>,
-) -> Result<serde_json::Value, IpcError> {
-    let body = serde_json::json!({ "name": name, "params": params.unwrap_or(serde_json::json!({})) });
-    forward_to_runtime("/api/query", body, session, hub_id, bearer).await
-}
-
-/// Handler `invoke` del camino de datos: ejecuta un **command** en el runtime embebido y devuelve
-/// el envelope `{ok, data?, error?}`. Contrato del `IpcTransport` (`invoke('erplora_command',
-/// {name, payload})`).
-#[tauri::command]
-async fn erplora_command(
-    name: String,
-    payload: Option<serde_json::Value>,
-    session: Option<String>,
-    hub_id: Option<String>,
-    bearer: Option<String>,
-) -> Result<serde_json::Value, IpcError> {
-    let body = serde_json::json!({ "name": name, "payload": payload.unwrap_or(serde_json::json!({})) });
-    forward_to_runtime("/api/command", body, session, hub_id, bearer).await
-}
+// `invoke` queda SOLO para lo nativo (`device_context`/`enroll_device`/…) y el HARDWARE en Hub Local
+// (`erplora_bridge_*`, más abajo: el shell ES el bridge, §2.7) — ambos legítimos por ADR-0050.
 
 const DEVICE_ID_FILE: &str = "device.id";
 
@@ -555,9 +470,17 @@ fn apply_persisted_token(app: &tauri::AppHandle, cache_dir: &std::path::Path) {
 /// módulos en `app_data_dir`, modo `Session` (identidad local real, login PIN/JWT), y la **celda
 /// compartida** del token de máquina (hot-reload). El `hub_id` sale de lo persistido al enrolar
 /// (placeholder de dev hasta el primer enrol).
+/// CSP del documento en Hub Local (ADR-0050). Con el doc servido por el Axum embebido en
+/// `127.0.0.1:8787`, `'self'` ES ese origen; la CSP de `tauri.conf` ya no aplica al doc (solo la
+/// inyecta el protocolo de assets), así que la emite el runtime (ver `erplora_server::with_csp`).
+/// Conserva `ipc:` (macOS/Linux) + `http://ipc.localhost` (Windows/Android) para que `invoke`
+/// (device_context + hardware) siga funcionando, y `ws://127.0.0.1:8787` para los eventos.
+const LOOPBACK_CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:8787 https://erplora.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'";
+
 fn embedded_serve_config(
     cache_dir: &std::path::Path,
     machine_token_cell: erplora_server::MachineToken,
+    web_dir: Option<String>,
 ) -> erplora_server::ServeConfig {
     erplora_server::ServeConfig {
         sqlite_path: cache_dir.join("erplora.db").to_string_lossy().into_owned(),
@@ -576,13 +499,22 @@ fn embedded_serve_config(
             sector: None, // sector/tipo de negocio (ADR-0054): no cableado en local/Tauri → preset de widgets degrada
         },
         machine_token_cell: Some(machine_token_cell),
+        // ADR-0050 (mismo origen): el runtime embebido sirve el `dist/` empaquetado (desktop prod) para
+        // que el webview cargue front + datos del mismo origen. `None` en dev (Vite sirve) y móvil.
+        web_dir,
+        // CSP del doc emitida por el runtime (la de `tauri.conf` no aplica al doc servido por Axum).
+        csp: Some(LOOPBACK_CSP.to_string()),
     }
 }
 
 /// Arranca el runtime embebido (`erplora_server::serve`) en un **hilo dedicado con su propio
 /// runtime tokio**, aislado del runtime async de Tauri. El webview le habla por loopback. El token
 /// de máquina vive en la celda compartida: un enrol/rotación lo aplica **en caliente** (#22).
-fn spawn_embedded_runtime(cache_dir: PathBuf, machine_token_cell: erplora_server::MachineToken) {
+fn spawn_embedded_runtime(
+    cache_dir: PathBuf,
+    machine_token_cell: erplora_server::MachineToken,
+    web_dir: Option<String>,
+) {
     std::thread::spawn(move || {
         let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
             Ok(rt) => rt,
@@ -593,12 +525,110 @@ fn spawn_embedded_runtime(cache_dir: PathBuf, machine_token_cell: erplora_server
         };
         rt.block_on(async move {
             if let Err(e) =
-                erplora_server::serve(embedded_serve_config(&cache_dir, machine_token_cell)).await
+                erplora_server::serve(embedded_serve_config(&cache_dir, machine_token_cell, web_dir))
+                    .await
             {
                 eprintln!("runtime embebido terminó: {e}");
             }
         });
     });
+}
+
+/// Ruta del `dist/` empaquetado a servir por el Axum embebido (ADR-0050, mismo origen). Solo en
+/// desktop EMPAQUETADO: en **dev** el front lo sirve Vite (→ `None`), y en **móvil** `resource_dir()`
+/// no es una ruta de FS servible por `ServeDir` (→ `None`; el webview carga el `dist` por el protocolo
+/// de assets). `resource_dir()/dist` casa con el destino del recurso declarado en `tauri.conf` (§bundle).
+fn resolve_web_dir(app: &tauri::App) -> Option<String> {
+    if tauri::is_dev() {
+        return None;
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = app;
+        None
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        use tauri::Manager;
+        app.path()
+            .resource_dir()
+            .ok()
+            .map(|r| r.join("dist"))
+            .filter(|p| p.join("index.html").exists())
+            .map(|p| p.to_string_lossy().into_owned())
+    }
+}
+
+/// Espera (con timeout) a que el runtime embebido acepte conexiones TCP en `addr`, para NO cargar la
+/// ventana antes de que el loopback escuche (evita `ERR_CONNECTION_REFUSED`). Un connect TCP basta
+/// como señal de "listo": `serve()` bindea el listener al final del arranque y empieza a aceptar acto
+/// seguido. OJO: el bind ocurre tras abrir SQLite + instalar módulos + `fetch_jwt_public_key` (que ya
+/// va ACOTADO por timeout, `crates/server`), así que en red hostil el bind puede tardar varios
+/// segundos — de ahí el budget de 15s. (TODO humano: mover esta espera fuera del hilo principal —
+/// página "loading" + redirección — para no congelar `setup`; ver M1 del review ADR-0050.)
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn wait_for_runtime(addr: &str, timeout: std::time::Duration) -> bool {
+    let sock: std::net::SocketAddr = match addr.parse() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let deadline = std::time::Instant::now() + timeout;
+    while std::time::Instant::now() < deadline {
+        if std::net::TcpStream::connect_timeout(&sock, std::time::Duration::from_millis(300)).is_ok()
+        {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    false
+}
+
+/// Crea la ventana principal con la URL correcta según entorno (ADR-0050). En **desktop prod** carga
+/// el runtime Axum embebido (`http://127.0.0.1:8787`) = mismo origen que `/api` (tras esperar a que
+/// escuche), PERO solo si el runtime arrancó (`runtime_started`) y el `dist/` se empaquetó
+/// (`web_dir_present`); en **dev** carga Vite (`http://127.0.0.1:5173`, que proxya `/api`,`/ws` →
+/// 8787); en **móvil** carga el `dist` por el protocolo de assets. La ventana se crea aquí (no en
+/// `tauri.conf`) para fijar la URL de una sola vez (el framework crea las ventanas de config ANTES
+/// del `setup`, lo que provocaría un flash + doble origen).
+///
+/// DEGRADADO (C3/M2 del review): si el runtime NO arrancó (p. ej. `app_data_dir` falló) o el `dist/`
+/// no está empaquetado, NO se navega al loopback (daría `ERR_CONNECTION_REFUSED` o 404 + cuelgue de
+/// 15s + ventana muerta): se carga el SPA por el protocolo de assets (se ve el shell aunque no
+/// alcance los datos) y se loguea el fallo de empaquetado/arranque.
+fn open_main_window(app: &tauri::App, runtime_started: bool, web_dir_present: bool) -> tauri::Result<()> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let url = {
+        let _ = (runtime_started, web_dir_present);
+        WebviewUrl::App("index.html".into())
+    };
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let url = if tauri::is_dev() {
+        // Dev: el doc lo sirve Vite (5173), que proxya /api,/ws → 8787 (mismo origen). No se espera al
+        // runtime aquí: las llamadas proxyadas reintentan si aún no está arriba.
+        WebviewUrl::External("http://127.0.0.1:5173".parse().expect("url dev válida"))
+    } else if runtime_started && web_dir_present {
+        if !wait_for_runtime("127.0.0.1:8787", std::time::Duration::from_secs(15)) {
+            eprintln!(
+                "runtime embebido no respondió a tiempo; abro la ventana igualmente (el front reintenta)"
+            );
+        }
+        WebviewUrl::External("http://127.0.0.1:8787".parse().expect("url prod válida"))
+    } else {
+        eprintln!(
+            "arranque DEGRADADO (runtime_started={runtime_started}, dist_empaquetado={web_dir_present}): \
+             cargo el SPA por el protocolo de assets (sin datos); revisa el empaquetado del dist / app_data_dir"
+        );
+        WebviewUrl::App("index.html".into())
+    };
+
+    WebviewWindowBuilder::new(app, "main", url)
+        .title("ERPlora")
+        .inner_size(1280.0, 800.0)
+        .min_inner_size(960.0, 600.0)
+        .build()?;
+    Ok(())
 }
 
 // ── Camino de hardware: handlers `invoke` → erplora-peripherals (issue #29) ──────────────────────
@@ -803,6 +833,10 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             use tauri::Manager;
+            // ADR-0050 (mismo origen): en desktop prod el runtime embebido sirve el `dist/` empaquetado,
+            // para que el webview cargue front + datos del MISMO origen (loopback). `None` en dev/móvil.
+            let web_dir = resolve_web_dir(app);
+            let mut runtime_started = false;
             // Arranca el runtime local ANTES de que el webview lo necesite (login `/api/auth/cloud`,
             // query/command, entitlement). app_data_dir es la raíz de datos por-instalación.
             if let Ok(cache_dir) = app.path().app_data_dir() {
@@ -821,9 +855,15 @@ pub fn run() {
                 // lanza el watchdog + el worker de la cola como tareas async del shell. `devices.json`
                 // se persiste en `app_data_dir` (misma raíz por-instalación que el resto de datos).
                 app.manage(build_peripherals_state(cache_dir.join(DEVICES_FILE)));
-                spawn_embedded_runtime(cache_dir, cell);
+                spawn_embedded_runtime(cache_dir, cell, web_dir.clone());
+                runtime_started = true;
             } else {
                 eprintln!("runtime embebido: no se pudo resolver app_data_dir; no se arranca");
+            }
+            // Crea la ventana SIEMPRE (sin ventana no hay app). La URL se acopla al estado real
+            // (C3/M2 del review): si el runtime no arrancó o no hay `dist/`, NO navega al loopback.
+            if let Err(e) = open_main_window(app, runtime_started, web_dir.is_some()) {
+                eprintln!("no se pudo crear la ventana principal: {e}");
             }
             Ok(())
         })
@@ -833,9 +873,7 @@ pub fn run() {
             enroll_device,
             rotate_machine_token,
             forget_hub,
-            // Camino de datos (issue #5): query/command → runtime embebido.
-            erplora_query,
-            erplora_command,
+            // Datos: NO van por `invoke` (ADR-0050) — el front habla HTTP+WS al runtime embebido.
             // Camino de hardware (issue #29): impresoras de red ESC/POS + cajón → peripherals.
             erplora_bridge_status,
             erplora_discover_printers,

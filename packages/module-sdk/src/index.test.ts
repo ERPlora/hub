@@ -4,11 +4,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   HttpWsTransport,
-  IpcTransport,
   ErploraClient,
   ErploraError,
   createClient,
-  type TauriBridge,
 } from './index.ts';
 
 // ── HttpWsTransport: query/command desenvuelven el sobre {ok,data} ───────────
@@ -145,24 +143,6 @@ test("createClient('http+sse') selecciona el push por SSE", () => {
   assert.deepEqual(es, ['http://h/api/events']);
 });
 
-// ── IpcTransport (Tauri) ────────────────────────────────────────────────────
-
-test('IpcTransport.query usa invoke(erplora_query) y desenvuelve', async () => {
-  const invoked: Array<{ cmd: string; args: unknown }> = [];
-  const bridge: TauriBridge = {
-    invoke: async (cmd, args) => {
-      invoked.push({ cmd, args });
-      return { ok: true, data: ['x'] };
-    },
-    listen: async () => () => {},
-  };
-  const t = new IpcTransport(bridge);
-  const r = await t.query('q', { a: 1 });
-  assert.equal(invoked[0].cmd, 'erplora_query');
-  assert.deepEqual(invoked[0].args, { name: 'q', params: { a: 1 } });
-  assert.deepEqual(r, ['x']);
-});
-
 // ── ErploraClient: hasPermission (solo UI) ──────────────────────────────────
 
 test('hasPermission respeta wildcard y permisos namespaced', () => {
@@ -176,8 +156,7 @@ test('hasPermission respeta wildcard y permisos namespaced', () => {
   assert.equal(emp.hasPermission('inventory.add_product'), false);
 });
 
-test('createClient ipc requiere bridge de Tauri', () => {
-  assert.throws(() => createClient('ipc', {}), /Tauri/);
+test('createClient http+ws construye un cliente con HttpWsTransport (ADR-0050: sin variante ipc)', () => {
   const c = createClient('http+ws', { http: { baseUrl: '' } });
   assert.ok(c instanceof ErploraClient);
 });

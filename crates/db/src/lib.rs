@@ -19,7 +19,7 @@ use sqlx::{Column, Encode, Row, Type, TypeInfo, ValueRef};
 /// Dump consistente del SQLite local (`VACUUM INTO`) para el módulo `backup` (ADR-0040/0041).
 pub mod backup;
 
-use sqlx::postgres::{PgPool, PgRow};
+use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
 
 /// Named parameters of a statement (`:key` → JSON value).
@@ -284,18 +284,68 @@ fn sqlite_cell(row: &SqliteRow, i: usize) -> Json {
 
 // ── Postgres backend (cloud / Aurora) ────────────────────────────────────────────────────
 
-/// Postgres backend over `PgPool`. Pool tuning (max_connections per plan, TLS,
-/// timeouts) is injected via environment at construction — pending (§8, managed by Cloud).
+/// Postgres backend over `PgPool`. `max_connections` is injected via environment at
+/// construction ([`PG_MAX_CONNECTIONS_ENV`], per plan, managed by the SaaS); the rest of the
+/// pool tuning (TLS, timeouts) is pending (§8).
 pub struct PgAdapter {
     pool: PgPool,
 }
 
+/// Default del pool Postgres cuando [`PG_MAX_CONNECTIONS_ENV`] no está configurado: **10**, el
+/// default de sqlx `PoolOptions` — cero cambio de comportamiento para los despliegues
+/// existentes que no inyectan el env.
+const DEFAULT_PG_MAX_CONNECTIONS: u32 = 10;
+
+/// Env que fija el nº máximo de conexiones del pool Postgres **por hub** (entero > 0). Lo
+/// inyecta el SaaS al desplegar (`plan.max_db_connections` en hubs de pago; 3 en demos —
+/// ERPlora/saas#609): el tope por hub se aplica aquí, en el pool del propio hub, y el
+/// `CONNECTION LIMIT` del rol de la org queda como red de seguridad.
+const PG_MAX_CONNECTIONS_ENV: &str = "HUB_DB_MAX_CONNECTIONS";
+
+/// Resuelve el tamaño del pool a partir del **valor crudo** del env. Función pura (no lee el
+/// entorno del proceso) para poder testearla sin mutar envs con tests en paralelo.
+///
+/// - Ausente o vacío (idioma del repo para "sin configurar") → default, sin warning.
+/// - Entero > 0 → ese valor.
+/// - Inválido (no numérico, 0, negativo) → default + mensaje de warning para el caller.
+fn resolve_pg_max_connections(raw: Option<&str>) -> (u32, Option<String>) {
+    let Some(raw) = raw.map(str::trim).filter(|s| !s.is_empty()) else {
+        return (DEFAULT_PG_MAX_CONNECTIONS, None);
+    };
+    match raw.parse::<u32>() {
+        Ok(n) if n > 0 => (n, None),
+        _ => (
+            DEFAULT_PG_MAX_CONNECTIONS,
+            Some(format!(
+                "{PG_MAX_CONNECTIONS_ENV} inválido ({raw:?}): se esperaba un entero > 0; \
+                 usando el default {DEFAULT_PG_MAX_CONNECTIONS}"
+            )),
+        ),
+    }
+}
+
+/// Lee [`PG_MAX_CONNECTIONS_ENV`] del entorno en el punto de construcción (mismo idioma que
+/// `HUB_MAX_ORG_POOLS` en el server) y loguea el warning si el valor es inválido.
+fn pg_max_connections_from_env() -> u32 {
+    let raw = std::env::var(PG_MAX_CONNECTIONS_ENV).ok();
+    let (n, warning) = resolve_pg_max_connections(raw.as_deref());
+    if let Some(w) = warning {
+        eprintln!("db: {w}");
+    }
+    n
+}
+
 impl PgAdapter {
     /// Connects with a standard Postgres DSN (`postgres://user:pass@host:5432/db`).
-    /// TODO §8: use `PgPoolOptions` with max_connections (per plan, via env), TLS require,
+    /// `max_connections` comes from [`PG_MAX_CONNECTIONS_ENV`] (per-hub cap injected by the
+    /// SaaS at deploy time; absent/invalid → the sqlx default of 10 — ERPlora/saas#609).
+    /// TODO §8: use `PgPoolOptions` with TLS require,
     /// max_lifetime/idle_timeout to survive Aurora failovers.
     pub async fn connect(dsn: &str) -> Result<Self, DbError> {
-        let pool = PgPool::connect(dsn).await?;
+        let pool = PgPoolOptions::new()
+            .max_connections(pg_max_connections_from_env())
+            .connect(dsn)
+            .await?;
         Ok(Self { pool })
     }
 }
@@ -1373,6 +1423,60 @@ mod tests {
         // los tests `#[ignore]` que requieren DATABASE_URL.
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         assert_eq!(db.dialect(), Dialect::Sqlite);
+    }
+
+    // ── tamaño del pool Postgres vía env `HUB_DB_MAX_CONNECTIONS` (§8; ERPlora/saas#609) ──────
+    //
+    // Contrato acordado con el SaaS: entero > 0. Ausente (o vacío, idioma del repo para
+    // "sin configurar") → default 10 (el default de sqlx: cero cambio para despliegues
+    // existentes) SIN warning. Valor inválido (basura, 0, negativo) → default 10 CON warning.
+    // Se testea la función pura `resolve_pg_max_connections` (no toca el env del proceso:
+    // los tests corren en paralelo).
+
+    #[test]
+    fn pg_max_connections_valid_value_is_used() {
+        assert_eq!(resolve_pg_max_connections(Some("5")), (5, None));
+        assert_eq!(resolve_pg_max_connections(Some("40")), (40, None));
+        // Tolerante a espacios alrededor (idioma del repo: `trim()` antes de decidir).
+        assert_eq!(resolve_pg_max_connections(Some(" 7 ")), (7, None));
+    }
+
+    #[test]
+    fn pg_max_connections_absent_defaults_silently() {
+        assert_eq!(resolve_pg_max_connections(None), (DEFAULT_PG_MAX_CONNECTIONS, None));
+    }
+
+    #[test]
+    fn pg_max_connections_empty_is_treated_as_absent() {
+        // Un env vacío significa "sin configurar" en los despliegues (mismo trato que
+        // `HUB_DATABASE_URL`/`HUB_MODULES_DIR` en el server): default sin warning.
+        assert_eq!(resolve_pg_max_connections(Some("")), (DEFAULT_PG_MAX_CONNECTIONS, None));
+        assert_eq!(resolve_pg_max_connections(Some("   ")), (DEFAULT_PG_MAX_CONNECTIONS, None));
+    }
+
+    #[test]
+    fn pg_max_connections_garbage_defaults_with_warning() {
+        let (n, warn) = resolve_pg_max_connections(Some("banana"));
+        assert_eq!(n, DEFAULT_PG_MAX_CONNECTIONS);
+        let warn = warn.expect("un valor inválido debe producir un warning");
+        assert!(warn.contains("HUB_DB_MAX_CONNECTIONS"), "el warning nombra el env: {warn}");
+        assert!(warn.contains("banana"), "el warning incluye el valor recibido: {warn}");
+    }
+
+    #[test]
+    fn pg_max_connections_zero_or_negative_is_invalid() {
+        // El contrato es entero > 0: un pool de 0 conexiones no puede servir peticiones.
+        let (n, warn) = resolve_pg_max_connections(Some("0"));
+        assert_eq!((n, warn.is_some()), (DEFAULT_PG_MAX_CONNECTIONS, true));
+        let (n, warn) = resolve_pg_max_connections(Some("-3"));
+        assert_eq!((n, warn.is_some()), (DEFAULT_PG_MAX_CONNECTIONS, true));
+    }
+
+    #[test]
+    fn pg_max_connections_default_matches_sqlx_default() {
+        // El default DEBE seguir siendo 10 (el de sqlx `PoolOptions`): cambiarlo cambiaría el
+        // comportamiento de todos los despliegues existentes sin el env.
+        assert_eq!(DEFAULT_PG_MAX_CONNECTIONS, 10);
     }
 
     // El mismo SQL portable normaliza distinto por dialecto: prueba textual emparejada (Postgres

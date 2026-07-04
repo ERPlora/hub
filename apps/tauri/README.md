@@ -51,9 +51,9 @@ En el producto **Hub Local** (Tauri), el shell **es el bridge**: no hay proceso 
 lógica de hardware ya vive en el crate compartido **`crates/peripherals`** (red-only, ESC/POS
 sobre TCP:9100), el mismo que usa el bridge standalone (`apps/bridge`) en **Hub Cloud**.
 
-Cuando se levante este `apps/tauri`, además de `erplora_query`/`erplora_command` (→ `crates/runtime`),
-registrar handlers `invoke` de hardware que delegan en `erplora-peripherals` (en vez del servidor
-WebSocket que monta `apps/bridge`):
+Los DATOS NO van por `invoke` (ADR-0050): el front habla HTTP+WS al runtime Axum embebido. `invoke`
+queda solo para lo nativo y para el HARDWARE — handlers que delegan en `erplora-peripherals` (en vez
+del servidor WebSocket que monta `apps/bridge`):
 
 | `invoke`                     | Llama a                                              |
 |------------------------------|-----------------------------------------------------|
@@ -63,6 +63,7 @@ WebSocket que monta `apps/bridge`):
 | `erplora_open_drawer`        | `peripherals::drawer::open_drawer(&target, pin)`     |
 | `erplora_get_devices` / role/name/remove | `peripherals::registry::DeviceRegistry`  |
 
-El watchdog (`registry::Watchdog`) corre como tarea async del shell. El frontend usa el mismo
-`IpcTransport` del `module-sdk`; el contrato de datos es idéntico al WS de `apps/bridge`, así que
-`hub/static/js/bridge.js` y la UI no distinguen el transporte. Ver `crates/peripherals/README.md`.
+El watchdog (`registry::Watchdog`) corre como tarea async del shell. Para el HARDWARE el frontend usa
+`IpcBridgeTransport` del `module-sdk` (los datos van aparte por `HttpWsTransport`); el contrato es
+idéntico al WS de `apps/bridge`, así que la UI no distingue el transporte de hardware. Ver
+`crates/peripherals/README.md`.

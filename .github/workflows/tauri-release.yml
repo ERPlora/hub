@@ -27,8 +27,10 @@
 # Firma: SIN FIRMAR de momento (no hay cert Authenticode de Windows). El instalador funcionará
 # con aviso de SmartScreen hasta que se añada el cert.
 #
-# AWS auth: OIDC (rol github-actions-deploy, cuenta 363427305647), igual que bridge-release.yml.
-# El rol ya confía en `ERPlora/hub` main + tags v* y tiene S3.
+# Almacenamiento: Hetzner Object Storage (S3-compatible, `fsn1.your-objectstorage.com`),
+# bucket `erplora-downloads`, prefijo `app/`. Sustituye a AWS S3/OIDC (AWS apagado).
+# Credenciales estáticas en secrets del repo:
+#   HETZNER_S3_ACCESS_KEY · HETZNER_S3_SECRET_KEY · HETZNER_S3_ENDPOINT
 # ==============================================================================
 
 name: Build Hub App (Tauri)
@@ -261,7 +263,7 @@ jobs:
           if-no-files-found: error
 
   upload-s3:
-    name: Upload to S3
+    name: Upload to Object Storage
     # Espera a desktop + Android, pero NO bloquea si Android se salta (sin keystore) o falla:
     # `always()` + exigir solo que el desktop (`build`) haya ido bien.
     needs: [build, build-android]
@@ -271,8 +273,12 @@ jobs:
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # OIDC
       contents: read
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_S3_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
+      AWS_DEFAULT_REGION: fsn1
+      S3_ENDPOINT: ${{ secrets.HETZNER_S3_ENDPOINT }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -280,13 +286,7 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::363427305647:role/github-actions-deploy
-          aws-region: eu-west-1
-
-      - name: Upload to S3
+      - name: Upload to Hetzner Object Storage
         run: |
           set -euo pipefail
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
@@ -298,7 +298,8 @@ jobs:
           FILES="erplora-app-setup.exe erplora-app.msi erplora-app.AppImage erplora-app.deb erplora-app.apk"
           for f in $FILES; do
             if [ -f "artifacts/$f" ]; then
-              aws s3 cp "artifacts/$f" "s3://erplora-downloads/app/${VERSION}/$f"
+              aws s3 cp "artifacts/$f" "s3://erplora-downloads/app/${VERSION}/$f" \
+                --endpoint-url "$S3_ENDPOINT"
             fi
           done
 
@@ -306,8 +307,9 @@ jobs:
           if [[ "$VERSION" != "latest" ]]; then
             for f in $FILES; do
               aws s3 cp "s3://erplora-downloads/app/${VERSION}/$f" \
-                "s3://erplora-downloads/app/latest/$f" 2>/dev/null || true
+                "s3://erplora-downloads/app/latest/$f" \
+                --endpoint-url "$S3_ENDPOINT" 2>/dev/null || true
             done
           fi
 
-          echo "Subido a s3://erplora-downloads/app/${VERSION}/"
+          echo "Subido a s3://erplora-downloads/app/${VERSION}/ (Hetzner Object Storage)"
