@@ -10,7 +10,7 @@
 #   push tag v*    ─► build (Windows + Linux) ─► S3 app/v{version}/ + latest/
 #
 # S3 layout (mismo bucket que el bridge; lo consume el Cloud para la descarga):
-#   s3://erplora-downloads/app/
+#   s3://erplora-saas/downloads/app/
 #   ├── latest/
 #   │   ├── erplora-app-setup.exe   (Windows x64, instalador NSIS — SIN FIRMAR de momento)
 #   │   ├── erplora-app.msi         (Windows x64, MSI — SIN FIRMAR)
@@ -28,7 +28,7 @@
 # con aviso de SmartScreen hasta que se añada el cert.
 #
 # Almacenamiento: Hetzner Object Storage (S3-compatible, `fsn1.your-objectstorage.com`),
-# bucket `erplora-downloads`, prefijo `app/`. Sustituye a AWS S3/OIDC (AWS apagado).
+# bucket `erplora-saas` (prefijo `downloads/`), prefijo `app/`. Sustituye a AWS S3/OIDC (AWS apagado).
 # Credenciales estáticas en secrets del repo:
 #   HETZNER_S3_ACCESS_KEY · HETZNER_S3_SECRET_KEY · HETZNER_S3_ENDPOINT
 # ==============================================================================
@@ -298,7 +298,7 @@ jobs:
           FILES="erplora-app-setup.exe erplora-app.msi erplora-app.AppImage erplora-app.deb erplora-app.apk"
           for f in $FILES; do
             if [ -f "artifacts/$f" ]; then
-              aws s3 cp "artifacts/$f" "s3://erplora-downloads/app/${VERSION}/$f" \
+              aws s3 cp "artifacts/$f" "s3://erplora-saas/downloads/app/${VERSION}/$f" \
                 --endpoint-url "$S3_ENDPOINT"
             fi
           done
@@ -306,10 +306,10 @@ jobs:
           # En tag push, además refresca latest/.
           if [[ "$VERSION" != "latest" ]]; then
             for f in $FILES; do
-              aws s3 cp "s3://erplora-downloads/app/${VERSION}/$f" \
-                "s3://erplora-downloads/app/latest/$f" \
+              aws s3 cp "s3://erplora-saas/downloads/app/${VERSION}/$f" \
+                "s3://erplora-saas/downloads/app/latest/$f" \
                 --endpoint-url "$S3_ENDPOINT" 2>/dev/null || true
             done
           fi
 
-          echo "Subido a s3://erplora-downloads/app/${VERSION}/ (Hetzner Object Storage)"
+          echo "Subido a s3://erplora-saas/downloads/app/${VERSION}/ (Hetzner Object Storage)"
