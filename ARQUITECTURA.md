@@ -10,7 +10,7 @@
 > [CLAUDE.md](../CLAUDE.md), repo de arquitectura seccionado [architecture/](../architecture/).
 >
 > **Estado:** propuesta + scaffolding inicial (`apps/web` Vue 3 + Ionic, primer módulo
-> `modules/inventory` con WC Lit; CSP validada — §14). Última actualización: 2026-05-31
+> `modules/inventory` con WC Lit; CSP validada — §14). Última actualización: 2026-06-30
 > (decisiones fijadas: impresoras **solo LAN**, **PK = UUID v4 `TEXT` en todo** el dato de negocio (ADR-0035, sin remapeo) — §2.5, §2.7, §14).
 
 ---
@@ -579,7 +579,7 @@ cambios. Instalación desde el marketplace real (`source/s3_source` + `cloud-cli
 `search_docs` (pgvector cloud + degradación local §9.5).
 
 ### Fase 6 — Cierre
-Conversión de módulos **completada** (99 módulos declarativos; source en `modules-workspace/modules/<id>/`,
+Conversión de módulos **completada** (27 módulos declarativos; source en `modules-workspace/modules/<id>/`,
 cada uno su propio repo git — `hub/modules/` es solo para instalados en runtime).
 Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 
@@ -587,7 +587,7 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 
 ## 13. Trabajo pendiente de plataforma (alto nivel)
 
-> La **conversión de módulos** está **hecha**: los 99 módulos son declarativos (2026-06-02); el
+> La **conversión de módulos** está **hecha**: los 27 módulos son declarativos (2026-06-02); el
 > source vive en `modules-workspace/modules/<id>/` (cada uno su propio repo git; `hub/modules/` = instalados).
 > Lo que **queda** es implementar los handlers **Rust→WASM Tier 2**
 > (documentados en los `WASM-TODO.md` por módulo) y la **reubicación del Bridge** (§2.7).
