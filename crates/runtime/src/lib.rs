@@ -111,12 +111,24 @@ impl Runtime {
     ///
     /// **Tolerante** (como el arranque original): un módulo cuyo manifest no carga o cuya
     /// instalación falla se **omite con log** y NO tumba a los demás (un módulo de terceros roto no
-    /// debe brickear el hub al arrancar). Solo abortan: un `read_dir` fallido (Err) o un **ciclo**
-    /// de `depends_on` (error estructural del conjunto, se reporta y no se instala nada del lote).
+    /// debe brickear el hub al arrancar). Un `root` **ausente** se trata como lote vacío (no hay
+    /// módulos horneados que instalar) — el caso del contenedor stateless con `HUB_MODULES_DIR`
+    /// apuntando a una ruta que el despliegue no crea (ERPlora/saas#616). Solo abortan: un
+    /// `read_dir` que falla por OTRA razón (permisos, etc.) o un **ciclo** de `depends_on` (error
+    /// estructural del conjunto, se reporta y no se instala nada del lote).
     pub async fn install_all_from_dir(&mut self, root: &Path) -> Result<Vec<String>> {
         // 1) Carga manifests; un manifest inválido se omite (log), no aborta el lote.
         let mut found: Vec<(std::path::PathBuf, crate::manifest::Manifest)> = Vec::new();
-        for entry in std::fs::read_dir(root)? {
+        // Un dir de módulos ausente NO es un error: significa "no hay módulos que instalar" (lote
+        // vacío), igual que un dir presente pero vacío. Sin esto, un `HUB_MODULES_DIR` inexistente
+        // (contenedor stateless) propagaba `io: No such file or directory (os error 2)` en TODOS los
+        // arranques (#616). Otros errores de IO (permisos, etc.) sí se propagan.
+        let entries = match std::fs::read_dir(root) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(e.into()),
+        };
+        for entry in entries {
             let path = entry?.path();
             if !path.join("module.json").exists() {
                 continue;
