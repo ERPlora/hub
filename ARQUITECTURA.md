@@ -2,7 +2,7 @@
 
 > **Documento de diseño.** Define el Hub de
 > ERPlora: **Vue 3 + Ionic + Rust/Axum + Tauri + módulos declarativos (module.json) +
-> WASM + SDK**, con **SQLite en local** y **PostgreSQL/Aurora en cloud**.
+> WASM + SDK**, con **SQLite en local** y **PostgreSQL per-org en cloud** (Hetzner `db-a`; AWS: Aurora, fallback).
 >
 > **hub ES el Hub de ERPlora.**
 >
@@ -12,6 +12,11 @@
 > **Estado:** propuesta + scaffolding inicial (`apps/web` Vue 3 + Ionic, primer módulo
 > `modules/inventory` con WC Lit; CSP validada — §14). Última actualización: 2026-06-30
 > (decisiones fijadas: impresoras **solo LAN**, **PK = UUID v4 `TEXT` en todo** el dato de negocio (ADR-0035, sin remapeo) — §2.5, §2.7, §14).
+>
+> 🏗️ **Infra cloud (jul-2026):** donde este doc dice **Aurora/ECS** como backend del Hub Cloud, el
+> proveedor **ACTIVO es Hetzner** — Postgres 18 per-org (`db-a` + standby `db-b`) desplegado como
+> **Dokploy application en el cluster Swarm**; **AWS (ECS + Aurora) = fallback seleccionable, sin infra
+> viva** (`get_provider`). Ver [CLAUDE.md](CLAUDE.md) y [architecture/hub/overview.md](../architecture/hub/overview.md).
 
 ---
 
