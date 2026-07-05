@@ -19,15 +19,38 @@ pub async fn ensure_table(db: &dyn DatabaseAdapter) -> Result<()> {
 }
 
 /// Aplica las migraciones del dialecto activo que aún no se hayan aplicado.
+///
+/// La lista efectiva es la **unión** `manifest ∪ migrations/<dialecto>/*.sql` del paquete,
+/// ordenada por nombre de fichero (prefijos `NNN_`) — decisión 2026-07-05 (A2): varios
+/// manifests publicados omiten `migrations.postgres` (o la listan a medias) aunque el `.sql`
+/// viaja en el zip, y aplicar solo la lista del manifest dejaba el módulo "instalado pero
+/// muerto" en Hub Cloud. Como el zip ya trae ambos dialectos, la unión los sana sin
+/// republicar. Para un manifest completo la unión coincide con su lista (sin cambio).
 pub async fn apply(db: &dyn DatabaseAdapter, dir: &Path, manifest: &Manifest) -> Result<()> {
     ensure_table(db).await?;
 
-    let files = match db.dialect() {
-        Dialect::Sqlite => &manifest.migrations.sqlite,
-        Dialect::Postgres => &manifest.migrations.postgres,
+    let (declared, subdir) = match db.dialect() {
+        Dialect::Sqlite => (&manifest.migrations.sqlite, "sqlite"),
+        Dialect::Postgres => (&manifest.migrations.postgres, "postgres"),
     };
+    let mut files = declared.clone();
+    if let Ok(entries) = std::fs::read_dir(dir.join("migrations").join(subdir)) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.ends_with(".sql") {
+                continue;
+            }
+            // Misma ruta relativa que usa el manifest: dedupe aquí y en `_hub_migrations`.
+            let rel = format!("migrations/{subdir}/{name}");
+            if !files.contains(&rel) {
+                eprintln!("⚠ módulo {}: migración {rel} no listada en el manifest — se aplica desde el paquete", manifest.id);
+                files.push(rel);
+            }
+        }
+    }
+    files.sort();
 
-    for file in files {
+    for file in &files {
         if is_applied(db, &manifest.id, file).await? {
             continue;
         }
