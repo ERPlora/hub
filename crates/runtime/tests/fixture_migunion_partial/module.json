@@ -1,0 +1,6 @@
+{
+  "id": "migunion_partial",
+  "name": "MigUnion Partial",
+  "version": "1.0.0",
+  "migrations": { "sqlite": ["migrations/sqlite/002_add_note.sql"] }
+}
