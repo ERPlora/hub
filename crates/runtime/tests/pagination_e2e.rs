@@ -31,7 +31,7 @@ async fn fresh_with_products(names_prices: &[(&str, f64)]) -> Runtime {
             &params(json!({
                 "name": name, "sku": format!("SKU-{i}"), "price": price, "cost": 0,
                 "stock": (i as i64) + 1, "low_stock_threshold": 5, "product_type": "physical",
-                "ean13": null, "description": "", "tax_rate_id": null, "image": ""
+                "ean13": null, "description": "", "tax_category_key": null, "image": ""
             })),
             &ctx(),
         )

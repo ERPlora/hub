@@ -138,25 +138,28 @@ async fn run_list(
     p.insert("offset".into(), json!(offset));
 
     // ── condiciones WHERE (búsqueda + filtros por columna) ──────────────────────────────────
-    // Centinela `IS NULL`: un parámetro ausente lo bindea el adapter como NULL ⇒ la condición
-    // se cumple ⇒ "sin filtro". Así los valores numéricos/fecha se comparan con su tipo real
-    // (no hace falta el truco `= ''`, que rompe en columnas no-texto).
+    // Un parámetro opcional AUSENTE (o null) NO genera condición ⇒ "sin filtro". No se usa el
+    // centinela `(:p IS NULL OR …)`: Postgres fija el tipo del parámetro en su PRIMERA
+    // aparición y `IS NULL` no aporta tipo ⇒ `could not determine data type of parameter`
+    // (42P08) al preparar — TODA lista fallaba en Hub Cloud (decisión 2026-07-05). El SQL ya
+    // se compone por llamada, así que emitir solo las condiciones provistas es equivalente.
     let mut conds: Vec<String> = Vec::new();
+    let has = |k: &str| p.get(k).is_some_and(|v| !v.is_null());
 
     // `CAST(... AS TEXT)` en búsqueda/eq/like: la UI (inputs/selects HTML) manda strings, y la
     // nube es Postgres (estricto: `integer = text` da error). Comparar como texto en ambos lados
     // hace que un `'1'` de un <select> case con una columna entera en SQLite **y** Postgres.
     // `range` NO castea: compara con el tipo real (numérico o fecha ISO como texto), que es lo
     // correcto para `>=`/`<=` (un cast a texto rompería el orden numérico).
-    if !spec.search.is_empty() {
+    if !spec.search.is_empty() && has("search") {
         let likes: Vec<String> = spec
             .search
             .iter()
             .filter(|c| is_ident(c))
-            .map(|c| format!("CAST(sub.{c} AS TEXT) LIKE '%' || :search || '%'"))
+            .map(|c| format!("CAST(sub.{c} AS TEXT) LIKE '%' || CAST(:search AS TEXT) || '%'"))
             .collect();
         if !likes.is_empty() {
-            conds.push(format!("(:search IS NULL OR {})", likes.join(" OR ")));
+            conds.push(format!("({})", likes.join(" OR ")));
         }
     }
 
@@ -166,18 +169,24 @@ async fn run_list(
         }
         match f.op {
             FilterOp::Eq => {
-                conds.push(format!(
-                    "(:f_{col} IS NULL OR CAST(sub.{col} AS TEXT) = CAST(:f_{col} AS TEXT))"
-                ));
+                if has(&format!("f_{col}")) {
+                    conds.push(format!("CAST(sub.{col} AS TEXT) = CAST(:f_{col} AS TEXT)"));
+                }
             }
             FilterOp::Like => {
-                conds.push(format!(
-                    "(:f_{col} IS NULL OR CAST(sub.{col} AS TEXT) LIKE '%' || CAST(:f_{col} AS TEXT) || '%')"
-                ));
+                if has(&format!("f_{col}")) {
+                    conds.push(format!(
+                        "CAST(sub.{col} AS TEXT) LIKE '%' || CAST(:f_{col} AS TEXT) || '%'"
+                    ));
+                }
             }
             FilterOp::Range => {
-                conds.push(format!("(:f_{col}_from IS NULL OR sub.{col} >= :f_{col}_from)"));
-                conds.push(format!("(:f_{col}_to IS NULL OR sub.{col} <= :f_{col}_to)"));
+                if has(&format!("f_{col}_from")) {
+                    conds.push(format!("sub.{col} >= :f_{col}_from"));
+                }
+                if has(&format!("f_{col}_to")) {
+                    conds.push(format!("sub.{col} <= :f_{col}_to"));
+                }
             }
         }
     }

@@ -121,7 +121,7 @@ async fn sale_decrements_stock_via_event() {
     rt.execute_command("inventory.products.create", &params(json!({
         "name": "Café", "sku": "CAF", "price": 121, "cost": 50, "stock": 10,
         "low_stock_threshold": 5, "product_type": "physical",
-        "ean13": null, "description": "", "tax_rate_id": null, "image": ""
+        "ean13": null, "description": "", "tax_category_key": null, "image": ""
     })), &ctx).await.unwrap();
     let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
