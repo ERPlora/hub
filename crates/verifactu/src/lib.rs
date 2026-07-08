@@ -151,12 +151,14 @@ fn op(command: &str, p: Json) -> Operation {
 
 /// Lee la config VeriFactu del hub (fila singleton; `None` si no se ha guardado nunca).
 ///
-/// **Certificado (ADR-0079):** el PKCS#12 del negocio ya NO vive en `verifactu_config`, sino en el
-/// core (`_hub_certificate`, subido en Ajustes → Negocio). Si existe, se **superpone** sobre la
-/// config (`certificate_pkcs12`/`certificate_password`, precedencia sobre lo del módulo), con
-/// fallback a las columnas legacy de `verifactu_config` para instalaciones antiguas. El acceso ya
-/// está gateado por la capability `certificate` (el dispatcher la exige antes del handler nativo),
-/// así que llegar aquí implica que el usuario la concedió.
+/// **Certificado (ADR-0079/0081):** el PKCS#12 del negocio vive en el core (`_hub_certificate`,
+/// subido en Ajustes → Negocio), NO en `verifactu_config`. Si existe, aquí solo se marca su
+/// presencia (`certificate_source = "core"`) — **los bytes del `.p12` y la contraseña NO se copian
+/// a la config del módulo**; la firma/transmisión usa la capability opaca
+/// `certificate_identity(hub_id)` (el core hace la cripto; ver `build_identity`). Fallback legacy:
+/// las columnas `certificate_pkcs12`/`certificate_password`/`certificate_path` de `verifactu_config`
+/// para instalaciones antiguas. El acceso está gateado por la capability `certificate` (el
+/// dispatcher la exige antes del handler nativo), así que llegar aquí implica que el usuario la concedió.
 async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>> {
     let rows = host
         .read(
@@ -177,13 +179,13 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
         if let Some(c) = cert_rows.into_iter().next() {
             let b64 = c.get("pkcs12_b64").and_then(|v| v.as_str()).unwrap_or("");
             if !b64.is_empty() {
+                // ADR-0079/0081: el `.p12` es del CORE. **No** copiamos los bytes ni la contraseña
+                // a la config del módulo — solo un marcador. La firma/transmisión usa la capability
+                // opaca `certificate_identity(hub_id)` (el core hace toda la cripto PKCS#12; la clave
+                // nunca cruza al módulo). Ver `build_identity`.
                 let obj = config.get_or_insert_with(|| json!({}));
                 if let Some(m) = obj.as_object_mut() {
-                    m.insert("certificate_pkcs12".into(), json!(b64));
-                    m.insert(
-                        "certificate_password".into(),
-                        json!(c.get("password").and_then(|v| v.as_str()).unwrap_or("")),
-                    );
+                    m.insert("certificate_source".into(), json!("core"));
                 }
             }
         }
@@ -218,6 +220,35 @@ fn load_pkcs12(config: &Json) -> Result<Vec<u8>> {
     }
     std::fs::read(&path)
         .map_err(|e| VerifactuError::Certificate(format!("no se pudo leer `{path}`: {e}")).into())
+}
+
+/// Construye la **Identity mTLS** para firmar/transmitir a la AEAT.
+///
+/// - **Certificado del core** (`certificate_source == "core"`, ADR-0079/0081): usa la capability
+///   opaca `host.certificate_identity(hub_id)` — el core lee `_hub_certificate` y hace TODA la
+///   cripto PKCS#12; **los bytes del `.p12` y la contraseña NUNCA entran al módulo**.
+/// - **Fallback legacy** (cert en `verifactu_config`/fichero, deprecado por ADR-0081): el módulo
+///   carga los bytes de SU propia config y el core solo hace el parseo (`certificate_identity_from`).
+async fn build_identity(
+    host: &dyn NativeHost,
+    hub_id: &str,
+    config: &Json,
+) -> Result<reqwest::Identity> {
+    if str_field(config, "certificate_source") == "core" {
+        host.certificate_identity(hub_id).await
+    } else {
+        let der = load_pkcs12(config)?;
+        let password = str_field(config, "certificate_password");
+        host.certificate_identity_from(&der, &password).await
+    }
+}
+
+/// ¿Hay un certificado disponible (del core o legacy) para transmitir? Gate barato que NO carga
+/// los bytes del `.p12` (para el cert del core basta el marcador `certificate_source`).
+fn has_certificate(config: &Json) -> bool {
+    str_field(config, "certificate_source") == "core"
+        || !str_field(config, "certificate_pkcs12").is_empty()
+        || !str_field(config, "certificate_path").is_empty()
 }
 
 // ── create_record (issue verifactu#2) ────────────────────────────────────────
@@ -535,8 +566,7 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
         // el resultado al registro (accepted/rejected + CSV) y, ante fallo de red, lo encola en
         // contingencia con backoff. Sin certificado configurado → se deja `pending` (envío manual
         // posterior). Las intenciones se aplican DESPUÉS del INSERT del registro (orden del Output).
-        if let Ok(der) = load_pkcs12(cfg) {
-            let password = str_field(cfg, "certificate_password");
+        if has_certificate(cfg) {
             let record_json = json!({
                 "id": record_id,
                 "record_type": r.record_type,
@@ -559,7 +589,7 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "recipient_name": r.recipient_name,
             });
             if let Ok((ops, _success)) =
-                transmit_one(host, ctx, &record_json, cfg, &der, &password, &ids[3], &ids[4]).await
+                transmit_one(host, ctx, &record_json, cfg, &ids[3], &ids[4]).await
             {
                 for o in ops {
                     output = output.with_operation(o);
@@ -606,11 +636,16 @@ async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Result<Output> 
     let config = read_config(host, &ctx.hub_id)
         .await?
         .ok_or_else(|| RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into()))?;
-    let password = str_field(&config, "certificate_password");
-    let der = load_pkcs12(&config)?;
+    // Gate: sin certificado (ni core ni legacy) no se puede transmitir.
+    if !has_certificate(&config) {
+        return Err(VerifactuError::Certificate(
+            "certificado PKCS#12 no configurado (sube el .p12 en Ajustes → Negocio)".into(),
+        )
+        .into());
+    }
 
     let (ops, _success) =
-        transmit_one(host, &ctx, &record, &config, &der, &password, &ctx.new_ids[0], &ctx.new_ids[1]).await?;
+        transmit_one(host, &ctx, &record, &config, &ctx.new_ids[0], &ctx.new_ids[1]).await?;
     let mut out = Output::new();
     for o in ops {
         out = out.with_operation(o);
@@ -629,8 +664,6 @@ async fn transmit_one(
     ctx: &Ctx,
     record: &Json,
     config: &Json,
-    der: &[u8],
-    password: &str,
     event_id: &str,
     queue_id: &str,
 ) -> Result<(Vec<Operation>, bool)> {
@@ -656,7 +689,8 @@ async fn transmit_one(
 
     let xml = aeat::build_soap(record, config, prev.as_ref(), &ctx.hub_id);
     let environment = environment_of(config);
-    let identity = host.certificate_identity_from(der, password).await?;
+    // Identity mTLS: cert del core (opaca, bytes en el core) o legacy. Ver `build_identity`.
+    let identity = build_identity(host, &ctx.hub_id, config).await?;
 
     match aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await {
         Ok(body) => {
@@ -795,8 +829,10 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
     let config = read_config(host, &ctx.hub_id)
         .await?
         .ok_or_else(|| RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into()))?;
-    let password = str_field(&config, "certificate_password");
-    let der = load_pkcs12(&config)?;
+    // Gate: sin certificado no hay nada que transmitir; deja la cola como está.
+    if !has_certificate(&config) {
+        return Ok(Output::new());
+    }
 
     let eligible = host
         .read(
@@ -837,7 +873,7 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
         let queue_id = ctx.new_ids[id_idx + 1].clone();
         id_idx += 2;
         let (ops, success) =
-            transmit_one(host, &ctx, &rec, &config, &der, &password, &event_id, &queue_id).await?;
+            transmit_one(host, &ctx, &rec, &config, &event_id, &queue_id).await?;
         for o in ops {
             out = out.with_operation(o);
         }
@@ -934,67 +970,63 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
     let huella = chain::alta_hash(&issuer_nif, &sample_number, &sample_date, &invoice_type, 21.0, 121.0, "", &gen_ts);
     let qr_url = chain::qr_url(&issuer_nif, &sample_number, &sample_date, 121.0, &environment);
 
-    let password = str_field(&config, "certificate_password");
     let mut cert_ok = false;
     let cert_message;
     let mut aeat = Json::Null;
 
-    match load_pkcs12(&config) {
-        Ok(der) => match host.certificate_identity_from(&der, &password).await {
-            Ok(identity) => {
-                cert_ok = true;
-                cert_message = "Certificado PKCS#12 cargado correctamente con la contraseña.".into();
-                if issuer_nif.is_empty() {
-                    // Sin NIF del obligado no se puede enviar (la AEAT lo rechazaría por formato).
-                    aeat = json!({ "ok": false, "error": "Configura el NIF del obligado tributario (emisor) antes de enviar la prueba." });
-                } else {
-                    // Envío de prueba real al endpoint AEAT del entorno configurado.
-                    let sample = json!({
-                        "record_type": "alta",
-                        "issuer_nif": issuer_nif,
-                        "issuer_name": issuer_name,
-                        "invoice_number": sample_number,
-                        "invoice_date": sample_date,
-                        "invoice_type": invoice_type,
-                        "description": "Factura de PRUEBA (diagnóstico VeriFactu)",
-                        "tax_rate": 21,
-                        "base_amount": 10000,
-                        "tax_amount": 2100,
-                        "total_amount": 12100,
-                        "recipient_nif": recipient_nif,
-                        "recipient_name": recipient_name,
-                        "record_hash": huella,
-                        "is_first_record": 1,
-                        "generation_timestamp": gen_ts,
-                    });
-                    let xml = aeat::build_soap(&sample, &config, None, &ctx.hub_id);
-                    match aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await {
-                        Ok(body) => {
-                            let r = aeat::parse_response(&body);
-                            let accepted = r.estado_registro == "Correcto"
-                                || r.estado_registro == "AceptadoConErrores"
-                                || r.estado_envio == "Correcto";
-                            aeat = json!({
-                                "ok": accepted,
-                                "estado_envio": r.estado_envio,
-                                "estado_registro": r.estado_registro,
-                                "csv": r.csv,
-                                "codigo_error": r.codigo_error,
-                                "descripcion_error": r.descripcion_error,
-                            });
-                        }
-                        Err(e) => {
-                            aeat = json!({ "ok": false, "error": e.to_string() });
-                        }
+    // Identity mTLS vía `build_identity`: cert del core (opaca, la cripto vive en el core) o
+    // legacy. Para el cert del core NO se cargan los bytes del `.p12` en el módulo (ADR-0079).
+    match build_identity(host, &ctx.hub_id, &config).await {
+        Ok(identity) => {
+            cert_ok = true;
+            cert_message = "Certificado cargado correctamente.".into();
+            if issuer_nif.is_empty() {
+                // Sin NIF del obligado no se puede enviar (la AEAT lo rechazaría por formato).
+                aeat = json!({ "ok": false, "error": "Configura el NIF del obligado tributario (emisor) antes de enviar la prueba." });
+            } else {
+                // Envío de prueba real al endpoint AEAT del entorno configurado.
+                let sample = json!({
+                    "record_type": "alta",
+                    "issuer_nif": issuer_nif,
+                    "issuer_name": issuer_name,
+                    "invoice_number": sample_number,
+                    "invoice_date": sample_date,
+                    "invoice_type": invoice_type,
+                    "description": "Factura de PRUEBA (diagnóstico VeriFactu)",
+                    "tax_rate": 21,
+                    "base_amount": 10000,
+                    "tax_amount": 2100,
+                    "total_amount": 12100,
+                    "recipient_nif": recipient_nif,
+                    "recipient_name": recipient_name,
+                    "record_hash": huella,
+                    "is_first_record": 1,
+                    "generation_timestamp": gen_ts,
+                });
+                let xml = aeat::build_soap(&sample, &config, None, &ctx.hub_id);
+                match aeat::post_soap(aeat::endpoint(&environment), identity, &xml).await {
+                    Ok(body) => {
+                        let r = aeat::parse_response(&body);
+                        let accepted = r.estado_registro == "Correcto"
+                            || r.estado_registro == "AceptadoConErrores"
+                            || r.estado_envio == "Correcto";
+                        aeat = json!({
+                            "ok": accepted,
+                            "estado_envio": r.estado_envio,
+                            "estado_registro": r.estado_registro,
+                            "csv": r.csv,
+                            "codigo_error": r.codigo_error,
+                            "descripcion_error": r.descripcion_error,
+                        });
+                    }
+                    Err(e) => {
+                        aeat = json!({ "ok": false, "error": e.to_string() });
                     }
                 }
             }
-            Err(e) => {
-                cert_message = format!("El certificado no carga (¿contraseña incorrecta?): {e}");
-            }
-        },
+        }
         Err(e) => {
-            cert_message = e.to_string();
+            cert_message = format!("El certificado no carga o no está configurado: {e}");
         }
     }
 
@@ -1096,13 +1128,13 @@ async fn next_sequence(host: &dyn NativeHost, hub_id: &str, issuer_nif: &str) ->
 /// periodo actual y los parsea. Red real — sin cert/red devuelve error (no silencioso).
 async fn run_consult(
     host: &dyn NativeHost,
+    hub_id: &str,
     config: &Json,
     issuer_nif: &str,
     now: &str,
 ) -> Result<Vec<aeat::ConsultRecord>> {
-    let password = str_field(config, "certificate_password");
-    let der = load_pkcs12(config)?;
-    let identity = host.certificate_identity_from(&der, &password).await?;
+    // Identity mTLS vía `build_identity`: cert del core (opaca) o legacy. Ver ADR-0079.
+    let identity = build_identity(host, hub_id, config).await?;
     let issuer_name = str_field(config, "software_name");
     let (ejercicio, periodo) = year_month(now);
     let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo);
@@ -1258,7 +1290,7 @@ async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> Result<Outpu
     if issuer_nif.is_empty() {
         return Err(VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into());
     }
-    let records = run_consult(host, &config, &issuer_nif, &ctx.now).await?;
+    let records = run_consult(host, &ctx.hub_id, &config, &issuer_nif, &ctx.now).await?;
     let (ops, limit) = aeat_snapshot_ops(&ctx, &issuer_nif, &records);
     let mut out = Output::new();
     for o in ops {
@@ -1293,7 +1325,7 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
     if issuer_nif.is_empty() {
         return Err(VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into());
     }
-    let records = run_consult(host, &config, &issuer_nif, &ctx.now).await?;
+    let records = run_consult(host, &ctx.hub_id, &config, &issuer_nif, &ctx.now).await?;
     if records.is_empty() {
         return Err(RuntimeError::Native(
             "la AEAT no devolvió registros para este emisor/periodo; nada que recuperar".into(),
@@ -1455,5 +1487,49 @@ mod tests {
         assert_eq!(derive_tax_rate(tb, -10000.0, -2100.0), 21.0);
         // Sin desglose, efectivo de negativos: (-210)/(-1000) → 21%.
         assert_eq!(derive_tax_rate("{}", -1000.0, -210.0), 21.0);
+    }
+}
+
+#[cfg(test)]
+mod cert_source_tests {
+    use super::*;
+
+    /// Host que simula un hub con certificado del negocio en el core (`_hub_certificate`).
+    struct CoreCertHost;
+    #[async_trait::async_trait]
+    impl NativeHost for CoreCertHost {
+        async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            if sql.contains("_hub_certificate") {
+                Ok(vec![json!({ "pkcs12_b64": "QUJD", "password": "secret" })])
+            } else if sql.contains("verifactu_config") {
+                Ok(vec![json!({ "hub_id": "h1", "environment": "testing" })])
+            } else {
+                Ok(vec![])
+            }
+        }
+    }
+
+    /// ADR-0079/0081: el `.p12` del negocio es del CORE. `read_config` debe **marcar** su presencia
+    /// (`certificate_source = "core"`) pero NUNCA copiar los bytes del `.p12` ni la contraseña a la
+    /// config del módulo — se quedan en el core; la firma usa la capability opaca
+    /// `certificate_identity(hub_id)` (ver `build_identity`), no `certificate_identity_from`.
+    /// (Antes del fix, `read_config` inyectaba `certificate_pkcs12`/`certificate_password`: este test
+    /// habría fallado — es la prueba de que los bytes ya no entran al módulo.)
+    #[tokio::test]
+    async fn read_config_marks_core_cert_without_leaking_bytes() {
+        let cfg = read_config(&CoreCertHost, "h1").await.unwrap().unwrap();
+        assert_eq!(
+            cfg.get("certificate_source").and_then(|v| v.as_str()),
+            Some("core"),
+            "debe marcar que el cert es del core"
+        );
+        assert!(
+            cfg.get("certificate_pkcs12").is_none(),
+            "los bytes del .p12 NO deben entrar en la config del módulo (ADR-0079)"
+        );
+        assert!(
+            cfg.get("certificate_password").is_none(),
+            "la contraseña del cert NO debe entrar en la config del módulo (ADR-0079)"
+        );
     }
 }
