@@ -719,11 +719,26 @@ async fn request_install(
             }))
             .into_response()
         }
-        Err(e) => (
-            StatusCode::BAD_GATEWAY,
-            Json(json!({ "ok": false, "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => {
+            // Observabilidad (antes: 502 ciego sin log → invisible en Dokploy). Logueamos el error
+            // real y mapeamos a un código honesto: un fallo instalando en el runtime (deps sin
+            // satisfacer tras la resolución anidada = ciclo, migración, schema) NO es un 502 de
+            // gateway. Así el operador distingue "fallo del Cloud/red" de "fallo instalando el módulo".
+            tracing::error!(
+                module_id = %req.module_id,
+                requested_version = %req.version,
+                error = %e,
+                "request-install falló"
+            );
+            let code = match &e {
+                install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
+                install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
+                install::InstallError::Cloud(_)
+                | install::InstallError::Source(_)
+                | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
+            };
+            (code, Json(json!({ "ok": false, "error": e.to_string() }))).into_response()
+        }
     }
 }
 

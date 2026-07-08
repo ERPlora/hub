@@ -104,6 +104,21 @@ impl Runtime {
         installer::install(self.db.as_ref(), &mut self.registry, &self.hub_id, dir).await
     }
 
+    /// Dependencias declaradas en el `module.json` de `dir` que aún NO están instaladas en este
+    /// runtime (en el orden del manifest). Base de la **instalación anidada**: el flujo de
+    /// instalación desde el Cloud (`server::install::install_from_cloud`) descarga e instala estas
+    /// deps ANTES del módulo que las declara, replicando para el camino "descarga marketplace" el
+    /// topo-orden que `install_all_from_dir` ya hace para los módulos horneados (hub#16). No
+    /// modifica estado; solo lee el manifest y consulta el registro.
+    pub fn missing_dependencies(&self, dir: &Path) -> Result<Vec<String>> {
+        let manifest = crate::manifest::Manifest::load(dir)?;
+        Ok(manifest
+            .depends_on
+            .into_iter()
+            .filter(|dep| !self.registry.is_installed(dep))
+            .collect())
+    }
+
     /// Instala todos los módulos de las subcarpetas de `root` (las que tienen `module.json`),
     /// **resolviendo el orden de `depends_on` por topo-sort** (hub#16): una dependencia se instala
     /// antes que quien la declara, sin depender del orden del sistema de ficheros. Devuelve los ids
