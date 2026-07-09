@@ -12,9 +12,9 @@
       <template v-if="tab === 'resources'">
         <!-- ── Bloque Recursos del sistema — SIEMPRE visible; la FUENTE cambia con el despliegue ──
              "Lo local se ve en local y lo de la nube en la nube" (ARQUITECTURA.md §1): en cloud
-             CPU/Memoria/Conexiones vienen de AWS (ECS Task Metadata + Aurora); en local, del propio
+             CPU/Memoria/Conexiones vienen del proveedor (cgroups/metadata del contenedor + Postgres); en local, del propio
              equipo (sysinfo + SQLite). El tamaño de BD solo existe en local (SQLite) → N/A en cloud.
-             La pill indica la fuente (AWS / Local). CPU/Memoria/Conexiones = ok-gauge; BD = stat. -->
+             La pill indica la fuente (Nube / Local). CPU/Memoria/Conexiones = ok-gauge; BD = stat. -->
         <div class="block-header">
           <h3 class="block-header__title">{{ resourcesTitle }}</h3>
           <ok-status-pill v-if="resourcesSource" tone="info">{{ resourcesSource }}</ok-status-pill>
@@ -354,7 +354,7 @@ const resourcesTitle = computed<string>(() =>
       : t('system.resourcesSystem')
 );
 const resourcesSource = computed<string | null>(() =>
-  info.value?.backend === 'cloud' ? 'AWS' : info.value?.backend === 'single' ? t('system.sourceLocal') : null
+  info.value?.backend === 'cloud' ? t('system.sourceCloud') : info.value?.backend === 'single' ? t('system.sourceLocal') : null
 );
 const showBridgeBlock = computed<boolean>(() => bridge.value.online || info.value?.backend !== 'cloud');
 
