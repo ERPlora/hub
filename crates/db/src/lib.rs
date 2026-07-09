@@ -975,6 +975,31 @@ pub(crate) fn translate(sql: &str, dialect: Dialect) -> (String, Vec<String>) {
             continue;
         }
 
+        // Comentarios `-- …` (línea) y `/* … */` (bloque), fuera de string: se emiten VERBATIM y
+        // sus `:name` NO se tratan como parámetros. Antes se traducían a `$N`, creando placeholders
+        // FANTASMA — bindeados pero ausentes del SQL que parsea el motor (que ignora los comentarios)
+        // → Postgres aborta con `could not determine data type of parameter $N`, rompiendo la lista
+        // de TODO módulo cuyo SELECT documenta binds en un comentario (verifactu, taxes, staff, …).
+        // Se copia por slice (no byte-a-byte) para preservar el UTF-8 del comentario.
+        if c == '-' && bytes.get(i + 1) == Some(&b'-') {
+            let start = i;
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            out.push_str(&sql[start..i]);
+            continue;
+        }
+        if c == '/' && bytes.get(i + 1) == Some(&b'*') {
+            let start = i;
+            i += 2;
+            while i < bytes.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len()); // consume el `*/` de cierre
+            out.push_str(&sql[start..i]);
+            continue;
+        }
+
         if c == ':' {
             // `::` is the Postgres cast operator, not a parameter.
             if i + 1 < bytes.len() && bytes[i + 1] == b':' {
@@ -1072,6 +1097,24 @@ mod tests {
         let (sql, names) = translate("SELECT * FROM t WHERE a = :a AND b = :b", Dialect::Postgres);
         assert_eq!(sql, "SELECT * FROM t WHERE a = $1 AND b = $2");
         assert_eq!(names, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn pg_translate_ignores_params_inside_comments() {
+        // Un `:name` dentro de un comentario NO es un parámetro. Regresión: se traducía a `$N`,
+        // creando placeholders fantasma (bindeados pero ausentes del SQL parseado, que ignora los
+        // comentarios) → Postgres `could not determine data type of parameter $N`, rompiendo la
+        // lista de módulos (verifactu, taxes, staff…) cuyo SELECT documenta binds en comentarios.
+        let (sql, names) = translate(
+            "-- binds opcionales: :status y :record_type\nSELECT * FROM t WHERE hub_id = :hub_id /* :ghost */ AND is_deleted = 0",
+            Dialect::Postgres,
+        );
+        assert_eq!(names, vec!["hub_id"], "solo el bind real, no los de los comentarios");
+        assert!(
+            sql.contains(":status") && sql.contains(":record_type") && sql.contains(":ghost"),
+            "los comentarios se preservan verbatim: {sql}"
+        );
+        assert!(sql.contains("hub_id = $1"), "el bind real sí se traduce: {sql}");
     }
 
     #[test]
