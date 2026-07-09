@@ -222,6 +222,21 @@ impl Runtime {
         Ok(out)
     }
 
+    /// Módulos que `hub_module` dice **instalados** para este hub pero que **NO** quedaron
+    /// registrados tras [`rehydrate_installed`] — típicamente porque su carpeta de caché no existía
+    /// (contrato **stateless** de Hub Cloud: `module_cache` efímero en `/tmp`, se vacía en cada
+    /// redeploy/reschedule). Devuelve `(id, version)` para que el host los **re-descargue** del
+    /// marketplace (`server::install::install_from_cloud`) y el hub se auto-cure tras un reinicio
+    /// sin depender de un volumen persistente. No modifica estado.
+    pub async fn installed_but_unregistered(&self) -> Result<Vec<(String, String)>> {
+        let persisted = installer::installed_status_versioned(self.db.as_ref(), &self.hub_id).await?;
+        Ok(persisted
+            .into_iter()
+            .filter(|(id, _version, _status)| !self.registry.is_installed(id))
+            .map(|(id, version, _status)| (id, version))
+            .collect())
+    }
+
     /// Activa un módulo instalado (sus capacidades vuelven a estar disponibles).
     pub async fn activate(&mut self, module_id: &str) -> Result<()> {
         installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id, ModuleStatus::Active).await
