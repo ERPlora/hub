@@ -138,7 +138,16 @@ fn acquire(
     Ok(dir)
 }
 
-/// Pipeline completo de instalación. Devuelve la versión y carpeta instaladas.
+/// Pipeline completo de instalación **con resolución de dependencias anidadas** (nested install).
+/// Descarga el módulo pedido y, ANTES de instalarlo, descarga+instala recursivamente cada
+/// dependencia declarada en su manifest que aún no esté instalada (topo-orden por profundidad).
+/// Devuelve la `Installed` del módulo pedido (el "headline"); las deps quedan instaladas como
+/// efecto lateral, igual que al instalar un lote horneado con `install_all_from_dir`.
+///
+/// El grafo de deps se lee del **manifest del ZIP publicado** (la fuente autoritativa que valida
+/// el runtime al registrar), no del catálogo del Cloud: ADR-0060 (`resolve_install_plan`) sigue
+/// sin cablear y el M2M `Module.dependencies` del Cloud está vacío en prod, así que un plan
+/// Cloud-side no ordenaría nada. El entitlement se sigue aplicando por módulo en cada `download/`.
 ///
 /// `runtime` se bloquea por el llamador (server) y se pasa por `&mut`; el resto del I/O
 /// (red, FS) es async/blocking sin tocar el lock más de lo necesario.
@@ -151,46 +160,103 @@ pub async fn install_from_cloud(
     module_id: &str,
     requested_version: &str,
 ) -> Result<Installed, InstallError> {
-    let cloud = CloudClient::new(cloud_base_url);
+    let mut installing: std::collections::HashSet<String> = std::collections::HashSet::new();
+    install_recursive(
+        http,
+        cloud_base_url,
+        cache_root,
+        auth,
+        runtime,
+        module_id.to_string(),
+        requested_version.to_string(),
+        &mut installing,
+    )
+    .await
+}
 
-    // (1) Resolver versión contra el Cloud. SHA256 obligatorio (ADR-0015): sin hash esperado
-    //     no hay verificación de integridad posible → abortar ANTES de descargar nada.
-    let version = resolve_version(http, &cloud, auth, module_id, requested_version).await?;
-    let sha = version
-        .sha256
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| InstallError::MissingSha256 {
-            module_id: module_id.to_string(),
-            version: version.version.clone(),
-        })?
-        .to_string();
+/// Instala `module_id`@`requested_version` resolviendo sus deps primero (recursivo). `installing`
+/// guarda la cadena en curso para cortar ciclos (`a→b→a`): una dep ya presente en la pila no se
+/// re-expande — el runtime la rechazará luego con `MissingDependency` si el ciclo es real, que es
+/// lo correcto (un ciclo es un error de autoría del módulo, no algo a resolver aquí).
+#[allow(clippy::too_many_arguments)]
+fn install_recursive<'a>(
+    http: &'a reqwest::Client,
+    cloud_base_url: &'a str,
+    cache_root: &'a std::path::Path,
+    auth: &'a Auth,
+    runtime: &'a mut erplora_runtime::Runtime,
+    module_id: String,
+    requested_version: String,
+    installing: &'a mut std::collections::HashSet<String>,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Installed, InstallError>> + Send + 'a>>
+{
+    Box::pin(async move {
+        let cloud = CloudClient::new(cloud_base_url);
 
-    // (2) Descargar el ZIP binario.
-    let dl_req = cloud.download(auth, module_id, &version.version);
-    let zip_bytes = send_bytes(http, &dl_req).await?;
+        // (1) Resolver versión contra el Cloud. SHA256 obligatorio (ADR-0015): sin hash esperado
+        //     no hay verificación de integridad posible → abortar ANTES de descargar nada.
+        let version = resolve_version(http, &cloud, auth, &module_id, &requested_version).await?;
+        let sha = version
+            .sha256
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| InstallError::MissingSha256 {
+                module_id: module_id.clone(),
+                version: version.version.clone(),
+            })?
+            .to_string();
 
-    // (3) Verificar SHA256 (obligatorio) + descomprimir de forma segura + cachear.
-    let store = ModuleStore::new(cache_root);
-    let dir = acquire(&store, module_id, &version, &sha, zip_bytes)?;
+        // (2) Descargar el ZIP binario.
+        let dl_req = cloud.download(auth, &module_id, &version.version);
+        let zip_bytes = send_bytes(http, &dl_req).await?;
 
-    // (4) Instalar en el runtime (migra, registra, activa).
-    let installed_id = runtime
-        .install_from_dir(&dir)
-        .await
-        .map_err(|e| InstallError::Runtime(e.to_string()))?;
+        // (3) Verificar SHA256 (obligatorio) + descomprimir de forma segura + cachear.
+        let store = ModuleStore::new(cache_root);
+        let dir = acquire(&store, &module_id, &version, &sha, zip_bytes)?;
 
-    // (5) Registrar la instalación en el Cloud (best-effort: no aborta si falla).
-    let mark = cloud.mark_installed(auth, module_id);
-    let mark_body = serde_json::json!({ "version": version.version });
-    let mut r = http.request(method(&mark), &mark.url).json(&mark_body);
-    for (k, v) in &mark.headers {
-        r = r.header(*k, v);
-    }
-    if let Err(e) = r.send().await {
-        tracing::warn!(module_id, error = %e, "mark_installed/ falló (no crítico)");
-    }
+        // (4) INSTALACIÓN ANIDADA: instala las dependencias declaradas que falten ANTES del módulo.
+        //     El runtime exige que las deps estén registradas al instalar (installer.rs::install);
+        //     aquí se satisface ese contrato descargándolas del Cloud en orden de profundidad.
+        let missing = runtime
+            .missing_dependencies(&dir)
+            .map_err(|e| InstallError::Runtime(e.to_string()))?;
+        installing.insert(module_id.clone());
+        for dep in missing {
+            // Ya en la cadena en curso (ciclo) o ya instalada por otra rama (dep en diamante): saltar.
+            if installing.contains(&dep) || runtime.registry().is_installed(&dep) {
+                continue;
+            }
+            install_recursive(
+                http,
+                cloud_base_url,
+                cache_root,
+                auth,
+                &mut *runtime,
+                dep,
+                "latest".to_string(),
+                &mut *installing,
+            )
+            .await?;
+        }
 
-    Ok(Installed { module_id: installed_id, version: version.version, dir })
+        // (5) Instalar el módulo (migra, registra, activa) — ya con sus deps presentes.
+        let installed_id = runtime
+            .install_from_dir(&dir)
+            .await
+            .map_err(|e| InstallError::Runtime(e.to_string()))?;
+
+        // (6) Registrar la instalación en el Cloud (best-effort: no aborta si falla).
+        let mark = cloud.mark_installed(auth, &module_id);
+        let mark_body = serde_json::json!({ "version": version.version });
+        let mut r = http.request(method(&mark), &mark.url).json(&mark_body);
+        for (k, v) in &mark.headers {
+            r = r.header(*k, v);
+        }
+        if let Err(e) = r.send().await {
+            tracing::warn!(module_id = %module_id, error = %e, "mark_installed/ falló (no crítico)");
+        }
+
+        Ok(Installed { module_id: installed_id, version: version.version, dir })
+    })
 }

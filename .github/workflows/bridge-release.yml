@@ -9,9 +9,9 @@
 #   push main/develop ─► build (Windows + Linux) ─► S3 bridge/latest/
 #   push tag v*        ─► build (Windows + Linux) ─► S3 bridge/v{version}/ + latest/
 #
-# Object Storage layout (Hetzner, bucket `erplora-downloads`, mismo prefijo que el Android
+# Object Storage layout (Hetzner, bucket `erplora-saas` (prefijo `downloads/`), mismo prefijo que el Android
 #   y que espera el Cloud `apps/public/bridge/views.py`):
-#   s3://erplora-downloads/bridge/
+#   s3://erplora-saas/downloads/bridge/
 #   ├── latest/
 #   │   ├── erplora-bridge.exe      (Windows x64)
 #   │   └── erplora-bridge-linux    (Linux x86_64, binario estático-ish)
@@ -109,7 +109,7 @@ jobs:
 
           for f in erplora-bridge.exe erplora-bridge-linux; do
             if [ -f "artifacts/$f" ]; then
-              aws s3 cp "artifacts/$f" "s3://erplora-downloads/bridge/${VERSION}/$f" \
+              aws s3 cp "artifacts/$f" "s3://erplora-saas/downloads/bridge/${VERSION}/$f" \
                 --endpoint-url "$S3_ENDPOINT"
             fi
           done
@@ -117,16 +117,16 @@ jobs:
           # En tag push, además refresca latest/.
           if [[ "$VERSION" != "latest" ]]; then
             for f in erplora-bridge.exe erplora-bridge-linux; do
-              aws s3 cp "s3://erplora-downloads/bridge/${VERSION}/$f" \
-                "s3://erplora-downloads/bridge/latest/$f" \
+              aws s3 cp "s3://erplora-saas/downloads/bridge/${VERSION}/$f" \
+                "s3://erplora-saas/downloads/bridge/latest/$f" \
                 --endpoint-url "$S3_ENDPOINT" 2>/dev/null || true
             done
           fi
 
-          echo "Subido a s3://erplora-downloads/bridge/${VERSION}/ (Hetzner Object Storage)"
+          echo "Subido a s3://erplora-saas/downloads/bridge/${VERSION}/ (Hetzner Object Storage)"
 
 # ==============================================================================
-# Almacenamiento: Hetzner Object Storage (bucket `erplora-downloads`), S3-compatible vía
+# Almacenamiento: Hetzner Object Storage (bucket `erplora-saas` (prefijo `downloads/`)), S3-compatible vía
 # `aws s3 --endpoint-url $HETZNER_S3_ENDPOINT`. Credenciales en secrets del repo ERPlora/hub:
 # HETZNER_S3_ACCESS_KEY · HETZNER_S3_SECRET_KEY · HETZNER_S3_ENDPOINT.
 # `develop` compila pero NO publica (gate `if` arriba); coherente con "develop never deploys".

@@ -104,6 +104,21 @@ impl Runtime {
         installer::install(self.db.as_ref(), &mut self.registry, &self.hub_id, dir).await
     }
 
+    /// Dependencias declaradas en el `module.json` de `dir` que aún NO están instaladas en este
+    /// runtime (en el orden del manifest). Base de la **instalación anidada**: el flujo de
+    /// instalación desde el Cloud (`server::install::install_from_cloud`) descarga e instala estas
+    /// deps ANTES del módulo que las declara, replicando para el camino "descarga marketplace" el
+    /// topo-orden que `install_all_from_dir` ya hace para los módulos horneados (hub#16). No
+    /// modifica estado; solo lee el manifest y consulta el registro.
+    pub fn missing_dependencies(&self, dir: &Path) -> Result<Vec<String>> {
+        let manifest = crate::manifest::Manifest::load(dir)?;
+        Ok(manifest
+            .depends_on
+            .into_iter()
+            .filter(|dep| !self.registry.is_installed(dep))
+            .collect())
+    }
+
     /// Instala todos los módulos de las subcarpetas de `root` (las que tienen `module.json`),
     /// **resolviendo el orden de `depends_on` por topo-sort** (hub#16): una dependencia se instala
     /// antes que quien la declara, sin depender del orden del sistema de ficheros. Devuelve los ids
@@ -205,6 +220,21 @@ impl Runtime {
             }
         }
         Ok(out)
+    }
+
+    /// Módulos que `hub_module` dice **instalados** para este hub pero que **NO** quedaron
+    /// registrados tras [`rehydrate_installed`] — típicamente porque su carpeta de caché no existía
+    /// (contrato **stateless** de Hub Cloud: `module_cache` efímero en `/tmp`, se vacía en cada
+    /// redeploy/reschedule). Devuelve `(id, version)` para que el host los **re-descargue** del
+    /// marketplace (`server::install::install_from_cloud`) y el hub se auto-cure tras un reinicio
+    /// sin depender de un volumen persistente. No modifica estado.
+    pub async fn installed_but_unregistered(&self) -> Result<Vec<(String, String)>> {
+        let persisted = installer::installed_status_versioned(self.db.as_ref(), &self.hub_id).await?;
+        Ok(persisted
+            .into_iter()
+            .filter(|(id, _version, _status)| !self.registry.is_installed(id))
+            .map(|(id, version, _status)| (id, version))
+            .collect())
     }
 
     /// Activa un módulo instalado (sus capacidades vuelven a estar disponibles).

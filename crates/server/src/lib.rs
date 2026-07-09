@@ -264,6 +264,37 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         }
     }
 
+    // Auto-curación del contrato STATELESS (Hub Cloud): el `module_cache` es efímero (`/tmp`) y se
+    // vacía en cada redeploy/reschedule, así que `rehydrate_installed` no encuentra las carpetas y
+    // los módulos que `hub_module` marca instalados quedan SIN registrar → "desaparecen" del runtime.
+    // El diseño stateless (reschedulable, sin volumen) implica **re-descargarlos del marketplace**:
+    // el hub se auto-cura re-bajando esos módulos con su token de máquina. Best-effort — un módulo
+    // que no se pueda re-bajar (red/entitlement) se omite con log, no aborta el arranque.
+    // `install_from_cloud` resuelve `depends_on` en orden (nested install).
+    {
+        let missing = state.runtime.lock().await.installed_but_unregistered().await.unwrap_or_default();
+        if !missing.is_empty() {
+            match auth::machine_auth(&state) {
+                Some(machine) => {
+                    let cache_root = state.config.module_cache.clone();
+                    let cloud = state.config.cloud_base_url.clone();
+                    eprintln!("cache vacío: re-descargando {} módulo(s) instalados del marketplace…", missing.len());
+                    for (id, version) in missing {
+                        let mut rt = state.runtime.lock().await;
+                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version).await {
+                            Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{version}"),
+                            Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
+                        }
+                    }
+                }
+                None => eprintln!(
+                    "⚠ {} módulo(s) instalados sin caché y hub sin enrolar (sin token de máquina): no se re-descargan",
+                    missing.len()
+                ),
+            }
+        }
+    }
+
     // Seed de configuración inicial (hub#36): SQL idempotente que se aplica UNA vez al arrancar,
     // tras las tablas de sistema. Mecanismo genérico (NO "modo demo"): el host lo pasa por env —
     // `HUB_SEED_SQL` (SQL inline, p. ej. el del despliegue demo) o `HUB_SEED_SQL_PATH` (fichero).
@@ -487,6 +518,12 @@ pub fn app(state: AppState) -> Router {
         .route("/api/modules", get(list_modules))
         .route("/api/modules/install", post(install_module))
         .route("/api/modules/request-install", post(request_install))
+        // Assets web de un módulo instalado (module.json + `dist/*.esm.js` + wasm/icons) servidos
+        // desde la CACHÉ de descargas, resueltos por la VERSIÓN instalada. En Hub Cloud los módulos
+        // se descargan en runtime al `module_cache` (NO se hornean en el `web_dir`), así que sin esta
+        // ruta `/modules/**` caía al fallback SPA (`index.html`) y NINGÚN Web Component cargaba: toda
+        // la UI de módulos quedaba muerta ("No se pudo cargar el módulo").
+        .route("/modules/:id/*path", get(serve_module_asset))
         // Proxies hub-scoped al Cloud (el token de máquina se queda en el runtime, no en el navegador)
         .route("/api/entitlement", get(proxy_entitlement))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
@@ -719,11 +756,72 @@ async fn request_install(
             }))
             .into_response()
         }
-        Err(e) => (
-            StatusCode::BAD_GATEWAY,
-            Json(json!({ "ok": false, "error": e.to_string() })),
-        )
-            .into_response(),
+        Err(e) => {
+            // Observabilidad (antes: 502 ciego sin log → invisible en Dokploy). Logueamos el error
+            // real y mapeamos a un código honesto: un fallo instalando en el runtime (deps sin
+            // satisfacer tras la resolución anidada = ciclo, migración, schema) NO es un 502 de
+            // gateway. Así el operador distingue "fallo del Cloud/red" de "fallo instalando el módulo".
+            tracing::error!(
+                module_id = %req.module_id,
+                requested_version = %req.version,
+                error = %e,
+                "request-install falló"
+            );
+            let code = match &e {
+                install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
+                install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
+                install::InstallError::Cloud(_)
+                | install::InstallError::Source(_)
+                | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
+            };
+            (code, Json(json!({ "ok": false, "error": e.to_string() }))).into_response()
+        }
+    }
+}
+
+/// GET /modules/:id/*path — sirve los assets web (`module.json`, `dist/*.esm.js`, wasm, icons) de un
+/// módulo instalado desde la CACHÉ de descargas, resueltos por la VERSIÓN instalada
+/// (`module_cache/<id>/<version>/<path>`). La versión sale del registro (el módulo debe estar
+/// instalado). Guard anti path-traversal. Un asset ausente o un módulo no instalado → **404** (lo
+/// maneja el cargador del Web Component); al ser ruta explícita NO cae al fallback SPA, así que nunca
+/// se sirve `index.html` haciéndose pasar por JS/JSON (que es exactamente lo que rompía la UI).
+async fn serve_module_asset(
+    State(st): State<AppState>,
+    Path((id, rel)): Path<(String, String)>,
+) -> Response {
+    // Anti path-traversal: ningún segmento `..` (incluido tras decodificar %2e%2e) ni vacío.
+    if rel.split('/').any(|seg| seg == ".." || seg.is_empty()) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    // Versión instalada del módulo (del registro). Módulo no instalado → 404.
+    let version = {
+        let rt = st.runtime.lock().await;
+        rt.modules().into_iter().find(|m| m.id == id).map(|m| m.version)
+    };
+    let Some(version) = version else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let full = st.config.module_cache.join(&id).join(&version).join(&rel);
+    match tokio::fs::read(&full).await {
+        Ok(bytes) => ([(header::CONTENT_TYPE, module_asset_content_type(&rel))], bytes).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// Content-Type de un asset de módulo por extensión (los que sirve [`serve_module_asset`]).
+fn module_asset_content_type(rel: &str) -> &'static str {
+    if rel.ends_with(".js") || rel.ends_with(".mjs") {
+        "text/javascript"
+    } else if rel.ends_with(".json") || rel.ends_with(".map") {
+        "application/json"
+    } else if rel.ends_with(".wasm") {
+        "application/wasm"
+    } else if rel.ends_with(".css") {
+        "text/css"
+    } else if rel.ends_with(".svg") {
+        "image/svg+xml"
+    } else {
+        "application/octet-stream"
     }
 }
 
