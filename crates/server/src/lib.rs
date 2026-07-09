@@ -264,6 +264,37 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         }
     }
 
+    // Auto-curación del contrato STATELESS (Hub Cloud): el `module_cache` es efímero (`/tmp`) y se
+    // vacía en cada redeploy/reschedule, así que `rehydrate_installed` no encuentra las carpetas y
+    // los módulos que `hub_module` marca instalados quedan SIN registrar → "desaparecen" del runtime.
+    // El diseño stateless (reschedulable, sin volumen) implica **re-descargarlos del marketplace**:
+    // el hub se auto-cura re-bajando esos módulos con su token de máquina. Best-effort — un módulo
+    // que no se pueda re-bajar (red/entitlement) se omite con log, no aborta el arranque.
+    // `install_from_cloud` resuelve `depends_on` en orden (nested install).
+    {
+        let missing = state.runtime.lock().await.installed_but_unregistered().await.unwrap_or_default();
+        if !missing.is_empty() {
+            match auth::machine_auth(&state) {
+                Some(machine) => {
+                    let cache_root = state.config.module_cache.clone();
+                    let cloud = state.config.cloud_base_url.clone();
+                    eprintln!("cache vacío: re-descargando {} módulo(s) instalados del marketplace…", missing.len());
+                    for (id, version) in missing {
+                        let mut rt = state.runtime.lock().await;
+                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version).await {
+                            Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{version}"),
+                            Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
+                        }
+                    }
+                }
+                None => eprintln!(
+                    "⚠ {} módulo(s) instalados sin caché y hub sin enrolar (sin token de máquina): no se re-descargan",
+                    missing.len()
+                ),
+            }
+        }
+    }
+
     // Seed de configuración inicial (hub#36): SQL idempotente que se aplica UNA vez al arrancar,
     // tras las tablas de sistema. Mecanismo genérico (NO "modo demo"): el host lo pasa por env —
     // `HUB_SEED_SQL` (SQL inline, p. ej. el del despliegue demo) o `HUB_SEED_SQL_PATH` (fichero).
