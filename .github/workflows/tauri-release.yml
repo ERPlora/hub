@@ -272,6 +272,10 @@ jobs:
       needs.build.result == 'success' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
+    # Un `aws s3 cp` colgado (red/endpoint) no debe quedarse horas ocupando el run: mejor fallar
+    # rápido y re-lanzar solo este job (`gh run rerun --failed`, los artifacts persisten). Visto
+    # 2026-07-09: el upload del run de #82 se quedó colgado 15 min hasta que el run se canceló.
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
