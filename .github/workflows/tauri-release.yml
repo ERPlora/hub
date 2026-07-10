@@ -5,9 +5,9 @@
 # La app de escritorio/móvil del Hub (`apps/tauri`, front Vue `@erplora/web` empaquetado con
 # Tauri v2). Espejo de `bridge-release.yml`: build por plataforma → S3 con el rol OIDC.
 #
-# Pipeline:
-#   push main      ─► build (Windows + Linux) ─► S3 app/latest/
-#   push tag v*    ─► build (Windows + Linux) ─► S3 app/v{version}/ + latest/
+# Pipeline (build pesado: Windows ×2 de facturación → NO en cada push a main, ADR-CI 2026-07-10):
+#   push tag v*        ─► build (Windows + Linux) ─► S3 app/v{version}/ + latest/
+#   workflow_dispatch  ─► build (Windows + Linux) ─► S3 app/latest/   (refresco manual de `latest/`)
 #
 # S3 layout (mismo bucket que el bridge; lo consume el Cloud para la descarga):
 #   s3://erplora-saas/downloads/app/
@@ -36,18 +36,17 @@
 name: Build Hub App (Tauri)
 
 on:
+  # Compilar la app es caro (Windows factura ×2). Antes corría en cada push a `main` que tocara
+  # apps/tauri, apps/web o crates → ~123 min/run, 13 runs/10d ≈ 1.595 min. Pre-lanzamiento nadie
+  # descarga `latest/` a diario, así que solo se construye al etiquetar una release o a mano.
   push:
-    branches: [main]
     tags: ['v*']
-    # La app es pesada de compilar: solo se rebuildeará cuando cambie su código o el del front.
-    paths:
-      - 'apps/tauri/**'
-      - 'apps/web/**'
-      - 'crates/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.github/workflows/tauri-release.yml'
   workflow_dispatch:
+
+# Un push/tag nuevo cancela el build en curso del mismo ref: no apilar builds completos.
+concurrency:
+  group: tauri-release-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -267,10 +266,11 @@ jobs:
     # Espera a desktop + Android, pero NO bloquea si Android se salta (sin keystore) o falla:
     # `always()` + exigir solo que el desktop (`build`) haya ido bien.
     needs: [build, build-android]
+    # tag v* → sube a v{version}/ + latest/ ; dispatch manual → refresca latest/.
     if: |
       always() &&
       needs.build.result == 'success' &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+      (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     # Un `aws s3 cp` colgado (red/endpoint) no debe quedarse horas ocupando el run: mejor fallar
     # rápido y re-lanzar solo este job (`gh run rerun --failed`, los artifacts persisten). Visto
