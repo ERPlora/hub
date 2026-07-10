@@ -3,6 +3,7 @@ import type { RouteRecordRaw } from 'vue-router';
 import { isAuthed } from '../lib/session';
 import { isModuleEntitled, needsActivation } from '../lib/entitlement';
 import { apiDocsEnabled } from '../lib/api-docs';
+import { ensureInstalledModules, needsFirstRun } from '../lib/nav';
 
 // Rutas del Hub (port de HubShell.tsx). Cada vista es un SFC Vue cargado de forma diferida.
 // `/m/:moduleId` monta el Web Component (Lit) del módulo en runtime (ModuleView).
@@ -27,6 +28,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/m/:moduleId/:navId?', name: 'module', component: () => import('../views/ModuleView.vue'), meta: { auth: true } },
   // Pantalla de activación: hay sesión pero el hub no tiene un entitlement válido (§2.10).
   { path: '/activation', name: 'activation', component: () => import('../views/ActivationPage.vue'), meta: { auth: true } },
+  // Primer arranque: el hub se despliega vacío (ADR-0087) y sin esto aterriza en un dashboard en
+  // blanco. Empuja a instalar el módulo `setup`; el wizard vive ahí, no aquí.
+  { path: '/first-run', name: 'first-run', component: () => import('../views/FirstRunPage.vue'), meta: { auth: true } },
 ];
 
 export const router = createRouter({
@@ -35,7 +39,7 @@ export const router = createRouter({
 });
 
 // Auth-gate: rutas con meta.auth requieren sesión; si no, a /login. (Vue-router nativo, sin React.)
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   if (to.meta.auth && !isAuthed.value) {
     return { name: 'login', query: { redirect: to.fullPath } };
   }
@@ -48,6 +52,20 @@ router.beforeEach((to) => {
   }
   // Si ya hay entitlement válido, no tiene sentido quedarse en /activation.
   if (to.name === 'activation' && !needsActivation.value) {
+    return { path: '/' };
+  }
+  // Primer arranque: un hub sin módulos aterrizaría en un dashboard vacío. Hay que ESPERAR a saber
+  // qué hay instalado (`/api/modules`), o decidiríamos sin la respuesta. Marketplace y ajustes
+  // quedan accesibles: la pantalla empuja, no encierra.
+  if (isAuthed.value && to.meta.auth) {
+    await ensureInstalledModules();
+    const escapes = ['first-run', 'marketplace', 'settings'];
+    if (needsFirstRun.value && !escapes.includes(String(to.name))) {
+      return { name: 'first-run' };
+    }
+  }
+  // Con módulos instalados, la pantalla de primer arranque ya no pinta nada.
+  if (to.name === 'first-run' && !needsFirstRun.value) {
     return { path: '/' };
   }
   // Un módulo concreto solo se monta si el hub tiene derecho (acceso por URL directa).
