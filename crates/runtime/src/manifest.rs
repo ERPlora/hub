@@ -567,6 +567,53 @@ pub struct NavLocale {
 mod tests {
     use super::*;
 
+    // ── PROPUESTA (aún SIN implementar): capabilities que el módulo `setup` necesita ──────────
+    //
+    // El wizard de puesta en marcha necesita tres primitivos que el contrato de módulos deniega
+    // hoy: instalar el pack de módulos del sector, preguntar al asistente los tipos de IVA
+    // vigentes, y fijar el país en `hub_settings` (de donde `taxes` resuelve el IVA, ADR-0061).
+    //
+    // NO pueden concederse como métodos del SDK en el navegador: los módulos comparten el mismo
+    // realm de JS, así que uno puede suplantar a otro o robarle su token. Una capability solo
+    // significa algo si se comprueba en Rust. Por eso van como `Operation { kind: "host" }` que
+    // devuelve el handler, gateadas por `capabilities::ensure_granted` (default-deny + consen-
+    // timiento del usuario, ADR-0079) — el mismo camino que `certificate` y `printer`.
+    //
+    // Estos dos tests fijan el contrato mínimo. Compilan hoy y FALLAN: son el rojo del TDD.
+
+    #[test]
+    fn capability_kind_conoce_los_tres_primitivos_del_setup() {
+        for canonical in ["module_install", "assistant", "settings"] {
+            let parsed = CapabilityKind::parse(canonical);
+            assert!(parsed.is_some(), "`{canonical}` debería ser una capability conocida");
+            assert_eq!(parsed.unwrap().as_str(), canonical, "el nombre canónico debe ir y volver");
+        }
+    }
+
+    #[test]
+    fn un_manifest_que_declara_las_nuevas_capabilities_las_solicita() {
+        // `settings` lleva allowlist de CLAVES y `module_install` de MÓDULOS: mínimo privilegio,
+        // igual que la allowlist de hosts de `network`. Un `setup` con la capability concedida no
+        // puede reescribir cualquier ajuste ni instalar cualquier cosa sin haberlo declarado.
+        let json = r#"{
+            "id": "setup",
+            "name": "Setup",
+            "version": "0.1.0",
+            "capabilities": {
+                "module_install": { "modules": ["inventory", "sales"], "reason": "instala el pack del sector" },
+                "assistant": { "reason": "consulta los tipos de IVA vigentes del país" },
+                "settings": { "keys": ["country_code"], "reason": "fija la identidad fiscal del hub" }
+            }
+        }"#;
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest válido");
+
+        let requested: Vec<&str> =
+            manifest.requested_capabilities().iter().map(|c| c.as_str()).collect();
+        assert!(requested.contains(&"module_install"), "requested: {requested:?}");
+        assert!(requested.contains(&"assistant"), "requested: {requested:?}");
+        assert!(requested.contains(&"settings"), "requested: {requested:?}");
+    }
+
     /// Parsea un manifest con un bloque `widgets` (uno por la vía declarativa `kind`+`query` y
     /// uno por el escape hatch `component`) y verifica que se deserializa y RE-SERIALIZA sin
     /// perder campos (ADR-0054).
