@@ -129,6 +129,59 @@ fn sistema_informatico(config: &Json, hub_id: &str) -> String {
     )
 }
 
+/// Una línea `<DetalleDesglose>` por tipo impositivo REAL de la factura.
+///
+/// La AEAT admite varias líneas de desglose. Antes se emitía **una sola**, con el tipo **efectivo**
+/// (`cuota/base`) cuando la factura era mixta: un ticket con una caña al 21% y una tapa al 10%
+/// declaraba un 17,33% que no existe en el sistema fiscal español. No era un caso de borde: es el
+/// ticket normal de un bar, el vertical principal del producto.
+///
+/// Los importes vienen en CÉNTIMOS (ADR-0007) y la AEAT exige euros con 2 decimales → `/100.0` en el
+/// límite. Los signos se conservan (rectificativas llevan base y cuota negativas).
+///
+/// Sin desglose (`'{}'`, facturas anteriores a este campo) se emite una única línea con el tipo
+/// efectivo, que para una factura de tipo único **es** su tipo real.
+fn desglose(record: &Json) -> String {
+    // (tipo %, base en céntimos, cuota en céntimos)
+    let mut lines: Vec<(f64, f64, f64)> = Vec::new();
+
+    if let Ok(Json::Object(map)) = serde_json::from_str::<Json>(&s(record, "tax_breakdown")) {
+        for (rate, amounts) in map {
+            if let Ok(rate) = rate.trim().parse::<f64>() {
+                lines.push((rate, f(&amounts, "base"), f(&amounts, "tax")));
+            }
+        }
+    }
+    if lines.is_empty() {
+        lines.push((
+            f(record, "tax_rate"),
+            f(record, "base_amount"),
+            f(record, "tax_amount"),
+        ));
+    }
+    // Tipo descendente: el XML no puede depender del orden de las claves del JSON.
+    lines.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    lines
+        .iter()
+        .map(|(rate, base, cuota)| {
+            format!(
+                "<sum1:DetalleDesglose>\
+                 <sum1:Impuesto>01</sum1:Impuesto>\
+                 <sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
+                 <sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
+                 <sum1:TipoImpositivo>{tipo}</sum1:TipoImpositivo>\
+                 <sum1:BaseImponibleOimporteNoSujeto>{base}</sum1:BaseImponibleOimporteNoSujeto>\
+                 <sum1:CuotaRepercutida>{cuota}</sum1:CuotaRepercutida>\
+                 </sum1:DetalleDesglose>",
+                tipo = format_amount(*rate),
+                base = format_amount(base / 100.0),
+                cuota = format_amount(cuota / 100.0),
+            )
+        })
+        .collect()
+}
+
 /// Construye el sobre SOAP `RegFactuSistemaFacturacion` para un registro (alta/anulación).
 /// `prev` = registro anterior de la cadena (para `Encadenamiento`), si lo hay.
 pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &str) -> String {
@@ -167,14 +220,7 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
              <sum1:TipoFactura>{tipo}</sum1:TipoFactura>\
              <sum1:DescripcionOperacion>{desc}</sum1:DescripcionOperacion>\
              {destinatarios}\
-             <sum1:Desglose><sum1:DetalleDesglose>\
-             <sum1:Impuesto>01</sum1:Impuesto>\
-             <sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
-             <sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
-             <sum1:TipoImpositivo>{tax_rate}</sum1:TipoImpositivo>\
-             <sum1:BaseImponibleOimporteNoSujeto>{base}</sum1:BaseImponibleOimporteNoSujeto>\
-             <sum1:CuotaRepercutida>{cuota}</sum1:CuotaRepercutida>\
-             </sum1:DetalleDesglose></sum1:Desglose>\
+             <sum1:Desglose>{desglose}</sum1:Desglose>\
              <sum1:CuotaTotal>{cuota}</sum1:CuotaTotal>\
              <sum1:ImporteTotal>{total}</sum1:ImporteTotal>\
              {chain}{sistema}\
@@ -189,10 +235,9 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
             tipo = esc(&s(record, "invoice_type")),
             desc = esc(&s(record, "description")),
             destinatarios = destinatarios(record),
-            // tax_rate es % (REAL) → se formatea tal cual. Los importes están en CÉNTIMOS
-            // (INTEGER, ADR-0007) y la AEAT exige euros con 2 decimales → /100.0 en el límite.
-            tax_rate = format_amount(f(record, "tax_rate")),
-            base = format_amount(f(record, "base_amount") / 100.0),
+            // Una línea de desglose por tipo REAL de la factura (ver `desglose`). Los importes están
+            // en CÉNTIMOS (INTEGER, ADR-0007) y la AEAT exige euros con 2 decimales → /100.0 aquí.
+            desglose = desglose(record),
             cuota = format_amount(f(record, "tax_amount") / 100.0),
             total = format_amount(f(record, "total_amount") / 100.0),
             chain = encadenamiento(record, prev),
@@ -278,6 +323,100 @@ pub struct ConsultRecord {
 /// Construye el sobre SOAP de **consulta** para un emisor y periodo (`ejercicio` = año YYYY,
 /// `periodo` = mes MM). ⚠️ Namespaces/elementos según el patrón del servicio de suministro;
 /// verificar contra el WSDL `ConsultaLR.xsd` vigente de la AEAT antes de producción.
+#[cfg(test)]
+mod desglose_tests {
+    use super::*;
+    use serde_json::json;
+
+    /// Un registro de alta mínimo. `base`/`tax` en CÉNTIMOS (ADR-0007); `tax_breakdown` es el JSON
+    /// que escribe el módulo `invoice` (`{"21.00":{"base":…,"tax":…}, …}`, también en céntimos).
+    fn alta(tax_breakdown: &str, base_cents: f64, tax_cents: f64, tax_rate: f64) -> Json {
+        json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "Bar Paco SL",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "invoice_type": "F2",
+            "description": "Ticket",
+            "base_amount": base_cents,
+            "tax_amount": tax_cents,
+            "total_amount": base_cents + tax_cents,
+            "tax_rate": tax_rate,
+            "tax_breakdown": tax_breakdown,
+            "record_hash": "ABC123",
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        })
+    }
+
+    fn xml_de(record: &Json) -> String {
+        build_soap(record, &json!({}), None, "hub-1")
+    }
+
+    /// EL caso del negocio: una caña (21%) y una tapa (10%) en el mismo ticket. Antes se declaraba
+    /// a la AEAT un ÚNICO `TipoImpositivo` con el tipo EFECTIVO (17,33%), que no existe en España.
+    #[test]
+    fn un_ticket_de_bar_declara_sus_dos_tipos_reales_no_uno_inventado() {
+        let tb = r#"{"21.00":{"base":1000,"tax":210},"10.00":{"base":500,"tax":50}}"#;
+        let xml = xml_de(&alta(tb, 1500.0, 260.0, 17.33));
+
+        assert_eq!(xml.matches("<sum1:DetalleDesglose>").count(), 2, "una línea por tipo");
+        assert!(xml.contains("<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>"));
+        assert!(xml.contains("<sum1:TipoImpositivo>10.00</sum1:TipoImpositivo>"));
+        assert!(
+            !xml.contains("<sum1:TipoImpositivo>17.33</sum1:TipoImpositivo>"),
+            "el tipo efectivo no es un tipo español y no puede viajar a Hacienda"
+        );
+
+        // Base y cuota POR LÍNEA, en euros (los céntimos se dividen en el límite AEAT).
+        assert!(xml.contains("<sum1:BaseImponibleOimporteNoSujeto>10.00</sum1:BaseImponibleOimporteNoSujeto>"));
+        assert!(xml.contains("<sum1:CuotaRepercutida>2.10</sum1:CuotaRepercutida>"));
+        assert!(xml.contains("<sum1:BaseImponibleOimporteNoSujeto>5.00</sum1:BaseImponibleOimporteNoSujeto>"));
+        assert!(xml.contains("<sum1:CuotaRepercutida>0.50</sum1:CuotaRepercutida>"));
+
+        // Los totales NO cambian: son los que alimentan la huella (CuotaTotal + ImporteTotal), así
+        // que la cadena de registros ya emitidos sigue siendo válida.
+        assert!(xml.contains("<sum1:CuotaTotal>2.60</sum1:CuotaTotal>"));
+        assert!(xml.contains("<sum1:ImporteTotal>17.60</sum1:ImporteTotal>"));
+    }
+
+    #[test]
+    fn el_orden_de_las_lineas_no_depende_del_json() {
+        let tb = r#"{"10.00":{"base":500,"tax":50},"21.00":{"base":1000,"tax":210}}"#;
+        let xml = xml_de(&alta(tb, 1500.0, 260.0, 17.33));
+        let pos21 = xml.find("<sum1:TipoImpositivo>21.00").expect("21%");
+        let pos10 = xml.find("<sum1:TipoImpositivo>10.00").expect("10%");
+        assert!(pos21 < pos10, "tipo descendente, estable entre ejecuciones");
+    }
+
+    #[test]
+    fn una_factura_de_tipo_unico_sigue_emitiendo_una_sola_linea() {
+        let tb = r#"{"10.00":{"base":1100,"tax":110}}"#;
+        let xml = xml_de(&alta(tb, 1100.0, 110.0, 10.0));
+        assert_eq!(xml.matches("<sum1:DetalleDesglose>").count(), 1);
+        assert!(xml.contains("<sum1:TipoImpositivo>10.00</sum1:TipoImpositivo>"));
+    }
+
+    /// Facturas viejas guardadas con `'{}'`: sin desglose no hay nada que descomponer, y el tipo
+    /// efectivo de una factura de tipo único ES su tipo real. Se conserva ese comportamiento.
+    #[test]
+    fn una_factura_antigua_sin_desglose_cae_al_tipo_efectivo() {
+        let xml = xml_de(&alta("{}", 1000.0, 100.0, 10.0));
+        assert_eq!(xml.matches("<sum1:DetalleDesglose>").count(), 1);
+        assert!(xml.contains("<sum1:TipoImpositivo>10.00</sum1:TipoImpositivo>"));
+    }
+
+    /// Rectificativa: base y cuota negativas. Los signos se conservan línea a línea.
+    #[test]
+    fn una_rectificativa_conserva_los_signos_por_linea() {
+        let tb = r#"{"21.00":{"base":-1000,"tax":-210}}"#;
+        let xml = xml_de(&alta(tb, -1000.0, -210.0, 21.0));
+        assert!(xml.contains("<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>"));
+        assert!(xml.contains("<sum1:BaseImponibleOimporteNoSujeto>-10.00</sum1:BaseImponibleOimporteNoSujeto>"));
+        assert!(xml.contains("<sum1:CuotaRepercutida>-2.10</sum1:CuotaRepercutida>"));
+    }
+}
+
 pub fn build_consult_soap(issuer_nif: &str, issuer_name: &str, ejercicio: &str, periodo: &str) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\

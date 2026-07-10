@@ -306,6 +306,7 @@ async fn create_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             description: str_field(&payload, "description"),
             base_amount: num_field(&payload, "base_amount", 0.0),
             tax_rate: num_field(&payload, "tax_rate", 21.0),
+            tax_breakdown: str_field(&payload, "tax_breakdown"),
             tax_amount: num_field(&payload, "tax_amount", 0.0),
             total_amount: num_field(&payload, "total_amount", 0.0),
             invoice_id: payload.get("invoice_id").cloned().unwrap_or(Json::Null),
@@ -398,13 +399,15 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             // `build_record_output` espera céntimos y divide /100 al formatear para la AEAT/QR.
             // NO convertir aquí (el `* 100.0` previo declaraba importes ×100 a la AEAT — QA 2026-06-25).
             base_amount: num_field(&inv, "base_amount", 0.0),
-            // Tipo IVA derivado del desglose REAL de la factura (un único tipo → ese; mixto/vacío →
-            // efectivo). Antes era fijo 21% — incorrecto en facturas a 10% (QA 2026-06-25).
+            // Tipo EFECTIVO de la factura. Es la columna de la fila y el fallback de facturas sin
+            // desglose; el XML ya NO lo usa en factura mixta (emite una línea por tipo real).
             tax_rate: derive_tax_rate(
                 &str_field(&inv, "tax_breakdown"),
                 num_field(&inv, "base_amount", 0.0),
                 num_field(&inv, "tax_amount", 0.0),
             ),
+            // El desglose real viaja íntegro hasta el XML: es lo que la AEAT tiene que ver.
+            tax_breakdown: str_field(&inv, "tax_breakdown"),
             tax_amount: num_field(&inv, "tax_amount", 0.0),
             total_amount: num_field(&inv, "total_amount", 0.0),
             invoice_id: Json::String(invoice_id),
@@ -428,7 +431,14 @@ struct RecordInput {
     invoice_type: String,
     description: String,
     base_amount: f64,
+    /// Tipo EFECTIVO (`cuota/base`). Ya NO es lo que se declara a la AEAT en factura mixta: el XML
+    /// emite una línea `DetalleDesglose` por tipo real (ver `aeat::desglose`). Se conserva como
+    /// columna de la fila —consultas, listados— y como fallback de facturas sin desglose.
     tax_rate: f64,
+    /// Desglose REAL por tipo, tal cual lo escribe el módulo `invoice`:
+    /// `{"21.00":{"base":1000,"tax":210},"10.00":{…}}` en céntimos. Es lo que la AEAT necesita para
+    /// que un ticket de bar (caña 21% + tapa 10%) declare sus DOS tipos y no uno inventado.
+    tax_breakdown: String,
     tax_amount: f64,
     total_amount: f64,
     invoice_id: Json,
@@ -520,6 +530,7 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "description": r.description,
                 "base_amount": r.base_amount,
                 "tax_rate": r.tax_rate,
+                "tax_breakdown": r.tax_breakdown,
                 "tax_amount": r.tax_amount,
                 "total_amount": r.total_amount,
                 "previous_hash": previous_hash,
@@ -578,6 +589,7 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "invoice_type": r.invoice_type,
                 "description": r.description,
                 "tax_rate": r.tax_rate,
+                "tax_breakdown": r.tax_breakdown,
                 "base_amount": r.base_amount,
                 "tax_amount": r.tax_amount,
                 "total_amount": r.total_amount,
@@ -994,6 +1006,7 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
                     "invoice_type": invoice_type,
                     "description": "Factura de PRUEBA (diagnóstico VeriFactu)",
                     "tax_rate": 21,
+                    "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
                     "base_amount": 10000,
                     "tax_amount": 2100,
                     "total_amount": 12100,
