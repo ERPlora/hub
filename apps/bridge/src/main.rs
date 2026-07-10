@@ -59,18 +59,21 @@ async fn main() {
         .unwrap_or_else(|_| PathBuf::from("devices.json"));
 
     // Política de auth: `BRIDGE_TOKEN` + `BRIDGE_ALLOWED_ORIGINS` del entorno. La CLAVE PÚBLICA para
-    // verificar la credencial JWT firmada se PIDE AL SAAS (`BRIDGE_SAAS_URL` → `/api/v1/auth/public-key/`),
-    // que es su fuente de verdad y gestiona la rotación; `BRIDGE_JWT_PUBLIC_KEY` solo la override.
-    // Si el SaaS no responde, el Bridge degrada a la vía de token simétrico (no aborta el arranque).
+    // verificar el bridge-token firmado se PIDE AL SAAS (`/api/v1/auth/public-key/`), su fuente de
+    // verdad y quien gestiona la rotación. El Bridge es GENÉRICO (mismo binario en toda máquina, sin
+    // vínculo a un hub): se autoconfigura con el SaaS de referencia (`DEFAULT_SAAS_URL`), sobreescribible
+    // por `BRIDGE_SAAS_URL` (fork/self-host); `BRIDGE_JWT_PUBLIC_KEY` es el override offline. Exige
+    // siempre `aud=erplora-bridge` (constante del protocolo). Si el SaaS no responde, degrada a la vía
+    // simétrica (no aborta). Cero config por-hub.
     let mut auth = BridgeAuth::from_env();
     if !auth.has_jwt() {
-        if let Ok(saas_url) = std::env::var(auth::ENV_SAAS_URL) {
-            if !saas_url.trim().is_empty() {
-                let (aud, hub_id) = auth::expected_claims_from_env();
-                if let Some(v) = auth::jwt_verifier_from_saas(saas_url.trim(), aud, hub_id).await {
-                    auth = auth.with_jwt(v);
-                }
-            }
+        let saas_url = std::env::var(auth::ENV_SAAS_URL)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| auth::DEFAULT_SAAS_URL.to_string());
+        if let Some(v) = auth::jwt_verifier_from_saas(&saas_url).await {
+            auth = auth.with_jwt(v);
         }
     }
 

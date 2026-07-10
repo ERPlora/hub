@@ -56,14 +56,19 @@ pub const ENV_ALLOWED_ORIGINS: &str = "BRIDGE_ALLOWED_ORIGINS";
 pub const ENV_JWT_PUBLIC_KEY: &str = "BRIDGE_JWT_PUBLIC_KEY";
 /// Env var con la **ruta** a un fichero con la clave pública PEM (alternativa a inyectarla inline).
 pub const ENV_JWT_PUBLIC_KEY_FILE: &str = "BRIDGE_JWT_PUBLIC_KEY_FILE";
-/// Env var del `aud` esperado del JWT (opcional). P.ej. `erplora-bridge`. Si se fija, se exige.
-pub const ENV_JWT_AUD: &str = "BRIDGE_JWT_AUD";
-/// Env var del `hub_id` al que este Bridge está atado (opcional). Si se fija, el claim debe casar.
-pub const ENV_HUB_ID: &str = "BRIDGE_HUB_ID";
-/// Env var de la base URL del SaaS. **Fuente primaria de la clave pública**: el Bridge la pide a
-/// `GET {saas}/api/v1/auth/public-key/` (mismo endpoint que el runtime del Hub). El SaaS es la
-/// fuente de verdad de la clave y gestiona su rotación; `BRIDGE_JWT_PUBLIC_KEY` es solo override.
+/// `aud` (audience) que DEBE llevar todo bridge-token, emitido por el SaaS. Es una **constante del
+/// protocolo, NO configurable**: el Bridge es genérico e idéntico en toda máquina. Distingue un token
+/// emitido PARA el Bridge de un token de login de usuario o de máquina → un token robado de otro
+/// plano no mueve el hardware. Siempre se exige cuando hay verificación JWT.
+pub const BRIDGE_AUDIENCE: &str = "erplora-bridge";
+/// Env var de la base URL del SaaS del que el Bridge pide la clave pública
+/// (`GET {saas}/api/v1/auth/public-key/`, mismo endpoint que el runtime del Hub). Tiene **default
+/// horneado** ([`DEFAULT_SAAS_URL`]): el Bridge se autoconfigura con cero ajustes; solo un fork la toca.
 pub const ENV_SAAS_URL: &str = "BRIDGE_SAAS_URL";
+/// SaaS por defecto (producto de referencia). **El Bridge NO se vincula a ningún hub:** es el mismo
+/// binario en toda máquina y sirve al hub cuya PWA esté abierta ahí. El `hub_id` del token es
+/// informativo (lo emite el SaaS), no un pin de instalación.
+pub const DEFAULT_SAAS_URL: &str = "https://erplora.com";
 
 /// Nombre por defecto del fichero del token (junto al cwd, igual que `devices.json`).
 const DEFAULT_TOKEN_FILE: &str = "bridge-token";
@@ -350,22 +355,13 @@ fn token_file_path() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from(DEFAULT_TOKEN_FILE))
 }
 
-/// Audience por defecto del bridge-token dedicado que emite el SaaS. Se exige **por defecto** cuando
-/// hay verificación JWT (seguro por defecto): sin esto, olvidar `BRIDGE_JWT_AUD` haría que el Bridge
-/// aceptara CUALQUIER token firmado por el SaaS (usuario/máquina) → agujero. Se puede sobreescribir.
-pub const DEFAULT_BRIDGE_AUDIENCE: &str = "erplora-bridge";
-
-/// Claims esperados del JWT leídos del entorno (`aud`/`hub_id`), compartidos por el override de env
-/// y el fetch al SaaS para que la verificación sea idéntica venga la clave de donde venga. El `aud`
-/// **por defecto** es [`DEFAULT_BRIDGE_AUDIENCE`] (seguro por defecto): solo tokens emitidos PARA el
-/// Bridge valen. `BRIDGE_JWT_AUD` lo sobreescribe (vacío ⇒ el default, no "sin audience").
-pub fn expected_claims_from_env() -> (Option<String>, Option<String>) {
-    let aud = std::env::var(ENV_JWT_AUD)
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| Some(DEFAULT_BRIDGE_AUDIENCE.to_string()));
-    let hub_id = std::env::var(ENV_HUB_ID).ok().filter(|s| !s.trim().is_empty());
-    (aud, hub_id)
+/// Política **fija** de claims del bridge-token: `aud = "erplora-bridge"` **siempre** (constante del
+/// protocolo, no configurable) y `hub_id` **no fijado** (el Bridge es genérico, no está vinculado a un
+/// hub). El `aud` es la frontera de seguridad — un token de usuario/máquina no lo lleva; el `hub_id`
+/// del token es informativo. Compartida por el override de env y el fetch al SaaS para que la
+/// verificación sea idéntica venga la clave de donde venga.
+fn bridge_jwt_policy() -> (Option<String>, Option<String>) {
+    (Some(BRIDGE_AUDIENCE.to_string()), None)
 }
 
 /// Verificador de JWT desde una clave pública **inyectada por env** (override/offline): inline
@@ -381,7 +377,7 @@ fn jwt_from_env() -> Option<JwtVerifier> {
     if pem.is_empty() {
         return None;
     }
-    let (aud, hub_id) = expected_claims_from_env();
+    let (aud, hub_id) = bridge_jwt_policy();
     match JwtVerifier::from_rsa_pem(pem, aud, hub_id) {
         Ok(v) => {
             tracing::info!("Bridge: verificación JWT por clave pública (override de env) activada");
@@ -395,15 +391,13 @@ fn jwt_from_env() -> Option<JwtVerifier> {
 }
 
 /// **Fuente primaria de la clave pública**: la pide al SaaS (`GET {saas}/api/v1/auth/public-key/`,
-/// mismo endpoint y forma que consume el runtime del Hub) y construye el verificador con los
-/// `aud`/`hub_id` esperados. `None` si el SaaS no responde o la clave no es válida — en ese caso el
-/// Bridge degrada a la vía de token simétrico (no aborta). El SaaS gestiona la rotación de la clave.
-pub async fn jwt_verifier_from_saas(
-    saas_url: &str,
-    aud: Option<String>,
-    hub_id: Option<String>,
-) -> Option<JwtVerifier> {
+/// mismo endpoint y forma que consume el runtime del Hub) y construye el verificador con la política
+/// fija ([`bridge_jwt_policy`]: `aud=erplora-bridge`, `hub_id` no fijado). `None` si el SaaS no
+/// responde o la clave no es válida — el Bridge degrada a la vía simétrica (no aborta). El SaaS
+/// gestiona la rotación de la clave.
+pub async fn jwt_verifier_from_saas(saas_url: &str) -> Option<JwtVerifier> {
     let pem = fetch_saas_public_key(saas_url).await?;
+    let (aud, hub_id) = bridge_jwt_policy();
     match JwtVerifier::from_rsa_pem(&pem, aud, hub_id) {
         Ok(v) => {
             tracing::info!("Bridge: clave pública obtenida del SaaS; verificación JWT activada");
