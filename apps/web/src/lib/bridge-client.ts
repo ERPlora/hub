@@ -53,6 +53,43 @@ export function bridgeWsUrl(): string {
   return token ? `${ws}/ws?token=${encodeURIComponent(token)}` : `${ws}/ws`;
 }
 
+/**
+ * Pide al **runtime** el token dedicado del Bridge (`GET /api/bridge/token`) y lo guarda, para que
+ * el `BridgeClient` del SDK lo presente. El runtime firma la llamada al SaaS con su `cloud_api_token`
+ * (nunca expuesto al navegador) y devuelve un JWT `aud=erplora-bridge` + `hub_id` (exp corto) que el
+ * Bridge verifica offline contra la clave pública del SaaS (ADR-0050 §2.7). Ruta RELATIVA a propósito
+ * (mismo origen que /api; evita un import circular con `runtime.ts`). `true` si se guardó un token.
+ */
+export async function refreshBridgeToken(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/bridge/token', { headers: { accept: 'application/json' } });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { token?: string };
+    if (body.token && body.token.trim()) {
+      setBridgeToken(body.token);
+      return true;
+    }
+    return false;
+  } catch {
+    return false; // runtime no enrolado / offline: el hardware degrada, no rompe el arranque
+  }
+}
+
+/** TTL del bridge-token = 15 min; refrescamos con margen (12 min) para no caducar en mitad del turno. */
+const BRIDGE_TOKEN_REFRESH_MS = 12 * 60 * 1000;
+let bridgeRefreshTimer: ReturnType<typeof setInterval> | undefined;
+
+/**
+ * Mantiene fresco el token del Bridge: lo pide una vez y luego cada 12 min (< TTL de 15). Idempotente
+ * (un solo timer). Lo arranca el shell en el boot; el `BridgeClient` del SDK lee el token guardado en
+ * cada conexión, así el refresco surte efecto sin recrear el cliente.
+ */
+export function startBridgeTokenRefresh(): void {
+  void refreshBridgeToken();
+  if (bridgeRefreshTimer) return;
+  bridgeRefreshTimer = setInterval(() => void refreshBridgeToken(), BRIDGE_TOKEN_REFRESH_MS);
+}
+
 /** Plataformas de descarga expuestas por el Cloud (macOS es solo desarrollo local → fuera). */
 export type BridgePlatform = 'windows' | 'linux' | 'android';
 

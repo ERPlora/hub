@@ -1627,7 +1627,9 @@ version = "0.0.0"
 dependencies = [
  "axum",
  "erplora-peripherals",
+ "jsonwebtoken",
  "notify-rust",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tokio",

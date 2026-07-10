@@ -723,11 +723,36 @@ export interface BridgeTransport {
  */
 export class BridgeClient implements BridgeTransport {
   private readonly base: string;
-  private readonly wsUrl: string;
+  private readonly wsBase: string;
+  private readonly token?: string | (() => string | null);
+  private readonly WebSocketImpl: typeof WebSocket;
 
-  constructor(host: string = `localhost:${BRIDGE_DEFAULT_PORT}`) {
+  /**
+   * @param host  `host:port` del Bridge (def. `localhost:12321`).
+   * @param opts.token  Token de emparejamiento (string o getter). El shell lo inyecta desde donde
+   *   lo guarde el usuario (web-PWA: `localStorage 'erplora.bridge.token'`). Un getter se relee en
+   *   cada conexión, así un emparejamiento posterior surte efecto sin recrear el cliente.
+   * @param opts.WebSocketImpl  Implementación de `WebSocket` (para tests); def. el global del navegador.
+   */
+  constructor(
+    host: string = `localhost:${BRIDGE_DEFAULT_PORT}`,
+    opts: { token?: string | (() => string | null); WebSocketImpl?: typeof WebSocket } = {},
+  ) {
     this.base = `http://${host}`;
-    this.wsUrl = `ws://${host}/ws`;
+    this.wsBase = `ws://${host}/ws`;
+    this.token = opts.token;
+    this.WebSocketImpl = opts.WebSocketImpl ?? WebSocket;
+  }
+
+  /**
+   * URL del canal WS con el token de emparejamiento como `?token=` — única vía por la que un
+   * `WebSocket` de navegador presenta credenciales (no puede fijar cabeceras). El Bridge es
+   * fail-closed (ADR-0050 §2.7): sin token válido responde 401 salvo en modo dev explícito. Se
+   * relee en cada conexión para recoger un emparejamiento posterior sin recrear el cliente.
+   */
+  private wsUrl(): string {
+    const t = typeof this.token === 'function' ? this.token() : this.token;
+    return t && t.trim() ? `${this.wsBase}?token=${encodeURIComponent(t.trim())}` : this.wsBase;
   }
 
   /** ¿Está el Bridge corriendo en este equipo? `GET /status` con timeout corto. */
@@ -756,7 +781,7 @@ export class BridgeClient implements BridgeTransport {
     return new Promise((resolve, reject) => {
       let ws: WebSocket;
       try {
-        ws = new WebSocket(this.wsUrl);
+        ws = new this.WebSocketImpl(this.wsUrl());
       } catch (e) {
         reject(e as Error);
         return;

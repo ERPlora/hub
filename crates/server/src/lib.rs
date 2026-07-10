@@ -526,6 +526,7 @@ pub fn app(state: AppState) -> Router {
         .route("/modules/:id/*path", get(serve_module_asset))
         // Proxies hub-scoped al Cloud (el token de máquina se queda en el runtime, no en el navegador)
         .route("/api/entitlement", get(proxy_entitlement))
+        .route("/api/bridge/token", get(proxy_bridge_token))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
         .route("/api/modules/:id/activate", post(activate_module))
         .route("/api/modules/:id/deactivate", post(deactivate_module))
@@ -858,6 +859,15 @@ async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Re
     // `entitlement(auth)` solo usa `auth` para las cabeceras; las reescribe `proxy_cloud_get`.
     let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
     proxy_cloud_get(&st, &headers, cloud.entitlement(&placeholder)).await
+}
+
+/// Proxya al SaaS la emisión del **token del Bridge** (`GET /api/v1/hub/device/bridge-token/`). El
+/// `cloud_api_token` firma la llamada aquí (nunca en el navegador); la app pega a esta ruta y recibe
+/// un JWT dedicado (`aud=erplora-bridge` + `hub_id`, exp corto) que presenta al Bridge local. ADR-0050 §2.7.
+async fn proxy_bridge_token(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    proxy_cloud_get(&st, &headers, cloud.bridge_token(&placeholder)).await
 }
 
 /// GET /api/marketplace/catalog — catálogo del marketplace (proxy de `/api/v1/marketplace/modules/`).
