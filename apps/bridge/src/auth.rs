@@ -37,6 +37,7 @@
 use std::path::{Path, PathBuf};
 
 use axum::http::{HeaderMap, Uri};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 
 /// Nombre de la cabecera propia de sesión del Hub (alternativa a `Authorization: Bearer`).
 pub const SESSION_HEADER: &str = "x-hub-session";
@@ -50,6 +51,19 @@ pub const ENV_TOKEN_FILE: &str = "BRIDGE_TOKEN_FILE";
 pub const ENV_DEV: &str = "BRIDGE_DEV";
 /// Env var de orígenes extra permitidos (CSV). P.ej. `https://app.erplora.com,https://hub.local`.
 pub const ENV_ALLOWED_ORIGINS: &str = "BRIDGE_ALLOWED_ORIGINS";
+/// Env var con la **clave pública RSA (PEM, SPKI)** para verificar la credencial JWT firmada. NO es
+/// secreta: solo quien tiene la privada (SaaS/Hub) puede emitir tokens válidos.
+pub const ENV_JWT_PUBLIC_KEY: &str = "BRIDGE_JWT_PUBLIC_KEY";
+/// Env var con la **ruta** a un fichero con la clave pública PEM (alternativa a inyectarla inline).
+pub const ENV_JWT_PUBLIC_KEY_FILE: &str = "BRIDGE_JWT_PUBLIC_KEY_FILE";
+/// Env var del `aud` esperado del JWT (opcional). P.ej. `erplora-bridge`. Si se fija, se exige.
+pub const ENV_JWT_AUD: &str = "BRIDGE_JWT_AUD";
+/// Env var del `hub_id` al que este Bridge está atado (opcional). Si se fija, el claim debe casar.
+pub const ENV_HUB_ID: &str = "BRIDGE_HUB_ID";
+/// Env var de la base URL del SaaS. **Fuente primaria de la clave pública**: el Bridge la pide a
+/// `GET {saas}/api/v1/auth/public-key/` (mismo endpoint que el runtime del Hub). El SaaS es la
+/// fuente de verdad de la clave y gestiona su rotación; `BRIDGE_JWT_PUBLIC_KEY` es solo override.
+pub const ENV_SAAS_URL: &str = "BRIDGE_SAAS_URL";
 
 /// Nombre por defecto del fichero del token (junto al cwd, igual que `devices.json`).
 const DEFAULT_TOKEN_FILE: &str = "bridge-token";
@@ -76,11 +90,78 @@ impl AuthOutcome {
     }
 }
 
+/// Claims que nos interesan del JWT del Bridge. `exp`/`aud` los valida `jsonwebtoken` leyéndolos del
+/// token (no hacen falta aquí); `hub_id` lo comprobamos nosotros contra el esperado si se configuró.
+#[derive(serde::Deserialize)]
+struct BridgeClaims {
+    #[serde(default)]
+    hub_id: Option<String>,
+}
+
+/// Verificador de la credencial **JWT firmada (RS256)** contra una clave **pública** configurada.
+///
+/// La clave pública NO es secreta: se puede shippear/leer sin riesgo — solo quien tiene la privada
+/// (el SaaS/Hub, mismo par que firma los JWT de usuario, `crates/cloud-client`) puede emitir tokens
+/// válidos. Por eso esta vía es **agnóstica al dominio**: un token válido prueba la autorización sin
+/// depender del `Origin`, así el tenant sirve la PWA desde su propio dominio (`erp.midominio.com`)
+/// sin allowlist por-dominio. `exp` obligatorio → tokens efímeros, resistentes a fugas.
+#[derive(Clone)]
+pub struct JwtVerifier {
+    key: DecodingKey,
+    expected_aud: Option<String>,
+    expected_hub_id: Option<String>,
+}
+
+impl std::fmt::Debug for JwtVerifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Nunca volcamos la clave; solo los criterios de validación.
+        f.debug_struct("JwtVerifier")
+            .field("expected_aud", &self.expected_aud)
+            .field("expected_hub_id", &self.expected_hub_id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl JwtVerifier {
+    /// Construye desde una clave pública RSA en PEM (SPKI). `aud`/`hub_id` esperados opcionales.
+    pub fn from_rsa_pem(
+        pem: &str,
+        expected_aud: Option<String>,
+        expected_hub_id: Option<String>,
+    ) -> Result<Self, String> {
+        let key = DecodingKey::from_rsa_pem(pem.as_bytes()).map_err(|e| e.to_string())?;
+        Ok(Self { key, expected_aud, expected_hub_id })
+    }
+
+    /// `true` si `token` es un JWT RS256 válido: firma correcta contra la clave pública, **no
+    /// expirado** (`exp` obligatorio), y `aud`/`hub_id` casan si se configuraron. Cualquier fallo
+    /// (parse, firma, expiración, claim) → `false`. No hace I/O ni loggea el token.
+    pub fn verify(&self, token: &str) -> bool {
+        let mut validation = Validation::new(Algorithm::RS256);
+        match self.expected_aud.as_deref() {
+            Some(aud) => validation.set_audience(&[aud]),
+            // `jsonwebtoken` valida `aud` por defecto; sin `aud` esperado, desactivamos esa comprobación.
+            None => validation.validate_aud = false,
+        }
+        match decode::<BridgeClaims>(token, &self.key, &validation) {
+            Ok(data) => match self.expected_hub_id.as_deref() {
+                Some(expected) => data.claims.hub_id.as_deref() == Some(expected),
+                None => true,
+            },
+            Err(_) => false,
+        }
+    }
+}
+
 /// Política de autenticación del Bridge. Inmutable tras construirse desde el entorno.
 #[derive(Debug, Clone)]
 pub struct BridgeAuth {
-    /// Secreto compartido; `None` desactiva la barrera de token (dev/local).
+    /// Secreto compartido (token de emparejamiento simétrico); `None` si no hay vía simétrica.
     token: Option<String>,
+    /// Verificador de la credencial JWT firmada (clave pública). `None` si no se configuró.
+    jwt: Option<JwtVerifier>,
+    /// `true` solo en modo dev (`BRIDGE_DEV`): sin barrera de credencial (queda solo `Origin`).
+    dev_open: bool,
     /// Orígenes exactos extra permitidos además de los implícitos (loopback/tauri/localhost).
     extra_origins: Vec<String>,
 }
@@ -107,19 +188,33 @@ impl BridgeAuth {
                 "{ENV_DEV} activo: el WS del Bridge NO exige token (solo allowlist de Origin). \
                  Es SOLO para desarrollo — nunca en producción."
             );
-            return Self { token: None, extra_origins };
+            return Self { token: None, jwt: None, dev_open: true, extra_origins };
         }
 
         let env_token = std::env::var(ENV_TOKEN).ok();
         let token = resolve_token(env_token, &token_file_path());
-        Self { token: Some(token), extra_origins }
+        let jwt = jwt_from_env();
+        Self { token: Some(token), jwt, dev_open: false, extra_origins }
     }
 
     /// Constructor explícito (tests / arranque programático del sidecar Tauri, que construirá la
     /// política sin pasar por el entorno). El binario standalone usa `from_env`.
+    ///
+    /// `token: None` ⇒ barrera de credencial desactivada (semántica dev/local histórica), salvo que
+    /// luego se añada un verificador con [`with_jwt`](Self::with_jwt).
     #[allow(dead_code)] // API pública: la consume el sidecar Tauri (futuro) y los tests.
     pub fn new(token: Option<String>, extra_origins: Vec<String>) -> Self {
-        Self { token, extra_origins }
+        let dev_open = token.is_none();
+        Self { token, jwt: None, dev_open, extra_origins }
+    }
+
+    /// Añade el verificador de JWT (clave pública) y activa la barrera de credencial (`dev_open=false`).
+    /// Builder para tests / arranque programático; `from_env` lo cablea vía `BRIDGE_JWT_PUBLIC_KEY`.
+    #[allow(dead_code)]
+    pub fn with_jwt(mut self, jwt: JwtVerifier) -> Self {
+        self.jwt = Some(jwt);
+        self.dev_open = false;
+        self
     }
 
     /// `true` si la barrera de token está activa (hay secreto configurado). Útil para que el
@@ -129,18 +224,76 @@ impl BridgeAuth {
         self.token.is_some()
     }
 
-    /// Evalúa un handshake completo: primero `Origin`, luego token. Devuelve el primer fallo.
+    /// `true` si ya hay un verificador JWT (clave pública) configurado. `main` lo usa para decidir
+    /// si pedir la clave al SaaS (solo si no llegó ya por el override de env).
+    pub fn has_jwt(&self) -> bool {
+        self.jwt.is_some()
+    }
+
+    /// Evalúa un handshake completo. Dos vías de credencial, en este orden:
+    ///
+    ///   1. **JWT firmado** (si hay verificador): un token válido autoriza desde **cualquier**
+    ///      `Origin` — la firma ES la prueba, agnóstica al dominio (soporta el dominio propio del
+    ///      tenant sin allowlist).
+    ///   2. **Token simétrico** (emparejamiento): exige además que el `Origin` sea de confianza
+    ///      (loopback/allowlist), porque el secreto es más filtrable (viaja en `?token=`).
+    ///
+    /// En modo dev (`dev_open`) no hay barrera de credencial: solo se comprueba el `Origin`.
     pub fn evaluate(&self, headers: &HeaderMap, uri: &Uri) -> AuthOutcome {
+        // `Host` loopback (anti DNS-rebinding) — antes que nada, en cualquier modo.
+        if !self.host_allowed(headers) {
+            return AuthOutcome::ForbiddenOrigin;
+        }
+
         let origin = headers
             .get(axum::http::header::ORIGIN)
             .and_then(|v| v.to_str().ok());
-        if !self.origin_allowed(origin) {
-            return AuthOutcome::ForbiddenOrigin;
+
+        // Modo dev: solo la barrera de `Origin`.
+        if self.dev_open {
+            return if self.origin_allowed(origin) {
+                AuthOutcome::Allowed
+            } else {
+                AuthOutcome::ForbiddenOrigin
+            };
         }
-        if !self.token_valid(headers, uri) {
-            return AuthOutcome::Unauthorized;
+
+        let presented = presented_token(headers, uri);
+
+        // (1) Vía JWT firmado — agnóstica al dominio.
+        if let (Some(jwt), Some(tok)) = (&self.jwt, presented.as_deref()) {
+            if jwt.verify(tok) {
+                return AuthOutcome::Allowed;
+            }
         }
-        AuthOutcome::Allowed
+
+        // (2) Vía token simétrico — el `Origin` es defensa en profundidad.
+        if let Some(secret) = self.token.as_deref() {
+            if !self.origin_allowed(origin) {
+                return AuthOutcome::ForbiddenOrigin;
+            }
+            return match presented.as_deref() {
+                Some(tok) if constant_time_eq(tok.as_bytes(), secret.as_bytes()) => {
+                    AuthOutcome::Allowed
+                }
+                _ => AuthOutcome::Unauthorized,
+            };
+        }
+
+        // (3) Solo-JWT configurado y el JWT no verificó → no autorizado.
+        AuthOutcome::Unauthorized
+    }
+
+    /// `true` si la cabecera `Host` apunta a loopback (`localhost`/`127.0.0.1`/`[::1]`), con o sin
+    /// puerto. **Cierra DNS rebinding**: un atacante que resuelva su dominio a 127.0.0.1 llega con
+    /// `Host: attacker.com` (no loopback) → rechazado, en TODAS las rutas (incluida `/status`). Un
+    /// `Host` ausente se permite (clientes nativos); el navegador SIEMPRE lo envía, así que no
+    /// habilita el ataque. Aplica en `/status` y en el handshake de `/ws`.
+    pub fn host_allowed(&self, headers: &HeaderMap) -> bool {
+        let Some(host) = headers.get(axum::http::header::HOST).and_then(|v| v.to_str().ok()) else {
+            return true; // clientes nativos sin `Host`; el navegador siempre lo envía.
+        };
+        is_loopback_host(host)
     }
 
     /// `true` si el `Origin` es de confianza. `None` (cliente no-navegador) se permite.
@@ -160,7 +313,9 @@ impl BridgeAuth {
     }
 
     /// `true` si el token presentado (cabecera o query) casa con el secreto. Sin secreto
-    /// configurado, siempre `true` (barrera desactivada).
+    /// configurado, siempre `true` (barrera desactivada). `evaluate` inlinea esta comprobación en su
+    /// vía simétrica; se conserva como API pública (tests / arranque programático del sidecar).
+    #[allow(dead_code)]
     pub fn token_valid(&self, headers: &HeaderMap, uri: &Uri) -> bool {
         let Some(secret) = self.token.as_deref() else {
             return true; // barrera desactivada
@@ -187,6 +342,82 @@ fn token_file_path() -> PathBuf {
     std::env::var(ENV_TOKEN_FILE)
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from(DEFAULT_TOKEN_FILE))
+}
+
+/// Claims esperados del JWT leídos del entorno (`aud`/`hub_id`), compartidos por el override de env
+/// y el fetch al SaaS para que la verificación sea idéntica venga la clave de donde venga.
+pub fn expected_claims_from_env() -> (Option<String>, Option<String>) {
+    let aud = std::env::var(ENV_JWT_AUD).ok().filter(|s| !s.trim().is_empty());
+    let hub_id = std::env::var(ENV_HUB_ID).ok().filter(|s| !s.trim().is_empty());
+    (aud, hub_id)
+}
+
+/// Verificador de JWT desde una clave pública **inyectada por env** (override/offline): inline
+/// (`BRIDGE_JWT_PUBLIC_KEY`) o fichero (`BRIDGE_JWT_PUBLIC_KEY_FILE`). `None` si no se configuró.
+/// La fuente PRIMARIA de la clave es el SaaS ([`jwt_verifier_from_saas`]); esto es el escape.
+fn jwt_from_env() -> Option<JwtVerifier> {
+    let pem = std::env::var(ENV_JWT_PUBLIC_KEY).ok().or_else(|| {
+        std::env::var(ENV_JWT_PUBLIC_KEY_FILE)
+            .ok()
+            .and_then(|p| std::fs::read_to_string(p).ok())
+    })?;
+    let pem = pem.trim();
+    if pem.is_empty() {
+        return None;
+    }
+    let (aud, hub_id) = expected_claims_from_env();
+    match JwtVerifier::from_rsa_pem(pem, aud, hub_id) {
+        Ok(v) => {
+            tracing::info!("Bridge: verificación JWT por clave pública (override de env) activada");
+            Some(v)
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Bridge: {ENV_JWT_PUBLIC_KEY} inválida; se ignora la vía JWT");
+            None
+        }
+    }
+}
+
+/// **Fuente primaria de la clave pública**: la pide al SaaS (`GET {saas}/api/v1/auth/public-key/`,
+/// mismo endpoint y forma que consume el runtime del Hub) y construye el verificador con los
+/// `aud`/`hub_id` esperados. `None` si el SaaS no responde o la clave no es válida — en ese caso el
+/// Bridge degrada a la vía de token simétrico (no aborta). El SaaS gestiona la rotación de la clave.
+pub async fn jwt_verifier_from_saas(
+    saas_url: &str,
+    aud: Option<String>,
+    hub_id: Option<String>,
+) -> Option<JwtVerifier> {
+    let pem = fetch_saas_public_key(saas_url).await?;
+    match JwtVerifier::from_rsa_pem(&pem, aud, hub_id) {
+        Ok(v) => {
+            tracing::info!("Bridge: clave pública obtenida del SaaS; verificación JWT activada");
+            Some(v)
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Bridge: la clave pública del SaaS no es válida; se ignora");
+            None
+        }
+    }
+}
+
+/// `GET {saas}/api/v1/auth/public-key/` → `{ "public_key": "<PEM>", "algorithm": "RS256" }`. Timeout
+/// ACOTADO (corre en el arranque, antes de escuchar): una red hostil no debe colgar el Bridge.
+async fn fetch_saas_public_key(saas_url: &str) -> Option<String> {
+    let url = format!("{}/api/v1/auth/public-key/", saas_url.trim_end_matches('/'));
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(3))
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .ok()?;
+    let resp = client.get(&url).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let v: serde_json::Value = resp.json().await.ok()?;
+    v.get("public_key")
+        .and_then(|k| k.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
 }
 
 /// Resuelve el token (fail-closed): `env_token` inyectado → fichero persistido → genera+persiste y
@@ -284,6 +515,17 @@ fn is_builtin_trusted_origin(origin: &str) -> bool {
 
     matches!(host, "localhost" | "127.0.0.1" | "::1")
         || host.eq_ignore_ascii_case("tauri.localhost")
+}
+
+/// `true` si un `host[:port]` (cabecera `Host`, sin esquema) es loopback. Extrae el host (maneja
+/// `[::1]:port`) y lo casa contra `localhost`/`127.0.0.1`/`::1`.
+fn is_loopback_host(host_port: &str) -> bool {
+    let host = if let Some(stripped) = host_port.strip_prefix('[') {
+        stripped.split(']').next().unwrap_or(stripped) // IPv6: `[::1]:port`
+    } else {
+        host_port.split(':').next().unwrap_or(host_port)
+    };
+    matches!(host, "localhost" | "127.0.0.1" | "::1")
 }
 
 /// Extrae el token presentado, en orden de preferencia:
@@ -388,6 +630,32 @@ mod tests {
 
     fn uri(path_and_query: &str) -> Uri {
         path_and_query.parse().unwrap()
+    }
+
+    // ── Host allowlist (anti DNS-rebinding) ──────────────────────────────────
+
+    #[test]
+    fn host_loopback_variants_allowed() {
+        let auth = BridgeAuth::new(None, vec![]);
+        for h in ["localhost:12321", "127.0.0.1:12321", "localhost", "127.0.0.1", "[::1]:12321"] {
+            let hm = headers_with(&[(header::HOST.as_str(), h)]);
+            assert!(auth.host_allowed(&hm), "{h} debería estar permitido");
+        }
+    }
+
+    #[test]
+    fn host_rebinding_domain_rejected() {
+        let auth = BridgeAuth::new(None, vec![]);
+        for h in ["attacker.com", "attacker.com:12321", "erp.midominio.com", "192.168.1.50:12321"] {
+            let hm = headers_with(&[(header::HOST.as_str(), h)]);
+            assert!(!auth.host_allowed(&hm), "{h} NO debería estar permitido (rebinding)");
+        }
+    }
+
+    #[test]
+    fn host_absent_allowed_for_native_clients() {
+        let auth = BridgeAuth::new(None, vec![]);
+        assert!(auth.host_allowed(&HeaderMap::new()));
     }
 
     // ── Origin allowlist ───────────────────────────────────────────────────
@@ -606,5 +874,182 @@ mod tests {
     #[test]
     fn generated_tokens_are_unique() {
         assert_ne!(generate_token(), generate_token(), "cada token generado es distinto");
+    }
+
+    // ── Credencial JWT firmada (RS256, clave pública) ────────────────────────
+    // Keypairs SOLO de test (no son secretos reales). `TEST_*` es el par bueno; `OTHER_PRIV` firma
+    // tokens con la clave equivocada para probar el rechazo por firma.
+
+    use jsonwebtoken::{encode, EncodingKey, Header};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    const TEST_PUB: &str = r#"-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArkiU7mt7J8B9U/qh0095
+XRLb5kY0QUVsqM2F2bJdWEOQIbWXlsPK3NtlVzB7xWp0+9x79N3dTtt5jdis9gmA
+Ko8bt5v077MG8jDhiC57N1asU3gJTwG/q1OsY1XHfUwUnqqdOiQe7TQH5P0DUcQW
+N7WnzVaISULpDSq+bEOt4tYEc2hEMcKJarZM/I2/E3Q/EPKb8bkzTA5bvuIFJG05
+UtILoZTJaa8kLePIsBgWed2zdubWIFUlTHrbmI7PTGZjKhEbKgf1JXuV79IzFe+0
+YY04dT3HV8ZNM8d+qJ9MMsBNvthXsV5hn29Q2sb5J0Mfwcxzw17gFDSfRN0DxedN
+jQIDAQAB
+-----END PUBLIC KEY-----"#;
+
+    const TEST_PRIV: &str = r#"-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCuSJTua3snwH1T
++qHTT3ldEtvmRjRBRWyozYXZsl1YQ5AhtZeWw8rc22VXMHvFanT73Hv03d1O23mN
+2Kz2CYAqjxu3m/TvswbyMOGILns3VqxTeAlPAb+rU6xjVcd9TBSeqp06JB7tNAfk
+/QNRxBY3tafNVohJQukNKr5sQ63i1gRzaEQxwolqtkz8jb8TdD8Q8pvxuTNMDlu+
+4gUkbTlS0guhlMlpryQt48iwGBZ53bN25tYgVSVMetuYjs9MZmMqERsqB/Ule5Xv
+0jMV77RhjTh1PcdXxk0zx36on0wywE2+2FexXmGfb1DaxvknQx/BzHPDXuAUNJ9E
+3QPF502NAgMBAAECggEAK90zsrAVfoNJZ84AVa0+d+jrtJC9zSG6f9++TPTB3pme
+mIVaQkVD9QM5BdE7jYvGJq+u+QmwDg1aEhPTMFdizRNYoAUeCAgwettHoB1GwL5N
+P/LJsPtZMLct/5BS1ZvE4sxBJyV5LS03wW/Wmok2KE5NjfY19e5jtn8oDxqXlKvr
+dAbMAGCQHunxZtZKQS9Er5ny8WP2z9v1zcRHlqdEukDqrzdLKdOUvpuRpt2ZoDAj
+TsvwsFfZ99vWvJb4F1scZp8/16BT19tLg4S9YPUe7wmGBALGQqE9z6T9TvLmlime
+ITdm2S1Hjwy8puWCuuiIvowo7PXgrO77IBl2lBYKxwKBgQDZLSCKsGdb8THljof3
+gp8YZ5KZ0tRa0yHs5EuU6stRUK3weoBsBQ3iZPfqpMonYjUkuFLJ09KrK6hQqfU8
+nn0LpA7ST3w+DpWS+P5rqN4STnLM1mGv4EzCx1oM/rYJi588umxxlCfO6TVDgXNh
+1EmABmfBXwewLiqO+LifC0VCtwKBgQDNcIHRF+7wXR8s8eFaF/HHv8TN6a0Z6KZx
+C+T5NWPNtXXsI7hA6VMsUTtD66uLgHSQh8G1hTRto4udA6pg8H2UjbRleaBfi1B1
+sXx8jY2Mj52c5aS3/LV/JFyq0XocauRA2IGYZRX4D+wBS5qiKJe+HpnK06vBV608
+VcljJSud2wKBgQCQX0aFzBU58tJ3x1Ot/4Ch6aB0b8pJgpfH8lAodBmrOdYXymf6
+5zU+rl589wWIPuoTOhGXKCChN8mRrhpgLP/1sB9GQh7W5j0a0jnX+g9+3fXFJDMW
+hyagSYQcpWsAV3gJF+klbBc2nqOQ98prW4Ns/1UUIIds4JPcLY4V9JkbawKBgQCd
+HJWrGuqY2B6neLQm+njlkjsoXrULQ2lGuxn5nGMfRs9QMGERA1+gXN8+KlWe8jYy
+8h+qepyF3LVA9zStvj3MBjMYB9QmPZzi5UGW34qJHKwk+VrnelQzT9Our1T7tqOp
+E+rIaUZL16FdvDweF3004KItA4Qu8KaDpffF4v9gUQKBgAX7P75RT6fWXc4fR3Yk
+w+ZQHCx2l47R2VzfllIO09RLShHkp/oRVSnpieU2gcXpJp51J5Gps5Bl2kxI+h3K
+ab8zNM0IaM8M2WpgVwVN5mMCNUb/Qo107pvDOKe2MdlW4+RgOd0tjFG+XS8We3pf
+xytPSgjzk/vei8IeqVZ5N+5T
+-----END PRIVATE KEY-----"#;
+
+    const OTHER_PRIV: &str = r#"-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCXep+uaSIf7icW
+PcBja/zFHTgPeJS4BvPA/zK9epfwlXGqYY7ULsm683qTSvgsAyF3S1upDpbOOGNJ
+v+EOdCTwuWlOb1roh0+Vb8eqVArc/WTqmuoN1uKJ0VzG/0jx3ooGeBYW13zzL3Q2
+1yQsWdNPUN2RYLB2HI2rcGiMv5XU/r26Dms/OHMAnyvEI6ebniXfwahhkhcbvzya
+pQxKqcX1TSEDMvKj9Zie7rpOReTEPMX3vn4QWPLeXWlU87kHtDvDnDYMQmQgelsu
+Y3OeWNnoNInAPtMnx13ElGEtXTbKcSicdKbjWBIsb3tBtUahpVBdhhduYu44oa0z
+Gyxv2q51AgMBAAECggEANCo1XVG1P7u62Czx2QsyJAt459MFnA5A2SDJL3lNY7uD
+RkKMdkOakvgQKTMzHa0CVFuuOBzfECtY/efHMDwNEJ05R5qPeu5GGNdCskR47TuS
+CjzJB3UN1Jo10g3N6AVUEQA/0yPoUrLv2YbjXSad332gn9TlT/drTjPKvVWo2o1L
+qpoMt1q5mTghzy+g2HTRapEW+mzxMfx9jJpz2idtdSaqdsWixRGuAb5DJHsLirhC
+GiThzxkTpdlL1ujiryiSgTD2tEdhsQ5PAVh+A9IRWRLAP2OB4MW7rxsK98HT5lEX
+BIW2hyY1NUhvqlrCIXCSB0PY85dn2pSPOtFmVvuH7QKBgQDO9o3vYzuf80e6dIQr
+4yh6FvIjlPwY2T4cNkwBG0CZUf9Vwgm73H5wGWOyqAo7vl94zvC4ihL4D8pPqRen
+Yr+hcr8qNNU8XeXfIbMSESSWAQDKagvFi8dP4+MXJzXw9sv3mOjOvus/bld9/zhN
+TAWO6UAjChKKq7oUAwsVrWx4VwKBgQC7XqeRc6k9CqrtPa9LiNh4Tjid4k8DV54F
+vCGYDuvchAqLtMSEHnjzGkrDBAx+7oXZVN8arTQskcnEBJ8mex6e/esOWHaat2Jt
+YCrzCINNIn2nmwgPaOSiDZRxbo5/dXbrausC7ftSOIub57pkCScpu3DLcEystn6n
+uaVt0AhAEwKBgQC1O2hNAZub1GCyYQfAmrm+N8uv5u3fIJVoBRAHRAMMf6ZVRYZa
+kJnTthf8wXO8n1dhJe3b22UC/mjN2yeQd0ORsDbAUeWMaDk8bHkvz/02sggsODK4
+uU8+oTMh+j8dFDDGT4tGSB8eu5Q4DD8USQbw/0YfqNlVv01B6uxQ/j1nHwKBgQCM
+QmAH1uASbMDlFS76yTbaYBurvLRPGTCWtG0lac4P5dwLFseg6zq5KK5ca9R61Ezo
+EstsKcoLrxqtnJQSd0nF1Og3detbB/orTDj6cx3vCOmtJLWU631y/d1oSE1thl39
+/qxsJf/jXabMj1wM9HkXmVPnRmpvQ7FuFt+KY5c5dwKBgBRcpQ+4bGqEDr6Duo91
+9KXCeCrFOZLHKO1ttisODHwD+7oDux+WjKjzndGp0QcmQ00TAkZISl0QGjQJ2SMq
+q8VD3AmaG1QetOaoFE3a0njqjcM/5WUd1xh7tt5d6/lkjshROjYI6vOWcRRcSjal
+IvFItyUYMXiE4CEIlmhbskGV
+-----END PRIVATE KEY-----"#;
+
+    /// Timestamp Unix (segundos) + `delta`.
+    fn ts(delta: i64) -> i64 {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+        now + delta
+    }
+
+    /// Firma un JWT RS256 con `priv_pem` a partir de unos claims JSON.
+    fn mint(claims: serde_json::Value, priv_pem: &str) -> String {
+        let key = EncodingKey::from_rsa_pem(priv_pem.as_bytes()).expect("priv pem");
+        encode(&Header::new(Algorithm::RS256), &claims, &key).expect("encode")
+    }
+
+    fn verifier(aud: Option<&str>, hub_id: Option<&str>) -> JwtVerifier {
+        JwtVerifier::from_rsa_pem(TEST_PUB, aud.map(Into::into), hub_id.map(Into::into))
+            .expect("test pub key")
+    }
+
+    #[test]
+    fn jwt_verify_valid_and_tampered() {
+        let v = verifier(None, None);
+        let tok = mint(serde_json::json!({ "exp": ts(300) }), TEST_PRIV);
+        assert!(v.verify(&tok), "un JWT bien firmado y no expirado verifica");
+        // Alterar un carácter del payload invalida la firma.
+        let mut bad = tok.clone();
+        let mid = bad.len() / 2;
+        bad.replace_range(mid..mid + 1, if &bad[mid..mid + 1] == "a" { "b" } else { "a" });
+        assert!(!v.verify(&bad), "un JWT manipulado NO verifica");
+    }
+
+    #[test]
+    fn jwt_valid_token_authorizes_from_any_origin() {
+        // Solo-JWT (sin token simétrico). Un token válido autoriza incluso desde el dominio propio
+        // del tenant, que NO está en ninguna allowlist — la firma ES la prueba (agnóstico al dominio).
+        let auth = BridgeAuth::new(None, vec![]).with_jwt(verifier(None, None));
+        let tok = mint(serde_json::json!({ "exp": ts(300) }), TEST_PRIV);
+        let h = headers_with(&[(header::ORIGIN.as_str(), "https://erp.midominio.com")]);
+        assert_eq!(auth.evaluate(&h, &uri(&format!("/ws?token={tok}"))), AuthOutcome::Allowed);
+    }
+
+    #[test]
+    fn jwt_expired_is_rejected() {
+        let auth = BridgeAuth::new(None, vec![]).with_jwt(verifier(None, None));
+        // Caducado holgadamente más allá del leeway por defecto de `jsonwebtoken` (60s, skew de reloj).
+        let tok = mint(serde_json::json!({ "exp": ts(-120) }), TEST_PRIV);
+        let h = headers_with(&[(header::ORIGIN.as_str(), "https://erp.midominio.com")]);
+        assert_eq!(auth.evaluate(&h, &uri(&format!("/ws?token={tok}"))), AuthOutcome::Unauthorized);
+    }
+
+    #[test]
+    fn jwt_bad_signature_is_rejected() {
+        // Firmado con la clave EQUIVOCADA → la clave pública del Bridge no lo valida.
+        let auth = BridgeAuth::new(None, vec![]).with_jwt(verifier(None, None));
+        let tok = mint(serde_json::json!({ "exp": ts(300) }), OTHER_PRIV);
+        let h = headers_with(&[(header::ORIGIN.as_str(), "https://erp.midominio.com")]);
+        assert_eq!(auth.evaluate(&h, &uri(&format!("/ws?token={tok}"))), AuthOutcome::Unauthorized);
+    }
+
+    #[test]
+    fn jwt_hub_id_must_match_when_configured() {
+        let auth = BridgeAuth::new(None, vec![]).with_jwt(verifier(None, Some("hub-1")));
+        let ok = mint(serde_json::json!({ "exp": ts(300), "hub_id": "hub-1" }), TEST_PRIV);
+        let bad = mint(serde_json::json!({ "exp": ts(300), "hub_id": "hub-2" }), TEST_PRIV);
+        let h = headers_with(&[(header::ORIGIN.as_str(), "https://erp.midominio.com")]);
+        assert_eq!(auth.evaluate(&h, &uri(&format!("/ws?token={ok}"))), AuthOutcome::Allowed);
+        assert_eq!(auth.evaluate(&h, &uri(&format!("/ws?token={bad}"))), AuthOutcome::Unauthorized);
+    }
+
+    #[test]
+    fn jwt_aud_must_match_when_configured() {
+        let auth = BridgeAuth::new(None, vec![]).with_jwt(verifier(Some("erplora-bridge"), None));
+        let ok = mint(serde_json::json!({ "exp": ts(300), "aud": "erplora-bridge" }), TEST_PRIV);
+        let bad = mint(serde_json::json!({ "exp": ts(300), "aud": "otro" }), TEST_PRIV);
+        let h = headers_with(&[(header::ORIGIN.as_str(), "https://erp.midominio.com")]);
+        assert_eq!(auth.evaluate(&h, &uri(&format!("/ws?token={ok}"))), AuthOutcome::Allowed);
+        assert_eq!(auth.evaluate(&h, &uri(&format!("/ws?token={bad}"))), AuthOutcome::Unauthorized);
+    }
+
+    #[test]
+    fn jwt_and_symmetric_token_coexist() {
+        // Con ambas vías: el JWT vale desde cualquier origin; el simétrico exige origin de confianza.
+        let auth = BridgeAuth::new(Some("s3cr3t".into()), vec![]).with_jwt(verifier(None, None));
+        let jwt = mint(serde_json::json!({ "exp": ts(300) }), TEST_PRIV);
+
+        // JWT válido desde dominio foráneo → Allowed.
+        let h_jwt = headers_with(&[(header::ORIGIN.as_str(), "https://erp.midominio.com")]);
+        assert_eq!(auth.evaluate(&h_jwt, &uri(&format!("/ws?token={jwt}"))), AuthOutcome::Allowed);
+
+        // Token simétrico desde loopback → Allowed.
+        let h_sym_ok = headers_with(&[
+            (header::ORIGIN.as_str(), "http://localhost:5173"),
+            (header::AUTHORIZATION.as_str(), "Bearer s3cr3t"),
+        ]);
+        assert_eq!(auth.evaluate(&h_sym_ok, &uri("/ws")), AuthOutcome::Allowed);
+
+        // Token simétrico desde dominio foráneo → ForbiddenOrigin (el simétrico NO es agnóstico).
+        let h_sym_bad = headers_with(&[
+            (header::ORIGIN.as_str(), "https://erp.midominio.com"),
+            (header::AUTHORIZATION.as_str(), "Bearer s3cr3t"),
+        ]);
+        assert_eq!(auth.evaluate(&h_sym_bad, &uri("/ws")), AuthOutcome::ForbiddenOrigin);
     }
 }

@@ -7,6 +7,7 @@ import {
   ErploraClient,
   ErploraError,
   createClient,
+  BridgeClient,
 } from './index.ts';
 
 // ── HttpWsTransport: query/command desenvuelven el sobre {ok,data} ───────────
@@ -201,4 +202,71 @@ test('formatMoney convierte céntimos→unidades con la moneda del hub', () => {
 test('formatAmount formatea unidades; opts.currency sobreescribe la del hub', () => {
   const c = new ErploraClient({} as never, { currency: () => 'EUR' });
   assert.equal(c.formatAmount(1234.5, { locale: 'en-US', currency: 'USD' }), '$1,234.50');
+});
+
+// ── BridgeClient: el WS presenta el token de emparejamiento como ?token= ─────
+// El Bridge es fail-closed (ADR-0050 §2.7): exige el token salvo en modo dev. Un `WebSocket`
+// de navegador no puede fijar cabeceras, así que la ÚNICA vía es el query param. Si el SDK no lo
+// pasa, `discoverPrinters`/`print` fallan con 401 contra un Bridge real (el gap que esto cierra).
+
+class FakeBridgeWs {
+  static last: FakeBridgeWs | undefined;
+  onopen: (() => void) | null = null;
+  onmessage: ((e: { data: string }) => void) | null = null;
+  onerror: (() => void) | null = null;
+  sent: string[] = [];
+  send = (d: string) => {
+    this.sent.push(d);
+  };
+  close = () => {};
+  constructor(public url: string) {
+    FakeBridgeWs.last = this;
+  }
+}
+
+/** Dispara open+evento para resolver el `request()` interno del BridgeClient. */
+function driveBridge(event: Record<string, unknown>): void {
+  const ws = FakeBridgeWs.last!;
+  ws.onopen?.();
+  ws.onmessage?.({ data: JSON.stringify(event) });
+}
+
+test('BridgeClient sin token abre ws://host/ws (sin query)', async () => {
+  const c = new BridgeClient(undefined, {
+    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
+  });
+  const p = c.discoverPrinters();
+  assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws');
+  driveBridge({ event: 'printers', printers: [] });
+  await p;
+});
+
+test('BridgeClient con token emparejado lo presenta como ?token= (URL-encoded)', async () => {
+  const c = new BridgeClient(undefined, {
+    token: 'pair-42/x',
+    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
+  });
+  const p = c.discoverPrinters();
+  assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws?token=pair-42%2Fx');
+  driveBridge({ event: 'printers', printers: [] });
+  await p;
+});
+
+test('BridgeClient acepta un getter de token (se relee tras emparejar, sin recrear el cliente)', async () => {
+  let tok: string | null = null;
+  const c = new BridgeClient(undefined, {
+    token: () => tok,
+    WebSocketImpl: FakeBridgeWs as unknown as typeof WebSocket,
+  });
+  // Antes de emparejar: sin query.
+  let p = c.discoverPrinters();
+  assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws');
+  driveBridge({ event: 'printers', printers: [] });
+  await p;
+  // El usuario introduce el código en Ajustes → el MISMO cliente ya presenta el token.
+  tok = 'later-token';
+  p = c.discoverPrinters();
+  assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws?token=later-token');
+  driveBridge({ event: 'printers', printers: [] });
+  await p;
 });

