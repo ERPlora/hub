@@ -139,8 +139,14 @@ impl JwtVerifier {
     pub fn verify(&self, token: &str) -> bool {
         let mut validation = Validation::new(Algorithm::RS256);
         match self.expected_aud.as_deref() {
-            Some(aud) => validation.set_audience(&[aud]),
-            // `jsonwebtoken` valida `aud` por defecto; sin `aud` esperado, desactivamos esa comprobación.
+            Some(aud) => {
+                validation.set_audience(&[aud]);
+                // `jsonwebtoken` solo valida `aud` SI está presente (no lo exige por defecto). Sin
+                // esto, un token de máquina/usuario sin `aud` pero con el `hub_id` correcto colaría
+                // — anulando el propósito del audience dedicado. Lo hacemos claim REQUERIDO.
+                validation.set_required_spec_claims(&["exp", "aud"]);
+            }
+            // Sin `aud` esperado, desactivamos esa comprobación.
             None => validation.validate_aud = false,
         }
         match decode::<BridgeClaims>(token, &self.key, &validation) {
@@ -344,10 +350,20 @@ fn token_file_path() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from(DEFAULT_TOKEN_FILE))
 }
 
+/// Audience por defecto del bridge-token dedicado que emite el SaaS. Se exige **por defecto** cuando
+/// hay verificación JWT (seguro por defecto): sin esto, olvidar `BRIDGE_JWT_AUD` haría que el Bridge
+/// aceptara CUALQUIER token firmado por el SaaS (usuario/máquina) → agujero. Se puede sobreescribir.
+pub const DEFAULT_BRIDGE_AUDIENCE: &str = "erplora-bridge";
+
 /// Claims esperados del JWT leídos del entorno (`aud`/`hub_id`), compartidos por el override de env
-/// y el fetch al SaaS para que la verificación sea idéntica venga la clave de donde venga.
+/// y el fetch al SaaS para que la verificación sea idéntica venga la clave de donde venga. El `aud`
+/// **por defecto** es [`DEFAULT_BRIDGE_AUDIENCE`] (seguro por defecto): solo tokens emitidos PARA el
+/// Bridge valen. `BRIDGE_JWT_AUD` lo sobreescribe (vacío ⇒ el default, no "sin audience").
 pub fn expected_claims_from_env() -> (Option<String>, Option<String>) {
-    let aud = std::env::var(ENV_JWT_AUD).ok().filter(|s| !s.trim().is_empty());
+    let aud = std::env::var(ENV_JWT_AUD)
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| Some(DEFAULT_BRIDGE_AUDIENCE.to_string()));
     let hub_id = std::env::var(ENV_HUB_ID).ok().filter(|s| !s.trim().is_empty());
     (aud, hub_id)
 }
@@ -1026,6 +1042,22 @@ IvFItyUYMXiE4CEIlmhbskGV
         let h = headers_with(&[(header::ORIGIN.as_str(), "https://erp.midominio.com")]);
         assert_eq!(auth.evaluate(&h, &uri(&format!("/ws?token={ok}"))), AuthOutcome::Allowed);
         assert_eq!(auth.evaluate(&h, &uri(&format!("/ws?token={bad}"))), AuthOutcome::Unauthorized);
+    }
+
+    #[test]
+    fn jwt_without_aud_is_rejected_when_aud_expected() {
+        // Un token SIN claim `aud` NO debe colar cuando se exige audience. Si no, un token de
+        // MÁQUINA o de USUARIO (que no llevan `aud`) con el `hub_id` correcto autorizaría el
+        // hardware — justo lo que el audience dedicado debe impedir. `jsonwebtoken` no exige `aud`
+        // por defecto (solo lo valida si está presente); hay que forzarlo como claim requerido.
+        let auth = BridgeAuth::new(None, vec![]).with_jwt(verifier(Some("erplora-bridge"), Some("hub-1")));
+        // Simula un token de máquina: hub_id correcto, exp válido, pero SIN aud.
+        let machine_like = mint(serde_json::json!({ "exp": ts(300), "hub_id": "hub-1" }), TEST_PRIV);
+        let h = headers_with(&[(header::ORIGIN.as_str(), "https://erp.midominio.com")]);
+        assert_eq!(
+            auth.evaluate(&h, &uri(&format!("/ws?token={machine_like}"))),
+            AuthOutcome::Unauthorized
+        );
     }
 
     #[test]
