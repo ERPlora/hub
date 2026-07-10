@@ -5,9 +5,9 @@
 # El bridge standalone (`apps/bridge`, binario `erplora-bridge`) sobre el crate
 # `crates/peripherals`. Red-only ESC/POS (ARQUITECTURA.md §2.7).
 #
-# Pipeline:
-#   push main/develop ─► build (Windows + Linux) ─► S3 bridge/latest/
+# Pipeline (build pesado: Windows ×2 de facturación → NO en cada push, ADR-CI 2026-07-10):
 #   push tag v*        ─► build (Windows + Linux) ─► S3 bridge/v{version}/ + latest/
+#   workflow_dispatch  ─► build (Windows + Linux) ─► S3 bridge/latest/   (refresco manual de `latest/`)
 #
 # Object Storage layout (Hetzner, bucket `erplora-saas` (prefijo `downloads/`), mismo prefijo que el Android
 #   y que espera el Cloud `apps/public/bridge/views.py`):
@@ -28,10 +28,16 @@
 name: Build Bridge Desktop
 
 on:
+  # Antes corría en cada push a main Y develop (Windows factura ×2). Nadie descarga `bridge/latest/`
+  # a diario pre-lanzamiento → solo se construye al etiquetar release o a mano.
   push:
-    branches: [main, develop]
     tags: ['v*']
   workflow_dispatch:
+
+# Un push/tag nuevo cancela el build en curso del mismo ref: no apilar builds completos.
+concurrency:
+  group: bridge-release-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -81,8 +87,8 @@ jobs:
   upload-s3:
     name: Upload to Object Storage
     needs: [build]
-    # `develop` compila pero NO publica ("develop never deploys"): solo main y tags v*.
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    # tag v* → v{version}/ + latest/ ; dispatch manual → refresca latest/.
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
