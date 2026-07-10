@@ -443,6 +443,14 @@ export default {
     retry: 'Retry',
     logout: 'Log out',
   },
+  firstRun: {
+    title: 'Set up your hub',
+    lead: 'This hub is empty. Setup asks for your country and sector, installs the modules you need, and loads a starter catalog with its images.',
+    install: 'Start setup',
+    installing: 'Installing…',
+    marketplace: 'I would rather pick the modules myself',
+    error: 'Setup could not be installed. Check the connection to the Cloud and try again.',
+  },
   moduleView: {
     loading: 'Loading module…',
     loadError: 'Could not load the module.',

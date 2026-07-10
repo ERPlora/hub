@@ -444,6 +444,14 @@ export default {
     retry: 'Reintentar',
     logout: 'Cerrar sesión',
   },
+  firstRun: {
+    title: 'Configura tu hub',
+    lead: 'Este hub está vacío. La puesta en marcha te pregunta el país y el sector, instala los módulos que necesitas y carga un catálogo inicial con sus imágenes.',
+    install: 'Empezar la puesta en marcha',
+    installing: 'Instalando…',
+    marketplace: 'Prefiero elegir los módulos yo',
+    error: 'No se pudo instalar la puesta en marcha. Revisa la conexión con el Cloud e inténtalo de nuevo.',
+  },
   moduleView: {
     loading: 'Cargando módulo…',
     loadError: 'No se pudo cargar el módulo.',
