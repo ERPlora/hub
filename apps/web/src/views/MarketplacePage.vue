@@ -159,7 +159,16 @@ interface DataTableColumn {
   format?: (row: Row) => string;
   render?: (row: Row) => Node | string;
 }
-interface DataTableAction { id: string; label: string; icon?: string; color?: string }
+interface DataTableAction {
+  id: string;
+  label: string;
+  icon?: string;
+  color?: string;
+  /** ADITIVO (OutfitKit ≥0.1.14): deshabilita el botón para esa fila (instalado → no re-instalable). */
+  disabled?: (row: Row) => boolean;
+  /** ADITIVO (OutfitKit ≥0.1.14): spinner en lugar del icono mientras la fila está en curso. */
+  loading?: (row: Row) => boolean;
+}
 
 // --- Datos demo (solo si config.demo y el Cloud no responde) ---
 const MODULES_DEMO: Mod[] = [
@@ -185,6 +194,31 @@ const toastColor = ref<'primary' | 'success' | 'danger'>('primary');
 // instalación en background; el resultado lo cierra y muestra el suyo). Por defecto 2.5s.
 const toastDuration = ref<number>(2500);
 
+// --- Progreso de instalación por módulo (feedback visual en la card) ---
+// Clave = módulo pedido (root); valor = módulo en curso (puede ser una dep anidada) + fase.
+// Se alimenta del evento WS `module.install.progress` del runtime (resolving → downloading →
+// verifying → installing) y se limpia al terminar (`module.installed` o error HTTP). El Map se
+// REEMPLAZA en cada cambio (no se muta) para que los computed que lo leen reaccionen.
+interface InstallProgress {
+  /** Módulo en curso ≠ root cuando el runtime está instalando una dependencia anidada. */
+  dep: string | null;
+  phase: string;
+}
+const installing = ref<Map<string, InstallProgress>>(new Map());
+
+function setProgress(rootId: string, moduleId: string, phase: string): void {
+  const next = new Map(installing.value);
+  next.set(rootId, { dep: moduleId !== rootId ? moduleId : null, phase });
+  installing.value = next;
+}
+
+function clearProgress(rootId: string): void {
+  if (!installing.value.has(rootId)) return;
+  const next = new Map(installing.value);
+  next.delete(rootId);
+  installing.value = next;
+}
+
 // --- Celdas ricas: pill de tinte suave con tokens Ionic (cruzan el shadow de la tabla) ---
 function badgeCell(text: string, tone: 'success' | 'medium' | 'primary' | 'danger'): Node {
   const span = document.createElement('span');
@@ -196,9 +230,56 @@ function badgeCell(text: string, tone: 'success' | 'medium' | 'primary' | 'dange
   return span;
 }
 
+// Etiqueta humana de una fase del pipeline de instalación (contrato WS del runtime).
+function phaseLabel(phase: string): string {
+  switch (phase) {
+    case 'resolving': return t('marketplace.phaseResolving');
+    case 'downloading': return t('marketplace.phaseDownloading');
+    case 'verifying': return t('marketplace.phaseVerifying');
+    case 'installing': return t('marketplace.phaseInstalling');
+    default: return t('marketplace.stateInstalling');
+  }
+}
+
+// Celda de estado del catálogo: spinner + fase mientras instala; badge Instalado/Disponible si no.
+function stateCell(row: Row): Node {
+  if (row.state === 'installing') {
+    const prog = row.progress as InstallProgress | null;
+    const wrap = document.createElement('span');
+    wrap.style.cssText =
+      'display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ion-color-primary)';
+    const spinner = document.createElement('ion-spinner');
+    spinner.setAttribute('name', 'dots');
+    spinner.style.cssText = 'width:18px;height:18px';
+    const label = document.createElement('span');
+    const phase = phaseLabel(prog?.phase ?? '');
+    label.textContent = prog?.dep ? t('marketplace.phaseDependency', { name: prog.dep, phase }) : phase;
+    wrap.append(spinner, label);
+    return wrap;
+  }
+  if (row.state === 'installed') return badgeCell(t('marketplace.stateInstalled'), 'success');
+  return badgeCell(t('marketplace.stateAvailable'), 'medium');
+}
+
 const filteredModules = computed<Row[]>(() => {
-  if (tab.value === 'paid') return modules.value.filter((m) => m.price !== 'Gratis');
-  return modules.value;
+  const base = tab.value === 'paid' ? modules.value.filter((m) => m.price !== 'Gratis') : modules.value;
+  // Inyecta el estado de instalación en cada fila: cambia la identidad del array cuando `installing`
+  // cambia → la tabla (Lit) re-renderiza celdas y predicados de acción con el estado fresco.
+  return base.map((m) => {
+    const prog = installing.value.get(m.id) ?? null;
+    const state = prog ? 'installing' : m.installed ? 'installed' : 'available';
+    return {
+      ...m,
+      state,
+      stateLabel:
+        state === 'installing'
+          ? t('marketplace.stateInstalling')
+          : state === 'installed'
+            ? t('marketplace.stateInstalled')
+            : t('marketplace.stateAvailable'),
+      progress: prog,
+    };
+  });
 });
 
 // Instalados desde el runtime, como filas de la tabla.
@@ -224,10 +305,19 @@ const catalogColumns = computed<DataTableColumn[]>(() => [
   { key: 'cat', header: t('marketplace.colCategory'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.cat ?? ''), 'medium') },
   { key: 'desc', header: t('marketplace.colDescription') },
   { key: 'price', header: t('marketplace.colPrice'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price ?? ''), r.price === 'Gratis' ? 'success' : 'medium') },
-  { key: 'installed', header: t('marketplace.colInstalled'), align: 'center', filterable: true, filterType: 'select', format: (r) => (r.installed ? t('marketplace.yes') : t('marketplace.no')) },
+  // Estado visual (Instalado / Instalando… + fase / Disponible). `stateLabel` (traducido) es el
+  // valor crudo de la fila → el filtro select y el buscador ven la misma etiqueta que el usuario.
+  { key: 'stateLabel', header: t('marketplace.colStatus'), align: 'center', filterable: true, filterType: 'select', render: (r) => stateCell(r) },
 ]);
 const catalogActions = computed<DataTableAction[]>(() => [
-  { id: 'install', label: t('marketplace.actionInstall'), icon: 'download-outline' },
+  {
+    id: 'install',
+    label: t('marketplace.actionInstall'),
+    icon: 'download-outline',
+    // Instalado o en curso → botón muerto; en curso → spinner en su lugar (pista de actividad).
+    disabled: (row) => row.state !== 'available',
+    loading: (row) => row.state === 'installing',
+  },
 ]);
 
 // --- Handlers ---
@@ -251,9 +341,11 @@ function notify(msg: string, color: 'primary' | 'success' | 'danger', duration =
   });
 }
 
-// Cliente del runtime (provide en main.ts; fallback al singleton) para escuchar `module.installed`.
+// Cliente del runtime (provide en main.ts; fallback al singleton) para escuchar `module.installed`
+// y el progreso por fases `module.install.progress`.
 const client = inject(clientInjectionKey) ?? getClient();
 let unsubInstalled: (() => void) | null = null;
+let unsubProgress: (() => void) | null = null;
 
 // --- Consentimiento de permisos al instalar (modal best-effort) ---
 // Si el módulo a instalar DECLARA capabilities, las mostramos antes de instalar y al confirmar las
@@ -273,6 +365,8 @@ function closeConsent(): void {
 /** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
 async function installModule(mod: Mod): Promise<void> {
   if (mod.installed) { notify(t('marketplace.alreadyInstalled', { name: mod.name }), 'primary'); return; }
+  // Ya en curso (doble clic o instalación arrancada por otro cliente): no relanzar el request.
+  if (installing.value.has(mod.id)) return;
   // Best-effort: intentamos conocer los permisos que declara el módulo ANTES de instalar. El catálogo
   // Cloud no los expone, así que esto solo encuentra algo si el módulo ya estuvo instalado (runtime lo
   // recuerda); si no, instalamos directo y los permisos se gestionan luego en Ajustes → Permisos.
@@ -304,9 +398,9 @@ async function confirmConsentInstall(): Promise<void> {
 
 /** Instalación real: pide al runtime instalar y (opcional) concede las capabilities pasadas. */
 async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<void> {
-  // Persistente (duration 0) mientras corre la instalación en background (descarga+verifica+migra);
-  // el resultado (éxito/fallo o el evento WS `module.installed`) lo cierra y muestra el suyo.
-  // Además la barra de progreso de la topbar se enciende vía requestInstall (inFlight del shell).
+  // La card pasa a "Instalando…" al instante (fase genérica hasta que llegue el primer evento WS
+  // `module.install.progress` con la fase real). El toast persistente se mantiene como refuerzo.
+  setProgress(mod.id, mod.id, '');
   notify(t('marketplace.installing', { name: mod.name }), 'primary', 0);
   try {
     // Pide la instalación al runtime: descarga el zip firmado (marketplace Cloud), verifica
@@ -319,9 +413,15 @@ async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<
       const grants = Object.fromEntries(grantCaps.map((c) => [c.id, true]));
       await putModuleCapabilities(mod.id, grants).catch(() => null);
     }
+    // Optimista: badge "Instalado" ya, sin esperar al refresco del catálogo (loadCatalog llega
+    // detrás vía `module.installed` y confirma el estado real del Cloud).
+    const row = modules.value.find((m) => m.id === mod.id);
+    if (row) row.installed = true;
     notify(t('marketplace.installSuccess', { name: mod.name }), 'success');
   } catch {
     notify(t('marketplace.installError', { name: mod.name }), 'danger');
+  } finally {
+    clearProgress(mod.id);
   }
 }
 
@@ -437,15 +537,27 @@ onMounted(() => {
   unsubInstalled = client.on('module.installed', (payload) => {
     const id = (payload as { module_id?: string } | null)?.module_id;
     const found = modules.value.find((m) => m.id === id);
+    // Cubre también instalaciones iniciadas por OTRO cliente/pestaña (aquí no corre doInstall).
+    if (id) clearProgress(id);
     notify(found ? t('marketplace.moduleInstalledNamed', { name: found.name }) : t('marketplace.moduleInstalled'), 'success');
     void loadCatalog();
     void loadInstalled();
     void refreshModuleNav();
   });
+  // Progreso por fases del pipeline (resolving → downloading → verifying → installing). El frame
+  // llega entero (sin `payload`): `root_id` = módulo pedido (clave de la card), `module_id` = el
+  // que está procesando de verdad (puede ser una dependencia anidada).
+  unsubProgress = client.on('module.install.progress', (payload) => {
+    const p = payload as { module_id?: string; root_id?: string; phase?: string } | null;
+    const root = p?.root_id ?? p?.module_id;
+    if (!root) return;
+    setProgress(root, p?.module_id ?? root, p?.phase ?? '');
+  });
 });
 
 onBeforeUnmount(() => {
   unsubInstalled?.();
+  unsubProgress?.();
   mineTable.value?.removeEventListener('rowAction', handleMineAction);
   catalogTable.value?.removeEventListener('rowAction', handleCatalogAction);
 });

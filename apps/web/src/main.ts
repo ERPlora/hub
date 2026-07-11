@@ -27,6 +27,7 @@ import App from './App.vue';
 import { router } from './router';
 import { i18n } from './i18n';
 import { getClient, clientInjectionKey, bootHubContext } from './lib/runtime';
+import { startBridgeTokenRefresh } from './lib/bridge-client';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
@@ -164,5 +165,9 @@ setOnHubGone(() => {
 // X-Hub-Id esté disponible en la primera llamada. No bloquea si el runtime no responde
 // (deja el fallback VITE_HUB_ID). Decisión del humano (2): hub_id inyectado, sin picker.
 void bootHubContext().finally(() => {
+  // Con el hub_id ya resuelto, mantén fresco el token dedicado del Bridge (hardware local): el
+  // runtime lo emite firmado por el SaaS y el `BridgeClient` del SDK lo presenta. Degrada solo si
+  // el hub no está enrolado (no hay hardware), sin romper el arranque. ADR-0050 §2.7.
+  startBridgeTokenRefresh();
   router.isReady().then(() => app.mount('#app'));
 });

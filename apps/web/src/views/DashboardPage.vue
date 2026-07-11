@@ -18,6 +18,44 @@
           </ion-item>
         </ion-list>
 
+        <!-- Widget CORE de export/import (ADR-0113 §4). DECISIÓN: tarjeta fija ENCIMA del board,
+             NO un WidgetDef dentro de ok-widget-board — el board solo se pinta cuando hay módulos
+             con widgets (hasWidgets) y su picker/persistencia (storage-key) permitiría ocultarlo;
+             justo el hub vacío/recién restaurable, que es quien MÁS lo necesita, no lo vería.
+             Una tarjeta fija está SIEMPRE visible, con o sin módulos. -->
+        <ion-card data-testid="dashboard-blueprint-widget" class="blueprint-card">
+          <ion-card-content>
+            <div class="blueprint-row">
+              <span class="blueprint-icon"><HubIcon name="swap-vertical-outline" /></span>
+              <div>
+                <h2 class="blueprint-title">{{ t('dashboard.blueprintTitle') }}</h2>
+                <p class="blueprint-body">{{ t('dashboard.blueprintBody') }}</p>
+              </div>
+            </div>
+            <div class="blueprint-actions">
+              <ion-button
+                size="small"
+                data-testid="dashboard-blueprint-import"
+                router-link="/import"
+                router-direction="forward"
+              >
+                <HubIcon slot="start" name="cloud-upload-outline" />
+                {{ t('dashboard.blueprintImport') }}
+              </ion-button>
+              <ion-button
+                size="small"
+                fill="outline"
+                data-testid="dashboard-blueprint-export"
+                router-link="/export"
+                router-direction="forward"
+              >
+                <HubIcon slot="start" name="download-outline" />
+                {{ t('dashboard.blueprintExport') }}
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
         <!-- Superficie principal: tablero de widgets que los MÓDULOS instalados declaran en su
              module.json (campo `widgets`, ADR-0054). El shell recolecta, filtra por permiso y
              renderiza cada uno con su ok-* (kind) o el WC del módulo (component). Datos REALES de
@@ -156,7 +194,8 @@ import {
   IonFooter,
   IonSegment, IonSegmentButton, IonLabel,
   IonBadge, IonButton, IonSpinner,
-  IonList, IonListHeader, IonItem, IonNote, IonToolbar
+  IonList, IonListHeader, IonItem, IonNote, IonToolbar,
+  IonCard, IonCardContent,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -372,6 +411,41 @@ onMounted(async () => {
    (cabecera/filtros/pager fijos, scroll solo en el cuerpo) — mismo patrón que Marketplace. */
 .fill {
   height: 100%;
+}
+
+/* Widget CORE de export/import: icono en tile suave (wash del color de marca, patrón
+   ok-icon-tile) + título/cuerpo + fila de acciones. Espaciado por gap (sin padding custom). */
+.blueprint-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.blueprint-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(var(--ion-color-primary-rgb), 0.12);
+  color: var(--ion-color-primary);
+  font-size: 1.5rem;
+}
+.blueprint-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.blueprint-body {
+  color: var(--ion-color-medium);
+  margin: 0.15rem 0 0;
+}
+.blueprint-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 /* Apps tab: rejilla estilo "Google apps"/ok-app-launcher (icono en caja + label), no cards.

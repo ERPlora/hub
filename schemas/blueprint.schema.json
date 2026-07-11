@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://erplora.com/schemas/blueprint.schema.json",
+  "title": "ERPlora hub blueprint manifest",
+  "description": "BORRADOR — pendiente de la decisión Fase 0(a) del humano (plan ADR-0113). Contrato del manifest.json de un bundle de export/import del hub (`<nombre>_<idioma>.blueprint.zip`). El manifest es la FUENTE DE VERDAD del contenido (idioma, país, módulos, secciones) — a prueba de renombres del fichero. Consistente 1:1 con el struct `BlueprintManifest` de hub/crates/runtime/src/export.rs.",
+  "type": "object",
+  "required": ["schema_version", "name", "locale", "hub", "created_at", "modules", "sections", "sha256"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Versión del formato del bundle (SCHEMA_VERSION del runtime). Un import con versión desconocida se rechaza entero, sin efectos."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Nombre lógico elegido por el usuario (p. ej. `barberia`). El default de fichero sugerido es `<name>_<locale>.blueprint.zip`, pero el zip puede renombrarse sin romper nada: manda este manifest."
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[a-z]{2}$",
+      "description": "Idioma del contenido (`es`, `fr`): un restaurante ES no es un restaurante FR. Guía la organización futura en nube (`blueprints/<idioma>/…`)."
+    },
+    "hub": { "$ref": "#/$defs/hubMeta" },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Momento del export, ISO-8601 (lo aporta el llamador; el runtime no lee el reloj)."
+    },
+    "modules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/manifestModule" },
+      "description": "Módulos referenciados por el bundle. Al importar, el server instala los que falten (flujo `install_from_cloud`) ANTES de aplicar los datos."
+    },
+    "sections": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Secciones presentes en el bundle: `hub_users`, `hub_settings`, `fiscal`, `media` y `modules/<id>` por cada módulo con datos."
+    },
+    "sha256": {
+      "type": "object",
+      "description": "SHA256 hex por fichero del bundle (ruta relativa → hash). Se verifica al importar ANTES de aplicar nada: un hash que no casa rechaza el import entero, sin efectos (integridad dura, patrón ADR-0015).",
+      "patternProperties": {
+        "^.+$": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Hash SHA256 del fichero, hex en minúsculas (64 caracteres)."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "hubMeta": {
+      "type": "object",
+      "description": "Metadatos del hub de ORIGEN (informativos; el import NO los aplica como datos).",
+      "required": ["name", "country", "currency"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Nombre del hub de origen."
+        },
+        "country": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "País del hub de origen, ISO-3166-1 alpha-2 (`ES`, `FR`)."
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "Moneda del hub de origen, ISO-4217 (`EUR`)."
+        }
+      }
+    },
+    "manifestModule": {
+      "type": "object",
+      "description": "Un módulo referenciado por el bundle: se instala al importar; `with_data` indica si el bundle trae además sus filas (`data/<id>.sql`). Módulo marcado sin datos → solo install.",
+      "required": ["id", "version", "with_data"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Identificador del módulo (mismo patrón que module.schema.json)."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+",
+          "description": "SemVer — la versión REAL instalada en el hub de origen (la de su module.json)."
+        },
+        "with_data": {
+          "type": "boolean",
+          "description": "true → el bundle incluye `data/<id>.sql` con las filas del módulo (y la sección `modules/<id>`); false → el módulo solo se registra para instalar, vacío."
+        }
+      }
+    }
+  }
+}

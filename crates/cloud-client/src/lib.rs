@@ -99,6 +99,15 @@ impl CloudClient {
         self.get("/api/v1/hub/device/entitlement/", auth)
     }
 
+    /// **Token del Bridge local** — el SaaS emite un JWT dedicado (`aud=erplora-bridge` + `hub_id`,
+    /// exp corto) para autorizar el daemon de hardware. `GET /api/v1/hub/device/bridge-token/`. El
+    /// runtime lo proxya a la app (el `cloud_api_token` nunca llega al navegador); la app lo presenta
+    /// al Bridge en `ws://localhost:12321/ws?token=`. El Bridge lo verifica offline contra la clave
+    /// pública del SaaS. Un token de usuario/máquina robado NO sirve (audience distinta). ADR-0050 §2.7.
+    pub fn bridge_token(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/bridge-token/", auth)
+    }
+
     /// **Enrolamiento del dispositivo** — el runtime obtiene su credencial de máquina
     /// (`cloud_api_token`) una sola vez. `GET /api/v1/hub/device/enroll/` con el JWT de un
     /// **owner/admin** de la org del hub (`IsHubAdmin`) + `X-Hub-Id`. La respuesta es
