@@ -111,6 +111,77 @@ impl RevalidationState {
     }
 }
 
+/// Registra en la celda compartida el resultado de UN tick del job de revalidación.
+/// Separado del fetch de red para poder testearlo con estado/clock inyectados.
+pub fn record_outcome(
+    cell: &SharedRevalidation,
+    outcome: Result<EntitlementClaims, String>,
+    now: i64,
+) {
+    // Si el lock está envenenado (panic de otro hilo) se degrada a no-op: este estado es
+    // UX/defensa en profundidad, nunca debe tumbar el server.
+    let Ok(mut guard) = cell.write() else { return };
+    match outcome {
+        Ok(claims) => guard.apply_success(claims, now),
+        Err(e) => {
+            tracing::warn!(error = %e, fallos = guard.consecutive_failures + 1, "revalidación de entitlement fallida");
+            guard.apply_failure(now);
+        }
+    }
+}
+
+/// Intervalo del job en segundos: el valor del env `HUB_ENTITLEMENT_REVALIDATE_SECS` si es un
+/// entero > 0; si no (ausente, vacío, no numérico o 0), el default de 24h.
+pub fn interval_secs(env_value: Option<&str>) -> u64 {
+    env_value
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(DEFAULT_REVALIDATE_SECS)
+}
+
+/// Baja del Cloud la clave pública + el entitlement firmado (credencial de máquina) y verifica
+/// la firma RS256 y la gracia — la MISMA ruta de verificación que el gate de arranque Tauri
+/// (`verify_entitlement`). Glue de red del tick: el manejo de resultado (estado/contador) vive
+/// en [`record_outcome`], que es lo testeable sin red.
+pub async fn fetch_verified_claims(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &cloud_client::Auth,
+    now: i64,
+) -> Result<EntitlementClaims, String> {
+    let cloud = cloud_client::CloudClient::new(cloud_base_url);
+
+    // 1) Clave pública RSA (endpoint público, sin auth).
+    #[derive(serde::Deserialize)]
+    struct Pk {
+        public_key: String,
+    }
+    let pk_body = exec_get(http, cloud.public_key()).await?;
+    let pk: Pk = serde_json::from_str(&pk_body).map_err(|e| format!("public-key: {e}"))?;
+
+    // 2) Entitlement firmado del hub (X-Hub-Token + X-Hub-Id).
+    let ent_body = exec_get(http, cloud.entitlement(auth)).await?;
+    let ent = cloud_client::EntitlementResponse::parse(&ent_body)
+        .map_err(|e| format!("entitlement: {e}"))?;
+
+    // 3) Verificación offline-style: firma RS256 + ventana de gracia.
+    cloud_client::verify_entitlement(&ent.token, &pk.public_key, now).map_err(|e| e.to_string())
+}
+
+/// Ejecuta un GET de una `PreparedRequest` del `CloudClient` y devuelve el body si es 2xx.
+async fn exec_get(http: &reqwest::Client, req: cloud_client::PreparedRequest) -> Result<String, String> {
+    let mut r = http.get(&req.url);
+    for (k, v) in req.headers {
+        r = r.header(k, v);
+    }
+    let resp = r.send().await.map_err(|e| e.to_string())?;
+    let status = resp.status();
+    if !status.is_success() {
+        return Err(format!("{}: status {status}", req.url));
+    }
+    resp.text().await.map_err(|e| e.to_string())
+}
+
 /// Unix-ts actual (segundos). `0` si el reloj está antes de EPOCH (imposible en la práctica).
 pub fn now_unix() -> i64 {
     std::time::SystemTime::now()
@@ -241,6 +312,32 @@ mod tests {
         assert_eq!(v["last_check"], serde_json::json!(2_000));
         assert_eq!(v["last_refresh_ok_at"], serde_json::json!(1_500));
         assert_eq!(v["consecutive_failures"], serde_json::json!(1));
+    }
+
+    #[test]
+    fn record_outcome_aplica_exito_y_fallo_sobre_la_celda() {
+        // El tick del job separa red (fetch) de estado: aquí se testea el estado inyectado.
+        let cell = new_shared();
+        record_outcome(&cell, Ok(claims(&["pos"], 9_000)), 1_000);
+        {
+            let g = cell.read().unwrap();
+            assert_eq!(g.consecutive_failures, 0);
+            assert_eq!(g.last_refresh_ok_at, Some(1_000));
+        }
+        record_outcome(&cell, Err("red caída".into()), 2_000);
+        let g = cell.read().unwrap();
+        assert_eq!(g.consecutive_failures, 1);
+        assert_eq!(g.last_check_at, Some(2_000));
+        assert!(g.last_claims.is_some()); // el fallo NO borra la última verdad conocida
+    }
+
+    #[test]
+    fn intervalo_del_job_default_y_override() {
+        assert_eq!(interval_secs(None), DEFAULT_REVALIDATE_SECS);
+        assert_eq!(interval_secs(Some("3600")), 3_600);
+        assert_eq!(interval_secs(Some("no-numero")), DEFAULT_REVALIDATE_SECS);
+        assert_eq!(interval_secs(Some("0")), DEFAULT_REVALIDATE_SECS);
+        assert_eq!(interval_secs(Some("")), DEFAULT_REVALIDATE_SECS);
     }
 
     #[test]

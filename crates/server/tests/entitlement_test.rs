@@ -9,7 +9,7 @@ use axum::http::{Request, StatusCode};
 use cloud_client::{EntitledModule, EntitlementClaims};
 use erplora_db::SqliteAdapter;
 use erplora_runtime::Runtime;
-use erplora_server::{app, AppState};
+use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt; // oneshot
@@ -139,4 +139,44 @@ async fn sin_refresh_exitoso_el_gate_es_fail_open() {
     assert_eq!(resp.status(), StatusCode::OK);
     let body = body_json(resp).await;
     assert_eq!(body["ok"], json!(true));
+}
+
+#[tokio::test]
+async fn proxy_entitlement_incluye_revalidation_aunque_el_cloud_no_responda() {
+    // Cloud inalcanzable (puerto de descarte, conexión rechazada): el proxy sigue devolviendo su
+    // error (502, contrato actual) pero con el bloque ADITIVO `revalidation`, para que la UI
+    // pueda pintar «funcionará hasta {fecha}» incluso offline.
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(&fixture()).await.unwrap();
+    let cfg = HubConfig {
+        hub_id: "h1".into(),
+        cloud_base_url: "http://127.0.0.1:9".into(), // puerto discard: rechazo inmediato
+        module_cache: std::env::temp_dir().join("erplora-test-cache"),
+        auth_mode: AuthMode::Dev,
+        jwt_public_key: None,
+        cloud_api_token: Some("tok-maquina".into()), // hub enrolado → el proxy intenta la red
+        device_trust_enforce: false,
+        media_dir: std::env::temp_dir().join("erplora-test-media"),
+        sector: None,
+    };
+    let state = AppState::with_config(rt, cfg);
+    // Estado sembrado por el job: último token válido con gracia 9_000, sin bloqueos.
+    state
+        .entitlement
+        .write()
+        .unwrap()
+        .apply_success(claims(&["inventory"], 9_000), 1_000);
+    let router = app(state.clone());
+
+    let resp = router
+        .oneshot(Request::builder().uri("/api/entitlement").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_GATEWAY); // contrato actual intacto
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(false)); // contrato actual intacto
+    assert_eq!(body["revalidation"]["grace_until"], json!(9_000)); // bloque aditivo nuevo
+    assert_eq!(body["revalidation"]["blocked_modules"], json!([]));
+    assert_eq!(body["revalidation"]["last_refresh_ok_at"], json!(1_000));
 }
