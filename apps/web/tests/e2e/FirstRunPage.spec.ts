@@ -2,7 +2,7 @@
 //
 // Un hub recién provisionado se despliega VACÍO: sin módulos, sin sector, sin país. Hoy aterriza en
 // `/dashboard`, que está en blanco, y nada le dice al usuario que su siguiente paso es instalar el
-// módulo `setup` desde el marketplace. El shell debe empujarle ahí.
+// módulo `setup` desde Apps (la tienda del Hub). El shell debe empujarle ahí.
 //
 // El empujón vive en el core; el wizard NO. En cuanto hay un módulo instalado, el shell se aparta.
 //
@@ -53,13 +53,22 @@ test.describe('primer arranque de un hub vacío', () => {
     await expect(page.getByTestId('first-run-install')).toBeVisible();
   });
 
-  test('la pantalla no es una trampa: se puede salir al marketplace', async ({ page }) => {
+  test('la pantalla no es una trampa: se puede salir a Apps', async ({ page }) => {
     await withSession(page, await loginByPin());
 
     await page.goto('/first-run');
-    await page.getByTestId('first-run-marketplace').click();
+    await page.getByTestId('first-run-apps').click();
 
-    await expect(page).toHaveURL(/\/marketplace$/);
+    await expect(page).toHaveURL(/\/apps$/);
+  });
+
+  test('la ruta antigua /marketplace redirige a /apps', async ({ page }) => {
+    await withSession(page, await loginByPin());
+
+    // Compat: enlaces/bookmarks viejos a la tienda no deben romper tras el rename.
+    await page.goto('/marketplace');
+
+    await expect(page).toHaveURL(/\/apps$/);
   });
 
   test('en cuanto hay un módulo instalado, el shell deja de empujar', async ({ page }) => {

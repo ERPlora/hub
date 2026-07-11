@@ -67,13 +67,22 @@ try {
     await page.context().close();
   }
 
-  // 2) la pantalla no es una trampa: se puede salir al marketplace
+  // 2) la pantalla no es una trampa: se puede salir a Apps
   {
     const page = await newPage(browser, session);
     await page.goto(WEB + '/first-run');
-    await page.getByTestId('first-run-marketplace').click();
-    await page.waitForURL(/\/marketplace$/, { timeout: 10_000 }).catch(() => {});
-    check('se puede escapar al marketplace', /\/marketplace$/.test(page.url()), `URL=${page.url()}`);
+    await page.getByTestId('first-run-apps').click();
+    await page.waitForURL(/\/apps$/, { timeout: 10_000 }).catch(() => {});
+    check('se puede escapar a Apps', /\/apps$/.test(page.url()), `URL=${page.url()}`);
+    await page.context().close();
+  }
+
+  // 2b) compat: la ruta antigua /marketplace redirige a /apps (bookmarks/enlaces viejos)
+  {
+    const page = await newPage(browser, session);
+    await page.goto(WEB + '/marketplace');
+    await page.waitForURL(/\/apps$/, { timeout: 10_000 }).catch(() => {});
+    check('/marketplace redirige a /apps', /\/apps$/.test(page.url()), `URL=${page.url()}`);
     await page.context().close();
   }
 

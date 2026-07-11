@@ -24,10 +24,10 @@
           expand="block"
           fill="clear"
           color="medium"
-          data-testid="first-run-marketplace"
-          @click="router.push('/marketplace')"
+          data-testid="first-run-apps"
+          @click="router.push('/apps')"
         >
-          {{ t('firstRun.marketplace') }}
+          {{ t('firstRun.apps') }}
         </ion-button>
       </div>
     </ion-content>
@@ -37,7 +37,7 @@
 <script setup lang="ts">
 // Empujón de primer arranque. Un hub se despliega vacío (ADR-0087) y aterrizaba en un dashboard en
 // blanco, sin pista de que el siguiente paso es instalar `setup`. Esta pantalla es el core; el
-// wizard NO: vive en el módulo `setup`, que se instala desde el marketplace como cualquier otro.
+// wizard NO: vive en el módulo `setup`, que se instala desde Apps como cualquier otro.
 // En cuanto hay un módulo instalado, `needsFirstRun` cae y el shell deja de desviar aquí.
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -47,7 +47,7 @@ import { IonPage, IonContent, IonButton, IonSpinner } from '@ionic/vue';
 import { requestInstall } from '../lib/runtime';
 import { refreshInstalledModules, refreshModuleNav } from '../lib/nav';
 
-/** Id del módulo de puesta en marcha en el marketplace. */
+/** Id del módulo de puesta en marcha en el catálogo de Apps. */
 const SETUP_MODULE_ID = 'setup';
 
 const { t } = useI18n();

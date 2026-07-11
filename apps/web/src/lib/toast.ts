@@ -1,5 +1,5 @@
 // Toast global de feedback de acciones (éxito / error / info). Centraliza lo que hoy cada página
-// reinventaba con su propio `<ion-toast>` (Marketplace/Files/System). Usa el `toastController` de
+// reinventaba con su propio `<ion-toast>` (Apps/Files/System). Usa el `toastController` de
 // Ionic (imperativo): encola/apila solo, no necesita un `<ion-toast>` en la plantilla.
 //
 // Además `bootActionFeedback()` engancha UN listener global a los eventos que `ok-data-table`
