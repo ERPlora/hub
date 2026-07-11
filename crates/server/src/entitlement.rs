@@ -11,7 +11,9 @@
 //!       revocado/no comprado → inmediato, sea cual sea su tier), O
 //!     - (b) es **DE PAGO** (`tier` fuera de los gratuitos `free`/`basic`/`essential`, ADR-0006)
 //!       y acumulamos [`MAX_CONSECUTIVE_FAILURES`] fallos seguidos de refresh **Y** ya pasó la
-//!       ventana de gracia (`grace_until`) del último token válido.
+//!       ventana de gracia del último token válido: la de pago (`paid_grace_until`, claim
+//!       ADITIVO del SaaS de 5 días, 2026-07-12) si el token la trae, o si no la global
+//!       (`grace_until`, 7 días, la del gate de la app) como hasta ahora.
 //!  3. Sin ningún refresh exitoso previo (dev/local sin enrolar, hub recién arrancado) NUNCA
 //!     se bloquea (fail-open): la autoridad es el SaaS, no este gate.
 //!
@@ -100,16 +102,23 @@ impl RevalidationState {
             return true;
         };
         // (b) Entitled según el último token válido: solo un módulo DE PAGO se bloquea, y solo
-        // si llevamos demasiados fallos seguidos Y además venció su ventana de gracia. Los
-        // tiers gratuitos siguen funcionando SIEMPRE (offline-first, ver doc del módulo).
+        // si llevamos demasiados fallos seguidos Y además venció su ventana de gracia — la DE
+        // PAGO (`paid_grace_until`, claim aditivo) si el token la trae; si no, la global
+        // (`grace_until`). Los tiers gratuitos siguen funcionando SIEMPRE (offline-first).
         is_paid_tier(&entry.tier)
             && self.consecutive_failures >= MAX_CONSECUTIVE_FAILURES
-            && now > claims.grace_until
+            && now > claims.paid_grace_until.unwrap_or(claims.grace_until)
     }
 
     /// `grace_until` del último token válido (para la UI: «funcionará hasta {fecha}»).
     pub fn grace_until(&self) -> Option<i64> {
         self.last_claims.as_ref().map(|c| c.grace_until)
+    }
+
+    /// `paid_grace_until` del último token válido: gracia ESPECÍFICA de los módulos de pago
+    /// (claim aditivo del SaaS). `None` = el token no la trae → aplica `grace_until`.
+    pub fn paid_grace_until(&self) -> Option<i64> {
+        self.last_claims.as_ref().and_then(|c| c.paid_grace_until)
     }
 
     /// Filtra de `installed` los módulos bloqueados a fecha `now` (para el proxy de entitlement).
@@ -123,6 +132,7 @@ impl RevalidationState {
         serde_json::json!({
             "blocked_modules": self.blocked_modules(installed, now),
             "grace_until": self.grace_until(),
+            "paid_grace_until": self.paid_grace_until(),
             "last_check": self.last_check_at,
             "last_refresh_ok_at": self.last_refresh_ok_at,
             "consecutive_failures": self.consecutive_failures,
@@ -231,6 +241,7 @@ mod tests {
             iat: 1_000,
             exp: 2_000,
             grace_until,
+            paid_grace_until: None,
         }
     }
 
@@ -250,6 +261,7 @@ mod tests {
             iat: 1_000,
             exp: 2_000,
             grace_until,
+            paid_grace_until: None,
         }
     }
 
@@ -363,6 +375,63 @@ mod tests {
         st.apply_failure(7_000);
         st.apply_failure(8_000);
         assert!(st.is_blocked("pos", 9_000)); // fallos == 3 AND now > grace_until
+    }
+
+    #[test]
+    fn paid_grace_until_menor_bloquea_al_de_pago_aunque_grace_until_siga_vigente() {
+        // Claim ADITIVO del SaaS (2026-07-12): gracia de pago de 5 días, SEPARADA de la global
+        // de 7 (`grace_until`, gate de la app). Con paid_grace_until (5_000) < grace_until
+        // (50_000), el módulo DE PAGO se bloquea en cuanto fallos >= 3 AND now > paid_grace_until,
+        // aunque la gracia global siga vigente. Los tiers gratuitos siguen exentos de la rama (b).
+        let mut st = RevalidationState::default();
+        let mut c = claims_tiered(
+            &[("pos", "premium"), ("caja", "basic"), ("agenda", "essential"), ("notas", "free")],
+            50_000,
+        );
+        c.paid_grace_until = Some(5_000);
+        st.apply_success(c, 1_500);
+        for i in 0..3 {
+            st.apply_failure(6_000 + i);
+        }
+        assert!(st.is_blocked("pos", 9_000)); // de pago: now > paid_grace (5_000), now < grace (50_000)
+        assert!(!st.is_blocked("pos", 4_000)); // antes de la gracia de pago aún no bloquea
+        assert!(!st.is_blocked("caja", 9_000)); // basic → gratis, nunca por la rama (b)
+        assert!(!st.is_blocked("agenda", 9_000)); // essential → gratis
+        assert!(!st.is_blocked("notas", 9_000)); // free → gratis
+    }
+
+    #[test]
+    fn sin_paid_grace_until_el_de_pago_cae_a_grace_until_como_hoy() {
+        // Retrocompat: tokens antiguos sin el claim (paid_grace_until = None, ver helpers) →
+        // la rama (b) usa `grace_until` exactamente igual que antes.
+        let mut st = RevalidationState::default();
+        st.apply_success(claims(&["pos"], 5_000), 1_500);
+        for i in 0..3 {
+            st.apply_failure(6_000 + i);
+        }
+        assert!(st.is_blocked("pos", 9_000)); // fallos >= 3 AND now > grace_until
+        assert!(!st.is_blocked("pos", 4_000)); // con la gracia global vigente no bloquea
+    }
+
+    #[test]
+    fn revalidation_json_expone_paid_grace_until_ademas_de_grace_until() {
+        // El bloque aditivo del proxy expone AMBAS gracias: la UI pinta «funcionará hasta
+        // {fecha}» con la de pago si viene, sin perder la global existente.
+        let mut st = RevalidationState::default();
+        let mut c = claims(&["inventory"], 9_000);
+        c.paid_grace_until = Some(4_000);
+        st.apply_success(c, 1_500);
+        let v = st.revalidation_json(&["inventory".to_string()], 2_500);
+        assert_eq!(v["grace_until"], serde_json::json!(9_000)); // el existente no se sustituye
+        assert_eq!(v["paid_grace_until"], serde_json::json!(4_000));
+        assert_eq!(st.paid_grace_until(), Some(4_000));
+
+        // Sin el claim (tokens antiguos) el campo va a null y el helper a None.
+        let mut st2 = RevalidationState::default();
+        st2.apply_success(claims(&["inventory"], 9_000), 1_500);
+        let v2 = st2.revalidation_json(&["inventory".to_string()], 2_500);
+        assert_eq!(v2["paid_grace_until"], Value::Null);
+        assert_eq!(st2.paid_grace_until(), None);
     }
 
     #[test]
