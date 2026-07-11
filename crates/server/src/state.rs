@@ -172,6 +172,10 @@ pub struct AppState {
     /// Índice vectorial para routing de tools (§9.2b) + ingestión de embeddings (§9.6). `None` =
     /// sin índice (degradación §9.5: el asistente manda todos los tools). Lo siembra `serve()`.
     pub vector: Option<SharedVectorStore>,
+    /// Estado de la **revalidación híbrida del entitlement** (módulos de pago): lo escribe el job
+    /// periódico de `serve()` y lo leen el gate de `query`/`command` y el proxy `/api/entitlement`.
+    /// Estado inicial = fail-open (nada bloqueado). Ver `crate::entitlement`.
+    pub entitlement: crate::entitlement::SharedRevalidation,
 }
 
 impl AppState {
@@ -201,6 +205,7 @@ impl AppState {
             http: reqwest::Client::new(),
             tenants: None,
             vector: None,
+            entitlement: crate::entitlement::new_shared(),
         }
     }
 
