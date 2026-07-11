@@ -7,13 +7,19 @@
 //!     entitlement **firmado RS256** del Cloud con la credencial de máquina del hub
 //!     (`X-Hub-Token`) y actualiza este estado compartido.
 //!  2. Un módulo queda **bloqueado** si:
-//!     - el ÚLTIMO refresh EXITOSO no lo incluye en `claims.modules` (verdad del servidor:
-//!       revocado/no comprado → inmediato), O
-//!     - acumulamos [`MAX_CONSECUTIVE_FAILURES`] fallos seguidos de refresh **Y** ya pasó la
-//!       ventana de gracia (`grace_until`) del último token válido — la misma semántica de
-//!       gracia que el gate de arranque de la app Tauri (`verify_entitlement`).
+//!     - (a) el ÚLTIMO refresh EXITOSO no lo incluye en `claims.modules` (verdad del servidor:
+//!       revocado/no comprado → inmediato, sea cual sea su tier), O
+//!     - (b) es **DE PAGO** (`tier` fuera de los gratuitos `free`/`basic`/`essential`, ADR-0006)
+//!       y acumulamos [`MAX_CONSECUTIVE_FAILURES`] fallos seguidos de refresh **Y** ya pasó la
+//!       ventana de gracia (`grace_until`) del último token válido.
 //!  3. Sin ningún refresh exitoso previo (dev/local sin enrolar, hub recién arrancado) NUNCA
 //!     se bloquea (fail-open): la autoridad es el SaaS, no este gate.
+//!
+//! Decisión del fundador: «si el módulo es de pago deja de funcionar» — y SOLO el de pago. Los
+//! módulos gratuitos son locales por diseño (offline-first, ADR-0040: sin sync) y siguen
+//! funcionando SIEMPRE, incluso con el hub incomunicado más allá de la gracia; el de pago en
+//! cambio depende del entitlement que emite el SaaS. Un tier desconocido se trata como de pago
+//! (fail-closed solo en la rama (b), ver [`is_paid_tier`]).
 //!
 //! El gate solo corta `execute_query`/`execute_command` con el error estable
 //! `module_entitlement_blocked` (ver `entitlement_blocked_response` en `lib.rs`); **NUNCA**
@@ -57,6 +63,15 @@ pub fn new_shared() -> SharedRevalidation {
     Arc::new(RwLock::new(RevalidationState::default()))
 }
 
+/// ¿Es `tier` un módulo DE PAGO? Los tiers gratuitos (ADR-0006: `basic` + `essential`; `free`
+/// por robustez) quedan EXENTOS de la rama (b) del bloqueo: los módulos free son locales por
+/// diseño (offline-first, ADR-0040) y deben seguir funcionando aunque el hub quede incomunicado.
+/// Un tier ausente/desconocido se trata como de pago — fail-closed SOLO en la rama (b), que ya
+/// exige `MAX_CONSECUTIVE_FAILURES` fallos consecutivos Y la gracia vencida.
+fn is_paid_tier(tier: &str) -> bool {
+    !matches!(tier.trim().to_ascii_lowercase().as_str(), "free" | "basic" | "essential")
+}
+
 impl RevalidationState {
     /// Registra un refresh EXITOSO: guarda las claims verificadas y resetea el contador.
     pub fn apply_success(&mut self, claims: EntitlementClaims, now: i64) {
@@ -79,13 +94,17 @@ impl RevalidationState {
         let Some(claims) = &self.last_claims else {
             return false;
         };
-        // Verdad del servidor: el último refresh OK no lo incluye → bloqueado inmediato.
-        if !claims.allows(module_id) {
+        // (a) Verdad del servidor: el último refresh OK no lo incluye (revocado/no comprado)
+        // → bloqueado inmediato, sea cual sea su tier (que ni siquiera conocemos).
+        let Some(entry) = claims.modules.iter().find(|m| m.module_id == module_id) else {
             return true;
-        }
-        // Entitled según el último token válido: solo se bloquea si llevamos demasiados fallos
-        // seguidos Y además venció su ventana de gracia (misma semántica que el gate Tauri).
-        self.consecutive_failures >= MAX_CONSECUTIVE_FAILURES && now > claims.grace_until
+        };
+        // (b) Entitled según el último token válido: solo un módulo DE PAGO se bloquea, y solo
+        // si llevamos demasiados fallos seguidos Y además venció su ventana de gracia. Los
+        // tiers gratuitos siguen funcionando SIEMPRE (offline-first, ver doc del módulo).
+        is_paid_tier(&entry.tier)
+            && self.consecutive_failures >= MAX_CONSECUTIVE_FAILURES
+            && now > claims.grace_until
     }
 
     /// `grace_until` del último token válido (para la UI: «funcionará hasta {fecha}»).
@@ -213,6 +232,87 @@ mod tests {
             exp: 2_000,
             grace_until,
         }
+    }
+
+    /// Como [`claims`] pero con `tier` explícito por módulo (regla (b): solo los DE PAGO).
+    fn claims_tiered(modules: &[(&str, &str)], grace_until: i64) -> EntitlementClaims {
+        EntitlementClaims {
+            hub_id: "h1".into(),
+            deployment_mode: "cloud".into(),
+            modules: modules
+                .iter()
+                .map(|(id, tier)| EntitledModule {
+                    module_id: (*id).to_string(),
+                    tier: (*tier).to_string(),
+                    version: "1.0.0".into(),
+                })
+                .collect(),
+            iat: 1_000,
+            exp: 2_000,
+            grace_until,
+        }
+    }
+
+    #[test]
+    fn tras_fallos_y_gracia_vencida_los_tiers_free_no_se_bloquean() {
+        // Decisión del fundador: solo el módulo DE PAGO deja de funcionar. Los free son
+        // locales por diseño (offline-first, ADR-0040) y siguen SIEMPRE, incluso con el
+        // hub incomunicado más allá de la gracia.
+        let mut st = RevalidationState::default();
+        st.apply_success(
+            claims_tiered(
+                &[("pos", "premium"), ("caja", "basic"), ("agenda", "essential"), ("notas", "free")],
+                5_000,
+            ),
+            1_500,
+        );
+        for i in 0..3 {
+            st.apply_failure(6_000 + i);
+        }
+        assert!(st.is_blocked("pos", 9_000)); // de pago → bloquea (fallos>=3 AND gracia vencida)
+        assert!(!st.is_blocked("caja", 9_000)); // basic → gratis (ADR-0006), nunca por la rama (b)
+        assert!(!st.is_blocked("agenda", 9_000)); // essential → gratis
+        assert!(!st.is_blocked("notas", 9_000)); // free → gratis
+    }
+
+    #[test]
+    fn tier_desconocido_o_vacio_cuenta_como_de_pago_en_la_rama_b() {
+        // Fail-closed SOLO en la rama (b) (que ya exige 3 fallos + gracia vencida): un tier
+        // que no sabemos que sea gratuito se trata como premium.
+        let mut st = RevalidationState::default();
+        st.apply_success(claims_tiered(&[("x", "pro"), ("y", "")], 5_000), 1_500);
+        for i in 0..3 {
+            st.apply_failure(6_000 + i);
+        }
+        assert!(st.is_blocked("x", 9_000)); // tier desconocido → como de pago
+        assert!(st.is_blocked("y", 9_000)); // tier vacío → como de pago
+    }
+
+    #[test]
+    fn fuera_de_claims_bloquea_inmediato_sea_cual_sea_el_tier() {
+        // La regla (a) NO cambia: fuera del último refresh OK = verdad del servidor
+        // (revocado/no comprado) → bloqueo inmediato; el tier ni se conoce.
+        let mut st = RevalidationState::default();
+        st.apply_success(claims_tiered(&[("caja", "basic")], 50_000), 1_500);
+        assert!(st.is_blocked("pos", 1_600)); // sin fallos y con gracia vigente: da igual
+        assert!(!st.is_blocked("caja", 1_600));
+    }
+
+    #[test]
+    fn blocked_modules_tras_gracia_solo_contiene_de_pago_o_revocados() {
+        // El bloque `revalidation` del proxy hereda la regla: tras fallos+gracia solo
+        // aparecen los de pago (rama b) y los fuera de claims (rama a); los free nunca.
+        let mut st = RevalidationState::default();
+        st.apply_success(claims_tiered(&[("pos", "premium"), ("caja", "basic")], 5_000), 1_500);
+        for i in 0..3 {
+            st.apply_failure(6_000 + i);
+        }
+        let installed =
+            vec!["pos".to_string(), "caja".to_string(), "revocado".to_string()];
+        assert_eq!(
+            st.blocked_modules(&installed, 9_000),
+            vec!["pos".to_string(), "revocado".to_string()]
+        );
     }
 
     #[test]
