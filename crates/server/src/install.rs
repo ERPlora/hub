@@ -54,6 +54,13 @@ impl Fetcher for InMemoryFetcher {
     }
 }
 
+/// Callback de progreso del pipeline: `(module_id_en_curso, fase)`. Fases, en orden por módulo:
+/// `resolving` → `downloading` → `verifying` → `installing`. Con deps anidadas el callback se
+/// dispara también por cada dependencia (la dep completa sus fases ANTES del `installing` del
+/// módulo que la declara). El server lo retransmite por WS como `module.install.progress` para
+/// que el Hub pinte en la card del catálogo en qué punto está la instalación.
+pub type OnProgress<'a> = &'a (dyn Fn(&str, &str) + Send + Sync);
+
 /// Resultado de una instalación correcta (forma del JSON de `/api/modules/request-install`).
 #[derive(Debug, Clone)]
 pub struct Installed {
@@ -159,6 +166,7 @@ pub async fn install_from_cloud(
     runtime: &mut erplora_runtime::Runtime,
     module_id: &str,
     requested_version: &str,
+    on_progress: OnProgress<'_>,
 ) -> Result<Installed, InstallError> {
     let mut installing: std::collections::HashSet<String> = std::collections::HashSet::new();
     install_recursive(
@@ -170,6 +178,7 @@ pub async fn install_from_cloud(
         module_id.to_string(),
         requested_version.to_string(),
         &mut installing,
+        on_progress,
     )
     .await
 }
@@ -188,6 +197,7 @@ fn install_recursive<'a>(
     module_id: String,
     requested_version: String,
     installing: &'a mut std::collections::HashSet<String>,
+    on_progress: OnProgress<'a>,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Installed, InstallError>> + Send + 'a>>
 {
     Box::pin(async move {
@@ -195,6 +205,7 @@ fn install_recursive<'a>(
 
         // (1) Resolver versión contra el Cloud. SHA256 obligatorio (ADR-0015): sin hash esperado
         //     no hay verificación de integridad posible → abortar ANTES de descargar nada.
+        on_progress(&module_id, "resolving");
         let version = resolve_version(http, &cloud, auth, &module_id, &requested_version).await?;
         let sha = version
             .sha256
@@ -208,10 +219,12 @@ fn install_recursive<'a>(
             .to_string();
 
         // (2) Descargar el ZIP binario.
+        on_progress(&module_id, "downloading");
         let dl_req = cloud.download(auth, &module_id, &version.version);
         let zip_bytes = send_bytes(http, &dl_req).await?;
 
         // (3) Verificar SHA256 (obligatorio) + descomprimir de forma segura + cachear.
+        on_progress(&module_id, "verifying");
         let store = ModuleStore::new(cache_root);
         let dir = acquire(&store, &module_id, &version, &sha, zip_bytes)?;
 
@@ -236,11 +249,13 @@ fn install_recursive<'a>(
                 dep,
                 "latest".to_string(),
                 &mut *installing,
+                on_progress,
             )
             .await?;
         }
 
         // (5) Instalar el módulo (migra, registra, activa) — ya con sus deps presentes.
+        on_progress(&module_id, "installing");
         let installed_id = runtime
             .install_from_dir(&dir)
             .await
