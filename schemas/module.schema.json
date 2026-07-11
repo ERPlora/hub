@@ -294,10 +294,10 @@
     },
     "billing": {
       "type": "object",
-      "description": "Términos comerciales del módulo (ADR-0007). SOLO lo lee el Cloud para crear/actualizar productos en Stripe; el Hub lo ignora. Relevante solo para `tier: premium` (basic/essential son gratis en todo despliegue). Precio único con `interval`+`price`, o multi-tier con `tiers`.",
+      "description": "Términos comerciales del módulo (ADR-0007). SOLO lo lee el Cloud para crear/actualizar productos en Stripe; el Hub lo ignora. Relevante solo para `tier: premium` (free es gratis en todo despliegue; ADR-0032 colapsó basic/essential→free). Precio único con `interval`+`price`, o multi-tier con `tiers`.",
       "additionalProperties": false,
       "properties": {
-        "tier": { "type": "string", "enum": ["basic", "essential", "premium"] },
+        "tier": { "type": "string", "enum": ["free", "premium"] },
         "type": { "type": "string", "enum": ["free", "one_time", "subscription"] },
         "interval": { "type": "string", "enum": ["month", "year"], "description": "Intervalo de la suscripción de precio único." },
         "price": { "type": "number", "minimum": 0, "description": "Precio único en EUR (IVA incl.)." },

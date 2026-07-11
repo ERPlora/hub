@@ -388,7 +388,7 @@
       <!-- ── Tab: Permisos (capabilities de módulo, default-deny) ── -->
       <!-- Lista los módulos instalados que DECLARAN permisos; por cada uno, un toggle por capability.
            El runtime es la autoridad (PUT solo admin → 401 si no); aquí el gate `:disabled` es solo
-           cosmético. La gestión autoritativa de permisos vive AQUÍ (el modal del marketplace es un
+           cosmético. La gestión autoritativa de permisos vive AQUÍ (el modal de Apps es un
            atajo de consentimiento al instalar). -->
       <template v-else-if="tab === 'permissions'">
         <ion-card>

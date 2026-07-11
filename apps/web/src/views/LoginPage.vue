@@ -377,8 +377,8 @@ async function submitEmail(): Promise<void> {
     // (ARQUITECTURA.md §2.9b). Lo adoptamos como X-Hub-Id ANTES de activar la sesión, para que el
     // gate de entitlement (App.vue → resolveEntitlement) deje de pegar contra el hub placeholder.
     // En Tauri, además, ENROLAMOS el dispositivo: el shell pide el token de máquina al Cloud y
-    // persiste token + hub_id real en disco (hot-reload del runtime embebido), así marketplace/
-    // entitlement firman con la identidad real sin depender de un JWT fresco. Best-effort: si el
+    // persiste token + hub_id real en disco (hot-reload del runtime embebido), así el catálogo de
+    // Apps/entitlement firman con la identidad real sin depender de un JWT fresco. Best-effort: si el
     // enroll falla, el JWT del usuario ya autoriza por IsHubMember.
     if (result.hubId) {
       config.hubId = result.hubId;

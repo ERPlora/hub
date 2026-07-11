@@ -16,7 +16,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/employees/:id', name: 'employee-edit', component: () => import('../views/EmployeeFormPage.vue'), meta: { auth: true } },
   { path: '/files', name: 'files', component: () => import('../views/FilesPage.vue'), meta: { auth: true } },
   { path: '/billing', name: 'billing', component: () => import('../views/BillingPage.vue'), meta: { auth: true } },
-  { path: '/marketplace', name: 'marketplace', component: () => import('../views/MarketplacePage.vue'), meta: { auth: true } },
+  { path: '/apps', name: 'apps', component: () => import('../views/AppsPage.vue'), meta: { auth: true } },
+  // Compat: la tienda se llamaba "Marketplace"; los enlaces/bookmarks viejos siguen funcionando.
+  { path: '/marketplace', redirect: '/apps' },
   { path: '/system', name: 'system', component: () => import('../views/SystemPage.vue'), meta: { auth: true } },
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsPage.vue'), meta: { auth: true } },
   // Documentación de la API pública (ADR-0057 §4): vista Vue interna que renderiza Swagger sobre el
@@ -55,11 +57,11 @@ router.beforeEach(async (to) => {
     return { path: '/' };
   }
   // Primer arranque: un hub sin módulos aterrizaría en un dashboard vacío. Hay que ESPERAR a saber
-  // qué hay instalado (`/api/modules`), o decidiríamos sin la respuesta. Marketplace y ajustes
+  // qué hay instalado (`/api/modules`), o decidiríamos sin la respuesta. Apps y ajustes
   // quedan accesibles: la pantalla empuja, no encierra.
   if (isAuthed.value && to.meta.auth) {
     await ensureInstalledModules();
-    const escapes = ['first-run', 'marketplace', 'settings'];
+    const escapes = ['first-run', 'apps', 'settings'];
     if (needsFirstRun.value && !escapes.includes(String(to.name))) {
       return { name: 'first-run' };
     }

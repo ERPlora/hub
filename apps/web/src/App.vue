@@ -145,7 +145,7 @@ const nav = computed<NavSection[]>(() => [
     titleKey: 'nav.account',
     items: [
       { path: '/billing', labelKey: 'nav.billing', icon: 'card-outline' },
-      { path: '/marketplace', labelKey: 'nav.marketplace', icon: 'storefront-outline' },
+      { path: '/apps', labelKey: 'nav.apps', icon: 'storefront-outline' },
       { path: '/system', labelKey: 'nav.system', icon: 'hardware-chip-outline' },
       ...(apiDocsEnabled.value
         ? [{ path: '/api-docs', labelKey: 'nav.apiDocs', icon: 'code-slash-outline' }]
@@ -181,7 +181,7 @@ const initials = computed<string>(() => {
 });
 
 // Resuelve el entitlement (§2.10) ANTES de pintar la nav de módulos: solo se montan los que el
-// hub puede usar. MarketplacePage refresca la nav al recibir el evento WS `module.installed`.
+// hub puede usar. AppsPage refresca la nav al recibir el evento WS `module.installed`.
 async function gateAndRefresh(): Promise<void> {
   await resolveEntitlement();
   await refreshModuleNav();

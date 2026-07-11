@@ -1,9 +1,13 @@
 <!--
   ModulePlanPanel — panel del SHELL (no un Web Component de módulo) que se renderiza en la pestaña
-  sintética "Plan" de la navegación de un módulo (ver ModuleView). Es la cara de cliente del plano
-  "compra = usuario": pinta los tiers del manifest (`billing.tiers`), el estado de suscripción
-  actual (cloudModuleSubscription) y los CTAs comprar/mejorar/cancelar, que pegan DIRECTO al Cloud
-  con el JWT del usuario + X-Hub-Id (NO el proxy del runtime ni el token de máquina).
+  sintética "Plan" de la navegación de un módulo (ver ModuleView). Pinta los tiers del manifest
+  (`billing.tiers`) y el estado de suscripción actual (cloudModuleSubscription, JWT del usuario +
+  X-Hub-Id).
+
+  El Hub NO vende (decisión Fase 4): los CTAs comprar/mejorar/cancelar abren un DEEP-LINK a la
+  página del módulo en el SaaS (navegador externo vía openExternal), donde vive el checkout y la
+  gestión de la suscripción. Al recuperar foco/visibilidad —o con el botón "comprobar"— el panel
+  re-consulta la suscripción para reflejar la compra hecha en el navegador.
 
   El Cloud NO expone el slug del tier actual (ni module-subscription ni check_ownership lo traen),
   así que en v1 NO se resalta un tier concreto: se muestra solo el `status` global y los CTAs se
@@ -34,19 +38,26 @@
           </p>
           <p v-else class="status-line opacity-70">{{ statusHint }}</p>
 
-          <!-- Cancelar: solo si hay una suscripción activa o en prueba (no cancelada ya). -->
-          <ion-button
-            v-if="canCancel"
-            class="cancel-btn"
-            fill="outline"
-            color="danger"
-            size="small"
-            :disabled="busy"
-            @click="onCancel"
-          >
-            <HubIcon name="close-outline" slot="start" />
-            {{ t('modulePlan.cancel') }}
-          </ion-button>
+          <!-- La compra/gestión ocurre en el navegador (SaaS); aquí solo se refleja el estado. -->
+          <p class="status-line opacity-70">{{ t('modulePlan.opensInBrowser') }}</p>
+          <div class="status-actions">
+            <!-- Re-consulta manual: "he completado la compra" (además del recheck-on-focus). -->
+            <ion-button size="small" fill="outline" :disabled="loadingStatus" @click="onCheckPurchase">
+              <HubIcon name="refresh-outline" slot="start" />
+              {{ t('modulePlan.checkPurchase') }}
+            </ion-button>
+            <!-- Cancelar: la gestión vive en el SaaS → mismo deep-link que la compra. -->
+            <ion-button
+              v-if="canCancel"
+              fill="outline"
+              color="danger"
+              size="small"
+              @click="onCancel"
+            >
+              <HubIcon name="close-outline" slot="start" />
+              {{ t('modulePlan.cancel') }}
+            </ion-button>
+          </div>
         </template>
       </ion-card-content>
     </ion-card>
@@ -76,8 +87,7 @@
           <ion-button
             expand="block"
             :fill="isOwned ? 'outline' : 'solid'"
-            :disabled="busy"
-            @click="onPurchase(tier)"
+            @click="onPurchase"
           >
             <HubIcon :name="isOwned ? 'trending-up-outline' : 'cart-outline'" slot="start" />
             {{ isOwned ? t('modulePlan.upgrade') : t('modulePlan.buy') }}
@@ -98,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
@@ -106,11 +116,13 @@ import {
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import {
-  cloudModuleSubscription, cloudPurchaseModule, cloudCancelModuleSubscription,
+  cloudModuleSubscription,
   type CloudModuleSubscription, type ModuleSubscriptionStatus,
 } from '../lib/cloud';
 import type { ModuleBilling, BillingTierDef } from '@erplora/module-types';
 import { formatAmount } from '../lib/money';
+import { openExternal } from '../lib/open-external';
+import { config } from '../lib/config';
 
 const props = defineProps<{
   /** Slug del módulo (el Hub usa el module_id como slug; el Cloud resuelve por pk|slug|module_id). */
@@ -123,7 +135,6 @@ const { t } = useI18n();
 
 const sub = ref<CloudModuleSubscription | null>(null);
 const loadingStatus = ref(true);
-const busy = ref(false);
 const toastOpen = ref(false);
 const toastMsg = ref('');
 const toastColor = ref<'primary' | 'success' | 'danger'>('primary');
@@ -204,58 +215,51 @@ async function loadStatus(): Promise<void> {
   }
 }
 
-async function onPurchase(tier: BillingTierDef): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  // Volver a ESTA pestaña tras el checkout; el panel refresca al ver `?checkout=success`.
-  const base = `${window.location.origin}/m/${props.moduleId}/__plan__`;
+// Deep-link a la página del módulo en el SaaS. El Hub NO vende: la compra, el upgrade y la
+// cancelación viven ahí (checkout de Stripe incluido). `hub` identifica este hub en el SaaS
+// (config.hubId lo resuelve el boot desde `GET /api/hub/context`, ver lib/runtime.ts).
+const deepLink = computed(() =>
+  `${config.cloudApiUrl}/dashboard/billing/modules/${encodeURIComponent(props.moduleId)}/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`);
+
+async function onPurchase(): Promise<void> {
+  // Abre el navegador externo; al volver el foco a esta vista, el recheck refleja la compra.
   try {
-    const res = await cloudPurchaseModule(props.moduleId, {
-      tierSlug: tier.slug,
-      successUrl: `${base}?checkout=success`,
-      cancelUrl: `${base}?checkout=cancel`,
-    });
-    if (res.isFree) {
-      notify(res.message || t('modulePlan.acquired'), 'success');
-      await loadStatus();
-    } else if (res.checkoutUrl) {
-      // Checkout alojado de Stripe: redirige a la pasarela; al volver caemos en `?checkout=success`.
-      window.location.assign(res.checkoutUrl);
-    } else {
-      notify(t('modulePlan.purchaseError'), 'danger');
-    }
+    await openExternal(deepLink.value);
   } catch {
     notify(t('modulePlan.purchaseError'), 'danger');
-  } finally {
-    busy.value = false;
   }
 }
 
 async function onCancel(): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
+  // La gestión de la suscripción vive en el SaaS: mismo deep-link que la compra.
   try {
-    const res = await cloudCancelModuleSubscription(props.moduleId);
-    notify(res.success ? (res.message || t('modulePlan.canceled')) : t('modulePlan.cancelError'),
-      res.success ? 'primary' : 'danger');
-    await loadStatus();
+    await openExternal(deepLink.value);
   } catch {
     notify(t('modulePlan.cancelError'), 'danger');
-  } finally {
-    busy.value = false;
   }
+}
+
+/** Botón "He completado la compra — comprobar": re-consulta y avisa si el plan ya está activo. */
+async function onCheckPurchase(): Promise<void> {
+  await loadStatus();
+  if (isOwned.value) notify(t('modulePlan.purchaseDetected'), 'success');
+}
+
+// Recheck-on-focus: la compra ocurre en OTRA pestaña/navegador. Al recuperar el foco o la
+// visibilidad, re-consultamos la suscripción para reflejar el nuevo estado sin recargar.
+function onFocusRecheck(): void {
+  if (document.visibilityState === 'visible') void loadStatus();
 }
 
 onMounted(() => {
   void loadStatus();
-  // Al volver del checkout de Stripe: refresca el estado y avisa.
-  const checkout = new URLSearchParams(window.location.search).get('checkout');
-  if (checkout === 'success') {
-    notify(t('modulePlan.checkoutSuccess'), 'success');
-    void loadStatus();
-  } else if (checkout === 'cancel') {
-    notify(t('modulePlan.checkoutCanceled'), 'primary');
-  }
+  window.addEventListener('focus', onFocusRecheck);
+  document.addEventListener('visibilitychange', onFocusRecheck);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('focus', onFocusRecheck);
+  document.removeEventListener('visibilitychange', onFocusRecheck);
 });
 </script>
 
@@ -276,7 +280,10 @@ onMounted(() => {
 .status-line {
   margin: 0;
 }
-.cancel-btn {
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-top: 0.75rem;
 }
 .tiers-grid {

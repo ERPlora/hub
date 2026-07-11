@@ -1,5 +1,5 @@
 <template>
-  <AppPage :title="t('nav.marketplace')">
+  <AppPage :title="t('nav.apps')">
     <div v-if="loading" class="flex justify-center py-10">
       <ion-spinner name="dots" />
     </div>
@@ -20,7 +20,7 @@
         default-view="cards"
         :searchKeys="['name']"
         :actions="mineActions"
-        :search-placeholder="t('marketplace.searchInstalled')"
+        :search-placeholder="t('apps.searchInstalled')"
         page-size="10"
         column-picker
       ></ok-data-table>
@@ -36,7 +36,7 @@
         default-view="cards"
         :searchKeys="['name', 'desc', 'cat']"
         :actions="catalogActions"
-        :search-placeholder="t('marketplace.searchCatalog')"
+        :search-placeholder="t('apps.searchCatalog')"
         page-size="10"
         column-picker
       ></ok-data-table>
@@ -48,7 +48,7 @@
     <ion-modal :is-open="consentOpen" @did-dismiss="closeConsent">
       <ion-header>
         <ion-toolbar>
-          <ion-title>{{ t('marketplace.consentTitle') }}</ion-title>
+          <ion-title>{{ t('apps.consentTitle') }}</ion-title>
           <ion-buttons slot="end">
             <ion-button @click="closeConsent">
               <HubIcon name="close-outline" />
@@ -57,7 +57,7 @@
         </ion-toolbar>
       </ion-header>
       <ion-content class="ion-padding">
-        <p class="mb-3">{{ t('marketplace.consentIntro') }}</p>
+        <p class="mb-3">{{ t('apps.consentIntro') }}</p>
         <ion-list lines="full">
           <ion-item v-for="cap in consentCaps" :key="cap.id">
             <HubIcon slot="start" name="shield-checkmark-outline" />
@@ -69,10 +69,10 @@
         </ion-list>
         <ion-button class="mt-3" expand="block" @click="confirmConsentInstall">
           <HubIcon slot="start" name="download-outline" />
-          {{ t('marketplace.consentInstallGrant') }}
+          {{ t('apps.consentInstallGrant') }}
         </ion-button>
         <ion-button class="mt-2" expand="block" fill="outline" @click="closeConsent">
-          {{ t('marketplace.consentCancel') }}
+          {{ t('apps.consentCancel') }}
         </ion-button>
       </ion-content>
     </ion-modal>
@@ -92,15 +92,15 @@
         <ion-segment :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="mine">
             <HubIcon name="cube-outline" />
-            <ion-label>{{ t('marketplace.tabMine') }}</ion-label>
+            <ion-label>{{ t('apps.tabMine') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="all">
             <HubIcon name="storefront-outline" />
-            <ion-label>{{ t('marketplace.tabCatalog') }}</ion-label>
+            <ion-label>{{ t('apps.tabCatalog') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="paid">
             <HubIcon name="wallet-outline" />
-            <ion-label>{{ t('marketplace.tabPaid') }}</ion-label>
+            <ion-label>{{ t('apps.tabPaid') }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
@@ -146,7 +146,7 @@ interface Mod {
   version?: string;
 }
 
-type MarketplaceTab = 'mine' | 'all' | 'paid';
+type AppsTab = 'mine' | 'all' | 'paid';
 
 // ok-data-table (OutfitKit) está registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
 type Row = Record<string, unknown>;
@@ -183,7 +183,7 @@ const MODULES_DEMO: Mod[] = [
 ];
 
 // --- Estado ---
-const tab = ref<MarketplaceTab>('mine');
+const tab = ref<AppsTab>('mine');
 const modules = ref<Mod[]>([]);
 const installedModules = ref<InstalledModule[]>([]);
 const loading = ref(true);
@@ -233,11 +233,11 @@ function badgeCell(text: string, tone: 'success' | 'medium' | 'primary' | 'dange
 // Etiqueta humana de una fase del pipeline de instalación (contrato WS del runtime).
 function phaseLabel(phase: string): string {
   switch (phase) {
-    case 'resolving': return t('marketplace.phaseResolving');
-    case 'downloading': return t('marketplace.phaseDownloading');
-    case 'verifying': return t('marketplace.phaseVerifying');
-    case 'installing': return t('marketplace.phaseInstalling');
-    default: return t('marketplace.stateInstalling');
+    case 'resolving': return t('apps.phaseResolving');
+    case 'downloading': return t('apps.phaseDownloading');
+    case 'verifying': return t('apps.phaseVerifying');
+    case 'installing': return t('apps.phaseInstalling');
+    default: return t('apps.stateInstalling');
   }
 }
 
@@ -253,12 +253,12 @@ function stateCell(row: Row): Node {
     spinner.style.cssText = 'width:18px;height:18px';
     const label = document.createElement('span');
     const phase = phaseLabel(prog?.phase ?? '');
-    label.textContent = prog?.dep ? t('marketplace.phaseDependency', { name: prog.dep, phase }) : phase;
+    label.textContent = prog?.dep ? t('apps.phaseDependency', { name: prog.dep, phase }) : phase;
     wrap.append(spinner, label);
     return wrap;
   }
-  if (row.state === 'installed') return badgeCell(t('marketplace.stateInstalled'), 'success');
-  return badgeCell(t('marketplace.stateAvailable'), 'medium');
+  if (row.state === 'installed') return badgeCell(t('apps.stateInstalled'), 'success');
+  return badgeCell(t('apps.stateAvailable'), 'medium');
 }
 
 const filteredModules = computed<Row[]>(() => {
@@ -273,10 +273,10 @@ const filteredModules = computed<Row[]>(() => {
       state,
       stateLabel:
         state === 'installing'
-          ? t('marketplace.stateInstalling')
+          ? t('apps.stateInstalling')
           : state === 'installed'
-            ? t('marketplace.stateInstalled')
-            : t('marketplace.stateAvailable'),
+            ? t('apps.stateInstalled')
+            : t('apps.stateAvailable'),
       progress: prog,
     };
   });
@@ -288,31 +288,31 @@ const installedRows = computed<Row[]>(() => installedModules.value as unknown as
 // --- Columnas + acciones ---
 // `computed` para que cabeceras/labels/celdas se recalculen al cambiar de idioma en caliente.
 const mineColumns = computed<DataTableColumn[]>(() => [
-  { key: 'name', header: t('marketplace.colModule') },
-  { key: 'version', header: t('marketplace.colVersion'), format: (r) => `v${String(r.version ?? '')}` },
+  { key: 'name', header: t('apps.colModule') },
+  { key: 'version', header: t('apps.colVersion'), format: (r) => `v${String(r.version ?? '')}` },
   {
-    key: 'status', header: t('marketplace.colStatus'), filterable: true, filterType: 'select',
-    render: (r) => badgeCell(r.status === 'active' ? t('marketplace.statusActive') : t('marketplace.statusInactive'), r.status === 'active' ? 'success' : 'medium'),
+    key: 'status', header: t('apps.colStatus'), filterable: true, filterType: 'select',
+    render: (r) => badgeCell(r.status === 'active' ? t('apps.statusActive') : t('apps.statusInactive'), r.status === 'active' ? 'success' : 'medium'),
   },
 ]);
 const mineActions = computed<DataTableAction[]>(() => [
-  { id: 'toggle', label: t('marketplace.actionToggle'), icon: 'power-outline' },
-  { id: 'uninstall', label: t('marketplace.actionUninstall'), icon: 'trash', color: 'danger' },
+  { id: 'toggle', label: t('apps.actionToggle'), icon: 'power-outline' },
+  { id: 'uninstall', label: t('apps.actionUninstall'), icon: 'trash', color: 'danger' },
 ]);
 
 const catalogColumns = computed<DataTableColumn[]>(() => [
-  { key: 'name', header: t('marketplace.colModule') },
-  { key: 'cat', header: t('marketplace.colCategory'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.cat ?? ''), 'medium') },
-  { key: 'desc', header: t('marketplace.colDescription') },
-  { key: 'price', header: t('marketplace.colPrice'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price ?? ''), r.price === 'Gratis' ? 'success' : 'medium') },
+  { key: 'name', header: t('apps.colModule') },
+  { key: 'cat', header: t('apps.colCategory'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.cat ?? ''), 'medium') },
+  { key: 'desc', header: t('apps.colDescription') },
+  { key: 'price', header: t('apps.colPrice'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price ?? ''), r.price === 'Gratis' ? 'success' : 'medium') },
   // Estado visual (Instalado / Instalando… + fase / Disponible). `stateLabel` (traducido) es el
   // valor crudo de la fila → el filtro select y el buscador ven la misma etiqueta que el usuario.
-  { key: 'stateLabel', header: t('marketplace.colStatus'), align: 'center', filterable: true, filterType: 'select', render: (r) => stateCell(r) },
+  { key: 'stateLabel', header: t('apps.colStatus'), align: 'center', filterable: true, filterType: 'select', render: (r) => stateCell(r) },
 ]);
 const catalogActions = computed<DataTableAction[]>(() => [
   {
     id: 'install',
-    label: t('marketplace.actionInstall'),
+    label: t('apps.actionInstall'),
     icon: 'download-outline',
     // Instalado o en curso → botón muerto; en curso → spinner en su lugar (pista de actividad).
     disabled: (row) => row.state !== 'available',
@@ -364,7 +364,7 @@ function closeConsent(): void {
 
 /** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
 async function installModule(mod: Mod): Promise<void> {
-  if (mod.installed) { notify(t('marketplace.alreadyInstalled', { name: mod.name }), 'primary'); return; }
+  if (mod.installed) { notify(t('apps.alreadyInstalled', { name: mod.name }), 'primary'); return; }
   // Ya en curso (doble clic o instalación arrancada por otro cliente): no relanzar el request.
   if (installing.value.has(mod.id)) return;
   // Best-effort: intentamos conocer los permisos que declara el módulo ANTES de instalar. El catálogo
@@ -401,7 +401,7 @@ async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<
   // La card pasa a "Instalando…" al instante (fase genérica hasta que llegue el primer evento WS
   // `module.install.progress` con la fase real). El toast persistente se mantiene como refuerzo.
   setProgress(mod.id, mod.id, '');
-  notify(t('marketplace.installing', { name: mod.name }), 'primary', 0);
+  notify(t('apps.installing', { name: mod.name }), 'primary', 0);
   try {
     // Pide la instalación al runtime: descarga el zip firmado (marketplace Cloud), verifica
     // SHA256 y aplica migraciones. La confirmación llega por el evento WS `module.installed`.
@@ -417,9 +417,9 @@ async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<
     // detrás vía `module.installed` y confirma el estado real del Cloud).
     const row = modules.value.find((m) => m.id === mod.id);
     if (row) row.installed = true;
-    notify(t('marketplace.installSuccess', { name: mod.name }), 'success');
+    notify(t('apps.installSuccess', { name: mod.name }), 'success');
   } catch {
-    notify(t('marketplace.installError', { name: mod.name }), 'danger');
+    notify(t('apps.installError', { name: mod.name }), 'danger');
   } finally {
     clearProgress(mod.id);
   }
@@ -439,15 +439,15 @@ async function toggleModule(m: InstalledModule): Promise<void> {
   try {
     if (m.status === 'active') {
       await deactivateModule(m.id);
-      notify(t('marketplace.deactivated', { name: m.name }), 'primary');
+      notify(t('apps.deactivated', { name: m.name }), 'primary');
     } else {
       await activateModule(m.id);
-      notify(t('marketplace.activated', { name: m.name }), 'success');
+      notify(t('apps.activated', { name: m.name }), 'success');
     }
     await loadInstalled();
     void refreshModuleNav();
   } catch {
-    notify(t('marketplace.toggleError', { name: m.name }), 'danger');
+    notify(t('apps.toggleError', { name: m.name }), 'danger');
   }
 }
 
@@ -455,11 +455,11 @@ async function toggleModule(m: InstalledModule): Promise<void> {
 async function removeModule(m: InstalledModule): Promise<void> {
   try {
     await uninstallModule(m.id);
-    notify(t('marketplace.uninstalled', { name: m.name }), 'primary');
+    notify(t('apps.uninstalled', { name: m.name }), 'primary');
     await Promise.all([loadInstalled(), loadCatalog()]);
     void refreshModuleNav();
   } catch {
-    notify(t('marketplace.uninstallError', { name: m.name }), 'danger');
+    notify(t('apps.uninstallError', { name: m.name }), 'danger');
   }
 }
 
@@ -468,7 +468,7 @@ function toViewModule(m: CloudMarketplaceModule): Mod {
     id: m.id,
     name: m.name,
     desc: m.description,
-    price: m.priceLabel || t('marketplace.priceOnRequest'),
+    price: m.priceLabel || t('apps.priceOnRequest'),
     installed: m.installed,
     cat: m.category,
   };
@@ -539,7 +539,7 @@ onMounted(() => {
     const found = modules.value.find((m) => m.id === id);
     // Cubre también instalaciones iniciadas por OTRO cliente/pestaña (aquí no corre doInstall).
     if (id) clearProgress(id);
-    notify(found ? t('marketplace.moduleInstalledNamed', { name: found.name }) : t('marketplace.moduleInstalled'), 'success');
+    notify(found ? t('apps.moduleInstalledNamed', { name: found.name }) : t('apps.moduleInstalled'), 'success');
     void loadCatalog();
     void loadInstalled();
     void refreshModuleNav();

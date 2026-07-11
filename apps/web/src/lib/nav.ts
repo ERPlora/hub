@@ -1,6 +1,6 @@
 // Navegación de módulos del shell: estado reactivo compartido entre el shell (App.vue, que
 // pinta la sección "Módulos" en el menú) y las vistas que cambian qué hay instalado
-// (MarketplacePage, al recibir el evento WS `module.installed`).
+// (AppsPage, al recibir el evento WS `module.installed`).
 //
 // Las entradas salen del RUNTIME (`GET /api/navigation` vía module-loader.loadMenu): los módulos
 // instalados y activos que reporta el runtime, no un set hardcodeado.
@@ -30,7 +30,7 @@ let _inflight: Promise<void> | null = null;
 
 /**
  * Un hub recién provisionado se despliega vacío (ADR-0087): sin módulos, aterriza en un dashboard en
- * blanco y nada le dice al usuario que su siguiente paso es instalar `setup` desde el marketplace.
+ * blanco y nada le dice al usuario que su siguiente paso es instalar `setup` desde Apps.
  * Esto lo detecta para que el shell le empuje. Es un EMPUJÓN del core; el wizard vive fuera, en el módulo.
  *
  * Se mide contra `/api/modules` (lo que el runtime tiene instalado), NO contra `moduleNav`: el menú

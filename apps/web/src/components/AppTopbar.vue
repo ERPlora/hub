@@ -158,7 +158,7 @@ const router = useRouter();
 
 const backHref = computed<string | undefined>(() => props.backHref);
 
-// Rejilla de apps para ok-app-launcher: un tile por módulo instalado + la Tienda al final.
+// Rejilla de apps para ok-app-launcher: un tile por módulo instalado + Apps (la tienda) al final.
 // El icono se PRE-RESUELVE a SVG horneado (resolveIcon, offline/CSP); el launcher lo detecta como
 // SVG ya resuelto y lo pinta vía la prop `icon` de ion-icon (no por nombre). `id` = ruta del shell.
 const launcherApps = computed<LauncherApp[]>(() => {
@@ -167,10 +167,10 @@ const launcherApps = computed<LauncherApp[]>(() => {
     label: m.label,
     icon: resolveIcon(m.icon),
   }));
-  // Tienda: siempre presente, para instalar más módulos (color de marca).
+  // Apps (la tienda): siempre presente, para instalar más módulos (color de marca).
   apps.push({
-    id: '/marketplace',
-    label: t('nav.marketplace'),
+    id: '/apps',
+    label: t('nav.apps'),
     icon: resolveIcon('storefront-outline'),
     color: 'var(--ion-color-primary, #0091ce)',
   });
