@@ -15,8 +15,6 @@ export default {
     system: 'System',
     settings: 'Settings',
     apiDocs: 'API',
-    export: 'Export',
-    import: 'Import',
   },
   apiDocs: {
     title: 'API documentation',
@@ -186,6 +184,7 @@ export default {
     tabTax: 'Business',
     tabTickets: 'Receipts',
     tabPermissions: 'Permissions',
+    tabData: 'Data',
     permissionsTitle: 'Module permissions',
     permissionsDesc: 'Grant or revoke the permissions each module requests (internet access, certificate, printer, notifications). For safety, everything is denied until you grant it.',
     permissionsAdminOnly: 'Only an administrator can change permissions.',

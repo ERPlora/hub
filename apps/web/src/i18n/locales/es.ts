@@ -16,8 +16,6 @@ export default {
     system: 'Sistema',
     settings: 'Ajustes',
     apiDocs: 'API',
-    export: 'Exportar',
-    import: 'Importar',
   },
   apiDocs: {
     title: 'Documentación de la API',
@@ -187,6 +185,7 @@ export default {
     tabTax: 'Negocio',
     tabTickets: 'Tiques',
     tabPermissions: 'Permisos',
+    tabData: 'Datos',
     permissionsTitle: 'Permisos de los módulos',
     permissionsDesc: 'Concede o revoca los permisos que cada módulo solicita (acceso a internet, certificado, impresora, notificaciones). Por seguridad, todo está denegado hasta que lo concedas.',
     permissionsAdminOnly: 'Solo un administrador puede cambiar los permisos.',
