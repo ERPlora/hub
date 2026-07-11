@@ -281,7 +281,8 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     eprintln!("cache vacío: re-descargando {} módulo(s) instalados del marketplace…", missing.len());
                     for (id, version) in missing {
                         let mut rt = state.runtime.lock().await;
-                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version).await {
+                        // Progreso no-op: en el arranque aún no hay clientes WS a los que retransmitir.
+                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}).await {
                             Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{version}"),
                             Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
                         }
@@ -701,6 +702,20 @@ async fn request_install(
             .into_response();
     };
 
+    // Progreso por fases → WS `module.install.progress` (feedback visual del marketplace).
+    // `module_id` = módulo en curso (puede ser una dep anidada); `root_id` = el pedido por el
+    // usuario, para que el frontend actualice la card correcta aunque esté migrando una dep.
+    let progress_state = st.clone();
+    let root_id = req.module_id.clone();
+    let on_progress = move |module_id: &str, phase: &str| {
+        progress_state.broadcast(json!({
+            "type": "module.install.progress",
+            "module_id": module_id,
+            "root_id": root_id,
+            "phase": phase,
+        }));
+    };
+
     let mut rt = st.runtime.lock().await;
     let result = install::install_from_cloud(
         &st.http,
@@ -710,6 +725,7 @@ async fn request_install(
         &mut rt,
         &req.module_id,
         &req.version,
+        &on_progress,
     )
     .await;
 
