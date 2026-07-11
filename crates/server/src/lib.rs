@@ -32,6 +32,7 @@ pub mod assistant;
 pub mod auth;
 pub mod backup;
 pub mod embed;
+pub mod entitlement;
 pub mod error_sink;
 pub mod ingest;
 pub mod install;
@@ -1060,6 +1061,31 @@ pub(crate) fn tenant_rejected(e: tenant::TenantError) -> Response {
     (status, Json(body)).into_response()
 }
 
+/// Gate del dispatcher (revalidación híbrida del entitlement, ver `crate::entitlement`): si el
+/// módulo dueño de la query/command está **bloqueado**, devuelve el error estable
+/// `module_entitlement_blocked` (HTTP 402) con su `module_id` para que el front lo distinga y
+/// pinte el aviso («funcionará hasta {fecha}»). `None` = no bloqueado → la ejecución sigue.
+/// Defensa en profundidad: el enforcement REAL es el proxy del SaaS; aquí NUNCA se desinstala
+/// ni se tocan datos. `module_id = None` (op desconocida) no se gatea: `execute_*` devolverá su
+/// `not_found` de siempre.
+fn entitlement_blocked(st: &AppState, module_id: Option<&str>) -> Option<Response> {
+    let module_id = module_id?;
+    let blocked = st
+        .entitlement
+        .read()
+        .ok()?
+        .is_blocked(module_id, entitlement::now_unix());
+    if !blocked {
+        return None;
+    }
+    let body = json!({ "ok": false, "error": {
+        "code": "module_entitlement_blocked",
+        "module_id": module_id,
+        "message": format!("el módulo `{module_id}` no está incluido en el entitlement vigente del hub"),
+    }});
+    Some((StatusCode::PAYMENT_REQUIRED, Json(body)).into_response())
+}
+
 /// `401` uniforme para fallos de autenticación (modo Jwt: token ausente/ inválido).
 fn unauthorized(e: auth::AuthError) -> Response {
     (
@@ -1186,6 +1212,11 @@ async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Q
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
+    // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
+    let owner = rt.registry().get_query(&req.name).map(|q| q.module_id.clone());
+    if let Some(resp) = entitlement_blocked(&st, owner.as_deref()) {
+        return resp;
+    }
     // Queries de lista (con bloque `list`) devuelven `{rows,total,limit,offset}` para el pager;
     // el resto devuelve el array de filas tal cual (compat con get/stats/settings).
     if rt.is_list_query(&req.name) {
@@ -1212,6 +1243,11 @@ async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
+    // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
+    let owner = rt.registry().get_command(&req.name).map(|c| c.module_id.clone());
+    if let Some(resp) = entitlement_blocked(&st, owner.as_deref()) {
+        return resp;
+    }
     match rt.execute_command(&req.name, &req.payload, &ctx).await {
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),
         Err(e) => err_response(e),
