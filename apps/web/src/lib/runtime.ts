@@ -317,6 +317,225 @@ export async function deleteBusinessCertificate(): Promise<void> {
   if (!res.ok) throw new Error(`delete-business-certificate → ${res.status}`);
 }
 
+// ── Export/Import del hub (blueprints, ADR-0113 — architecture/hub/export-import.md) ──────────
+// Motor CORE de backup/restore: exportar empaqueta configuración (+datos opcionales) en un
+// `*.blueprint.zip`; importar lo restaura en orden «migrate» (instalar módulos → SQL → media →
+// fiscal) con informe best-effort por sección. Endpoints solo owner/admin (el runtime revalida).
+
+/** Selección por módulo del export: registrar el módulo y, opcionalmente, volcar sus datos. */
+export interface ExportModuleSelection {
+  module_id: string;
+  with_data: boolean;
+}
+
+/** Selección de secciones del export (`POST /api/hub/export`). */
+export interface ExportSelection {
+  users: boolean;
+  settings: boolean;
+  /** Subselección ítem a ítem de settings; `null` = todos (la UI aún no la desglosa). */
+  settings_items: string[] | null;
+  /** OFF por defecto: incluye la config VeriFactu + el certificado .p12 (viaja tal cual). */
+  fiscal: boolean;
+  media: boolean;
+  modules: ExportModuleSelection[];
+}
+
+/** Un módulo listado en el manifest de un blueprint. */
+export interface BlueprintModule {
+  id: string;
+  version: string;
+  /** `true` si el bundle lleva `data/<id>.sql` además de registrar el módulo para instalar. */
+  with_data: boolean;
+}
+
+/** `manifest.json` del bundle — la fuente de verdad (a prueba de renombres del zip). */
+export interface BlueprintManifest {
+  schema_version: number;
+  name: string;
+  locale: string;
+  hub: { name?: string | null; country?: string | null; currency?: string | null };
+  created_at: string;
+  modules: BlueprintModule[];
+  /** Secciones presentes en el bundle: `hub_users`, `hub_settings`, `fiscal`, `media`, … */
+  sections: string[];
+  /** SHA256 por fichero (integridad dura: mismatch = rechazo entero sin efectos). */
+  sha256: unknown;
+}
+
+/** Respuesta de `POST /api/hub/import/inspect` (el zip subido queda staged bajo `upload_id`). */
+export interface BlueprintInspection {
+  ok: boolean;
+  upload_id: string;
+  manifest: BlueprintManifest;
+}
+
+/** Selección de secciones a aplicar en el import (`POST /api/hub/import`). */
+export interface ImportSelection {
+  users: boolean;
+  settings: boolean;
+  fiscal: boolean;
+  media: boolean;
+  /** Ids de módulo del manifest a instalar/aplicar. */
+  modules: string[];
+}
+
+/**
+ * Estado de una sección del informe. Serde del enum Rust `SectionStatus`: `Applied`/`Skipped`
+ * llegan como string; `Failed(motivo)` como objeto `{"Failed": "motivo"}`. Tolerar ambas formas.
+ */
+export type SectionStatus = 'Applied' | 'Skipped' | { Failed: string };
+
+/** Una entrada del informe: sección (`hub_users`, `media`, `modules/<id>`, …) + estado. */
+export interface SectionResult {
+  section: string;
+  status: SectionStatus;
+}
+
+/** Informe final del import (best-effort: una sección rota NO aborta el resto). */
+export interface ImportReport {
+  sections: SectionResult[];
+}
+
+/** Estado normalizado de una sección del informe, listo para pintar. */
+export interface SectionStatusInfo {
+  kind: 'applied' | 'skipped' | 'failed';
+  /** Motivo del fallo (solo `failed`). */
+  reason?: string;
+}
+
+/**
+ * Normaliza el `status` serde (string `"Applied"`/`"Skipped"` u objeto `{"Failed": "motivo"}` —
+ * y, defensivamente, las variantes objeto `{"Applied": …}`) a un shape estable para la UI.
+ */
+export function sectionStatusInfo(status: SectionStatus | Record<string, unknown> | string): SectionStatusInfo {
+  if (typeof status === 'string') {
+    const s = status.toLowerCase();
+    if (s === 'applied') return { kind: 'applied' };
+    if (s === 'skipped') return { kind: 'skipped' };
+    return { kind: 'failed', reason: status === 'Failed' ? undefined : status };
+  }
+  if (status && typeof status === 'object') {
+    const obj = status as Record<string, unknown>;
+    if ('Failed' in obj) return { kind: 'failed', reason: String(obj.Failed ?? '') };
+    if ('Applied' in obj) return { kind: 'applied' };
+    if ('Skipped' in obj) return { kind: 'skipped' };
+  }
+  // Forma desconocida → trátala como fallo SIN inventar un éxito (informe honesto).
+  return { kind: 'failed', reason: JSON.stringify(status) };
+}
+
+/**
+ * Extrae el mensaje de error HONESTO de una respuesta fallida del runtime: intenta el envelope
+ * JSON (`{error:{message}}` / `{message}` / `{error:"…"}`) y cae al texto crudo; nunca inventa
+ * un mensaje genérico si el server dijo algo.
+ */
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const text = await res.text();
+    if (!text.trim()) return fallback;
+    try {
+      const j = JSON.parse(text) as { error?: { message?: string } | string; message?: string };
+      const msg = typeof j.error === 'string' ? j.error : (j.error?.message ?? j.message);
+      return msg?.trim() ? msg : text;
+    } catch {
+      return text;
+    }
+  } catch {
+    return fallback;
+  }
+}
+
+/** Filename de un header `Content-Disposition` (`filename="…"` o `filename*=UTF-8''…`). */
+function filenameFromDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const star = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(header);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      /* cae al filename= simple */
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() ?? null;
+}
+
+/**
+ * Exporta el hub (`POST /api/hub/export`) y devuelve el zip como blob + el nombre de fichero
+ * (del `Content-Disposition` o el default `<nombre>_<idioma>.blueprint.zip`). Solo owner/admin
+ * (el runtime revalida). Lanza con el mensaje del server si rechaza.
+ */
+export async function exportHub(
+  name: string,
+  locale: string,
+  selection: ExportSelection,
+): Promise<{ blob: Blob; filename: string }> {
+  beginRequest(); // volcar datos + empaquetar puede tardar → barra de progreso del shell
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ name, locale, selection }),
+    });
+    if (!res.ok) throw new Error(await readErrorMessage(res, `export → ${res.status}`));
+    const blob = await res.blob();
+    const filename =
+      filenameFromDisposition(res.headers.get('Content-Disposition')) ??
+      `${name}_${locale}.blueprint.zip`;
+    return { blob, filename };
+  } finally {
+    endRequest();
+  }
+}
+
+/**
+ * Sube un `*.blueprint.zip` para inspección (`POST /api/hub/import/inspect`, body = el zip como
+ * octet-stream). El server valida manifest + SHA256 (integridad dura: rechazo sin efectos) y
+ * devuelve el manifest + un `upload_id` staged para el import posterior.
+ */
+export async function inspectBlueprint(file: Blob): Promise<BlueprintInspection> {
+  beginRequest();
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/import/inspect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', ...runtimeHeaders() },
+      body: file,
+    });
+    if (!res.ok) throw new Error(await readErrorMessage(res, `import/inspect → ${res.status}`));
+    const body = (await res.json()) as BlueprintInspection;
+    if (!body.ok || !body.upload_id) {
+      throw new Error(`import/inspect → respuesta inválida del runtime`);
+    }
+    return body;
+  } finally {
+    endRequest();
+  }
+}
+
+/**
+ * Aplica un blueprint ya inspeccionado (`POST /api/hub/import`): instala los módulos que falten,
+ * aplica los `data/*.sql` seleccionados, copia media y restaura fiscal — best-effort, con informe
+ * por sección. Lanza con el mensaje del server solo si el import entero fue rechazado.
+ */
+export async function importBlueprint(
+  uploadId: string,
+  selection: ImportSelection,
+): Promise<ImportReport> {
+  beginRequest(); // instalar módulos + aplicar SQL puede tardar → barra de progreso del shell
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify({ upload_id: uploadId, selection }),
+    });
+    if (!res.ok) throw new Error(await readErrorMessage(res, `import → ${res.status}`));
+    const body = (await res.json()) as { ok: boolean; report?: ImportReport };
+    return body.report ?? { sections: [] };
+  } finally {
+    endRequest();
+  }
+}
+
 /**
  * Siembra la cache de settings del hub con la lectura barata del context (`currency`/`language`).
  * El context NO trae `api_docs_enabled` (eso vive en /api/settings, que se carga aparte tras el

@@ -41,6 +41,13 @@ futures-util = "0.3"
 # Métricas del SO para `/api/system` en el combo LOCAL (single/Tauri): CPU + memoria reales del
 # equipo. En cloud (ECS) NO se usa: ahí las métricas salen del ECS Task Metadata Endpoint v4 (HTTP).
 sysinfo = { version = "0.32", default-features = false, features = ["system", "disk"] }
+# Export/import de blueprints (ADR-0113): empaquetado/inspección del `.blueprint.zip` en memoria
+# (mismo crate que usa `erplora-source` para descomprimir módulos), sha256 del manifest,
+# `created_at` ISO-8601 del export y decodificación del `.p12` (`_hub_certificate.pkcs12_b64`).
+zip = "2"
+sha2 = "0.10"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+base64 = "0.22"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

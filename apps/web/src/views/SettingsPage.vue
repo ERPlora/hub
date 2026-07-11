@@ -435,6 +435,16 @@
           </ion-card-content>
         </ion-card>
       </template>
+
+      <!-- ── Datos: importar / exportar el hub (ADR-0113; decisión humano 2026-07-12) ──
+           Import y export viven JUNTOS en esta pestaña de la navegación secundaria de Ajustes
+           (antes eran las páginas /import y /export). Deep-link: /settings?tab=data. -->
+      <template v-else-if="tab === 'data'">
+        <h2 class="data-section-title">{{ t('importPage.title') }}</h2>
+        <ImportPanel />
+        <h2 class="data-section-title">{{ t('exportPage.title') }}</h2>
+        <ExportPanel />
+      </template>
     <!-- Footer tab bar -->
     <template #footer>
       <ion-footer class="ion-no-border">
@@ -460,6 +470,10 @@
             <HubIcon name="shield-checkmark-outline" />
             <ion-label>{{ t('settings.tabPermissions') }}</ion-label>
           </ion-segment-button>
+          <ion-segment-button value="data" data-testid="settings-tab-data">
+            <HubIcon name="swap-vertical-outline" />
+            <ion-label>{{ t('settings.tabData') }}</ion-label>
+          </ion-segment-button>
         </ion-segment>
       </ion-toolbar>
       </ion-footer>
@@ -469,6 +483,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
@@ -492,6 +507,8 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import ImportPanel from '../components/ImportPanel.vue';
+import ExportPanel from '../components/ExportPanel.vue';
 import { themeMode, setThemeMode, type ThemeMode } from '../lib/theme';
 import { setLocale, bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
@@ -512,9 +529,14 @@ import {
 
 const { t, locale } = useI18n();
 
-type Tab = 'hub' | 'store' | 'tax' | 'tickets' | 'permissions';
+type Tab = 'hub' | 'store' | 'tax' | 'tickets' | 'permissions' | 'data';
+const TABS: readonly Tab[] = ['hub', 'store', 'tax', 'tickets', 'permissions', 'data'];
 
-const tab = ref<Tab>('hub');
+// Deep-link a una pestaña concreta: /settings?tab=data (lo usan el widget de la home y el
+// empujón de first-run para aterrizar en Datos). Query inválida/ausente → pestaña por defecto.
+const route = useRoute();
+const initialTab = TABS.find((v) => v === String(route.query.tab ?? '')) ?? 'hub';
+const tab = ref<Tab>(initialTab);
 
 // Monedas ISO-4217 ofrecidas (lista razonable; EUR por defecto). El runtime acepta cualquier ISO.
 const CURRENCIES: { code: string; name: string }[] = [
@@ -842,3 +864,15 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
   }
 }
 </script>
+
+<style scoped>
+/* Cabeceras que separan los dos paneles de la pestaña Datos (Importar / Exportar). */
+.data-section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1.25rem 0 0.25rem;
+}
+.data-section-title:first-of-type {
+  margin-top: 0.25rem;
+}
+</style>

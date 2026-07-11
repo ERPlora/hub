@@ -33,6 +33,7 @@ pub mod auth;
 pub mod backup;
 pub mod embed;
 pub mod error_sink;
+pub mod export_import;
 pub mod ingest;
 pub mod install;
 pub mod logging;
@@ -281,7 +282,8 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     eprintln!("cache vacío: re-descargando {} módulo(s) instalados del marketplace…", missing.len());
                     for (id, version) in missing {
                         let mut rt = state.runtime.lock().await;
-                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version).await {
+                        // Progreso no-op: en el arranque aún no hay clientes WS a los que retransmitir.
+                        match install::install_from_cloud(&state.http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}).await {
                             Ok(_) => eprintln!("✓ módulo re-descargado: {id}@{version}"),
                             Err(e) => eprintln!("✗ re-descarga de {id}@{version}: {e}"),
                         }
@@ -509,6 +511,16 @@ pub fn app(state: AppState) -> Router {
                 .put(settings::put_business_certificate)
                 .delete(settings::delete_business_certificate),
         )
+        // Export/import del hub a blueprint (ADR-0113): capa server sobre el motor del runtime
+        // (`export_hub`/`import_sections`). Auth = sesión admin (owner/admin), como /api/settings.
+        // El inspect recibe el zip crudo → body limit propio (el default de axum son 2 MiB).
+        .route("/api/hub/export", post(export_import::export_blueprint))
+        .route(
+            "/api/hub/import/inspect",
+            post(export_import::import_inspect)
+                .layer(axum::extract::DefaultBodyLimit::max(export_import::MAX_BLUEPRINT_BYTES)),
+        )
+        .route("/api/hub/import", post(export_import::import_blueprint))
         // Gestor de la carpeta `media/` (pantalla /files). Browse + raw + upload + delete + mkdir.
         .route("/api/media", get(media::media_list).delete(media::media_delete))
         .route("/api/media/raw", get(media::media_raw))
@@ -701,6 +713,20 @@ async fn request_install(
             .into_response();
     };
 
+    // Progreso por fases → WS `module.install.progress` (feedback visual del marketplace).
+    // `module_id` = módulo en curso (puede ser una dep anidada); `root_id` = el pedido por el
+    // usuario, para que el frontend actualice la card correcta aunque esté migrando una dep.
+    let progress_state = st.clone();
+    let root_id = req.module_id.clone();
+    let on_progress = move |module_id: &str, phase: &str| {
+        progress_state.broadcast(json!({
+            "type": "module.install.progress",
+            "module_id": module_id,
+            "root_id": root_id,
+            "phase": phase,
+        }));
+    };
+
     let mut rt = st.runtime.lock().await;
     let result = install::install_from_cloud(
         &st.http,
@@ -710,6 +736,7 @@ async fn request_install(
         &mut rt,
         &req.module_id,
         &req.version,
+        &on_progress,
     )
     .await;
 

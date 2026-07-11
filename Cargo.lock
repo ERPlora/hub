@@ -1726,6 +1726,8 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "axum",
+ "base64 0.22.1",
+ "chrono",
  "erplora-cloud-client",
  "erplora-db",
  "erplora-runtime",
@@ -1737,6 +1739,7 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "sysinfo",
  "thiserror 1.0.69",
  "tokio",
@@ -1745,6 +1748,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "zip",
 ]
 
 [[package]]

@@ -1,10 +1,12 @@
-// Contrato del "empujón" de primer arranque (ADR pendiente; cierra el hueco de ADR-0087).
+// Contrato del "empujón" de primer arranque (cierra el hueco de ADR-0087).
 //
 // Un hub recién provisionado se despliega VACÍO: sin módulos, sin sector, sin país. Hoy aterriza en
-// `/dashboard`, que está en blanco, y nada le dice al usuario que su siguiente paso es instalar el
-// módulo `setup` desde el marketplace. El shell debe empujarle ahí.
+// `/dashboard`, que está en blanco, y nada le dice al usuario cuál es su siguiente paso. El shell
+// debe empujarle a ponerse en marcha.
 //
-// El empujón vive en el core; el wizard NO. En cuanto hay un módulo instalado, el shell se aparta.
+// El módulo `setup` se RETIRÓ (ADR-0113): la puesta en marcha ahora es importar una plantilla
+// (pestaña Datos de Ajustes, /settings?tab=data) o elegir módulos del marketplace. En cuanto hay
+// un módulo instalado, el shell se aparta.
 //
 // Sin mocks: se ejerce contra el runtime Axum real, con una BD efímera y `HUB_MODULES_DIR` vacío.
 // Arranque documentado en `e2e/README.md`.
@@ -51,6 +53,18 @@ test.describe('primer arranque de un hub vacío', () => {
     await expect(page).toHaveURL(/\/first-run$/);
     await expect(page.getByTestId('first-run-title')).toBeVisible();
     await expect(page.getByTestId('first-run-install')).toBeVisible();
+  });
+
+  test('el CTA de puesta en marcha lleva a importar una plantilla (Ajustes → Datos)', async ({ page }) => {
+    await withSession(page, await loginByPin());
+
+    await page.goto('/first-run');
+    await page.getByTestId('first-run-install').click();
+
+    // El módulo `setup` ya no existe (ADR-0113): el botón navega a la pestaña Datos de Ajustes,
+    // donde vive el import (decisión del humano 2026-07-12: ya no hay página /import).
+    await expect(page).toHaveURL(/\/settings\?tab=data$/);
+    await expect(page.getByTestId('import-lead')).toBeVisible();
   });
 
   test('la pantalla no es una trampa: se puede salir al marketplace', async ({ page }) => {
