@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
@@ -65,6 +66,12 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+  },
+  // Tests unitarios (vitest), colocados junto al código: src/**/*.test.ts. Los e2e de Playwright
+  // viven en tests/e2e y NO los corre vitest (requieren la app levantada).
+  test: {
+    include: ['src/**/*.test.ts'],
+    environment: 'node',
   },
   // Dev proxy (mismo origen → sin CORS). El runtime local (Axum :8787) no expone CORS y el Cloud
   // (erplora.com) tampoco para localhost; con VITE_RUNTIME_URL='' y VITE_CLOUD_API_URL='/cloud'
