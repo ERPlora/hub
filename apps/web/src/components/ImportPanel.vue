@@ -95,45 +95,53 @@
       <h2 class="section-title">{{ t('importPage.sections') }}</h2>
       <ion-card>
         <ion-card-content class="p-0">
+          <!-- Ionic 8: la label la pone el PROPIO checkbox (label-placement/justify), no un
+               ion-label hermano — texto clicable y nombre accesible sin aria-label duplicado. -->
           <ion-list lines="none">
             <ion-item v-if="hasUsers">
               <ion-checkbox
                 data-testid="import-section-users"
-                slot="start"
                 v-model="selUsers"
-                :aria-label="t('importPage.sectionUsers')"
-              />
-              <ion-label><h2>{{ t('importPage.sectionUsers') }}</h2></ion-label>
+                justify="start"
+                label-placement="end"
+                alignment="start"
+              >
+                <h2 class="cb-title">{{ t('importPage.sectionUsers') }}</h2>
+              </ion-checkbox>
             </ion-item>
             <ion-item v-if="hasSettings">
               <ion-checkbox
                 data-testid="import-section-settings"
-                slot="start"
                 v-model="selSettings"
-                :aria-label="t('importPage.sectionSettings')"
-              />
-              <ion-label><h2>{{ t('importPage.sectionSettings') }}</h2></ion-label>
+                justify="start"
+                label-placement="end"
+                alignment="start"
+              >
+                <h2 class="cb-title">{{ t('importPage.sectionSettings') }}</h2>
+              </ion-checkbox>
             </ion-item>
             <ion-item v-if="hasFiscal">
               <ion-checkbox
                 data-testid="import-section-fiscal"
-                slot="start"
                 v-model="selFiscal"
-                :aria-label="t('importPage.sectionFiscal')"
-              />
-              <ion-label class="ion-text-wrap">
-                <h2>{{ t('importPage.sectionFiscal') }}</h2>
-                <p>{{ t('importPage.sectionFiscalDesc') }}</p>
-              </ion-label>
+                justify="start"
+                label-placement="end"
+                alignment="start"
+              >
+                <h2 class="cb-title">{{ t('importPage.sectionFiscal') }}</h2>
+                <p class="cb-desc">{{ t('importPage.sectionFiscalDesc') }}</p>
+              </ion-checkbox>
             </ion-item>
             <ion-item v-if="hasMedia">
               <ion-checkbox
                 data-testid="import-section-media"
-                slot="start"
                 v-model="selMedia"
-                :aria-label="t('importPage.sectionMedia')"
-              />
-              <ion-label><h2>{{ t('importPage.sectionMedia') }}</h2></ion-label>
+                justify="start"
+                label-placement="end"
+                alignment="start"
+              >
+                <h2 class="cb-title">{{ t('importPage.sectionMedia') }}</h2>
+              </ion-checkbox>
             </ion-item>
           </ion-list>
         </ion-card-content>
@@ -148,18 +156,18 @@
             <ion-list lines="none">
               <ion-item v-for="m in moduleRows" :key="m.id">
                 <ion-checkbox
-                  slot="start"
                   :checked="m.include"
-                  :aria-label="m.id"
+                  justify="start"
+                  label-placement="end"
+                  alignment="start"
                   @ion-change="onModuleToggle(m.id, $event)"
-                />
-                <ion-label>
-                  <h2>{{ m.id }}</h2>
-                  <p>
+                >
+                  <h2 class="cb-title">{{ m.id }}</h2>
+                  <p class="cb-desc">
                     v{{ m.version }}
                     <template v-if="m.withData"> · {{ t('importPage.withData') }}</template>
                   </p>
-                </ion-label>
+                </ion-checkbox>
               </ion-item>
             </ion-list>
           </ion-card-content>
@@ -452,6 +460,23 @@ async function finish(): Promise<void> {
   font-size: 1rem;
   font-weight: 600;
   margin: 1rem 0 0.5rem;
+}
+/* Ionic pinta `.label-text-wrapper` DENTRO del shadow con `white-space:nowrap` + ellipsis, así
+   que la clase `ion-text-wrap` (que actúa sobre el host) NO la vence y el texto se trunca en
+   móvil. La única vía desde fuera es el shadow part `label`. */
+ion-checkbox::part(label) {
+  white-space: normal;
+}
+/* Tipografía de la label del checkbox (antes la daba ion-label con sus h2/p). */
+.cb-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.cb-desc {
+  margin: 0.1rem 0 0;
+  font-size: 0.875rem;
+  color: var(--ion-color-medium);
 }
 .soon-note {
   display: block;
