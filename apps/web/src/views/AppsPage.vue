@@ -133,6 +133,7 @@ import {
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { refreshModuleNav } from '../lib/nav';
+import { isModuleInstalled } from '../lib/apps-catalog';
 
 // --- Tipos ---
 interface Mod {
@@ -261,13 +262,20 @@ function stateCell(row: Row): Node {
   return badgeCell(t('apps.stateAvailable'), 'medium');
 }
 
+// El runtime es la FUENTE DE VERDAD local de qué está instalado (`listInstalledModules`). El flag
+// `installed` del catálogo Cloud (proxy al SaaS) puede no reflejar aún la instalación de ESTE hub
+// (`mark_installed` es best-effort), así que lo cruzamos con la lista local para no mostrar
+// "Disponible" (ni el botón Instalar activo) en un módulo ya instalado. (Bug demo 2026-07-12.)
+const installedIds = computed<Set<string>>(() => new Set(installedModules.value.map((m) => m.id)));
+
 const filteredModules = computed<Row[]>(() => {
   const base = tab.value === 'paid' ? modules.value.filter((m) => m.price !== 'Gratis') : modules.value;
   // Inyecta el estado de instalación en cada fila: cambia la identidad del array cuando `installing`
   // cambia → la tabla (Lit) re-renderiza celdas y predicados de acción con el estado fresco.
   return base.map((m) => {
     const prog = installing.value.get(m.id) ?? null;
-    const state = prog ? 'installing' : m.installed ? 'installed' : 'available';
+    const isInstalled = isModuleInstalled(m.installed, m.id, installedIds.value);
+    const state = prog ? 'installing' : isInstalled ? 'installed' : 'available';
     return {
       ...m,
       state,
@@ -507,23 +515,24 @@ function handleCatalogAction(e: Event): void {
 function wireTable(el: HTMLElement | null, handler: (e: Event) => void): void {
   if (!el) return;
   (el as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+  // Idempotente: quitar antes de añadir evita listeners duplicados si el mismo elemento persiste
+  // entre re-cableados (`handler` es una referencia estable, así que removeEventListener casa).
+  el.removeEventListener('rowAction', handler);
   el.addEventListener('rowAction', handler);
 }
 
-// Las tablas viven detrás de `v-else` (loading): al ejecutarse onMounted, loading=true y los refs
-// aún son null, así que cablear ahí no hacía nada (labels en inglés + acciones muertas). Cableamos
-// cuando loading pasa a false y las tablas ya existen, una sola vez (loadCatalog re-togglea loading
-// en cada refresco; el flag evita duplicar listeners).
-let tablesWired = false;
+// Cablear en CADA `loading`→false. Las tablas viven detrás de `v-else` (loading): cada vez que
+// `loadCatalog` re-togglea `loading` (al instalar, al cambiar de contexto…) el v-if(loading)/v-else
+// DESTRUYE y RECREA las tablas, y los elementos NUEVOS no conservan sus listeners. Con el guard
+// `once` anterior, tras el primer refresco toggle/uninstall/install quedaban MUERTOS hasta recargar
+// la página (bug reportado en el demo, 2026-07-12). `wireTable` es idempotente → re-cablear es seguro.
 watch(
   loading,
   (isLoading) => {
-    if (isLoading || tablesWired) return;
+    if (isLoading) return;
     void nextTick(() => {
-      if (!mineTable.value && !catalogTable.value) return;
       wireTable(mineTable.value, handleMineAction);
       wireTable(catalogTable.value, handleCatalogAction);
-      tablesWired = true;
     });
   },
   { immediate: true },
