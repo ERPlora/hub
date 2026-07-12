@@ -19,24 +19,21 @@
         </ion-list>
 
         <!-- Superficie principal: tablero de widgets que los MÓDULOS instalados declaran en su
-             module.json (campo `widgets`, ADR-0054). El shell recolecta, filtra por permiso y
-             renderiza cada uno con su ok-* (kind) o el WC del módulo (component). Datos REALES de
-             las queries declaradas; degrada a estado vacío/muted (nunca datos inventados). -->
+             module.json (campo `widgets`, ADR-0054) + el widget CORE de export/import (ADR-0113;
+             decisión humano 2026-07-12: entra en el CATÁLOGO del board como uno más — en todos los
+             presets y ocultable desde el picker — en vez de tarjeta fija encima). Con el widget
+             core siempre en catálogo, el board se pinta también en un hub sin módulos. Datos
+             REALES de las queries declaradas; degrada a vacío/muted (nunca datos inventados). -->
         <ion-list v-if="loadingWidgets" inset>
           <ion-item lines="none">
             <ion-spinner slot="start" name="crescent" />
             <ion-label>{{ t('dashboard.loadingWidgets') }}</ion-label>
           </ion-item>
         </ion-list>
-        <ion-list v-else-if="hasWidgets === false" inset>
-          <ion-item lines="none">
-            <ion-label class="ion-text-center" style="opacity: .6">{{ t('dashboard.noWidgets') }}</ion-label>
-          </ion-item>
-        </ion-list>
         <!-- ref imperativo: <ok-widget-board> recibe widgets/presets/labels por PROPIEDAD (no
              atributo) — gotcha OutfitKit/Lit con datos tipados. -->
         <ok-widget-board
-          v-show="!loadingWidgets && hasWidgets"
+          v-show="!loadingWidgets"
           ref="board"
           editable
           storage-key="dashboard-hub"
@@ -156,7 +153,7 @@ import {
   IonFooter,
   IonSegment, IonSegmentButton, IonLabel,
   IonBadge, IonButton, IonSpinner,
-  IonList, IonListHeader, IonItem, IonNote, IonToolbar
+  IonList, IonListHeader, IonItem, IonNote, IonToolbar,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -203,11 +200,67 @@ type WidgetBoardEl = HTMLElement & {
 };
 const board = ref<WidgetBoardEl | null>(null);
 const loadingWidgets = ref<boolean>(true);
-const hasWidgets = ref<boolean | null>(null);
+
+// ── Widget CORE de export/import (ADR-0113 §4; decisión humano 2026-07-12) ──────────────────
+// Es un widget DEL BOARD como los de módulo: entra en el catálogo y en TODOS los presets (sin
+// estado guardado el board activa el primer preset → debe incluirlo para verse por defecto), y
+// el picker permite ocultarlo como a cualquier otro. Va horneado en el shell (no bebe de los
+// manifests), así que el board se pinta también en un hub vacío — que es quien más lo necesita.
+// render(cell) vive en el shadow del board: DOM imperativo sin innerHTML (CSP estricta) y
+// estilos por elemento (los scoped de la SFC no cruzan el shadow).
+const CORE_BLUEPRINT_ID = 'core.blueprint';
+
+function coreBlueprintWidget(): WidgetDef {
+  return {
+    id: CORE_BLUEPRINT_ID,
+    title: t('dashboard.blueprintTitle'),
+    icon: 'swap-vertical-outline',
+    category: 'Hub',
+    size: 'md',
+    render: (cell: HTMLElement) => {
+      const card = document.createElement('ion-card');
+      card.setAttribute('data-testid', 'dashboard-blueprint-widget');
+      card.style.margin = '0'; // la celda del board ya aporta el hueco de la rejilla
+      const content = document.createElement('ion-card-content');
+
+      const title = document.createElement('h2');
+      title.textContent = t('dashboard.blueprintTitle');
+      title.style.cssText = 'font-size:1rem;font-weight:600;margin:0;';
+      const body = document.createElement('p');
+      body.textContent = t('dashboard.blueprintBody');
+      body.style.cssText = 'color:var(--ion-color-medium);margin:0.15rem 0 0;';
+
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem;';
+      const mkBtn = (testid: string, label: string, outline: boolean): HTMLElement => {
+        const b = document.createElement('ion-button');
+        b.setAttribute('size', 'small');
+        if (outline) b.setAttribute('fill', 'outline');
+        b.setAttribute('data-testid', testid);
+        b.textContent = label;
+        // Import y export viven JUNTOS en la pestaña Datos de Ajustes (/settings?tab=data).
+        b.addEventListener('click', () => void router.push('/settings?tab=data'));
+        return b;
+      };
+      actions.append(
+        mkBtn('dashboard-blueprint-import', t('dashboard.blueprintImport'), false),
+        mkBtn('dashboard-blueprint-export', t('dashboard.blueprintExport'), true),
+      );
+
+      content.append(title, body, actions);
+      card.append(content);
+      cell.append(card);
+    },
+  };
+}
 
 async function loadWidgets(): Promise<void> {
+  // El widget core SIEMPRE está; los de módulo se suman si la recolección responde (y si falla,
+  // degrada al catálogo mínimo con solo el core — nunca un board vacío).
+  let widgets: WidgetDef[] = [coreBlueprintWidget()];
+  let presets: WidgetPreset[] = [];
   try {
-    const { widgets, presets } = await collectDashboardWidgets({
+    const collected = await collectDashboardWidgets({
       client,
       sector: getHubSector(),
       // Sin set de permisos en cliente hoy (el runtime es la autoridad y revalida cada query):
@@ -216,25 +269,25 @@ async function loadWidgets(): Promise<void> {
       hasPermission: () => null,
       labels: { empty: t('dashboard.widgetEmpty'), error: t('dashboard.widgetError') },
     });
-    hasWidgets.value = widgets.length > 0;
-    const el = board.value;
-    if (el) {
-      el.widgets = widgets;
-      el.presets = presets;
-      el.labels = {
-        customize: t('dashboard.customizePanel'),
-        close: t('dashboard.closePanel'),
-        presets: t('dashboard.presetsTitle'),
-        active: t('dashboard.activeWidgets'),
-        available: t('dashboard.availableWidgets'),
-        empty: t('dashboard.emptyPanel'),
-      };
-    }
+    widgets = [...widgets, ...collected.widgets];
+    presets = collected.presets.map((p) => ({ ...p, widgets: [CORE_BLUEPRINT_ID, ...p.widgets] }));
   } catch {
-    hasWidgets.value = false;
-  } finally {
-    loadingWidgets.value = false;
+    /* degrada: solo el widget core */
   }
+  const el = board.value;
+  if (el) {
+    el.widgets = widgets;
+    el.presets = presets;
+    el.labels = {
+      customize: t('dashboard.customizePanel'),
+      close: t('dashboard.closePanel'),
+      presets: t('dashboard.presetsTitle'),
+      active: t('dashboard.activeWidgets'),
+      available: t('dashboard.availableWidgets'),
+      empty: t('dashboard.emptyPanel'),
+    };
+  }
+  loadingWidgets.value = false;
 }
 
 // Formateador de dinero con la MONEDA DEL HUB (money.ts; no más 'EUR' hardcodeado). Datos en

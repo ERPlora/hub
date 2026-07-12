@@ -20,6 +20,9 @@ const routes: RouteRecordRaw[] = [
   // Compat: la tienda se llamaba "Marketplace"; los enlaces/bookmarks viejos siguen funcionando.
   { path: '/marketplace', redirect: '/apps' },
   { path: '/system', name: 'system', component: () => import('../views/SystemPage.vue'), meta: { auth: true } },
+  // Export/Import del hub (ADR-0113): viven JUNTOS en la pestaña Datos de Ajustes
+  // (/settings?tab=data, decisión del humano 2026-07-12 — antes eran las páginas /export y
+  // /import). El gate admin REAL es del runtime (require_admin_session, como PUT /api/settings).
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsPage.vue'), meta: { auth: true } },
   // Documentación de la API pública (ADR-0057 §4): vista Vue interna que renderiza Swagger sobre el
   // spec del runtime. Visible a cualquier usuario logueado; la entrada de menú/página la habilita
@@ -31,8 +34,11 @@ const routes: RouteRecordRaw[] = [
   // Pantalla de activación: hay sesión pero el hub no tiene un entitlement válido (§2.10).
   { path: '/activation', name: 'activation', component: () => import('../views/ActivationPage.vue'), meta: { auth: true } },
   // Primer arranque: el hub se despliega vacío (ADR-0087) y sin esto aterriza en un dashboard en
-  // blanco. Empuja a instalar el módulo `setup`; el wizard vive ahí, no aquí.
+  // blanco. Empuja a importar una plantilla (Ajustes → Datos, ADR-0113) o al marketplace.
   { path: '/first-run', name: 'first-run', component: () => import('../views/FirstRunPage.vue'), meta: { auth: true } },
+  // Catch-all: cualquier ruta desconocida (incl. las retiradas /export y /import → ahora en
+  // Ajustes → Datos, ADR-0116) cae al inicio en vez de dejar el outlet en blanco.
+  { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ];
 
 export const router = createRouter({
@@ -58,7 +64,8 @@ router.beforeEach(async (to) => {
   }
   // Primer arranque: un hub sin módulos aterrizaría en un dashboard vacío. Hay que ESPERAR a saber
   // qué hay instalado (`/api/modules`), o decidiríamos sin la respuesta. Apps y ajustes
-  // quedan accesibles: la pantalla empuja, no encierra.
+  // quedan accesibles: la pantalla empuja, no encierra — y el hub vacío es precisamente el que
+  // necesita el import (pestaña Datos de Ajustes: restaurar un backup / plantilla, ADR-0113).
   if (isAuthed.value && to.meta.auth) {
     await ensureInstalledModules();
     const escapes = ['first-run', 'apps', 'settings'];

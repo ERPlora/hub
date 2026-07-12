@@ -529,7 +529,8 @@ pub async fn media_create_folder(
 /// Une `rel` (ruta relativa del cliente) bajo `root` descartando cualquier intento de salir del
 /// root: solo se aceptan componentes normales; `..`, raíz absoluta y prefijos (p.ej. `C:\`) se
 /// rechazan devolviendo `None`. Es la única puerta por la que pasa el input de ruta del cliente.
-fn safe_join(root: &Path, rel: &str) -> Option<PathBuf> {
+/// `pub(crate)`: lo reutiliza el import de blueprints (`export_import.rs`) al copiar `media/*`.
+pub(crate) fn safe_join(root: &Path, rel: &str) -> Option<PathBuf> {
     let mut out = root.to_path_buf();
     for comp in Path::new(rel).components() {
         match comp {

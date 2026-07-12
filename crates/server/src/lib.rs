@@ -34,6 +34,7 @@ pub mod backup;
 pub mod embed;
 pub mod entitlement;
 pub mod error_sink;
+pub mod export_import;
 pub mod ingest;
 pub mod install;
 pub mod logging;
@@ -535,6 +536,16 @@ pub fn app(state: AppState) -> Router {
                 .put(settings::put_business_certificate)
                 .delete(settings::delete_business_certificate),
         )
+        // Export/import del hub a blueprint (ADR-0113): capa server sobre el motor del runtime
+        // (`export_hub`/`import_sections`). Auth = sesión admin (owner/admin), como /api/settings.
+        // El inspect recibe el zip crudo → body limit propio (el default de axum son 2 MiB).
+        .route("/api/hub/export", post(export_import::export_blueprint))
+        .route(
+            "/api/hub/import/inspect",
+            post(export_import::import_inspect)
+                .layer(axum::extract::DefaultBodyLimit::max(export_import::MAX_BLUEPRINT_BYTES)),
+        )
+        .route("/api/hub/import", post(export_import::import_blueprint))
         // Gestor de la carpeta `media/` (pantalla /files). Browse + raw + upload + delete + mkdir.
         .route("/api/media", get(media::media_list).delete(media::media_delete))
         .route("/api/media/raw", get(media::media_raw))

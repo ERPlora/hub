@@ -1726,6 +1726,8 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "axum",
+ "base64 0.22.1",
+ "chrono",
  "erplora-cloud-client",
  "erplora-db",
  "erplora-runtime",

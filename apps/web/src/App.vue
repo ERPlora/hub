@@ -150,6 +150,8 @@ const nav = computed<NavSection[]>(() => [
       ...(apiDocsEnabled.value
         ? [{ path: '/api-docs', labelKey: 'nav.apiDocs', icon: 'code-slash-outline' }]
         : []),
+      // Export/Import del hub (ADR-0113) ya NO cuelga aquí: vive en la pestaña Datos de
+      // Ajustes (/settings?tab=data, navegación secundaria — decisión del humano 2026-07-12).
       { path: '/settings', labelKey: 'nav.settings', icon: 'settings-outline' },
     ]
   },

@@ -20,10 +20,12 @@ use tower::ServiceExt; // oneshot
 
 const INDEX_HTML: &str = "<!doctype html><title>ERPlora SPA</title><div id=app></div>";
 
-/// Prepara un `dist/` temporal con un `index.html` reconocible. Sin `Date`/`rand` (no disponibles en
-/// el sandbox de scripts ni necesarios aquí): el nombre se deriva del PID del proceso de test.
-fn temp_dist() -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("erplora_adr0050_spa_{}", std::process::id()));
+/// Prepara un `dist/` temporal con un `index.html` reconocible. El nombre lleva PID **y un sufijo
+/// por test**: los tests del binario corren en paralelo y compartir el dir era una race — el
+/// `remove_dir_all` final de un test borraba el dist mientras otro aún servía de él (404 flaky,
+/// cazada en la review del 2026-07-12).
+fn temp_dist(suffix: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("erplora_adr0050_spa_{}_{suffix}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("crear dist temporal");
     std::fs::write(dir.join("index.html"), INDEX_HTML).expect("escribir index.html");
@@ -46,7 +48,7 @@ fn router_with_front(dist: &std::path::Path) -> Router {
 
 #[tokio::test]
 async fn api_routes_are_not_shadowed_by_the_static_frontend() {
-    let dist = temp_dist();
+    let dist = temp_dist("api");
     let resp = router_with_front(&dist)
         .oneshot(Request::get("/api/ping").body(Body::empty()).unwrap())
         .await
@@ -66,7 +68,7 @@ async fn api_routes_are_not_shadowed_by_the_static_frontend() {
 
 #[tokio::test]
 async fn root_serves_index_html_same_origin() {
-    let dist = temp_dist();
+    let dist = temp_dist("root");
     let resp = router_with_front(&dist)
         .oneshot(Request::get("/").body(Body::empty()).unwrap())
         .await
@@ -81,7 +83,7 @@ async fn root_serves_index_html_same_origin() {
 
 #[tokio::test]
 async fn unknown_client_route_falls_back_to_spa_index() {
-    let dist = temp_dist();
+    let dist = temp_dist("fallback");
     // Una ruta del router de cliente (sin fichero en disco) debe servir el index.html, no 404 — así
     // un refresco en `/dashboard` o `/modules/...` carga la SPA en lugar de romper.
     let resp = router_with_front(&dist)

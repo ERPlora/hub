@@ -9,25 +9,18 @@
         </span>
         <h1 data-testid="first-run-title">{{ t('firstRun.title') }}</h1>
         <p class="first-run-lead">{{ t('firstRun.lead') }}</p>
-        <p v-if="error" class="first-run-error">{{ t('firstRun.error') }}</p>
 
-        <ion-button
-          expand="block"
-          data-testid="first-run-install"
-          :disabled="loading"
-          @click="startSetup"
-        >
-          <ion-spinner v-if="loading" name="crescent" slot="start" />
-          {{ loading ? t('firstRun.installing') : t('firstRun.install') }}
+        <ion-button expand="block" data-testid="first-run-install" @click="startSetup">
+          {{ t('firstRun.install') }}
         </ion-button>
         <ion-button
           expand="block"
           fill="clear"
           color="medium"
-          data-testid="first-run-apps"
-          @click="router.push('/apps')"
+          data-testid="first-run-marketplace"
+          @click="router.push('/marketplace')"
         >
-          {{ t('firstRun.apps') }}
+          {{ t('firstRun.marketplace') }}
         </ion-button>
       </div>
     </ion-content>
@@ -36,39 +29,20 @@
 
 <script setup lang="ts">
 // Empujón de primer arranque. Un hub se despliega vacío (ADR-0087) y aterrizaba en un dashboard en
-// blanco, sin pista de que el siguiente paso es instalar `setup`. Esta pantalla es el core; el
-// wizard NO: vive en el módulo `setup`, que se instala desde Apps como cualquier otro.
-// En cuanto hay un módulo instalado, `needsFirstRun` cae y el shell deja de desviar aquí.
-import { ref } from 'vue';
+// blanco, sin pista del siguiente paso. El módulo `setup` se RETIRÓ (ADR-0113): la puesta en
+// marcha ahora es importar una plantilla/backup (pestaña Datos de Ajustes) o elegir módulos del
+// marketplace. En cuanto hay un módulo instalado, `needsFirstRun` cae y el shell deja de desviar aquí.
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { IonPage, IonContent, IonButton, IonSpinner } from '@ionic/vue';
-
-import { requestInstall } from '../lib/runtime';
-import { refreshInstalledModules, refreshModuleNav } from '../lib/nav';
-
-/** Id del módulo de puesta en marcha en el catálogo de Apps. */
-const SETUP_MODULE_ID = 'setup';
+import { IonPage, IonContent, IonButton } from '@ionic/vue';
 
 const { t } = useI18n();
 const router = useRouter();
-const loading = ref<boolean>(false);
-const error = ref<boolean>(false);
 
-async function startSetup(): Promise<void> {
-  loading.value = true;
-  error.value = false;
-  try {
-    await requestInstall(SETUP_MODULE_ID, 'latest');
-    // El contador primero: es lo que hace caer `needsFirstRun` y libera el guard del router.
-    await refreshInstalledModules();
-    await refreshModuleNav();
-    await router.replace(`/m/${SETUP_MODULE_ID}`);
-  } catch {
-    error.value = true;
-  } finally {
-    loading.value = false;
-  }
+// La puesta en marcha vive en la pestaña Datos de Ajustes (ADR-0113; decisión humano 2026-07-12):
+// navegar, no instalar nada.
+function startSetup(): void {
+  void router.push('/settings?tab=data');
 }
 </script>
 
@@ -83,8 +57,5 @@ async function startSetup(): Promise<void> {
 }
 .first-run-lead {
   color: var(--ion-color-medium);
-}
-.first-run-error {
-  color: var(--ion-color-danger);
 }
 </style>
