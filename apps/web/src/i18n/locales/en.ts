@@ -453,12 +453,6 @@ export default {
     retry: 'Retry',
     logout: 'Log out',
   },
-  firstRun: {
-    title: 'Set up your hub',
-    lead: 'This hub is empty. Get going by importing a template for your business type (or a backup of another hub), or pick the modules yourself from the marketplace.',
-    install: 'Start setup',
-    marketplace: 'I would rather pick the modules myself',
-  },
   exportPage: {
     title: 'Export configuration',
     lead: 'Package this hub\'s configuration — and optionally its data — as a blueprint you can import into another hub.',

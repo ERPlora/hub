@@ -3,7 +3,6 @@ import type { RouteRecordRaw } from 'vue-router';
 import { isAuthed } from '../lib/session';
 import { isModuleEntitled, needsActivation } from '../lib/entitlement';
 import { apiDocsEnabled } from '../lib/api-docs';
-import { ensureInstalledModules, needsFirstRun } from '../lib/nav';
 
 // Rutas del Hub (port de HubShell.tsx). Cada vista es un SFC Vue cargado de forma diferida.
 // `/m/:moduleId` monta el Web Component (Lit) del módulo en runtime (ModuleView).
@@ -33,11 +32,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/m/:moduleId/:navId?', name: 'module', component: () => import('../views/ModuleView.vue'), meta: { auth: true } },
   // Pantalla de activación: hay sesión pero el hub no tiene un entitlement válido (§2.10).
   { path: '/activation', name: 'activation', component: () => import('../views/ActivationPage.vue'), meta: { auth: true } },
-  // Primer arranque: el hub se despliega vacío (ADR-0087) y sin esto aterriza en un dashboard en
-  // blanco. Empuja a importar una plantilla (Ajustes → Datos, ADR-0113) o al marketplace.
-  { path: '/first-run', name: 'first-run', component: () => import('../views/FirstRunPage.vue'), meta: { auth: true } },
   // Catch-all: cualquier ruta desconocida (incl. las retiradas /export y /import → ahora en
-  // Ajustes → Datos, ADR-0116) cae al inicio en vez de dejar el outlet en blanco.
+  // Ajustes → Datos, ADR-0116, y la retirada /first-run) cae al inicio en vez de dejar el
+  // outlet en blanco.
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ];
 
@@ -47,7 +44,7 @@ export const router = createRouter({
 });
 
 // Auth-gate: rutas con meta.auth requieren sesión; si no, a /login. (Vue-router nativo, sin React.)
-router.beforeEach(async (to) => {
+router.beforeEach((to) => {
   if (to.meta.auth && !isAuthed.value) {
     return { name: 'login', query: { redirect: to.fullPath } };
   }
@@ -62,21 +59,9 @@ router.beforeEach(async (to) => {
   if (to.name === 'activation' && !needsActivation.value) {
     return { path: '/' };
   }
-  // Primer arranque: un hub sin módulos aterrizaría en un dashboard vacío. Hay que ESPERAR a saber
-  // qué hay instalado (`/api/modules`), o decidiríamos sin la respuesta. Apps y ajustes
-  // quedan accesibles: la pantalla empuja, no encierra — y el hub vacío es precisamente el que
-  // necesita el import (pestaña Datos de Ajustes: restaurar un backup / plantilla, ADR-0113).
-  if (isAuthed.value && to.meta.auth) {
-    await ensureInstalledModules();
-    const escapes = ['first-run', 'apps', 'settings'];
-    if (needsFirstRun.value && !escapes.includes(String(to.name))) {
-      return { name: 'first-run' };
-    }
-  }
-  // Con módulos instalados, la pantalla de primer arranque ya no pinta nada.
-  if (to.name === 'first-run' && !needsFirstRun.value) {
-    return { path: '/' };
-  }
+  // (Retirado) El desvío a /first-run para hubs sin módulos: la puesta en marcha vive AHORA en
+  // core — pestaña Datos de Ajustes (import/export, ADR-0113/0116) + el widget del dashboard.
+  // Un hub vacío entra directo al dashboard y configura desde ahí si lo necesita.
   // Un módulo concreto solo se monta si el hub tiene derecho (acceso por URL directa).
   if (to.name === 'module' && !isModuleEntitled(String(to.params.moduleId))) {
     return { name: 'dashboard' };
