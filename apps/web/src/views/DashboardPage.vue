@@ -88,7 +88,7 @@
             <span class="label">{{ entry.moduleName }}</span>
           </button>
           <!-- Añadir módulo: misma rejilla, caja "fantasma" para distinguirlo de las apps reales. -->
-          <button type="button" class="app" @click="router.push('/marketplace')">
+          <button type="button" class="app" @click="router.push('/apps')">
             <span class="box box-add"><HubIcon name="add-outline" /></span>
             <span class="label">{{ t('dashboard.addModule') }}</span>
           </button>
@@ -422,7 +422,7 @@ onMounted(async () => {
 
 <style scoped>
 /* La pestaña Actividad usa ok-data-table en modo `fill`: fija el alto al área de ion-content
-   (cabecera/filtros/pager fijos, scroll solo en el cuerpo) — mismo patrón que Marketplace. */
+   (cabecera/filtros/pager fijos, scroll solo en el cuerpo) — mismo patrón que Apps. */
 .fill {
   height: 100%;
 }

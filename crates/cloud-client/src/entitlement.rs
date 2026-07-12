@@ -57,6 +57,12 @@ pub struct EntitlementClaims {
     pub exp: i64,
     /// Hasta este unix-ts el hub puede operar offline con este token cacheado.
     pub grace_until: i64,
+    /// Claim ADITIVO (2026-07-12): gracia ESPECÍFICA de los módulos **de pago** (5 días en el
+    /// SaaS, separada de la global de 7 de `grace_until` que usa el gate de la app). Tokens
+    /// antiguos no lo traen → `None` (retrocompatible) y la rama (b) de la revalidación cae a
+    /// `grace_until`.
+    #[serde(default)]
+    pub paid_grace_until: Option<i64>,
 }
 
 impl EntitlementClaims {
@@ -172,6 +178,33 @@ nQIDAQAB
         assert_eq!(claims.deployment_mode, "desktop");
         assert!(claims.allows("pos"));
         assert!(!claims.allows("not-installed"));
+    }
+
+    #[test]
+    fn token_antiguo_sin_paid_grace_until_deserializa_con_none() {
+        // Retrocompat del claim ADITIVO: los tokens que el SaaS emitió sin `paid_grace_until`
+        // siguen verificando EXACTAMENTE igual y el campo queda a None (fallback a grace_until).
+        let token = sign(2000, 9000);
+        let claims = verify_entitlement(&token, PUB, 3000).unwrap();
+        assert_eq!(claims.paid_grace_until, None);
+    }
+
+    #[test]
+    fn token_con_paid_grace_until_lo_expone_en_las_claims() {
+        let claims_json = json!({
+            "hub_id": "h1",
+            "deployment_mode": "desktop",
+            "modules": [{"module_id": "pos", "tier": "premium", "version": "1.0.0"}],
+            "iat": 1000,
+            "exp": 2000,
+            "grace_until": 9000,
+            "paid_grace_until": 5000,
+        });
+        let key = EncodingKey::from_rsa_pem(PRIV.as_bytes()).unwrap();
+        let token = encode(&Header::new(Algorithm::RS256), &claims_json, &key).unwrap();
+        let claims = verify_entitlement(&token, PUB, 3000).unwrap();
+        assert_eq!(claims.paid_grace_until, Some(5000));
+        assert_eq!(claims.grace_until, 9000);
     }
 
     #[test]

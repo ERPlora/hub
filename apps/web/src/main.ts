@@ -18,7 +18,7 @@ import {
   swapVerticalOutline,
   // ok-file-manager (/files): navegación por carpetas, tipo de archivo terminal.
   chevronForwardOutline, folderOpenOutline, terminalOutline,
-  // Marketplace (ok-data-table): acción activar/desactivar de un módulo instalado.
+  // Apps (ok-data-table): acción activar/desactivar de un módulo instalado.
   powerOutline,
   // ok-widget-board (DashboardPage): botón ⋮ de "Personalizar panel".
   ellipsisVertical,
@@ -68,7 +68,7 @@ addIcons({
   'chevron-forward-outline': chevronForwardOutline,
   'folder-open-outline': folderOpenOutline,
   'terminal-outline': terminalOutline,
-  // Marketplace: acción activar/desactivar (ok-data-table rowAction).
+  // Apps: acción activar/desactivar (ok-data-table rowAction).
   'power-outline': powerOutline,
   // ok-widget-board: botón ⋮ "Personalizar panel" del dashboard de inicio.
   'ellipsis-vertical': ellipsisVertical,

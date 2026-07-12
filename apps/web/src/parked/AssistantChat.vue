@@ -1,6 +1,6 @@
 <!--
   APARCADO — NO es una vista del shell ni está enrutado.
-  En ERPlora el asistente AI es un MÓDULO INSTALABLE (se instala desde el marketplace y
+  En ERPlora el asistente AI es un MÓDULO INSTALABLE (se instala desde Apps y
   se carga como Web Component vía ModuleView), no una página horneada en el shell.
   Este SFC se conserva como REFERENCIA de UX/markup del chat (streaming SSE contra el
   proxy del Hub `POST /api/assistant/chat/stream`, ver lib/assistant.ts) para cuando se

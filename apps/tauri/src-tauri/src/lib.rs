@@ -831,6 +831,9 @@ fn erplora_remove_device(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Deep-link de compra (F4, ADR-0114): habilita `openUrl` (navegador del sistema) para el
+        // front (`lib/open-external.ts`). El permiso lo acota `capabilities/default.json`.
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             use tauri::Manager;
             // ADR-0050 (mismo origen): en desktop prod el runtime embebido sirve el `dist/` empaquetado,

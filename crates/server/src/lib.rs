@@ -32,6 +32,7 @@ pub mod assistant;
 pub mod auth;
 pub mod backup;
 pub mod embed;
+pub mod entitlement;
 pub mod error_sink;
 pub mod export_import;
 pub mod ingest;
@@ -390,6 +391,30 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     }
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            }
+        });
+    }
+
+    // Job de **revalidación híbrida del entitlement** (crate::entitlement): refresca el token
+    // firmado del Cloud cada `HUB_ENTITLEMENT_REVALIDATE_SECS` (default 24h) con la credencial
+    // de máquina y actualiza el estado que leen el gate de query/command y `/api/entitlement`.
+    // Primer tick al arrancar (siembra el estado cuanto antes). Sin token de máquina (dev/local
+    // sin enrolar) el tick se salta SIN contar fallo → el gate queda fail-open, como hoy.
+    {
+        let st = state.clone();
+        let secs = entitlement::interval_secs(
+            std::env::var("HUB_ENTITLEMENT_REVALIDATE_SECS").ok().as_deref(),
+        );
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(secs));
+            loop {
+                tick.tick().await;
+                let Some(auth) = auth::machine_auth(&st) else { continue };
+                let now = entitlement::now_unix();
+                let outcome =
+                    entitlement::fetch_verified_claims(&st.http, &st.config.cloud_base_url, &auth, now)
+                        .await;
+                entitlement::record_outcome(&st.entitlement, outcome, now);
             }
         });
     }
@@ -853,39 +878,99 @@ fn module_asset_content_type(rel: &str) -> &'static str {
     }
 }
 
-/// GET hub-scoped al Cloud con la credencial de máquina (o JWT de usuario como fallback) y
-/// devuelve el JSON tal cual. El **secreto de máquina nunca sale al navegador**: el web llama a
-/// estas rutas del runtime y es el runtime quien firma la petición al Cloud.
-async fn proxy_cloud_get(st: &AppState, headers: &HeaderMap, req: cloud_client::PreparedRequest) -> Response {
+/// Fallo de un GET hub-scoped al Cloud: sin credencial (401 local) o error de red (502).
+/// Separado de la respuesta HTTP para que cada proxy construya su body (p. ej.
+/// `proxy_entitlement` añade el bloque `revalidation` también en el fallo).
+enum CloudGetError {
+    NoCredential,
+    Network(String),
+}
+
+/// GET hub-scoped al Cloud con la credencial de máquina (o JWT de usuario como fallback).
+/// Devuelve status + body crudos del Cloud. El **secreto de máquina nunca sale al navegador**:
+/// el web llama a estas rutas del runtime y es el runtime quien firma la petición al Cloud.
+async fn cloud_get_raw(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+) -> Result<(StatusCode, axum::body::Bytes), CloudGetError> {
     let Some(auth) = auth::hub_scoped_auth(headers, st) else {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
-        )
-            .into_response();
+        return Err(CloudGetError::NoCredential);
     };
     let mut r = st.http.get(&req.url);
     for (k, v) in auth.headers() {
         r = r.header(k, v);
     }
-    match r.send().await {
-        Ok(resp) => {
-            let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-            match resp.bytes().await {
-                Ok(body) => (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response(),
-                Err(e) => (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": e.to_string() }))).into_response(),
-            }
+    let resp = r.send().await.map_err(|e| CloudGetError::Network(e.to_string()))?;
+    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let body = resp.bytes().await.map_err(|e| CloudGetError::Network(e.to_string()))?;
+    Ok((status, body))
+}
+
+/// Respuesta HTTP para un [`CloudGetError`] (contrato previo de `proxy_cloud_get`, sin cambios).
+fn cloud_get_error_response(e: CloudGetError) -> Response {
+    match e {
+        CloudGetError::NoCredential => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
+        )
+            .into_response(),
+        CloudGetError::Network(msg) => {
+            (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": msg }))).into_response()
         }
-        Err(e) => (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": e.to_string() }))).into_response(),
+    }
+}
+
+/// GET hub-scoped al Cloud y devuelve el JSON tal cual (ver [`cloud_get_raw`]).
+async fn proxy_cloud_get(st: &AppState, headers: &HeaderMap, req: cloud_client::PreparedRequest) -> Response {
+    match cloud_get_raw(st, headers, req).await {
+        Ok((status, body)) => {
+            (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response()
+        }
+        Err(e) => cloud_get_error_response(e),
     }
 }
 
 /// GET /api/entitlement — entitlement firmado del hub (proxy de `/api/v1/hub/device/entitlement/`).
+///
+/// **Aditivo** (revalidación híbrida, `crate::entitlement`): a la respuesta del Cloud se le añade
+/// el bloque `revalidation` (`blocked_modules` + `grace_until` + `last_check`…) con el estado
+/// local del job periódico — también cuando el Cloud no responde (fallo de red), que es justo
+/// cuando la UI necesita pintar «funcionará hasta {fecha}». El contrato previo no cambia:
+/// mismo status y mismos campos, solo se AÑADE la clave.
 async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    // `entitlement(auth)` solo usa `auth` para las cabeceras; las reescribe `proxy_cloud_get`.
+    // `entitlement(auth)` solo usa `auth` para las cabeceras; las reescribe `cloud_get_raw`.
     let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
-    proxy_cloud_get(&st, &headers, cloud.entitlement(&placeholder)).await
+
+    // Estado local de revalidación sobre los módulos INSTALADOS de este hub.
+    let installed: Vec<String> = {
+        let rt = st.runtime.lock().await;
+        rt.modules().into_iter().map(|m| m.id).collect()
+    };
+    let revalidation = st
+        .entitlement
+        .read()
+        .map(|g| g.revalidation_json(&installed, entitlement::now_unix()))
+        .unwrap_or(Value::Null);
+
+    match cloud_get_raw(&st, &headers, cloud.entitlement(&placeholder)).await {
+        Ok((status, body)) => match serde_json::from_slice::<Value>(&body) {
+            // Body objeto JSON → se le inyecta la clave aditiva.
+            Ok(Value::Object(mut obj)) => {
+                obj.insert("revalidation".into(), revalidation);
+                (status, Json(Value::Object(obj))).into_response()
+            }
+            // Body no-objeto (raro: HTML de error, vacío) → tal cual, como antes.
+            _ => (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response(),
+        },
+        Err(CloudGetError::Network(msg)) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "ok": false, "error": msg, "revalidation": revalidation })),
+        )
+            .into_response(),
+        Err(e) => cloud_get_error_response(e),
+    }
 }
 
 /// Proxya al SaaS la emisión del **token del Bridge** (`GET /api/v1/hub/device/bridge-token/`). El
@@ -1087,6 +1172,31 @@ pub(crate) fn tenant_rejected(e: tenant::TenantError) -> Response {
     (status, Json(body)).into_response()
 }
 
+/// Gate del dispatcher (revalidación híbrida del entitlement, ver `crate::entitlement`): si el
+/// módulo dueño de la query/command está **bloqueado**, devuelve el error estable
+/// `module_entitlement_blocked` (HTTP 402) con su `module_id` para que el front lo distinga y
+/// pinte el aviso («funcionará hasta {fecha}»). `None` = no bloqueado → la ejecución sigue.
+/// Defensa en profundidad: el enforcement REAL es el proxy del SaaS; aquí NUNCA se desinstala
+/// ni se tocan datos. `module_id = None` (op desconocida) no se gatea: `execute_*` devolverá su
+/// `not_found` de siempre.
+fn entitlement_blocked(st: &AppState, module_id: Option<&str>) -> Option<Response> {
+    let module_id = module_id?;
+    let blocked = st
+        .entitlement
+        .read()
+        .ok()?
+        .is_blocked(module_id, entitlement::now_unix());
+    if !blocked {
+        return None;
+    }
+    let body = json!({ "ok": false, "error": {
+        "code": "module_entitlement_blocked",
+        "module_id": module_id,
+        "message": format!("el módulo `{module_id}` no está incluido en el entitlement vigente del hub"),
+    }});
+    Some((StatusCode::PAYMENT_REQUIRED, Json(body)).into_response())
+}
+
 /// `401` uniforme para fallos de autenticación (modo Jwt: token ausente/ inválido).
 fn unauthorized(e: auth::AuthError) -> Response {
     (
@@ -1213,6 +1323,11 @@ async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Q
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
+    // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
+    let owner = rt.registry().get_query(&req.name).map(|q| q.module_id.clone());
+    if let Some(resp) = entitlement_blocked(&st, owner.as_deref()) {
+        return resp;
+    }
     // Queries de lista (con bloque `list`) devuelven `{rows,total,limit,offset}` para el pager;
     // el resto devuelve el array de filas tal cual (compat con get/stats/settings).
     if rt.is_list_query(&req.name) {
@@ -1239,6 +1354,11 @@ async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
+    // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
+    let owner = rt.registry().get_command(&req.name).map(|c| c.module_id.clone());
+    if let Some(resp) = entitlement_blocked(&st, owner.as_deref()) {
+        return resp;
+    }
     match rt.execute_command(&req.name, &req.payload, &ctx).await {
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),
         Err(e) => err_response(e),

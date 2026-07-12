@@ -496,7 +496,13 @@ export type PurchaseModuleResult =
       currency: string;
     };
 
-/** Compra / upgrade de un módulo (plano "compra = usuario"). Devuelve free o datos de checkout. */
+/**
+ * Compra / upgrade de un módulo (plano "compra = usuario"). Devuelve free o datos de checkout.
+ *
+ * @deprecated El Hub ya NO vende (Fase 4): ModulePlanPanel abre un deep-link a la página del
+ * módulo en el SaaS (openExternal) y la compra se completa en el navegador. Se conserva mientras
+ * el endpoint del SaaS siga vivo; se retirará tras el próximo ciclo de updates.
+ */
 export async function cloudPurchaseModule(
   moduleSlug: string,
   opts: PurchaseModuleOptions,
