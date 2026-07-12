@@ -52,3 +52,7 @@ base64 = "0.22"
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
+# Fixtures del test de progreso de instalación (`tests/install_progress.rs`): zips de módulo
+# reales en memoria + su SHA256 (la verificación ADR-0015 es obligatoria, el mock no la salta).
+zip = "2"
+sha2 = "0.10"

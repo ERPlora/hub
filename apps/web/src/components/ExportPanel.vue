@@ -39,18 +39,23 @@
     <ion-card>
       <ion-card-content class="p-0">
         <ion-list lines="none">
+          <!-- Ionic 8: la label la pone el PROPIO checkbox (label-placement/justify), no un
+               ion-label hermano — así el texto es clicable y ES el nombre accesible del input
+               (sin aria-label duplicado que mantener en sync con el i18n).
+               alignment=start alinea la casilla con la 1ª línea cuando la label es multilínea. -->
+
           <!-- Usuarios: empleados + roles + permisos (data/hub_users.sql). -->
           <ion-item>
             <ion-checkbox
               data-testid="export-section-users"
-              slot="start"
               v-model="selUsers"
-              :aria-label="t('exportPage.sectionUsers')"
-            />
-            <ion-label>
-              <h2>{{ t('exportPage.sectionUsers') }}</h2>
-              <p>{{ t('exportPage.sectionUsersDesc') }}</p>
-            </ion-label>
+              justify="start"
+              label-placement="end"
+              alignment="start"
+            >
+              <h2 class="cb-title">{{ t('exportPage.sectionUsers') }}</h2>
+              <p class="cb-desc">{{ t('exportPage.sectionUsersDesc') }}</p>
+            </ion-checkbox>
           </ion-item>
 
           <!-- Ajustes del hub (data/hub_settings.sql). La subselección ítem a ítem
@@ -60,14 +65,14 @@
           <ion-item>
             <ion-checkbox
               data-testid="export-section-settings"
-              slot="start"
               v-model="selSettings"
-              :aria-label="t('exportPage.sectionSettings')"
-            />
-            <ion-label>
-              <h2>{{ t('exportPage.sectionSettings') }}</h2>
-              <p>{{ t('exportPage.sectionSettingsDesc') }}</p>
-            </ion-label>
+              justify="start"
+              label-placement="end"
+              alignment="start"
+            >
+              <h2 class="cb-title">{{ t('exportPage.sectionSettings') }}</h2>
+              <p class="cb-desc">{{ t('exportPage.sectionSettingsDesc') }}</p>
+            </ion-checkbox>
           </ion-item>
 
           <!-- Fiscal: OFF por defecto. Incluye config VeriFactu + certificado .p12 (viaja tal
@@ -75,32 +80,32 @@
           <ion-item>
             <ion-checkbox
               data-testid="export-section-fiscal"
-              slot="start"
               v-model="selFiscal"
-              :aria-label="t('exportPage.sectionFiscal')"
-            />
-            <ion-label class="ion-text-wrap">
-              <h2>{{ t('exportPage.sectionFiscal') }}</h2>
-              <p>{{ t('exportPage.sectionFiscalDesc') }}</p>
+              justify="start"
+              label-placement="end"
+              alignment="start"
+            >
+              <h2 class="cb-title">{{ t('exportPage.sectionFiscal') }}</h2>
+              <p class="cb-desc">{{ t('exportPage.sectionFiscalDesc') }}</p>
               <ion-note data-testid="export-fiscal-note" color="warning" class="fiscal-note">
                 <HubIcon name="warning-outline" class="fiscal-note-icon" />
                 {{ t('exportPage.fiscalWarning') }}
               </ion-note>
-            </ion-label>
+            </ion-checkbox>
           </ion-item>
 
           <!-- Imágenes/media (carpeta media del hub, dentro del zip — sin depender del S3). -->
           <ion-item>
             <ion-checkbox
               data-testid="export-section-media"
-              slot="start"
               v-model="selMedia"
-              :aria-label="t('exportPage.sectionMedia')"
-            />
-            <ion-label>
-              <h2>{{ t('exportPage.sectionMedia') }}</h2>
-              <p>{{ t('exportPage.sectionMediaDesc') }}</p>
-            </ion-label>
+              justify="start"
+              label-placement="end"
+              alignment="start"
+            >
+              <h2 class="cb-title">{{ t('exportPage.sectionMedia') }}</h2>
+              <p class="cb-desc">{{ t('exportPage.sectionMediaDesc') }}</p>
+            </ion-checkbox>
           </ion-item>
         </ion-list>
       </ion-card-content>
@@ -372,6 +377,23 @@ async function doExport(): Promise<void> {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+/* Ionic pinta `.label-text-wrapper` DENTRO del shadow con `white-space:nowrap` + ellipsis, así
+   que la clase `ion-text-wrap` (que actúa sobre el host) NO la vence y el texto se trunca en
+   móvil. La única vía desde fuera es el shadow part `label`. */
+ion-checkbox::part(label) {
+  white-space: normal;
+}
+/* Tipografía de la label del checkbox (antes la daba ion-label con sus h2/p). */
+.cb-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.cb-desc {
+  margin: 0.1rem 0 0;
+  font-size: 0.875rem;
+  color: var(--ion-color-medium);
 }
 .fiscal-note {
   display: flex;

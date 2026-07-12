@@ -6,7 +6,7 @@
         <ion-spinner name="dots" />
       </div>
       <!-- `fill` fija el alto al área de ion-content (cabecera/pager fijos, scroll solo en el
-           cuerpo) — mismo patrón que MarketplacePage/EmployeesPage. -->
+           cuerpo) — mismo patrón que AppsPage/EmployeesPage. -->
       <ok-data-table
         v-show="!loadingInvoices"
         ref="invoicesTable"
@@ -151,7 +151,7 @@ function statusLabel(s: CloudInvoice['status']): string {
 }
 
 // Pill de estado: las clases .ion-color-* NO penetran el shadow del data-table, así que el color
-// va por vars inline (heredan al shadow). Mismo recurso que MarketplacePage.badgeCell.
+// va por vars inline (heredan al shadow). Mismo recurso que AppsPage.badgeCell.
 function statusCell(s: CloudInvoice['status']): Node {
   const tone = STATUS_COLOR[s] ?? 'medium';
   const span = document.createElement('span');

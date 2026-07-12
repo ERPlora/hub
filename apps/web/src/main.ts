@@ -7,15 +7,18 @@ import {
   appsOutline, closeOutline, arrowBackOutline, backspaceOutline,
   // ok-kpi (DashboardPage / /system): iconos de tendencia + neutro.
   trendingUp, trendingDown, remove,
-  // ok-kpi icon prop (DashboardPage): estas pasan directamente a <ion-icon name="…"> dentro del WC.
+  // ok-kpi / ok-stat icon prop (DashboardPage widgets): estas pasan directamente a
+  // <ion-icon name="…"> dentro del WC → hay que registrarlas o el icono no resuelve (URL inválida).
   trendingUpOutline, receiptOutline, peopleOutline, warningOutline,
+  // Widgets de inventario del board de inicio: stock bajo / valor / existencias / menos stock.
+  alertCircleOutline, cashOutline, cubeOutline, trendingDownOutline,
   // ok-data-table / ok-empty-state: icono por defecto del estado vacío.
   fileTrayOutline,
   // ok-data-table: indicador de orden en cabeceras de columna.
   swapVerticalOutline,
   // ok-file-manager (/files): navegación por carpetas, tipo de archivo terminal.
   chevronForwardOutline, folderOpenOutline, terminalOutline,
-  // Marketplace (ok-data-table): acción activar/desactivar de un módulo instalado.
+  // Apps (ok-data-table): acción activar/desactivar de un módulo instalado.
   powerOutline,
   // ok-widget-board (DashboardPage): botón ⋮ de "Personalizar panel".
   ellipsisVertical,
@@ -54,6 +57,9 @@ addIcons({
   // ok-kpi `icon` prop (DashboardPage): KPI icon names passed directly to ion-icon inside the WC.
   'trending-up-outline': trendingUpOutline, 'receipt-outline': receiptOutline,
   'people-outline': peopleOutline, 'warning-outline': warningOutline,
+  // Widgets de inventario del board de inicio (ok-stat/ok-kpi): sin registrar caían a "URL inválida".
+  'alert-circle-outline': alertCircleOutline, 'cash-outline': cashOutline,
+  'cube-outline': cubeOutline, 'trending-down-outline': trendingDownOutline,
   // ok-data-table / ok-empty-state: default empty-state icon used by all module tables.
   'file-tray-outline': fileTrayOutline,
   // ok-data-table: sort indicator shown on every sortable column header.
@@ -62,7 +68,7 @@ addIcons({
   'chevron-forward-outline': chevronForwardOutline,
   'folder-open-outline': folderOpenOutline,
   'terminal-outline': terminalOutline,
-  // Marketplace: acción activar/desactivar (ok-data-table rowAction).
+  // Apps: acción activar/desactivar (ok-data-table rowAction).
   'power-outline': powerOutline,
   // ok-widget-board: botón ⋮ "Personalizar panel" del dashboard de inicio.
   'ellipsis-vertical': ellipsisVertical,

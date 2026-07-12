@@ -1,7 +1,7 @@
 // Config por entorno (Vite). En cloud/local los valores llegan por variables VITE_*.
 // Nunca se hardcodean secretos aquí.
 export const config = {
-  // URL del Cloud Portal (marketplace, auth, billing, proxy AI). ARQUITECTURA.md §2.1–2.3.
+  // URL del Cloud Portal (catálogo de módulos, auth, billing, proxy AI). ARQUITECTURA.md §2.1–2.3.
   cloudApiUrl: import.meta.env.VITE_CLOUD_API_URL ?? 'https://erplora.com',
   // X-Hub-Id del hub activo. Decisión del humano (2): NO hay picker de hub; el hub_id lo
   // inyecta el deployment y se RESUELVE EN EL BOOT desde el runtime (`GET /api/hub/context`,

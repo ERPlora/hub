@@ -388,7 +388,7 @@
       <!-- ── Tab: Permisos (capabilities de módulo, default-deny) ── -->
       <!-- Lista los módulos instalados que DECLARAN permisos; por cada uno, un toggle por capability.
            El runtime es la autoridad (PUT solo admin → 401 si no); aquí el gate `:disabled` es solo
-           cosmético. La gestión autoritativa de permisos vive AQUÍ (el modal del marketplace es un
+           cosmético. La gestión autoritativa de permisos vive AQUÍ (el modal de Apps es un
            atajo de consentimiento al instalar). -->
       <template v-else-if="tab === 'permissions'">
         <ion-card>
@@ -532,8 +532,8 @@ const { t, locale } = useI18n();
 type Tab = 'hub' | 'store' | 'tax' | 'tickets' | 'permissions' | 'data';
 const TABS: readonly Tab[] = ['hub', 'store', 'tax', 'tickets', 'permissions', 'data'];
 
-// Deep-link a una pestaña concreta: /settings?tab=data (lo usan el widget de la home y el
-// empujón de first-run para aterrizar en Datos). Query inválida/ausente → pestaña por defecto.
+// Deep-link a una pestaña concreta: /settings?tab=data (lo usa el widget de la home para
+// aterrizar en Datos). Query inválida/ausente → pestaña por defecto.
 const route = useRoute();
 const initialTab = TABS.find((v) => v === String(route.query.tab ?? '')) ?? 'hub';
 const tab = ref<Tab>(initialTab);

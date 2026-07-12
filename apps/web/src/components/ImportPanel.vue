@@ -34,20 +34,46 @@
             {{ inspecting ? t('importPage.inspecting') : t('importPage.pickFile') }}
           </ion-button>
 
-          <!-- «Desde la nube»: el registro/distribución de blueprints en el SaaS es una tanda
-               posterior (fuera de alcance, doc §1) → botón deshabilitado + nota honesta. -->
+          <!-- «Desde la nube» (ADR-0121): catálogo de blueprints publicados en el vendor portal
+               del SaaS. El runtime proxya con su X-Hub-Token y VERIFICA el sha256 del zip antes
+               de dárnoslo; a partir de ahí el flujo es idéntico al de un fichero local. -->
           <ion-button
             data-testid="import-cloud"
             expand="block"
             fill="outline"
             class="mt-2"
-            disabled
+            :disabled="!isAdmin || inspecting || loadingCatalog"
+            @click="openCloudCatalog"
           >
-            <HubIcon slot="start" name="cloud-download-outline" />
-            {{ t('importPage.fromCloud') }}
+            <ion-spinner v-if="loadingCatalog" slot="start" name="crescent" />
+            <HubIcon v-else slot="start" name="cloud-download-outline" />
+            {{ loadingCatalog ? t('importPage.loadingCatalog') : t('importPage.fromCloud') }}
           </ion-button>
-          <ion-note data-testid="import-cloud-note" class="soon-note">
-            {{ t('importPage.cloudSoon') }}
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Catálogo de la nube -->
+      <ion-card v-if="showCatalog" data-testid="import-cloud-catalog">
+        <ion-card-content class="p-0">
+          <ion-list v-if="catalog.length" lines="full">
+            <ion-item
+              v-for="bp in catalog"
+              :key="bp.slug"
+              button
+              :disabled="inspecting"
+              :data-testid="`import-cloud-item-${bp.slug}`"
+              @click="pickFromCloud(bp)"
+            >
+              <HubIcon slot="start" name="cube-outline" />
+              <ion-label>
+                <h3>{{ bp.name }}</h3>
+                <p>{{ bp.description || bp.slug }}</p>
+              </ion-label>
+              <ion-note slot="end">{{ bp.locale }} · v{{ bp.latest_version }}</ion-note>
+            </ion-item>
+          </ion-list>
+          <ion-note v-else data-testid="import-cloud-empty" class="soon-note">
+            {{ t('importPage.catalogEmpty') }}
           </ion-note>
         </ion-card-content>
       </ion-card>
@@ -95,45 +121,53 @@
       <h2 class="section-title">{{ t('importPage.sections') }}</h2>
       <ion-card>
         <ion-card-content class="p-0">
+          <!-- Ionic 8: la label la pone el PROPIO checkbox (label-placement/justify), no un
+               ion-label hermano — texto clicable y nombre accesible sin aria-label duplicado. -->
           <ion-list lines="none">
             <ion-item v-if="hasUsers">
               <ion-checkbox
                 data-testid="import-section-users"
-                slot="start"
                 v-model="selUsers"
-                :aria-label="t('importPage.sectionUsers')"
-              />
-              <ion-label><h2>{{ t('importPage.sectionUsers') }}</h2></ion-label>
+                justify="start"
+                label-placement="end"
+                alignment="start"
+              >
+                <h2 class="cb-title">{{ t('importPage.sectionUsers') }}</h2>
+              </ion-checkbox>
             </ion-item>
             <ion-item v-if="hasSettings">
               <ion-checkbox
                 data-testid="import-section-settings"
-                slot="start"
                 v-model="selSettings"
-                :aria-label="t('importPage.sectionSettings')"
-              />
-              <ion-label><h2>{{ t('importPage.sectionSettings') }}</h2></ion-label>
+                justify="start"
+                label-placement="end"
+                alignment="start"
+              >
+                <h2 class="cb-title">{{ t('importPage.sectionSettings') }}</h2>
+              </ion-checkbox>
             </ion-item>
             <ion-item v-if="hasFiscal">
               <ion-checkbox
                 data-testid="import-section-fiscal"
-                slot="start"
                 v-model="selFiscal"
-                :aria-label="t('importPage.sectionFiscal')"
-              />
-              <ion-label class="ion-text-wrap">
-                <h2>{{ t('importPage.sectionFiscal') }}</h2>
-                <p>{{ t('importPage.sectionFiscalDesc') }}</p>
-              </ion-label>
+                justify="start"
+                label-placement="end"
+                alignment="start"
+              >
+                <h2 class="cb-title">{{ t('importPage.sectionFiscal') }}</h2>
+                <p class="cb-desc">{{ t('importPage.sectionFiscalDesc') }}</p>
+              </ion-checkbox>
             </ion-item>
             <ion-item v-if="hasMedia">
               <ion-checkbox
                 data-testid="import-section-media"
-                slot="start"
                 v-model="selMedia"
-                :aria-label="t('importPage.sectionMedia')"
-              />
-              <ion-label><h2>{{ t('importPage.sectionMedia') }}</h2></ion-label>
+                justify="start"
+                label-placement="end"
+                alignment="start"
+              >
+                <h2 class="cb-title">{{ t('importPage.sectionMedia') }}</h2>
+              </ion-checkbox>
             </ion-item>
           </ion-list>
         </ion-card-content>
@@ -148,18 +182,18 @@
             <ion-list lines="none">
               <ion-item v-for="m in moduleRows" :key="m.id">
                 <ion-checkbox
-                  slot="start"
                   :checked="m.include"
-                  :aria-label="m.id"
+                  justify="start"
+                  label-placement="end"
+                  alignment="start"
                   @ion-change="onModuleToggle(m.id, $event)"
-                />
-                <ion-label>
-                  <h2>{{ m.id }}</h2>
-                  <p>
+                >
+                  <h2 class="cb-title">{{ m.id }}</h2>
+                  <p class="cb-desc">
                     v{{ m.version }}
                     <template v-if="m.withData"> · {{ t('importPage.withData') }}</template>
                   </p>
-                </ion-label>
+                </ion-checkbox>
               </ion-item>
             </ion-list>
           </ion-card-content>
@@ -244,12 +278,15 @@ import {
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { isAdmin } from '../lib/session';
-import { refreshInstalledModules, refreshModuleNav } from '../lib/nav';
+import { refreshModuleNav } from '../lib/nav';
 import {
   inspectBlueprint,
   importBlueprint,
   sectionStatusInfo,
+  fetchBlueprintCatalog,
+  downloadBlueprint,
   type BlueprintManifest,
+  type CatalogBlueprint,
   type ImportReport,
 } from '../lib/runtime';
 
@@ -274,11 +311,17 @@ async function onFileChange(e: Event): Promise<void> {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
+  await inspectAndReview(file);
+  input.value = ''; // permite re-elegir el mismo fichero tras un error
+}
+
+/** Paso común: un zip (local o de la nube) → inspect → pantalla de revisión. */
+async function inspectAndReview(zip: Blob): Promise<void> {
   error.value = '';
   inspecting.value = true;
   try {
     // Integridad dura en el server (SHA256/manifest/zip-slip): un zip malo se rechaza SIN efectos.
-    const res = await inspectBlueprint(file);
+    const res = await inspectBlueprint(zip);
     uploadId.value = res.upload_id;
     manifest.value = res.manifest;
     seedSelection(res.manifest);
@@ -288,7 +331,43 @@ async function onFileChange(e: Event): Promise<void> {
     error.value = err instanceof Error ? err.message : String(err);
   } finally {
     inspecting.value = false;
-    input.value = ''; // permite re-elegir el mismo fichero tras un error
+  }
+}
+
+// ── Paso 1 (bis): fuente NUBE — catálogo de blueprints del SaaS (ADR-0121) ──
+const loadingCatalog = ref<boolean>(false);
+const showCatalog = ref<boolean>(false);
+const catalog = ref<CatalogBlueprint[]>([]);
+
+async function openCloudCatalog(): Promise<void> {
+  error.value = '';
+  loadingCatalog.value = true;
+  try {
+    catalog.value = await fetchBlueprintCatalog();
+    showCatalog.value = true;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    loadingCatalog.value = false;
+  }
+}
+
+/**
+ * Elegir un blueprint de la nube. El runtime lo descarga de Object Storage y **verifica su
+ * sha256** antes de entregárnoslo; si no casa, `downloadBlueprint` lanza y no se importa nada.
+ * A partir de ahí es el MISMO flujo que un zip local.
+ */
+async function pickFromCloud(bp: CatalogBlueprint): Promise<void> {
+  error.value = '';
+  inspecting.value = true;
+  try {
+    const zip = await downloadBlueprint(bp.slug);
+    showCatalog.value = false;
+    await inspectAndReview(zip);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    inspecting.value = false;
   }
 }
 
@@ -366,8 +445,7 @@ async function doImport(): Promise<void> {
       modules: moduleRows.value.filter((m) => m.include).map((m) => m.id),
     });
     step.value = 'report';
-    // El import pudo instalar módulos: refresca el contador (cae needsFirstRun) y el menú.
-    await refreshInstalledModules();
+    // El import pudo instalar módulos: refresca el menú del shell.
     await refreshModuleNav();
   } catch (err) {
     // Rechazo ENTERO (integridad dura / server caído): vuelve al resumen con el motivo del server.
@@ -403,21 +481,34 @@ interface ReportRow {
 
 // Informe pintado tal cual llega (contrato JSON del motor): Applied ✓ verde · Skipped — gris ·
 // Failed ✗ rojo con su motivo. sectionStatusInfo tolera las dos formas serde del enum.
+const visual = {
+  applied: { icon: 'checkmark-circle-outline', color: 'success', label: () => t('importPage.statusApplied') },
+  skipped: { icon: 'remove-circle-outline', color: 'medium', label: () => t('importPage.statusSkipped') },
+  failed: { icon: 'close-circle-outline', color: 'danger', label: () => t('importPage.statusFailed') },
+} as const;
+
+// El motor del runtime NO copia media (lo hace la capa server) y la reporta `Skipped`; su
+// resultado REAL viene en `report.media`. Traducimos ese contador al estado verdadero de la fila
+// para no mentir con un «Saltado» cuando las imágenes sí se copiaron (informe de review, hallazgo #1).
+function mediaStatus(m: NonNullable<ImportReport['media']>): { kind: 'applied' | 'skipped' | 'failed'; reason?: string } {
+  const reason = m.failed > 0 ? t('importPage.mediaFailed', { n: m.failed }) : undefined;
+  if (m.copied > 0) return { kind: 'applied', reason };
+  if (m.failed > 0) return { kind: 'failed', reason };
+  return { kind: 'skipped' }; // seleccionada pero sin ficheros que copiar
+}
+
 const reportRows = computed<ReportRow[]>(() =>
   (report.value?.sections ?? []).map((s) => {
-    const info = sectionStatusInfo(s.status);
-    const visual = {
-      applied: { icon: 'checkmark-circle-outline', color: 'success', label: t('importPage.statusApplied') },
-      skipped: { icon: 'remove-circle-outline', color: 'medium', label: t('importPage.statusSkipped') },
-      failed: { icon: 'close-circle-outline', color: 'danger', label: t('importPage.statusFailed') },
-    } as const;
+    const media = report.value?.media;
+    const info =
+      s.section === 'media' && media ? mediaStatus(media) : sectionStatusInfo(s.status);
     const v = visual[info.kind];
     return {
       section: s.section,
       label: sectionLabel(s.section),
       icon: v.icon,
       color: v.color,
-      statusLabel: v.label,
+      statusLabel: v.label(),
       reason: info.reason,
     };
   }),
@@ -440,6 +531,23 @@ async function finish(): Promise<void> {
   font-size: 1rem;
   font-weight: 600;
   margin: 1rem 0 0.5rem;
+}
+/* Ionic pinta `.label-text-wrapper` DENTRO del shadow con `white-space:nowrap` + ellipsis, así
+   que la clase `ion-text-wrap` (que actúa sobre el host) NO la vence y el texto se trunca en
+   móvil. La única vía desde fuera es el shadow part `label`. */
+ion-checkbox::part(label) {
+  white-space: normal;
+}
+/* Tipografía de la label del checkbox (antes la daba ion-label con sus h2/p). */
+.cb-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.cb-desc {
+  margin: 0.1rem 0 0;
+  font-size: 0.875rem;
+  color: var(--ion-color-medium);
 }
 .soon-note {
   display: block;

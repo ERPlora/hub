@@ -17,7 +17,7 @@ import { defineCustomElement as ionAlert } from '@ionic/core/components/ion-aler
 import { defineCustomElement as ionCard } from '@ionic/core/components/ion-card.js';
 import { defineCustomElement as ionCardHeader } from '@ionic/core/components/ion-card-header.js';
 import { defineCustomElement as ionCardContent } from '@ionic/core/components/ion-card-content.js';
-// ExportPage crea ion-checkbox IMPERATIVAMENTE en las celdas render() de su ok-data-table
+// ExportPanel crea ion-checkbox IMPERATIVAMENTE en las celdas render() de su ok-data-table
 // (checkbox «módulo» + «datos» por fila): hay que garantizar el custom element definido aunque
 // ninguna SFC lo haya montado aún vía @ionic/vue.
 import { defineCustomElement as ionCheckbox } from '@ionic/core/components/ion-checkbox.js';

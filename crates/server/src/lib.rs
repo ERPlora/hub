@@ -32,6 +32,7 @@ pub mod assistant;
 pub mod auth;
 pub mod backup;
 pub mod embed;
+pub mod entitlement;
 pub mod error_sink;
 pub mod export_import;
 pub mod ingest;
@@ -394,6 +395,30 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         });
     }
 
+    // Job de **revalidación híbrida del entitlement** (crate::entitlement): refresca el token
+    // firmado del Cloud cada `HUB_ENTITLEMENT_REVALIDATE_SECS` (default 24h) con la credencial
+    // de máquina y actualiza el estado que leen el gate de query/command y `/api/entitlement`.
+    // Primer tick al arrancar (siembra el estado cuanto antes). Sin token de máquina (dev/local
+    // sin enrolar) el tick se salta SIN contar fallo → el gate queda fail-open, como hoy.
+    {
+        let st = state.clone();
+        let secs = entitlement::interval_secs(
+            std::env::var("HUB_ENTITLEMENT_REVALIDATE_SECS").ok().as_deref(),
+        );
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(secs));
+            loop {
+                tick.tick().await;
+                let Some(auth) = auth::machine_auth(&st) else { continue };
+                let now = entitlement::now_unix();
+                let outcome =
+                    entitlement::fetch_verified_claims(&st.http, &st.config.cloud_base_url, &auth, now)
+                        .await;
+                entitlement::record_outcome(&st.entitlement, outcome, now);
+            }
+        });
+    }
+
     // Router de API + (opcional) frontend estático en el MISMO origen (`cfg.web_dir`). En ECS/binario
     // lo vuelca `from_env` desde `HUB_WEB_DIR`; en Tauri (Hub Local, ADR-0050) lo fija el shell con la
     // ruta del `dist/` empaquetado (`resource_dir()`), para que el webview cargue front + datos del
@@ -540,6 +565,9 @@ pub fn app(state: AppState) -> Router {
         .route("/api/entitlement", get(proxy_entitlement))
         .route("/api/bridge/token", get(proxy_bridge_token))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
+        // Blueprints: «fuente nube» del import (Ajustes → Datos). ADR-0121.
+        .route("/api/blueprints/catalog", get(proxy_blueprints_catalog))
+        .route("/api/blueprints/:slug/download", get(download_blueprint))
         .route("/api/modules/:id/activate", post(activate_module))
         .route("/api/modules/:id/deactivate", post(deactivate_module))
         .route("/api/modules/:id/uninstall", post(uninstall_module))
@@ -853,39 +881,99 @@ fn module_asset_content_type(rel: &str) -> &'static str {
     }
 }
 
-/// GET hub-scoped al Cloud con la credencial de máquina (o JWT de usuario como fallback) y
-/// devuelve el JSON tal cual. El **secreto de máquina nunca sale al navegador**: el web llama a
-/// estas rutas del runtime y es el runtime quien firma la petición al Cloud.
-async fn proxy_cloud_get(st: &AppState, headers: &HeaderMap, req: cloud_client::PreparedRequest) -> Response {
+/// Fallo de un GET hub-scoped al Cloud: sin credencial (401 local) o error de red (502).
+/// Separado de la respuesta HTTP para que cada proxy construya su body (p. ej.
+/// `proxy_entitlement` añade el bloque `revalidation` también en el fallo).
+enum CloudGetError {
+    NoCredential,
+    Network(String),
+}
+
+/// GET hub-scoped al Cloud con la credencial de máquina (o JWT de usuario como fallback).
+/// Devuelve status + body crudos del Cloud. El **secreto de máquina nunca sale al navegador**:
+/// el web llama a estas rutas del runtime y es el runtime quien firma la petición al Cloud.
+async fn cloud_get_raw(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+) -> Result<(StatusCode, axum::body::Bytes), CloudGetError> {
     let Some(auth) = auth::hub_scoped_auth(headers, st) else {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
-        )
-            .into_response();
+        return Err(CloudGetError::NoCredential);
     };
     let mut r = st.http.get(&req.url);
     for (k, v) in auth.headers() {
         r = r.header(k, v);
     }
-    match r.send().await {
-        Ok(resp) => {
-            let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-            match resp.bytes().await {
-                Ok(body) => (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response(),
-                Err(e) => (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": e.to_string() }))).into_response(),
-            }
+    let resp = r.send().await.map_err(|e| CloudGetError::Network(e.to_string()))?;
+    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let body = resp.bytes().await.map_err(|e| CloudGetError::Network(e.to_string()))?;
+    Ok((status, body))
+}
+
+/// Respuesta HTTP para un [`CloudGetError`] (contrato previo de `proxy_cloud_get`, sin cambios).
+fn cloud_get_error_response(e: CloudGetError) -> Response {
+    match e {
+        CloudGetError::NoCredential => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
+        )
+            .into_response(),
+        CloudGetError::Network(msg) => {
+            (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": msg }))).into_response()
         }
-        Err(e) => (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": e.to_string() }))).into_response(),
+    }
+}
+
+/// GET hub-scoped al Cloud y devuelve el JSON tal cual (ver [`cloud_get_raw`]).
+async fn proxy_cloud_get(st: &AppState, headers: &HeaderMap, req: cloud_client::PreparedRequest) -> Response {
+    match cloud_get_raw(st, headers, req).await {
+        Ok((status, body)) => {
+            (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response()
+        }
+        Err(e) => cloud_get_error_response(e),
     }
 }
 
 /// GET /api/entitlement — entitlement firmado del hub (proxy de `/api/v1/hub/device/entitlement/`).
+///
+/// **Aditivo** (revalidación híbrida, `crate::entitlement`): a la respuesta del Cloud se le añade
+/// el bloque `revalidation` (`blocked_modules` + `grace_until` + `last_check`…) con el estado
+/// local del job periódico — también cuando el Cloud no responde (fallo de red), que es justo
+/// cuando la UI necesita pintar «funcionará hasta {fecha}». El contrato previo no cambia:
+/// mismo status y mismos campos, solo se AÑADE la clave.
 async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    // `entitlement(auth)` solo usa `auth` para las cabeceras; las reescribe `proxy_cloud_get`.
+    // `entitlement(auth)` solo usa `auth` para las cabeceras; las reescribe `cloud_get_raw`.
     let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
-    proxy_cloud_get(&st, &headers, cloud.entitlement(&placeholder)).await
+
+    // Estado local de revalidación sobre los módulos INSTALADOS de este hub.
+    let installed: Vec<String> = {
+        let rt = st.runtime.lock().await;
+        rt.modules().into_iter().map(|m| m.id).collect()
+    };
+    let revalidation = st
+        .entitlement
+        .read()
+        .map(|g| g.revalidation_json(&installed, entitlement::now_unix()))
+        .unwrap_or(Value::Null);
+
+    match cloud_get_raw(&st, &headers, cloud.entitlement(&placeholder)).await {
+        Ok((status, body)) => match serde_json::from_slice::<Value>(&body) {
+            // Body objeto JSON → se le inyecta la clave aditiva.
+            Ok(Value::Object(mut obj)) => {
+                obj.insert("revalidation".into(), revalidation);
+                (status, Json(Value::Object(obj))).into_response()
+            }
+            // Body no-objeto (raro: HTML de error, vacío) → tal cual, como antes.
+            _ => (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response(),
+        },
+        Err(CloudGetError::Network(msg)) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "ok": false, "error": msg, "revalidation": revalidation })),
+        )
+            .into_response(),
+        Err(e) => cloud_get_error_response(e),
+    }
 }
 
 /// Proxya al SaaS la emisión del **token del Bridge** (`GET /api/v1/hub/device/bridge-token/`). El
@@ -902,6 +990,85 @@ async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMa
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
     proxy_cloud_get(&st, &headers, cloud.marketplace_modules(&placeholder)).await
+}
+
+/// GET /api/blueprints/catalog — catálogo de blueprints (proxy de `/api/v1/catalog/blueprints/`).
+///
+/// La **«fuente nube»** del panel de import (Ajustes → Datos). [ADR-0121]
+async fn proxy_blueprints_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    proxy_cloud_get(&st, &headers, cloud.blueprints_catalog(&placeholder)).await
+}
+
+/// GET /api/blueprints/:slug/download — baja el `.blueprint.zip` y lo sirve al front.
+///
+/// El runtime hace de intermediario a propósito (ADR-0003): pide al SaaS la **URL firmada** con su
+/// `X-Hub-Token` —que **nunca** llega al navegador—, descarga el zip de Object Storage y
+/// **verifica el SHA256 ANTES de entregarlo**. Un hash que no casa aborta con 502 sin devolver
+/// bytes: es el mismo contrato no-saltable que el install de módulos (ADR-0015).
+///
+/// Devuelve el zip crudo, así que el front lo trata **igual que un fichero local** y reusa el
+/// flujo existente `inspect` → `import` (cero lógica de import duplicada).
+async fn download_blueprint(
+    State(st): State<AppState>,
+    Path(slug): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+
+    // 1) El SaaS nos da URL firmada + sha256 (hub-scoped: se autentica el runtime, no el usuario).
+    let (status, body) = match cloud_get_raw(&st, &headers, cloud.blueprint_download(&slug, &placeholder)).await {
+        Ok(pair) => pair,
+        Err(e) => return cloud_get_error_response(e),
+    };
+    if !status.is_success() {
+        return (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response();
+    }
+
+    let info: Value = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => return bad_gateway(format!("respuesta de blueprint ilegible: {e}")),
+    };
+    let (Some(url), Some(expected)) = (info["url"].as_str(), info["sha256"].as_str()) else {
+        return bad_gateway("el SaaS no expuso url/sha256 del blueprint".to_string());
+    };
+
+    // 2) Descarga directa de Object Storage (URL prefirmada: sin credenciales nuestras).
+    let zip = match st.http.get(url).send().await {
+        Ok(r) if r.status().is_success() => match r.bytes().await {
+            Ok(b) => b,
+            Err(e) => return bad_gateway(format!("descarga del blueprint interrumpida: {e}")),
+        },
+        Ok(r) => return bad_gateway(format!("Object Storage devolvió {} al bajar el blueprint", r.status())),
+        Err(e) => return bad_gateway(format!("no se pudo descargar el blueprint: {e}")),
+    };
+
+    // 3) 🔴 Integridad NO-SALTABLE (ADR-0015): si el hash no casa, no se entrega ni un byte.
+    let actual = {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(&zip);
+        format!("{:x}", h.finalize())
+    };
+    if actual != expected {
+        return bad_gateway(format!(
+            "integridad del blueprint «{slug}»: sha256 esperado {expected}, obtenido {actual} — import abortado"
+        ));
+    }
+
+    (
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "application/zip")],
+        zip,
+    )
+        .into_response()
+}
+
+/// 502 con el motivo en JSON (contrato de error del resto de proxies).
+fn bad_gateway(reason: String) -> Response {
+    (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": reason }))).into_response()
 }
 
 /// POST /api/assistant/chat/stream — proxy SSE hacia el Cloud (ARQUITECTURA.md §9.3).
@@ -1087,6 +1254,31 @@ pub(crate) fn tenant_rejected(e: tenant::TenantError) -> Response {
     (status, Json(body)).into_response()
 }
 
+/// Gate del dispatcher (revalidación híbrida del entitlement, ver `crate::entitlement`): si el
+/// módulo dueño de la query/command está **bloqueado**, devuelve el error estable
+/// `module_entitlement_blocked` (HTTP 402) con su `module_id` para que el front lo distinga y
+/// pinte el aviso («funcionará hasta {fecha}»). `None` = no bloqueado → la ejecución sigue.
+/// Defensa en profundidad: el enforcement REAL es el proxy del SaaS; aquí NUNCA se desinstala
+/// ni se tocan datos. `module_id = None` (op desconocida) no se gatea: `execute_*` devolverá su
+/// `not_found` de siempre.
+fn entitlement_blocked(st: &AppState, module_id: Option<&str>) -> Option<Response> {
+    let module_id = module_id?;
+    let blocked = st
+        .entitlement
+        .read()
+        .ok()?
+        .is_blocked(module_id, entitlement::now_unix());
+    if !blocked {
+        return None;
+    }
+    let body = json!({ "ok": false, "error": {
+        "code": "module_entitlement_blocked",
+        "module_id": module_id,
+        "message": format!("el módulo `{module_id}` no está incluido en el entitlement vigente del hub"),
+    }});
+    Some((StatusCode::PAYMENT_REQUIRED, Json(body)).into_response())
+}
+
 /// `401` uniforme para fallos de autenticación (modo Jwt: token ausente/ inválido).
 fn unauthorized(e: auth::AuthError) -> Response {
     (
@@ -1213,6 +1405,11 @@ async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Q
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
+    // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
+    let owner = rt.registry().get_query(&req.name).map(|q| q.module_id.clone());
+    if let Some(resp) = entitlement_blocked(&st, owner.as_deref()) {
+        return resp;
+    }
     // Queries de lista (con bloque `list`) devuelven `{rows,total,limit,offset}` para el pager;
     // el resto devuelve el array de filas tal cual (compat con get/stats/settings).
     if rt.is_list_query(&req.name) {
@@ -1239,6 +1436,11 @@ async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
+    // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
+    let owner = rt.registry().get_command(&req.name).map(|c| c.module_id.clone());
+    if let Some(resp) = entitlement_blocked(&st, owner.as_deref()) {
+        return resp;
+    }
     match rt.execute_command(&req.name, &req.payload, &ctx).await {
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),
         Err(e) => err_response(e),

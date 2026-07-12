@@ -8,10 +8,9 @@
 // DETECTADAS, (3) `POST /api/hub/import` → informe final por sección (Applied/Skipped/Failed).
 //
 // Endpoints ya vivos en `crates/server/src/export_import.rs` (contrato congelado). Sin mocks:
-// runtime Axum real con BD efímera y `HUB_MODULES_DIR` vacío (mismo arranque que
-// FirstRunPage.spec.ts, `e2e/README.md`); el zip del flujo completo se genera con el PROPIO
-// `POST /api/hub/export` del runtime (round-trip real, cero fixtures).
-// Un hub vacío es EXACTAMENTE el caso de uso del import → /settings es un escape del guard.
+// runtime Axum real con BD efímera y `HUB_MODULES_DIR` vacío (`e2e/README.md`); el zip del flujo
+// completo se genera con el PROPIO `POST /api/hub/export` del runtime (round-trip real, cero
+// fixtures). Un hub vacío es EXACTAMENTE el caso de uso del import y navega a /settings sin desvíos.
 
 import { test, expect, request as pwRequest, type Page } from '@playwright/test';
 
@@ -45,20 +44,25 @@ async function withSession(page: Page, s: Session): Promise<void> {
 }
 
 test.describe('importar configuración (Ajustes → Datos)', () => {
-  test('muestra el uploader local y la fuente nube deshabilitada ("próximamente")', async ({ page }) => {
+  test('muestra las dos fuentes: zip local y nube (catálogo del SaaS, ADR-0121)', async ({ page }) => {
     await withSession(page, await loginByPin());
 
     await page.goto('/settings?tab=data');
 
-    // El guard de first-run NO desvía: el hub vacío es quien más necesita importar.
+    // El hub vacío es quien más necesita importar: navega a /settings sin desvíos.
     await expect(page).toHaveURL(/\/settings\?tab=data$/);
     await expect(page.getByTestId('import-lead')).toBeVisible();
 
     // Paso 1: subir un zip local…
     await expect(page.getByTestId('import-pick-file')).toBeVisible();
-    // …y «desde la nube» deshabilitado con nota (el registro SaaS de blueprints no existe aún).
-    await expect(page.getByTestId('import-cloud')).toHaveJSProperty('disabled', true);
-    await expect(page.getByTestId('import-cloud-note')).toBeVisible();
+    // …y «desde la nube» YA HABILITADO: el registro de blueprints del SaaS existe (ADR-0121).
+    await expect(page.getByTestId('import-cloud')).toBeVisible();
+    await expect(page.getByTestId('import-cloud')).toHaveJSProperty('disabled', false);
+
+    // Al pulsarlo se pide el catálogo al runtime (que proxya al SaaS con su X-Hub-Token).
+    await page.getByTestId('import-cloud').click();
+    // Sin blueprints publicados aún, la lista sale vacía con su nota honesta — no un error.
+    await expect(page.getByTestId('import-cloud-catalog')).toBeVisible();
   });
 
   test('inspeccionar un zip muestra el manifest y al importar sale el informe', async ({ page }) => {
@@ -103,7 +107,10 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
     // Paso 3: importar → INFORME final por sección (contrato JSON del motor pintado tal cual).
     await page.getByTestId('import-submit').click();
     await expect(page.getByTestId('import-report')).toBeVisible({ timeout: 30_000 });
-    // Con la BD efímera el SQL aplica (Applied) y media viaja vacía (Skipped) — locale 'es'.
+    // Con la BD efímera el SQL aplica (Applied). La media viaja VACÍA (0 ficheros) → «Saltado»:
+    // la UI deriva el estado real de `report.media` (copied/failed), no del `Skipped` que el motor
+    // pone siempre. El caso «media copiada → Aplicado» (report.media.copied>0) se cubre en la e2e
+    // en vivo con un hub que sí tiene imágenes (informe de review 2026-07-12, hallazgo #1).
     await expect(page.getByTestId('import-report')).toContainText('Aplicado');
   });
 });

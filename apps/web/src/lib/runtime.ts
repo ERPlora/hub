@@ -391,9 +391,24 @@ export interface SectionResult {
   status: SectionStatus;
 }
 
+/** Resultado de la copia de media, que hace el SERVER (no el motor del runtime). */
+export interface MediaReport {
+  selected: boolean;
+  copied: number;
+  failed: number;
+}
+
 /** Informe final del import (best-effort: una sección rota NO aborta el resto). */
 export interface ImportReport {
   sections: SectionResult[];
+  /**
+   * Media/fiscal las materializa la capa server (gestor media + endpoint del certificado), no
+   * el motor del runtime — que las reporta como `Skipped` en `sections`. Su resultado REAL viene
+   * en estas claves aparte; la UI las usa para pintar el estado verdadero (p. ej. media copiada).
+   */
+  media?: MediaReport;
+  fiscal?: { certificate: string; note?: string };
+  installed_modules?: unknown[];
 }
 
 /** Estado normalizado de una sección del informe, listo para pintar. */
@@ -493,6 +508,57 @@ export async function exportHub(
  * octet-stream). El server valida manifest + SHA256 (integridad dura: rechazo sin efectos) y
  * devuelve el manifest + un `upload_id` staged para el import posterior.
  */
+/** Ficha de un blueprint del catálogo del SaaS (ADR-0121). */
+export interface CatalogBlueprint {
+  slug: string;
+  name: string;
+  description: string;
+  locale: string;
+  country: string;
+  latest_version: string;
+  latest_sha256: string;
+  size_bytes: number;
+  downloads: number;
+}
+
+/**
+ * Catálogo de blueprints publicados en el SaaS (`GET /api/blueprints/catalog`, ADR-0121).
+ *
+ * Es la **«fuente nube»** del import. El runtime hace de proxy: firma la llamada al SaaS con su
+ * `X-Hub-Token`, que **nunca** llega al navegador.
+ */
+export async function fetchBlueprintCatalog(): Promise<CatalogBlueprint[]> {
+  beginRequest();
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/blueprints/catalog`, { headers: runtimeHeaders() });
+    if (!res.ok) throw new Error(await readErrorMessage(res, `blueprints/catalog → ${res.status}`));
+    const body = (await res.json()) as { blueprints?: CatalogBlueprint[] };
+    return body.blueprints ?? [];
+  } finally {
+    endRequest();
+  }
+}
+
+/**
+ * Descarga un blueprint del catálogo (`GET /api/blueprints/:slug/download`, ADR-0121).
+ *
+ * El **runtime verifica el SHA256** contra el que anunció el SaaS antes de entregarnos un solo
+ * byte (integridad no-saltable, ADR-0015): si no casa, esto lanza. El Blob resultante se pasa a
+ * `inspectBlueprint()` **igual que un fichero local** — el flujo de import es el mismo.
+ */
+export async function downloadBlueprint(slug: string): Promise<Blob> {
+  beginRequest();
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/blueprints/${encodeURIComponent(slug)}/download`, {
+      headers: runtimeHeaders(),
+    });
+    if (!res.ok) throw new Error(await readErrorMessage(res, `blueprints/download → ${res.status}`));
+    return await res.blob();
+  } finally {
+    endRequest();
+  }
+}
+
 export async function inspectBlueprint(file: Blob): Promise<BlueprintInspection> {
   beginRequest();
   try {

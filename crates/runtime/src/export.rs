@@ -264,7 +264,20 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
                 if *c == "hub_id" {
                     format!("'{HUB_ID_PLACEHOLDER}'")
                 } else {
-                    sql_literal(&obj[*c].clone())
+                    let lit = sql_literal(&obj[*c].clone());
+                    // Guardarraíl anti-fuga POR COLUMNA: el hub_id de ORIGEN no viaja aunque
+                    // OTRA columna lo repita. Excepción: `id` (clave primaria) y las columnas
+                    // de auditoría (`created_by`/`updated_by`), que en Dev valen igual que el
+                    // hub_id (`local`) pero guardan identidad propia — el hub destino las
+                    // re-inyecta al aplicar y no deben perder su valor. (Antes un `replace`
+                    // ciego de `'{hub_id}'` sobre todo el SQL las arrastraba: bug dev-only.)
+                    if !matches!(c.as_str(), "id" | "created_by" | "updated_by")
+                        && lit == format!("'{hub_id}'")
+                    {
+                        format!("'{HUB_ID_PLACEHOLDER}'")
+                    } else {
+                        lit
+                    }
                 }
             })
             .collect();
@@ -287,8 +300,9 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
         };
         out.push_str(&format!("INSERT INTO {table} ({col_list}) SELECT {val_list}{guard};\n"));
     }
-    // Guardarraíl: el hub_id de ORIGEN jamás viaja (ni siquiera si una columna lo repite).
-    out.replace(&format!("'{hub_id}'"), &format!("'{HUB_ID_PLACEHOLDER}'"))
+    // El barrido anti-fuga del hub_id de ORIGEN va ya POR COLUMNA arriba (respetando id y
+    // auditoría), no con un replace ciego sobre todo el SQL.
+    out
 }
 
 /// Literal SQL portable a partir de un valor JSON (escape de comillas simples).
@@ -340,5 +354,30 @@ mod tests {
     fn format_constants_are_stable() {
         assert_eq!(HUB_ID_PLACEHOLDER, "__HUB_ID__");
         assert_eq!(SCHEMA_VERSION, 1);
+    }
+
+    /// Anti-fuga POR COLUMNA: en Dev el `hub_id` y las columnas de auditoría
+    /// (`created_by`/`updated_by`) comparten el literal `local`. El export debe sustituir
+    /// SOLO la columna `hub_id` por el placeholder y CONSERVAR la identidad de auditoría
+    /// (el hub destino la re-inyecta al aplicar). Un `replace` ciego de `'local'` sobre todo
+    /// el SQL las arrastraba (bug dev-only del informe de review 2026-07-12, hallazgo #3).
+    #[test]
+    fn rows_to_sql_no_arrastra_auditoria_cuando_hub_id_coincide() {
+        let rows = vec![serde_json::json!({
+            "id": "prod-1",
+            "hub_id": "local",
+            "created_by": "local",
+            "updated_by": "local",
+            "name": "Café",
+        })];
+        let sql = rows_to_sql("inventory_product", &rows, "local");
+        // La columna hub_id (valor + guard NOT EXISTS) va como placeholder: 2 apariciones.
+        assert!(sql.contains("'__HUB_ID__'"), "el hub_id debe viajar como placeholder");
+        // created_by y updated_by conservan 'local' (identidad): exactamente 2 apariciones.
+        assert_eq!(
+            sql.matches("'local'").count(),
+            2,
+            "created_by/updated_by deben conservar su valor 'local', no convertirse en placeholder:\n{sql}"
+        );
     }
 }
