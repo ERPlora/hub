@@ -454,12 +454,6 @@ export default {
     retry: 'Reintentar',
     logout: 'Cerrar sesión',
   },
-  firstRun: {
-    title: 'Configura tu hub',
-    lead: 'Este hub está vacío. Ponte en marcha importando una plantilla para tu tipo de negocio (o un backup de otro hub), o elige tú los módulos desde el marketplace.',
-    install: 'Empezar la puesta en marcha',
-    marketplace: 'Prefiero elegir los módulos yo',
-  },
   exportPage: {
     title: 'Exportar configuración',
     lead: 'Empaqueta la configuración de este hub — y opcionalmente sus datos — como un blueprint que puedes importar en otro hub.',

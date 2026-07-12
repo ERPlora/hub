@@ -532,8 +532,8 @@ const { t, locale } = useI18n();
 type Tab = 'hub' | 'store' | 'tax' | 'tickets' | 'permissions' | 'data';
 const TABS: readonly Tab[] = ['hub', 'store', 'tax', 'tickets', 'permissions', 'data'];
 
-// Deep-link a una pestaña concreta: /settings?tab=data (lo usan el widget de la home y el
-// empujón de first-run para aterrizar en Datos). Query inválida/ausente → pestaña por defecto.
+// Deep-link a una pestaña concreta: /settings?tab=data (lo usa el widget de la home para
+// aterrizar en Datos). Query inválida/ausente → pestaña por defecto.
 const route = useRoute();
 const initialTab = TABS.find((v) => v === String(route.query.tab ?? '')) ?? 'hub';
 const tab = ref<Tab>(initialTab);

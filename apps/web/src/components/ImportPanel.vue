@@ -244,7 +244,7 @@ import {
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { isAdmin } from '../lib/session';
-import { refreshInstalledModules, refreshModuleNav } from '../lib/nav';
+import { refreshModuleNav } from '../lib/nav';
 import {
   inspectBlueprint,
   importBlueprint,
@@ -366,8 +366,7 @@ async function doImport(): Promise<void> {
       modules: moduleRows.value.filter((m) => m.include).map((m) => m.id),
     });
     step.value = 'report';
-    // El import pudo instalar módulos: refresca el contador (cae needsFirstRun) y el menú.
-    await refreshInstalledModules();
+    // El import pudo instalar módulos: refresca el menú del shell.
     await refreshModuleNav();
   } catch (err) {
     // Rechazo ENTERO (integridad dura / server caído): vuelve al resumen con el motivo del server.

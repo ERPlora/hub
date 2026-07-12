@@ -6,9 +6,8 @@
 // `<nombre>_<idioma>.blueprint.zip` descargable (`POST /api/hub/export`, contrato congelado;
 // endpoints ya vivos en `crates/server/src/export_import.rs`).
 //
-// Sin mocks: runtime Axum real con BD efímera y `HUB_MODULES_DIR` vacío (mismo arranque que
-// FirstRunPage.spec.ts, ver `e2e/README.md`). Un hub vacío PUEDE exportar (usuarios/ajustes):
-// /settings es un escape del guard de first-run.
+// Sin mocks: runtime Axum real con BD efímera y `HUB_MODULES_DIR` vacío (ver `e2e/README.md`).
+// Un hub vacío PUEDE exportar (usuarios/ajustes) y navega a /settings sin desvíos.
 
 import { test, expect, request as pwRequest, type Page } from '@playwright/test';
 
@@ -48,7 +47,7 @@ test.describe('exportar configuración (Ajustes → Datos)', () => {
     // Deep-link a la pestaña Datos: ?tab=data selecciona la pestaña al montar.
     await page.goto('/settings?tab=data');
 
-    // El guard de first-run NO desvía: /settings es un escape (un hub vacío puede exportar).
+    // Un hub vacío navega a /settings sin desvíos (puede exportar usuarios/ajustes).
     await expect(page).toHaveURL(/\/settings\?tab=data$/);
     await expect(page.getByTestId('export-lead')).toBeVisible();
 

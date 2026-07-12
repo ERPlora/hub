@@ -8,10 +8,9 @@
 // DETECTADAS, (3) `POST /api/hub/import` → informe final por sección (Applied/Skipped/Failed).
 //
 // Endpoints ya vivos en `crates/server/src/export_import.rs` (contrato congelado). Sin mocks:
-// runtime Axum real con BD efímera y `HUB_MODULES_DIR` vacío (mismo arranque que
-// FirstRunPage.spec.ts, `e2e/README.md`); el zip del flujo completo se genera con el PROPIO
-// `POST /api/hub/export` del runtime (round-trip real, cero fixtures).
-// Un hub vacío es EXACTAMENTE el caso de uso del import → /settings es un escape del guard.
+// runtime Axum real con BD efímera y `HUB_MODULES_DIR` vacío (`e2e/README.md`); el zip del flujo
+// completo se genera con el PROPIO `POST /api/hub/export` del runtime (round-trip real, cero
+// fixtures). Un hub vacío es EXACTAMENTE el caso de uso del import y navega a /settings sin desvíos.
 
 import { test, expect, request as pwRequest, type Page } from '@playwright/test';
 
@@ -50,7 +49,7 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
 
     await page.goto('/settings?tab=data');
 
-    // El guard de first-run NO desvía: el hub vacío es quien más necesita importar.
+    // El hub vacío es quien más necesita importar: navega a /settings sin desvíos.
     await expect(page).toHaveURL(/\/settings\?tab=data$/);
     await expect(page.getByTestId('import-lead')).toBeVisible();
 
