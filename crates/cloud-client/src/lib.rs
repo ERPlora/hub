@@ -108,6 +108,23 @@ impl CloudClient {
         self.get("/api/v1/hub/device/bridge-token/", auth)
     }
 
+    /// **Catálogo de blueprints** — plantillas de hub publicadas en el vendor portal del SaaS
+    /// ([ADR-0121]). `GET /api/v1/catalog/blueprints/`. Es la **«fuente nube»** del panel de
+    /// import (Ajustes → Datos). Hub-scoped: el runtime se autentica **a sí mismo**
+    /// (`X-Hub-Token`), así que funciona sin JWT de usuario fresco (el día a día del POS es
+    /// sesión local/PIN).
+    pub fn blueprints_catalog(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/catalog/blueprints/", auth)
+    }
+
+    /// **Descarga de un blueprint** — devuelve URL **firmada** de Object Storage + `version` +
+    /// `sha256`. `GET /api/v1/catalog/blueprints/{slug}/download/`. El runtime baja el zip de esa
+    /// URL y **verifica el sha256 ANTES de aplicar nada** (mismo contrato que el install de
+    /// módulos: ruta inmutable + hash). [ADR-0121]
+    pub fn blueprint_download(&self, slug: &str, auth: &Auth) -> PreparedRequest {
+        self.get(&format!("/api/v1/catalog/blueprints/{slug}/download/"), auth)
+    }
+
     /// **Enrolamiento del dispositivo** — el runtime obtiene su credencial de máquina
     /// (`cloud_api_token`) una sola vez. `GET /api/v1/hub/device/enroll/` con el JWT de un
     /// **owner/admin** de la org del hub (`IsHubAdmin`) + `X-Hub-Id`. La respuesta es
@@ -504,6 +521,23 @@ mod tests {
         assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/modules/");
         assert!(r.headers.contains(&("Authorization", "Bearer abc".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
+    }
+
+    /// ADR-0121: catálogo de blueprints (la «fuente nube» del import). Hub-scoped: el runtime
+    /// se autentica a sí mismo con `X-Hub-Token` — el token NUNCA llega al navegador.
+    #[test]
+    fn blueprint_catalog_paths_are_hub_scoped() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken { hub_id: "h1".into(), token: "tok".into() };
+
+        let list = c.blueprints_catalog(&auth);
+        assert_eq!(list.url, "https://erplora.com/api/v1/catalog/blueprints/");
+        assert!(list.headers.contains(&("X-Hub-Token", "tok".to_string())));
+        assert!(list.headers.contains(&("X-Hub-Id", "h1".to_string())));
+
+        let dl = c.blueprint_download("barberia-basica", &auth);
+        assert_eq!(dl.url, "https://erplora.com/api/v1/catalog/blueprints/barberia-basica/download/");
+        assert!(dl.headers.contains(&("X-Hub-Token", "tok".to_string())));
     }
 
     #[test]
