@@ -391,9 +391,24 @@ export interface SectionResult {
   status: SectionStatus;
 }
 
+/** Resultado de la copia de media, que hace el SERVER (no el motor del runtime). */
+export interface MediaReport {
+  selected: boolean;
+  copied: number;
+  failed: number;
+}
+
 /** Informe final del import (best-effort: una sección rota NO aborta el resto). */
 export interface ImportReport {
   sections: SectionResult[];
+  /**
+   * Media/fiscal las materializa la capa server (gestor media + endpoint del certificado), no
+   * el motor del runtime — que las reporta como `Skipped` en `sections`. Su resultado REAL viene
+   * en estas claves aparte; la UI las usa para pintar el estado verdadero (p. ej. media copiada).
+   */
+  media?: MediaReport;
+  fiscal?: { certificate: string; note?: string };
+  installed_modules?: unknown[];
 }
 
 /** Estado normalizado de una sección del informe, listo para pintar. */

@@ -403,21 +403,34 @@ interface ReportRow {
 
 // Informe pintado tal cual llega (contrato JSON del motor): Applied ✓ verde · Skipped — gris ·
 // Failed ✗ rojo con su motivo. sectionStatusInfo tolera las dos formas serde del enum.
+const visual = {
+  applied: { icon: 'checkmark-circle-outline', color: 'success', label: () => t('importPage.statusApplied') },
+  skipped: { icon: 'remove-circle-outline', color: 'medium', label: () => t('importPage.statusSkipped') },
+  failed: { icon: 'close-circle-outline', color: 'danger', label: () => t('importPage.statusFailed') },
+} as const;
+
+// El motor del runtime NO copia media (lo hace la capa server) y la reporta `Skipped`; su
+// resultado REAL viene en `report.media`. Traducimos ese contador al estado verdadero de la fila
+// para no mentir con un «Saltado» cuando las imágenes sí se copiaron (informe de review, hallazgo #1).
+function mediaStatus(m: NonNullable<ImportReport['media']>): { kind: 'applied' | 'skipped' | 'failed'; reason?: string } {
+  const reason = m.failed > 0 ? t('importPage.mediaFailed', { n: m.failed }) : undefined;
+  if (m.copied > 0) return { kind: 'applied', reason };
+  if (m.failed > 0) return { kind: 'failed', reason };
+  return { kind: 'skipped' }; // seleccionada pero sin ficheros que copiar
+}
+
 const reportRows = computed<ReportRow[]>(() =>
   (report.value?.sections ?? []).map((s) => {
-    const info = sectionStatusInfo(s.status);
-    const visual = {
-      applied: { icon: 'checkmark-circle-outline', color: 'success', label: t('importPage.statusApplied') },
-      skipped: { icon: 'remove-circle-outline', color: 'medium', label: t('importPage.statusSkipped') },
-      failed: { icon: 'close-circle-outline', color: 'danger', label: t('importPage.statusFailed') },
-    } as const;
+    const media = report.value?.media;
+    const info =
+      s.section === 'media' && media ? mediaStatus(media) : sectionStatusInfo(s.status);
     const v = visual[info.kind];
     return {
       section: s.section,
       label: sectionLabel(s.section),
       icon: v.icon,
       color: v.color,
-      statusLabel: v.label,
+      statusLabel: v.label(),
       reason: info.reason,
     };
   }),

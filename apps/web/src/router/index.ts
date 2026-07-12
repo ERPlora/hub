@@ -34,6 +34,9 @@ const routes: RouteRecordRaw[] = [
   // Primer arranque: el hub se despliega vacío (ADR-0087) y sin esto aterriza en un dashboard en
   // blanco. Empuja a importar una plantilla (Ajustes → Datos, ADR-0113) o al marketplace.
   { path: '/first-run', name: 'first-run', component: () => import('../views/FirstRunPage.vue'), meta: { auth: true } },
+  // Catch-all: cualquier ruta desconocida (incl. las retiradas /export y /import → ahora en
+  // Ajustes → Datos, ADR-0116) cae al inicio en vez de dejar el outlet en blanco.
+  { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ];
 
 export const router = createRouter({

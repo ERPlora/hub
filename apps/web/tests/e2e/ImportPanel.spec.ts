@@ -103,7 +103,10 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
     // Paso 3: importar → INFORME final por sección (contrato JSON del motor pintado tal cual).
     await page.getByTestId('import-submit').click();
     await expect(page.getByTestId('import-report')).toBeVisible({ timeout: 30_000 });
-    // Con la BD efímera el SQL aplica (Applied) y media viaja vacía (Skipped) — locale 'es'.
+    // Con la BD efímera el SQL aplica (Applied). La media viaja VACÍA (0 ficheros) → «Saltado»:
+    // la UI deriva el estado real de `report.media` (copied/failed), no del `Skipped` que el motor
+    // pone siempre. El caso «media copiada → Aplicado» (report.media.copied>0) se cubre en la e2e
+    // en vivo con un hub que sí tiene imágenes (informe de review 2026-07-12, hallazgo #1).
     await expect(page.getByTestId('import-report')).toContainText('Aplicado');
   });
 });

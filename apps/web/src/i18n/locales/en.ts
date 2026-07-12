@@ -524,6 +524,7 @@ export default {
     statusApplied: 'Applied',
     statusSkipped: 'Skipped',
     statusFailed: 'Failed',
+    mediaFailed: '{n} not copied',
     done: 'Go to home',
   },
   moduleView: {
