@@ -533,6 +533,33 @@ export class ErploraClient {
     const data = (await this.transport.query(name, buildListParams(params))) as Page<T>;
     return data;
   }
+  /**
+   * Trae **TODAS** las filas de una query de lista. Sin tope, salvo que el llamador pase un `limit`.
+   *
+   * Para cuando la vista no quiere «una página» sino el conjunto entero: la rejilla de productos de
+   * un TPV (un cajero tiene que poder vender TODO lo que vende la casa), un `<ion-select>` de
+   * categorías fiscales, el mapa producto↔categoría… Ahí paginar no es una feature, es un fallo.
+   *
+   * Existe porque la forma en que se pedía eso —`query(name, { page_size: 200 })`— **no funcionaba**:
+   * `page_size` no es un parámetro del runtime (lee `limit`), así que se ignoraba en silencio y
+   * llegaban las 50 filas del `page_size` del manifest. Un restaurante con 80 platos solo podía
+   * vender 50: los otros 30 no existían en el TPV y el buscador tampoco los encontraba.
+   *
+   * Cómo: una primera página (la que el módulo declare) trae ya el `total`; si faltan filas, se pide
+   * el resto **por su total exacto**. Ningún número mágico cableado, y dos viajes como mucho.
+   */
+  async queryAll<T = unknown>(name: string, params: ListParams = {}): Promise<T[]> {
+    const first = await this.queryPage<T>(name, { ...params, offset: 0 });
+    // Una query SIN bloque `list` no devuelve sobre: contesta el array pelado. Se acepta tal cual.
+    if (Array.isArray(first)) return first as T[];
+    const rows = Array.isArray(first?.rows) ? first.rows : [];
+    // El llamador mandó su propio `limit`: quiere ESE tope, no todo. Se respeta.
+    if (params.limit != null) return rows;
+    const total = first?.total ?? rows.length;
+    if (rows.length >= total) return rows;
+    const full = await this.queryPage<T>(name, { ...params, limit: total, offset: 0 });
+    return Array.isArray(full?.rows) ? full.rows : rows;
+  }
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T> {
     return this.transport.command(name, payload) as Promise<T>;
   }
