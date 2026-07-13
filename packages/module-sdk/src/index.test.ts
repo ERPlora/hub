@@ -8,6 +8,10 @@ import {
   ErploraError,
   createClient,
   BridgeClient,
+  eurosToCents,
+  centsToEuros,
+  majorToMinor,
+  minorToMajor,
 } from './index.ts';
 
 // ── HttpWsTransport: query/command desenvuelven el sobre {ok,data} ───────────
@@ -269,4 +273,155 @@ test('BridgeClient acepta un getter de token (se relee tras emparejar, sin recre
   assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws?token=later-token');
   driveBridge({ event: 'printers', printers: [] });
   await p;
+});
+
+// ── La frontera EUROS ↔ CÉNTIMOS (ADR-0123) ─────────────────────────────────────────────
+//
+// El dinero es un INTEGER de céntimos, pero un humano teclea EUROS: un `<input step="0.01">`, un
+// CSV con el catálogo del cliente. Esa conversión es una FRONTERA, y hasta ahora no existía en el
+// SDK: cada Web Component se la escribía a mano. Los que no lo hicieron produjeron los bugs de ×100
+// (un café de 2,20 € guardado como producto de 2 céntimos; un billete de 20 € registrado como 20
+// céntimos). Ahora la frontera vive aquí, con el gemelo Rust en `guest_sdk::money::euros_to_cents`.
+test('eurosToCents: lo que teclea un humano son EUROS', () => {
+  assert.equal(eurosToCents('2.20'), 220);
+  assert.equal(eurosToCents('50'), 5000);
+  assert.equal(eurosToCents('0.01'), 1);
+});
+
+test('eurosToCents: el céntimo NO se pierde por la coma flotante', () => {
+  // El bug clásico: 0.29 * 100 = 28.999999999999996 en IEEE-754 → sin Math.round, 28 céntimos.
+  assert.equal(eurosToCents('0.29'), 29);
+  assert.equal(eurosToCents('1.15'), 115);
+});
+
+test('eurosToCents: la basura entra como 0, no como NaN', () => {
+  // Un CSV de cliente trae celdas vacías. Un NaN en una columna INTEGER es corrupción silenciosa.
+  assert.equal(eurosToCents(''), 0);
+  assert.equal(eurosToCents('abc'), 0);
+  assert.equal(eurosToCents(undefined), 0);
+});
+
+test('centsToEuros: la vuelta, para rellenar un input de edición', () => {
+  assert.equal(centsToEuros(220), '2.20');
+  assert.equal(centsToEuros(5), '0.05');
+  assert.equal(centsToEuros(0), '0.00');
+  assert.equal(centsToEuros(undefined), '');
+});
+
+// ── La MONEDA define la escala, no una constante (ADR-0123 §7) ──────────────────────────
+//
+// El dinero viaja en UNIDADES MÍNIMAS, y cuántas hay en una unidad mayor **depende de la moneda**:
+// EUR 2, **JPY 0**, KWD 3. El `/ 100` que estaba clavado aquí es un bug en cuanto un hub se pone en
+// yenes — y la app es gratuita, así que se pondrá: mostraría 19,99 ¥ donde hay **1999 ¥**.
+test('majorToMinor: lo que teclea un humano depende de SU moneda', () => {
+  assert.equal(majorToMinor('19.99', 2), 1999); // EUR
+  assert.equal(majorToMinor('1999', 0), 1999); // JPY: NO se multiplica por 100
+  assert.equal(majorToMinor('1.999', 3), 1999); // KWD
+});
+
+test('minorToMajor: pintar tampoco divide siempre entre 100', () => {
+  assert.equal(minorToMajor(1999, 2), 19.99);
+  assert.equal(minorToMajor(1999, 0), 1999, 'en yenes NO se divide');
+  assert.equal(minorToMajor(1999, 3), 1.999);
+});
+
+test('el mismo entero significa cosas distintas según la moneda', () => {
+  // Es LA razón de todo esto: `1999` no significa nada sin su moneda.
+  assert.equal(minorToMajor(1999, 2), 19.99); //   19,99 €
+  assert.equal(minorToMajor(1999, 0), 1999); // 1999   ¥
+});
+
+test('el céntimo no se pierde por la coma flotante, sea cual sea la escala', () => {
+  assert.equal(majorToMinor('0.29', 2), 29); // 0.29*100 = 28.999… en IEEE-754
+  assert.equal(majorToMinor('1.005', 3), 1005);
+});
+
+test('eurosToCents sigue existiendo, y es majorToMinor con escala 2', () => {
+  // Se conserva para los sitios donde la moneda es EUR POR CONTRATO (VeriFactu, fiscalidad ES).
+  assert.equal(eurosToCents('2.20'), majorToMinor('2.20', 2));
+});
+
+// ── queryAll: TODAS las filas, paginando por dentro ──────────────────────────
+//
+// Por qué existe: el runtime tiene un tope duro por request (`MAX_LIMIT = 500`) y, si no le mandas
+// `limit`, cae al `page_size` que declara el manifest (50 por defecto). Un TPV no quiere "una
+// página": quiere TODOS sus productos, y un desplegable de IVA TODAS las categorías. La forma en
+// que las vistas intentaban pedir eso era `query(name, { page_size: 200 })` — y `page_size` NO ES
+// UN PARÁMETRO del runtime, así que se ignoraba en silencio y llegaban 50. Un restaurante con 80
+// platos solo podía vender 50: los otros 30 no existían en el TPV.
+//
+// `queryAll` no lleva número mágico: itera limit/offset hasta agotar `total`.
+
+/** Transporte que simula una query de lista de `total` filas, respetando limit/offset. */
+function transporteDeLista(total: number, registro: unknown[] = []) {
+  return {
+    query: async (name: string, params?: Record<string, unknown>) => {
+      registro.push({ name, ...params });
+      const limit = Number(params?.limit ?? 50); // sin `limit` → page_size del manifest
+      const offset = Number(params?.offset ?? 0);
+      const rows = Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, i) => ({
+        id: `p${offset + i}`,
+      }));
+      return { rows, total, limit, offset };
+    },
+    command: async () => ({}),
+    subscribe: () => () => {},
+  };
+}
+
+test('queryAll devuelve TODAS las filas: sin tope', async () => {
+  const llamadas: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(1234, llamadas));
+
+  const rows = await c.queryAll<{ id: string }>('inventory.products.list');
+
+  assert.equal(rows.length, 1234, 'un hub con 1234 productos los ve los 1234');
+  assert.equal(rows[0].id, 'p0');
+  assert.equal(rows[1233].id, 'p1233', 'la última fila también llega');
+  assert.equal(llamadas.length, 2, 'una página para saber el total + una para pedirlo entero');
+  assert.equal(llamadas[1].limit, 1234, 'pide el total EXACTO, no un número cableado a ojo');
+});
+
+test('queryAll no manda nunca `page_size` (no es un parámetro del runtime)', async () => {
+  const llamadas: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(10, llamadas));
+
+  await c.queryAll('taxes.categories.list', { sort: 'name', dir: 'asc' });
+
+  assert.equal(llamadas[0].page_size, undefined, 'page_size sería ignorado por el runtime');
+  assert.equal(llamadas[0].sort, 'name', 'los filtros del llamador se conservan');
+});
+
+test('queryAll con `limit` explícito respeta ESE tope (el llamador manda)', async () => {
+  const llamadas: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(1000, llamadas));
+
+  const rows = await c.queryAll('customers.list', { limit: 20, search: 'ana' });
+
+  assert.equal(rows.length, 20, 'pidió 20 (typeahead): le llegan 20, no los 1000');
+  assert.equal(llamadas.length, 1, 'un solo viaje: no hace falta ir a por el resto');
+  assert.equal(llamadas[0].limit, 20);
+});
+
+test('queryAll cabe en un viaje si la primera página ya lo trae todo', async () => {
+  const llamadas: unknown[] = [];
+  const c = new ErploraClient(transporteDeLista(8, llamadas));
+  assert.equal((await c.queryAll('taxes.categories.list')).length, 8);
+  assert.equal(llamadas.length, 1, '8 categorías caben en la primera página: no hay segundo viaje');
+});
+
+test('queryAll con una lista vacía devuelve [] sin girar en vacío', async () => {
+  const llamadas: unknown[] = [];
+  const c = new ErploraClient(transporteDeLista(0, llamadas));
+  assert.deepEqual(await c.queryAll('inventory.products.list'), []);
+  assert.equal(llamadas.length, 1, 'un solo viaje, no un bucle infinito');
+});
+
+test('queryAll tolera una query que NO es de lista (devuelve el array tal cual)', async () => {
+  const c = new ErploraClient({
+    query: async () => [{ id: 'a' }, { id: 'b' }], // sin sobre {rows,total}
+    command: async () => ({}),
+    subscribe: () => () => {},
+  });
+  assert.deepEqual(await c.queryAll('taxes.rules.list'), [{ id: 'a' }, { id: 'b' }]);
 });

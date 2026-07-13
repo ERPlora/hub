@@ -7,3 +7,10 @@ license.workspace = true
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Aritmética decimal EXACTA para el dinero (ADR-0123). Sustituye al `f64` que 5 handlers usaban
+# para redondear céntimos. No cuesta tamaño: el wasm de `pricing` CON rust_decimal (191 KB) pesa
+# menos que el de `sales` CON f64 (263 KB).
+rust_decimal = { version = "1", default-features = false, features = ["serde"] }
+
+[dev-dependencies]
+rust_decimal_macros = "1"

@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 erplora-db = { path = "../db" }
+erplora-guest-sdk = { path = "../guest-sdk" }
 erplora-wasm-host = { path = "../wasm-host" }
 # Traits async del contrato de plugins nativos first-party (ADR-0009, native.rs).
 async-trait = "0.1"
@@ -45,4 +46,5 @@ openssl = { version = "0.10", features = ["vendored"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 # Para el test e2e de sync (PgAdapter contra Aurora por túnel) y construir payloads.
 erplora-db = { path = "../db" }
+erplora-guest-sdk = { path = "../guest-sdk" }
 serde_json = "1"

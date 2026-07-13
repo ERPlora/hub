@@ -499,6 +499,9 @@ export class ErploraClient {
        * a `'EUR'` (igual que `locale` degrada a `'es'`). Inyectable para tests.
        */
       currency?: () => string;
+      /** Los DECIMALES de la moneda del hub (ADR-0123 §7): EUR 2, JPY 0, KWD 3. Lo inyecta el shell
+       *  desde `/api/hub/context` (`currency_decimals`). Sin esto, se resuelven del código ISO. */
+      currencyDecimals?: () => number;
     } = {},
     bridge?: BridgeTransport,
   ) {
@@ -529,6 +532,33 @@ export class ErploraClient {
   async queryPage<T = unknown>(name: string, params: ListParams = {}): Promise<Page<T>> {
     const data = (await this.transport.query(name, buildListParams(params))) as Page<T>;
     return data;
+  }
+  /**
+   * Trae **TODAS** las filas de una query de lista. Sin tope, salvo que el llamador pase un `limit`.
+   *
+   * Para cuando la vista no quiere «una página» sino el conjunto entero: la rejilla de productos de
+   * un TPV (un cajero tiene que poder vender TODO lo que vende la casa), un `<ion-select>` de
+   * categorías fiscales, el mapa producto↔categoría… Ahí paginar no es una feature, es un fallo.
+   *
+   * Existe porque la forma en que se pedía eso —`query(name, { page_size: 200 })`— **no funcionaba**:
+   * `page_size` no es un parámetro del runtime (lee `limit`), así que se ignoraba en silencio y
+   * llegaban las 50 filas del `page_size` del manifest. Un restaurante con 80 platos solo podía
+   * vender 50: los otros 30 no existían en el TPV y el buscador tampoco los encontraba.
+   *
+   * Cómo: una primera página (la que el módulo declare) trae ya el `total`; si faltan filas, se pide
+   * el resto **por su total exacto**. Ningún número mágico cableado, y dos viajes como mucho.
+   */
+  async queryAll<T = unknown>(name: string, params: ListParams = {}): Promise<T[]> {
+    const first = await this.queryPage<T>(name, { ...params, offset: 0 });
+    // Una query SIN bloque `list` no devuelve sobre: contesta el array pelado. Se acepta tal cual.
+    if (Array.isArray(first)) return first as T[];
+    const rows = Array.isArray(first?.rows) ? first.rows : [];
+    // El llamador mandó su propio `limit`: quiere ESE tope, no todo. Se respeta.
+    if (params.limit != null) return rows;
+    const total = first?.total ?? rows.length;
+    if (rows.length >= total) return rows;
+    const full = await this.queryPage<T>(name, { ...params, limit: total, offset: 0 });
+    return Array.isArray(full?.rows) ? full.rows : rows;
   }
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T> {
     return this.transport.command(name, payload) as Promise<T>;
@@ -596,13 +626,32 @@ export class ErploraClient {
   }
 
   /**
-   * Formatea un importe en CÉNTIMOS (entero) con la MONEDA DEL HUB (ADR-0059). El runtime guarda
-   * dinero en céntimos para no arrastrar errores de coma flotante; esta es la entrada canónica para
-   * los Web Components de módulo. `opts.currency` sobreescribe (p. ej. una factura en otra divisa).
-   * Mismo contrato que `apps/web/src/lib/money.ts` del shell, así Cloud↔Hub formatean igual.
+   * Formatea un importe en **UNIDADES MÍNIMAS** (entero) con la moneda del hub (ADR-0059/0123).
+   * Es la entrada canónica de los Web Components de módulo.
+   *
+   * **Ya no divide entre 100 a ciegas**: divide entre `10^decimales-de-la-moneda`. En EUR son 2, en
+   * **JPY son 0** (`1999` son **1999 ¥**, no 19,99) y en KWD son 3. El `/100` que había clavado aquí
+   * era un bug esperando a que alguien pusiera su hub fuera del euro — y la app es gratuita.
    */
-  formatMoney(cents: number, opts?: FormatMoneyOptions): string {
-    return this.moneyFmt(opts).format((cents || 0) / 100);
+  formatMoney(minor: number, opts?: FormatMoneyOptions): string {
+    return this.moneyFmt(opts).format(minorToMajor(minor, this.currencyDecimals));
+  }
+
+  /**
+   * Los **decimales de la moneda del hub** — la escala del dinero. Los inyecta el shell desde
+   * `/api/hub/context` (`currency_decimals`), que a su vez los resuelve del registro ISO-4217 o de
+   * lo que el hub haya declarado a mano para una moneda que el registro no conozca.
+   *
+   * Si el shell no los inyecta, se resuelven del código de moneda; y si tampoco, 2. Nunca se asumen
+   * a ciegas: asumir 2 en una moneda de 0 decimales es cobrar 100 veces de más.
+   */
+  get currencyDecimals(): number {
+    const injected = this.opts?.currencyDecimals?.();
+    if (typeof injected === 'number') return injected;
+    const published = (globalThis as { __erploraCurrencyDecimals?: number })
+      .__erploraCurrencyDecimals;
+    if (typeof published === 'number') return published;
+    return decimalsForCurrency(this.currency);
   }
 
   /**
@@ -612,6 +661,16 @@ export class ErploraClient {
    */
   formatAmount(units: number, opts?: FormatMoneyOptions): string {
     return this.moneyFmt(opts).format(units || 0);
+  }
+
+  /** Atajo de [`eurosToCents`] (la frontera con nombre; ADR-0123). */
+  eurosToCents(euros: string | number | undefined): number {
+    return eurosToCents(euros);
+  }
+
+  /** Atajo de [`centsToEuros`]. */
+  centsToEuros(cents: number | undefined): string {
+    return centsToEuros(cents);
   }
 
   /**
@@ -909,4 +968,90 @@ export class IpcBridgeTransport implements BridgeTransport {
   setDeviceRole(mac: string, role: string): Promise<BridgeDevice[]> {
     return this.tauri.invoke('erplora_set_device_role', { mac, role }) as Promise<BridgeDevice[]>;
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+// LA FRONTERA EUROS ↔ CÉNTIMOS (ADR-0123)
+//
+// El dinero es un INTEGER de CÉNTIMOS en toda la pila (ADR-0007), pero un humano teclea EUROS: un
+// `<input step="0.01">`, un CSV con el catálogo de un cliente, la etiqueta de un billete. Esa
+// conversión es una FRONTERA, y toda frontera tiene que ser **una función con nombre**, no un `*100`
+// suelto en medio de un componente.
+//
+// Hasta ahora no existía aquí, así que cada Web Component se la escribía a mano — y los que se
+// olvidaron produjeron los bugs de ×100: un café de 2,20 € importado como producto de **2 céntimos**,
+// y un billete de 20 € registrado como **20 céntimos** en el arqueo de caja.
+//
+// El gemelo en Rust es `erplora_guest_sdk::money::euros_to_cents`, para que el WC y el handler
+// coincidan al céntimo.
+// ─────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * **Frontera 1 de 2:** lo que teclea un humano (unidad MAYOR) → **unidades mínimas** (lo que guarda
+ * la BD).
+ *
+ * `decimals` son los de **la moneda del hub** (`erplora.currencyDecimals`), no un 2 fijo. En **JPY
+ * son 0**: `1999` se teclea y se guarda como `1999` yenes, no como `199900`. En KWD son 3. Un `*100`
+ * clavado aquí **cobra 100 veces mal** en cuanto el hub sale del euro — y la app es gratuita, así
+ * que saldrá.
+ *
+ * `Math.round` no es un adorno: en IEEE-754, `0.29 * 100 = 28.999999999999996`, así que sin él un
+ * precio de 0,29 € se guardaría como **28 céntimos**. Basura o vacío → `0`, nunca `NaN` (un `NaN` en
+ * una columna `INTEGER` es corrupción silenciosa).
+ */
+export function majorToMinor(amount: string | number | undefined, decimals: number): number {
+  const n = Number(amount);
+  return Number.isFinite(n) ? Math.round(n * 10 ** decimals) : 0;
+}
+
+/**
+ * **Frontera 2 de 2:** unidades mínimas → la unidad mayor que se le pinta a un humano.
+ *
+ * En EUR divide entre 100; en **JPY no divide** (la unidad mínima ES el yen); en KWD divide entre
+ * 1000.
+ */
+export function minorToMajor(amount: number | undefined, decimals: number): number {
+  return (amount ?? 0) / 10 ** decimals;
+}
+
+/**
+ * EUROS → céntimos. Es `majorToMinor(x, 2)`.
+ *
+ * **Prefiere `majorToMinor` con `erplora.currencyDecimals`**: esta función asume una moneda de 2
+ * decimales, que es exactamente la suposición que rompe en un hub en yenes. Se conserva para los
+ * sitios donde la moneda es EUR **por contrato** (la fiscalidad española: VeriFactu).
+ */
+export function eurosToCents(euros: string | number | undefined): number {
+  return majorToMinor(euros, 2);
+}
+
+/**
+ * CÉNTIMOS → la cadena en EUROS con la que se rellena un `<input step="0.01">` de edición.
+ * `undefined` → `''` (campo vacío, no «0.00»: no es lo mismo «sin precio» que «gratis»).
+ */
+export function centsToEuros(cents: number | undefined): string {
+  return cents == null ? '' : (cents / 100).toFixed(2);
+}
+
+/**
+ * Los decimales de una moneda ISO-4217. **No siempre son 2** — y esa suposición es un bug:
+ *
+ * * **JPY, KRW…** → **0**. La unidad mínima ES el yen: `1999` son 1999 ¥.
+ * * **KWD, BHD, TND…** → **3**.
+ * * El resto de las comunes → 2.
+ *
+ * Espejo del registro de Rust (`erplora_guest_sdk::currency`). Para una moneda que no está aquí, el
+ * hub declara sus decimales a mano (`hub_settings.currency_decimals`) y el shell los inyecta; este
+ * fallback solo actúa si nadie dijo nada.
+ */
+const ZERO_DECIMAL = new Set(['BIF','CLP','DJF','GNF','ISK','JPY','KMF','KRW','PYG','RWF','UGX','UYI','VND','VUV','XAF','XOF','XPF']);
+const THREE_DECIMAL = new Set(['BHD','IQD','JOD','KWD','LYD','OMR','TND']);
+const FOUR_DECIMAL = new Set(['CLF','UYW']);
+
+export function decimalsForCurrency(code: string | undefined): number {
+  const c = (code ?? '').trim().toUpperCase();
+  if (ZERO_DECIMAL.has(c)) return 0;
+  if (THREE_DECIMAL.has(c)) return 3;
+  if (FOUR_DECIMAL.has(c)) return 4;
+  return 2;
 }

@@ -184,3 +184,79 @@ async fn category_crud() {
     assert_eq!(cats[0]["name"], json!("Bebidas"));
     assert_eq!(cats[0]["product_count"], json!(0));
 }
+
+/// Vínculo producto↔categoría (M2M `inventory_product_categories`). La tabla y sus lectores ya
+/// existían — el TPV pide `inventory.product_categories` para filtrar la carta por categoría y
+/// `categories.list` cuenta productos por esa M2M — pero ningún comando la escribía: no había
+/// forma de asignarle una categoría a un producto. Contrato: escalar, idempotente y acotado al
+/// hub del contexto (la tabla es un join puro, sin `hub_id` propio → la guarda la pone el SQL).
+#[tokio::test]
+async fn product_category_link_add_and_remove() {
+    let rt = fresh().await;
+    let ctx = admin_ctx();
+
+    rt.execute_command(
+        "inventory.categories.create",
+        &params(json!({ "name": "Cafés e infusiones", "slug": "cafes", "icon": "cafe-outline",
+                        "color": "#3880ff", "description": "", "order": 0 })),
+        &ctx,
+    ).await.unwrap();
+    let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx).await.unwrap();
+    let cat_id = cats[0]["id"].as_str().unwrap().to_string();
+
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({ "name": "Café solo", "sku": "CAFE-SOLO", "price": 180, "cost": 0,
+                        "stock": 0, "low_stock_threshold": 10, "product_type": "physical",
+                        "ean13": null, "description": "", "tax_category_key": null, "image": "" })),
+        &ctx,
+    ).await.unwrap();
+    let prods = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
+    let prod_id = prods[0]["id"].as_str().unwrap().to_string();
+
+    // Punto de partida: sin vínculo, el TPV no puede agrupar por categoría.
+    let map = rt.execute_query("inventory.product_categories", &Params::new(), &ctx).await.unwrap();
+    assert!(map.is_empty());
+
+    rt.execute_command(
+        "inventory.products.add_category",
+        &params(json!({ "product_id": prod_id, "category_id": cat_id })),
+        &ctx,
+    ).await.unwrap();
+
+    let map = rt.execute_query("inventory.product_categories", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(map.len(), 1);
+    assert_eq!(map[0]["product_id"], json!(prod_id));
+    assert_eq!(map[0]["category_id"], json!(cat_id));
+
+    // El conteo de la lista de categorías (lo que pinta la UI) ve el vínculo.
+    let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(cats[0]["product_count"], json!(1));
+
+    // Idempotente: re-asignar no duplica ni revienta contra la PK compuesta.
+    rt.execute_command(
+        "inventory.products.add_category",
+        &params(json!({ "product_id": prod_id, "category_id": cat_id })),
+        &ctx,
+    ).await.unwrap();
+    let map = rt.execute_query("inventory.product_categories", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(map.len(), 1);
+
+    // Un hub ajeno no puede ligar un producto que no es suyo (scoping por hub_id, §2.5).
+    let other = RequestContext::new("h2", "u2", ["*".to_string()]);
+    rt.execute_command(
+        "inventory.products.add_category",
+        &params(json!({ "product_id": prod_id, "category_id": cat_id })),
+        &other,
+    ).await.unwrap();
+    let map = rt.execute_query("inventory.product_categories", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(map.len(), 1, "el hub ajeno no debe haber añadido nada");
+
+    rt.execute_command(
+        "inventory.products.remove_category",
+        &params(json!({ "product_id": prod_id, "category_id": cat_id })),
+        &ctx,
+    ).await.unwrap();
+    let map = rt.execute_query("inventory.product_categories", &Params::new(), &ctx).await.unwrap();
+    assert!(map.is_empty());
+}

@@ -49,6 +49,34 @@ const KNOWN: &[Setting] = &[
         validate: validate_currency,
         parse_stored: |s| json!(s),
     },
+    // IDENTIDAD FISCAL DEL HUB (ADR-0085): vive aquí, en el core, NO en el módulo `taxes`.
+    //
+    // Es lo que le permite al servidor resolver el IVA de una venta contra el catálogo: una regla
+    // fiscal es `(country_code, region_code, tax_category_key) → rate_pct`, así que sin el país del
+    // hub el runtime no puede casar ninguna regla… y el handler cae al fallback, que es la pista
+    // del cliente. O sea: **sin esto, el navegador decide el IVA que se declara a la AEAT**.
+    Setting {
+        key: "country_code",
+        default: || json!("ES"),
+        validate: validate_country,
+        parse_stored: |s| json!(s),
+    },
+    // Región/comunidad (`ES-MD`, `ES-CN`…). `null` = todo el país (el caso normal). Existe porque
+    // hay regímenes con tipos propios (Canarias/IGIC, Ceuta y Melilla/IPSI).
+    Setting {
+        key: "region_code",
+        default: || Value::Null,
+        validate: validate_region,
+        parse_stored: |s| if s.is_empty() { Value::Null } else { json!(s) },
+    },
+    // Los decimales de la moneda. `null` = «resuélvelos del registro ISO-4217» (el caso normal);
+    // un número = el hub los declara a mano, para una moneda que el registro no conoce.
+    Setting {
+        key: "currency_decimals",
+        default: || Value::Null,
+        validate: validate_currency_decimals,
+        parse_stored: |s| s.parse::<i64>().map(|n| json!(n)).unwrap_or(Value::Null),
+    },
     Setting {
         key: "language",
         default: || json!("es"),
@@ -94,14 +122,81 @@ fn find(key: &str) -> Option<&'static Setting> {
 }
 
 /// `currency`: string ISO-4217 de 3 letras. Se normaliza a MAYÚSCULAS al persistir.
+///
+/// **No es una lista blanca**: cualquier código bien formado vale, aunque el registro de monedas no
+/// lo conozca. Lo que el registro aporta son los **decimales** de las monedas que sí conoce; para el
+/// resto, el hub los declara a mano en `currency_decimals`.
 fn validate_currency(v: &Value) -> std::result::Result<String, String> {
     let s = v.as_str().ok_or("debe ser un string ISO-4217 (p. ej. \"EUR\")")?;
+    erplora_guest_sdk::currency::normalize_code(s).ok_or_else(|| {
+        format!("moneda inválida `{s}`: se espera un código ISO-4217 de 3 letras (p. ej. EUR)")
+    })
+}
+
+/// `country_code`: ISO-3166-1 alpha-2 (`ES`, `FR`, `PT`…). Se normaliza a MAYÚSCULAS.
+///
+/// Es la mitad de la clave con la que se resuelve el impuesto (`country + region + categoría` →
+/// `rate_pct`, ADR-0085). Sin él, ninguna regla fiscal casa.
+fn validate_country(v: &Value) -> std::result::Result<String, String> {
+    let s = v.as_str().ok_or("debe ser un string ISO-3166 de 2 letras (p. ej. \"ES\")")?;
     let up = s.trim().to_ascii_uppercase();
-    if up.len() == 3 && up.chars().all(|c| c.is_ascii_alphabetic()) {
+    if up.len() == 2 && up.chars().all(|c| c.is_ascii_alphabetic()) {
         Ok(up)
     } else {
-        Err(format!("moneda inválida `{s}`: se espera un código ISO-4217 de 3 letras (p. ej. EUR)"))
+        Err(format!("país inválido `{s}`: se espera ISO-3166-1 alpha-2 (p. ej. ES)"))
     }
+}
+
+/// `region_code`: subdivisión ISO-3166-2 (`ES-MD`, `ES-CN`…) o vacío/`null` = todo el país.
+///
+/// Existe porque hay regímenes con tipos propios (Canarias/IGIC, Ceuta y Melilla/IPSI): una regla
+/// con región gana a la del país (ADR-0085).
+fn validate_region(v: &Value) -> std::result::Result<String, String> {
+    match v {
+        Value::Null => Ok(String::new()),
+        Value::String(s) if s.trim().is_empty() => Ok(String::new()),
+        Value::String(s) => {
+            let up = s.trim().to_ascii_uppercase();
+            // `XX-YYY`: país + subdivisión.
+            let ok = up.len() >= 4
+                && up.len() <= 6
+                && up.as_bytes()[2] == b'-'
+                && up[..2].chars().all(|c| c.is_ascii_alphabetic())
+                && up[3..].chars().all(|c| c.is_ascii_alphanumeric());
+            if ok {
+                Ok(up)
+            } else {
+                Err(format!("región inválida `{s}`: se espera ISO-3166-2 (p. ej. ES-CN) o vacío"))
+            }
+        }
+        _ => Err("debe ser un string ISO-3166-2 (p. ej. \"ES-CN\") o null".to_string()),
+    }
+}
+
+/// `currency_decimals`: cuántos decimales tiene la moneda del hub.
+///
+/// **Solo hace falta si la moneda NO está en el registro** (ISO-4217 conoce EUR=2, JPY=0, KWD=3…).
+/// Es la vía para que un hub con una moneda rara funcione igual: la declara y ya.
+///
+/// El rango es 0..=4 porque es el de ISO-4217 — y **0 no es un error**: el yen no tiene céntimos, su
+/// unidad mínima es el propio yen. Precisamente por eso el `/100` clavado en la capa de dinero era un
+/// bug: en un hub en yenes habría mostrado y cobrado **100 veces mal**.
+fn validate_currency_decimals(v: &Value) -> std::result::Result<String, String> {
+    let n = v
+        .as_i64()
+        .ok_or("debe ser un entero (los decimales de la moneda: EUR 2, JPY 0, KWD 3)")?;
+    if (0..=4).contains(&n) {
+        Ok(n.to_string())
+    } else {
+        Err(format!("decimales inválidos `{n}`: ISO-4217 va de 0 (JPY) a 4"))
+    }
+}
+
+/// Los decimales de una moneda, **sin** override del hub: lo que diga el registro, y si no la
+/// conoce, el default explícito. Nunca un 2 clavado «porque sí».
+pub fn decimals_of(currency: &str) -> u32 {
+    erplora_guest_sdk::currency::decimals_for(currency)
+        .unwrap_or(erplora_guest_sdk::currency::DEFAULT_DECIMALS)
 }
 
 /// `language`: locale soportado (`es`|`en`). Se normaliza a minúsculas al persistir.
@@ -248,6 +343,44 @@ pub async fn set_many(
 mod tests {
     use super::*;
     use erplora_db::SqliteAdapter;
+
+    // ── La MONEDA y sus DECIMALES (ADR-0123 §7) ─────────────────────────────────────────
+    //
+    // El dinero se guarda en UNIDADES MÍNIMAS, y cuántas tiene una unidad mayor depende de la
+    // MONEDA: EUR 2, JPY **0**, KWD **3**. Un hub en yenes con la escala clavada en 2 mostraría y
+    // cobraría **100 veces mal**. Y la app es gratuita: la usará quien quiera, no solo la eurozona.
+
+    #[test]
+    fn los_decimales_salen_del_registro_de_monedas_no_de_un_2_fijo() {
+        assert_eq!(validate_currency_decimals(&json!(0)), Ok("0".to_string()));
+        assert_eq!(validate_currency_decimals(&json!(3)), Ok("3".to_string()));
+    }
+
+    #[test]
+    fn una_moneda_que_el_registro_NO_conoce_se_puede_declarar_a_mano() {
+        // «Si la moneda no existe en el hub, se debería poder añadir a mano.» El registro sabe de
+        // las comunes; para el resto, el hub declara sus decimales y funciona igual.
+        assert_eq!(validate_currency(&json!("xpf")), Ok("XPF".to_string()));
+        assert_eq!(validate_currency_decimals(&json!(0)), Ok("0".to_string()));
+    }
+
+    #[test]
+    fn los_decimales_no_pueden_ser_cualquier_cosa() {
+        // ISO-4217 no pasa de 4. Un 8 sería un hub cuya unidad mínima no cabe en la cabeza de nadie.
+        assert!(validate_currency_decimals(&json!(5)).is_err());
+        assert!(validate_currency_decimals(&json!(-1)).is_err());
+        assert!(validate_currency_decimals(&json!("dos")).is_err());
+    }
+
+    #[test]
+    fn sin_declararlos_se_resuelven_desde_la_moneda() {
+        // El default NO es un 2 fijo: es «lo que diga el registro para la moneda del hub».
+        assert_eq!(decimals_of("EUR"), 2);
+        assert_eq!(decimals_of("JPY"), 0, "en yenes NO se divide entre 100");
+        assert_eq!(decimals_of("KWD"), 3);
+        // Y una moneda desconocida cae en el default explícito (2), que el hub puede sobreescribir.
+        assert_eq!(decimals_of("ZZZ"), 2);
+    }
 
     /// Crea la tabla `hub_settings` a mano (en prod la crea la migración de sistema v4).
     async fn ensure_table(db: &SqliteAdapter) {
