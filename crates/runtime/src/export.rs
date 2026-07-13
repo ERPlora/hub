@@ -386,7 +386,12 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
                 }
             })
             .collect();
-        let col_list = cols.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(", ");
+        // Identificadores ENTRECOMILLADOS (comillas dobles = SQL estándar, válidas en SQLite y en
+        // Postgres). Sin esto, una columna que sea PALABRA RESERVADA revienta el INSERT al
+        // importar: `inventory_category`/`staff_role` tienen una columna `order` y el bundle
+        // aterrizaba con «near "order": syntax error» — perdiendo la sección ENTERA (el módulo se
+        // aplica en bloque), así que 19 categorías + 280 productos se quedaban en nada.
+        let col_list = cols.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ");
         let val_list = vals.join(", ");
         // Guard NOT EXISTS por (id, hub_id) cuando hay `id` (contrato de fila): re-importar el
         // mismo bundle no duplica. Sin `id` (p.ej. hub_settings, PK compuesta) → guard por PK real.
@@ -398,8 +403,9 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
                 format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE id = {id_lit})")
             }
         } else if table == "hub_settings" && obj.contains_key("key") {
+            // `key` también es palabra reservada en algunos dialectos → entrecomillada.
             let key_lit = sql_literal(&obj["key"]);
-            format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE key = {key_lit} AND hub_id = '{HUB_ID_PLACEHOLDER}')")
+            format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE \"key\" = {key_lit} AND hub_id = '{HUB_ID_PLACEHOLDER}')")
         } else {
             // Sin `id`: tablas de VÍNCULO (M2M), donde la PK ES la tupla entera. La guarda va por
             // todas las columnas → re-aplicar el bundle no duplica (mismo contrato idempotente).
@@ -407,10 +413,11 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
                 .iter()
                 .zip(vals.iter())
                 .map(|(c, v)| {
+                    let col = quote_ident(c);
                     if v == "NULL" {
-                        format!("{c} IS NULL")
+                        format!("{col} IS NULL")
                     } else {
-                        format!("{c} = {v}")
+                        format!("{col} = {v}")
                     }
                 })
                 .collect();
@@ -421,6 +428,14 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
     // El barrido anti-fuga del hub_id de ORIGEN va ya POR COLUMNA arriba (respetando id y
     // auditoría), no con un replace ciego sobre todo el SQL.
     out
+}
+
+/// Entrecomilla un identificador (columna) con comillas dobles — SQL estándar, lo entienden tanto
+/// SQLite como Postgres. Es lo que permite volcar columnas cuyo nombre es una PALABRA RESERVADA
+/// (`order`, `key`…). Los nombres salen del catálogo de la BD, pero se escapa la comilla doble por
+/// si acaso (defensivo: nunca se construye SQL con texto del usuario).
+fn quote_ident(name: &str) -> String {
+    format!("\"{}\"", name.replace('"', "\"\""))
 }
 
 /// Literal SQL portable a partir de un valor JSON (escape de comillas simples).
