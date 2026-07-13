@@ -40,6 +40,8 @@ async fn deactivate_hides_menu_and_blocks_capabilities() {
     // inactivo → sin menú, query/command devuelven NotFound (no existen para el caller)
     assert_eq!(rt.modules()[0].status, ModuleStatus::Inactive);
     assert_eq!(rt.navigation().len(), 0, "el menú no debe mostrar módulos inactivos");
+    // Desactivado ≠ desinstalado: el módulo SIGUE en el hub (sus datos y su manifest están), solo
+    // que inactivo — así que la query "no se encuentra", no "el módulo no está instalado".
     assert!(matches!(
         rt.execute_query("inventory.products.list", &Params::new(), &ctx()).await.unwrap_err(),
         RuntimeError::QueryNotFound(_)
@@ -79,9 +81,12 @@ async fn uninstall_removes_module() {
 
     assert_eq!(rt.modules().len(), 0);
     assert_eq!(rt.navigation().len(), 0);
+    // Tras desinstalar, el dueño de la query YA NO ESTÁ: el error correcto es la AUSENCIA del
+    // módulo (ADR-0127 — es lo que permite a `queryOptional` distinguirla de un contrato roto),
+    // no un `QueryNotFound` genérico.
     assert!(matches!(
         rt.execute_query("inventory.products.list", &Params::new(), &ctx()).await.unwrap_err(),
-        RuntimeError::QueryNotFound(_)
+        RuntimeError::ModuleNotInstalled { .. }
     ));
 }
 

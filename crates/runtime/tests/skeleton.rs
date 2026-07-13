@@ -113,9 +113,12 @@ async fn permission_is_enforced() {
 async fn unknown_capabilities_error() {
     let rt = fresh_runtime().await;
     let ctx = admin_ctx();
+    // `nope` no está instalado: desde ADR-0127 la ausencia del MÓDULO tiene su propio error para
+    // queries (es lo que permite a `queryOptional` distinguirla de un contrato roto). Los commands
+    // conservan `CommandNotFound`: no hay `commandOptional` que necesite la distinción.
     assert!(matches!(
         rt.execute_query("nope.query", &Params::new(), &ctx).await.unwrap_err(),
-        RuntimeError::QueryNotFound(_)
+        RuntimeError::ModuleNotInstalled { .. }
     ));
     assert!(matches!(
         rt.execute_command("nope.cmd", &Params::new(), &ctx).await.unwrap_err(),

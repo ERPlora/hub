@@ -526,6 +526,24 @@ export class ErploraClient {
     return this.transport.query(name, params).then(unwrapPage) as Promise<T>;
   }
   /**
+   * Query a una integración **OPCIONAL** (ADR-0127): el módulo dueño puede no estar instalado en
+   * este hub (`sales` consulta `verifactu` solo si existe). Devuelve `undefined` **únicamente**
+   * ante `module_not_installed`; el llamador decide el default (`?? []`) — el SDK no inventa el
+   * tipo de una query que no conoce.
+   *
+   * Todo lo demás EXPLOTA como en `query()`: una query renombrada en un módulo presente, un
+   * permiso denegado o un handler roto son contratos rotos, no ausencias. Esto NO es un
+   * `.catch(() => [])` — esa forma se tragaba las dos cosas y por eso se retiró.
+   */
+  async queryOptional<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T | undefined> {
+    try {
+      return await this.query<T>(name, params);
+    } catch (e) {
+      if (e instanceof ErploraError && e.code === 'module_not_installed') return undefined;
+      throw e;
+    }
+  }
+  /**
    * Ejecuta una **query de lista** (paginada): aplana `ListParams` y devuelve la página
    * `{rows,total,limit,offset}`. Úsala con `createListController` para el `<data-table>`.
    */

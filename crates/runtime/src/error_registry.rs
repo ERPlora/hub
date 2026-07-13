@@ -248,6 +248,7 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::Manifest { .. } => "manifest",
         E::Db(_) => "db",
         E::QueryNotFound(_) => "query_not_found",
+        E::ModuleNotInstalled { .. } => "module_not_installed",
         E::CommandNotFound(_) => "command_not_found",
         E::PermissionDenied(_) => "permission_denied",
         E::CapabilityDenied { .. } => "capability_denied",

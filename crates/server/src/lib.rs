@@ -1246,6 +1246,9 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     let (status, code) = match &e {
         E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied"),
         E::QueryNotFound(_) | E::CommandNotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
+        // ADR-0127: `queryOptional` del SDK devuelve `undefined` SOLO con este código; un
+        // `not_found` normal (contrato roto contra un módulo presente) sigue siendo un error.
+        E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed"),
         E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload"),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
         _ => (StatusCode::BAD_REQUEST, "error"),

@@ -11,6 +11,12 @@ pub enum RuntimeError {
     Db(#[from] DbError),
     #[error("query no encontrada: {0}")]
     QueryNotFound(String),
+    /// El MÓDULO dueño de la operación no está instalado en este hub. Distinto de
+    /// `QueryNotFound` (módulo presente, query inexistente = contrato roto): esta distinción es
+    /// la que permite a `queryOptional` del SDK devolver `undefined` SOLO ante la ausencia del
+    /// módulo, sin tragarse contratos rotos (ADR-0127).
+    #[error("módulo no instalado: `{module}` (requerido por `{operation}`)")]
+    ModuleNotInstalled { module: String, operation: String },
     #[error("command no encontrado: {0}")]
     CommandNotFound(String),
     #[error("permiso denegado: requiere `{0}`")]
