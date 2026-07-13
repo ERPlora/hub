@@ -1,11 +1,18 @@
-// Registro de iconos del shell del Hub. Los SVG se hornean EN BUILD (unplugin-icons, set
-// Iconify `ion:` desde @iconify-json/ion) — offline, CSP-safe, tree-shaken, cero runtime/red.
-// Para AÑADIR un icono del shell: una línea `import x from "~icons/ion/<name>?raw"` + su entrada.
-// Cualquier set Iconify vale (lucide/mdi/tabler…); aquí solo `ion:` porque es lo que usa el shell.
+// REGISTRO ÚNICO de iconos del Hub. Los SVG se hornean EN BUILD (unplugin-icons, set Iconify
+// `ion:` desde @iconify-json/ion) — offline, CSP-safe, tree-shaken, cero runtime/red.
+// Para AÑADIR un icono: una línea `import x from "~icons/ion/<name>?raw"` + su entrada en SVGS.
+// Cualquier set Iconify vale (lucide/mdi/tabler…); aquí solo `ion:` porque es lo que usa el Hub.
 //
-// Los iconos que declara un MÓDULO (module.json `icon`/`navigation[].icon`) NO viven aquí: el
-// `module-toolkit pack` hornea su SVG en el manifest construido (ADR option-b) y `resolveIcon`
-// lo pasa tal cual. Este registro es solo el set propio del shell + fallback.
+// De aquí salen los DOS caminos por los que se pinta un icono, para que no se desincronicen:
+//   · `resolveIcon()`  → `<ion-icon :icon>`  — el shell (Vue), vía <HubIcon>.
+//   · `iconRegistry()` → `<ion-icon name="…">` — los ok-* de OutfitKit y los WC de los módulos,
+//     volcado en `addIcons()` desde main.ts. Ojo: ionicons SANEA el nombre a `[a-z0-9-]`, así que
+//     un nombre con prefijo de colección (`mdi:home`) NO vale en `name=` — va por `:icon`.
+// `icons.test.ts` escanea shell + OutfitKit + módulos y falla si algún nombre usado no está aquí.
+//
+// Los iconos que declara un MÓDULO en su manifest (`icon`/`navigation[].icon`) no hace falta
+// añadirlos: `module-toolkit pack` hornea su SVG en el manifest construido (ADR option-b) y
+// `resolveIcon` lo pasa tal cual.
 import { svgToIcon, isInlineSvg } from "./iconify";
 
 import addOutline from "~icons/ion/add-outline?raw";
@@ -91,6 +98,56 @@ import closeOutline from "~icons/ion/close-outline?raw";
 import stopCircleOutline from "~icons/ion/stop-circle-outline?raw";
 import copyOutline from "~icons/ion/copy-outline?raw";
 import codeSlashOutline from "~icons/ion/code-slash-outline?raw";
+
+// Iconos que se pintan POR NOMBRE (`<ion-icon name="…">`) desde los ok-* de OutfitKit y desde los
+// Web Components de los módulos. Antes vivían en un `addIcons()` aparte, en main.ts, importados de
+// `ionicons/icons`: ese segundo registro se desincronizaba de este y el icono que faltaba en uno
+// salía VACÍO. Ahora hay uno solo, y `src/lib/icons.test.ts` verifica que no falte ninguno.
+import add from "~icons/ion/add?raw";
+import alertCircleOutline from "~icons/ion/alert-circle-outline?raw";
+import appsOutline from "~icons/ion/apps-outline?raw";
+import archiveOutline from "~icons/ion/archive-outline?raw";
+import arrowRedoOutline from "~icons/ion/arrow-redo-outline?raw";
+import arrowUndoOutline from "~icons/ion/arrow-undo-outline?raw";
+import backspaceOutline from "~icons/ion/backspace-outline?raw";
+import checkmarkOutline from "~icons/ion/checkmark-outline?raw";
+import chevronDownOutline from "~icons/ion/chevron-down-outline?raw";
+import close from "~icons/ion/close?raw";
+import cloudDownloadOutline from "~icons/ion/cloud-download-outline?raw";
+import cloudOfflineOutline from "~icons/ion/cloud-offline-outline?raw";
+import contractOutline from "~icons/ion/contract-outline?raw";
+import createOutline from "~icons/ion/create-outline?raw";
+import documentAttachOutline from "~icons/ion/document-attach-outline?raw";
+import documentOutline from "~icons/ion/document-outline?raw";
+import ellipsisVertical from "~icons/ion/ellipsis-vertical?raw";
+import expandOutline from "~icons/ion/expand-outline?raw";
+import fileTrayOutline from "~icons/ion/file-tray-outline?raw";
+import fileTrayStackedOutline from "~icons/ion/file-tray-stacked-outline?raw";
+import folderOpenOutline from "~icons/ion/folder-open-outline?raw";
+import funnelOutline from "~icons/ion/funnel-outline?raw";
+import gift from "~icons/ion/gift?raw";
+import giftOutline from "~icons/ion/gift-outline?raw";
+import listOutline from "~icons/ion/list-outline?raw";
+import mailOpenOutline from "~icons/ion/mail-open-outline?raw";
+import menuOutline from "~icons/ion/menu-outline?raw";
+import notificationsOffOutline from "~icons/ion/notifications-off-outline?raw";
+import openOutline from "~icons/ion/open-outline?raw";
+import pause from "~icons/ion/pause?raw";
+import pencil from "~icons/ion/pencil?raw";
+import play from "~icons/ion/play?raw";
+import playOutline from "~icons/ion/play-outline?raw";
+import powerOutline from "~icons/ion/power-outline?raw";
+import printOutline from "~icons/ion/print-outline?raw";
+import remove from "~icons/ion/remove?raw";
+import ribbonOutline from "~icons/ion/ribbon-outline?raw";
+import searchOutline from "~icons/ion/search-outline?raw";
+import star from "~icons/ion/star?raw";
+import swapVerticalOutline from "~icons/ion/swap-vertical-outline?raw";
+import terminalOutline from "~icons/ion/terminal-outline?raw";
+import trash from "~icons/ion/trash?raw";
+import trashOutline from "~icons/ion/trash-outline?raw";
+import trendingDown from "~icons/ion/trending-down?raw";
+import trendingUp from "~icons/ion/trending-up?raw";
 
 // `panel-left` (lucide) — NO hay equivalente en el set `ion:`; se hornea a mano para dar paridad
 // exacta con el rail-toggle de Cloud (que usa `lucide:panel-left`). SVG inline = offline/CSP-safe,
@@ -184,6 +241,54 @@ const SVGS: Record<string, string> = {
   "copy-outline": copyOutline,
   "code-slash-outline": codeSlashOutline,
   "panel-left": panelLeft,
+
+  // Pintados por nombre desde los ok-* (OutfitKit) y los WC de los módulos — ver el bloque de
+  // imports de arriba.
+  add,
+  "alert-circle-outline": alertCircleOutline,
+  "apps-outline": appsOutline,
+  "archive-outline": archiveOutline,
+  "arrow-redo-outline": arrowRedoOutline,
+  "arrow-undo-outline": arrowUndoOutline,
+  "backspace-outline": backspaceOutline,
+  "checkmark-outline": checkmarkOutline,
+  "chevron-down-outline": chevronDownOutline,
+  close,
+  "cloud-download-outline": cloudDownloadOutline,
+  "cloud-offline-outline": cloudOfflineOutline,
+  "contract-outline": contractOutline,
+  "create-outline": createOutline,
+  "document-attach-outline": documentAttachOutline,
+  "document-outline": documentOutline,
+  "ellipsis-vertical": ellipsisVertical,
+  "expand-outline": expandOutline,
+  "file-tray-outline": fileTrayOutline,
+  "file-tray-stacked-outline": fileTrayStackedOutline,
+  "folder-open-outline": folderOpenOutline,
+  "funnel-outline": funnelOutline,
+  gift,
+  "gift-outline": giftOutline,
+  "list-outline": listOutline,
+  "mail-open-outline": mailOpenOutline,
+  "menu-outline": menuOutline,
+  "notifications-off-outline": notificationsOffOutline,
+  "open-outline": openOutline,
+  pause,
+  pencil,
+  play,
+  "play-outline": playOutline,
+  "power-outline": powerOutline,
+  "print-outline": printOutline,
+  remove,
+  "ribbon-outline": ribbonOutline,
+  "search-outline": searchOutline,
+  star,
+  "swap-vertical-outline": swapVerticalOutline,
+  "terminal-outline": terminalOutline,
+  trash,
+  "trash-outline": trashOutline,
+  "trending-down": trendingDown,
+  "trending-up": trendingUp,
 };
 
 // Alias de nombres estilo lucide que arrastran manifests antiguos → equivalente `ion:`.
@@ -212,3 +317,49 @@ export function resolveIcon(name?: string): string {
 
 /** Compat: los manifests de módulo declaran `navigation[].icon` por nombre. Alias de resolveIcon. */
 export const manifestIcon = resolveIcon;
+
+/**
+ * El registro entero como `nombre → data-URI`, para volcarlo en `addIcons()` (ionicons) al arrancar.
+ *
+ * Hay dos formas de pintar un icono y las dos tienen que beber de ESTE mapa:
+ * - `<ion-icon :icon="…">` — el shell (Vue) vía `<HubIcon>` → `resolveIcon()`.
+ * - `<ion-icon name="…">` — los ok-* de OutfitKit y los WC de los módulos, que son Web Components
+ *   ajenos y no pueden llamar a `resolveIcon()`. `ion-icon` resuelve el nombre contra el mapa
+ *   global `window.Ionicons.map`, que es justo lo que `addIcons()` rellena; si un nombre no está,
+ *   ionicons intenta bajar el SVG por red y en offline/CSP el icono sale VACÍO y sin error.
+ *
+ * Alimentar ambos caminos desde el mismo sitio es lo que evita que se desincronicen. Usamos solo la
+ * API pública de ionicons (`addIcons`), sin tocar el Web Component: una subida de versión de Ionic
+ * no rompe esto.
+ */
+export function iconRegistry(): Record<string, string> {
+  const registry: Record<string, string> = {};
+  for (const [name, svg] of Object.entries(SVGS)) registry[name] = svgToIcon(svg);
+  for (const [alias, target] of Object.entries(ALIASES)) {
+    const svg = SVGS[target];
+    if (svg) registry[alias] = svgToIcon(svg);
+  }
+  return registry;
+}
+
+/**
+ * Los iconos que TRAE UN MÓDULO (su sidecar `dist/icons.json`, nombre → SVG inline, horneado por
+ * `module-toolkit build`), en formato `addIcons()`.
+ *
+ * El shell NO puede conocer los iconos de un módulo — menos aún los de uno de terceros instalado
+ * desde el marketplace. Así que el módulo los trae dentro del zip y el shell los registra al
+ * cargarlo (module-loader). Es lo que hace que un módulo sea autónomo: añadir uno nuevo no obliga a
+ * tocar este fichero ni a redesplegar el Hub.
+ */
+export function moduleIconRegistry(icons: Record<string, string>): Record<string, string> {
+  const registry: Record<string, string> = {};
+  for (const [name, svg] of Object.entries(icons)) {
+    // Lo que el shell ya trae no se re-registra: es el mismo dibujo pero no el mismo string (el
+    // shell lo hornea con unplugin-icons y el módulo con @iconify/utils), y ionicons escupiría un
+    // "Multiple icons were mapped to name …" por cada uno. Gana el del shell; el módulo aporta
+    // lo que falta, que es justo lo que lo hace autónomo.
+    if (name in SVGS) continue;
+    if (isInlineSvg(svg)) registry[name] = svgToIcon(svg);
+  }
+  return registry;
+}

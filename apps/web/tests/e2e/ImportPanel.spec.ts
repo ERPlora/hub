@@ -44,7 +44,7 @@ async function withSession(page: Page, s: Session): Promise<void> {
 }
 
 test.describe('importar configuración (Ajustes → Datos)', () => {
-  test('muestra el uploader local y la fuente nube deshabilitada ("próximamente")', async ({ page }) => {
+  test('muestra las dos fuentes: zip local y nube (catálogo del SaaS, ADR-0121)', async ({ page }) => {
     await withSession(page, await loginByPin());
 
     await page.goto('/settings?tab=data');
@@ -55,9 +55,14 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
 
     // Paso 1: subir un zip local…
     await expect(page.getByTestId('import-pick-file')).toBeVisible();
-    // …y «desde la nube» deshabilitado con nota (el registro SaaS de blueprints no existe aún).
-    await expect(page.getByTestId('import-cloud')).toHaveJSProperty('disabled', true);
-    await expect(page.getByTestId('import-cloud-note')).toBeVisible();
+    // …y «desde la nube» YA HABILITADO: el registro de blueprints del SaaS existe (ADR-0121).
+    await expect(page.getByTestId('import-cloud')).toBeVisible();
+    await expect(page.getByTestId('import-cloud')).toHaveJSProperty('disabled', false);
+
+    // Al pulsarlo se pide el catálogo al runtime (que proxya al SaaS con su X-Hub-Token).
+    await page.getByTestId('import-cloud').click();
+    // Sin blueprints publicados aún, la lista sale vacía con su nota honesta — no un error.
+    await expect(page.getByTestId('import-cloud-catalog')).toBeVisible();
   });
 
   test('inspeccionar un zip muestra el manifest y al importar sale el informe', async ({ page }) => {

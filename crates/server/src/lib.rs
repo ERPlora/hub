@@ -565,6 +565,9 @@ pub fn app(state: AppState) -> Router {
         .route("/api/entitlement", get(proxy_entitlement))
         .route("/api/bridge/token", get(proxy_bridge_token))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
+        // Blueprints: «fuente nube» del import (Ajustes → Datos). ADR-0121.
+        .route("/api/blueprints/catalog", get(proxy_blueprints_catalog))
+        .route("/api/blueprints/:slug/download", get(download_blueprint))
         .route("/api/modules/:id/activate", post(activate_module))
         .route("/api/modules/:id/deactivate", post(deactivate_module))
         .route("/api/modules/:id/uninstall", post(uninstall_module))
@@ -987,6 +990,85 @@ async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMa
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
     proxy_cloud_get(&st, &headers, cloud.marketplace_modules(&placeholder)).await
+}
+
+/// GET /api/blueprints/catalog — catálogo de blueprints (proxy de `/api/v1/catalog/blueprints/`).
+///
+/// La **«fuente nube»** del panel de import (Ajustes → Datos). [ADR-0121]
+async fn proxy_blueprints_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    proxy_cloud_get(&st, &headers, cloud.blueprints_catalog(&placeholder)).await
+}
+
+/// GET /api/blueprints/:slug/download — baja el `.blueprint.zip` y lo sirve al front.
+///
+/// El runtime hace de intermediario a propósito (ADR-0003): pide al SaaS la **URL firmada** con su
+/// `X-Hub-Token` —que **nunca** llega al navegador—, descarga el zip de Object Storage y
+/// **verifica el SHA256 ANTES de entregarlo**. Un hash que no casa aborta con 502 sin devolver
+/// bytes: es el mismo contrato no-saltable que el install de módulos (ADR-0015).
+///
+/// Devuelve el zip crudo, así que el front lo trata **igual que un fichero local** y reusa el
+/// flujo existente `inspect` → `import` (cero lógica de import duplicada).
+async fn download_blueprint(
+    State(st): State<AppState>,
+    Path(slug): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+
+    // 1) El SaaS nos da URL firmada + sha256 (hub-scoped: se autentica el runtime, no el usuario).
+    let (status, body) = match cloud_get_raw(&st, &headers, cloud.blueprint_download(&slug, &placeholder)).await {
+        Ok(pair) => pair,
+        Err(e) => return cloud_get_error_response(e),
+    };
+    if !status.is_success() {
+        return (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response();
+    }
+
+    let info: Value = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => return bad_gateway(format!("respuesta de blueprint ilegible: {e}")),
+    };
+    let (Some(url), Some(expected)) = (info["url"].as_str(), info["sha256"].as_str()) else {
+        return bad_gateway("el SaaS no expuso url/sha256 del blueprint".to_string());
+    };
+
+    // 2) Descarga directa de Object Storage (URL prefirmada: sin credenciales nuestras).
+    let zip = match st.http.get(url).send().await {
+        Ok(r) if r.status().is_success() => match r.bytes().await {
+            Ok(b) => b,
+            Err(e) => return bad_gateway(format!("descarga del blueprint interrumpida: {e}")),
+        },
+        Ok(r) => return bad_gateway(format!("Object Storage devolvió {} al bajar el blueprint", r.status())),
+        Err(e) => return bad_gateway(format!("no se pudo descargar el blueprint: {e}")),
+    };
+
+    // 3) 🔴 Integridad NO-SALTABLE (ADR-0015): si el hash no casa, no se entrega ni un byte.
+    let actual = {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(&zip);
+        format!("{:x}", h.finalize())
+    };
+    if actual != expected {
+        return bad_gateway(format!(
+            "integridad del blueprint «{slug}»: sha256 esperado {expected}, obtenido {actual} — import abortado"
+        ));
+    }
+
+    (
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "application/zip")],
+        zip,
+    )
+        .into_response()
+}
+
+/// 502 con el motivo en JSON (contrato de error del resto de proxies).
+fn bad_gateway(reason: String) -> Response {
+    (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": reason }))).into_response()
 }
 
 /// POST /api/assistant/chat/stream — proxy SSE hacia el Cloud (ARQUITECTURA.md §9.3).

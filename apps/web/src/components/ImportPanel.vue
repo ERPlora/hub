@@ -34,20 +34,46 @@
             {{ inspecting ? t('importPage.inspecting') : t('importPage.pickFile') }}
           </ion-button>
 
-          <!-- «Desde la nube»: el registro/distribución de blueprints en el SaaS es una tanda
-               posterior (fuera de alcance, doc §1) → botón deshabilitado + nota honesta. -->
+          <!-- «Desde la nube» (ADR-0121): catálogo de blueprints publicados en el vendor portal
+               del SaaS. El runtime proxya con su X-Hub-Token y VERIFICA el sha256 del zip antes
+               de dárnoslo; a partir de ahí el flujo es idéntico al de un fichero local. -->
           <ion-button
             data-testid="import-cloud"
             expand="block"
             fill="outline"
             class="mt-2"
-            disabled
+            :disabled="!isAdmin || inspecting || loadingCatalog"
+            @click="openCloudCatalog"
           >
-            <HubIcon slot="start" name="cloud-download-outline" />
-            {{ t('importPage.fromCloud') }}
+            <ion-spinner v-if="loadingCatalog" slot="start" name="crescent" />
+            <HubIcon v-else slot="start" name="cloud-download-outline" />
+            {{ loadingCatalog ? t('importPage.loadingCatalog') : t('importPage.fromCloud') }}
           </ion-button>
-          <ion-note data-testid="import-cloud-note" class="soon-note">
-            {{ t('importPage.cloudSoon') }}
+        </ion-card-content>
+      </ion-card>
+
+      <!-- Catálogo de la nube -->
+      <ion-card v-if="showCatalog" data-testid="import-cloud-catalog">
+        <ion-card-content class="p-0">
+          <ion-list v-if="catalog.length" lines="full">
+            <ion-item
+              v-for="bp in catalog"
+              :key="bp.slug"
+              button
+              :disabled="inspecting"
+              :data-testid="`import-cloud-item-${bp.slug}`"
+              @click="pickFromCloud(bp)"
+            >
+              <HubIcon slot="start" name="cube-outline" />
+              <ion-label>
+                <h3>{{ bp.name }}</h3>
+                <p>{{ bp.description || bp.slug }}</p>
+              </ion-label>
+              <ion-note slot="end">{{ bp.locale }} · v{{ bp.latest_version }}</ion-note>
+            </ion-item>
+          </ion-list>
+          <ion-note v-else data-testid="import-cloud-empty" class="soon-note">
+            {{ t('importPage.catalogEmpty') }}
           </ion-note>
         </ion-card-content>
       </ion-card>
@@ -257,7 +283,10 @@ import {
   inspectBlueprint,
   importBlueprint,
   sectionStatusInfo,
+  fetchBlueprintCatalog,
+  downloadBlueprint,
   type BlueprintManifest,
+  type CatalogBlueprint,
   type ImportReport,
 } from '../lib/runtime';
 
@@ -282,11 +311,17 @@ async function onFileChange(e: Event): Promise<void> {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
+  await inspectAndReview(file);
+  input.value = ''; // permite re-elegir el mismo fichero tras un error
+}
+
+/** Paso común: un zip (local o de la nube) → inspect → pantalla de revisión. */
+async function inspectAndReview(zip: Blob): Promise<void> {
   error.value = '';
   inspecting.value = true;
   try {
     // Integridad dura en el server (SHA256/manifest/zip-slip): un zip malo se rechaza SIN efectos.
-    const res = await inspectBlueprint(file);
+    const res = await inspectBlueprint(zip);
     uploadId.value = res.upload_id;
     manifest.value = res.manifest;
     seedSelection(res.manifest);
@@ -296,7 +331,43 @@ async function onFileChange(e: Event): Promise<void> {
     error.value = err instanceof Error ? err.message : String(err);
   } finally {
     inspecting.value = false;
-    input.value = ''; // permite re-elegir el mismo fichero tras un error
+  }
+}
+
+// ── Paso 1 (bis): fuente NUBE — catálogo de blueprints del SaaS (ADR-0121) ──
+const loadingCatalog = ref<boolean>(false);
+const showCatalog = ref<boolean>(false);
+const catalog = ref<CatalogBlueprint[]>([]);
+
+async function openCloudCatalog(): Promise<void> {
+  error.value = '';
+  loadingCatalog.value = true;
+  try {
+    catalog.value = await fetchBlueprintCatalog();
+    showCatalog.value = true;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    loadingCatalog.value = false;
+  }
+}
+
+/**
+ * Elegir un blueprint de la nube. El runtime lo descarga de Object Storage y **verifica su
+ * sha256** antes de entregárnoslo; si no casa, `downloadBlueprint` lanza y no se importa nada.
+ * A partir de ahí es el MISMO flujo que un zip local.
+ */
+async function pickFromCloud(bp: CatalogBlueprint): Promise<void> {
+  error.value = '';
+  inspecting.value = true;
+  try {
+    const zip = await downloadBlueprint(bp.slug);
+    showCatalog.value = false;
+    await inspectAndReview(zip);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    inspecting.value = false;
   }
 }
 

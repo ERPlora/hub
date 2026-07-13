@@ -1,30 +1,7 @@
 import { createApp } from 'vue';
 import { IonicVue } from '@ionic/vue';
 import { addIcons } from 'ionicons';
-import {
-  pencil, trash, add, close, chevronBack, chevronForward,
-  listOutline, gridOutline, funnelOutline, downloadOutline, cloudUploadOutline,
-  appsOutline, closeOutline, arrowBackOutline, backspaceOutline,
-  // ok-kpi (DashboardPage / /system): iconos de tendencia + neutro.
-  trendingUp, trendingDown, remove,
-  // ok-kpi / ok-stat icon prop (DashboardPage widgets): estas pasan directamente a
-  // <ion-icon name="…"> dentro del WC → hay que registrarlas o el icono no resuelve (URL inválida).
-  trendingUpOutline, receiptOutline, peopleOutline, warningOutline,
-  // Widgets de inventario del board de inicio: stock bajo / valor / existencias / menos stock.
-  alertCircleOutline, cashOutline, cubeOutline, trendingDownOutline,
-  // ok-data-table / ok-empty-state: icono por defecto del estado vacío.
-  fileTrayOutline,
-  // ok-data-table: indicador de orden en cabeceras de columna.
-  swapVerticalOutline,
-  // ok-file-manager (/files): navegación por carpetas, tipo de archivo terminal.
-  chevronForwardOutline, folderOpenOutline, terminalOutline,
-  // Apps (ok-data-table): acción activar/desactivar de un módulo instalado.
-  powerOutline,
-  // ok-widget-board (DashboardPage): botón ⋮ de "Personalizar panel".
-  ellipsisVertical,
-  // Usuarios → API keys (ok-data-table rowAction): rotar una key (devuelve secreto nuevo).
-  refreshOutline,
-} from 'ionicons/icons';
+import { iconRegistry } from './lib/icons';
 
 import App from './App.vue';
 import { router } from './router';
@@ -40,41 +17,14 @@ import { bootPwa } from './lib/pwa';
 import { bootActionFeedback } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 
-// Los componentes de OutfitKit (ok-data-table, etc.) usan ion-icon POR NOMBRE ('pencil', 'trash',
-// 'chevron-back'…). En @ionic/vue los iconos por nombre hay que registrarlos con addIcons (no se
-// auto-cargan como en el loader CDN). Registramos el set que usan los ok-*.
-addIcons({
-  pencil, trash, add, close,
-  'chevron-back': chevronBack, 'chevron-forward': chevronForward,
-  'list-outline': listOutline, 'grid-outline': gridOutline, 'funnel-outline': funnelOutline,
-  'download-outline': downloadOutline, 'cloud-upload-outline': cloudUploadOutline,
-  // Trigger (rejilla) y cerrar de ok-app-launcher (OutfitKit), por NOMBRE.
-  'apps-outline': appsOutline, 'close-outline': closeOutline,
-  // Teclado PIN del login (ok-pinpad): borrado + tecla «cambiar usuario».
-  'arrow-back-outline': arrowBackOutline, 'backspace-outline': backspaceOutline,
-  // ok-kpi (DashboardPage + /system): flecha tendencia arriba/abajo y neutro.
-  'trending-up': trendingUp, 'trending-down': trendingDown, 'remove': remove,
-  // ok-kpi `icon` prop (DashboardPage): KPI icon names passed directly to ion-icon inside the WC.
-  'trending-up-outline': trendingUpOutline, 'receipt-outline': receiptOutline,
-  'people-outline': peopleOutline, 'warning-outline': warningOutline,
-  // Widgets de inventario del board de inicio (ok-stat/ok-kpi): sin registrar caían a "URL inválida".
-  'alert-circle-outline': alertCircleOutline, 'cash-outline': cashOutline,
-  'cube-outline': cubeOutline, 'trending-down-outline': trendingDownOutline,
-  // ok-data-table / ok-empty-state: default empty-state icon used by all module tables.
-  'file-tray-outline': fileTrayOutline,
-  // ok-data-table: sort indicator shown on every sortable column header.
-  'swap-vertical-outline': swapVerticalOutline,
-  // ok-file-manager (/files): folder navigation and terminal file-type icon.
-  'chevron-forward-outline': chevronForwardOutline,
-  'folder-open-outline': folderOpenOutline,
-  'terminal-outline': terminalOutline,
-  // Apps: acción activar/desactivar (ok-data-table rowAction).
-  'power-outline': powerOutline,
-  // ok-widget-board: botón ⋮ "Personalizar panel" del dashboard de inicio.
-  'ellipsis-vertical': ellipsisVertical,
-  // Usuarios → API keys (ok-data-table): acción "Rotar" de una key.
-  'refresh-outline': refreshOutline,
-});
+// Los ok-* de OutfitKit y los Web Components de los módulos pintan sus iconos POR NOMBRE
+// (`<ion-icon name="trash-outline">`): son WC ajenos, no pueden llamar a `resolveIcon()`. ion-icon
+// resuelve el nombre contra el mapa global `window.Ionicons.map` y, si no está, intenta bajar el
+// SVG por red → en offline/CSP el icono sale VACÍO y sin error. Aquí volcamos el registro entero
+// (SVG Iconify horneados en build) en ese mapa, con la API pública de ionicons.
+// La fuente de verdad es lib/icons.ts, la misma de la que come <HubIcon> → un icono nuevo se añade
+// en UN sitio y funciona en los dos caminos. Guard: src/lib/icons.test.ts.
+addIcons(iconRegistry());
 
 // CSS base de Ionic (core + utilidades). Dark mode por clase (.ion-palette-dark).
 import '@ionic/vue/css/core.css';

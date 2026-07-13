@@ -11,8 +11,10 @@
 //   - dev: copiados a public/ por sync-modules.mjs (puente del shell de desarrollo),
 //   - prod: el runtime (crates/server, ServeDir) los sirve desde el web dir.
 import type { ModuleManifest, NavigationItem } from '@erplora/module-types';
+import { addIcons } from 'ionicons';
 
 import { isModuleEntitled } from './entitlement';
+import { moduleIconRegistry } from './icons';
 import { RUNTIME_URL } from './runtime';
 import { getLocale } from '../i18n';
 
@@ -59,14 +61,25 @@ async function fetchNavigation(): Promise<RuntimeNavItem[]> {
   return env.ok && env.data ? env.data : [];
 }
 
-/** Sidecar `dist/icons.json` del módulo (nombre Iconify → SVG inline). `{}` si no lo trae. */
+/**
+ * Sidecar `dist/icons.json` del módulo (nombre Iconify → SVG inline). `{}` si no lo trae.
+ *
+ * Además de devolverlo (para el icono del MENÚ), lo REGISTRA en ionicons: el Web Component del
+ * módulo pinta sus iconos por nombre (`<ion-icon name="file-tray-stacked-outline">`) y, sin
+ * registrar, ion-icon intenta bajar el SVG por red → en el Hub (offline, sin la carpeta svg/
+ * servida) el icono sale VACÍO y sin ningún error. El shell no puede llevar una lista con los
+ * iconos de cada módulo —menos aún de uno de terceros—, así que el módulo los trae en su zip y
+ * aquí se registran al cargarlo.
+ */
 async function loadIconMap(base: string, entry: string): Promise<Record<string, string>> {
   // icons.json vive junto al bundle del WC (dist/), lo genera `module-toolkit build`.
   const distDir = entry.includes('/') ? entry.replace(/\/[^/]+$/, '') : '';
   try {
     const res = await fetch(`${base}/${distDir ? `${distDir}/` : ''}icons.json`);
     if (!res.ok) return {};
-    return (await res.json()) as Record<string, string>;
+    const icons = (await res.json()) as Record<string, string>;
+    addIcons(moduleIconRegistry(icons));
+    return icons;
   } catch {
     return {};
   }
