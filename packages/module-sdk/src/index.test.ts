@@ -8,6 +8,10 @@ import {
   ErploraError,
   createClient,
   BridgeClient,
+  eurosToCents,
+  centsToEuros,
+  majorToMinor,
+  minorToMajor,
 } from './index.ts';
 
 // ── HttpWsTransport: query/command desenvuelven el sobre {ok,data} ───────────
@@ -269,4 +273,70 @@ test('BridgeClient acepta un getter de token (se relee tras emparejar, sin recre
   assert.equal(FakeBridgeWs.last!.url, 'ws://localhost:12321/ws?token=later-token');
   driveBridge({ event: 'printers', printers: [] });
   await p;
+});
+
+// ── La frontera EUROS ↔ CÉNTIMOS (ADR-0123) ─────────────────────────────────────────────
+//
+// El dinero es un INTEGER de céntimos, pero un humano teclea EUROS: un `<input step="0.01">`, un
+// CSV con el catálogo del cliente. Esa conversión es una FRONTERA, y hasta ahora no existía en el
+// SDK: cada Web Component se la escribía a mano. Los que no lo hicieron produjeron los bugs de ×100
+// (un café de 2,20 € guardado como producto de 2 céntimos; un billete de 20 € registrado como 20
+// céntimos). Ahora la frontera vive aquí, con el gemelo Rust en `guest_sdk::money::euros_to_cents`.
+test('eurosToCents: lo que teclea un humano son EUROS', () => {
+  assert.equal(eurosToCents('2.20'), 220);
+  assert.equal(eurosToCents('50'), 5000);
+  assert.equal(eurosToCents('0.01'), 1);
+});
+
+test('eurosToCents: el céntimo NO se pierde por la coma flotante', () => {
+  // El bug clásico: 0.29 * 100 = 28.999999999999996 en IEEE-754 → sin Math.round, 28 céntimos.
+  assert.equal(eurosToCents('0.29'), 29);
+  assert.equal(eurosToCents('1.15'), 115);
+});
+
+test('eurosToCents: la basura entra como 0, no como NaN', () => {
+  // Un CSV de cliente trae celdas vacías. Un NaN en una columna INTEGER es corrupción silenciosa.
+  assert.equal(eurosToCents(''), 0);
+  assert.equal(eurosToCents('abc'), 0);
+  assert.equal(eurosToCents(undefined), 0);
+});
+
+test('centsToEuros: la vuelta, para rellenar un input de edición', () => {
+  assert.equal(centsToEuros(220), '2.20');
+  assert.equal(centsToEuros(5), '0.05');
+  assert.equal(centsToEuros(0), '0.00');
+  assert.equal(centsToEuros(undefined), '');
+});
+
+// ── La MONEDA define la escala, no una constante (ADR-0123 §7) ──────────────────────────
+//
+// El dinero viaja en UNIDADES MÍNIMAS, y cuántas hay en una unidad mayor **depende de la moneda**:
+// EUR 2, **JPY 0**, KWD 3. El `/ 100` que estaba clavado aquí es un bug en cuanto un hub se pone en
+// yenes — y la app es gratuita, así que se pondrá: mostraría 19,99 ¥ donde hay **1999 ¥**.
+test('majorToMinor: lo que teclea un humano depende de SU moneda', () => {
+  assert.equal(majorToMinor('19.99', 2), 1999); // EUR
+  assert.equal(majorToMinor('1999', 0), 1999); // JPY: NO se multiplica por 100
+  assert.equal(majorToMinor('1.999', 3), 1999); // KWD
+});
+
+test('minorToMajor: pintar tampoco divide siempre entre 100', () => {
+  assert.equal(minorToMajor(1999, 2), 19.99);
+  assert.equal(minorToMajor(1999, 0), 1999, 'en yenes NO se divide');
+  assert.equal(minorToMajor(1999, 3), 1.999);
+});
+
+test('el mismo entero significa cosas distintas según la moneda', () => {
+  // Es LA razón de todo esto: `1999` no significa nada sin su moneda.
+  assert.equal(minorToMajor(1999, 2), 19.99); //   19,99 €
+  assert.equal(minorToMajor(1999, 0), 1999); // 1999   ¥
+});
+
+test('el céntimo no se pierde por la coma flotante, sea cual sea la escala', () => {
+  assert.equal(majorToMinor('0.29', 2), 29); // 0.29*100 = 28.999… en IEEE-754
+  assert.equal(majorToMinor('1.005', 3), 1005);
+});
+
+test('eurosToCents sigue existiendo, y es majorToMinor con escala 2', () => {
+  // Se conserva para los sitios donde la moneda es EUR POR CONTRATO (VeriFactu, fiscalidad ES).
+  assert.equal(eurosToCents('2.20'), majorToMinor('2.20', 2));
 });
