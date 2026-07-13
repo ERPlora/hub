@@ -460,6 +460,23 @@ pub struct CommandDef {
     /// (se compila una vez al instalar y se cachea en el `Registry`). §5.2, hub#27.
     #[serde(default)]
     pub schema: Option<String>,
+    /// **Lecturas PRE-CARGADAS** que el runtime le entrega al handler antes de invocarlo
+    /// (ADR-0069): nombres de query cuyas filas aterrizan en `context.reads["<query>"]`.
+    ///
+    /// Existe porque el handler WASM corre en un **sandbox** y no puede leer la BD. Sin esto, un
+    /// handler solo sabe lo que le cuenta el cliente — y eso es exactamente cómo el navegador
+    /// acababa decidiendo **el IVA que se le declara a la AEAT**: `sales.complete_sale` recibía el
+    /// `tax_rate` de cada línea en el payload y se fiaba. Con `reads`, el handler resuelve el % del
+    /// **catálogo de confianza del hub** (`taxes.rules.list`) y la pista del cliente pasa a ser solo
+    /// un fallback.
+    ///
+    /// **Alcance**: queries del propio módulo o de los declarados en `depends_on`. Se gatea por la
+    /// DEPENDENCIA, no por el permiso del usuario: el permiso del command ya se comprobó y las reads
+    /// son contrato *vouched* por el autor del módulo (un empleado de POS sin `taxes.view_tax` igual
+    /// necesita los tipos para cobrar). Una read que falle se **omite**: cobrar es lo último que
+    /// puede romperse en un TPV.
+    #[serde(default)]
+    pub reads: Vec<String>,
     #[serde(default)]
     pub emit: Vec<String>,
     /// Handler de lógica: Tier 2 (WASM sandbox) o **plugin nativo first-party**

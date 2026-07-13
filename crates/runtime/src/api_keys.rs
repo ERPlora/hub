@@ -359,6 +359,7 @@ mod tests {
     fn command_def(permission: &str, expose: bool) -> CommandDef {
         CommandDef {
             permission: permission.to_string(),
+            reads: Vec::new(),
             transaction: false,
             sql: vec![],
             schema: None,

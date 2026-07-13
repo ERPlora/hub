@@ -388,6 +388,17 @@ pub struct RequestContext {
     /// `:has_certificate` (0/1) para que los módulos con capability `certificate` (p.ej. verifactu)
     /// muestren el estado SIN leer la tabla de sistema directamente.
     pub has_certificate: bool,
+    /// **IDENTIDAD FISCAL del hub** (`hub_settings.country_code` / `region_code` — ADR-0085). La
+    /// inyecta el dispatcher junto a la identidad de negocio.
+    ///
+    /// Es la mitad de la clave con la que el SERVIDOR resuelve el impuesto de una venta: una regla
+    /// fiscal es `(country_code, region_code, tax_category_key) → rate_pct`. Sin el país del hub,
+    /// ninguna regla casa y el handler cae a su fallback… que es la pista del cliente. O sea: sin
+    /// esto, **el navegador decide el IVA que se le declara a la AEAT**.
+    pub country_code: String,
+    /// Subdivisión ISO-3166-2 (`ES-CN`…) o vacío = todo el país. Una regla con región gana a la del
+    /// país (Canarias/IGIC, Ceuta y Melilla/IPSI).
+    pub region_code: String,
 }
 
 impl RequestContext {
@@ -400,6 +411,8 @@ impl RequestContext {
             hub_id: hub_id.into(),
             user_id: user_id.into(),
             permissions: permissions.into_iter().collect(),
+            country_code: String::new(),
+            region_code: String::new(),
             business_tax_id: String::new(),
             business_legal_name: String::new(),
             business_address: String::new(),
@@ -418,6 +431,18 @@ impl RequestContext {
         self.business_tax_id = tax_id.into();
         self.business_legal_name = legal_name.into();
         self.business_address = address.into();
+        self
+    }
+
+    /// Fija la **identidad fiscal** del hub (país/región, ADR-0085). Es lo que permite al servidor
+    /// resolver el impuesto contra el catálogo en vez de creerse el % que le mande el cliente.
+    pub fn with_fiscal(
+        mut self,
+        country_code: impl Into<String>,
+        region_code: impl Into<String>,
+    ) -> Self {
+        self.country_code = country_code.into();
+        self.region_code = region_code.into();
         self
     }
 

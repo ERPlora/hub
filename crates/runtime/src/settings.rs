@@ -49,6 +49,26 @@ const KNOWN: &[Setting] = &[
         validate: validate_currency,
         parse_stored: |s| json!(s),
     },
+    // IDENTIDAD FISCAL DEL HUB (ADR-0085): vive aquí, en el core, NO en el módulo `taxes`.
+    //
+    // Es lo que le permite al servidor resolver el IVA de una venta contra el catálogo: una regla
+    // fiscal es `(country_code, region_code, tax_category_key) → rate_pct`, así que sin el país del
+    // hub el runtime no puede casar ninguna regla… y el handler cae al fallback, que es la pista
+    // del cliente. O sea: **sin esto, el navegador decide el IVA que se declara a la AEAT**.
+    Setting {
+        key: "country_code",
+        default: || json!("ES"),
+        validate: validate_country,
+        parse_stored: |s| json!(s),
+    },
+    // Región/comunidad (`ES-MD`, `ES-CN`…). `null` = todo el país (el caso normal). Existe porque
+    // hay regímenes con tipos propios (Canarias/IGIC, Ceuta y Melilla/IPSI).
+    Setting {
+        key: "region_code",
+        default: || Value::Null,
+        validate: validate_region,
+        parse_stored: |s| if s.is_empty() { Value::Null } else { json!(s) },
+    },
     // Los decimales de la moneda. `null` = «resuélvelos del registro ISO-4217» (el caso normal);
     // un número = el hub los declara a mano, para una moneda que el registro no conoce.
     Setting {
@@ -111,6 +131,46 @@ fn validate_currency(v: &Value) -> std::result::Result<String, String> {
     erplora_guest_sdk::currency::normalize_code(s).ok_or_else(|| {
         format!("moneda inválida `{s}`: se espera un código ISO-4217 de 3 letras (p. ej. EUR)")
     })
+}
+
+/// `country_code`: ISO-3166-1 alpha-2 (`ES`, `FR`, `PT`…). Se normaliza a MAYÚSCULAS.
+///
+/// Es la mitad de la clave con la que se resuelve el impuesto (`country + region + categoría` →
+/// `rate_pct`, ADR-0085). Sin él, ninguna regla fiscal casa.
+fn validate_country(v: &Value) -> std::result::Result<String, String> {
+    let s = v.as_str().ok_or("debe ser un string ISO-3166 de 2 letras (p. ej. \"ES\")")?;
+    let up = s.trim().to_ascii_uppercase();
+    if up.len() == 2 && up.chars().all(|c| c.is_ascii_alphabetic()) {
+        Ok(up)
+    } else {
+        Err(format!("país inválido `{s}`: se espera ISO-3166-1 alpha-2 (p. ej. ES)"))
+    }
+}
+
+/// `region_code`: subdivisión ISO-3166-2 (`ES-MD`, `ES-CN`…) o vacío/`null` = todo el país.
+///
+/// Existe porque hay regímenes con tipos propios (Canarias/IGIC, Ceuta y Melilla/IPSI): una regla
+/// con región gana a la del país (ADR-0085).
+fn validate_region(v: &Value) -> std::result::Result<String, String> {
+    match v {
+        Value::Null => Ok(String::new()),
+        Value::String(s) if s.trim().is_empty() => Ok(String::new()),
+        Value::String(s) => {
+            let up = s.trim().to_ascii_uppercase();
+            // `XX-YYY`: país + subdivisión.
+            let ok = up.len() >= 4
+                && up.len() <= 6
+                && up.as_bytes()[2] == b'-'
+                && up[..2].chars().all(|c| c.is_ascii_alphabetic())
+                && up[3..].chars().all(|c| c.is_ascii_alphanumeric());
+            if ok {
+                Ok(up)
+            } else {
+                Err(format!("región inválida `{s}`: se espera ISO-3166-2 (p. ej. ES-CN) o vacío"))
+            }
+        }
+        _ => Err("debe ser un string ISO-3166-2 (p. ej. \"ES-CN\") o null".to_string()),
+    }
 }
 
 /// `currency_decimals`: cuántos decimales tiene la moneda del hub.
