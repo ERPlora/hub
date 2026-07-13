@@ -174,3 +174,31 @@ async fn eq_filter_on_is_active() {
     assert_eq!(inactive.total, 1);
     assert_eq!(inactive.rows[0]["name"], json!("B"));
 }
+
+// ── el `limit` que pides es el `limit` que recibes ──────────────────────────────────────────
+//
+// Había un tope duro `MAX_LIMIT = 500` que hacía `limit.clamp(1, 500)`. Un hub con 800 productos
+// pedía 800, recibía 500, y NADIE se enteraba: la respuesta no dice «te he truncado». Un tope que
+// miente es peor que no tener tope — es el mismo fallo por el que un TPV solo vendía 50 platos.
+//
+// Contrato: el servidor devuelve lo que le pides. El que sabe cuántas filas necesita es quien
+// llama (un TPV necesita TODOS sus productos; una tabla, una página).
+#[tokio::test]
+async fn un_hub_con_800_productos_los_ve_los_800() {
+    let productos: Vec<(String, f64)> = (0..800).map(|i| (format!("Producto {i:03}"), 1.0)).collect();
+    let refs: Vec<(&str, f64)> = productos.iter().map(|(n, p)| (n.as_str(), *p)).collect();
+    let rt = fresh_with_products(&refs).await;
+
+    let page = rt
+        .execute_query_page("inventory.products.list", &params(json!({"limit": 800})), &ctx())
+        .await
+        .expect("la query no falla");
+
+    assert_eq!(page.total, 800, "el total anunciado son 800");
+    assert_eq!(
+        page.rows.len(),
+        800,
+        "pedí 800 filas y me tienen que llegar 800 — no 500 y a callar"
+    );
+    assert_eq!(page.limit, 800, "el `limit` que devuelve el sobre es el que pedí");
+}

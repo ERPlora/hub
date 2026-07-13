@@ -76,6 +76,10 @@ pub(crate) async fn execute_at(
                 get("business_legal_name"),
                 get("business_address"),
             )
+            // IDENTIDAD FISCAL (ADR-0085): el país/región del hub. Es la mitad de la clave con la
+            // que el SERVIDOR resuelve el impuesto contra el catálogo — sin ella, ninguna regla
+            // casa y el handler se cree el % que le mande el cliente.
+            .with_fiscal(get("country_code"), get("region_code"))
             .with_certificate(has_cert);
         &enriched_ctx
     } else {
@@ -158,6 +162,78 @@ pub(crate) async fn execute_at(
 
 /// Ejecuta un command Tier 2: invoca el handler WASM, valida cada intención y
 /// aplica todas las operaciones + el `emit` del command en una sola transacción.
+/// Ejecuta las **lecturas pre-cargadas** que el command declara (`reads`) y las devuelve como
+/// `{ "<query>": [ …filas… ] }` para inyectarlas en `context.reads` del handler (ADR-0069 §1).
+///
+/// # Por qué existe
+///
+/// El handler WASM corre en un **sandbox**: no puede tocar la BD. Sin este mecanismo, un handler
+/// solo sabe lo que le cuenta el cliente — y así es como el navegador acababa decidiendo **el IVA
+/// que se le declara a la AEAT**: `sales.complete_sale` recibía el `tax_rate` de cada línea en el
+/// payload y se lo creía. Con `reads`, el handler resuelve el % contra `taxes.rules.list` (el
+/// catálogo del hub) y la pista del cliente queda como mero fallback.
+///
+/// # Las tres reglas (ADR-0069 §1)
+///
+/// 1. **Alcance por DEPENDENCIA, no por permiso.** Solo queries del propio módulo o de los que
+///    declara en `depends_on`. Un módulo no puede leerle las tablas a otro con el que no tiene
+///    contrato — la lista de queries permitidas la fija el manifest, no el caller.
+/// 2. **Contexto de SISTEMA.** No se re-gatea por el permiso del usuario: el permiso del *command*
+///    ya se comprobó, y las reads son contrato vouched por el autor del módulo. Un empleado de POS
+///    sin `taxes.view_tax` igual necesita los tipos para poder cobrar. Se conserva el `hub_id` del
+///    caller (el tenant NO es negociable) y se usa el wildcard de permisos.
+/// 3. **Fallo GRACEFUL.** Una read que no resuelve se **omite** (no aborta el command). Cobrar es
+///    lo último que puede romperse en un TPV: si `taxes` está raro, el handler degrada a su
+///    fallback, pero la venta se cierra.
+async fn preload_reads(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    cmd: &RegisteredCommand,
+    ctx: &RequestContext,
+) -> Json {
+    if cmd.def.reads.is_empty() {
+        return Json::Object(Default::default());
+    }
+
+    // Regla 1 — alcance: el propio módulo + sus `depends_on` declarados en el manifest.
+    let deps: Vec<String> = registry
+        .installed
+        .iter()
+        .find(|m| m.id == cmd.module_id)
+        .map(|m| m.depends_on.clone())
+        .unwrap_or_default();
+    let allowed: Vec<&str> = std::iter::once(cmd.module_id.as_str())
+        .chain(deps.iter().map(|s| s.as_str()))
+        .collect();
+
+    // Regla 2 — contexto de sistema: mismo `hub_id` (el tenant NO se negocia), permisos wildcard.
+    let sys = RequestContext::new(&ctx.hub_id, &ctx.user_id, ["*".to_string()]);
+
+    let mut out = serde_json::Map::new();
+    for name in &cmd.def.reads {
+        let owner = name.split('.').next().unwrap_or("");
+        if !allowed.contains(&owner) {
+            // No es un error del caller: es un manifest mal declarado. Se avisa y se omite —
+            // el módulo no puede leer lo que no declaró como dependencia.
+            eprintln!(
+                "⚠ reads: `{}` declara `{name}`, pero `{owner}` no está en su depends_on → omitida",
+                cmd.module_id
+            );
+            continue;
+        }
+        // Regla 3 — graceful: si la query falla (no existe, SQL roto, tabla ausente), se omite.
+        match crate::queries::execute(db, registry, name, &Params::new(), &sys).await {
+            Ok(rows) => {
+                out.insert(name.clone(), Json::Array(rows));
+            }
+            Err(e) => {
+                eprintln!("⚠ reads: `{name}` falló ({e}) → se omite; el handler degradará");
+            }
+        }
+    }
+    Json::Object(out)
+}
+
 async fn execute_wasm(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
@@ -184,6 +260,10 @@ async fn execute_wasm(
     let new_ids: Vec<Json> = (0..NEW_IDS_BATCH)
         .map(|_| Json::String(crate::registry::new_id()))
         .collect();
+    // LECTURAS PRE-CARGADAS (ADR-0069). El handler corre en un sandbox y NO puede leer la BD, así
+    // que sin esto solo sabe lo que le cuenta el cliente. Aquí el host le entrega el **catálogo de
+    // confianza del hub**.
+    let reads = preload_reads(db, registry, cmd, ctx).await;
     let input = json!({
         "payload": Json::Object(bound_payload),
         "context": {
@@ -191,6 +271,11 @@ async fn execute_wasm(
             "current_user_id": ctx.user_id,
             "now": crate::registry::now_rfc3339(),
             "new_ids": new_ids,
+            // Identidad fiscal del hub: con esto + `reads`, el handler resuelve el impuesto contra
+            // el catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
+            "country_code": ctx.country_code,
+            "region_code": ctx.region_code,
+            "reads": reads,
         },
     });
 
@@ -352,6 +437,7 @@ mod tests {
     fn cmd_def() -> CommandDef {
         CommandDef {
             permission: String::new(),
+            reads: Vec::new(),
             transaction: true,
             sql: vec!["INSERT INTO x VALUES (1);".to_string()],
             emit: vec![],

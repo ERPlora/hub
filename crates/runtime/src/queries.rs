@@ -14,8 +14,6 @@ use crate::manifest::{FilterOp, ListSpec};
 use crate::permissions;
 use crate::registry::{Registry, RequestContext};
 
-/// Tope duro de `limit` (defensa: una página no puede pedir filas ilimitadas).
-const MAX_LIMIT: u64 = 500;
 
 /// Resultado de una query de lista: la página de filas + el total filtrado (para el pager).
 /// Es lo que viaja en `data` del envelope para queries paginadas (§7.6, §8.2).
@@ -128,11 +126,12 @@ async fn run_list(
     };
 
     // ── límite / offset ────────────────────────────────────────────────────────────────────
-    let limit = p
-        .get("limit")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(spec.page_size)
-        .clamp(1, MAX_LIMIT);
+    // El `limit` que pides es el que recibes. Aquí hubo un tope duro (`clamp(1, 500)`) y era un
+    // fallo, no una defensa: un hub con 800 productos pedía 800, recibía 500, y la respuesta no
+    // decía nada — el TPV se quedaba sin la mitad del catálogo en silencio. Quien sabe cuántas
+    // filas necesita es quien llama (una tabla quiere una página; un TPV quiere TODO su catálogo).
+    // Sin `limit`, manda el `page_size` que el módulo declara en su manifest.
+    let limit = p.get("limit").and_then(|v| v.as_u64()).unwrap_or(spec.page_size);
     let offset = p.get("offset").and_then(|v| v.as_u64()).unwrap_or(0);
     p.insert("limit".into(), json!(limit));
     p.insert("offset".into(), json!(offset));

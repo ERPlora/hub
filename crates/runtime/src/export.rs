@@ -161,9 +161,21 @@ pub async fn export_hub(
             if table_owner(table, &installed_ids).as_deref() != Some(m.module_id.as_str()) {
                 continue;
             }
-            // Solo filas del tenant; una tabla sin columna hub_id (fuera del contrato de fila)
-            // no es por-tenant → se salta.
-            let Ok(rows) = fetch_rows(db, table, Some(hub_id)).await else { continue };
+            // La mayoría de tablas llevan `hub_id` (contrato de fila §2.5) → se acotan por él.
+            // Las tablas de VÍNCULO (M2M) son joins puros SIN `hub_id` (`inventory_product_
+            // categories`, `customers_customer_{groups,tags}`): antes se saltaban en silencio y
+            // el bundle perdía la categoría de cada producto. Se vuelcan acotadas por su tabla
+            // PADRE a través de la FK DECLARADA (metadato de la BD, no adivinar nombres).
+            let rows = if has_column(db, table, "hub_id").await {
+                fetch_rows(db, table, Some(hub_id)).await.unwrap_or_default()
+            } else {
+                match fetch_join_rows(db, table, hub_id).await {
+                    Some(rows) => rows,
+                    // Sin `hub_id` y sin FK a un padre con `hub_id` no hay forma de acotar el
+                    // tenant: no se vuelca (volcarla entera filtraría datos de otros hubs).
+                    None => continue,
+                }
+            };
             sql.push_str(&rows_to_sql(table, &rows, hub_id));
         }
         files.insert(format!("data/{}.sql", m.module_id), sql.into_bytes());
@@ -221,6 +233,99 @@ fn table_owner(table: &str, installed_ids: &[String]) -> Option<String> {
         .filter(|id| table == id.as_str() || table.starts_with(&format!("{id}_")))
         .max_by_key(|id| id.len())
         .cloned()
+}
+
+/// Nombre de tabla/columna seguro para interpolar (vienen del CATÁLOGO de la BD, no del usuario;
+/// el guardarraíl es defensivo por si un módulo declara algo raro).
+fn safe_ident(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// ¿`table` tiene la columna `col`? (catálogo por dialecto).
+async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str, col: &str) -> bool {
+    if !safe_ident(table) {
+        return false;
+    }
+    let sql = match db.dialect() {
+        erplora_db::Dialect::Sqlite => format!("SELECT name FROM pragma_table_info('{table}')"),
+        erplora_db::Dialect::Postgres => format!(
+            "SELECT column_name AS name FROM information_schema.columns \
+             WHERE table_schema = 'public' AND table_name = '{table}'"
+        ),
+    };
+    let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else { return false };
+    res.rows
+        .iter()
+        .filter_map(|r| r.get("name").and_then(|n| n.as_str()))
+        .any(|n| n == col)
+}
+
+/// Una FK declarada por la tabla: `from` (columna local) → `parent`.`to`.
+struct ForeignKey {
+    from: String,
+    parent: String,
+    to: String,
+}
+
+/// FKs declaradas de `table`, leídas del catálogo de la BD (no se infieren por nombre).
+async fn foreign_keys(db: &dyn erplora_db::DatabaseAdapter, table: &str) -> Vec<ForeignKey> {
+    if !safe_ident(table) {
+        return Vec::new();
+    }
+    let sql = match db.dialect() {
+        // `pragma_foreign_key_list` como tabla-función: columnas `from`/`to`/`table`.
+        erplora_db::Dialect::Sqlite => format!(
+            "SELECT \"from\" AS col_from, \"to\" AS col_to, \"table\" AS parent \
+             FROM pragma_foreign_key_list('{table}')"
+        ),
+        erplora_db::Dialect::Postgres => format!(
+            "SELECT kcu.column_name AS col_from, ccu.column_name AS col_to, \
+                    ccu.table_name AS parent \
+             FROM information_schema.table_constraints tc \
+             JOIN information_schema.key_column_usage kcu \
+               ON kcu.constraint_name = tc.constraint_name \
+             JOIN information_schema.constraint_column_usage ccu \
+               ON ccu.constraint_name = tc.constraint_name \
+             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = '{table}'"
+        ),
+    };
+    let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else { return Vec::new() };
+    res.rows
+        .iter()
+        .filter_map(|r| {
+            let from = r.get("col_from")?.as_str()?.to_string();
+            let parent = r.get("parent")?.as_str()?.to_string();
+            // En SQLite `to` puede venir NULL → referencia implícita a la PK del padre (`id`).
+            let to = r.get("col_to").and_then(|v| v.as_str()).unwrap_or("id").to_string();
+            (safe_ident(&from) && safe_ident(&parent) && safe_ident(&to))
+                .then_some(ForeignKey { from, parent, to })
+        })
+        .collect()
+}
+
+/// Filas de una tabla de VÍNCULO (sin `hub_id` propio) acotadas al tenant a través de la primera
+/// FK cuyo PADRE sí lleva `hub_id`. `None` = no hay por dónde acotar → el llamador no la vuelca.
+async fn fetch_join_rows(
+    db: &dyn erplora_db::DatabaseAdapter,
+    table: &str,
+    hub_id: &str,
+) -> Option<Vec<serde_json::Value>> {
+    for fk in foreign_keys(db, table).await {
+        if !has_column(db, &fk.parent, "hub_id").await {
+            continue;
+        }
+        let (parent, to, from) = (&fk.parent, &fk.to, &fk.from);
+        let sql = format!(
+            "SELECT t.* FROM {table} t WHERE EXISTS \
+             (SELECT 1 FROM {parent} p WHERE p.{to} = t.{from} AND p.hub_id = :hub_id)"
+        );
+        let mut p = erplora_db::Params::new();
+        p.insert("hub_id".into(), serde_json::Value::String(hub_id.to_string()));
+        if let Ok(res) = db.query(&sql, &p).await {
+            return Some(res.rows);
+        }
+    }
+    None
 }
 
 /// Filas de `table` (opcionalmente scoped por hub_id), sin las soft-deleted.
@@ -281,7 +386,12 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
                 }
             })
             .collect();
-        let col_list = cols.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(", ");
+        // Identificadores ENTRECOMILLADOS (comillas dobles = SQL estándar, válidas en SQLite y en
+        // Postgres). Sin esto, una columna que sea PALABRA RESERVADA revienta el INSERT al
+        // importar: `inventory_category`/`staff_role` tienen una columna `order` y el bundle
+        // aterrizaba con «near "order": syntax error» — perdiendo la sección ENTERA (el módulo se
+        // aplica en bloque), así que 19 categorías + 280 productos se quedaban en nada.
+        let col_list = cols.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ");
         let val_list = vals.join(", ");
         // Guard NOT EXISTS por (id, hub_id) cuando hay `id` (contrato de fila): re-importar el
         // mismo bundle no duplica. Sin `id` (p.ej. hub_settings, PK compuesta) → guard por PK real.
@@ -293,16 +403,39 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
                 format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE id = {id_lit})")
             }
         } else if table == "hub_settings" && obj.contains_key("key") {
+            // `key` también es palabra reservada en algunos dialectos → entrecomillada.
             let key_lit = sql_literal(&obj["key"]);
-            format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE key = {key_lit} AND hub_id = '{HUB_ID_PLACEHOLDER}')")
+            format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE \"key\" = {key_lit} AND hub_id = '{HUB_ID_PLACEHOLDER}')")
         } else {
-            String::new()
+            // Sin `id`: tablas de VÍNCULO (M2M), donde la PK ES la tupla entera. La guarda va por
+            // todas las columnas → re-aplicar el bundle no duplica (mismo contrato idempotente).
+            let conds: Vec<String> = cols
+                .iter()
+                .zip(vals.iter())
+                .map(|(c, v)| {
+                    let col = quote_ident(c);
+                    if v == "NULL" {
+                        format!("{col} IS NULL")
+                    } else {
+                        format!("{col} = {v}")
+                    }
+                })
+                .collect();
+            format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE {})", conds.join(" AND "))
         };
         out.push_str(&format!("INSERT INTO {table} ({col_list}) SELECT {val_list}{guard};\n"));
     }
     // El barrido anti-fuga del hub_id de ORIGEN va ya POR COLUMNA arriba (respetando id y
     // auditoría), no con un replace ciego sobre todo el SQL.
     out
+}
+
+/// Entrecomilla un identificador (columna) con comillas dobles — SQL estándar, lo entienden tanto
+/// SQLite como Postgres. Es lo que permite volcar columnas cuyo nombre es una PALABRA RESERVADA
+/// (`order`, `key`…). Los nombres salen del catálogo de la BD, pero se escapa la comilla doble por
+/// si acaso (defensivo: nunca se construye SQL con texto del usuario).
+fn quote_ident(name: &str) -> String {
+    format!("\"{}\"", name.replace('"', "\"\""))
 }
 
 /// Literal SQL portable a partir de un valor JSON (escape de comillas simples).

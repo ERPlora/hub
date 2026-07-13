@@ -228,6 +228,59 @@ async fn deselected_sections_are_absent() {
     }
 }
 
+/// Las tablas de VÍNCULO (M2M) son joins puros SIN `hub_id` propio (`inventory_product_categories`,
+/// `customers_customer_{groups,tags}`). El export las saltaba en silencio —«sin hub_id no es
+/// por-tenant»— así que un blueprint (y, con el mismo motor, un BACKUP) perdía la categoría de cada
+/// producto: 280 productos aterrizaban sin categoría, el TPV sin pestañas y el KDS sin enrutar.
+/// Contrato: se vuelcan, y se acotan al hub por la **FK declarada** hacia su tabla padre (que sí
+/// lleva `hub_id`) — no por adivinar nombres de columna.
+#[tokio::test]
+async fn join_tables_without_hub_id_are_exported_scoped_by_their_parent() {
+    let rt = fresh().await;
+
+    // Dos hubs con su propia categoría + producto ligados entre sí.
+    for (hub, sku, cat) in [("h1", "CAF", "Cafés"), ("h2", "TEA", "Tés")] {
+        create_product(&rt, hub, "Producto", sku).await;
+        rt.execute_command(
+            "inventory.categories.create",
+            &params(json!({ "name": cat, "slug": cat, "icon": "cube-outline",
+                            "color": "#3880ff", "description": "", "order": 0 })),
+            &ctx(hub),
+        )
+        .await
+        .unwrap();
+        let prods = rt.execute_query("inventory.products.list", &Params::new(), &ctx(hub)).await.unwrap();
+        let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx(hub)).await.unwrap();
+        rt.execute_command(
+            "inventory.products.add_category",
+            &params(json!({
+                "product_id": prods[0]["id"].as_str().unwrap(),
+                "category_id": cats[0]["id"].as_str().unwrap(),
+            })),
+            &ctx(hub),
+        )
+        .await
+        .unwrap();
+    }
+
+    let bundle = export_hub(&rt, "h1", &full_selection(), "restaurante", "es", CREATED_AT)
+        .await
+        .expect("export");
+    let sql = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
+
+    assert!(
+        sql.contains("INSERT INTO inventory_product_categories"),
+        "el vínculo producto↔categoría no viaja en el bundle:\n{sql}"
+    );
+    // Aislamiento de tenant: solo el vínculo de h1 (el de h2 tiene otros ids).
+    let vinculos = sql.matches("INSERT INTO inventory_product_categories").count();
+    assert_eq!(vinculos, 1, "esperado 1 vínculo (el de h1), hay {vinculos}:\n{sql}");
+    // Idempotencia: re-aplicar el bundle no puede duplicar (PK compuesta, sin columna `id`).
+    for line in sql.lines().filter(|l| l.contains("inventory_product_categories")) {
+        assert!(line.contains("WHERE NOT EXISTS"), "vínculo sin guarda de idempotencia: {line}");
+    }
+}
+
 #[tokio::test]
 async fn sha256_covers_exactly_the_bundle_files() {
     let rt = fresh().await;

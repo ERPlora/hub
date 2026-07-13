@@ -340,6 +340,7 @@ mod tests {
             module_id: module.to_string(),
             def: CommandDef {
                 permission: String::new(),
+                reads: Vec::new(),
                 transaction: true,
                 sql: vec![sql.to_string()],
                 emit,

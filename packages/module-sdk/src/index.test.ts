@@ -340,3 +340,88 @@ test('eurosToCents sigue existiendo, y es majorToMinor con escala 2', () => {
   // Se conserva para los sitios donde la moneda es EUR POR CONTRATO (VeriFactu, fiscalidad ES).
   assert.equal(eurosToCents('2.20'), majorToMinor('2.20', 2));
 });
+
+// ── queryAll: TODAS las filas, paginando por dentro ──────────────────────────
+//
+// Por qué existe: el runtime tiene un tope duro por request (`MAX_LIMIT = 500`) y, si no le mandas
+// `limit`, cae al `page_size` que declara el manifest (50 por defecto). Un TPV no quiere "una
+// página": quiere TODOS sus productos, y un desplegable de IVA TODAS las categorías. La forma en
+// que las vistas intentaban pedir eso era `query(name, { page_size: 200 })` — y `page_size` NO ES
+// UN PARÁMETRO del runtime, así que se ignoraba en silencio y llegaban 50. Un restaurante con 80
+// platos solo podía vender 50: los otros 30 no existían en el TPV.
+//
+// `queryAll` no lleva número mágico: itera limit/offset hasta agotar `total`.
+
+/** Transporte que simula una query de lista de `total` filas, respetando limit/offset. */
+function transporteDeLista(total: number, registro: unknown[] = []) {
+  return {
+    query: async (name: string, params?: Record<string, unknown>) => {
+      registro.push({ name, ...params });
+      const limit = Number(params?.limit ?? 50); // sin `limit` → page_size del manifest
+      const offset = Number(params?.offset ?? 0);
+      const rows = Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, i) => ({
+        id: `p${offset + i}`,
+      }));
+      return { rows, total, limit, offset };
+    },
+    command: async () => ({}),
+    subscribe: () => () => {},
+  };
+}
+
+test('queryAll devuelve TODAS las filas: sin tope', async () => {
+  const llamadas: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(1234, llamadas));
+
+  const rows = await c.queryAll<{ id: string }>('inventory.products.list');
+
+  assert.equal(rows.length, 1234, 'un hub con 1234 productos los ve los 1234');
+  assert.equal(rows[0].id, 'p0');
+  assert.equal(rows[1233].id, 'p1233', 'la última fila también llega');
+  assert.equal(llamadas.length, 2, 'una página para saber el total + una para pedirlo entero');
+  assert.equal(llamadas[1].limit, 1234, 'pide el total EXACTO, no un número cableado a ojo');
+});
+
+test('queryAll no manda nunca `page_size` (no es un parámetro del runtime)', async () => {
+  const llamadas: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(10, llamadas));
+
+  await c.queryAll('taxes.categories.list', { sort: 'name', dir: 'asc' });
+
+  assert.equal(llamadas[0].page_size, undefined, 'page_size sería ignorado por el runtime');
+  assert.equal(llamadas[0].sort, 'name', 'los filtros del llamador se conservan');
+});
+
+test('queryAll con `limit` explícito respeta ESE tope (el llamador manda)', async () => {
+  const llamadas: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(1000, llamadas));
+
+  const rows = await c.queryAll('customers.list', { limit: 20, search: 'ana' });
+
+  assert.equal(rows.length, 20, 'pidió 20 (typeahead): le llegan 20, no los 1000');
+  assert.equal(llamadas.length, 1, 'un solo viaje: no hace falta ir a por el resto');
+  assert.equal(llamadas[0].limit, 20);
+});
+
+test('queryAll cabe en un viaje si la primera página ya lo trae todo', async () => {
+  const llamadas: unknown[] = [];
+  const c = new ErploraClient(transporteDeLista(8, llamadas));
+  assert.equal((await c.queryAll('taxes.categories.list')).length, 8);
+  assert.equal(llamadas.length, 1, '8 categorías caben en la primera página: no hay segundo viaje');
+});
+
+test('queryAll con una lista vacía devuelve [] sin girar en vacío', async () => {
+  const llamadas: unknown[] = [];
+  const c = new ErploraClient(transporteDeLista(0, llamadas));
+  assert.deepEqual(await c.queryAll('inventory.products.list'), []);
+  assert.equal(llamadas.length, 1, 'un solo viaje, no un bucle infinito');
+});
+
+test('queryAll tolera una query que NO es de lista (devuelve el array tal cual)', async () => {
+  const c = new ErploraClient({
+    query: async () => [{ id: 'a' }, { id: 'b' }], // sin sobre {rows,total}
+    command: async () => ({}),
+    subscribe: () => () => {},
+  });
+  assert.deepEqual(await c.queryAll('taxes.rules.list'), [{ id: 'a' }, { id: 'b' }]);
+});

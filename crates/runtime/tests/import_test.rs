@@ -128,6 +128,53 @@ async fn round_trip_restores_equivalent_state_under_target_hub_id() {
     assert!(leaked.is_empty(), "filas importadas bajo el hub_id de origen: {leaked:?}");
 }
 
+/// Round-trip con una columna que es PALABRA RESERVADA de SQL (`order`, en `inventory_category` y
+/// `staff_role`). El export escribía la lista de columnas SIN comillas → `INSERT INTO
+/// inventory_category (…, order, …)` reventaba con «syntax error» al importar, y como la sección se
+/// aplica en bloque se perdía el módulo ENTERO: un blueprint de 19 categorías + 280 productos
+/// aterrizaba VACÍO. El round-trip de arriba no lo cazaba porque solo exporta productos, cuya tabla
+/// no tiene ninguna columna reservada.
+#[tokio::test]
+async fn round_trip_survives_reserved_word_columns() {
+    let a = fresh().await;
+    a.execute_command(
+        "inventory.categories.create",
+        &params(json!({ "name": "Cafés e infusiones", "slug": "cafes", "icon": "cafe-outline",
+                        "color": "#3880ff", "description": "", "order": 3 })),
+        &ctx("h1"),
+    )
+    .await
+    .expect("crear categoría en A");
+    create_product(&a, "h1", "Café", "CAF").await;
+
+    let bundle = export_hub(&a, "h1", &full_selection(), "restaurante", "es", CREATED_AT)
+        .await
+        .expect("export A");
+
+    let mut b = fresh().await;
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("import en B");
+
+    let r = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .expect("sin resultado para modules/inventory");
+    assert!(matches!(r.status, SectionStatus::Applied), "inventory no aplicada: {:?}", r.status);
+
+    let cats = b
+        .execute_query("inventory.categories.list", &Params::new(), &ctx("h2"))
+        .await
+        .unwrap();
+    assert_eq!(cats.len(), 1, "la categoría con la columna reservada `order` no sobrevivió");
+    assert_eq!(cats[0]["name"], json!("Cafés e infusiones"));
+    assert_eq!(cats[0]["order"], json!(3), "el valor de la columna reservada se perdió");
+
+    // Y los productos del mismo módulo siguen ahí (la sección no se cayó entera).
+    assert_eq!(product_names(&b, "h2").await, vec!["Café".to_string()]);
+}
+
 #[tokio::test]
 async fn unselected_sections_are_skipped() {
     let bundle = exported_bundle().await;
