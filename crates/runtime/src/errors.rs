@@ -17,6 +17,11 @@ pub enum RuntimeError {
     /// módulo, sin tragarse contratos rotos (ADR-0127).
     #[error("módulo no instalado: `{module}` (requerido por `{operation}`)")]
     ModuleNotInstalled { module: String, operation: String },
+    /// El módulo está instalado pero DESACTIVADO (manual o en cascada, ADR-0128). Para
+    /// `queryOptional` equivale a ausencia; un consumidor obligatorio nunca pregunta, porque la
+    /// cascada lo apagó junto a su dependencia.
+    #[error("módulo desactivado: `{module}` (requerido por `{operation}`)")]
+    ModuleInactive { module: String, operation: String },
     #[error("command no encontrado: {0}")]
     CommandNotFound(String),
     #[error("permiso denegado: requiere `{0}`")]

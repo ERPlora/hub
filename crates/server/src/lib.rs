@@ -1249,6 +1249,7 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
         // ADR-0127: `queryOptional` del SDK devuelve `undefined` SOLO con este código; un
         // `not_found` normal (contrato roto contra un módulo presente) sigue siendo un error.
         E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed"),
+        E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive"),
         E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload"),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
         _ => (StatusCode::BAD_REQUEST, "error"),

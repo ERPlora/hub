@@ -472,3 +472,10 @@ test('queryOptional con el módulo presente devuelve los datos tal cual (desenvu
   });
   assert.deepEqual(await c.queryOptional('verifactu.records.by_invoice'), [{ id: 'r1' }]);
 });
+
+test('queryOptional también trata module_inactive como ausencia (cascada ADR-0128)', async () => {
+  // Un módulo DESACTIVADO (manual o arrastrado) equivale a ausente para un consumidor opcional:
+  // el obligatorio nunca llega a preguntar, porque la cascada lo apagó junto a su dependencia.
+  const c = new ErploraClient(transporteQueFalla('module_inactive'));
+  assert.equal(await c.queryOptional('verifactu.records.by_invoice'), undefined);
+});

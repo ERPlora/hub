@@ -539,7 +539,9 @@ export class ErploraClient {
     try {
       return await this.query<T>(name, params);
     } catch (e) {
-      if (e instanceof ErploraError && e.code === 'module_not_installed') return undefined;
+      // `module_inactive` (cascada ADR-0128) equivale a ausencia: un módulo desactivado no está
+      // disponible, y el consumidor OBLIGATORIO nunca pregunta (la cascada lo apagó con su dep).
+      if (e instanceof ErploraError && (e.code === 'module_not_installed' || e.code === 'module_inactive')) return undefined;
       throw e;
     }
   }

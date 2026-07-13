@@ -40,11 +40,12 @@ async fn deactivate_hides_menu_and_blocks_capabilities() {
     // inactivo → sin menú, query/command devuelven NotFound (no existen para el caller)
     assert_eq!(rt.modules()[0].status, ModuleStatus::Inactive);
     assert_eq!(rt.navigation().len(), 0, "el menú no debe mostrar módulos inactivos");
-    // Desactivado ≠ desinstalado: el módulo SIGUE en el hub (sus datos y su manifest están), solo
-    // que inactivo — así que la query "no se encuentra", no "el módulo no está instalado".
+    // Desactivado ≠ desinstalado ≠ contrato roto (ADR-0128): el módulo SIGUE en el hub (datos y
+    // manifest presentes) pero no disponible — su error propio permite a `queryOptional` tratarlo
+    // como ausencia sin tragarse queries inexistentes de módulos activos.
     assert!(matches!(
         rt.execute_query("inventory.products.list", &Params::new(), &ctx()).await.unwrap_err(),
-        RuntimeError::QueryNotFound(_)
+        RuntimeError::ModuleInactive { .. }
     ));
     assert!(matches!(
         rt.execute_command("inventory.products.create", &params(json!({"name":"X","sku":"X","price":1,"stock":1})), &ctx()).await.unwrap_err(),
