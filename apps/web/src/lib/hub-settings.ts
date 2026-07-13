@@ -19,6 +19,10 @@ import { RUNTIME_URL, runtimeHeaders } from './runtime';
 export interface HubSettings {
   /** Moneda ISO-4217 del hub (global, sin override por usuario). Default servidor: EUR. */
   currency: string;
+  /** Los DECIMALES de la moneda (ADR-0123 §7): EUR 2, **JPY 0**, KWD 3. La escala del dinero, que
+   *  NO se puede asumir 2. Lo resuelve el runtime (`/api/hub/context`) del registro ISO-4217, o de
+   *  lo que el hub haya declarado a mano si su moneda no está en él. */
+  currency_decimals?: number;
   /** Idioma DEFAULT del hub (código de locale, p.ej. 'es' | 'en'). El usuario puede overridearlo. */
   language: string;
   /** ¿Está visible la documentación de la API (entrada de menú + página Swagger)? */

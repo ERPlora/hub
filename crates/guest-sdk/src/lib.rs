@@ -64,6 +64,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+/// **La aritmética del dinero** (ADR-0123). Céntimos enteros, un solo modo de redondeo, y la
+/// distinción entre dinero, tasa y cantidad. Antes vivía copiada en 7 handlers.
+pub mod currency;
+pub mod money;
+
 /// Entrada arbitraria que el host pasa al handler WASM.
 ///
 /// Es un wrapper transparente sobre un [`serde_json::Value`]; el guest decide

@@ -678,7 +678,7 @@ pub fn build_router(state: AppState, web_dir: Option<&str>) -> Router {
 /// pegar a `/api/settings` por separado. Contrato del frontend.
 async fn hub_context(State(st): State<AppState>) -> Response {
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
-    let (pin_users, currency, language) = {
+    let (pin_users, currency, currency_decimals, language) = {
         let rt = st.runtime.lock().await;
         let pin_users: Vec<Value> = rt
             .list_pin_users()
@@ -694,11 +694,25 @@ async fn hub_context(State(st): State<AppState>) -> Response {
             .get("currency")
             .cloned()
             .unwrap_or_else(|| json!("EUR"));
+        // Los DECIMALES de la moneda (ADR-0123 §7). El front los necesita para las dos fronteras
+        // (teclear y pintar): el dinero viaja en UNIDADES MÍNIMAS, y cuántas hay en una unidad mayor
+        // depende de la moneda — EUR 2, **JPY 0**, KWD 3. Un `/100` clavado en el front cobra 100
+        // veces mal en un hub en yenes.
+        //
+        // Precedencia: lo que el hub declare a mano (`currency_decimals`, para monedas que el
+        // registro no conoce) → el registro ISO-4217 → el default explícito.
+        let currency_decimals = settings
+            .get("currency_decimals")
+            .and_then(|v| v.as_i64())
+            .map(|n| n as u32)
+            .unwrap_or_else(|| {
+                erplora_runtime::settings::decimals_of(currency.as_str().unwrap_or("EUR"))
+            });
         let language = settings
             .get("language")
             .cloned()
             .unwrap_or_else(|| json!("es"));
-        (pin_users, currency, language)
+        (pin_users, currency, currency_decimals, language)
     };
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
     // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
@@ -712,6 +726,8 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         // Settings de arranque (tabla `hub_settings` ∪ defaults). El SPA los usa para formato de
         // moneda + locale sin un fetch extra a `/api/settings`.
         "currency": currency,
+        // Cuántos decimales tiene esa moneda. El front NO puede asumir 2 (ADR-0123 §7).
+        "currency_decimals": currency_decimals,
         "language": language,
     }))
     .into_response()

@@ -20,6 +20,33 @@ export function hubCurrency(): string {
 }
 
 /**
+ * Los **decimales de la moneda del hub** — la escala del dinero (ADR-0123 §7).
+ *
+ * El dinero viaja en UNIDADES MÍNIMAS, y cuántas hay en una unidad mayor **depende de la moneda**:
+ * EUR 2, **JPY 0** (la unidad mínima ES el yen), KWD 3. Dividir siempre entre 100 es un bug en cuanto
+ * el hub sale del euro — y la app es gratuita, así que sale.
+ *
+ * Los resuelve el runtime (`/api/hub/context` → `currency_decimals`): registro ISO-4217, o lo que el
+ * hub haya declarado a mano si su moneda no está en él.
+ */
+export function hubCurrencyDecimals(): number {
+  const d = hubSettings.value?.currency_decimals;
+  return typeof d === 'number' ? d : decimalsForCurrency(hubCurrency());
+}
+
+/** Espejo del registro de Rust (`erplora_guest_sdk::currency`), como último recurso. */
+const ZERO_DECIMAL = new Set(['BIF','CLP','DJF','GNF','ISK','JPY','KMF','KRW','PYG','RWF','UGX','UYI','VND','VUV','XAF','XOF','XPF']);
+const THREE_DECIMAL = new Set(['BHD','IQD','JOD','KWD','LYD','OMR','TND']);
+const FOUR_DECIMAL = new Set(['CLF','UYW']);
+function decimalsForCurrency(code: string): number {
+  const c = code.trim().toUpperCase();
+  if (ZERO_DECIMAL.has(c)) return 0;
+  if (THREE_DECIMAL.has(c)) return 3;
+  if (FOUR_DECIMAL.has(c)) return 4;
+  return 2;
+}
+
+/**
  * Publica la moneda del hub en `globalThis.__erploraCurrency` (ADR-0059), de donde la lee el
  * `@erplora/module-sdk` (`erplora.currency` / `formatMoney` / `formatAmount`) como fallback cuando
  * el shell no le inyectó el getter. Mirror de cómo `erplora.locale` lee `localStorage('erplora.locale')`:
@@ -29,6 +56,9 @@ export function hubCurrency(): string {
 export function publishHubCurrency(currency: string): void {
   try {
     (globalThis as { __erploraCurrency?: string }).__erploraCurrency = currency;
+    // Y su ESCALA: sin esto, un WC de módulo en un hub en yenes seguiría dividiendo entre 100.
+    (globalThis as { __erploraCurrencyDecimals?: number }).__erploraCurrencyDecimals =
+      hubCurrencyDecimals();
   } catch {
     /* noop — degradación elegante */
   }
@@ -54,11 +84,14 @@ function intl(opts?: FormatMoneyOptions): Intl.NumberFormat {
 }
 
 /**
- * Formatea un importe en CÉNTIMOS (entero) con la moneda del hub (o `opts.currency`). El runtime
- * guarda dinero en céntimos para no arrastrar errores de coma flotante; esta es la entrada canónica.
+ * Formatea un importe en **UNIDADES MÍNIMAS** (entero) con la moneda del hub (o `opts.currency`).
+ * Es la entrada canónica: el runtime guarda dinero en enteros para no arrastrar error binario.
+ *
+ * **Ya no divide entre 100 a ciegas**: divide entre `10^decimales-de-la-moneda`. En **JPY no divide**
+ * (`1999` son 1999 ¥, no 19,99). Ver `hubCurrencyDecimals`.
  */
-export function formatMoney(cents: number, opts?: FormatMoneyOptions): string {
-  return intl(opts).format((cents || 0) / 100);
+export function formatMoney(minor: number, opts?: FormatMoneyOptions): string {
+  return intl(opts).format((minor || 0) / 10 ** hubCurrencyDecimals());
 }
 
 /**
