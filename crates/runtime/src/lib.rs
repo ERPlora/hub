@@ -53,6 +53,9 @@ pub struct ModuleInfo {
     pub name: String,
     pub version: String,
     pub status: ModuleStatus,
+    /// Dependencias declaradas (`depends_on`): la UI del shell las usa para avisar de la CASCADA
+    /// (ADR-0128) antes de desactivar («también desactivará: …»).
+    pub depends_on: Vec<String>,
 }
 
 /// `hub_id` de desarrollo por defecto (mismo UUID fijo que `crates/server::DEV_HUB_ID`). El host
@@ -332,6 +335,7 @@ impl Runtime {
                 name: m.name.clone(),
                 version: m.version.clone(),
                 status: *self.registry.status.get(&m.id).unwrap_or(&ModuleStatus::Inactive),
+                depends_on: m.depends_on.clone(),
             })
             .collect()
     }

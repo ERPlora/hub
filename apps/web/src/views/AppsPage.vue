@@ -117,7 +117,7 @@ import {
   IonFooter, IonSegment, IonSegmentButton, IonLabel,
   IonSpinner, IonToast,
   IonModal, IonHeader, IonTitle, IonButtons, IonButton, IonContent,
-  IonList, IonItem,
+  IonList, IonItem, alertController,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -221,7 +221,7 @@ function clearProgress(rootId: string): void {
 }
 
 // --- Celdas ricas: pill de tinte suave con tokens Ionic (cruzan el shadow de la tabla) ---
-function badgeCell(text: string, tone: 'success' | 'medium' | 'primary' | 'danger'): Node {
+function badgeCell(text: string, tone: 'success' | 'medium' | 'primary' | 'danger' | 'warning'): Node {
   const span = document.createElement('span');
   span.textContent = text;
   span.style.cssText =
@@ -300,7 +300,14 @@ const mineColumns = computed<DataTableColumn[]>(() => [
   { key: 'version', header: t('apps.colVersion'), format: (r) => `v${String(r.version ?? '')}` },
   {
     key: 'status', header: t('apps.colStatus'), filterable: true, filterType: 'select',
-    render: (r) => badgeCell(r.status === 'active' ? t('apps.statusActive') : t('apps.statusInactive'), r.status === 'active' ? 'success' : 'medium'),
+    // Tres estados (ADR-0128): apagado A MANO ≠ ARRASTRADO por la cascada de una dependencia.
+    // El arrastrado va en warning: volverá solo cuando su dependencia vuelva.
+    render: (r) => badgeCell(
+      r.status === 'active' ? t('apps.statusActive')
+        : r.status === 'inactive_auto' ? t('apps.statusInactiveAuto')
+        : t('apps.statusInactive'),
+      r.status === 'active' ? 'success' : r.status === 'inactive_auto' ? 'warning' : 'medium',
+    ),
   },
 ]);
 const mineActions = computed<DataTableAction[]>(() => [
@@ -442,13 +449,70 @@ async function loadInstalled(): Promise<void> {
   }
 }
 
+/** Dependientes transitivos ACTIVOS de `id` (los que la cascada apagará al desactivarlo). */
+function activeDependentsOf(id: string): InstalledModule[] {
+  const out: InstalledModule[] = [];
+  const fallen = new Set([id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const m of installedModules.value) {
+      if (fallen.has(m.id) || m.status !== 'active') continue;
+      if ((m.depends_on ?? []).some((d) => fallen.has(d))) {
+        fallen.add(m.id);
+        out.push(m);
+        grew = true;
+      }
+    }
+  }
+  return out;
+}
+
+/** Dependencias transitivas NO activas de `id` (las que la cascada encenderá al activarlo). */
+function inactiveDepsOf(id: string): InstalledModule[] {
+  const byId = new Map(installedModules.value.map((m) => [m.id, m]));
+  const seen = new Set<string>();
+  const out: InstalledModule[] = [];
+  const walk = (mid: string) => {
+    for (const d of byId.get(mid)?.depends_on ?? []) {
+      if (seen.has(d)) continue;
+      seen.add(d);
+      const dep = byId.get(d);
+      if (dep && dep.status !== 'active') out.push(dep);
+      walk(d);
+    }
+  };
+  walk(id);
+  return out;
+}
+
+/** Confirmación cuando el toggle va a arrastrar a OTROS módulos (ADR-0128): la cascada nunca
+ *  sorprende — se lista lo afectado antes de tocar nada. Sin afectados, ni se pregunta. */
+async function confirmCascade(titleKey: string, msgKey: string, m: InstalledModule, affected: InstalledModule[]): Promise<boolean> {
+  if (!affected.length) return true;
+  const alert = await alertController.create({
+    header: t(titleKey, { name: m.name }),
+    message: `${t(msgKey, { name: m.name })}\n${affected.map((a) => `· ${a.name}`).join('\n')}`,
+    cssClass: 'cascade-alert',
+    buttons: [
+      { text: t('apps.cascadeCancel'), role: 'cancel' },
+      { text: t('apps.cascadeConfirm'), role: 'confirm' },
+    ],
+  });
+  await alert.present();
+  const { role } = await alert.onDidDismiss();
+  return role === 'confirm';
+}
+
 /** Activa o desactiva un módulo (hot-plug) y refresca la lista + la nav del shell. */
 async function toggleModule(m: InstalledModule): Promise<void> {
   try {
     if (m.status === 'active') {
+      if (!(await confirmCascade('apps.cascadeOffTitle', 'apps.cascadeOffMsg', m, activeDependentsOf(m.id)))) return;
       await deactivateModule(m.id);
       notify(t('apps.deactivated', { name: m.name }), 'primary');
     } else {
+      if (!(await confirmCascade('apps.cascadeOnTitle', 'apps.cascadeOnMsg', m, inactiveDepsOf(m.id)))) return;
       await activateModule(m.id);
       notify(t('apps.activated', { name: m.name }), 'success');
     }

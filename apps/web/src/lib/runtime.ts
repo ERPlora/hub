@@ -158,12 +158,16 @@ export async function requestInstall(moduleId: string, version: string): Promise
   }
 }
 
-/** Un módulo instalado según el runtime (`GET /api/modules`). `status` = active|inactive. */
+/** Un módulo instalado según el runtime (`GET /api/modules`).
+ *  `inactive` = apagado A MANO (se respeta); `inactive_auto` = arrastrado por la cascada de una
+ *  dependencia (ADR-0128) — vuelve solo cuando sus `depends_on` estén activas. */
 export interface InstalledModule {
   id: string;
   name: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'inactive_auto';
   version: string;
+  /** Dependencias declaradas: el toggle las usa para AVISAR de la cascada antes de confirmar. */
+  depends_on?: string[];
   /**
    * ADITIVO (ADR-0057): `true` si el módulo expone al menos una query/command `expose_api`.
    * Lo usa la matriz de scope de las API keys para listar solo módulos que conceden algo.

@@ -1362,6 +1362,9 @@ async fn list_modules(State(st): State<AppState>, Query(q): Query<LocaleQuery>) 
                 "name": reg.module_name_localized(&m.id, &m.name, locale),
                 "version": m.version,
                 "status": m.status,
+                // Dependencias declaradas: el toggle del shell las usa para AVISAR de la cascada
+                // (ADR-0128) antes de desactivar («también desactivará: …»).
+                "depends_on": m.depends_on,
                 // ADITIVO (ADR-0057): true si el módulo expone alguna query/command `expose_api`.
                 "has_public_api": public_api.contains(&m.id),
             })

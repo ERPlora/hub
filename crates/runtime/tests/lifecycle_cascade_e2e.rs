@@ -109,3 +109,15 @@ async fn query_a_modulo_desactivado_es_module_inactive() {
         .expect_err("sales cayó en cascada");
     assert!(matches!(err, RuntimeError::ModuleInactive { .. }), "fue: {err:?}");
 }
+
+#[tokio::test]
+async fn modules_expone_depends_on_para_que_la_ui_avise_de_la_cascada() {
+    // El toggle del shell debe LISTAR qué va a arrastrar ANTES de confirmar («desactivar taxes
+    // también desactivará: inventory, sales…»). Para computar el grafo inverso en cliente, la
+    // lista de módulos tiene que exponer las dependencias declaradas.
+    let rt = hub_pos().await;
+    let sales = rt.modules().into_iter().find(|m| m.id == "sales").unwrap();
+    for dep in ["customers", "inventory", "taxes"] {
+        assert!(sales.depends_on.iter().any(|d| d == dep), "sales debe declarar {dep}");
+    }
+}

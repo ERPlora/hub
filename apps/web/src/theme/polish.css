@@ -376,3 +376,9 @@ ok-data-table[fill] {
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(var(--ion-text-color-rgb), 0.3); background-clip: content-box; }
+
+/* Aviso de cascada de módulos (ADR-0128): el mensaje lista los módulos afectados con saltos de
+   línea (`· Inventario\n· Ventas…`); sin esto, ion-alert los aplana en una sola línea. */
+.cascade-alert .alert-message {
+  white-space: pre-line;
+}
