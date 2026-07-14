@@ -438,12 +438,10 @@
 
       <!-- ── Datos: importar / exportar el hub (ADR-0113; decisión humano 2026-07-12) ──
            Import y export viven JUNTOS en esta pestaña de la navegación secundaria de Ajustes
-           (antes eran las páginas /import y /export). Deep-link: /settings?tab=data. -->
+           (antes eran las páginas /import y /export). Deep-link: /settings?tab=data.
+           Dentro, un ion-segment elige panel (2026-07-14) — antes se apilaban los dos. -->
       <template v-else-if="tab === 'data'">
-        <h2 class="data-section-title">{{ t('importPage.title') }}</h2>
-        <ImportPanel />
-        <h2 class="data-section-title">{{ t('exportPage.title') }}</h2>
-        <ExportPanel />
+        <SettingsDataTab />
       </template>
     <!-- Footer tab bar -->
     <template #footer>
@@ -507,8 +505,7 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
-import ImportPanel from '../components/ImportPanel.vue';
-import ExportPanel from '../components/ExportPanel.vue';
+import SettingsDataTab from '../components/SettingsDataTab.vue';
 import { themeMode, setThemeMode, type ThemeMode } from '../lib/theme';
 import { setLocale, bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
@@ -864,15 +861,3 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
   }
 }
 </script>
-
-<style scoped>
-/* Cabeceras que separan los dos paneles de la pestaña Datos (Importar / Exportar). */
-.data-section-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 1.25rem 0 0.25rem;
-}
-.data-section-title:first-of-type {
-  margin-top: 0.25rem;
-}
-</style>

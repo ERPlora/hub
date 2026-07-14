@@ -185,6 +185,9 @@ export default {
     tabTickets: 'Receipts',
     tabPermissions: 'Permissions',
     tabData: 'Data',
+    // Segmento dentro de la pestaña «Data»: elige panel (importar / exportar).
+    dataImport: 'Import',
+    dataExport: 'Export',
     permissionsTitle: 'Module permissions',
     permissionsDesc: 'Grant or revoke the permissions each module requests (internet access, certificate, printer, notifications). For safety, everything is denied until you grant it.',
     permissionsAdminOnly: 'Only an administrator can change permissions.',

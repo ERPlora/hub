@@ -133,3 +133,43 @@ async fn sale_completed_records_cash_movement() {
     assert_eq!(movs[0]["movement_type"], json!("sale"));
     assert_eq!(movs[0]["amount"].as_i64().unwrap(), 3000);
 }
+
+#[tokio::test]
+async fn sale_by_another_cashier_lands_in_the_open_session() {
+    // ADR-0130: la sesión de caja es del TERMINAL, no del cajero — es el patrón unánime del mercado
+    // (Odoo, Loyverse, Square, Lightspeed, Shopify): se abre una vez y TODOS los cajeros venden
+    // dentro de ella.
+    //
+    // El bug que esto fija PIERDE DINERO: `current_session` resolvía la sesión abierta del HUB, pero
+    // `_movement_for_open_session` la buscaba del USUARIO ACTIVO. Si la cajera A abría la caja y
+    // cobraba la B, el INSERT ... SELECT no casaba ninguna fila → NO se insertaba el movimiento, SIN
+    // ERROR, y el efectivo de esa venta desaparecía del arqueo (mientras el KPI seguía diciendo que
+    // había caja abierta).
+    if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(&mdir("taxes")).await.unwrap();
+    rt.install_from_dir(&mdir("inventory")).await.unwrap();
+    rt.install_from_dir(&mdir("customers")).await.unwrap();
+    rt.install_from_dir(&mdir("invoice")).await.unwrap();
+    rt.install_from_dir(&mdir("cash_register")).await.unwrap();
+    rt.install_from_dir(&mdir("sales")).await.unwrap();
+
+    // La cajera A (u1) abre la caja del turno.
+    let cajera_a = RequestContext::new("h1", "u1", ["*".to_string()]);
+    let sid = open_session(&rt, &cajera_a, 0).await;
+
+    // Entra la cajera B (u2) —relevo, o simplemente otro cajero en el mismo terminal— y cobra.
+    let cajera_b = RequestContext::new("h1", "u2", ["*".to_string()]);
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "tax_included": false,
+        "items": [{ "product_name": "Corte", "price": 3000, "quantity": 1, "tax_rate": 0.0 }]
+    })), &cajera_b).await.unwrap();
+    rt.drain_outbox().await.unwrap();
+
+    let movs = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &cajera_a).await.unwrap();
+    assert_eq!(movs.len(), 1, "el efectivo cobrado por OTRO cajero debe entrar en la sesión abierta del terminal");
+    assert_eq!(movs[0]["amount"].as_i64().unwrap(), 3000);
+    // Y queda la traza de QUIÉN cobró: la sesión es del terminal, la responsabilidad es de la persona.
+    assert_eq!(movs[0]["employee_id"], json!("u2"), "el movimiento atribuye la venta al cajero que cobró");
+}

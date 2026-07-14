@@ -186,6 +186,8 @@ export default {
     tabTickets: 'Tiques',
     tabPermissions: 'Permisos',
     tabData: 'Datos',
+    dataImport: 'Importar',
+    dataExport: 'Exportar',
     permissionsTitle: 'Permisos de los módulos',
     permissionsDesc: 'Concede o revoca los permisos que cada módulo solicita (acceso a internet, certificado, impresora, notificaciones). Por seguridad, todo está denegado hasta que lo concedas.',
     permissionsAdminOnly: 'Solo un administrador puede cambiar los permisos.',
