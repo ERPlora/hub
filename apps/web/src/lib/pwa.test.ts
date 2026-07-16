@@ -13,6 +13,7 @@ vi.mock('./device', () => ({
 
 import {
   installModalOpen,
+  installModalOffered,
   isStandalone,
   shouldShowInstallModal,
   maybeShowInstallModal,
@@ -26,6 +27,7 @@ beforeEach(() => {
   tauriMock.value = false;
   isStandalone.value = false;
   installModalOpen.value = false;
+  installModalOffered.value = false;
 });
 
 describe('shouldShowInstallModal', () => {
@@ -57,6 +59,16 @@ describe('maybeShowInstallModal', () => {
 
   it('no lo abre cuando no toca (standalone)', () => {
     isStandalone.value = true;
+    maybeShowInstallModal();
+    expect(installModalOpen.value).toBe(false);
+  });
+
+  // El disparo vive en un watcher de App.vue (isAuthed + ruta): sin este guard, cada cambio de
+  // ruta re-abriría el modal que el usuario acaba de cerrar con «Ahora no».
+  it('ofrece UNA vez por sesión: tras cerrarlo, una nueva llamada NO lo reabre', () => {
+    maybeShowInstallModal();
+    expect(installModalOpen.value).toBe(true);
+    dismissInstallModal(false);
     maybeShowInstallModal();
     expect(installModalOpen.value).toBe(false);
   });

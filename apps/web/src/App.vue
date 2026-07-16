@@ -188,17 +188,21 @@ async function gateAndRefresh(): Promise<void> {
   }
 }
 onMounted(() => {
-  if (isAuthed.value) {
-    void gateAndRefresh();
-    maybeShowInstallModal();
-  }
+  if (isAuthed.value) void gateAndRefresh();
 });
 watch(isAuthed, (authed) => {
-  if (authed) {
-    void gateAndRefresh();
-    maybeShowInstallModal();
-  }
+  if (authed) void gateAndRefresh();
 });
+// Modal PWA «vista nativa»: se ofrece al ENTRAR (autenticado y ya FUERA de /login — el login
+// cloud crea sesión antes de terminar, p. ej. en el paso «crea tu PIN», y el modal no debe
+// taparlo). lib/pwa garantiza como mucho una oferta por sesión.
+watch(
+  () => isAuthed.value && !route.path.startsWith('/login'),
+  (entered) => {
+    if (entered) maybeShowInstallModal();
+  },
+  { immediate: true },
+);
 // Si el entitlement resulta `needs_activation` (Tauri offline sin token cacheado, hub sin
 // derecho…), saca al usuario del negocio → pantalla de activación.
 watch(needsActivation, (needs) => {
