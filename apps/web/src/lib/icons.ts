@@ -112,6 +112,7 @@ import arrowUndoOutline from "~icons/ion/arrow-undo-outline?raw";
 import backspaceOutline from "~icons/ion/backspace-outline?raw";
 import checkmarkOutline from "~icons/ion/checkmark-outline?raw";
 import chevronDownOutline from "~icons/ion/chevron-down-outline?raw";
+import chevronExpandOutline from "~icons/ion/chevron-expand-outline?raw";
 import close from "~icons/ion/close?raw";
 import cloudDownloadOutline from "~icons/ion/cloud-download-outline?raw";
 import cloudOfflineOutline from "~icons/ion/cloud-offline-outline?raw";
@@ -253,6 +254,7 @@ const SVGS: Record<string, string> = {
   "backspace-outline": backspaceOutline,
   "checkmark-outline": checkmarkOutline,
   "chevron-down-outline": chevronDownOutline,
+  "chevron-expand-outline": chevronExpandOutline,
   close,
   "cloud-download-outline": cloudDownloadOutline,
   "cloud-offline-outline": cloudOfflineOutline,

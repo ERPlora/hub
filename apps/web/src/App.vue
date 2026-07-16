@@ -4,11 +4,12 @@
       <!-- Menú lateral (drawer en móvil, fijo en desktop ≥lg). Solo con sesión. -->
       <ion-menu v-if="isAuthed" content-id="main" type="overlay" class="dash-menu">
         <!-- Tarjeta de usuario ARRIBA (decisión 2026-07-16: el avatar de la topbar se retiró por
-             duplicado; el usuario vive aquí): avatar/iniciales + nombre/email + editar perfil +
-             logout. El brand (logo + versión) baja al footer. -->
+             duplicado; el usuario vive aquí). La tarjeta ENTERA es el trigger de un menú
+             desplegable (ion-popover) con Perfil / Cerrar sesión — patrón "user menu" del
+             dashboard de Cloud/Untitled UI, en vez de iconos sueltos. -->
         <ion-header class="ion-no-border">
           <ion-toolbar class="brand-toolbar">
-            <div class="sidebar-user">
+            <button id="sidebar-user-menu" class="sidebar-user" type="button">
               <!-- TODO(#39): migrar a ok-avatar cuando exista (ERPlora/outfitkit). Hasta entonces,
                    avatar de iniciales a mano; el CSS vive en polish.css (.sidebar-user-avatar). -->
               <div class="sidebar-user-avatar">{{ initials }}</div>
@@ -16,25 +17,29 @@
                 <div class="sidebar-user-name">{{ user?.name }}</div>
                 <div class="sidebar-user-email">{{ user?.email }}</div>
               </div>
-              <ion-button
-                class="nav-label"
-                fill="clear"
-                size="small"
-                :aria-label="t('sidebar.profile')"
-                @click="goProfile"
-              >
-                <HubIcon slot="icon-only" name="create-outline" />
-              </ion-button>
-              <ion-button
-                class="nav-label"
-                fill="clear"
-                size="small"
-                :aria-label="t('sidebar.signOut')"
-                @click="onLogout"
-              >
-                <HubIcon slot="icon-only" name="log-out-outline" />
-              </ion-button>
-            </div>
+              <HubIcon class="sidebar-user-chevron nav-label" name="chevron-expand-outline" />
+            </button>
+            <ion-popover
+              trigger="sidebar-user-menu"
+              trigger-action="click"
+              :dismiss-on-select="true"
+              side="bottom"
+              alignment="start"
+              class="sidebar-user-popover"
+            >
+              <ion-content>
+                <ion-list lines="none">
+                  <ion-item button :detail="false" @click="goProfile">
+                    <HubIcon slot="start" name="person-outline" />
+                    <ion-label>{{ t('sidebar.profile') }}</ion-label>
+                  </ion-item>
+                  <ion-item button :detail="false" @click="onLogout">
+                    <HubIcon slot="start" name="log-out-outline" />
+                    <ion-label>{{ t('sidebar.signOut') }}</ion-label>
+                  </ion-item>
+                </ion-list>
+              </ion-content>
+            </ion-popover>
             <!-- El rail-toggle se movió a la topbar compartida (AppTopbar), a la derecha del back,
                  para dar paridad con el shell de Cloud. El estado sigue en lib/shell (railCollapsed). -->
           </ion-toolbar>
@@ -105,8 +110,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
   IonApp, IonSplitPane, IonMenu, IonMenuToggle, IonHeader, IonToolbar,
-  IonContent, IonList, IonListHeader, IonItem, IonLabel,  IonFooter,
-  IonButton, IonRouterOutlet
+  IonContent, IonList, IonListHeader, IonItem, IonLabel, IonFooter,
+  IonPopover, IonRouterOutlet, menuController,
 } from '@ionic/vue';
 import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
@@ -213,11 +218,15 @@ function goHome(): void {
   void router.push('/dashboard');
 }
 
+// Las acciones del menú de usuario cierran también el drawer móvil: sin esto, en móvil la
+// navegación ocurre DEBAJO del menú abierto y parece que el botón «no hace nada».
 function goProfile(): void {
+  void menuController.close().catch(() => {});
   void router.push(PROFILE_ROUTE);
 }
 
 async function onLogout(): Promise<void> {
+  void menuController.close().catch(() => {});
   logout();
   await router.replace('/login');
 }
