@@ -281,10 +281,18 @@ ion-menu.dash-menu ion-content.sidebar-content { --background: var(--ion-backgro
 /* Footer: tarjeta de usuario (avatar iniciales + nombre/email + logout) — mismo lienzo que el
    resto del menú (--ion-background-color), para que header/contenido/footer del menú sean uniformes. */
 .sidebar-foot { --background: var(--ion-background-color); }
+/* La tarjeta es un <button> nativo (trigger del ion-popover del menú de usuario): reset de
+   button + hover suave, mismo lenguaje que .nav-item. */
 .sidebar-user {
   display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.5rem 0.6rem 0.7rem;
+  width: 100%; margin: 0.35rem 0.35rem 0.5rem; padding: 0.4rem 0.45rem;
+  background: none; border: 0; border-radius: 9px;
+  font: inherit; color: inherit; text-align: start; cursor: pointer;
 }
+.sidebar-user:hover { background: color-mix(in oklab, var(--ion-text-color) 6%, transparent); }
+.sidebar-user-chevron { flex: none; font-size: 15px; color: var(--ion-color-medium); }
+.sidebar-user-popover { --width: 220px; }
+.sidebar-user-popover ion-item { --min-height: 42px; font-size: 0.9rem; }
 .sidebar-user-avatar {
   width: 34px; height: 34px; border-radius: 999px; flex: none;
   display: grid; place-items: center; font-weight: 700; font-size: 0.72rem;
