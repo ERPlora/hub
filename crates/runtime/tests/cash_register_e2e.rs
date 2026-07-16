@@ -133,3 +133,44 @@ async fn sale_completed_records_cash_movement() {
     assert_eq!(movs[0]["movement_type"], json!("sale"));
     assert_eq!(movs[0]["amount"].as_i64().unwrap(), 3000);
 }
+
+/// El CAJÓN es efectivo FÍSICO (QA restaurante 07-16, P0 del arqueo): una venta con
+/// TARJETA se registra (visible en movimientos y KPI de ventas) pero NO infla el
+/// efectivo esperado — con día mixto, el arqueo debe cuadrar contra lo contado.
+#[tokio::test]
+async fn card_sales_do_not_inflate_expected_cash() {
+    let rt = rt_cr().await;
+    let ctx = admin();
+    rt.execute_command("cash_register.session.open", &params(json!({
+        "register_id": null, "session_number": "CARD-1", "opening_balance": 10000, "opening_notes": ""
+    })), &ctx).await.unwrap();
+    let sid = rt.execute_query("cash_register.sessions.list", &Params::new(), &ctx).await.unwrap()
+        .last().unwrap()["id"].as_str().unwrap().to_string();
+
+    // Venta en efectivo (+3000) y venta con tarjeta (+2500).
+    rt.execute_command("cash_register.movement.add", &params(json!({
+        "session_id": sid, "movement_type": "sale", "amount": 3000, "payment_method": "cash",
+        "sale_reference": "s-cash", "description": "venta efectivo"
+    })), &ctx).await.unwrap();
+    rt.execute_command("cash_register.movement.add", &params(json!({
+        "session_id": sid, "movement_type": "sale", "amount": 2500, "payment_method": "card",
+        "sale_reference": "s-card", "description": "venta tarjeta"
+    })), &ctx).await.unwrap();
+
+    // KPI en vivo: el esperado del CAJÓN solo suma efectivo.
+    let cur = rt.execute_query("cash_register.current_session", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(cur[0]["expected_total"].as_i64().unwrap(), 13000,
+        "la tarjeta no entra en el cajón (10000 + 3000)");
+    // Las ventas del día sí cuentan TODOS los métodos.
+    assert_eq!(cur[0]["total_sales"].as_i64().unwrap(), 5500);
+
+    // Cierre: contado = 13000 → diferencia CERO con día mixto.
+    rt.execute_command("cash_register.session.close", &params(json!({
+        "session_id": sid, "closing_balance": 13000, "closing_notes": ""
+    })), &ctx).await.unwrap();
+    let closed = rt.execute_query("cash_register.sessions.list", &params(json!({"session_number": "CARD-1"})), &ctx)
+        .await.unwrap();
+    let s = closed.iter().find(|s| s["id"] == json!(sid)).unwrap();
+    assert_eq!(s["expected_balance"].as_i64().unwrap(), 13000);
+    assert_eq!(s["difference"].as_i64().unwrap(), 0, "día mixto cuadra contra el efectivo contado");
+}
