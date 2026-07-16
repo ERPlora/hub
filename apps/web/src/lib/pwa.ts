@@ -96,6 +96,11 @@ const LS_HIDE_MODAL_KEY = 'erplora.pwa.hideInstallModal';
 /** Estado del modal (lo monta App.vue; lo abre `maybeShowInstallModal` al entrar). */
 export const installModalOpen = ref<boolean>(false);
 
+/** Ya se ofreció en esta sesión (carga de la app). El disparo vive en un watcher de App.vue
+ *  (isAuthed + ruta): sin este guard, cada cambio de ruta re-abriría el modal que el usuario
+ *  acaba de cerrar con «Ahora no». Se resetea al recargar (siguiente "entrada"). */
+export const installModalOffered = ref<boolean>(false);
+
 function installModalDismissedForever(): boolean {
   try {
     return localStorage.getItem(LS_HIDE_MODAL_KEY) === '1';
@@ -109,9 +114,14 @@ export function shouldShowInstallModal(): boolean {
   return !isTauri() && !isStandalone.value && !installModalDismissedForever();
 }
 
-/** Abre el modal si toca ofrecerlo. Llamar al entrar el usuario (post-login). */
+/** Abre el modal si toca ofrecerlo — como mucho UNA vez por sesión. Llamar al entrar el
+ *  usuario (post-login, ya fuera de /login). */
 export function maybeShowInstallModal(): void {
-  if (shouldShowInstallModal()) installModalOpen.value = true;
+  if (installModalOffered.value) return;
+  if (shouldShowInstallModal()) {
+    installModalOpen.value = true;
+    installModalOffered.value = true;
+  }
 }
 
 /** Cierra el modal; con `remember` el descarte se persiste y no se vuelve a ofrecer. */
