@@ -90,19 +90,19 @@ jobs:
       # mismo leg acaba de compilar (0 builds nuevos). Gate: Variables BRIDGE_MSIX_* —
       # inerte hasta que Ioan reserve la ficha (hub#123). Publisher/Display se
       # REUTILIZAN de la app (misma cuenta). Runbook: apps/tauri/MICROSOFT-STORE.md.
+      # SOLO en tag: el bridge no tiene versión propia (version.workspace = 0.0.0),
+      # así que en dispatch no hay versión MSIX que valga — y la Store solo consume
+      # releases etiquetadas (hub#123). El dispatch queda para refrescar S3 `latest/`.
       # ------------------------------------------------------------------------------
       - name: Install winapp CLI
-        if: matrix.os == 'windows-latest' && vars.BRIDGE_MSIX_IDENTITY_NAME != ''
+        if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v') && vars.BRIDGE_MSIX_IDENTITY_NAME != ''
         run: winget install microsoft.winappcli --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity
 
       - name: Pack MSIX (Store, unsigned)
-        if: matrix.os == 'windows-latest' && vars.BRIDGE_MSIX_IDENTITY_NAME != ''
+        if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v') && vars.BRIDGE_MSIX_IDENTITY_NAME != ''
         shell: pwsh
         run: |
-          $v = if ('${{ github.ref }}'.StartsWith('refs/tags/v')) { '${{ github.ref_name }}' } else {
-            (Select-String -Path apps/bridge/Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
-          }
-          pwsh scripts/pack-msix.ps1 -Flavor bridge -Version $v `
+          pwsh scripts/pack-msix.ps1 -Flavor bridge -Version '${{ github.ref_name }}' `
             -IdentityName '${{ vars.BRIDGE_MSIX_IDENTITY_NAME }}' `
             -Publisher '${{ vars.MSIX_PUBLISHER }}' `
             -PublisherDisplay '${{ vars.MSIX_PUBLISHER_DISPLAY }}' `
