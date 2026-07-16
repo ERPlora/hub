@@ -84,6 +84,71 @@ jobs:
           name: bridge-${{ matrix.out_name }}
           path: dist/${{ matrix.out_name }}
 
+      # ------------------------------------------------------------------------------
+      # Canal Microsoft Store del BRIDGE (ADR-0136 · hub#120/#122): 2ª ficha «ERPlora
+      # Bridge», MSIX SIN FIRMAR (la Store re-firma). Post-build sobre el exe que este
+      # mismo leg acaba de compilar (0 builds nuevos). Gate: Variables BRIDGE_MSIX_* —
+      # inerte hasta que Ioan reserve la ficha (hub#123). Publisher/Display se
+      # REUTILIZAN de la app (misma cuenta). Runbook: apps/tauri/MICROSOFT-STORE.md.
+      # SOLO en tag: el bridge no tiene versión propia (version.workspace = 0.0.0),
+      # así que en dispatch no hay versión MSIX que valga — y la Store solo consume
+      # releases etiquetadas (hub#123). El dispatch queda para refrescar S3 `latest/`.
+      # ------------------------------------------------------------------------------
+      - name: Install winapp CLI
+        if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v') && vars.BRIDGE_MSIX_IDENTITY_NAME != ''
+        run: winget install microsoft.winappcli --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity
+
+      - name: Pack MSIX (Store, unsigned)
+        if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v') && vars.BRIDGE_MSIX_IDENTITY_NAME != ''
+        shell: pwsh
+        run: |
+          pwsh scripts/pack-msix.ps1 -Flavor bridge -Version '${{ github.ref_name }}' `
+            -IdentityName '${{ vars.BRIDGE_MSIX_IDENTITY_NAME }}' `
+            -Publisher '${{ vars.MSIX_PUBLISHER }}' `
+            -PublisherDisplay '${{ vars.MSIX_PUBLISHER_DISPLAY }}' `
+            -OutDir dist-msix
+
+      - name: Upload MSIX artifact
+        if: matrix.os == 'windows-latest' && vars.BRIDGE_MSIX_IDENTITY_NAME != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-msix
+          path: dist-msix/erplora-bridge.msix
+          if-no-files-found: error
+
+  # Publica el MSIX del bridge en Microsoft Store (producto GRATUITO). Requisitos
+  # manuales (hub#123): ficha «ERPlora Bridge» publicada y live + los MISMOS 4 secrets
+  # de la app (la app Entra con rol Manager es de cuenta, no por producto).
+  # Gate por Variable BRIDGE_MICROSOFT_STORE_PRODUCT_ID (vacía = job saltado).
+  publish-store:
+    name: Publish Bridge to Microsoft Store
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') && vars.BRIDGE_MICROSOFT_STORE_PRODUCT_ID != ''
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download MSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-msix
+          path: artifacts
+
+      - name: Configure Microsoft Store CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.1
+
+      - name: Authenticate with Partner Center
+        shell: pwsh
+        run: |
+          msstore reconfigure `
+            --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}" `
+            --sellerId "${{ secrets.SELLER_ID }}" `
+            --clientId "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}" `
+            --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
+
+      - name: Publish MSIX
+        shell: pwsh
+        run: msstore publish "${{ github.workspace }}/artifacts/erplora-bridge.msix" -id "${{ vars.BRIDGE_MICROSOFT_STORE_PRODUCT_ID }}"
+
   upload-s3:
     name: Upload to Object Storage
     needs: [build]

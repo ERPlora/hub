@@ -53,10 +53,17 @@ struct AppState {
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    // `devices.json` configurable; por defecto en el cwd (afinar a un config-dir en empaquetado).
-    let devices_path = std::env::var("ERPLORA_BRIDGE_DEVICES")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("devices.json"));
+    // `devices.json` configurable por env; por defecto en el dir de datos por-usuario (hub#121:
+    // bajo MSIX el install-dir es de solo lectura y el cwd desde Inicio no es el install-dir).
+    let devices_path = resolve_devices_path(
+        std::env::var_os("ERPLORA_BRIDGE_DEVICES").map(PathBuf::from),
+        dirs::data_local_dir(),
+    );
+    if let Some(parent) = devices_path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!(path = %parent.display(), error = %e, "no se pudo crear el dir de devices.json");
+        }
+    }
 
     // Política de auth: `BRIDGE_TOKEN` + `BRIDGE_ALLOWED_ORIGINS` del entorno. La CLAVE PÚBLICA para
     // verificar el bridge-token firmado se PIDE AL SAAS (`/api/v1/auth/public-key/`), su fuente de
@@ -429,6 +436,22 @@ fn err_event(e: &erplora_peripherals::PeripheralError) -> Event {
     Event::Error { message: e.to_string(), code: "peripheral_error".into() }
 }
 
+/// Resuelve dónde vive `devices.json` (hub#121). Pura para poder testearla sin tocar el entorno:
+/// `main` la llama con `ERPLORA_BRIDGE_DEVICES` y `dirs::data_local_dir()` reales.
+///
+/// Prioridad: override por env → dir de datos por-usuario (`…/ERPloraBridge/devices.json`;
+/// bajo MSIX el install-dir es de SOLO LECTURA y el cwd desde Inicio no es el install-dir,
+/// así que el cwd NO vale como default) → cwd como último recurso (plataformas sin data-dir).
+fn resolve_devices_path(env_override: Option<PathBuf>, data_local_dir: Option<PathBuf>) -> PathBuf {
+    if let Some(p) = env_override {
+        return p;
+    }
+    match data_local_dir {
+        Some(dir) => dir.join("ERPloraBridge").join("devices.json"),
+        None => PathBuf::from("devices.json"),
+    }
+}
+
 #[cfg(test)]
 mod integration_tests {
     //! Tests de integración del handshake WS: arrancan el router real (`build_router`) en un puerto
@@ -647,6 +670,28 @@ mod integration_tests {
         let req = "GET /status HTTP/1.1\r\nHost: attacker.com\r\nConnection: close\r\n\r\n";
         let status = send_request(port, req).await;
         assert!(status.contains("403"), "/status con Host de rebinding debe ser 403, fue: {status:?}");
+    }
+
+    // ── hub#121: devices.json FUERA del cwd (MSIX: install-dir de solo lectura) ──
+    #[test]
+    fn devices_path_prefers_env_override() {
+        let p = resolve_devices_path(
+            Some(PathBuf::from("/tmp/custom.json")),
+            Some(PathBuf::from("/data")),
+        );
+        assert_eq!(p, PathBuf::from("/tmp/custom.json"));
+    }
+
+    #[test]
+    fn devices_path_defaults_to_per_user_data_dir() {
+        let p = resolve_devices_path(None, Some(PathBuf::from("/data")));
+        assert_eq!(p, PathBuf::from("/data/ERPloraBridge/devices.json"));
+    }
+
+    #[test]
+    fn devices_path_falls_back_to_cwd_without_data_dir() {
+        let p = resolve_devices_path(None, None);
+        assert_eq!(p, PathBuf::from("devices.json"));
     }
 
     // ── B: el preflight PNA concede el acceso a red privada (dominio propio incluido) ──
