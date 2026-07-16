@@ -142,9 +142,12 @@ async fn eq_filter_on_is_active() {
     };
     rt.execute_command(
         "inventory.products.update",
+        // Contrato de inventory#8 (v1.2.x): products.update exige el conjunto COMPLETO
+        // de campos editables — omitir uno falla alto en vez de borrar en silencio.
         &params(json!({
             "product_id": id_b, "name": "B", "price": 2.0, "cost": 0,
-            "low_stock_threshold": 5, "is_active": 0
+            "low_stock_threshold": 5, "ean13": null, "description": "",
+            "tax_category_key": null, "is_active": 0
         })),
         &ctx(),
     )
