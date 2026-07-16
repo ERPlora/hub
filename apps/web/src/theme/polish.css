@@ -122,8 +122,19 @@ ion-item {
   --min-height: 52px;
   --padding-start: 16px;
   --inner-padding-end: 12px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
   --background-hover: var(--ion-color-step-50);
   --background-hover-opacity: 1;
+}
+/* Icono de fila (listas/ajustes: icono + título/descripción): aire entre icono y texto +
+   tamaño normalizado. PARIDAD con Cloud (misma regla en cloud dashboard-shell.css).
+   Exclusiones: el icono del sidebar (.nav-icon, lleva su propio 0.7rem y el rail lo pone a 0)
+   y los iconos con tamaño intencional (ion-icon[size], iconify-icon con width propio). */
+ion-item ion-icon[slot="start"]:not(.nav-icon):not([size]),
+ion-item iconify-icon[slot="start"]:not(.nav-icon):not([width]) {
+  margin-inline-end: 16px;
+  font-size: 20px;
 }
 ion-item h3 { font-weight: 600; }
 ion-note { font-size: 0.875rem; }

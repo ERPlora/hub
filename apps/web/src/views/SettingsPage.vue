@@ -62,28 +62,35 @@
                 </ion-select>
               </ion-item>
 
-              <!-- Tema -->
-              <!-- El modo de tema (system/light/dark) se controla desde el toggle de la TOPBAR
-                   (AppTopbar.vue), no aquí (issue #38). Cambia el modo efectivo claro↔oscuro;
-                   lib/theme.ts persiste la elección. -->
-              <ion-item>
+              <!-- Tema PERSONAL: modo (system/light/dark) + paleta de marca (ADR-0138).
+                   ok-theme-picker (OutfitKit, compartido con Cloud) solo emite ok-change;
+                   aquí se persiste: modo → lib/theme (localStorage, mismo estado que el
+                   toggle de la topbar) y paleta → override LOCAL por usuario
+                   (erplora.palette; sin override se sigue la paleta global del hub). -->
+              <ion-item lines="none">
                 <HubIcon slot="start" name="color-palette-outline" />
                 <ion-label>
                   <h2>{{ t('settings.theme') }}</h2>
                   <p>{{ t('settings.themeDesc') }}</p>
                 </ion-label>
-                <ion-select
-                  v-model="hubTheme"
-                  interface="popover"
-                  :aria-label="t('settings.theme')"
-                  slot="end"
-                  @ion-change="onThemeChange($event.detail.value as ThemeMode)"
-                >
-                  <ion-select-option value="system">{{ t('settings.themeSystem') }}</ion-select-option>
-                  <ion-select-option value="light">{{ t('settings.themeLight') }}</ion-select-option>
-                  <ion-select-option value="dark">{{ t('settings.themeDark') }}</ion-select-option>
-                </ion-select>
               </ion-item>
+              <div class="ion-padding-horizontal ion-padding-bottom">
+                <ok-theme-picker
+                  :palette="themePalette"
+                  :mode="hubTheme"
+                  :labels.prop="pickerLabels"
+                  @ok-change="onPickerChange"
+                ></ok-theme-picker>
+                <ion-button
+                  v-if="hasLocalPalette"
+                  size="small"
+                  fill="clear"
+                  class="mt-1"
+                  @click="setLocalPalette('')"
+                >
+                  {{ t('settings.paletteFollowHub') }}
+                </ion-button>
+              </div>
             </ion-list>
           </ion-card-content>
         </ion-card>
@@ -138,6 +145,26 @@
                 </ion-select>
                 <ion-note v-else slot="end">{{ hubLanguageName }}</ion-note>
               </ion-item>
+
+              <!-- Paleta DEFAULT del hub (GLOBAL, hub_settings.theme_palette — ADR-0138): la que
+                   ven los usuarios SIN override local. Solo admin; persiste al instante como la
+                   moneda. -->
+              <ion-item lines="none">
+                <HubIcon slot="start" name="color-palette-outline" />
+                <ion-label>
+                  <h2>{{ t('settings.hubPalette') }}</h2>
+                  <p>{{ t('settings.hubPaletteDesc') }}</p>
+                </ion-label>
+                <ion-note v-if="!isAdmin" slot="end">{{ hubPalette }}</ion-note>
+              </ion-item>
+              <div v-if="isAdmin" class="ion-padding-horizontal ion-padding-bottom">
+                <ok-theme-picker
+                  hide-mode
+                  :palette="hubPalette"
+                  :labels.prop="pickerLabels"
+                  @ok-change="onHubPaletteChange"
+                ></ok-theme-picker>
+              </div>
             </ion-list>
           </ion-card-content>
         </ion-card>
@@ -509,7 +536,15 @@ import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import ImportPanel from '../components/ImportPanel.vue';
 import ExportPanel from '../components/ExportPanel.vue';
-import { themeMode, setThemeMode, type ThemeMode } from '../lib/theme';
+import {
+  themeMode,
+  setThemeMode,
+  themePalette,
+  setLocalPalette,
+  hasLocalPalette,
+  type ThemeMode,
+  type ThemePalette,
+} from '../lib/theme';
 import { setLocale, bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { isAdmin } from '../lib/session';
@@ -565,6 +600,8 @@ const showModulesInSidebar = ref<boolean>(false);
 // onMounted; persisten al cambiar (solo admin) vía updateHubSettings.
 const hubCurrency = ref<string>(hubSettings.value?.currency ?? 'EUR');
 const hubLanguage = ref<Locale>(hubSettings.value?.language ?? 'es');
+// Paleta GLOBAL del hub (ADR-0138): la default para usuarios sin override local.
+const hubPalette = ref<string>(hubSettings.value?.theme_palette ?? 'erplora');
 // Doc de la API: deriva del setting server-side (lib/api-docs → hubSettings.api_docs_enabled).
 const showApiDocs = apiDocsEnabled;
 
@@ -578,6 +615,7 @@ watch(hubSettings, (s) => {
   if (!s) return;
   hubCurrency.value = s.currency;
   hubLanguage.value = s.language;
+  hubPalette.value = s.theme_palette;
   businessTaxId.value = s.business_tax_id;
   businessLegalName.value = s.business_legal_name;
   businessAddress.value = s.business_address;
@@ -605,6 +643,35 @@ const businessAddress = ref<string>(hubSettings.value?.business_address ?? '');
 function onThemeChange(value: ThemeMode): void {
   hubTheme.value = value;
   setThemeMode(value);
+}
+
+// Textos i18n del ok-theme-picker (defaults en inglés dentro del componente, ADR-0055).
+const pickerLabels = computed(() => ({
+  palette: t('settings.themePalette'),
+  mode: t('settings.theme'),
+  system: t('settings.themeSystem'),
+  light: t('settings.themeLight'),
+  dark: t('settings.themeDark'),
+}));
+
+// ok-theme-picker PERSONAL: el componente solo emite; el host (aquí) persiste cada eje.
+// Modo → lib/theme (localStorage compartido con la topbar). Paleta → override LOCAL.
+function onPickerChange(e: Event): void {
+  const { palette, mode } = (e as CustomEvent<{ palette: ThemePalette; mode: ThemeMode }>).detail;
+  if (mode !== themeMode.value) onThemeChange(mode);
+  if (palette !== themePalette.value) setLocalPalette(palette);
+}
+
+// ok-theme-picker GLOBAL (solo admin): persiste al instante en hub_settings, como la moneda.
+// theme.ts refleja la nueva global en el shell salvo que este navegador tenga override.
+function onHubPaletteChange(e: Event): void {
+  const next = (e as CustomEvent<{ palette: string }>).detail.palette;
+  const prev = hubPalette.value;
+  if (next === prev) return;
+  hubPalette.value = next;
+  void persistHubSettings({ theme_palette: next }, () => {
+    hubPalette.value = prev;
+  });
 }
 
 // Idioma PERSONAL del usuario: cambia el locale i18n en caliente y lo persiste como OVERRIDE local
