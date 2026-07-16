@@ -28,15 +28,8 @@ ion-toolbar {
 ion-title { font-weight: 650; letter-spacing: -0.01em; font-size: 1.0625rem; }
 
 /* ── Topbar compartida (AppTopbar.vue) — paridad con .dash-header de Cloud ─────────────────── */
+/* (El avatar de la topbar se retiró 2026-07-16: el usuario vive en la cabecera del sidebar.) */
 .app-topbar { position: relative; }
-/* Avatar de la topbar (iniciales) → perfil. Mismo lenguaje que .sidebar-user-avatar. */
-.topbar-avatar {
-  width: 32px; height: 32px; border-radius: 999px; margin-inline: 6px;
-  display: grid; place-items: center; font-weight: 700; font-size: 0.72rem;
-  text-decoration: none; cursor: pointer;
-  background: color-mix(in oklab, var(--ion-color-primary) 18%, transparent);
-  color: var(--ion-color-primary);
-}
 /* Badge de notificaciones (campana). Posicionado sobre el ion-button (relative host). */
 .topbar-notif { position: relative; overflow: visible; }
 .topbar-notif .notif-badge {
@@ -52,16 +45,16 @@ ion-title { font-weight: 650; letter-spacing: -0.01em; font-size: 1.0625rem; }
 @keyframes topbarpulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .topbar-progress > div { animation: none; } }
 
-/* Fila de acciones del footer del sidebar (reportar/logout/versión). */
-.sidebar-foot-actions {
-  display: flex; align-items: center; gap: 0.2rem;
-  padding: 0 0.4rem 0.6rem; font-size: 0.72rem;
+/* Footer del sidebar: brand (logo + wordmark) + versión. El usuario vive arriba (.sidebar-user
+   en la cabecera del menú); la fila de acciones vieja (instalar/logout) desapareció 2026-07-16. */
+.sidebar-foot-brand {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.45rem 0.75rem 0.7rem; font-size: 0.72rem;
 }
-.sidebar-foot-actions ion-button { --color: var(--ion-color-medium); height: 32px; }
 .sidebar-foot-text { color: color-mix(in oklab, var(--ion-text-color) 55%, transparent); }
 .ml-auto { margin-inline-start: auto; }
-/* Rail colapsado: oculta la fila de acciones/versión, como en Cloud. */
-ion-split-pane.rail .sidebar-foot-actions { display: none; }
+/* Rail colapsado: solo el logo, centrado (la versión es .nav-label → ya se oculta). */
+ion-split-pane.rail .sidebar-foot-brand { justify-content: center; padding-inline: 0; }
 
 /* ── Cards: radio + elevación suave + hover en cards clicables ────────────────────────────── */
 ion-card {
@@ -315,10 +308,9 @@ ion-menu.dash-menu ion-content.sidebar-content { --background: var(--ion-backgro
 ion-split-pane.rail .erp-wordmark,
 ion-split-pane.rail .nav-label,
 ion-split-pane.rail .sidebar-user-meta { display: none; }
-/* El menu-toggle del logo encoge a su contenido (~32px) y, con el toolbar-container
-   de Ionic en space-between, se ancla a la izquierda del rail (68px). Forzarlo a ocupar
-   todo el ancho deja que el lockup (que ya se centra abajo) caiga en el centro del rail. */
-ion-split-pane.rail .brand-toolbar ion-menu-toggle[slot="start"] {
+/* El menu-toggle del brand (footer) encoge a su contenido; forzarlo a ocupar todo el ancho
+   deja que el lockup caiga en el centro del rail (68px). */
+ion-split-pane.rail .sidebar-foot-brand ion-menu-toggle {
   display: flex; width: 100%; justify-content: center;
 }
 ion-split-pane.rail .brand-link { padding-inline-start: 0; justify-content: center; width: 100%; }
