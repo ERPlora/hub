@@ -227,6 +227,8 @@ export default {
     installing: 'Instalando {name}…',
     installSuccess: '{name} instalado correctamente.',
     installError: 'No se pudo iniciar la instalación de {name}.',
+    purchaseInBrowser: '{name} es un módulo de pago — completa la compra en el navegador y vuelve.',
+    purchaseOpenError: 'No se pudo abrir la página de compra. Inténtalo de nuevo.',
     deactivated: '{name} desactivado.',
     activated: '{name} activado.',
     toggleError: 'No se pudo cambiar el estado de {name}.',
@@ -422,6 +424,9 @@ export default {
     ends: 'Finaliza',
     renews: 'Renueva',
     paymentsPortalNotice: 'La gestión del método de pago se realiza desde el portal de facturación.',
+    managePlan: 'Actualizar plan',
+    managePlanHint: 'Los cambios y mejoras de plan se gestionan desde tu cuenta de ERPlora (se abre en el navegador).',
+    managePlanError: 'No se pudo abrir la página de planes. Inténtalo de nuevo.',
     statusDraft: 'Borrador',
     statusOpen: 'Abierta',
     statusPaid: 'Pagada',
@@ -533,6 +538,9 @@ export default {
   moduleView: {
     loading: 'Cargando módulo…',
     loadError: 'No se pudo cargar el módulo.',
+    blockedTitle: 'Suscripción necesaria',
+    blockedHint: 'Este módulo de pago está deshabilitado porque su suscripción ya no está activa para este hub. Tus datos locales están a salvo y volverán a estar disponibles en cuanto se restaure la suscripción.',
+    manageSubscription: 'Gestionar suscripción',
   },
   moduleSettings: {
     tab: 'Ajustes',

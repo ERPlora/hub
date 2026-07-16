@@ -29,6 +29,10 @@ const _ids = ref<Set<string> | null>(null);
 const _status = ref<EntitlementStatus>('unknown');
 const _offline = ref<boolean>(false);
 const _reason = ref<string>('');
+// Módulos de pago BLOQUEADOS por la revalidación híbrida (ADR-0114 §6): el dispatcher del
+// runtime ya rechaza sus queries/commands con 402; aquí la UI los deshabilita con CTA
+// "Gestionar suscripción". NUNCA se desinstalan ni se tocan datos locales.
+const _blocked = ref<Set<string>>(new Set());
 
 export const entitlementStatus = computed<EntitlementStatus>(() => _status.value);
 export const entitlementOffline = computed<boolean>(() => _offline.value);
@@ -41,12 +45,19 @@ export function isModuleEntitled(moduleId: string): boolean {
   return _ids.value.has(moduleId);
 }
 
+/** ¿Está el módulo de pago BLOQUEADO por la revalidación híbrida? (ADR-0114 §6).
+ *  Estricto (default false): solo bloquea si el runtime lo afirma. */
+export function isModuleBlocked(moduleId: string): boolean {
+  return _blocked.value.has(moduleId);
+}
+
 /** Limpia el estado (al cerrar sesión). */
 export function resetEntitlement(): void {
   _ids.value = null;
   _status.value = 'unknown';
   _offline.value = false;
   _reason.value = '';
+  _blocked.value = new Set();
 }
 
 function applyOutcome(o: GateOutcome): void {
@@ -96,8 +107,9 @@ export async function resolveEntitlement(): Promise<void> {
 
   // Camino web (online).
   try {
-    const { modules } = await cloudEntitlement();
+    const { modules, blockedModules } = await cloudEntitlement();
     _ids.value = new Set(modules.map((m) => m.moduleId).filter(Boolean));
+    _blocked.value = new Set(blockedModules);
     _status.value = 'unlocked';
     _offline.value = false;
     _reason.value = '';
