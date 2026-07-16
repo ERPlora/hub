@@ -226,6 +226,8 @@ export default {
     installing: 'Installing {name}…',
     installSuccess: '{name} installed successfully.',
     installError: 'Could not start installation of {name}.',
+    purchaseInBrowser: '{name} is a paid module — complete the purchase in your browser and come back.',
+    purchaseOpenError: 'Could not open the purchase page. Please try again.',
     deactivated: '{name} deactivated.',
     activated: '{name} activated.',
     cascadeOffTitle: 'Deactivate {name}',
@@ -421,6 +423,9 @@ export default {
     ends: 'Ends',
     renews: 'Renews',
     paymentsPortalNotice: 'Payment method management is handled from the billing portal.',
+    managePlan: 'Update plan',
+    managePlanHint: 'Plan upgrades and changes are managed from your ERPlora account (opens in your browser).',
+    managePlanError: 'Could not open the plans page. Please try again.',
     statusDraft: 'Draft',
     statusOpen: 'Open',
     statusPaid: 'Paid',
@@ -532,6 +537,9 @@ export default {
   moduleView: {
     loading: 'Loading module…',
     loadError: 'Could not load the module.',
+    blockedTitle: 'Subscription required',
+    blockedHint: 'This paid module is disabled because its subscription is no longer active for this hub. Your local data is safe and will be available again as soon as the subscription is restored.',
+    manageSubscription: 'Manage subscription',
   },
   moduleSettings: {
     tab: 'Settings',

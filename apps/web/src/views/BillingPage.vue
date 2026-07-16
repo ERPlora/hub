@@ -22,7 +22,18 @@
     </div>
 
     <!-- Suscripciones -->
-    <div v-show="tab === 'subscriptions'" class="fill">
+    <div v-show="tab === 'subscriptions'" class="fill subs-fill">
+      <!-- El Hub NO vende (ADR-0114): el upgrade/cambio de plan vive en el marketplace del
+           SaaS; aquí solo un CTA que abre el navegador externo + recheck al recuperar el foco. -->
+      <ion-card class="plan-cta m-0">
+        <ion-card-content class="plan-cta-content">
+          <p class="plan-cta-hint">{{ t('billing.managePlanHint') }}</p>
+          <ion-button size="small" fill="outline" @click="onManagePlan">
+            <HubIcon name="open-outline" slot="start" />
+            {{ t('billing.managePlan') }}
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
       <div v-if="loadingSubs" class="flex justify-center py-10">
         <ion-spinner name="dots" />
       </div>
@@ -72,9 +83,10 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
-  IonToolbar,
+  IonToolbar, IonCard, IonCardContent, IonButton,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonSpinner
 } from '@ionic/vue';
+import { openExternal } from '../lib/open-external';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import { DT_LABELS_ES } from '../lib/data-table-labels';
@@ -107,6 +119,35 @@ const invoices = ref<CloudInvoice[]>([]);
 const subscriptions = ref<CloudSubscription[]>([]);
 const loadingInvoices = ref(true);
 const loadingSubs = ref(true);
+
+// --- Plan del hub: deep-link al marketplace del SaaS + recheck-on-focus ---
+// (patrón ModulePlanPanel: el Hub nunca compra; abre el navegador y, al volver
+// el foco, re-consulta las suscripciones para reflejar el cambio).
+const plansDeepLink = (): string =>
+  `${config.cloudApiUrl}/dashboard/marketplace/plans/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
+
+async function onManagePlan(): Promise<void> {
+  try {
+    await openExternal(plansDeepLink());
+  } catch {
+    console.error('No se pudo abrir la página de planes del SaaS');
+  }
+}
+
+function refreshSubscriptions(): void {
+  cloudSubscriptions()
+    .then((data) => { subscriptions.value = data; })
+    .catch(() => { /* mantiene los datos previos */ })
+    .finally(() => { loadingSubs.value = false; });
+}
+
+function onWindowFocus(): void {
+  refreshSubscriptions();
+}
+
+function onVisibilityChange(): void {
+  if (document.visibilityState === 'visible') refreshSubscriptions();
+}
 
 // --- Handlers ---
 function onTabChange(ev: Event): void {
@@ -211,6 +252,11 @@ onMounted(() => {
     .catch(() => { subscriptions.value = []; })
     .finally(() => { loadingSubs.value = false; });
 
+  // Recheck-on-focus: tras gestionar el plan en el SaaS (navegador externo),
+  // el estado se refresca al volver a esta ventana.
+  window.addEventListener('focus', onWindowFocus);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
   // Vista por defecto responsive: tarjetas en móvil (≤768px), tabla en escritorio — recupera el
   // fallback a tarjetas del listado original. `views` habilita el toggle; `viewMode` es @state
   // interno del WC (default 'table') sin prop pública, así que lo fijamos por referencia.
@@ -231,6 +277,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   invoicesTable.value?.removeEventListener('rowAction', handleInvoiceAction);
+  window.removeEventListener('focus', onWindowFocus);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
 });
 
 // --- Descarga PDF de factura (endpoint real del Cloud) ---
@@ -264,5 +312,32 @@ async function downloadInvoice(id: number): Promise<void> {
    :host{height:100%} contra este contenedor → cabecera + pager fijos y scroll solo en el cuerpo. */
 .fill {
   height: 100%;
+}
+
+/* La pestaña de suscripciones apila CTA de plan + tabla; la tabla resuelve su
+   height:100% contra el hueco restante. */
+.subs-fill {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subs-fill > ok-data-table {
+  flex: 1;
+  min-height: 0;
+}
+
+.plan-cta-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.plan-cta-hint {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.75;
 }
 </style>
