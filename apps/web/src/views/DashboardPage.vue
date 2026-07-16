@@ -220,7 +220,11 @@ function coreBlueprintWidget(): WidgetDef {
     render: (cell: HTMLElement) => {
       const card = document.createElement('ion-card');
       card.setAttribute('data-testid', 'dashboard-blueprint-widget');
-      card.style.margin = '0'; // la celda del board ya aporta el hueco de la rejilla
+      // La celda del board ya aporta el hueco de la rejilla (margin:0). El resto replica la regla
+      // global de theme/polish.css (ion-card: radio + sombra + borde) con los MISMOS tokens: el
+      // CSS global no cruza el shadow del board, pero las custom properties sí heredan.
+      card.style.cssText =
+        'margin:0;border-radius:var(--ok-radius);box-shadow:var(--ok-shadow-sm);border:1px solid var(--ion-border-color);';
       const content = document.createElement('ion-card-content');
 
       const title = document.createElement('h2');
