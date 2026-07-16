@@ -32,10 +32,14 @@ Sin rasterizador SVG obligatorio: trabaja sobre PNG. Si el asset es `.svg` y
 `cairosvg` está instalado, lo rasteriza; si no, pide un PNG (mensaje claro).
 
 Uso:
-    python3 scripts/gen-tauri-icon.py [SOURCE]
+    python3 scripts/gen-tauri-icon.py [SOURCE] [--out DIR] [--store-assets-only]
 
   SOURCE por defecto: apps/tauri/branding/app-icon-source.png
   (ver apps/tauri/branding/README.md — ahí va el arte de marca DEFINITIVO).
+  --out DIR             destino alternativo (default: apps/tauri/src-tauri/icons).
+  --store-assets-only   emite SOLO los 3 PNG que referencia un Package.appxmanifest
+                        (Square44x44Logo, Square150x150Logo, StoreLogo) — para los
+                        Assets MSIX del bridge (hub#120), sin ico/icns/set completo.
 
 Dependencia única: Pillow (`pip install Pillow`). Reproducible.
 """
@@ -199,10 +203,29 @@ def save(img: Image.Image, name: str) -> None:
 
 
 def main() -> None:
-    source = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else DEFAULT_SOURCE
+    import argparse
+
+    global ICONS_DIR
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("source", nargs="?", default=str(DEFAULT_SOURCE))
+    parser.add_argument("--out", default=str(ICONS_DIR))
+    parser.add_argument("--store-assets-only", action="store_true")
+    args = parser.parse_args()
+
+    ICONS_DIR = Path(args.out).resolve()
+    source = Path(args.source).resolve()
     src = load_source(source)
     print(f"→ fuente: {source.relative_to(ROOT) if ROOT in source.parents else source}")
-    print(f"→ destino: {ICONS_DIR.relative_to(ROOT)}")
+    print(
+        f"→ destino: {ICONS_DIR.relative_to(ROOT) if ROOT in ICONS_DIR.parents else ICONS_DIR}"
+    )
+
+    if args.store_assets_only:
+        for name in ("Square44x44Logo.png", "Square150x150Logo.png", "StoreLogo.png"):
+            save(compose(src, SQUARE_LOGOS[name]), name)
+        print("OK — Assets MSIX (manifest) generados.")
+        return
 
     # PNGs cuadrados a sangre (Linux/dev + base) — Windows aplica su máscara
     for name, size in PNG_SIZES.items():

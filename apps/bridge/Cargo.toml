@@ -31,6 +31,9 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 # Notificaciones de SO para `send_notification` (bridge#9): multiplataforma (Linux DBus /
 # macOS / Windows Toast); si la plataforma no soporta, degradamos a log sin panic.
 notify-rust = "4"
+# Dir de datos por-usuario para `devices.json` (hub#121): bajo MSIX el install-dir es de solo
+# lectura → %LOCALAPPDATA%\ERPloraBridge (Windows) / equivalente XDG/macOS.
+dirs = "6"
 
 # Pendiente de fase de implementación: `tray-icon` (bandeja del sistema) — no añadido aún para
 # mantener el esqueleto compilando headless sin dependencias gráficas.
