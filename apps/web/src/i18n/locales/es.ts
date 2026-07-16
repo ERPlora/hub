@@ -35,16 +35,23 @@ export default {
     notifications: 'Notificaciones',
     noNotifications: 'Todo al día. Sin notificaciones.',
     configure: 'Configurar',
-    toggleTheme: 'Cambiar tema',
-    profile: 'Perfil',
     menu: 'Abrir menú',
     collapseMenu: 'Colapsar menú',
     expandMenu: 'Expandir menú',
   },
   sidebar: {
     profile: 'Perfil',
-    installApp: 'Instalar app',
     signOut: 'Cerrar sesión',
+  },
+  // Modal de instalación PWA (PwaInstallModal.vue) — sustituye al botón «Instalar app» del sidebar.
+  pwa: {
+    title: 'Llévate la experiencia completa',
+    hook: 'Usa ERPlora como una app nativa: pantalla completa, su propio icono y acceso al instante — sin barras del navegador de por medio.',
+    nativeView: 'Vista nativa',
+    cancel: 'Ahora no',
+    dontShowAgain: 'No volver a mostrar',
+    iosHint: 'En iPhone/iPad: toca Compartir (el cuadrado con la flecha) y elige «Añadir a pantalla de inicio».',
+    browserHint: 'En el menú de tu navegador, elige «Instalar aplicación» (o «Añadir a pantalla de inicio»).',
   },
   assistant: {
     title: 'Asistente',

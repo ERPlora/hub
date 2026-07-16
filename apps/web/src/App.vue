@@ -3,19 +3,38 @@
     <ion-split-pane content-id="main" when="lg" :class="{ rail: railCollapsed }">
       <!-- Menú lateral (drawer en móvil, fijo en desktop ≥lg). Solo con sesión. -->
       <ion-menu v-if="isAuthed" content-id="main" type="overlay" class="dash-menu">
-        <!-- Brand: rejilla CSS (erplora-logo) + wordmark, igual que el dashboard de Cloud. -->
+        <!-- Tarjeta de usuario ARRIBA (decisión 2026-07-16: el avatar de la topbar se retiró por
+             duplicado; el usuario vive aquí): avatar/iniciales + nombre/email + editar perfil +
+             logout. El brand (logo + versión) baja al footer. -->
         <ion-header class="ion-no-border">
           <ion-toolbar class="brand-toolbar">
-            <ion-menu-toggle :auto-hide="false" slot="start">
-              <a class="erp-lockup sm brand-link" role="button" tabindex="0" @click="goHome">
-                <span class="erp-logo sm">
-                  <i class="erp-nw" /><i class="erp-n" /><i class="erp-ne" />
-                  <i class="erp-w" /><i class="erp-hub" /><i class="erp-e" />
-                  <i class="erp-sw" /><i class="erp-s" /><i class="erp-se" />
-                </span>
-                <span class="erp-wordmark nav-label">erplora</span>
-              </a>
-            </ion-menu-toggle>
+            <div class="sidebar-user">
+              <!-- TODO(#39): migrar a ok-avatar cuando exista (ERPlora/outfitkit). Hasta entonces,
+                   avatar de iniciales a mano; el CSS vive en polish.css (.sidebar-user-avatar). -->
+              <div class="sidebar-user-avatar">{{ initials }}</div>
+              <div class="sidebar-user-meta nav-label">
+                <div class="sidebar-user-name">{{ user?.name }}</div>
+                <div class="sidebar-user-email">{{ user?.email }}</div>
+              </div>
+              <ion-button
+                class="nav-label"
+                fill="clear"
+                size="small"
+                :aria-label="t('sidebar.profile')"
+                @click="goProfile"
+              >
+                <HubIcon slot="icon-only" name="create-outline" />
+              </ion-button>
+              <ion-button
+                class="nav-label"
+                fill="clear"
+                size="small"
+                :aria-label="t('sidebar.signOut')"
+                @click="onLogout"
+              >
+                <HubIcon slot="icon-only" name="log-out-outline" />
+              </ion-button>
+            </div>
             <!-- El rail-toggle se movió a la topbar compartida (AppTopbar), a la derecha del back,
                  para dar paridad con el shell de Cloud. El estado sigue en lib/shell (railCollapsed). -->
           </ion-toolbar>
@@ -45,50 +64,22 @@
                El estado `moduleNav` sigue vivo (lo usa la rejilla de la topbar). -->
         </ion-content>
 
-        <!-- Tarjeta de usuario: avatar + nombre/email + enlace a perfil; fila de acciones
-             (reportar problema + logout) + versión de app. Paridad con el footer del sidebar
-             de Cloud (cloud/.../partials/sidebar.html). -->
+        <!-- Footer: brand (logo + wordmark, click → home) + versión de la app. El usuario se
+             movió a la cabecera del menú; el botón «Instalar app» lo sustituye el modal PWA
+             (PwaInstallModal). -->
         <ion-footer class="ion-no-border sidebar-foot">
-          <div class="sidebar-user">
-            <!-- TODO(#39): migrar a ok-avatar cuando exista (ERPlora/outfitkit). Hasta entonces,
-                 avatar de iniciales a mano (mismo cálculo en AppTopbar); el CSS NO se vuelve a
-                 duplicar (vive en dashboard-shell). -->
-            <div class="sidebar-user-avatar">{{ initials }}</div>
-            <div class="sidebar-user-meta nav-label">
-              <div class="sidebar-user-name">{{ user?.name }}</div>
-              <div class="sidebar-user-email">{{ user?.email }}</div>
-            </div>
-            <ion-button
-              class="nav-label"
-              fill="clear"
-              size="small"
-              :aria-label="t('sidebar.profile')"
-              @click="goProfile"
-            >
-              <HubIcon slot="icon-only" name="person-outline" />
-            </ion-button>
-          </div>
-          <div class="sidebar-foot-actions nav-label">
-            <!-- Botón «Instalar app» (PWA): solo cuando el navegador la ofrece (Chrome/Edge/
-                 Android) y aún no está instalada. lib/pwa.ts captura beforeinstallprompt. -->
-            <ion-button
-              v-if="canInstall"
-              fill="clear"
-              size="small"
-              :aria-label="t('sidebar.installApp')"
-              @click="onInstallApp"
-            >
-              <HubIcon slot="icon-only" name="download-outline" />
-            </ion-button>
-            <ion-button
-              fill="clear"
-              size="small"
-              :aria-label="t('sidebar.signOut')"
-              @click="onLogout"
-            >
-              <HubIcon slot="icon-only" name="log-out-outline" />
-            </ion-button>
-            <span class="sidebar-foot-text ml-auto">v{{ appVersion }}</span>
+          <div class="sidebar-foot-brand">
+            <ion-menu-toggle :auto-hide="false">
+              <a class="erp-lockup sm brand-link" role="button" tabindex="0" @click="goHome">
+                <span class="erp-logo sm">
+                  <i class="erp-nw" /><i class="erp-n" /><i class="erp-ne" />
+                  <i class="erp-w" /><i class="erp-hub" /><i class="erp-e" />
+                  <i class="erp-sw" /><i class="erp-s" /><i class="erp-se" />
+                </span>
+                <span class="erp-wordmark nav-label">erplora</span>
+              </a>
+            </ion-menu-toggle>
+            <span class="sidebar-foot-text ml-auto nav-label">v{{ appVersion }}</span>
           </div>
         </ion-footer>
       </ion-menu>
@@ -101,6 +92,9 @@
          AUTOMÁTICAMENTE al runtime (lib/error-report), sin modal ni acción del usuario. -->
     <template v-if="isAuthed">
       <AssistantDrawer />
+      <!-- Modal «vista nativa» (PWA): se ofrece al entrar mientras la app no esté instalada;
+           lib/pwa decide (standalone/Tauri/descartado-para-siempre → no se abre). -->
+      <PwaInstallModal />
     </template>
   </ion-app>
 </template>
@@ -116,12 +110,13 @@ import {
 } from '@ionic/vue';
 import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
+import PwaInstallModal from './components/PwaInstallModal.vue';
 import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav } from './lib/nav';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
 import { railCollapsed } from './lib/shell';
 import { PROFILE_ROUTE } from './lib/routes';
-import { canInstall, promptInstall } from './lib/pwa';
+import { maybeShowInstallModal } from './lib/pwa';
 import { apiDocsEnabled } from './lib/api-docs';
 import { getHubSettings } from './lib/hub-settings';
 import { bootHubLanguage } from './i18n';
@@ -164,11 +159,6 @@ const router = useRouter();
 // Versión de la app (horneada por Vite, ver vite.config.ts `define`).
 const appVersion = __APP_VERSION__;
 
-// Botón «Instalar app» (PWA): dispara el prompt nativo del navegador (lib/pwa.ts).
-async function onInstallApp(): Promise<void> {
-  await promptInstall();
-}
-
 const isActive = (path: string): boolean =>
   route.path === path || route.path.startsWith(`${path}/`);
 
@@ -198,10 +188,16 @@ async function gateAndRefresh(): Promise<void> {
   }
 }
 onMounted(() => {
-  if (isAuthed.value) void gateAndRefresh();
+  if (isAuthed.value) {
+    void gateAndRefresh();
+    maybeShowInstallModal();
+  }
 });
 watch(isAuthed, (authed) => {
-  if (authed) void gateAndRefresh();
+  if (authed) {
+    void gateAndRefresh();
+    maybeShowInstallModal();
+  }
 });
 // Si el entitlement resulta `needs_activation` (Tauri offline sin token cacheado, hub sin
 // derecho…), saca al usuario del negocio → pantalla de activación.

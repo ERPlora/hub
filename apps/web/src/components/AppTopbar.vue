@@ -5,9 +5,12 @@
   Orden/iconos iguales al shell de Cloud:
     start:  menu-button (drawer móvil; Ionic lo oculta en ≥lg) · back contextual
     title:  título de la vista (prop `title`)
-    end:    [slot actions de la vista] · asistente (sparkles) · notificaciones (campana+badge)
-            · toggle de tema · avatar (iniciales) → perfil
+    end:    [slot actions de la vista] · apps (rejilla) · asistente (sparkles)
+            · notificaciones (campana+badge)
     bajo el toolbar: barra de progreso mientras hay peticiones en vuelo.
+
+  El toggle de tema y el avatar se retiraron (2026-07-16, no cabían en móvil): tema → Ajustes;
+  usuario/perfil → cabecera del sidebar (App.vue).
 
   La vista pasa `title` y, si es una vista de detalle, `back-href` (muestra el botón Back).
   Acciones propias de la vista (p. ej. "Nuevo empleado") van en el slot `#actions`.
@@ -93,27 +96,9 @@
           </ion-content>
         </ion-popover>
 
-        <!-- Tema: alterna claro/oscuro (movido aquí desde SettingsPage). -->
-        <ion-button
-          fill="clear"
-          :aria-label="t('topbar.toggleTheme')"
-          :title="t('topbar.toggleTheme')"
-          @click="toggleTheme"
-        >
-          <HubIcon slot="icon-only" :name="isDark ? 'sunny-outline' : 'moon-outline'" />
-        </ion-button>
-
-        <!-- Avatar (iniciales) → perfil. -->
-        <!-- TODO(#39): migrar a ok-avatar cuando exista (ERPlora/outfitkit). -->
-        <a
-          class="topbar-avatar"
-          :aria-label="t('topbar.profile')"
-          :title="t('topbar.profile')"
-          role="button"
-          tabindex="0"
-          @click="goProfile"
-          @keydown.enter="goProfile"
-        >{{ initials }}</a>
+        <!-- El toggle de tema y el avatar se RETIRARON de la topbar (2026-07-16): en móvil no
+             cabían los iconos. El tema se cambia en Ajustes (selector system/light/dark) y el
+             usuario/perfil vive en la cabecera del sidebar (App.vue). -->
       </ion-buttons>
     </ion-toolbar>
 
@@ -131,12 +116,9 @@ import {
   IonPopover, IonContent, IonList, IonItem, IonLabel,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
-import { user } from '../lib/session';
-import { isDark, toggleTheme } from '../lib/theme';
 import { assistantAvailable, toggleAssistant, notificationCount, isLoading, railCollapsed } from '../lib/shell';
 import { moduleNav } from '../lib/nav';
 import { resolveIcon } from '../lib/icons';
-import { PROFILE_ROUTE } from '../lib/routes';
 
 // Una entrada de la rejilla de ok-app-launcher (OutfitKit). Espejo de su `OkLauncherApp`.
 interface LauncherApp {
@@ -190,24 +172,10 @@ function onAppSelect(e: Event): void {
   if (id) void router.push(id);
 }
 
-// Iniciales para el avatar (mismo cálculo que el footer del sidebar).
-const initials = computed<string>(() => {
-  const name = user.value?.name?.trim();
-  if (name) {
-    const parts = name.split(/\s+/).filter(Boolean);
-    return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
-  }
-  return (user.value?.email?.[0] ?? '?').toUpperCase();
-});
-
 function goBack(): void {
   // Si hay historial dentro de la app, volvemos; si no (deep-link), al href de fallback.
   if (window.history.state?.back) router.back();
   else if (props.backHref) void router.push(props.backHref);
-}
-
-function goProfile(): void {
-  void router.push(PROFILE_ROUTE);
 }
 </script>
 

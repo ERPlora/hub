@@ -85,3 +85,51 @@ export async function promptInstall(): Promise<boolean> {
   canInstall.value = false;
   return outcome === 'accepted';
 }
+
+// ── Modal «vista nativa» ────────────────────────────────────────────────────────────────────
+// Sustituye al botón «Instalar app» del sidebar: al entrar, si la app no está instalada, se
+// ofrece un modal con «Vista nativa» / «Cancelar» + checkbox «no volver a mostrar». Cancelar
+// sin checkbox solo lo cierra esta vez (vuelve a ofrecerse en la siguiente entrada).
+
+const LS_HIDE_MODAL_KEY = 'erplora.pwa.hideInstallModal';
+
+/** Estado del modal (lo monta App.vue; lo abre `maybeShowInstallModal` al entrar). */
+export const installModalOpen = ref<boolean>(false);
+
+function installModalDismissedForever(): boolean {
+  try {
+    return localStorage.getItem(LS_HIDE_MODAL_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** ¿Toca ofrecer el modal? No instalada (ni standalone ni Tauri) y no descartado para siempre. */
+export function shouldShowInstallModal(): boolean {
+  return !isTauri() && !isStandalone.value && !installModalDismissedForever();
+}
+
+/** Abre el modal si toca ofrecerlo. Llamar al entrar el usuario (post-login). */
+export function maybeShowInstallModal(): void {
+  if (shouldShowInstallModal()) installModalOpen.value = true;
+}
+
+/** Cierra el modal; con `remember` el descarte se persiste y no se vuelve a ofrecer. */
+export function dismissInstallModal(remember: boolean): void {
+  installModalOpen.value = false;
+  if (remember) {
+    try {
+      localStorage.setItem(LS_HIDE_MODAL_KEY, '1');
+    } catch {
+      /* noop */
+    }
+  }
+}
+
+/** iOS (Safari/WebKit): sin `beforeinstallprompt`; la instalación es manual vía Compartir. */
+export function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    // iPadOS 13+ se presenta como macOS pero es táctil.
+    || (navigator.userAgent.includes('Mac') && navigator.maxTouchPoints > 1);
+}
