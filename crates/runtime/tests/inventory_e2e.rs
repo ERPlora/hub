@@ -86,8 +86,11 @@ async fn product_crud_and_low_stock() {
     assert_eq!(rows2.len(), 0);
 }
 
+/// CONTRATO NUEVO (inventory#7): `stock.adjust` pasó de delta-con-clamp a RECUENTO
+/// ABSOLUTO con motivo obligatorio. El test viejo (`delta: -5 → clamp a 0`) fijaba la
+/// ambigüedad que #7 elimina; el contrato completo del ledger vive en inventory_ledger_e2e.rs.
 #[tokio::test]
-async fn stock_adjust_clamps_at_zero() {
+async fn stock_adjust_is_absolute_count() {
     let rt = fresh().await;
     let ctx = admin_ctx();
     rt.execute_command(
@@ -100,9 +103,9 @@ async fn stock_adjust_clamps_at_zero() {
     let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
-    // -5 sobre stock 2 → MAX(0, -3) = 0 (no negativo por defecto).
+    // Recuento absoluto: el stock queda en el valor contado.
     rt.execute_command("inventory.stock.adjust",
-        &params(json!({ "product_id": id, "delta": -5 })), &ctx).await.unwrap();
+        &params(json!({ "product_id": id, "stock": 0, "reason": "recuento: rotura total" })), &ctx).await.unwrap();
     let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": id})), &ctx).await.unwrap();
     assert_eq!(p[0]["stock"], json!(0));
 }
