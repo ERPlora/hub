@@ -73,10 +73,12 @@ async fn product_crud_and_low_stock() {
     let low = rt.execute_query("inventory.products.low_stock", &Params::new(), &ctx).await.unwrap();
     assert_eq!(low.len(), 1);
 
-    // stats: 1 producto, en stock, valor 450 céntimos × 3 = 1350 céntimos (13.50€).
+    // stats: 1 producto, en stock. Valoración A COSTE (inventory#9 — la fórmula anterior,
+    // precio×stock=1350, era conceptualmente incorrecta: valoraba a PVP): 200 × 3 = 600 céntimos.
+    // El contrato completo (exclusiones, sin-coste, agotados) se fija en inventory_stats_e2e.rs.
     let stats = rt.execute_query("inventory.products.stats", &Params::new(), &ctx).await.unwrap();
     assert_eq!(stats[0]["total_products"], json!(1));
-    assert_eq!(stats[0]["total_inventory_value"].as_i64().unwrap(), 1350);
+    assert_eq!(stats[0]["total_inventory_value"].as_i64().unwrap(), 600);
 
     // Otro hub no ve nada (scope hub_id).
     let other = RequestContext::new("h2", "u9", ["*".to_string()]);
