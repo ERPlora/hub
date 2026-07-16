@@ -285,16 +285,20 @@ export interface EntitledModuleInfo {
 
 /** Lista de módulos que ESTE hub puede montar (según deployment_mode + compras de la org).
  *  Vía el runtime local (firma con el token de máquina del hub). */
-export async function cloudEntitlement(): Promise<{ modules: EntitledModuleInfo[] }> {
-  const data = await runtimeGet<{ modules?: Array<{ module_id?: string; tier?: string; version?: string }> }>(
-    '/api/entitlement',
-  );
+export async function cloudEntitlement(): Promise<{ modules: EntitledModuleInfo[]; blockedModules: string[] }> {
+  const data = await runtimeGet<{
+    modules?: Array<{ module_id?: string; tier?: string; version?: string }>;
+    // Bloque ADITIVO del proxy del runtime (ADR-0114 §6): módulos de pago bloqueados
+    // por la revalidación híbrida (no-entitled del servidor o gracia vencida).
+    revalidation?: { blocked_modules?: string[] };
+  }>('/api/entitlement');
   const modules = (data.modules ?? []).map((m) => ({
     moduleId: String(m.module_id ?? ''),
     tier: String(m.tier ?? 'basic'),
     version: String(m.version ?? ''),
   }));
-  return { modules };
+  const blockedModules = (data.revalidation?.blocked_modules ?? []).map(String).filter(Boolean);
+  return { modules, blockedModules };
 }
 
 // --- Billing: facturas y suscripciones (datos reales del Cloud) -------------
@@ -473,110 +477,9 @@ export async function cloudModuleSubscription(moduleSlug: string): Promise<Cloud
   };
 }
 
-export interface PurchaseModuleOptions {
-  /** Tier a comprar/mejorar. UPGRADE = mismo endpoint con otro `tierSlug`. */
-  tierSlug?: string;
-  /** URL del Hub a la que vuelve Stripe tras pagar. */
-  successUrl: string;
-  /** URL del Hub a la que vuelve Stripe si cancela el checkout. */
-  cancelUrl: string;
-  /** Modo del checkout de Stripe (por defecto "hosted" → checkout_url). */
-  uiMode?: 'hosted' | 'embedded';
-}
-
-/** Resultado de iniciar una compra/upgrade. Discriminado por `isFree`. */
-export type PurchaseModuleResult =
-  | { isFree: true; purchaseId: number | null; message: string }
-  | {
-      isFree: false;
-      sessionId: string;
-      /** URL del checkout alojado de Stripe (modo "hosted"). Vacía en modo "embedded". */
-      checkoutUrl: string;
-      mode: string;
-      currency: string;
-    };
-
-/**
- * Compra / upgrade de un módulo (plano "compra = usuario"). Devuelve free o datos de checkout.
- *
- * @deprecated El Hub ya NO vende (Fase 4): ModulePlanPanel abre un deep-link a la página del
- * módulo en el SaaS (openExternal) y la compra se completa en el navegador. Se conserva mientras
- * el endpoint del SaaS siga vivo; se retirará tras el próximo ciclo de updates.
- */
-export async function cloudPurchaseModule(
-  moduleSlug: string,
-  opts: PurchaseModuleOptions,
-): Promise<PurchaseModuleResult> {
-  const data = await post<{
-    is_free?: boolean;
-    purchase_id?: number | null;
-    message?: string;
-    session_id?: string;
-    checkout_url?: string;
-    mode?: string;
-    currency?: string;
-  }>(`/api/v1/marketplace/modules/${encodeURIComponent(moduleSlug)}/purchase/`, {
-    success_url: opts.successUrl,
-    cancel_url: opts.cancelUrl,
-    ...(opts.tierSlug ? { tier_slug: opts.tierSlug } : {}),
-    ui_mode: opts.uiMode ?? 'hosted',
-  });
-  if (data.is_free) {
-    return { isFree: true, purchaseId: data.purchase_id ?? null, message: String(data.message ?? '') };
-  }
-  return {
-    isFree: false,
-    sessionId: String(data.session_id ?? ''),
-    checkoutUrl: String(data.checkout_url ?? ''),
-    mode: String(data.mode ?? ''),
-    currency: String(data.currency ?? 'EUR'),
-  };
-}
-
-export interface CancelModuleSubscriptionResult {
-  success: boolean;
-  message: string;
-  /** Fecha (ISO) en la que se cancelará (fin del periodo) o null. */
-  canceledAt: string | null;
-}
-
-/** Cancela la suscripción de un módulo (al final del periodo). */
-export async function cloudCancelModuleSubscription(moduleSlug: string): Promise<CancelModuleSubscriptionResult> {
-  const data = await post<{ success?: boolean; message?: string; canceled_at?: string | null }>(
-    `/api/v1/marketplace/modules/${encodeURIComponent(moduleSlug)}/cancel-subscription/`,
-    {},
-  );
-  return {
-    success: Boolean(data.success),
-    message: String(data.message ?? ''),
-    canceledAt: data.canceled_at ?? null,
-  };
-}
-
-export interface CloudModuleOwnership {
-  owned: boolean;
-  /** "purchase" | "subscription" | "free" | null. El Cloud NO expone el slug del tier actual. */
-  purchaseType: string | null;
-  purchaseId: number | null;
-  purchasedAt: string | null;
-}
-
-/** ¿Posee el hub este módulo? (check_ownership). NO devuelve el tier exacto (v1 pragmático). */
-export async function cloudModuleOwnership(moduleSlug: string): Promise<CloudModuleOwnership> {
-  const data = await get<{
-    owned?: boolean;
-    is_owned?: boolean;
-    purchase_type?: string | null;
-    purchase_id?: number | null;
-    purchased_at?: string | null;
-  }>(`/api/v1/marketplace/modules/${encodeURIComponent(moduleSlug)}/check_ownership/`);
-  return {
-    owned: Boolean(data.owned ?? data.is_owned),
-    purchaseType: data.purchase_type ?? null,
-    purchaseId: data.purchase_id ?? null,
-    purchasedAt: data.purchased_at ?? null,
-  };
-}
+// La compra/cancelación/ownership desde el Hub se RETIRÓ (ADR-0114 + hub#119): el Hub no
+// vende — ModulePlanPanel/AppsPage abren el marketplace del SaaS por deep-link (openExternal)
+// y el estado se refleja vía cloudModuleSubscription + entitlement (recheck-on-focus).
 
 async function meRequest(access: string): Promise<CloudUser> {
   const ctrl = new AbortController();

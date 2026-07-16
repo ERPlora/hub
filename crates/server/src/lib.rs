@@ -1246,6 +1246,10 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     let (status, code) = match &e {
         E::PermissionDenied(_) => (StatusCode::FORBIDDEN, "permission_denied"),
         E::QueryNotFound(_) | E::CommandNotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
+        // ADR-0127: `queryOptional` del SDK devuelve `undefined` SOLO con este código; un
+        // `not_found` normal (contrato roto contra un módulo presente) sigue siendo un error.
+        E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed"),
+        E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive"),
         E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload"),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented"),
         _ => (StatusCode::BAD_REQUEST, "error"),
@@ -1358,6 +1362,9 @@ async fn list_modules(State(st): State<AppState>, Query(q): Query<LocaleQuery>) 
                 "name": reg.module_name_localized(&m.id, &m.name, locale),
                 "version": m.version,
                 "status": m.status,
+                // Dependencias declaradas: el toggle del shell las usa para AVISAR de la cascada
+                // (ADR-0128) antes de desactivar («también desactivará: …»).
+                "depends_on": m.depends_on,
                 // ADITIVO (ADR-0057): true si el módulo expone alguna query/command `expose_api`.
                 "has_public_api": public_api.contains(&m.id),
             })

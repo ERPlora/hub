@@ -191,6 +191,7 @@ pub async fn installed_status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<
         let id = row["module_id"].as_str().unwrap_or_default().to_string();
         let status = match row["status"].as_str() {
             Some("inactive") => ModuleStatus::Inactive,
+            Some("inactive_auto") => ModuleStatus::InactiveAuto,
             _ => ModuleStatus::Active,
         };
         out.push((id, status));
@@ -221,6 +222,7 @@ pub async fn installed_status_versioned(
         let version = row["version"].as_str().unwrap_or_default().to_string();
         let status = match row["status"].as_str() {
             Some("inactive") => ModuleStatus::Inactive,
+            Some("inactive_auto") => ModuleStatus::InactiveAuto,
             _ => ModuleStatus::Active,
         };
         out.push((id, version, status));
@@ -280,6 +282,7 @@ async fn persist_status(db: &dyn DatabaseAdapter, hub_id: &str, id: &str, versio
     let status_str = match status {
         ModuleStatus::Active => "active",
         ModuleStatus::Inactive => "inactive",
+        ModuleStatus::InactiveAuto => "inactive_auto",
     };
     let now = crate::registry::now_rfc3339();
     let mut p = Params::new();

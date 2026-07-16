@@ -53,6 +53,9 @@ pub struct ModuleInfo {
     pub name: String,
     pub version: String,
     pub status: ModuleStatus,
+    /// Dependencias declaradas (`depends_on`): la UI del shell las usa para avisar de la CASCADA
+    /// (ADR-0128) antes de desactivar («también desactivará: …»).
+    pub depends_on: Vec<String>,
 }
 
 /// `hub_id` de desarrollo por defecto (mismo UUID fijo que `crates/server::DEV_HUB_ID`). El host
@@ -179,7 +182,10 @@ impl Runtime {
 
         // 5) Repón el estado inactivo previo de este hub sobre el registro recién reconstruido y
         // persístelo (el upsert del install lo había dejado `active`). Solo módulos presentes en
-        // disco; un estado huérfano de un módulo ya borrado se ignora.
+        // disco; un estado huérfano de un módulo ya borrado se ignora. Basta con reponer los
+        // MANUALES: `deactivate` re-deriva la cascada (ADR-0128), así que los `inactive_auto`
+        // persistidos renacen solos de su raíz — y si su raíz ya no existe, quedan activos, que
+        // es lo coherente (sin causa no hay caída).
         for (id, status) in persisted {
             if status == ModuleStatus::Inactive && self.registry.is_installed(&id) {
                 self.deactivate(&id).await?;
@@ -239,14 +245,79 @@ impl Runtime {
             .collect())
     }
 
-    /// Activa un módulo instalado (sus capacidades vuelven a estar disponibles).
+    /// Activa un módulo instalado — con CASCADA en las dos direcciones (ADR-0128).
+    ///
+    /// El invariante es «activo ⇒ todas tus `depends_on` activas», y lo mantiene el runtime, no
+    /// el admin: activar `sales` enciende también sus dependencias (el admin pidió sales; sales
+    /// no existe sin ellas). Después, un barrido a punto fijo revive todo lo que cayó EN CASCADA
+    /// (`InactiveAuto`) y ya tiene sus dependencias activas — lo apagado A MANO no se toca.
     pub async fn activate(&mut self, module_id: &str) -> Result<()> {
-        installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id, ModuleStatus::Active).await
+        // Cascada hacia ARRIBA: el módulo pedido + sus dependencias transitivas.
+        let mut pending = vec![module_id.to_string()];
+        let mut to_enable: Vec<String> = Vec::new();
+        while let Some(id) = pending.pop() {
+            if to_enable.contains(&id) {
+                continue;
+            }
+            to_enable.push(id.clone());
+            if let Some(m) = self.registry.installed.iter().find(|m| m.id == id) {
+                pending.extend(m.depends_on.iter().cloned());
+            }
+        }
+        for id in &to_enable {
+            installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, id, ModuleStatus::Active).await?;
+        }
+        // Barrido a punto fijo: lo caído en cascada vuelve en cuanto puede.
+        loop {
+            let revivable: Vec<String> = self
+                .registry
+                .installed
+                .iter()
+                .filter(|m| {
+                    matches!(self.registry.status.get(&m.id), Some(ModuleStatus::InactiveAuto))
+                        && m.depends_on.iter().all(|d| self.registry.is_active(d))
+                })
+                .map(|m| m.id.clone())
+                .collect();
+            if revivable.is_empty() {
+                break;
+            }
+            for id in revivable {
+                installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, &id, ModuleStatus::Active).await?;
+            }
+        }
+        Ok(())
     }
 
-    /// Desactiva un módulo instalado (oculta su menú y bloquea sus queries/commands).
+    /// Desactiva un módulo instalado — y ARRASTRA a todo dependiente transitivo activo (ADR-0128).
+    ///
+    /// El objetivo cae como `Inactive` (decisión MANUAL: se respeta hasta que el admin lo pida de
+    /// vuelta). Los arrastrados caen como `InactiveAuto`: volverán solos en cuanto sus
+    /// dependencias vuelvan a estar activas.
     pub async fn deactivate(&mut self, module_id: &str) -> Result<()> {
-        installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id, ModuleStatus::Inactive).await
+        installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id, ModuleStatus::Inactive).await?;
+        // Cascada hacia ABAJO por el grafo inverso de depends_on, en oleadas.
+        let mut fallen = vec![module_id.to_string()];
+        loop {
+            let wave: Vec<String> = self
+                .registry
+                .installed
+                .iter()
+                .filter(|m| {
+                    self.registry.is_active(&m.id)
+                        && m.depends_on.iter().any(|d| fallen.contains(d))
+                })
+                .map(|m| m.id.clone())
+                .collect();
+            if wave.is_empty() {
+                break;
+            }
+            for id in wave {
+                installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, &id, ModuleStatus::InactiveAuto).await?;
+                fallen.push(id);
+            }
+        }
+        Ok(())
     }
 
     /// Desinstala un módulo (quita sus capacidades; no borra sus datos).
@@ -264,6 +335,7 @@ impl Runtime {
                 name: m.name.clone(),
                 version: m.version.clone(),
                 status: *self.registry.status.get(&m.id).unwrap_or(&ModuleStatus::Inactive),
+                depends_on: m.depends_on.clone(),
             })
             .collect()
     }

@@ -40,9 +40,12 @@ async fn deactivate_hides_menu_and_blocks_capabilities() {
     // inactivo → sin menú, query/command devuelven NotFound (no existen para el caller)
     assert_eq!(rt.modules()[0].status, ModuleStatus::Inactive);
     assert_eq!(rt.navigation().len(), 0, "el menú no debe mostrar módulos inactivos");
+    // Desactivado ≠ desinstalado ≠ contrato roto (ADR-0128): el módulo SIGUE en el hub (datos y
+    // manifest presentes) pero no disponible — su error propio permite a `queryOptional` tratarlo
+    // como ausencia sin tragarse queries inexistentes de módulos activos.
     assert!(matches!(
         rt.execute_query("inventory.products.list", &Params::new(), &ctx()).await.unwrap_err(),
-        RuntimeError::QueryNotFound(_)
+        RuntimeError::ModuleInactive { .. }
     ));
     assert!(matches!(
         rt.execute_command("inventory.products.create", &params(json!({"name":"X","sku":"X","price":1,"stock":1})), &ctx()).await.unwrap_err(),
@@ -79,9 +82,12 @@ async fn uninstall_removes_module() {
 
     assert_eq!(rt.modules().len(), 0);
     assert_eq!(rt.navigation().len(), 0);
+    // Tras desinstalar, el dueño de la query YA NO ESTÁ: el error correcto es la AUSENCIA del
+    // módulo (ADR-0127 — es lo que permite a `queryOptional` distinguirla de un contrato roto),
+    // no un `QueryNotFound` genérico.
     assert!(matches!(
         rt.execute_query("inventory.products.list", &Params::new(), &ctx()).await.unwrap_err(),
-        RuntimeError::QueryNotFound(_)
+        RuntimeError::ModuleNotInstalled { .. }
     ));
 }
 

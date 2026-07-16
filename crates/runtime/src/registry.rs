@@ -7,10 +7,15 @@ use crate::manifest::{CommandDef, Manifest, ModuleLocale, Nav, QueryDef};
 
 /// Estado de un módulo instalado en este hub (equivalente a la tabla `hub_module`, §2.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum ModuleStatus {
     Active,
+    /// Apagado A MANO por el admin: se respeta hasta que él lo reactive (o algo que dependa de él
+    /// se active y lo arrastre hacia arriba).
     Inactive,
+    /// Caído EN CASCADA al apagarse una dependencia (ADR-0128): quiere volver, y vuelve solo en
+    /// cuanto todas sus `depends_on` estén activas.
+    InactiveAuto,
 }
 
 /// JSON Schema **compilado** del payload de una query/command. Se compila UNA vez al

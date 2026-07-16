@@ -219,7 +219,7 @@ async function loadStatus(): Promise<void> {
 // cancelación viven ahí (checkout de Stripe incluido). `hub` identifica este hub en el SaaS
 // (config.hubId lo resuelve el boot desde `GET /api/hub/context`, ver lib/runtime.ts).
 const deepLink = computed(() =>
-  `${config.cloudApiUrl}/dashboard/billing/modules/${encodeURIComponent(props.moduleId)}/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`);
+  `${config.cloudApiUrl}/dashboard/marketplace/modules/${encodeURIComponent(props.moduleId)}/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`);
 
 async function onPurchase(): Promise<void> {
   // Abre el navegador externo; al volver el foco a esta vista, el recheck refleja la compra.

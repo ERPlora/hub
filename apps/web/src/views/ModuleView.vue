@@ -21,11 +21,25 @@
       :module-id="params().moduleId"
       :settings="settings"
     />
+    <!-- Módulo de pago BLOQUEADO por la revalidación híbrida (ADR-0114 §6): el dispatcher del
+         runtime rechaza sus queries/commands (402) — la UI lo cuenta y manda a gestionar la
+         suscripción al SaaS. Los datos locales NUNCA se tocan. La pestaña "Plan" sigue accesible. -->
+    <ion-card v-if="status === 'ready' && isBlocked && !isPlanTab" color="warning" class="blocked-card">
+      <ion-card-content>
+        <strong>{{ t('moduleView.blockedTitle') }}</strong>
+        <p class="blocked-hint">{{ t('moduleView.blockedHint') }}</p>
+        <ion-button size="small" @click="onManageSubscription">
+          <HubIcon name="open-outline" slot="start" />
+          {{ t('moduleView.manageSubscription') }}
+        </ion-button>
+      </ion-card-content>
+    </ion-card>
+
     <!-- El WebComponent (Lit) de la pestaña activa se monta aquí en runtime (createElement + append). -->
     <div
       ref="outlet"
       class="outlet"
-      v-show="status === 'ready' && !isPlanTab && !isGenericSettingsTab"
+      v-show="status === 'ready' && !isPlanTab && !isGenericSettingsTab && !isBlocked"
     />
 
     <!-- Tabbar secundario del módulo: las pestañas salen de `navigation[]` del manifest
@@ -55,7 +69,7 @@ import { computed, inject, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  IonToolbar,
+  IonToolbar, IonCard, IonCardContent, IonButton,
   IonFooter, IonSegment, IonSegmentButton,  IonLabel, IonSpinner
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
@@ -64,6 +78,9 @@ import ModulePlanPanel from '../components/ModulePlanPanel.vue';
 import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
 import { clientInjectionKey, getClient } from '../lib/runtime';
+import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
+import { openExternal } from '../lib/open-external';
+import { config } from '../lib/config';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
@@ -97,6 +114,26 @@ const billing = ref<ModuleBilling | null>(null);
 const settings = ref<ModuleSettingsDef | null>(null);
 /** ¿Está activa la pestaña sintética "Plan"? */
 const isPlanTab = computed(() => activeNavId.value === PLAN_TAB_ID);
+/** ¿Módulo de pago bloqueado por la revalidación híbrida? (bloque `revalidation`, ADR-0114 §6). */
+const isBlocked = computed(() => isModuleBlocked(params().moduleId));
+
+/** CTA del banner de bloqueo: gestionar la suscripción en el marketplace del SaaS
+ *  (deep-link con hub) + recheck del entitlement al recuperar el foco. */
+async function onManageSubscription(): Promise<void> {
+  const url =
+    `${config.cloudApiUrl}/dashboard/marketplace/modules/${encodeURIComponent(params().moduleId)}` +
+    `/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
+  const recheck = (): void => {
+    window.removeEventListener('focus', recheck);
+    void resolveEntitlement();
+  };
+  window.addEventListener('focus', recheck);
+  try {
+    await openExternal(url);
+  } catch {
+    window.removeEventListener('focus', recheck);
+  }
+}
 /**
  * ¿La pestaña activa es la de ajustes Y el módulo declara `settings` sin `component`? Entonces el
  * shell pinta el form genérico. Con `settings.component`, en cambio, se monta ese WC (vía outlet).
@@ -232,5 +269,14 @@ watch(
      el outlet y sigue scrolleando vía `ion-content` (que es el scroller por defecto). */
 .outlet {
   height: 100%;
+}
+
+.blocked-card {
+  margin: 12px 0;
+}
+
+.blocked-hint {
+  margin: 6px 0 12px;
+  font-size: 13px;
 }
 </style>

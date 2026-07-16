@@ -45,9 +45,19 @@ pub async fn execute_page(
     params: &Params,
     ctx: &RequestContext,
 ) -> Result<QueryPage> {
-    let q = registry
-        .get_query(name)
-        .ok_or_else(|| RuntimeError::QueryNotFound(name.to_string()))?;
+    let q = registry.get_query(name).ok_or_else(|| {
+        // Tres ausencias distintas, tres errores (ADR-0127/0128): módulo NO instalado y módulo
+        // DESACTIVADO son ausencias que `queryOptional` perdona; una query inexistente en un
+        // módulo activo es un CONTRATO ROTO y explota.
+        let owner = name.split('.').next().unwrap_or("");
+        if owner.is_empty() || !registry.installed.iter().any(|m| m.id == owner) {
+            return RuntimeError::ModuleNotInstalled { module: owner.to_string(), operation: name.to_string() };
+        }
+        if !registry.is_active(owner) {
+            return RuntimeError::ModuleInactive { module: owner.to_string(), operation: name.to_string() };
+        }
+        RuntimeError::QueryNotFound(name.to_string())
+    })?;
     permissions::check(ctx, &q.def.permission)?;
 
     // Validación del payload contra el JSON Schema declarado (compilado al instalar y

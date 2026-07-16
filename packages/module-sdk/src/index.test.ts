@@ -425,3 +425,57 @@ test('queryAll tolera una query que NO es de lista (devuelve el array tal cual)'
   });
   assert.deepEqual(await c.queryAll('taxes.rules.list'), [{ id: 'a' }, { id: 'b' }]);
 });
+
+// ── queryOptional: la optionalidad es del MÓDULO, no del contrato (ADR-0127) ─────────────────
+//
+// `sales` consulta `verifactu.records.by_invoice` SOLO si el hub tiene verifactu instalado. La
+// forma antigua era `.catch(() => [])` — que se tragaba TODO: módulo ausente, pero también query
+// renombrada, permiso denegado, handler roto. `queryOptional` perdona UNA sola cosa: la ausencia
+// del módulo (código `module_not_installed`, que el runtime distingue de `query_not_found`).
+
+function transporteQueFalla(code: string) {
+  return {
+    query: async () => { throw new ErploraError(code, `error ${code}`); },
+    command: async () => ({}),
+    subscribe: () => () => {},
+  };
+}
+
+test('queryOptional devuelve undefined SOLO si el módulo no está instalado', async () => {
+  const c = new ErploraClient(transporteQueFalla('module_not_installed'));
+  assert.equal(await c.queryOptional('verifactu.records.by_invoice', { invoice_id: 'i1' }), undefined);
+});
+
+test('queryOptional NO se traga un contrato roto (query inexistente en módulo presente)', async () => {
+  const c = new ErploraClient(transporteQueFalla('not_found'));
+  await assert.rejects(() => c.queryOptional('verifactu.records.by_invoice'), (e) => {
+    assert.ok(e instanceof ErploraError && e.code === 'not_found', 'el contrato roto EXPLOTA');
+    return true;
+  });
+});
+
+test('queryOptional NO se traga permisos ni fallos del handler', async () => {
+  for (const code of ['permission_denied', 'invalid_payload', 'wasm', 'db']) {
+    const c = new ErploraClient(transporteQueFalla(code));
+    await assert.rejects(() => c.queryOptional('verifactu.records.by_invoice'), (e) => {
+      assert.equal((e as ErploraError).code, code);
+      return true;
+    });
+  }
+});
+
+test('queryOptional con el módulo presente devuelve los datos tal cual (desenvuelve la página)', async () => {
+  const c = new ErploraClient({
+    query: async () => ({ rows: [{ id: 'r1' }], total: 1, limit: 50, offset: 0 }),
+    command: async () => ({}),
+    subscribe: () => () => {},
+  });
+  assert.deepEqual(await c.queryOptional('verifactu.records.by_invoice'), [{ id: 'r1' }]);
+});
+
+test('queryOptional también trata module_inactive como ausencia (cascada ADR-0128)', async () => {
+  // Un módulo DESACTIVADO (manual o arrastrado) equivale a ausente para un consumidor opcional:
+  // el obligatorio nunca llega a preguntar, porque la cascada lo apagó junto a su dependencia.
+  const c = new ErploraClient(transporteQueFalla('module_inactive'));
+  assert.equal(await c.queryOptional('verifactu.records.by_invoice'), undefined);
+});
