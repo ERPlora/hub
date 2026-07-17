@@ -16,6 +16,7 @@ import { addIcons } from 'ionicons';
 import { isModuleEntitled } from './entitlement';
 import { moduleIconRegistry } from './icons';
 import { RUNTIME_URL } from './runtime';
+import { orderSlotFillers } from './slot-fillers';
 import { getLocale } from '../i18n';
 
 export interface MenuEntry {
@@ -238,26 +239,19 @@ export async function loadModuleComponent(mod: InstalledManifest, tag: string): 
  * responde, ningún módulo aporta al slot, o el ESM de un aportante falla (ese se omite).
  */
 export async function loadSlotComponents(slot: string): Promise<{ component: string }[]> {
-  type SlotDef = { slot?: string; component?: string; priority?: number };
   let manifests: InstalledManifest[];
   try {
     manifests = await loadInstalledManifests();
   } catch {
     return [];
   }
-  const entries: Array<{ def: SlotDef; mod: InstalledManifest }> = [];
-  for (const mod of manifests) {
-    const slots = (mod.manifest as unknown as { provides_slots?: SlotDef[] }).provides_slots ?? [];
-    for (const def of slots) {
-      if (def && def.slot === slot && def.component) entries.push({ def, mod });
-    }
-  }
-  entries.sort((a, b) => (a.def.priority ?? 100) - (b.def.priority ?? 100));
+  // Match + orden por `priority` = lógica pura testeada en `slot-fillers.test.ts`. Aquí solo queda
+  // la I/O: cargar el ESM de cada aportante (registra su WC) en orden y devolver los tags a montar.
   const out: { component: string }[] = [];
-  for (const { def, mod } of entries) {
+  for (const { mod, component } of orderSlotFillers(manifests, slot)) {
     try {
-      await loadModuleComponent(mod, def.component as string);
-      out.push({ component: def.component as string });
+      await loadModuleComponent(mod, component);
+      out.push({ component });
     } catch {
       /* un aportante cuyo ESM falle se omite (no rompe el resto del slot) */
     }
