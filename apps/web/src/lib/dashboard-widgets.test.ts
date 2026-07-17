@@ -488,6 +488,54 @@ describe('accesibilidad de las cards (T5)', () => {
   });
 });
 
+describe('i18n de títulos de widget (T5, ADR-0055)', () => {
+  const client = clientWith(async () => [{ value: 1 }]);
+  const def: WidgetManifestDef = {
+    title: 'Sales today', // inglés canónico en el module.json
+    kind: 'kpi',
+    query: 'sales.today',
+    map: { value: 'value' },
+  };
+
+  it('traduce el título desde el locale del módulo (`locale.widgets.<id>.title`)', () => {
+    const mods = [
+      {
+        id: 'sales',
+        manifest: { id: 'sales', widgets: { 'sales.today': def } },
+        locale: { widgets: { 'sales.today': { title: 'Ventas hoy' } } },
+      },
+    ] as unknown as InstalledManifest[];
+    const { widgets } = buildWidgetsFromManifests(mods, { client, sector: null });
+    expect(widgets[0]!.title).toBe('Ventas hoy');
+  });
+
+  it('sin locale (o sin entrada) usa el título canónico inglés del module.json', () => {
+    const mods = [
+      { id: 'sales', manifest: { id: 'sales', widgets: { 'sales.today': def } } },
+    ] as unknown as InstalledManifest[];
+    const { widgets } = buildWidgetsFromManifests(mods, { client, sector: null });
+    expect(widgets[0]!.title).toBe('Sales today');
+  });
+
+  it('el título traducido llega a la card (aria-label / cabecera), no el canónico', async () => {
+    const mods = [
+      {
+        id: 'sales',
+        manifest: { id: 'sales', widgets: { 'sales.today': { ...def, options: { format: 'number' } } } },
+        locale: { widgets: { 'sales.today': { title: 'Ventas hoy' } } },
+      },
+    ] as unknown as InstalledManifest[];
+    const { widgets } = buildWidgetsFromManifests(mods, { client, sector: null });
+    const cell = document.createElement('div');
+    document.body.appendChild(cell);
+    widgets[0]!.render(cell);
+    await new Promise((r) => setTimeout(r, 0));
+    const card = cell.querySelector('[role="group"]') as HTMLElement | null;
+    expect(card?.getAttribute('aria-label')).toContain('Ventas hoy');
+    document.body.replaceChildren();
+  });
+});
+
 describe('validación de def — bloque real', () => {
   const client = clientWith(async () => [{ total: 1 }]);
   const base: WidgetManifestDef = { title: 'W', kind: 'kpi', query: 'sales.today', map: { value: 'total' } };

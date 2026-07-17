@@ -177,11 +177,37 @@ async function loadEntryUrl(entryUrl: string): Promise<string> {
 }
 
 /** Un módulo instalado + su manifest crudo (incluye `widgets`, `provides_slots`, etc.). */
+/**
+ * Traducciones del módulo para el idioma activo (`locales/<lang>.json`, ADR-0055). El runtime ya
+ * traduce `name`/`navigation`; los TÍTULOS de widget los lee el shell del `module.json` crudo
+ * (ADR-0054), así que su traducción también se resuelve en cliente desde este mismo fichero,
+ * espejando `navigation.<id>.label`. Inglés canónico en el manifest; ES aquí.
+ */
+export interface ModuleLocaleFile {
+  widgets?: Record<string, { title?: string }>;
+}
+
 export interface InstalledManifest {
   moduleId: string;
   manifest: ModuleManifest;
   /** URL del bundle ESM del WC del módulo (`/modules/<id>/<ui.entry>`). */
   entryUrl: string;
+  /** Traducciones del módulo para el idioma activo (o `undefined` si no trae/idioma canónico). */
+  locale?: ModuleLocaleFile;
+}
+
+/** Lee `/modules/<id>/locales/<lang>.json` (asset estático). `undefined` si no existe o falla. */
+export async function loadModuleLocale(
+  moduleId: string,
+  lang: string,
+): Promise<ModuleLocaleFile | undefined> {
+  try {
+    const res = await fetch(`${MODULES_BASE}/${moduleId}/locales/${lang}.json`);
+    if (!res.ok) return undefined;
+    return (await res.json()) as ModuleLocaleFile;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -208,14 +234,19 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
     moduleIds.push(item.module_id);
   }
 
+  // Idioma activo (ADR-0055): para el canónico inglés no se busca locale (el manifest ya está en EN);
+  // para otros se intenta `locales/<lang>.json` (best-effort, fallback al título del manifest).
+  const lang = getLocale();
   const out: InstalledManifest[] = [];
   for (const moduleId of moduleIds) {
     const manifest = await loadManifest(moduleId);
     if (!manifest) continue;
+    const locale = lang === 'en' ? undefined : await loadModuleLocale(moduleId, lang);
     out.push({
       moduleId,
       manifest,
       entryUrl: `${MODULES_BASE}/${moduleId}/${manifest.ui.entry}`,
+      locale,
     });
   }
   return out;

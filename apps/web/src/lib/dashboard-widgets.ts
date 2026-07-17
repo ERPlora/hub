@@ -708,12 +708,16 @@ export function buildWidgetsFromManifests(
       }
 
       const size: WidgetSize = def.size && VALID_SIZES.has(def.size) ? def.size : 'md';
+      // i18n (ADR-0055): el título canónico (inglés) del manifest se traduce con el locale del
+      // módulo para el idioma activo (`locale.widgets.<id>.title`); sin entrada, se queda el canónico.
+      const title = mod.locale?.widgets?.[id]?.title ?? def.title;
+      const localizedDef: WidgetManifestDef = title === def.title ? def : { ...def, title };
       const render =
         def.kind != null
-          ? buildKindRender(deps.client, def, labels, gate)
-          : buildComponentRender(deps.client, mod, def, labels);
+          ? buildKindRender(deps.client, localizedDef, labels, gate)
+          : buildComponentRender(deps.client, mod, localizedDef, labels);
 
-      widgets.push({ id, title: def.title, icon: def.icon, category: def.category, size, render });
+      widgets.push({ id, title, icon: def.icon, category: def.category, size, render });
 
       // Preset "Recomendado": widgets con default===true cuyo sectors incluye el sector del hub
       // (o sin sectors = todos). Sin sector conocido → no se recomienda nada (preset vacío).
