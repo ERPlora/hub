@@ -437,7 +437,15 @@
         },
         "priority": {
           "type": "integer",
-          "description": "Orden cuando varios módulos rellenan el mismo slot (mayor = primero, desc)."
+          "description": "Orden cuando varios módulos rellenan el mismo slot (MENOR = primero, ascendente)."
+        },
+        "tab_label": {
+          "type": "string",
+          "description": "Etiqueta de la pestaña cuando el host agrega varios fillers en un modal de pestañas (ADR-0043 B, p. ej. `sales.pos.assign` → 'Mesa' / 'Cliente'). El host la lee vía `loadSlot`; se ignora en slots de montaje directo."
+        },
+        "tab_icon": {
+          "type": "string",
+          "description": "Nombre del icono (Iconify/ionicons) de la pestaña, junto a `tab_label`. Opcional."
         }
       }
     },
