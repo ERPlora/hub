@@ -419,7 +419,80 @@ describe('buildWidgetsFromManifests (T2): permiso, presets y validación', () =>
     expect(presets).toHaveLength(0);
   });
 
-  it('VALIDACIÓN: descarta def sin title, def con kind Y component, y kind sin query', () => {
+  it('CAP DE CONCURRENCIA (T4): no dispara más de N queries a la vez al montar el board', async () => {
+    // Protege el pool per-hub (fix #609) y la ruta crítica del TPV: N widgets no deben saturar la BD
+    // con N queries simultáneas. Con cap=2 y 6 widgets, como mucho 2 quedan en vuelo a la vez.
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const resolvers: Array<() => void> = [];
+    const client = {
+      query: vi.fn(() => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        return new Promise((res) => resolvers.push(() => {
+          inFlight--;
+          res([{ value: 1 }]);
+        }));
+      }),
+      on: () => () => {},
+    } as unknown as ErploraClient;
+
+    const widgets: Record<string, WidgetManifestDef> = {};
+    for (let i = 0; i < 6; i++) widgets[`w${i}`] = { ...base, map: { value: 'value' } };
+    const { widgets: built } = buildWidgetsFromManifests(manifestWithMany(widgets), {
+      client,
+      sector: null,
+      maxConcurrentQueries: 2,
+    });
+    built.forEach((w) => w.render(document.createElement('div')));
+    await flush();
+
+    expect(maxInFlight).toBeLessThanOrEqual(2);
+
+    // Drena: al resolver, el gate deja entrar a los siguientes.
+    while (resolvers.length) {
+      resolvers.shift()!();
+      await flush();
+    }
+    expect(client.query).toHaveBeenCalledTimes(6); // todos se ejecutan, solo escalonados
+  });
+});
+
+describe('accesibilidad de las cards (T5)', () => {
+  it('la card KPI expone role="group" y aria-label con título + valor', async () => {
+    const def: WidgetManifestDef = {
+      title: 'Ventas hoy',
+      kind: 'kpi',
+      query: 'sales.today',
+      map: { value: 'value' },
+      options: { format: 'number' },
+    };
+    const cell = await renderOne(def, clientWith(async () => [{ value: 5 }]));
+    const card = cell.querySelector('[role="group"]') as HTMLElement | null;
+    expect(card).not.toBeNull();
+    const label = card!.getAttribute('aria-label') ?? '';
+    expect(label).toContain('Ventas hoy'); // etiqueta
+    expect(label).toContain('5'); // valor real
+  });
+
+  it('la card de un widget de lista tiene aria-label = título (el detalle es el contenido)', async () => {
+    const def: WidgetManifestDef = {
+      title: 'Stock bajo',
+      kind: 'bar-list',
+      query: 'inventory.products.low_stock',
+      map: { label: 'name', value: 'stock' },
+    };
+    const cell = await renderOne(def, clientWith(async () => [{ name: 'Café', stock: 3 }]));
+    const card = cell.querySelector('[role="group"]') as HTMLElement | null;
+    expect(card?.getAttribute('aria-label')).toBe('Stock bajo');
+  });
+});
+
+describe('validación de def — bloque real', () => {
+  const client = clientWith(async () => [{ total: 1 }]);
+  const base: WidgetManifestDef = { title: 'W', kind: 'kpi', query: 'sales.today', map: { value: 'total' } };
+
+  it('descarta def sin title, def con kind Y component, y kind sin query', () => {
     const widgets = {
       sin_title: { kind: 'kpi', query: 'q', map: { value: 'v' } } as unknown as WidgetManifestDef,
       ambos: { title: 'X', kind: 'kpi', query: 'q', component: 'erp-x' } as WidgetManifestDef,

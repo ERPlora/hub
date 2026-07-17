@@ -60,6 +60,8 @@ export interface CollectWidgetsDeps {
   hasPermission?: PermissionResolver;
   /** Textos de los estados vacío/error. */
   labels?: Partial<WidgetRenderLabels>;
+  /** Máx. de queries de widget en vuelo a la vez (T4). Por defecto `WIDGET_QUERY_CONCURRENCY`. */
+  maxConcurrentQueries?: number;
 }
 
 /** Resultado de la recolección: catálogo de widgets + presets para <ok-widget-board>. */
@@ -150,6 +152,10 @@ interface WidgetCard {
 
 function createCard(title: string, icon?: string, align: CardAlign = 'start'): WidgetCard {
   const root = document.createElement('div');
+  // A11y (T5): cada widget es un grupo etiquetado. El nombre accesible arranca en el título; los
+  // renderers de valor (kpi/stat) lo enriquecen con el valor real tras pintar (`title: valor`).
+  root.setAttribute('role', 'group');
+  root.setAttribute('aria-label', title);
   // Superficie de card consistente sobre tokens Ionic (paridad con ok-kpi/ion-card).
   root.style.cssText = [
     'box-sizing:border-box',
@@ -501,6 +507,39 @@ const VALID_SIZES = new Set<WidgetSize>(['sm', 'md', 'lg']);
 /** Debounce del refresco en vivo: absorbe ráfagas de eventos (un TPV en hora punta) en 1 re-query. */
 const REFRESH_DEBOUNCE_MS = 800;
 
+/**
+ * Máximo de queries de widget en vuelo a la vez (T4). N widgets montándose NO deben disparar N
+ * queries simultáneas: satura el pool per-hub (fix #609) y compite con la ruta crítica del TPV (una
+ * venta en curso). Se escalonan por un semáforo; todas se ejecutan, solo que de `max` en `max`.
+ */
+const WIDGET_QUERY_CONCURRENCY = 4;
+
+/** Semáforo async: como mucho `max` funciones corriendo a la vez; el resto hace cola y entra al liberar. */
+type QueryGate = <T>(fn: () => Promise<T>) => Promise<T>;
+
+function createQueryGate(max: number): QueryGate {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  const pump = (): void => {
+    while (active < max && queue.length > 0) {
+      active += 1;
+      queue.shift()!();
+    }
+  };
+  return <T>(fn: () => Promise<T>): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      queue.push(() => {
+        fn()
+          .then(resolve, reject)
+          .finally(() => {
+            active -= 1;
+            pump();
+          });
+      });
+      pump();
+    });
+}
+
 /** La celda recuerda su limpieza de suscripciones para no fugar listeners al re-renderizar/desmontar. */
 interface CellWithCleanup extends HTMLElement {
   __widgetCleanup?: () => void;
@@ -510,6 +549,7 @@ function buildKindRender(
   client: ErploraClient,
   def: WidgetManifestDef,
   labels: WidgetRenderLabels,
+  gate: QueryGate,
 ): (cell: HTMLElement) => void {
   // KPIs/valores se centran en la card; listas/cronologías/gráficos van top-align.
   const align: CardAlign =
@@ -535,8 +575,9 @@ function buildKindRender(
         showMuted(card.body, labels.error);
         return;
       }
-      client
-        .query(query, def.params ?? {})
+      // La query pasa por el semáforo (T4): se escalona para no saturar el pool per-hub con N
+      // widgets a la vez. El refresco en vivo también entra por aquí.
+      gate(() => client.query(query, def.params ?? {}))
         .then((result) => {
           const rows = normalizeRows(result);
           if (!rows.length) {
@@ -546,7 +587,16 @@ function buildKindRender(
           clear(card.body);
           // `def.title` se pasa para que kpi/stat NO repitan el título que ya muestra la cabecera.
           const ok = renderer(card.body, rows, def.map, def.options ?? {}, def.title);
-          if (!ok) showMuted(card.body, labels.empty);
+          if (!ok) {
+            showMuted(card.body, labels.empty);
+            return;
+          }
+          // A11y (T5): enriquece el nombre accesible del grupo con el valor real pintado (kpi/stat);
+          // los demás kinds se quedan con el título (su detalle ya es el contenido leíble).
+          const valueEl = card.body.querySelector('ok-kpi, ok-stat') as
+            | (HTMLElement & { value?: string })
+            | null;
+          if (valueEl?.value) card.root.setAttribute('aria-label', `${def.title}: ${valueEl.value}`);
         })
         .catch(() => {
           // CERO MOCKS: ante un fallo de la query mostramos estado muted, nunca datos inventados.
@@ -638,6 +688,8 @@ export function buildWidgetsFromManifests(
   const labels: WidgetRenderLabels = { ...DEFAULT_RENDER_LABELS, ...deps.labels };
   const hasPermission = deps.hasPermission;
   const sector = deps.sector;
+  // Semáforo COMPARTIDO por todos los widgets de este board (T4): escalona sus queries.
+  const gate = createQueryGate(deps.maxConcurrentQueries ?? WIDGET_QUERY_CONCURRENCY);
 
   const widgets: WidgetDef[] = [];
   const recommended: string[] = [];
@@ -658,7 +710,7 @@ export function buildWidgetsFromManifests(
       const size: WidgetSize = def.size && VALID_SIZES.has(def.size) ? def.size : 'md';
       const render =
         def.kind != null
-          ? buildKindRender(deps.client, def, labels)
+          ? buildKindRender(deps.client, def, labels, gate)
           : buildComponentRender(deps.client, mod, def, labels);
 
       widgets.push({ id, title: def.title, icon: def.icon, category: def.category, size, render });
