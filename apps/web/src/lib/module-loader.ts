@@ -184,7 +184,7 @@ async function loadEntryUrl(entryUrl: string): Promise<string> {
  * espejando `navigation.<id>.label`. Inglés canónico en el manifest; ES aquí.
  */
 export interface ModuleLocaleFile {
-  widgets?: Record<string, { title?: string }>;
+  widgets?: Record<string, { title?: string; label?: string }>;
 }
 
 export interface InstalledManifest {
@@ -241,6 +241,10 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
   for (const moduleId of moduleIds) {
     const manifest = await loadManifest(moduleId);
     if (!manifest) continue;
+    // Registra los iconos HORNEADOS del módulo (dist/icons.json) también por esta vía: el dashboard
+    // usa `loadInstalledManifests` (no la navegación), así que sin esto los iconos de cabecera de
+    // widget que SÍ están horneados salían vacíos si su módulo no tenía entrada de navegación (P2).
+    await loadIconMap(`${MODULES_BASE}/${moduleId}`, manifest.ui.entry);
     const locale = lang === 'en' ? undefined : await loadModuleLocale(moduleId, lang);
     out.push({
       moduleId,

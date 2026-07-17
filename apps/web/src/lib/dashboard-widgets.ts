@@ -262,6 +262,18 @@ function bool(opts: Opts, key: string): boolean {
   return opts[key] === true || opts[key] === 'true';
 }
 
+/**
+ * `ok-kpi` trae su PROPIA superficie de card (borde/fondo/sombra/padding vía CSS vars). Dentro de
+ * `createCard` eso dobla el marco (marco-dentro-de-marco). Lo aplanamos neutralizando esas vars para
+ * que quede plano como `ok-stat` — la card exterior ya aporta la superficie. (P2 de hub-qa.)
+ */
+function flattenCardSurface(el: HTMLElement): void {
+  el.style.setProperty('--background', 'transparent');
+  el.style.setProperty('--border-color', 'transparent');
+  el.style.setProperty('--box-shadow', 'none');
+  el.style.setProperty('--padding', '0');
+}
+
 function renderKpi(
   cell: HTMLElement,
   rows: Row[],
@@ -280,6 +292,7 @@ function renderKpi(
   const el = document.createElement('ok-kpi') as HTMLElement & {
     label?: string; value?: string; delta?: string; trend?: string; icon?: string;
   };
+  flattenCardSurface(el); // no doblar el marco de createCard (P2)
   // La cabecera de la card ya muestra el título; solo añadimos label si aporta info distinta.
   el.label = captionLabel(str(opts, 'label'), title);
   el.icon = str(opts, 'icon');
@@ -356,6 +369,7 @@ function renderSparkline(
     const kpi = document.createElement('ok-kpi') as HTMLElement & {
       label?: string; value?: string; delta?: string; trend?: string; icon?: string;
     };
+    flattenCardSurface(kpi); // no doblar el marco de createCard (P2)
     kpi.label = captionLabel(str(opts, 'label'), title);
     kpi.icon = str(opts, 'icon');
     kpi.value = formatValue(last?.[valueCol], format, currency, undefined);
@@ -709,9 +723,16 @@ export function buildWidgetsFromManifests(
 
       const size: WidgetSize = def.size && VALID_SIZES.has(def.size) ? def.size : 'md';
       // i18n (ADR-0055): el título canónico (inglés) del manifest se traduce con el locale del
-      // módulo para el idioma activo (`locale.widgets.<id>.title`); sin entrada, se queda el canónico.
-      const title = mod.locale?.widgets?.[id]?.title ?? def.title;
-      const localizedDef: WidgetManifestDef = title === def.title ? def : { ...def, title };
+      // módulo para el idioma activo (`locale.widgets.<id>.title`/`.label`); sin entrada, se queda
+      // el canónico. El `label` (caption dentro de kpi/stat) va en `options.label`.
+      const tr = mod.locale?.widgets?.[id];
+      const title = tr?.title ?? def.title;
+      const label = tr?.label;
+      let localizedDef: WidgetManifestDef = def;
+      if (title !== def.title || label != null) {
+        localizedDef = { ...def, title };
+        if (label != null) localizedDef.options = { ...def.options, label };
+      }
       const render =
         def.kind != null
           ? buildKindRender(deps.client, localizedDef, labels, gate)

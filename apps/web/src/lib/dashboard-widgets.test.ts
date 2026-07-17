@@ -320,6 +320,24 @@ describe('renderers por kind (T2) — formas de fila reales de los 5 módulos', 
 
 // ── T2 · Estados de carga / error / vacío (hoy funcionan pero sin cobertura → riesgo de regresión) ─
 
+describe('doble marco (P2): kpi/stat se aplanan dentro de la card', () => {
+  it('ok-kpi NO dobla marco: pierde su borde/fondo/sombra/padding propios (la card ya los pone)', async () => {
+    const def: WidgetManifestDef = {
+      title: 'Ventas hoy',
+      kind: 'kpi',
+      query: 'sales.today',
+      map: { value: 'value' },
+      options: { format: 'number' },
+    };
+    const cell = await renderOne(def, clientWith(async () => [{ value: 5 }]));
+    const kpi = cell.querySelector('ok-kpi') as HTMLElement;
+    expect(kpi.style.getPropertyValue('--background')).toBe('transparent');
+    expect(kpi.style.getPropertyValue('--border-color')).toBe('transparent');
+    expect(kpi.style.getPropertyValue('--box-shadow')).toBe('none');
+    expect(kpi.style.getPropertyValue('--padding')).toBe('0');
+  });
+});
+
 describe('estados de celda (T2): carga / error / vacío', () => {
   const KPI: WidgetManifestDef = {
     title: 'Ventas hoy',
@@ -515,6 +533,34 @@ describe('i18n de títulos de widget (T5, ADR-0055)', () => {
     ] as unknown as InstalledManifest[];
     const { widgets } = buildWidgetsFromManifests(mods, { client, sector: null });
     expect(widgets[0]!.title).toBe('Sales today');
+  });
+
+  it('traduce también el `label` (options.label) del widget desde el locale', async () => {
+    const def: WidgetManifestDef = {
+      title: 'Sales today',
+      kind: 'kpi',
+      query: 'sales.today',
+      map: { value: 'value' },
+      options: { format: 'number', label: 'Today' },
+    };
+    const mods = [
+      {
+        id: 'sales',
+        manifest: { id: 'sales', widgets: { 'sales.today': def } },
+        locale: { widgets: { 'sales.today': { title: 'Ventas hoy', label: 'Hoy' } } },
+      },
+    ] as unknown as InstalledManifest[];
+    const { widgets } = buildWidgetsFromManifests(mods, {
+      client: clientWith(async () => [{ value: 5 }]),
+      sector: null,
+    });
+    const cell = document.createElement('div');
+    document.body.appendChild(cell);
+    widgets[0]!.render(cell);
+    await new Promise((r) => setTimeout(r, 0));
+    const kpi = cell.querySelector('ok-kpi') as (HTMLElement & { label?: string }) | null;
+    expect(kpi?.label).toBe('Hoy');
+    document.body.replaceChildren();
   });
 
   it('el título traducido llega a la card (aria-label / cabecera), no el canónico', async () => {
