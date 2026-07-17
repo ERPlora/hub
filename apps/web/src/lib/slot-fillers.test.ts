@@ -77,4 +77,15 @@ describe('orderSlotFillers — resolución pura de provides_slots (ADR-0043)', (
     expect(out[0].mod.moduleId).toBe('tables');
     expect(out[0].mod.entryUrl).toContain('/modules/tables/');
   });
+
+  // Para el modal de pestañas del POS (sales.pos.assign, ADR-0043 B): cada aportante declara en su
+  // manifest `tab_label`/`tab_icon`, y el resolutor debe conservar el def entero para que sales pinte
+  // la pestaña sin conocer al módulo. Es genérico (no sabe de "mesa"/"cliente"): pasa lo que venga.
+  it('conserva el slot-def completo (tab_label/tab_icon/…) para que el consumidor lea su metadata', () => {
+    const manifests = [
+      mod('tables', [{ slot: 's', component: 'erp-tables-pos-zones', tab_label: 'Mesa', tab_icon: 'restaurant-outline' }]),
+    ];
+    const out = orderSlotFillers(manifests, 's');
+    expect(out[0].def).toMatchObject({ component: 'erp-tables-pos-zones', tab_label: 'Mesa', tab_icon: 'restaurant-outline' });
+  });
 });

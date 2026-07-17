@@ -4,13 +4,18 @@
 // MESA/CLIENTE aparece en el POS; si el orden o el match se rompe, los botones desaparecen en
 // silencio (el POS oculta el slot vacío). Genérico en el manifest para no acoplarse a `module-loader`.
 
-type SlotDef = { slot?: string; component?: string; priority?: number };
+// El slot-def es abierto: además de los campos base, un consumidor concreto puede declarar metadata
+// propia (p.ej. `tab_label`/`tab_icon` para el modal de pestañas del POS). El resolutor la pasa tal
+// cual, sin conocerla.
+export type SlotDef = { slot?: string; component?: string; priority?: number; [key: string]: unknown };
 
 export interface SlotFiller<M> {
   /** El módulo dueño (para cargar su ESM antes de montar el WC). */
   mod: M;
   /** El custom element a montar en el slot. */
   component: string;
+  /** El slot-def completo del manifest, para que el consumidor lea su metadata (tab_label, …). */
+  def: SlotDef;
 }
 
 /**
@@ -23,15 +28,15 @@ export function orderSlotFillers<M extends { manifest: unknown }>(
   manifests: M[],
   slot: string,
 ): SlotFiller<M>[] {
-  const entries: Array<{ mod: M; component: string; priority: number }> = [];
+  const entries: Array<{ mod: M; component: string; def: SlotDef; priority: number }> = [];
   for (const mod of manifests) {
     const slots = (mod.manifest as { provides_slots?: SlotDef[] }).provides_slots ?? [];
     for (const def of slots) {
       if (def && def.slot === slot && def.component) {
-        entries.push({ mod, component: def.component, priority: def.priority ?? 100 });
+        entries.push({ mod, component: def.component, def, priority: def.priority ?? 100 });
       }
     }
   }
   entries.sort((a, b) => a.priority - b.priority);
-  return entries.map(({ mod, component }) => ({ mod, component }));
+  return entries.map(({ mod, component, def }) => ({ mod, component, def }));
 }

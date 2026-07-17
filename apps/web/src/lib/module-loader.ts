@@ -17,6 +17,7 @@ import { isModuleEntitled } from './entitlement';
 import { moduleIconRegistry } from './icons';
 import { RUNTIME_URL } from './runtime';
 import { orderSlotFillers } from './slot-fillers';
+import type { SlotDef } from './slot-fillers';
 import { getLocale } from '../i18n';
 
 export interface MenuEntry {
@@ -238,7 +239,10 @@ export async function loadModuleComponent(mod: InstalledManifest, tag: string): 
  * llaman los WC de módulo (p.ej. el POS monta el picker de mesa/cliente). `[]` si el runtime no
  * responde, ningún módulo aporta al slot, o el ESM de un aportante falla (ese se omite).
  */
-export async function loadSlotComponents(slot: string): Promise<{ component: string }[]> {
+/** Un aportante resuelto de un slot: el tag a montar + la metadata del def (tab_label, tab_icon…). */
+export type SlotComponent = SlotDef & { component: string };
+
+export async function loadSlotComponents(slot: string): Promise<SlotComponent[]> {
   let manifests: InstalledManifest[];
   try {
     manifests = await loadInstalledManifests();
@@ -247,11 +251,13 @@ export async function loadSlotComponents(slot: string): Promise<{ component: str
   }
   // Match + orden por `priority` = lógica pura testeada en `slot-fillers.test.ts`. Aquí solo queda
   // la I/O: cargar el ESM de cada aportante (registra su WC) en orden y devolver los tags a montar.
-  const out: { component: string }[] = [];
-  for (const { mod, component } of orderSlotFillers(manifests, slot)) {
+  // Se propaga la metadata del def (p.ej. `tab_label`/`tab_icon` del modal de pestañas del POS,
+  // ADR-0043 B); `component` queda garantizado. El consumidor lee lo que necesite.
+  const out: SlotComponent[] = [];
+  for (const { mod, component, def } of orderSlotFillers(manifests, slot)) {
     try {
       await loadModuleComponent(mod, component);
-      out.push({ component });
+      out.push({ ...def, component });
     } catch {
       /* un aportante cuyo ESM falle se omite (no rompe el resto del slot) */
     }
