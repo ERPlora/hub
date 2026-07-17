@@ -44,7 +44,9 @@ async function withSession(page: Page, s: Session): Promise<void> {
 }
 
 test.describe('importar configuración (Ajustes → Datos)', () => {
-  test('muestra las dos fuentes: zip local y nube (catálogo del SaaS, ADR-0121)', async ({ page }) => {
+  test('muestra las fuentes como cards: blueprints de la nube + subir desde archivo', async ({
+    page,
+  }) => {
     await withSession(page, await loginByPin());
 
     await page.goto('/settings?tab=data');
@@ -53,16 +55,13 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
     await expect(page).toHaveURL(/\/settings\?tab=data$/);
     await expect(page.getByTestId('import-lead')).toBeVisible();
 
-    // Paso 1: subir un zip local…
-    await expect(page.getByTestId('import-pick-file')).toBeVisible();
-    // …y «desde la nube» YA HABILITADO: el registro de blueprints del SaaS existe (ADR-0121).
-    await expect(page.getByTestId('import-cloud')).toBeVisible();
-    await expect(page.getByTestId('import-cloud')).toHaveJSProperty('disabled', false);
+    // Rediseño 2026-07-17: la card «subir desde archivo» SIEMPRE está a la vista (ya no un botón).
+    await expect(page.getByTestId('import-upload-local')).toBeVisible();
 
-    // Al pulsarlo se pide el catálogo al runtime (que proxya al SaaS con su X-Hub-Token).
-    await page.getByTestId('import-cloud').click();
-    // Sin blueprints publicados aún, la lista sale vacía con su nota honesta — no un error.
-    await expect(page.getByTestId('import-cloud-catalog')).toBeVisible();
+    // El catálogo de la nube (ADR-0121) se carga SOLO al entrar — sin botón que descubrir. En un
+    // hub sin blueprints publicados sale la nota honesta de «vacío»; con blueprints, una card por
+    // cada uno. En cualquier caso, el spinner de carga termina.
+    await expect(page.getByTestId('import-cloud-loading')).toHaveCount(0);
   });
 
   test('inspeccionar un zip muestra el manifest y al importar sale el informe', async ({ page }) => {

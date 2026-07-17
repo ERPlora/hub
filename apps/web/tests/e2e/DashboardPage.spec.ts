@@ -59,21 +59,15 @@ test.describe('widget core de export/import en la home', () => {
     // widget core debe formar parte de TODOS los presets para ser visible por defecto.
     await page.goto('/dashboard');
 
-    // El widget está DENTRO de <ok-widget-board> (no una tarjeta fija encima).
+    // El widget está DENTRO de <ok-widget-board> (no una tarjeta fija encima). Tras la
+    // simplificación (2026-07-17) ofrece UN solo CTA «configurar»: la primera vez nadie exporta.
     const board = page.locator('ok-widget-board');
     await expect(board.getByTestId('dashboard-blueprint-widget')).toBeVisible();
-    await expect(board.getByTestId('dashboard-blueprint-import')).toBeVisible();
-    await expect(board.getByTestId('dashboard-blueprint-export')).toBeVisible();
+    await expect(board.getByTestId('dashboard-blueprint-cta')).toBeVisible();
 
-    // CTA «importar» → pestaña Datos de Ajustes, con la sección de import visible.
-    await board.getByTestId('dashboard-blueprint-import').click();
+    // El CTA → pestaña Datos de Ajustes, que aterriza en la sección de importar.
+    await board.getByTestId('dashboard-blueprint-cta').click();
     await expect(page).toHaveURL(/\/settings\?tab=data$/);
     await expect(page.getByTestId('import-lead')).toBeVisible();
-
-    // CTA «exportar» → misma pestaña (import y export viven juntos), sección de export visible.
-    await page.goBack();
-    await board.getByTestId('dashboard-blueprint-export').click();
-    await expect(page).toHaveURL(/\/settings\?tab=data$/);
-    await expect(page.getByTestId('export-lead')).toBeVisible();
   });
 });
