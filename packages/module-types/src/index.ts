@@ -186,6 +186,12 @@ export interface WidgetManifestDef {
   sectors?: WidgetSector[];
   /** Sugerido ACTIVO en el preset "Recomendado" cuando el sector del hub coincide. */
   default?: boolean;
+  /**
+   * Refresco en vivo (ADR-0054, T1): nombres de eventos de dominio cuya emisión debe re-ejecutar
+   * la query de este widget. El board se suscribe al canal push existente (Outbox→broadcast, SDK
+   * `subscribe`) y re-consulta con debounce. Ausente/vacío = el widget se monta UNA vez (como hoy).
+   */
+  refresh_on?: string[];
 
   // ── Vía declarativa (kind) ──
   /** Kind del render genérico (mutuamente excluyente con `component`). */

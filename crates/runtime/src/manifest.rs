@@ -314,6 +314,12 @@ pub struct WidgetDef {
     /// Sugerido ACTIVO cuando el sector del hub coincide con `sectors` (preset "Recomendado").
     #[serde(default)]
     pub default: bool,
+    /// Refresco EN VIVO (ADR-0054 T1): eventos de dominio cuya emisión re-ejecuta la `query` de
+    /// este widget. El shell se suscribe al canal push existente (Outbox→broadcast) y re-consulta
+    /// con debounce. Ausente/vacío = el widget se monta una vez. El Hub solo TRANSPORTA el campo
+    /// (el shell lee el `module.json` crudo); aquí se declara para no perderlo en un round-trip.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refresh_on: Vec<String>,
     /// Tipo de render declarativo. Mutuamente excluyente con `component` (lo valida el schema).
     /// Si está presente, `query` es obligatoria.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -609,7 +615,8 @@ mod tests {
                     "query": "sales.metrics.today",
                     "params": { "period": "day" },
                     "map": { "value": "total", "delta": "delta_pct", "trend": "trend" },
-                    "options": { "label": "Hoy", "format": "currency", "currency": "EUR" }
+                    "options": { "label": "Hoy", "format": "currency", "currency": "EUR" },
+                    "refresh_on": ["sale.completed", "sale.voided"]
                 },
                 "sales.live_feed": {
                     "title": "Actividad en vivo",
@@ -629,6 +636,10 @@ mod tests {
         assert_eq!(kpi.query.as_deref(), Some("sales.metrics.today"));
         assert!(kpi.default);
         assert_eq!(kpi.sectors, vec!["hosteleria".to_string(), "retail".to_string()]);
+        assert_eq!(
+            kpi.refresh_on,
+            vec!["sale.completed".to_string(), "sale.voided".to_string()]
+        );
         assert!(kpi.component.is_none());
         assert!(kpi.options.is_some());
         assert!(kpi.map.is_some());
@@ -650,6 +661,10 @@ mod tests {
         assert_eq!(kpi_json["sectors"][0], "hosteleria");
         assert_eq!(kpi_json["options"]["currency"], "EUR");
         assert_eq!(kpi_json["map"]["value"], "total");
+        // El refresco en vivo (refresh_on, ADR-0054 T1) sobrevive el round-trip: sin el campo en
+        // el struct, serde lo DESCARTA en silencio y este assert cae (Null != "sale.completed").
+        assert_eq!(kpi_json["refresh_on"][0], "sale.completed");
+        assert_eq!(kpi_json["refresh_on"][1], "sale.voided");
 
         let custom_json = &serialized["sales.live_feed"];
         assert_eq!(custom_json["component"], "erp-sales-live-feed");

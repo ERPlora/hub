@@ -387,6 +387,11 @@
           "description": "Tipos de negocio a los que aplica el widget. Ausente/vacío = todos. Alimenta el preset `Recomendado` derivado del sector del hub."
         },
         "default": { "type": "boolean", "default": false, "description": "Sugerido ACTIVO en el preset `Recomendado` cuando el sector del hub coincide con `sectors` (o `sectors` está ausente)." },
+        "refresh_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Refresco EN VIVO (ADR-0054 T1): nombres de eventos de dominio (p. ej. `sale.completed`) cuya emisión debe re-ejecutar la `query` de este widget. El shell se suscribe al canal push ya existente (Outbox→broadcast, SDK `subscribe`) y re-consulta con debounce; un refresco fallido cae a estado muted (nunca dato viejo como fresco). Ausente/vacío = el widget se monta UNA sola vez (comportamiento por defecto)."
+        },
         "kind": {
           "type": "string",
           "enum": ["kpi", "stat", "sparkline", "bar-list", "timeline", "chart"],

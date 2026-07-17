@@ -498,6 +498,14 @@ const KIND_RENDERERS: Record<string, KindRenderer> = {
 
 const VALID_SIZES = new Set<WidgetSize>(['sm', 'md', 'lg']);
 
+/** Debounce del refresco en vivo: absorbe ráfagas de eventos (un TPV en hora punta) en 1 re-query. */
+const REFRESH_DEBOUNCE_MS = 800;
+
+/** La celda recuerda su limpieza de suscripciones para no fugar listeners al re-renderizar/desmontar. */
+interface CellWithCleanup extends HTMLElement {
+  __widgetCleanup?: () => void;
+}
+
 function buildKindRender(
   client: ErploraClient,
   def: WidgetManifestDef,
@@ -507,38 +515,70 @@ function buildKindRender(
   const align: CardAlign =
     def.kind === 'bar-list' || def.kind === 'timeline' || def.kind === 'chart' ? 'start' : 'center';
   return (cell: HTMLElement): void => {
+    // Si el board re-renderiza la misma celda, corta la suscripción anterior antes de crear otra.
+    (cell as CellWithCleanup).__widgetCleanup?.();
+
     // Cada widget vive DENTRO de su card (contenedor visible); el cuerpo aloja
     // spinner/contenido/estado vacío, así la card se ve aunque la query no devuelva datos.
     const card = createCard(def.title, def.icon, align);
     cell.replaceChildren(card.root);
-    showSpinner(card.body);
     const query = def.query;
-    if (!query) {
-      showMuted(card.body, labels.error);
-      return;
-    }
     const renderer = KIND_RENDERERS[def.kind ?? ''];
-    if (!renderer) {
-      showMuted(card.body, labels.error);
-      return;
-    }
-    client
-      .query(query, def.params ?? {})
-      .then((result) => {
-        const rows = normalizeRows(result);
-        if (!rows.length) {
-          showMuted(card.body, labels.empty);
+
+    // Ejecuta la query y pinta el resultado en el cuerpo de la card. `showLoading`=true en la carga
+    // inicial (spinner); en un REFRESCO en vivo va a false: mantiene el valor visible hasta que
+    // llega el nuevo (sin parpadeo). Un fallo SIEMPRE muestra muted, nunca deja un valor viejo
+    // haciéndose pasar por fresco (CERO MOCKS + contrato T1).
+    const run = (showLoading: boolean): void => {
+      if (showLoading) showSpinner(card.body);
+      if (!query || !renderer) {
+        showMuted(card.body, labels.error);
+        return;
+      }
+      client
+        .query(query, def.params ?? {})
+        .then((result) => {
+          const rows = normalizeRows(result);
+          if (!rows.length) {
+            showMuted(card.body, labels.empty);
+            return;
+          }
+          clear(card.body);
+          // `def.title` se pasa para que kpi/stat NO repitan el título que ya muestra la cabecera.
+          const ok = renderer(card.body, rows, def.map, def.options ?? {}, def.title);
+          if (!ok) showMuted(card.body, labels.empty);
+        })
+        .catch(() => {
+          // CERO MOCKS: ante un fallo de la query mostramos estado muted, nunca datos inventados.
+          showMuted(card.body, labels.error);
+        });
+    };
+
+    run(true); // carga inicial
+
+    // Refresco en vivo (ADR-0054 T1): suscribe la card a los eventos de dominio declarados en
+    // `refresh_on` sobre el canal push ya existente (Outbox→broadcast, SDK subscribe) y re-consulta
+    // con debounce. Sin `refresh_on` el widget se monta UNA vez (comportamiento previo intacto).
+    const events = def.refresh_on;
+    if (events?.length && typeof client.on === 'function') {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const cleanup = (): void => {
+        if (timer) clearTimeout(timer);
+        for (const unsub of unsubs) unsub();
+        (cell as CellWithCleanup).__widgetCleanup = undefined;
+      };
+      const onEvent = (): void => {
+        // Celda ya desmontada → deja de escuchar (limpieza acotada, sin fugas de listeners).
+        if (!card.root.isConnected) {
+          cleanup();
           return;
         }
-        clear(card.body);
-        // `def.title` se pasa para que kpi/stat NO repitan el título que ya muestra la cabecera.
-        const ok = renderer(card.body, rows, def.map, def.options ?? {}, def.title);
-        if (!ok) showMuted(card.body, labels.empty);
-      })
-      .catch(() => {
-        // CERO MOCKS: ante un fallo de la query mostramos estado muted, nunca datos inventados.
-        showMuted(card.body, labels.error);
-      });
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => run(false), REFRESH_DEBOUNCE_MS);
+      };
+      const unsubs = events.map((ev) => client.on(ev, onEvent));
+      (cell as CellWithCleanup).__widgetCleanup = cleanup;
+    }
   };
 }
 
