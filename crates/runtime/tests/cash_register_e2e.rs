@@ -3,10 +3,22 @@
 //! con reconciliación (expected = opening + Σ movimientos; difference = closing - expected),
 //! y la cadena sale.completed → movimiento de caja en la sesión abierta.
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use erplora_db::{Params, SqliteAdapter};
-use erplora_runtime::{RequestContext, Runtime};
+use erplora_runtime::{EventSink, RequestContext, Runtime};
 use serde_json::json;
+
+/// Sink mínimo que captura los NOMBRES de los eventos emitidos (para asertar el `emit` de un command).
+#[derive(Default, Debug)]
+struct Sink {
+    names: Mutex<Vec<String>>,
+}
+impl EventSink for Sink {
+    fn emit(&self, name: &str, _payload: &serde_json::Value) {
+        self.names.lock().unwrap().push(name.to_string());
+    }
+}
 
 fn params(v: serde_json::Value) -> Params { v.as_object().cloned().unwrap_or_default() }
 fn mdir(n: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(n) }
@@ -132,4 +144,68 @@ async fn sale_completed_records_cash_movement() {
     assert_eq!(movs.len(), 1, "la venta debe registrar 1 movimiento de caja");
     assert_eq!(movs[0]["movement_type"], json!("sale"));
     assert_eq!(movs[0]["amount"].as_i64().unwrap(), 3000);
+}
+
+// ── P1 (ADR-0054 T3): evento de DATO-LISTO para el refresco en vivo del KPI de caja ───────────────
+// El widget `cash_register.current_session` refrescaba al oír `sale.completed` (evento DISPARADOR),
+// pero el movimiento de caja lo escribe `record_sale` de forma ASÍNCRONA (relay) → carrera: el
+// re-query corría antes de que el movimiento estuviera en la BD. El arreglo: los comandos que
+// ESCRIBEN un movimiento emiten `cash_register.movement_added` (evento de DATO-LISTO, en el MISMO
+// tx transaccional del outbox), y el widget refresca con ese → cero carrera.
+
+#[tokio::test]
+async fn movement_add_emits_movement_added() {
+    // Path directo determinista: `movement.add` escribe un movimiento → debe emitir el evento.
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let mut rt = Runtime::new(Box::new(db));
+    let sink = Arc::new(Sink::default());
+    rt.set_event_sink(sink.clone());
+    rt.install_from_dir(&mdir("cash_register")).await.expect("instalar cash_register");
+    let ctx = admin();
+    let sid = open_session(&rt, &ctx, 10000).await;
+
+    rt.execute_command("cash_register.movement.add", &params(json!({
+        "session_id": sid, "movement_type": "sale", "amount": 5000, "payment_method": "cash",
+        "sale_reference": "", "description": "venta"
+    })), &ctx).await.unwrap();
+
+    let names = sink.names.lock().unwrap();
+    assert!(
+        names.iter().any(|n| n == "cash_register.movement_added"),
+        "un movimiento de caja debe emitir `cash_register.movement_added` (dato-listo para el KPI); emitidos: {names:?}"
+    );
+}
+
+#[tokio::test]
+async fn record_sale_emits_movement_added_after_relay() {
+    // Path REAL del P1: venta → (relay) record_sale escribe el movimiento Y emite el evento, en el
+    // mismo tx del outbox → cuando el widget lo recibe, el dato YA está en la BD.
+    if !wasm() || !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let mut rt = Runtime::new(Box::new(db));
+    let sink = Arc::new(Sink::default());
+    rt.set_event_sink(sink.clone());
+    rt.install_from_dir(&mdir("taxes")).await.unwrap();
+    rt.install_from_dir(&mdir("inventory")).await.unwrap();
+    rt.install_from_dir(&mdir("customers")).await.unwrap();
+    rt.install_from_dir(&mdir("invoice")).await.unwrap();
+    rt.install_from_dir(&mdir("cash_register")).await.unwrap();
+    rt.install_from_dir(&mdir("sales")).await.unwrap();
+    let ctx = admin();
+    let sid = open_session(&rt, &ctx, 0).await;
+
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "tax_included": false,
+        "items": [{ "product_name": "X", "price": 3000, "quantity": 1, "tax_rate": 0.0 }]
+    })), &ctx).await.unwrap();
+    rt.drain_outbox().await.unwrap(); // el relay corre record_sale (escribe el movimiento + emite)
+
+    // Invariante del arreglo: el movimiento ESTÁ escrito Y el evento de dato-listo se emitió.
+    let movs = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &ctx).await.unwrap();
+    assert_eq!(movs.len(), 1, "la venta debe haber escrito el movimiento");
+    let names = sink.names.lock().unwrap();
+    assert!(
+        names.iter().any(|n| n == "cash_register.movement_added"),
+        "record_sale debe emitir `cash_register.movement_added` tras escribir el movimiento; emitidos: {names:?}"
+    );
 }
