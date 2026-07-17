@@ -438,12 +438,10 @@
 
       <!-- ── Datos: importar / exportar el hub (ADR-0113; decisión humano 2026-07-12) ──
            Import y export viven JUNTOS en esta pestaña de la navegación secundaria de Ajustes
-           (antes eran las páginas /import y /export). Deep-link: /settings?tab=data. -->
+           (antes eran las páginas /import y /export). Deep-link: /settings?tab=data. Un sub-segment
+           elige entre importar (por defecto) y exportar (decisión humano 2026-07-17). -->
       <template v-else-if="tab === 'data'">
-        <h2 class="data-section-title">{{ t('importPage.title') }}</h2>
-        <ImportPanel />
-        <h2 class="data-section-title">{{ t('exportPage.title') }}</h2>
-        <ExportPanel />
+        <DataPanel :initial="dataView" />
       </template>
     <!-- Footer tab bar -->
     <template #footer>
@@ -507,8 +505,7 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
-import ImportPanel from '../components/ImportPanel.vue';
-import ExportPanel from '../components/ExportPanel.vue';
+import DataPanel from '../components/DataPanel.vue';
 import { themeMode, setThemeMode, type ThemeMode } from '../lib/theme';
 import { setLocale, bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
@@ -537,6 +534,10 @@ const TABS: readonly Tab[] = ['hub', 'store', 'tax', 'tickets', 'permissions', '
 const route = useRoute();
 const initialTab = TABS.find((v) => v === String(route.query.tab ?? '')) ?? 'hub';
 const tab = ref<Tab>(initialTab);
+
+// Vista inicial del sub-segment de Datos: importar por defecto (lo habitual); ?data=export permite
+// aterrizar en exportar desde un deep-link.
+const dataView: 'import' | 'export' = route.query.data === 'export' ? 'export' : 'import';
 
 // Monedas ISO-4217 ofrecidas (lista razonable; EUR por defecto). El runtime acepta cualquier ISO.
 const CURRENCIES: { code: string; name: string }[] = [
@@ -864,15 +865,3 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
   }
 }
 </script>
-
-<style scoped>
-/* Cabeceras que separan los dos paneles de la pestaña Datos (Importar / Exportar). */
-.data-section-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 1.25rem 0 0.25rem;
-}
-.data-section-title:first-of-type {
-  margin-top: 0.25rem;
-}
-</style>

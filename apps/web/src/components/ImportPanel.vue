@@ -3,80 +3,77 @@
     <p class="page-lead" data-testid="import-lead">{{ t('importPage.lead') }}</p>
     <p v-if="!isAdmin" class="page-lead admin-note">{{ t('importPage.adminOnly') }}</p>
 
-    <!-- ── Paso 1: elegir fuente (zip local; nube = próximamente) ── -->
+    <!-- ── Paso 1: elegir fuente — SIEMPRE a la vista qué se puede cargar ──
+         Rediseño 2026-07-17 (decisión humano): «descargar de la nube» ya no es un botón que
+         despliega una lista (nadie descubría qué había). Ahora el catálogo de la nube se carga
+         solo al entrar y se pinta como UNA CARD por blueprint, más una card secundaria para subir
+         un fichero local. El usuario ve de un vistazo lo que tiene disponible. -->
     <template v-if="step === 'pick'">
-      <ion-card>
-        <ion-card-content>
-          <ion-label>
-            <h2>{{ t('importPage.pickTitle') }}</h2>
-            <p>{{ t('importPage.pickDesc') }}</p>
-          </ion-label>
+      <ion-label class="page-lead-block">
+        <h2>{{ t('importPage.pickTitle') }}</h2>
+        <p>{{ t('importPage.pickDesc') }}</p>
+      </ion-label>
 
-          <!-- Selector de fichero oculto disparado por un ion-button (patrón CSP-safe del cert). -->
-          <input
-            ref="fileInput"
-            data-testid="import-file-input"
-            type="file"
-            accept=".zip,application/zip"
-            style="display: none"
-            @change="onFileChange"
-          />
+      <!-- Selector de fichero oculto disparado por la card (patrón CSP-safe del cert). -->
+      <input
+        ref="fileInput"
+        data-testid="import-file-input"
+        type="file"
+        accept=".zip,application/zip"
+        style="display: none"
+        @change="onFileChange"
+      />
 
-          <ion-button
-            data-testid="import-pick-file"
-            expand="block"
-            class="mt-3"
-            :disabled="!isAdmin || inspecting"
-            @click="triggerFilePicker"
-          >
-            <ion-spinner v-if="inspecting" slot="start" name="crescent" />
-            <HubIcon v-else slot="start" name="document-attach-outline" />
-            {{ inspecting ? t('importPage.inspecting') : t('importPage.pickFile') }}
-          </ion-button>
+      <div v-if="loadingCatalog" class="cloud-loading" data-testid="import-cloud-loading">
+        <ion-spinner name="crescent" />
+        <span>{{ t('importPage.loadingCatalog') }}</span>
+      </div>
 
-          <!-- «Desde la nube» (ADR-0121): catálogo de blueprints publicados en el vendor portal
-               del SaaS. El runtime proxya con su X-Hub-Token y VERIFICA el sha256 del zip antes
-               de dárnoslo; a partir de ahí el flujo es idéntico al de un fichero local. -->
-          <ion-button
-            data-testid="import-cloud"
-            expand="block"
-            fill="outline"
-            class="mt-2"
-            :disabled="!isAdmin || inspecting || loadingCatalog"
-            @click="openCloudCatalog"
-          >
-            <ion-spinner v-if="loadingCatalog" slot="start" name="crescent" />
-            <HubIcon v-else slot="start" name="cloud-download-outline" />
-            {{ loadingCatalog ? t('importPage.loadingCatalog') : t('importPage.fromCloud') }}
-          </ion-button>
-        </ion-card-content>
-      </ion-card>
+      <div v-else class="cloud-grid">
+        <!-- Un blueprint publicado en la nube (ADR-0121). El runtime lo descarga con su
+             X-Hub-Token y VERIFICA el sha256 antes de dárnoslo; de ahí en adelante el flujo es
+             idéntico al de un fichero local. -->
+        <ion-card
+          v-for="bp in catalog"
+          :key="bp.slug"
+          button
+          class="source-card"
+          :disabled="!isAdmin || inspecting"
+          :data-testid="`import-cloud-item-${bp.slug}`"
+          @click="pickFromCloud(bp)"
+        >
+          <ion-card-content>
+            <HubIcon name="cube-outline" class="source-card-icon" />
+            <h3>{{ bp.name }}</h3>
+            <p>{{ bp.description || bp.slug }}</p>
+            <ion-note>{{ bp.locale }} · v{{ bp.latest_version }}</ion-note>
+          </ion-card-content>
+        </ion-card>
 
-      <!-- Catálogo de la nube -->
-      <ion-card v-if="showCatalog" data-testid="import-cloud-catalog">
-        <ion-card-content class="p-0">
-          <ion-list v-if="catalog.length" lines="full">
-            <ion-item
-              v-for="bp in catalog"
-              :key="bp.slug"
-              button
-              :disabled="inspecting"
-              :data-testid="`import-cloud-item-${bp.slug}`"
-              @click="pickFromCloud(bp)"
-            >
-              <HubIcon slot="start" name="cube-outline" />
-              <ion-label>
-                <h3>{{ bp.name }}</h3>
-                <p>{{ bp.description || bp.slug }}</p>
-              </ion-label>
-              <ion-note slot="end">{{ bp.locale }} · v{{ bp.latest_version }}</ion-note>
-            </ion-item>
-          </ion-list>
-          <ion-note v-else data-testid="import-cloud-empty" class="soon-note">
-            {{ t('importPage.catalogEmpty') }}
-          </ion-note>
-        </ion-card-content>
-      </ion-card>
+        <!-- Card secundaria: subir un .blueprint.zip desde el equipo (otro hub / un backup). -->
+        <ion-card
+          button
+          class="source-card source-card--add"
+          :disabled="!isAdmin || inspecting"
+          data-testid="import-upload-local"
+          @click="triggerFilePicker"
+        >
+          <ion-card-content>
+            <ion-spinner v-if="inspecting" name="crescent" class="source-card-icon" />
+            <HubIcon v-else name="add-outline" class="source-card-icon" />
+            <h3>{{ t('importPage.fromLocal') }}</h3>
+            <p>{{ inspecting ? t('importPage.inspecting') : t('importPage.fromLocalDesc') }}</p>
+          </ion-card-content>
+        </ion-card>
+      </div>
+
+      <ion-note
+        v-if="!loadingCatalog && !catalog.length"
+        data-testid="import-cloud-empty"
+        class="soon-note"
+      >
+        {{ t('importPage.catalogEmpty') }}
+      </ion-note>
 
       <ion-note v-if="error" data-testid="import-error" color="danger" class="error-note">
         {{ t('importPage.inspectErrorTitle') }}: {{ error }}
@@ -262,7 +259,7 @@
 // resumen del manifest + checkboxes de las secciones DETECTADAS → (3) import en orden «migrate»
 // con INFORME final por sección (Applied ✓ / Skipped — / Failed ✗ con motivo, best-effort).
 // El gate real es del runtime (solo owner/admin); el `:disabled` de aquí es cosmético.
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -335,22 +332,29 @@ async function inspectAndReview(zip: Blob): Promise<void> {
 }
 
 // ── Paso 1 (bis): fuente NUBE — catálogo de blueprints del SaaS (ADR-0121) ──
+// Se carga SOLO al entrar (ya no detrás de un botón): el usuario debe ver de un vistazo qué
+// blueprints puede cargar. Solo admin puede importar, así que solo admin dispara la carga.
 const loadingCatalog = ref<boolean>(false);
-const showCatalog = ref<boolean>(false);
 const catalog = ref<CatalogBlueprint[]>([]);
 
-async function openCloudCatalog(): Promise<void> {
-  error.value = '';
+async function loadCatalog(): Promise<void> {
   loadingCatalog.value = true;
   try {
     catalog.value = await fetchBlueprintCatalog();
-    showCatalog.value = true;
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+  } catch {
+    // El catálogo es BEST-EFFORT: un hub sin credencial cloud (Local no enrolado, dev) o un fallo
+    // de red NO deben gritar un banner de error — la card «subir desde archivo» siempre es el
+    // fallback. Degradamos en silencio a catálogo vacío (la nota «sin plantillas» ya lo cubre).
+    // El `error.value` se reserva para fallos de INSPECCIÓN de un fichero elegido por el usuario.
+    catalog.value = [];
   } finally {
     loadingCatalog.value = false;
   }
 }
+
+onMounted(() => {
+  if (isAdmin.value) void loadCatalog();
+});
 
 /**
  * Elegir un blueprint de la nube. El runtime lo descarga de Object Storage y **verifica su
@@ -362,7 +366,6 @@ async function pickFromCloud(bp: CatalogBlueprint): Promise<void> {
   inspecting.value = true;
   try {
     const zip = await downloadBlueprint(bp.slug);
-    showCatalog.value = false;
     await inspectAndReview(zip);
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
@@ -553,6 +556,62 @@ ion-checkbox::part(label) {
   display: block;
   margin-top: 0.35rem;
   font-size: 0.8rem;
+}
+/* Encabezado del paso «elegir fuente». */
+.page-lead-block {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+.page-lead-block h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.page-lead-block p {
+  color: var(--ion-color-medium);
+  margin: 0.2rem 0 0;
+}
+/* Rejilla de fuentes de importación: una card por blueprint de la nube + la card de subir. */
+.cloud-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+.source-card {
+  margin: 0;
+  cursor: pointer;
+}
+.source-card ion-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.source-card-icon {
+  font-size: 1.75rem;
+  margin-bottom: 0.35rem;
+  color: var(--ion-color-primary);
+}
+.source-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.source-card p {
+  color: var(--ion-color-medium);
+  margin: 0;
+  font-size: 0.875rem;
+}
+/* La card de subir desde archivo: borde punteado para leerla como acción «añadir». */
+.source-card--add {
+  border: 1px dashed var(--ion-border-color);
+  box-shadow: none;
+}
+.cloud-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ion-color-medium);
+  padding: 1rem 0;
 }
 .error-note {
   display: block;

@@ -162,6 +162,7 @@ import { loadMenu, type MenuEntry } from '../lib/module-loader';
 import { getClient, getHubSector } from '../lib/runtime';
 import { cloudSubscriptions, cloudInvoices, getAccessToken } from '../lib/cloud';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
+import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
 import { pendingSetups, refreshSetupStatus } from '../lib/setup-status';
 import { formatAmount } from '../lib/money';
 import type { WidgetDef, WidgetPreset, OkWidgetBoardLabels } from '@erplora/outfitkit';
@@ -217,43 +218,10 @@ function coreBlueprintWidget(): WidgetDef {
     icon: 'swap-vertical-outline',
     category: 'Hub',
     size: 'md',
+    // Un ÚNICO CTA «configurar» que aterriza en Ajustes › Datos (import/export viven ahí). El DOM
+    // imperativo del widget vive en lib/dashboard-blueprint-widget.ts (testeable, aislado del board).
     render: (cell: HTMLElement) => {
-      const card = document.createElement('ion-card');
-      card.setAttribute('data-testid', 'dashboard-blueprint-widget');
-      // La celda del board ya aporta el hueco de la rejilla (margin:0). El resto replica la regla
-      // global de theme/polish.css (ion-card: radio + sombra + borde) con los MISMOS tokens: el
-      // CSS global no cruza el shadow del board, pero las custom properties sí heredan.
-      card.style.cssText =
-        'margin:0;border-radius:var(--ok-radius);box-shadow:var(--ok-shadow-sm);border:1px solid var(--ion-border-color);';
-      const content = document.createElement('ion-card-content');
-
-      const title = document.createElement('h2');
-      title.textContent = t('dashboard.blueprintTitle');
-      title.style.cssText = 'font-size:1rem;font-weight:600;margin:0;';
-      const body = document.createElement('p');
-      body.textContent = t('dashboard.blueprintBody');
-      body.style.cssText = 'color:var(--ion-color-medium);margin:0.15rem 0 0;';
-
-      const actions = document.createElement('div');
-      actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem;';
-      const mkBtn = (testid: string, label: string, outline: boolean): HTMLElement => {
-        const b = document.createElement('ion-button');
-        b.setAttribute('size', 'small');
-        if (outline) b.setAttribute('fill', 'outline');
-        b.setAttribute('data-testid', testid);
-        b.textContent = label;
-        // Import y export viven JUNTOS en la pestaña Datos de Ajustes (/settings?tab=data).
-        b.addEventListener('click', () => void router.push('/settings?tab=data'));
-        return b;
-      };
-      actions.append(
-        mkBtn('dashboard-blueprint-import', t('dashboard.blueprintImport'), false),
-        mkBtn('dashboard-blueprint-export', t('dashboard.blueprintExport'), true),
-      );
-
-      content.append(title, body, actions);
-      card.append(content);
-      cell.append(card);
+      buildBlueprintWidget(cell, t, () => void router.push('/settings?tab=data'));
     },
   };
 }
