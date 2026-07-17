@@ -186,7 +186,10 @@ onBeforeUnmount(() => {
   z-index: 50;
   display: flex;
   flex-direction: column;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.18);
+  /* Comentada de momento (QA 2026-07-17): cerrado (translateX(100%)) la sombra sangraba ~32px en
+     el borde derecho del viewport. Ver cómo queda sin ella; si se quiere de vuelta, moverla a
+     `.assistant-drawer[data-open='true']` para que solo pinte con el panel abierto. */
+  /* box-shadow: -8px 0 32px rgba(0, 0, 0, 0.18); */
   transform: translateX(100%);
   transition: transform 0.2s ease;
 }
