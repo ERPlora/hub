@@ -150,6 +150,113 @@ async fn cocina_no_conoce_mesas_ni_clientes() {
 }
 
 #[tokio::test]
+async fn cada_estacion_dice_a_donde_sale_su_comanda() {
+    if !wasm_present() {
+        eprintln!("SKIP: falta handler.wasm");
+        return;
+    }
+    // Hasta ahora disparar guardaba la comanda en la BD **y ya**: nadie la imprimía y nadie
+    // garantizaba que apareciese en una pantalla. Un restaurante real tiene varias estaciones y
+    // cada una sale por donde puede: en la plancha nadie mira una pantalla con las manos ocupadas
+    // (papel), y en la barra imprimir es tirar papel porque el camarero se sirve solo (pantalla).
+    //
+    // El destino es de la ESTACIÓN, no de la comanda: así "caliente imprime, barra solo pantalla"
+    // se configura una vez y no en cada disparo. El enrutado producto→estación YA existía
+    // (`_insert_item.sql`); lo que faltaba era que la estación dijera **a dónde**.
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    let cocina = rt
+        .execute_command(
+            "kitchen.stations.create",
+            &params(json!({ "name": "Cocina caliente", "destination": "printer", "printer_role": "kitchen" })),
+            &ctx,
+        )
+        .await
+        .expect("crear la estación de cocina");
+    let cocina_id = cocina["new_ids"][0].as_str().unwrap().to_string();
+
+    let barra = rt
+        .execute_command(
+            "kitchen.stations.create",
+            &params(json!({ "name": "Barra", "destination": "display" })),
+            &ctx,
+        )
+        .await
+        .expect("crear la estación de barra");
+    let barra_id = barra["new_ids"][0].as_str().unwrap().to_string();
+
+    for (station_id, product_id) in [(&cocina_id, "prod-croquetas"), (&barra_id, "prod-canas")] {
+        rt.execute_command(
+            "kitchen.stations.set_routing",
+            &params(json!({ "station_id": station_id, "product_id": product_id })),
+            &ctx,
+        )
+        .await
+        .expect("enrutar el producto a su estación");
+    }
+
+    let oid = open_order(&rt, &ctx, "Croquetas").await;
+    rt.execute_command(
+        "sales.order.fire",
+        &params(json!({
+            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
+            "items": [
+                { "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2, "unit_price": 350 },
+                { "product_id": "prod-canas", "product_name": "Cañas", "quantity": 2, "unit_price": 250 }
+            ]
+        })),
+        &ctx,
+    )
+    .await
+    .expect("disparar el pedido a cocina");
+    rt.drain_outbox().await.unwrap();
+
+    let comandas = rt.execute_query("kitchen.orders.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(comandas.len(), 1, "un disparo, una comanda: {comandas:?}");
+    let comanda_id = comandas[0]["id"].as_str().unwrap();
+
+    let items = rt
+        .execute_query("kitchen.orders.items", &params(json!({ "order_id": comanda_id })), &ctx)
+        .await
+        .unwrap();
+    assert_eq!(items.len(), 2, "las dos líneas bajan a cocina: {items:?}");
+
+    // La línea no solo sabe QUÉ estación: sabe por dónde sale esa estación. Es lo que necesita
+    // quien imprime para agrupar por papel y no mandar a la impresora lo que es solo de pantalla.
+    let croquetas =
+        items.iter().find(|i| i["product_name"] == json!("Croquetas")).expect("línea de croquetas");
+    assert_eq!(croquetas["station_id"], json!(cocina_id), "las croquetas van a la plancha");
+    assert_eq!(croquetas["destination"], json!("printer"), "la cocina caliente imprime");
+    assert_eq!(croquetas["printer_role"], json!("kitchen"), "y sale por el rol `kitchen`");
+
+    let canas = items.iter().find(|i| i["product_name"] == json!("Cañas")).expect("línea de cañas");
+    assert_eq!(canas["station_id"], json!(barra_id), "las cañas van a la barra");
+    assert_eq!(canas["destination"], json!("display"), "la barra NO imprime: solo pantalla");
+}
+
+#[tokio::test]
+async fn una_estacion_sin_destino_configurado_imprime_y_se_muestra() {
+    if !wasm_present() {
+        eprintln!("SKIP: falta handler.wasm");
+        return;
+    }
+    // El default no puede ser "solo pantalla": un hub que actualiza y tenía sus estaciones de
+    // siempre dejaría de imprimir sin que nadie toque nada, y la cocina se entera con la comida
+    // fría. Ante la duda, las dos vías: sobra papel, pero no se pierde ninguna comanda.
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    rt.execute_command("kitchen.stations.create", &params(json!({ "name": "Pase" })), &ctx)
+        .await
+        .expect("crear una estación sin decir su destino");
+
+    let estaciones = rt.execute_query("kitchen.stations.list", &Params::new(), &ctx).await.unwrap();
+    let pase = estaciones.iter().find(|s| s["name"] == json!("Pase")).expect("la estación Pase");
+    assert_eq!(pase["destination"], json!("both"), "sin configurar, pantalla Y papel");
+    assert_eq!(pase["printer_role"], json!("kitchen"), "y por la impresora de cocina");
+}
+
+#[tokio::test]
 async fn una_ronda_sin_etiqueta_hereda_la_del_pedido() {
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
