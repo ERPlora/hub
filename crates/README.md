@@ -4,29 +4,35 @@ Workspace Cargo. El **runtime es la autoridad** (ARQUITECTURA.md §4): valida pe
 tenant (`hub_id`) y payload, y ejecuta queries/commands declarados por los módulos. Rust
 no tiene lógica de negocio hardcodeada.
 
-> ✅ **`cargo test --workspace` → 62 tests verdes, 0 warnings.** Todo compila. El server
-> arranca y responde por HTTP real; el flujo de instalación E2E (SaaS→descarga→runtime) y
-> el hot-plug (install/activate/deactivate/uninstall) están probados.
+> ✅ **`cargo test --workspace` en verde** (todo compila; el número exacto de tests cambia
+> con cada commit — corre el comando, o `/test-hub`, en vez de fiarte de una cifra congelada
+> aquí). El server arranca y responde por HTTP real; el flujo de instalación E2E
+> (SaaS→descarga→runtime) y el hot-plug (install/activate/deactivate/uninstall) están probados.
 
 ## Estado
 
+12 crates, todos con código real (ninguno es un esqueleto). Tabla orientativa — para el
+recuento de tests vigente, corre `cargo test -p <crate>`:
+
 | Crate | Qué es | Estado |
 |-------|--------|--------|
-| `erplora-db` | `DatabaseAdapter` + **SQLite** (rusqlite) + **Postgres** (feature `postgres`, traductor `:n`→`$n`). | ✅ 8 tests |
-| `erplora-runtime` | Host genérico: manifest → migraciones → permisos → query/command/eventos (scope `hub_id`) + ciclo de vida (estado en `hub_module`). | ✅ 10 tests + ejemplo |
-| `erplora-server` | **Axum**: query/command, navigation, gestión de módulos, `/ws`, `/healthz`. | ✅ 5 tests + binario |
-| `erplora-cloud-client` | Cliente del SaaS: auth (X-Hub-Token/JWT/webhook), marketplace, **SHA256**. | ✅ 4 tests |
-| `erplora-source` | Descarga `module.zip` (S3, fetcher inyectable) + verifica SHA256 + descomprime (anti zip-slip) + cache. | ✅ 6 tests |
-| `erplora-installer` | **Flujo E2E**: grant(SaaS) → descarga/verifica(source) → instala(runtime). | ✅ 3 tests |
-| `erplora-vector` | `VectorStore` para RAG local (embeddings en SQLite + coseno). | ✅ 7 tests |
-| `erplora-guest-sdk` | Contrato host↔guest WASM (Input/Operation/Event/Output) para autores de plugins. | ✅ 6 tests |
-| `erplora-wasm-host` | **Tier 2**: ejecuta handlers WASM en sandbox (Extism), devuelve *intenciones*. | ✅ 6 tests |
-| `erplora-sync` | Cliente de eventos en vivo (consume `/ws`) con reconexión + backoff. | ✅ 7 tests |
+| `erplora-db` | `DatabaseAdapter` + **SQLite** (rusqlite) + **Postgres** (feature `postgres`, traductor `:n`→`$n`). | ✅ implementado |
+| `erplora-runtime` | Host genérico: manifest → migraciones → permisos → query/command/eventos (scope `hub_id`) + ciclo de vida (estado en `hub_module`). | ✅ implementado + varias suites e2e |
+| `erplora-server` | **Axum**: query/command, navigation, gestión de módulos, `/ws`, `/healthz`. | ✅ implementado + binario |
+| `erplora-cloud-client` | Cliente del SaaS: auth (X-Hub-Token/JWT/webhook), marketplace, **SHA256**. | ✅ implementado |
+| `erplora-source` | Descarga `module.zip` (S3, fetcher inyectable) + verifica SHA256 + descomprime (anti zip-slip) + cache. | ✅ implementado |
+| `erplora-installer` | **Flujo E2E**: grant(SaaS) → descarga/verifica(source) → instala(runtime). | ✅ implementado |
+| `erplora-vector` | `VectorStore` para RAG local (embeddings en SQLite + coseno). | ✅ implementado |
+| `erplora-guest-sdk` | Contrato host↔guest WASM (Input/Operation/Event/Output) para autores de plugins. | ✅ implementado |
+| `erplora-wasm-host` | **Tier 2**: ejecuta handlers WASM en sandbox (Extism), devuelve *intenciones*. | ✅ implementado |
+| `erplora-sync` | Cliente de eventos en vivo (consume `/ws`) con reconexión + backoff. | ✅ implementado |
+| `erplora-peripherals` | Hardware POS red-only (ESC/POS, cajón, discovery, cola/reintentos) — ver [`peripherals/README.md`](peripherals/README.md). | ✅ implementado |
+| `erplora-verifactu` | Lógica fiscal VeriFactu (encadenado, XML, hashing). | ✅ implementado |
 
 ## Probarlo
 
 ```sh
-cargo test  --workspace                                   # 62 tests verdes
+cargo test  --workspace                                   # ver conteo real al ejecutar (no lo congeles)
 cargo run   -p erplora-runtime --example walking_skeleton # demo runtime end-to-end
 cargo build -p erplora-db --features postgres             # compila el backend Postgres
 
