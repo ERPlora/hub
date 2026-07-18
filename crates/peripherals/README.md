@@ -35,12 +35,7 @@ Lo que **no** se porta: `hardware/scanner.py`, `toggle_keyboard`/teclado virtual
 
 ## Estado
 
-**Esqueleto**: tipos y firmas con `todo!()`. La implementación real (y los tests del crate:
-render ESC/POS contra bytes esperados, cola/reintentos con socket simulado) es la fase
-siguiente. Ver el plan en `~/.claude/plans/`.
-
-## Dependencias pendientes (al implementar)
-
-- `mdns-sd` — descubrimiento mDNS.
-- `chrono` — timestamps `first_seen`/`last_seen`.
-- codificación cp437 para `escpos::text` (crate `codepage`/tabla propia).
+**Implementado**: los 8 módulos (`protocol`, `discovery`, `escpos`, `drawer`, `queue`,
+`registry`, `printer`, `lib`) tienen lógica real (~2148 líneas), no firmas con `todo!()`.
+`cargo test -p erplora-peripherals` corre 9 tests en verde (render ESC/POS contra bytes
+esperados, cola/reintentos, apertura de cajón, discovery).

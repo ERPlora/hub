@@ -6,7 +6,7 @@
 >
 > **hub ES el Hub de ERPlora.**
 >
-> Fuentes: diseño AI/RAG [PLAN-ASISTENTE-RAG.md](../docs/arquitectura/PLAN-ASISTENTE-RAG.md), mapa del monorepo
+> Fuentes: diseño AI/RAG [architecture/hub/crates/vector.md](../architecture/hub/crates/vector.md) (ADR-0033), mapa del monorepo
 > [CLAUDE.md](../CLAUDE.md), repo de arquitectura seccionado [architecture/](../architecture/).
 >
 > **Estado:** propuesta + scaffolding inicial (`apps/web` Vue 3 + Ionic, primer módulo

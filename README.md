@@ -9,7 +9,8 @@ Reemplazará progresivamente al Hub actual (`../hub`).
 
 ## Estado
 
-Lo que **ya funciona** (validado en Chrome headless; sin Rust todavía):
+Lo que **ya funciona** (validado en Chrome headless; el workspace Rust compila y pasa tests —
+ver más abajo):
 
 - **App web navegable** ([apps/web](apps/web)): **Vue 3 + Ionic (`@ionic/vue` 8.8) + vue-router
   + Vite + TS + Tailwind v4 + Iconify (`unplugin-icons`)** (componentes Ionic reales, **sin
@@ -31,27 +32,28 @@ Lo que **ya funciona** (validado en Chrome headless; sin Rust todavía):
 
 - **Runtime Rust** ([crates/runtime](crates/runtime) + [crates/db](crates/db)): host genérico
   (manifest → migraciones → queries/commands/eventos con scope `hub_id`) + adaptador SQLite.
-  Módulo [modules/inventory](modules/inventory) con SQL real + ejemplo `walking_skeleton` y tests.
-  ⚠️ **Code-complete pero sin compilar** (no hay toolchain de Rust en el entorno; el sandbox
-  bloquea rustup). Ver [crates/README.md](crates/README.md).
+  Módulos de ejemplo viven hoy en `modules-workspace/modules/` (fuente), no en `hub/modules/`.
+  **Compila y pasa tests**: `cargo check --workspace` en verde y `cargo test --workspace` corre
+  cientos de tests en verde en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri`. Ver
+  [crates/README.md](crates/README.md) y [REPASO-MOTOR-RUST.md](REPASO-MOTOR-RUST.md).
 
-**Stub** (requieren toolchain de Rust o trabajo posterior): `apps/tauri`, `crates/{vector,
-source,cloud-client,guest-sdk,wasm-host,server,sync}`, WASM.
+`apps/tauri` es funcional (gate de entitlement + hardware sidecar), no un stub — ver
+[apps/tauri/README.md](apps/tauri/README.md).
 
 ## Estructura
 
 ```
 apps/
   web/           Vue 3 + Ionic 8.8 + Vite + TS + Tailwind + Iconify (13 vistas)       [real]
-  tauri/         empaquetado desktop/móvil                                          [stub]
+  tauri/         empaquetado desktop/móvil (gate entitlement + hardware sidecar)     [real]
 packages/
   ui/            (ejemplo, NO usado por apps/web) componentes React+Tailwind         [ejemplo]
-  module-cli/    erplora module build|validate                                       [real]
+  module-cli/    erplora module build|validate                                       [deprecado, ver DEPRECATED.md — usa @erplora/module-toolkit]
   module-sdk/    SDK TS frontend (transport IPC/HTTP+WS)                             [interfaz]
   module-types/  tipos del contrato (manifest/envelope)                             [parcial]
-modules/
-  inventory/     módulo de ejemplo (manifest + WC Lit)                              [real]
-crates/          runtime Rust (host genérico) y soporte                            [stub]
+modules/         módulos instalados en runtime (vacío de source; el source vive en
+                 modules-workspace/modules/ en la raíz del monorepo)
+crates/          runtime Rust (host genérico) y soporte, 12 crates                  [real, compila y pasa tests]
 schemas/         contrato compartido                                               [real]
 docker/          Dockerfile.planned                                                [stub]
 ```
@@ -60,7 +62,7 @@ docker/          Dockerfile.planned                                             
 
 - **Node 20+** (hay Node 24) + **pnpm 10+** (`corepack enable pnpm`).
 - **Google Chrome** para `snapshot`/`verify` (headless).
-- **Rust** (aún no instalado) para `crates/*` y `apps/tauri`.
+- **Rust** para `crates/*` y `apps/tauri` (`cargo check --workspace` / `cargo test --workspace`).
 
 > El registry npm del repo es el público (`.npmrc`); el `~/.npmrc` global apunta a un
 > CodeArtifact privado de otro proyecto.
@@ -69,8 +71,10 @@ docker/          Dockerfile.planned                                             
 
 ```sh
 pnpm install
-pnpm build:modules                              # compila los WC de los módulos a ESM (CSP-safe)
 pnpm dev                                         # ⭐ turnkey: runtime (Axum :8787) + web (Vite :5173)
+                                                  # (apps/web/sync-modules.mjs copia los WC ya
+                                                  # compilados desde modules-workspace/modules/*/dist/
+                                                  # vía hooks predev/prebuild; ya no hay `pnpm build:modules`)
 ```
 
 ### Arranque turnkey (`pnpm dev`) — runtime + web de un comando

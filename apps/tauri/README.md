@@ -40,9 +40,9 @@ Flujo (`src/lib.rs::EntitlementGate`):
 
 `HUB_CLOUD_API_URL` sobreescribe la base del SaaS (por defecto `https://erplora.com`).
 
-> **No está en `members` del workspace raíz** (necesita el toolchain Tauri v2 + el `dist` de
-> `apps/web`). Cuando se estabilice el arranque, añadir `"apps/tauri/src-tauri"` a `members` en
-> `../../Cargo.toml`. La lógica criptográfica/gracia (verificable hoy con `cargo test -p
+> Histórico (ya resuelto): en su día `apps/tauri/src-tauri` no estaba en `members` del
+> workspace raíz. Hoy **sí lo está** (ver `../../Cargo.toml`); `cargo check -p erplora-tauri`
+> pasa en verde (línea 12 arriba). La lógica criptográfica/gracia (verificable con `cargo test -p
 > erplora-cloud-client`) vive en `crates/cloud-client/src/entitlement.rs`.
 
 ## Hardware local = sidecar de `erplora-peripherals` (§2.7)
