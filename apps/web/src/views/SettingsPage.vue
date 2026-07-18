@@ -474,7 +474,7 @@
     <template #footer>
       <ion-footer class="ion-no-border">
       <ion-toolbar>
-        <ion-segment :value="tab" @ion-change="tab = ($event.detail.value as Tab)">
+        <ion-segment class="ok-tabbar" :value="tab" @ion-change="tab = ($event.detail.value as Tab)">
           <ion-segment-button value="hub">
             <HubIcon name="business-outline" />
             <ion-label>{{ t('settings.tabHub') }}</ion-label>

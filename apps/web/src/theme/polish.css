@@ -163,48 +163,10 @@ ion-badge {
 ion-footer { box-shadow: none; }
 ion-footer ion-toolbar { --border-width: 0; }
 ion-segment { --background: transparent; padding: 4px; gap: 4px; }
-/* El tabbar de footer (ADR-0022: `navigation[]` → ion-segment) debe LLENAR el ancho disponible.
-   En modo `ios` —el que fijamos en main.ts— Ionic trata el segment como el "segmented control"
-   compacto de iOS y le pone `:host(.in-toolbar){ width: auto; margin-inline: auto }`, así que el
-   host se encoge a su contenido (medido: 289px dentro de una toolbar de 1560px) sin importar cómo
-   dimensiones las columnas. Aquí el segment hace de barra de NAVEGACIÓN, no de pill de filtro, así
-   que fijamos la geometría nosotros y dejamos de depender del modo:
-     · width:100% + margin-inline:0 → el host ocupa la toolbar (esto es lo que arregla el bug).
-     · minmax(88px, 1fr) → con pocas pestañas manda el `1fr` y llenan el ancho; con muchas manda
-       el mínimo y NO se aplastan. 88px sale de MEDIR, no de estimar: con la barra de Ajustes a
-       390px el umbral en el que deja de truncarse el label más largo ("Permisos") está en 86px
-       —a 84px se cortaba 1px, "Permis…"— y se dejan 2px de margen por si el render de la fuente
-       es algo más ancho. Preferimos scroll antes que labels cortados.
-     · start + overflow-x → a partir de ~5 pestañas la barra scrollea en horizontal.
-   (`ion-tab-bar` daría el ancho gratis, pero no tiene ninguna estrategia de desbordamiento.) */
-ion-footer ion-segment {
-  width: 100%;
-  margin-inline: 0;
-  box-sizing: border-box;
-  grid-auto-columns: minmax(84px, 1fr);
-  justify-content: start;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-ion-footer ion-segment::-webkit-scrollbar { display: none; }
-/* Al esconder la barra de scroll hay que señalar de otro modo que quedan pestañas fuera: sin esto
-   el único indicio es una pestaña cortada a medias, que se lee como un fallo de maquetación y no
-   como una invitación a deslizar. El degradado va SOLO en el borde que esconde algo — uno fijo a
-   la derecha seguiría oscureciendo la última pestaña al llegar al final, que es justo el efecto
-   de "roto" que se quiere evitar. `data-overflow` lo publica AppPage (lib/tabbar-scroll.ts), que
-   es lo único que CSS no puede saber: si desborda y por dónde va el scroll. */
-ion-footer ion-segment[data-overflow='end'] {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent 100%);
-  mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent 100%);
-}
-ion-footer ion-segment[data-overflow='start'] {
-  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent 100%);
-  mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent 100%);
-}
-ion-footer ion-segment[data-overflow='both'] {
-  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 36px, #000 calc(100% - 36px), transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0, #000 36px, #000 calc(100% - 36px), transparent 100%);
-}
+/* El tabbar de footer (ADR-0022: `navigation[]` → ion-segment) lo estiliza ahora OutfitKit:
+   `@erplora/outfitkit/tabbar.css` + `bindTabbar()` desde AppPage (cargado en main.ts). Estaba
+   duplicado y ya divergente con el SaaS (outfitkit#29). El mínimo de pestaña se ajusta con el
+   token `--ok-tabbar-min` si algún día hace falta. */
 ion-segment-button {
   --indicator-color: transparent;
   --color: var(--ion-color-medium);

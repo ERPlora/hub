@@ -239,7 +239,7 @@
     <template #footer>
       <ion-footer class="ion-no-border">
         <ion-toolbar>
-          <ion-segment :value="tab" scrollable @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value">
+          <ion-segment class="ok-tabbar" :value="tab" scrollable @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value">
             <ion-segment-button value="resources">
               <HubIcon name="pulse-outline" />
               <ion-label>{{ t('system.tabResources') }}</ion-label>
