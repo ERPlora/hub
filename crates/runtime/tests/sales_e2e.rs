@@ -256,3 +256,37 @@ async fn sale_records_customer_purchase_via_event() {
     assert_eq!(c[0]["total_purchases"], json!(1));
     assert_eq!(c[0]["total_spent"].as_i64().unwrap(), 5000); // 50.00€ en céntimos
 }
+
+#[tokio::test]
+async fn open_order_persists_open_order_with_lines() {
+    // ADR-0141 Gate 2: `sales.order.open` abre un `order` MUTABLE (status=open) con sus líneas
+    // materializadas TEMPRANO (filas reales sales_order/sales_order_item). Invariante del ADR:
+    // `sales` es AGNÓSTICO de la mesa — el payload no lleva table_id (la asociación mesa↔pedido la
+    // OWNea `tables` en table_session.order_id). Importes PROVISIONALES; la cuota fiscal se congela
+    // al cobrar (complete_sale).
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _sink) = fresh().await;
+    let ctx = admin();
+    // Dinero en CÉNTIMOS (ADR-0007): 121=1.21€, 110=1.10€.
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [
+            { "product_name": "Café", "price": 121, "quantity": 2 },
+            { "product_name": "Agua", "price": 110, "quantity": 1 }
+        ]
+    })), &ctx).await.expect("sales.order.open WASM");
+    assert_eq!(res["operations"], json!(3)); // 1 cabecera + 2 líneas materializadas
+
+    let orders = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(orders.len(), 1);
+    assert_eq!(orders[0]["status"], json!("open"), "el pedido nace abierto (mutable)");
+    // provisional_total = 121*2 + 110 = 352 céntimos (display, no fiscal).
+    assert_eq!(orders[0]["provisional_total"].as_i64().unwrap(), 352);
+    let oid = orders[0]["id"].as_str().unwrap().to_string();
+
+    let lines = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(lines.len(), 2, "una línea real por artículo (materialización temprana)");
+    let cafe = lines.iter().find(|l| l["product_name"] == json!("Café")).unwrap();
+    assert_eq!(cafe["quantity"].as_f64().unwrap(), 2.0);
+    assert_eq!(cafe["line_total"].as_i64().unwrap(), 242); // 121*2, provisional
+    assert_eq!(cafe["order_id"], json!(oid), "la línea cuelga del order");
+}
