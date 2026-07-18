@@ -451,3 +451,75 @@ async fn un_cobro_PARCIAL_no_libera_la_mesa() {
 
     assert_eq!(estado_mesa(&rt, "m12").await, "occupied", "la mesa sigue ocupada: aún queda cuenta");
 }
+
+// ── Etapa 4: aparcar = soltar la mesa sin cerrar la cuenta ────────────────────────────────────
+
+#[tokio::test]
+async fn aparcar_suelta_la_mesa_y_cierra_el_tramo_sin_cerrar_la_sesion() {
+    // Aparcar NO abre un tramo nuevo: cierra el vivo con motivo `parked`. Así el periodo aparcado
+    // no tiene que inventarse una asignación a ninguna mesa (ADR-0146).
+    let mut rt = fresh().await;
+    let sid = abrir(&mut rt, "m12").await;
+
+    rt.execute_command("tables.sessions.park", &params(json!({ "session_id": sid })), &admin())
+        .await
+        .expect("aparcar");
+
+    assert_eq!(estado_mesa(&rt, "m12").await, "available", "la mesa queda libre para otros");
+    let res = rt
+        .db_for_test()
+        .query(
+            "SELECT s.status AS sesion, a.release_reason AS motivo, a.released_at IS NOT NULL AS cerrado
+             FROM tables_session s JOIN tables_session_assignment a ON a.session_id = s.id
+             WHERE s.id = :sid",
+            &params(json!({ "sid": sid })),
+        )
+        .await
+        .unwrap();
+    let o = res.rows[0].as_object().unwrap().clone();
+    assert_eq!(o["sesion"], json!("parked"), "la CUENTA sigue viva, solo sin mesa");
+    assert_eq!(o["motivo"], json!("parked"));
+    assert_eq!(tramos(&rt, &sid).await.len(), 1, "aparcar no inventa un tramo nuevo");
+}
+
+#[tokio::test]
+async fn restaurar_una_cuenta_aparcada_estrena_tramo_en_la_mesa_nueva() {
+    // La recuperas en otra mesa: el historial encadena 12 → (aparcada) → 8, sin fingir que estuvo
+    // en ninguna mesa mientras esperaba.
+    let mut rt = fresh().await;
+    let sid = abrir(&mut rt, "m12").await;
+    rt.execute_command("tables.sessions.park", &params(json!({ "session_id": sid })), &admin())
+        .await
+        .unwrap();
+
+    rt.execute_command(
+        "tables.sessions.restore",
+        &params(json!({ "session_id": sid, "table_id": "m8" })),
+        &admin(),
+    )
+    .await
+    .expect("restaurar");
+
+    let t = tramos(&rt, &sid).await;
+    assert_eq!(t.len(), 2, "un tramo por estancia: {t:?}");
+    assert_eq!(t[1], ("m8".to_string(), "restored".to_string(), true));
+    assert_eq!(estado_mesa(&rt, "m8").await, "occupied");
+    assert_eq!(estado_mesa(&rt, "m12").await, "available");
+}
+
+#[tokio::test]
+async fn una_cuenta_aparcada_no_ocupa_ninguna_mesa() {
+    // Invariante de sala: mientras está aparcada, ninguna mesa la está esperando.
+    let mut rt = fresh().await;
+    let sid = abrir(&mut rt, "m12").await;
+    rt.execute_command("tables.sessions.park", &params(json!({ "session_id": sid })), &admin())
+        .await
+        .unwrap();
+    let ocupadas = contar(
+        &rt,
+        "SELECT COUNT(*) FROM tables_session_assignment WHERE released_at IS NULL AND is_deleted = 0",
+    )
+    .await;
+    assert_eq!(ocupadas, 0, "sin tramo vivo = sin mesa ocupada");
+    let _ = sid;
+}
