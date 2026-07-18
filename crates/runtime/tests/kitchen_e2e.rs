@@ -148,3 +148,35 @@ async fn cocina_no_conoce_mesas_ni_clientes() {
     assert!(listen.get("sale.completed").is_none(), "cocina no debe colgar del cobro: {listen}");
     assert!(listen.get("order.fired").is_some(), "cocina cuelga del disparo del pedido: {listen}");
 }
+
+#[tokio::test]
+async fn una_ronda_sin_etiqueta_hereda_la_del_pedido() {
+    if !wasm_present() {
+        eprintln!("SKIP: falta handler.wasm");
+        return;
+    }
+    // Encontrado en el navegador: el camarero manda las bebidas de la Mesa 4, y al reanudar el
+    // pedido más tarde (otro turno, otra tablet, el POS sin la mesa cargada) la segunda comanda
+    // salía con el destino VACÍO. En cocina eso es un ticket huérfano: comida sin saber a dónde va.
+    // La etiqueta es del PEDIDO, aunque la aporte quien dispara: si un disparo no la trae, hereda.
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    let oid = open_order(&rt, &ctx, "Cañas").await;
+
+    for label in ["Mesa 4", ""] {
+        rt.execute_command(
+            "sales.order.fire",
+            &params(json!({ "order_id": oid, "label": label, "channel": "dine_in" })),
+            &ctx,
+        )
+        .await
+        .unwrap();
+        rt.drain_outbox().await.unwrap();
+    }
+
+    let comandas = rt.execute_query("kitchen.orders.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(comandas.len(), 2);
+    for c in &comandas {
+        assert_eq!(c["label"], json!("Mesa 4"), "toda ronda del pedido va a la misma mesa: {c:?}");
+    }
+}
