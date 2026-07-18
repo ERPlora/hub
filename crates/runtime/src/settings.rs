@@ -89,6 +89,15 @@ const KNOWN: &[Setting] = &[
         validate: validate_bool,
         parse_stored: |s| json!(s == "true"),
     },
+    // Paleta de tema DEFAULT del hub (ADR-0138): valor de `data-ok-palette` (OutfitKit
+    // palettes.css, compartido con Cloud). 'erplora' = marca por defecto (sin atributo).
+    // El override POR USUARIO no vive aquí: es localStorage del navegador (`erplora.palette`).
+    Setting {
+        key: "theme_palette",
+        default: || json!("erplora"),
+        validate: validate_theme_palette,
+        parse_stored: |s| json!(s),
+    },
     // Identidad de NEGOCIO (FUENTE ÚNICA, país-agnóstica — ADR-0061): identificador fiscal universal
     // (NIF en ES, SIREN/SIRET en FR, VAT-ID…), razón social y dirección del obligado tributario. La
     // usan invoice (emisor) y los módulos fiscales por país (verifactu, …) + los documentos de venta.
@@ -234,6 +243,31 @@ fn validate_tax_id(v: &Value) -> std::result::Result<String, String> {
         return Err("identificador fiscal demasiado largo".into());
     }
     Ok(up)
+}
+
+/// Paletas de tema válidas (espejo 1:1 de `@erplora/outfitkit/palettes.css` + el default).
+const THEME_PALETTES: &[&str] = &[
+    "erplora",
+    "terracotta",
+    "corporate",
+    "minimal",
+    "forest",
+    "ocean",
+    "violet",
+];
+
+/// `theme_palette`: una de las paletas de OutfitKit. Se normaliza a minúsculas al persistir.
+fn validate_theme_palette(v: &Value) -> std::result::Result<String, String> {
+    let s = v.as_str().ok_or("debe ser un string (id de paleta, p. ej. \"ocean\")")?;
+    let lo = s.trim().to_ascii_lowercase();
+    if THEME_PALETTES.contains(&lo.as_str()) {
+        Ok(lo)
+    } else {
+        Err(format!(
+            "paleta desconocida `{s}`: válidas {}",
+            THEME_PALETTES.join(", ")
+        ))
+    }
 }
 
 /// Boolean. Acepta solo un JSON `true`/`false`; se persiste como `"true"`/`"false"`.
@@ -425,6 +459,40 @@ mod tests {
         assert_eq!(all["currency"], json!("EUR"));
         assert_eq!(all["language"], json!("es"));
         assert_eq!(all["api_docs_enabled"], json!(false));
+    }
+
+    // ── PALETA DE TEMA global del hub (ADR-0138, ERPlora/pm#15) ────────────────────────
+    //
+    // `theme_palette` es la paleta DEFAULT del hub (data-ok-palette de OutfitKit palettes.css,
+    // compartida con Cloud). El override por usuario vive en el navegador (localStorage
+    // `erplora.palette`); esta clave es lo que ve quien no ha elegido nada.
+
+    #[tokio::test]
+    async fn theme_palette_default_es_la_marca_erplora() {
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        ensure_table(&db).await;
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["theme_palette"], json!("erplora"));
+    }
+
+    #[tokio::test]
+    async fn theme_palette_acepta_las_paletas_de_outfitkit_y_rechaza_el_resto() {
+        let db = SqliteAdapter::open_in_memory().await.unwrap();
+        ensure_table(&db).await;
+
+        // Las 6 paletas de palettes.css + 'erplora' (default) son válidas.
+        for id in ["erplora", "terracotta", "corporate", "minimal", "forest", "ocean", "violet"] {
+            let mut updates = serde_json::Map::new();
+            updates.insert("theme_palette".into(), json!(id));
+            let result = set_many(&db, "hub-1", &updates, "hub_user:1").await.unwrap();
+            assert_eq!(result["theme_palette"], json!(id));
+        }
+
+        // Un id que no existe en palettes.css se rechaza (p. ej. el set viejo del Cloud).
+        let mut updates = serde_json::Map::new();
+        updates.insert("theme_palette".into(), json!("glass"));
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1").await.unwrap_err();
+        assert!(matches!(err, RuntimeError::InvalidPayload { .. }), "err = {err:?}");
     }
 
     #[tokio::test]

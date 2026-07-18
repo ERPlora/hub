@@ -17,7 +17,7 @@
   "dependencies": {
     "@erplora/module-sdk": "workspace:*",
     "@erplora/module-types": "workspace:*",
-    "@erplora/outfitkit": "^0.1.15",
+    "@erplora/outfitkit": "^0.1.16",
     "@iconify/vue": "^5.0.1",
     "@ionic/core": "^8.8.8",
     "@ionic/vue": "^8.8.8",
