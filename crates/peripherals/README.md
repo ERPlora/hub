@@ -1,7 +1,7 @@
 # erplora-peripherals
 
 Lógica de hardware POS reutilizable, **solo red** (ESC/POS sobre TCP, puerto 9100).
-Diseño en [architecture/hub/apps/bridge.md](../../../architecture/hub/apps/bridge.md) (reubicado desde `ARQUITECTURA.md §2.7`, ver H6). Es el reemplazo en Rust del Bridge Python
+Diseño en [architecture/hub/apps/bridge.md](../../../architecture/hub/apps/bridge.md) (reubicado desde `ARQUITECTURA.md §2.7`). Es el reemplazo en Rust del Bridge Python
 (`bridge/ERPlora-Bridge-desktop`), empaquetado como **librería** sin servidor ni UI.
 
 ## Consumidores
