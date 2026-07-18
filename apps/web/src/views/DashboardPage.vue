@@ -122,7 +122,7 @@
     <template #footer>
       <ion-footer class="ion-no-border">
       <ion-toolbar>
-        <ion-segment
+        <ion-segment class="ok-tabbar"
           :value="tab"
           @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value"
         >

@@ -7,6 +7,11 @@ explica y marca progreso. Marca `[x]` cuando un fichero queda entendido y probad
 > Estado verificado contra el repo (2026-06-01): workspace compila, **95/95 tests verdes**,
 > 0 fallos (2 `ignored` = Extism real). El `README.md`/`CLAUDE.md` de hub están
 > **desfasados** (dicen "Rust sin compilar" y "Lit"): la fuente de verdad es el código.
+>
+> **Nota (2026-07-18):** los conteos de líneas entre paréntesis (p. ej. `manifest.rs (115)`) y la
+> cita `server/lib.rs:145` del diagrama de flujo están **congelados a fecha 2026-06-01** y ya no
+> coinciden con el fichero actual (ha crecido bastante desde entonces). No los uses como
+> referencia de tamaño/posición actual; si se retoma el repaso, recontar.
 
 ---
 

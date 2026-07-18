@@ -18,7 +18,7 @@
   (sin topbar/sidebar), con su propia maquetación.
 -->
 <template>
-  <ion-page>
+  <ion-page ref="page">
     <AppTopbar :title="title" :back-href="backHref">
       <template v-if="$slots.actions" #actions>
         <slot name="actions" />
@@ -38,7 +38,9 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { IonPage, IonContent } from '@ionic/vue';
+import { bindTabbar } from '@erplora/outfitkit/tabbar';
 import AppTopbar from './AppTopbar.vue';
 
 defineProps<{
@@ -47,4 +49,25 @@ defineProps<{
   /** Href de fallback del botón Back; si se pasa, AppTopbar muestra el Back (vista de detalle). */
   backHref?: string;
 }>();
+
+// ── Tabbar de footer ───────────────────────────────────────────────────────────────────────────
+// Cuando hay más pestañas de las que caben, la barra scrollea y hay que SEÑALARLO: sin eso el
+// único indicio es una pestaña cortada a medias, que se lee como un fallo de maquetación.
+// El comportamiento (estado de desbordamiento + degradado + pista de scroll) vive en OutfitKit
+// —lo comparten Hub y SaaS, que antes lo tenían duplicado y divergente (outfitkit#29)—; aquí solo
+// se cablea. Va en AppPage y no en cada vista porque es quien posee el slot `#footer`, así que las
+// 9 vistas con tabbar lo heredan sin repetir nada.
+const page = ref<{ $el?: HTMLElement } | null>(null);
+let desatar: (() => void) | null = null;
+
+onMounted(async () => {
+  await nextTick();
+  const segment = (page.value?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>(
+    'ion-footer ion-segment',
+  );
+  if (!segment) return; // la mayoría de vistas no tienen tabbar
+  desatar = bindTabbar(segment);
+});
+
+onBeforeUnmount(() => desatar?.());
 </script>

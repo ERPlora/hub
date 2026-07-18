@@ -89,7 +89,7 @@
     <template #footer>
       <ion-footer class="ion-no-border">
       <ion-toolbar>
-        <ion-segment :value="tab" @ion-change="onTabChange">
+        <ion-segment class="ok-tabbar" :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="mine">
             <HubIcon name="cube-outline" />
             <ion-label>{{ t('apps.tabMine') }}</ion-label>

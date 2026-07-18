@@ -163,6 +163,10 @@ ion-badge {
 ion-footer { box-shadow: none; }
 ion-footer ion-toolbar { --border-width: 0; }
 ion-segment { --background: transparent; padding: 4px; gap: 4px; }
+/* El tabbar de footer (ADR-0022: `navigation[]` → ion-segment) lo estiliza ahora OutfitKit:
+   `@erplora/outfitkit/tabbar.css` + `bindTabbar()` desde AppPage (cargado en main.ts). Estaba
+   duplicado y ya divergente con el SaaS (outfitkit#29). El mínimo de pestaña se ajusta con el
+   token `--ok-tabbar-min` si algún día hace falta. */
 ion-segment-button {
   --indicator-color: transparent;
   --color: var(--ion-color-medium);

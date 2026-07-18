@@ -1,7 +1,7 @@
 # erplora-peripherals
 
 Lógica de hardware POS reutilizable, **solo red** (ESC/POS sobre TCP, puerto 9100).
-ARQUITECTURA.md §2.7. Es el reemplazo en Rust del Bridge Python
+Diseño en [architecture/hub/apps/bridge.md](../../../architecture/hub/apps/bridge.md) (reubicado desde `ARQUITECTURA.md §2.7`, ver H6). Es el reemplazo en Rust del Bridge Python
 (`bridge/ERPlora-Bridge-desktop`), empaquetado como **librería** sin servidor ni UI.
 
 ## Consumidores
@@ -9,7 +9,8 @@ ARQUITECTURA.md §2.7. Es el reemplazo en Rust del Bridge Python
 - **`apps/bridge`** — bridge standalone (producto **Hub Cloud**): servidor Axum
   `GET /status` + `WS /ws` que envuelve este crate.
 - **`apps/tauri`** — sidecar (producto **Hub Local**): handlers `invoke` que llaman a este crate
-  (pendiente; ver `apps/tauri`).
+  (implementado — `erplora_discover_printers`/`erplora_print`/`erplora_test_print`/
+  `erplora_open_drawer`/`erplora_get_devices`; ver tabla de `invoke` en `apps/tauri/README.md`).
 
 Ambos hablan el **mismo protocolo JSON** que `hub/static/js/bridge.js` ya consume.
 
@@ -35,12 +36,7 @@ Lo que **no** se porta: `hardware/scanner.py`, `toggle_keyboard`/teclado virtual
 
 ## Estado
 
-**Esqueleto**: tipos y firmas con `todo!()`. La implementación real (y los tests del crate:
-render ESC/POS contra bytes esperados, cola/reintentos con socket simulado) es la fase
-siguiente. Ver el plan en `~/.claude/plans/`.
-
-## Dependencias pendientes (al implementar)
-
-- `mdns-sd` — descubrimiento mDNS.
-- `chrono` — timestamps `first_seen`/`last_seen`.
-- codificación cp437 para `escpos::text` (crate `codepage`/tabla propia).
+**Implementado**: los 8 módulos (`protocol`, `discovery`, `escpos`, `drawer`, `queue`,
+`registry`, `printer`, `lib`) tienen lógica real (~2148 líneas), no firmas con `todo!()`.
+`cargo test -p erplora-peripherals` corre 9 tests en verde (render ESC/POS contra bytes
+esperados, cola/reintentos, apertura de cajón, discovery).

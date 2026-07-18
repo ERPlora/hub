@@ -49,7 +49,8 @@
     <template #footer>
       <ion-footer v-if="segmentTabs.length > 1" class="ion-no-border">
       <ion-toolbar>
-        <ion-segment
+        <ion-segment class="ok-tabbar"
+          ref="tabbar"
           :value="activeNavId"
           @ion-change="onTabChange($event as CustomEvent<{ value: string }>)"
         >
@@ -65,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from 'vue';
+import { computed, inject, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
@@ -77,6 +78,7 @@ import AppPage from '../components/AppPage.vue';
 import ModulePlanPanel from '../components/ModulePlanPanel.vue';
 import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
+import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
 import { clientInjectionKey, getClient } from '../lib/runtime';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { openExternal } from '../lib/open-external';
@@ -100,6 +102,8 @@ const router = useRouter();
 // Cliente del runtime inyectado en el boot (provide en main.ts); fallback al singleton.
 const client = inject(clientInjectionKey) ?? getClient();
 const outlet = ref<HTMLDivElement | null>(null);
+/** El `ion-segment` del tabbar de footer (ver `revealActiveTab`). */
+const tabbar = ref<{ $el?: HTMLElement } | null>(null);
 const status = ref<'loading' | 'ready' | 'error'>('loading');
 const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
@@ -248,11 +252,25 @@ function onTabChange(ev: CustomEvent<{ value: string }>): void {
   }
 }
 
-onMounted(() => void mount());
+/**
+ * Trae a la vista la pestaña activa del tabbar. Hace falta porque la pestaña activa la fija la RUTA
+ * (deep-link, back/forward), no un toque: con 5 pestañas —`tables`, `verifactu`— la barra ya
+ * desborda en un móvil de 390px y la activa puede quedar fuera de pantalla al montar. Ionic no lo
+ * cubre. Se espera a `nextTick` (Vue pinta el segment) + un frame (Ionic aplica
+ * `.segment-button-checked` en su propio ciclo, no en el de Vue).
+ */
+async function revealActiveTab(): Promise<void> {
+  await nextTick();
+  requestAnimationFrame(() => {
+    scrollActiveTabIntoView((tabbar.value?.$el as HTMLElement | undefined) ?? null);
+  });
+}
+
+onMounted(() => void mount().then(revealActiveTab));
 watch(
   () => [route.params.moduleId, route.params.navId],
   () => {
-    if (route.name === 'module' && params().moduleId) void mount();
+    if (route.name === 'module' && params().moduleId) void mount().then(revealActiveTab);
   },
 );
 </script>

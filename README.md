@@ -9,7 +9,8 @@ Reemplazará progresivamente al Hub actual (`../hub`).
 
 ## Estado
 
-Lo que **ya funciona** (validado en Chrome headless; sin Rust todavía):
+Lo que **ya funciona** (validado en Chrome headless; el workspace Rust compila y pasa tests —
+ver más abajo):
 
 - **App web navegable** ([apps/web](apps/web)): **Vue 3 + Ionic (`@ionic/vue` 8.8) + vue-router
   + Vite + TS + Tailwind v4 + Iconify (`unplugin-icons`)** (componentes Ionic reales, **sin
@@ -19,39 +20,41 @@ Lo que **ya funciona** (validado en Chrome headless; sin Rust todavía):
   billing, marketplace, ajustes, sistema, **vista de módulo (WC Lit en runtime)** y
   **asistente AI** (drawer). Tema claro/oscuro. **0 violaciones de CSP de script**. Capturas
   en `apps/web/snapshots/`.
-- **AUTH** ([apps/web/src/pages/auth](apps/web/src/pages/auth) + `src/lib/auth.tsx`):
+- **AUTH** ([apps/web/src/views/LoginPage.vue](apps/web/src/views/LoginPage.vue) + `src/lib/session.ts`):
   email+password (1er login) → dispositivo de confianza → PIN + setup. Degrada a modo demo
   si el SaaS no es accesible.
-- **Piezas propias mínimas** ([apps/web/src/ui](apps/web/src/ui)): `Logo` (SVG inline) y
-  `PinPad` — lo único que Ionic no trae. El resto es **Ionic + Tailwind**.
-  (`packages/ui` queda solo como **ejemplo**, no es dependencia.)
+- **Piezas propias mínimas**: logo (imagen inline con fallback al logo local de ERPlora) y el
+  PIN vía `ok-pinpad` (OutfitKit) — lo único que Ionic no trae. El resto es **Ionic + Tailwind**.
 - **CLI de módulos** ([packages/module-cli](packages/module-cli)): `build`/`validate`
   (compila el WC a ESM y verifica CSP-safe).
 - **Contrato** ([schemas/](schemas)): `module.schema.json` + `envelope.schema.json`.
 
 - **Runtime Rust** ([crates/runtime](crates/runtime) + [crates/db](crates/db)): host genérico
   (manifest → migraciones → queries/commands/eventos con scope `hub_id`) + adaptador SQLite.
-  Módulo [modules/inventory](modules/inventory) con SQL real + ejemplo `walking_skeleton` y tests.
-  ⚠️ **Code-complete pero sin compilar** (no hay toolchain de Rust en el entorno; el sandbox
-  bloquea rustup). Ver [crates/README.md](crates/README.md).
+  Módulos de ejemplo viven hoy en `modules-workspace/modules/` (fuente), no en `hub/modules/`.
+  **Compila y pasa tests**: `cargo check --workspace` en verde y `cargo test --workspace` corre
+  cientos de tests en verde en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri` — salvo un
+  fallo conocido y aislado en `erplora-db` (`tests/parity.rs::taxes_rate_real_and_active_filter_parity`,
+  desactualizado tras ADR-0085: falta `key` en el payload del test). Ver
+  [crates/README.md](crates/README.md) y [REPASO-MOTOR-RUST.md](REPASO-MOTOR-RUST.md).
 
-**Stub** (requieren toolchain de Rust o trabajo posterior): `apps/tauri`, `crates/{vector,
-source,cloud-client,guest-sdk,wasm-host,server,sync}`, WASM.
+`apps/tauri` es funcional (gate de entitlement + hardware sidecar), no un stub — ver
+[apps/tauri/README.md](apps/tauri/README.md).
 
 ## Estructura
 
 ```
 apps/
   web/           Vue 3 + Ionic 8.8 + Vite + TS + Tailwind + Iconify (13 vistas)       [real]
-  tauri/         empaquetado desktop/móvil                                          [stub]
+  tauri/         empaquetado desktop/móvil (gate entitlement + hardware sidecar)     [real]
 packages/
   ui/            (ejemplo, NO usado por apps/web) componentes React+Tailwind         [ejemplo]
-  module-cli/    erplora module build|validate                                       [real]
+  module-cli/    erplora module build|validate                                       [deprecado, ver DEPRECATED.md — usa @erplora/module-toolkit]
   module-sdk/    SDK TS frontend (transport IPC/HTTP+WS)                             [interfaz]
   module-types/  tipos del contrato (manifest/envelope)                             [parcial]
-modules/
-  inventory/     módulo de ejemplo (manifest + WC Lit)                              [real]
-crates/          runtime Rust (host genérico) y soporte                            [stub]
+modules/         módulos instalados en runtime (vacío de source; el source vive en
+                 modules-workspace/modules/ en la raíz del monorepo)
+crates/          runtime Rust (host genérico) y soporte, 12 crates                  [real, compila y pasa tests]
 schemas/         contrato compartido                                               [real]
 docker/          Dockerfile.planned                                                [stub]
 ```
@@ -60,7 +63,7 @@ docker/          Dockerfile.planned                                             
 
 - **Node 20+** (hay Node 24) + **pnpm 10+** (`corepack enable pnpm`).
 - **Google Chrome** para `snapshot`/`verify` (headless).
-- **Rust** (aún no instalado) para `crates/*` y `apps/tauri`.
+- **Rust** para `crates/*` y `apps/tauri` (`cargo check --workspace` / `cargo test --workspace`).
 
 > El registry npm del repo es el público (`.npmrc`); el `~/.npmrc` global apunta a un
 > CodeArtifact privado de otro proyecto.
@@ -69,8 +72,10 @@ docker/          Dockerfile.planned                                             
 
 ```sh
 pnpm install
-pnpm build:modules                              # compila los WC de los módulos a ESM (CSP-safe)
 pnpm dev                                         # ⭐ turnkey: runtime (Axum :8787) + web (Vite :5173)
+                                                  # (apps/web/sync-modules.mjs copia los WC ya
+                                                  # compilados desde modules-workspace/modules/*/dist/
+                                                  # vía hooks predev/prebuild; ya no hay `pnpm build:modules`)
 ```
 
 ### Arranque turnkey (`pnpm dev`) — runtime + web de un comando
@@ -107,7 +112,7 @@ pnpm -F @erplora/web typecheck                  # TS estricto
 - **TypeScript** en todo · **Vue 3 + Ionic 8.8 + Tailwind + Iconify** (sin Capacitor; nativo = Tauri).
 - **Lit** para los Web Components de módulos · **pnpm** + Cargo workspaces (raíz compartida).
 - **Dos productos** (§1; ADR-0080): **Hub Local** (backend `single`/SQLite + shell `tauri`) y **Hub Cloud** (backend `cloud`/Aurora + shell `web-pwa`). `single ⟺ Hub Local`, `cloud ⟺ Hub Cloud`.
-- Transporte de datos **HTTP (RPC) + WS (eventos)** en **Hub Cloud** (`cloud`) / **IPC** en **Hub Local** (`single`).
+- Transporte de datos **HTTP (RPC) + WS (eventos)** en **AMBOS productos** (ADR-0050; `invoke` solo para lo nativo/hardware, no para datos).
 - Multi-tenant **`hub_id` por fila**, BD por organización. Hardware vía **shell Tauri** (Bridge como sidecar) en **Hub Local**, o **Bridge standalone opcional** en **Hub Cloud** (§2.7).
 - Red de módulos: **`http.fetch` mediado** (Opción A). Migración **POS-first**, gradual.
 - Auth: email (1er login) → dispositivo de confianza → PIN; usuarios cloud y solo-locales.

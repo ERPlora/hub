@@ -33,6 +33,11 @@ function mountPanel(initial?: 'import' | 'export') {
 }
 
 describe('DataPanel', () => {
+  it('hereda el modo iOS global y no fuerza una apariencia Material local', () => {
+    const w = mountPanel();
+    expect(w.get('[data-testid="data-view-segment"]').attributes('mode')).toBeUndefined();
+  });
+
   it('pinta el segment y por defecto muestra Importar (no Exportar)', () => {
     const w = mountPanel();
     expect(w.find('[data-testid="data-view-segment"]').exists()).toBe(true);

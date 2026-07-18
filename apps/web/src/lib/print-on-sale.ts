@@ -6,10 +6,14 @@
 // → resuelve impresoras por ROL en el Bridge (`receipt`/`kitchen`/`bar`) → según los flags:
 //   - `auto_print_on_sale` → ticket por la impresora con rol `receipt` (formato `receipt` ESC/POS).
 //   - `open_drawer_on_sale` → kick del cajón por la misma impresora de recibo.
-//   - `print_kitchen`      → comandas: ítems enrutados por categoría a estaciones según
-//                            `printing.routing.list`; sin regla, los productos (no servicios)
-//                            van a `kitchen` por defecto; estación `receipt` = no comanda.
 // Todo defensivo: si falta el módulo printing, los ajustes, o el Bridge → no-op silencioso.
+//
+// La COMANDA de cocina ya NO se imprime aquí (ADR-0144): colgaba de `sale.completed`, o sea que
+// mandaba la comida a la plancha **cuando el cliente pagaba** — el final del servicio. Ahora sale
+// al disparar el pedido, en `print-comanda.ts`, y se enruta con las estaciones de `kitchen`
+// (`kitchen_station` + destino por estación) en vez de con `printing.routing` (categoría → texto
+// libre `receipt|kitchen|bar`, sin relación con las estaciones reales).
+// `printing.print_kitchen` y `printing.routing.*` quedan OBSOLETOS: no los lee nadie.
 import type { BridgeDevice, ErploraClient } from '@erplora/module-sdk';
 import { printerIdForRole } from './print';
 
@@ -18,12 +22,6 @@ interface PrintingSettings {
   receipt_footer?: string;
   auto_print_on_sale?: number;
   open_drawer_on_sale?: number;
-  print_kitchen?: number;
-}
-
-interface RoutingRule {
-  category?: string;
-  station?: string;
 }
 
 interface SaleLine {
@@ -34,9 +32,6 @@ interface SaleLine {
   line_total?: number;
   is_service?: number | boolean;
   notes?: string;
-  // `sales.lines` aún no proyecta categoría; se acepta si el contrato la añade (ver printing#1).
-  category?: string;
-  category_name?: string;
 }
 
 /** Arranca el escuchador en el boot del shell. Devuelve la función para cancelar. */
@@ -60,8 +55,7 @@ async function onSaleCompleted(client: ErploraClient, payload: unknown): Promise
   if (!settings) return;
   const autoPrint = flag(settings.auto_print_on_sale);
   const openDrawer = flag(settings.open_drawer_on_sale);
-  const printKitchen = flag(settings.print_kitchen);
-  if (!autoPrint && !openDrawer && !printKitchen) return;
+  if (!autoPrint && !openDrawer) return;
 
   // Impresoras por ROL desde el registro del Bridge. El rol físico vive en el Bridge
   // (devices.json); printing solo decide QUÉ se imprime y a QUÉ estación lógica va.
@@ -97,65 +91,6 @@ async function onSaleCompleted(client: ErploraClient, payload: unknown): Promise
   if (openDrawer && receiptPrinterId) {
     await client.peripherals.openDrawer(receiptPrinterId).catch(() => undefined);
   }
-
-  if (printKitchen) {
-    await printKitchenTickets(client, sale, lines, printerByRole, saleId);
-  }
-}
-
-/**
- * Comandas a cocina/barra: agrupa los ítems por estación según `printing.routing.list`
- * (categoría → estación) y manda un `kitchen_order` por estación a la impresora con ese rol.
- * Reglas: categoría con regla → su estación; sin categoría/regla → `kitchen` (solo productos,
- * los servicios no se "cocinan"); estación `receipt` = excluido de comandas; estación sin
- * impresora con ese rol en el Bridge → se omite (no hay dónde imprimir).
- */
-async function printKitchenTickets(
-  client: ErploraClient,
-  sale: Record<string, unknown>,
-  lines: SaleLine[],
-  printerByRole: (role: string) => string | undefined,
-  saleId: string,
-): Promise<void> {
-  if (!lines.length) return;
-
-  const rules = await client.query<RoutingRule[]>('printing.routing.list').catch(() => [] as RoutingRule[]);
-  const stationByCategory = new Map<string, string>();
-  for (const r of rules ?? []) {
-    const cat = norm(r.category);
-    if (cat && r.station) stationByCategory.set(cat, r.station);
-  }
-
-  const groups = new Map<string, SaleLine[]>();
-  for (const line of lines) {
-    const cat = norm(line.category ?? line.category_name);
-    let station = cat ? stationByCategory.get(cat) : undefined;
-    if (!station) {
-      if (flag(line.is_service)) continue; // un servicio sin regla explícita no genera comanda
-      station = 'kitchen';
-    }
-    if (station === 'receipt') continue;
-    const group = groups.get(station);
-    if (group) group.push(line);
-    else groups.set(station, [line]);
-  }
-
-  const orderNumber = String(sale.sale_number ?? sale.id ?? saleId);
-  for (const [station, items] of groups) {
-    const printerId = printerByRole(station);
-    if (!printerId) continue;
-    const data = {
-      receipt_id: orderNumber,
-      items: items.map((l) => ({
-        name: l.name ?? l.product_name ?? '',
-        quantity: num(l.quantity ?? 1),
-        notes: l.notes,
-      })),
-    };
-    await client.peripherals
-      .print(printerId, 'kitchen_order', data, `sale-${saleId}-${station}`)
-      .catch((e) => console.warn(`[print-on-sale] comanda ${station}`, e));
-  }
 }
 
 function saleIdOf(payload: unknown): string | undefined {
@@ -177,10 +112,6 @@ function flag(v: unknown): boolean {
 
 function num(v: unknown): number {
   return typeof v === 'number' ? v : Number(v ?? 0) || 0;
-}
-
-function norm(v: unknown): string {
-  return typeof v === 'string' ? v.trim().toLowerCase() : '';
 }
 
 function buildReceipt(

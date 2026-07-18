@@ -236,6 +236,48 @@ async fn cada_estacion_dice_a_donde_sale_su_comanda() {
 }
 
 #[tokio::test]
+async fn la_cabecera_de_la_comanda_trae_lo_que_hay_que_imprimir() {
+    if !wasm_present() {
+        eprintln!("SKIP: falta handler.wasm");
+        return;
+    }
+    // Quien imprime lee la cabecera con `kitchen.orders.get`. Si esa query no proyecta la
+    // ETIQUETA, el papel sale con el destino vacío: comida en el pase sin saber a qué mesa va.
+    // Es el mismo fallo que ya nos mordió con las rondas sin etiqueta, un eslabón más abajo — y un
+    // test con la query mockeada no lo ve, porque el mock siempre devuelve la etiqueta.
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    let oid = open_order(&rt, &ctx, "Croquetas").await;
+    rt.execute_command(
+        "sales.order.fire",
+        &params(json!({
+            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
+            "items": [{ "product_name": "Croquetas", "quantity": 2, "unit_price": 350 }]
+        })),
+        &ctx,
+    )
+    .await
+    .unwrap();
+    rt.drain_outbox().await.unwrap();
+
+    let comandas = rt.execute_query("kitchen.orders.list", &Params::new(), &ctx).await.unwrap();
+    let comanda_id = comandas[0]["id"].as_str().unwrap();
+    let cabecera = rt
+        .execute_query("kitchen.orders.get", &params(json!({ "order_id": comanda_id })), &ctx)
+        .await
+        .unwrap();
+
+    assert_eq!(cabecera.len(), 1, "la comanda existe: {cabecera:?}");
+    assert_eq!(cabecera[0]["label"], json!("Mesa 4"), "sin etiqueta, el papel sale huérfano");
+    assert_eq!(cabecera[0]["round_number"], json!(1), "la ronda va en el papel: ¿es la 1ª o la 3ª?");
+    assert!(
+        cabecera[0]["order_number"].as_str().is_some_and(|n| !n.is_empty()),
+        "la comanda se identifica por número: {:?}",
+        cabecera[0]["order_number"]
+    );
+}
+
+#[tokio::test]
 async fn una_estacion_sin_destino_configurado_imprime_y_se_muestra() {
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");

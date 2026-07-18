@@ -12,10 +12,12 @@ import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
+import { bootPrintComanda } from './lib/print-comanda';
+import { createPrintService } from './lib/print';
 import { loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
-import { bootActionFeedback } from './lib/toast';
+import { bootActionFeedback, toastError } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 
 // Los ok-* de OutfitKit y los Web Components de los módulos pintan sus iconos POR NOMBRE
@@ -35,6 +37,10 @@ import '@ionic/vue/css/typography.css';
 import '@ionic/vue/css/padding.css';
 import '@ionic/vue/css/flex-utils.css';
 import '@ionic/vue/css/palettes/dark.class.css';
+
+// Impresión: reglas GLOBALES del Hub (deja en el papel solo el documento, quita la app). Van aquí
+// —no dentro de cada modal— porque imprimir es del shell y debe valer para cualquier documento.
+import './print.css';
 
 // OutfitKit: registra los Web Components (Lit) que usa el shell. OutfitKit aporta lo que Ionic
 // no tiene o compuestos complejos (p. ej. ok-data-table). Import por efecto secundario.
@@ -70,6 +76,9 @@ registerOutfitkitIonicDeps();
 // Tema de marca (--ion-*) + logo de marca (rejilla CSS) + pulido visual + globales (Tailwind).
 import './theme/variables.css';
 import './theme/erplora-logo.css';
+// Tabbar de footer (ion-segment como barra de navegación): ancho, scroll y degradado de borde.
+// Comportamiento compartido con el SaaS — lo cablea AppPage con bindTabbar (outfitkit#29).
+import '@erplora/outfitkit/tabbar.css';
 import './theme/polish.css';
 import './theme/global.css';
 
@@ -83,7 +92,11 @@ bootPwa();
 // que el shell muestre éxito/fallo de otras acciones). Ver lib/toast.ts.
 bootActionFeedback();
 
-const app = createApp(App).use(IonicVue).use(router).use(i18n);
+// mode: 'ios' FIJO. Sin esto Ionic autodetecta plataforma (md en desktop/Android, ios en
+// Safari/iPad), así que el mismo Hub se veía distinto según el dispositivo. Debe coincidir con
+// el SaaS (templates/base.html y public_base.html: window.Ionic.config.mode) — paridad SaaS↔Hub.
+// Nota: en modo ios el router activa swipe-back; si molesta en el TPV táctil → swipeBackEnabled: false.
+const app = createApp(App).use(IonicVue, { mode: 'ios' }).use(router).use(i18n);
 
 // Captura AUTOMÁTICA de errores del frontend (sin modal ni acción del usuario): errores globales,
 // promesas rechazadas y errorHandler de Vue → POST best-effort al runtime local (lib/error-report).
@@ -102,10 +115,26 @@ app.provide(clientInjectionKey, getClient());
 const erploraClient = getClient();
 (erploraClient as unknown as { loadSlot?: (slot: string) => Promise<{ component: string }[]> }).loadSlot =
   loadSlotComponents;
+// `print` (global): LA puerta de impresión para TODOS los módulos. Bridge si lo hay —por ROL de
+// impresora: receipt/kitchen/bar/…— y diálogo del navegador como respaldo. Ningún módulo abre el
+// Bridge ni llama a window.print() por su cuenta: se pisan entre sí y el hardware es del shell.
+(erploraClient as unknown as { print?: ReturnType<typeof createPrintService> }).print =
+  createPrintService(erploraClient as unknown as Parameters<typeof createPrintService>[0]);
 (globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
 
 // Auto-impresión del ticket al cerrar venta (escucha `sale.completed` en el shell, no en sales).
 bootPrintOnSale(getClient());
+
+// Comanda a cocina al DISPARAR el pedido (ADR-0144), no al cobrar. Aquí y no en `kitchen` porque
+// tiene que imprimir siempre, no solo con el KDS montado: la cocina caliente suele ser solo papel.
+// Si la impresora falla NO se bloquea al camarero —la comanda ya está en la BD y el KDS es la
+// fuente de verdad—: se avisa, y desde el KDS se reimprime.
+bootPrintComanda(getClient(), {
+  print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  onFailure: (f) => {
+    void toastError(`No se imprimió la comanda de ${f.label || 'sala'} (${f.role}): ${f.error}`);
+  },
+});
 
 // Si un refresh falla (sesión expirada de verdad), cloud.ts ya limpió los tokens; aquí
 // limpiamos el estado reactivo del usuario y mandamos a /login vía el router del shell.
