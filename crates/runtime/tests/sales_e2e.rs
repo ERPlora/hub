@@ -337,3 +337,73 @@ async fn mutate_open_order_recomputes_provisional_total() {
     let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     assert_eq!(ord[0]["status"], json!("voided"), "el pedido queda anulado");
 }
+
+#[tokio::test]
+async fn checkout_order_marks_it_completed_and_links_sale() {
+    // ADR-0141 Gate 4: cobrar un pedido (complete_sale con order_id) congela una venta INMUTABLE
+    // ligada al pedido y lo marca completado (open → completed). El POS envía los items del pedido.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 2 }]
+    })), &ctx).await.unwrap();
+    let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "amount_tendered": 300,
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 2, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("checkout");
+
+    // el pedido queda completado.
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["status"], json!("completed"), "el pedido se completa al cobrar");
+
+    // existe UNA venta inmutable ligada al pedido.
+    let sales = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(sales.len(), 1);
+    let sale = rt.execute_query("sales.get", &params(json!({"sale_id": sales[0]["id"]})), &ctx).await.unwrap();
+    assert_eq!(sale[0]["order_id"], json!(oid), "la venta apunta al pedido");
+}
+
+#[tokio::test]
+async fn split_bill_one_order_produces_two_sales() {
+    // ADR-0141 Gate 4: split-bill = 1 order → N sale. Dos cobros parciales (keep_order_open) del
+    // mismo pedido producen dos ventas inmutables; el pedido se completa en el cobro FINAL.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    rt.execute_command("sales.order.open", &params(json!({
+        "items": [
+            { "product_name": "Plato A", "price": 1000, "quantity": 1 },
+            { "product_name": "Plato B", "price": 500, "quantity": 1 }
+        ]
+    })), &ctx).await.unwrap();
+    let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    // split 1: cobra el Plato A, deja el pedido ABIERTO.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "keep_order_open": true, "amount_tendered": 1000,
+        "items": [{ "product_name": "Plato A", "price": 1000, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("split 1");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["status"], json!("open"), "un split parcial deja el pedido abierto");
+
+    // split 2 (final): cobra el Plato B → completa el pedido.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "amount_tendered": 500,
+        "items": [{ "product_name": "Plato B", "price": 500, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("split 2");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["status"], json!("completed"), "el cobro final completa el pedido");
+
+    // dos ventas, ambas ligadas al MISMO pedido (1 order → N sale).
+    let sales = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(sales.len(), 2, "1 order → 2 sale (split-bill)");
+    for s in &sales {
+        let g = rt.execute_query("sales.get", &params(json!({"sale_id": s["id"]})), &ctx).await.unwrap();
+        assert_eq!(g[0]["order_id"], json!(oid), "cada venta apunta al pedido");
+    }
+}
