@@ -18,7 +18,7 @@
   (sin topbar/sidebar), con su propia maquetación.
 -->
 <template>
-  <ion-page>
+  <ion-page ref="page">
     <AppTopbar :title="title" :back-href="backHref">
       <template v-if="$slots.actions" #actions>
         <slot name="actions" />
@@ -38,8 +38,10 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { IonPage, IonContent } from '@ionic/vue';
 import AppTopbar from './AppTopbar.vue';
+import { hintScroll, shouldHintScroll, syncTabbarOverflow, tabbarOverflow } from '../lib/tabbar-scroll';
 
 defineProps<{
   /** Título de la vista (se pasa a AppTopbar). */
@@ -47,4 +49,61 @@ defineProps<{
   /** Href de fallback del botón Back; si se pasa, AppTopbar muestra el Back (vista de detalle). */
   backHref?: string;
 }>();
+
+// ── Degradado de borde del tabbar de footer ────────────────────────────────────────────────────
+// Cuando hay más pestañas de las que caben, la barra scrollea (polish.css) y hay que SEÑALARLO:
+// sin esto el único indicio es una pestaña cortada a medias, que se lee como un fallo de
+// maquetación. Va aquí —y no en cada vista— porque AppPage es quien posee el slot `#footer`, así
+// que las 9 vistas con tabbar lo heredan sin repetir nada.
+// El estado se publica en `data-overflow` y el degradado lo pinta el CSS.
+/** Margen para que la pantalla se asiente antes de decidir si dar la pista de scroll. */
+const HINT_ESPERA_MS = 450;
+
+const page = ref<{ $el?: HTMLElement } | null>(null);
+let segment: HTMLElement | null = null;
+let observadorTamano: ResizeObserver | null = null;
+let observadorPestanas: MutationObserver | null = null;
+let hint: ReturnType<typeof setTimeout> | null = null;
+
+const sync = (): void => syncTabbarOverflow(segment);
+
+onMounted(async () => {
+  await nextTick();
+  segment = (page.value?.$el as HTMLElement | undefined)?.querySelector('ion-footer ion-segment') ?? null;
+  if (!segment) return; // la mayoría de vistas no tienen tabbar
+
+  segment.addEventListener('scroll', sync, { passive: true });
+  // Cambia el ancho disponible (rotar el móvil, plegar el menú) → cambia si desborda.
+  observadorTamano = new ResizeObserver(sync);
+  observadorTamano.observe(segment);
+  // Cambia el NÚMERO de pestañas sin cambiar el ancho: ModuleView las carga async desde el
+  // manifest, así que al montar aún no están y el ResizeObserver no se entera.
+  observadorPestanas = new MutationObserver(sync);
+  observadorPestanas.observe(segment, { childList: true });
+  sync();
+
+  // Pista de scroll: la barra se asoma y vuelve, para enseñar que se puede deslizar. El degradado
+  // dice que hay más; esto enseña el gesto. Se espera un momento a que la pantalla se asiente (y a
+  // que ModuleView cargue sus pestañas del manifest y revele la activa) antes de decidir.
+  hint = setTimeout(() => {
+    if (!segment) return;
+    hint = null;
+    if (
+      shouldHintScroll({
+        overflow: tabbarOverflow(segment),
+        reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        yaScrolleado: segment.scrollLeft > 1,
+      })
+    ) {
+      hintScroll(segment);
+    }
+  }, HINT_ESPERA_MS);
+});
+
+onBeforeUnmount(() => {
+  segment?.removeEventListener('scroll', sync);
+  observadorTamano?.disconnect();
+  observadorPestanas?.disconnect();
+  if (hint) clearTimeout(hint); // salir antes de que dispare no debe dejar un timer huérfano
+});
 </script>
