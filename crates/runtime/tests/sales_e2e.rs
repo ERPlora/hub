@@ -40,8 +40,10 @@ async fn fresh() -> (Runtime, Arc<Sink>) {
     rt.set_event_sink(sink.clone());
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes"); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.expect("instalar inventory");
-    rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
+    // ADR-0141: la dependencia se INVIRTIÓ — `customers` depende de `sales` (es el satélite que
+    // OWNea la junction cliente↔pedido), así que ahora `sales` va ANTES en el orden topológico.
     rt.install_from_dir(&mdir("sales")).await.expect("instalar sales");
+    rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
     (rt, sink)
 }
 
@@ -59,7 +61,7 @@ async fn install_with_deps() {
 
 #[tokio::test]
 async fn missing_dep_fails() {
-    // sales sin sus deps debe fallar (orden topológico es responsabilidad del instalador).
+    // sales sin sus deps (inventory/taxes) debe fallar: el orden topológico es del instalador.
     let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
     let err = rt.install_from_dir(&mdir("sales")).await;
@@ -426,4 +428,49 @@ async fn split_bill_one_order_produces_two_sales() {
         let g = rt.execute_query("sales.get", &params(json!({"sale_id": s["id"]})), &ctx).await.unwrap();
         assert_eq!(g[0]["order_id"], json!(oid), "cada venta apunta al pedido");
     }
+}
+
+#[tokio::test]
+async fn el_pedido_no_sabe_de_clientes_la_junction_la_owna_customers() {
+    // ADR-0141: el pedido NO guarda `customer_id` —una tienda de alimentación vende sin cliente—.
+    // La asociación cliente↔pedido la OWNea `customers` en su junction. El pedido es ajeno a ella.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    rt.execute_command("customers.create", &params(json!({
+        "name": "Ana", "email": "", "phone": "", "tax_id": "", "address": "", "city": "",
+        "postal_code": "", "country": "", "avatar": "", "notes": "", "lifecycle_stage": "lead",
+        "source": "walk_in", "company_name": "", "birthday": null, "anniversary": null,
+        "preferred_channel": "none", "marketing_consent": 0, "consent_date": null
+    })), &ctx).await.unwrap();
+    let cid = rt.execute_query("customers.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 1 }]
+    })), &ctx).await.unwrap();
+    let oid = res["new_ids"][0].as_str().unwrap().to_string();
+
+    // 1) el pedido NO expone cliente por ningún lado.
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert!(ord[0].get("customer_id").is_none(), "el pedido no debe saber de clientes: {:?}", ord[0]);
+
+    // 2) la asociación la escribe CUSTOMERS, en su junction.
+    rt.execute_command("customers.orders.link", &params(json!({
+        "customer_id": cid, "order_id": oid
+    })), &ctx).await.expect("customers.orders.link");
+
+    let pedidos = rt.execute_query("customers.orders.by_customer", &params(json!({"customer_id": cid})), &ctx)
+        .await.unwrap();
+    assert_eq!(pedidos.len(), 1, "el cliente tiene su pedido enlazado");
+    assert_eq!(pedidos[0]["order_id"], json!(oid));
+
+    // 3) re-asignar NO duplica: un pedido tiene como mucho un cliente.
+    rt.execute_command("customers.orders.link", &params(json!({
+        "customer_id": cid, "order_id": oid
+    })), &ctx).await.unwrap();
+    let otra_vez = rt.execute_query("customers.orders.by_customer", &params(json!({"customer_id": cid})), &ctx)
+        .await.unwrap();
+    assert_eq!(otra_vez.len(), 1, "re-asignar sustituye, no duplica");
 }
