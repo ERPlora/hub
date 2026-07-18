@@ -2,7 +2,7 @@
 
 > **Qué es esto:** lista de trabajo específica del **Hub** (runtime Rust + `apps/web` Vue3 + Ionic +
 > OutfitKit). Se ordena por prioridad; el item **#1** es lo que atacamos ahora. El backlog amplio del
-> núcleo sigue en [`BACKLOG.md`](BACKLOG.md); el backlog cross-component, en el [`roadmap/TODO.md`](../roadmap/TODO.md).
+> núcleo sigue en [`BACKLOG.md`](BACKLOG.md); el backlog cross-component, en el [`roadmap/TODO.md`](../pm/roadmap/TODO.md).
 >
 > **Convenciones:** `[ ]` pendiente · `[~]` en curso · `[x]` hecho · `[H]` requiere al humano
 > (core/decisión) · `[IA]` la IA puede acelerar (tests/docs/boilerplate). Toda decisión de
@@ -21,11 +21,11 @@
 > [`saas/TODO.md` #1](../saas/TODO.md)).
 
 **Estado hoy:** es un drawer overlay custom (slide-over `translateX`) con scrim:
-- Componente → [hub/apps/web/src/components/AssistantDrawer.vue](hub/apps/web/src/components/AssistantDrawer.vue) (drawer propio en CSS, no usa `ok-drawer`).
-- Montaje en el shell → [hub/apps/web/src/App.vue:107-112](hub/apps/web/src/App.vue#L107-L112).
-- Botón sparkles en la topbar → [hub/apps/web/src/components/AppTopbar.vue:59-68](hub/apps/web/src/components/AppTopbar.vue#L59-L68).
-- Estado global `assistantOpen` / `toggleAssistant` / `closeAssistant` → [hub/apps/web/src/lib/shell.ts:9-35](hub/apps/web/src/lib/shell.ts#L9-L35) (ya persiste entre rutas por ser ref de módulo).
-- Chat SSE intacto → [hub/apps/web/src/lib/assistant.ts](hub/apps/web/src/lib/assistant.ts) (`POST /api/assistant/chat/stream`).
+- Componente → [apps/web/src/components/AssistantDrawer.vue](apps/web/src/components/AssistantDrawer.vue) (drawer propio en CSS, no usa `ok-drawer`).
+- Montaje en el shell → [apps/web/src/App.vue:99](apps/web/src/App.vue#L99) (import en línea 117).
+- Botón sparkles en la topbar → [apps/web/src/components/AppTopbar.vue:59-68](apps/web/src/components/AppTopbar.vue#L59-L68).
+- Estado global `assistantOpen` / `toggleAssistant` / `closeAssistant` → [apps/web/src/lib/shell.ts:9-35](apps/web/src/lib/shell.ts#L9-L35) (ya persiste entre rutas por ser ref de módulo).
+- Chat SSE intacto → [apps/web/src/lib/assistant.ts](apps/web/src/lib/assistant.ts) (`POST /api/assistant/chat/stream`).
 
 **Tareas:**
 
@@ -36,11 +36,11 @@
   con el Cloud. **NOTA QA:** el push se hace encogiendo el `ion-split-pane` (`inset-inline-end:420px`),
   NO padeando `ion-app` — Ionic posiciona el split-pane `absolute; inset:0` y un hijo `inset:0` llena
   el padding-box, así que el padding del host NO lo encoge (el contenido quedaba tapado, no empujado).
-- [x] [IA] **Refactor de [AssistantDrawer.vue](hub/apps/web/src/components/AssistantDrawer.vue):** de
+- [x] [IA] **Refactor de [AssistantDrawer.vue](apps/web/src/components/AssistantDrawer.vue):** de
   overlay `translateX` a **panel persistente** que **empuja el contenido** en desktop (sin scrim, ancho
   fijo 420px) y **overlay + scrim** debajo del breakpoint. Chat SSE y footer intactos (solo layout).
 - [x] [IA] **Persistir el estado abierto entre recargas:** `assistantOpen` respaldado en `localStorage`
-  (clave `erplora.assistant.open`) desde [hub/apps/web/src/lib/shell.ts](hub/apps/web/src/lib/shell.ts):
+  (clave `erplora.assistant.open`) desde [apps/web/src/lib/shell.ts](apps/web/src/lib/shell.ts):
   el ref se inicializa desde localStorage y un `watch` escribe en cada cambio.
 - [x] [IA] **Verificación (directiva QA, 3 viewports):** `typecheck` + `build` VERDES y **QA visual con
   Playwright HECHA** (Hub local `pnpm dev` :5173 + runtime :8787, viewports 1280/800/390): desktop
