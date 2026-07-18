@@ -40,10 +40,8 @@ async fn fresh() -> (Runtime, Arc<Sink>) {
     rt.set_event_sink(sink.clone());
     rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes"); // inventory depende de taxes (ADR-0066)
     rt.install_from_dir(&mdir("inventory")).await.expect("instalar inventory");
-    // ADR-0141: la dependencia se INVIRTIÓ — `customers` depende de `sales` (es el satélite que
-    // OWNea la junction cliente↔pedido), así que ahora `sales` va ANTES en el orden topológico.
-    rt.install_from_dir(&mdir("sales")).await.expect("instalar sales");
     rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
+    rt.install_from_dir(&mdir("sales")).await.expect("instalar sales");
     (rt, sink)
 }
 

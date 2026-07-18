@@ -54,35 +54,35 @@ async fn desactivar_taxes_arrastra_a_sus_dependientes_activos() {
 #[tokio::test]
 async fn reactivar_devuelve_solo_lo_que_cayo_en_cascada() {
     let mut rt = hub_pos().await;
-    // El admin apaga customers A MANO (su decisión) → sales cae en cascada.
-    rt.deactivate("customers").await.unwrap();
+    // ADR-0141: la cadena real es taxes → inventory → sales (dependencias FUNCIONALES: IVA y stock).
+    // `customers` ya no está en ella — el pedido no sabe de clientes.
+    // El admin apaga inventory A MANO (su decisión) → sales cae en cascada.
+    rt.deactivate("inventory").await.unwrap();
     assert_eq!(status_of(&rt, "sales"), ModuleStatus::InactiveAuto);
-    // Y luego apaga taxes → inventory cae.
+    // Y luego apaga taxes.
     rt.deactivate("taxes").await.unwrap();
-    assert_eq!(status_of(&rt, "inventory"), ModuleStatus::InactiveAuto);
 
-    // Reactivar taxes: vuelve inventory (cayó en cascada y sus deps ya están)…
+    // Reactivar taxes NO devuelve inventory (fue decisión del admin) ni sales (sin inventory).
     rt.activate("taxes").await.unwrap();
-    assert_eq!(status_of(&rt, "inventory"), ModuleStatus::Active, "cayó AUTO y ya puede volver");
-    // …pero NI sales (customers sigue apagado) NI customers (fue decisión del admin).
-    assert_eq!(status_of(&rt, "customers"), ModuleStatus::Inactive, "lo apagado A MANO se respeta");
-    assert_eq!(status_of(&rt, "sales"), ModuleStatus::InactiveAuto, "sin customers no puede volver");
+    assert_eq!(status_of(&rt, "inventory"), ModuleStatus::Inactive, "lo apagado A MANO se respeta");
+    assert_eq!(status_of(&rt, "sales"), ModuleStatus::InactiveAuto, "sin inventory no puede volver");
+    assert_eq!(status_of(&rt, "customers"), ModuleStatus::Active, "customers es ajeno a esta cadena");
 
-    // Al reactivar customers, sales revive solo (barrido a punto fijo).
-    rt.activate("customers").await.unwrap();
+    // Al reactivar inventory, sales revive solo (barrido a punto fijo).
+    rt.activate("inventory").await.unwrap();
     assert_eq!(status_of(&rt, "sales"), ModuleStatus::Active, "todas sus deps activas → vuelve solo");
 }
 
 #[tokio::test]
 async fn activar_arrastra_hacia_arriba() {
     let mut rt = hub_pos().await;
-    rt.deactivate("customers").await.unwrap();
-    rt.deactivate("taxes").await.unwrap(); // → inventory y sales caídos; customers manual
+    rt.deactivate("inventory").await.unwrap();
+    rt.deactivate("taxes").await.unwrap(); // → sales caído; inventory manual
 
-    // Encender sales enciende TODO lo que necesita, incluida la decisión manual sobre customers:
-    // el admin acaba de pedir sales explícitamente, y sales no existe sin customers.
+    // Encender sales enciende TODO lo que necesita, incluida la decisión manual sobre inventory:
+    // el admin acaba de pedir sales explícitamente, y sales no existe sin stock.
     rt.activate("sales").await.unwrap();
-    for m in ["sales", "customers", "inventory", "taxes"] {
+    for m in ["sales", "inventory", "taxes"] {
         assert_eq!(status_of(&rt, m), ModuleStatus::Active, "{m} debe encenderse con sales");
     }
 }
@@ -117,7 +117,11 @@ async fn modules_expone_depends_on_para_que_la_ui_avise_de_la_cascada() {
     // lista de módulos tiene que exponer las dependencias declaradas.
     let rt = hub_pos().await;
     let sales = rt.modules().into_iter().find(|m| m.id == "sales").unwrap();
-    for dep in ["customers", "inventory", "taxes"] {
+    for dep in ["inventory", "taxes"] {
         assert!(sales.depends_on.iter().any(|d| d == dep), "sales debe declarar {dep}");
+    }
+    // ADR-0141: y NO debe declarar los satélites — la asociación la owna el satélite, no el pedido.
+    for no_dep in ["customers", "tables"] {
+        assert!(!sales.depends_on.iter().any(|d| d == no_dep), "sales no debe declarar {no_dep}");
     }
 }
