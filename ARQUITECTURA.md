@@ -17,6 +17,14 @@
 > proveedor **ACTIVO es Hetzner** — Postgres 18 per-org (`db-a` + standby `db-b`) desplegado como
 > **Dokploy application en el cluster Swarm**; **AWS (ECS + Aurora) = fallback seleccionable, sin infra
 > viva** (`get_provider`). Ver [CLAUDE.md](CLAUDE.md) y [architecture/hub/overview.md](../architecture/hub/overview.md).
+>
+> ⚠️ **Las secciones §2.x y §8–§12 citadas en este documento (tenancy, auth, module-system,
+> instalación, RAG/asistente, entitlement…) ya no existen como headers aquí: se reubicaron a**
+> [architecture/hub/tenancy.md](../architecture/hub/tenancy.md),
+> [architecture/hub/auth.md](../architecture/hub/auth.md),
+> [architecture/hub/module-system.md](../architecture/hub/module-system.md) y
+> [architecture/hub/overview.md](../architecture/hub/overview.md). Las referencias `§2.x`/`§8`-`§12`
+> que quedan sueltas en el texto son residuo de esa reubicación.
 
 ---
 
