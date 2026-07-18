@@ -1,0 +1,78 @@
+/* print.css — reglas de IMPRESIÓN del Hub. Global y en UN solo sitio.
+ *
+ * Por qué aquí y no dentro de cada modal: la impresión es del shell (igual que `erplora.print`),
+ * y un <style> metido dentro de un modal solo existe mientras ESE modal está abierto y reparentado
+ * — imprimir la cuenta previa salía mal justo por eso, porque su modal no llevaba las reglas.
+ *
+ * Lo que hay que resolver: al imprimir, el navegador saca TODO el documento. Hay que dejar solo el
+ * papel (el tiquet/factura/cuenta) y quitar el resto de la app.
+ *
+ * Historial de intentos fallidos, para que nadie los repita:
+ *   1. ocultar los hermanos de <body>  → hoja EN BLANCO: ese div raíz es quien CONTIENE el modal
+ *      (Ionic lo reparenta a <ion-app>, no a <body>).
+ *   2. visibility:hidden sobre "body *" → salía el tiquet Y toda la web: los selectores del
+ *      documento NO entran en el SHADOW DOM, y la app son web components.
+ *   3. display:none a los hermanos, pero declarado DENTRO del modal del documento → no aplicaba
+ *      al imprimir otros documentos (la cuenta previa).
+ * Lo que funciona: display:none a los hermanos del modal, declarado GLOBALMENTE aquí — se lleva
+ * su shadow entero, esté abierto el modal que esté.
+ */
+
+@media print {
+  /* Sin márgenes de página el navegador deja de estampar su cabecera/pie (fecha, título, URL, 1/1). */
+  @page {
+    margin: 0;
+  }
+
+  /* Fuera todo lo que no sea el documento a imprimir. `.doc-modal` la ponen los modales que
+     contienen un papel (tiquet, factura, cuenta previa). */
+  ion-app > *:not(ion-modal.doc-modal) {
+    display: none !important;
+  }
+
+  /* El modal deja de comportarse como overlay: es la hoja. */
+  ion-modal.doc-modal {
+    position: static !important;
+    display: block !important;
+    --width: auto;
+    --height: auto;
+    --border-radius: 0;
+    --box-shadow: none;
+    --backdrop-opacity: 0;
+  }
+  ion-modal.doc-modal::part(backdrop) {
+    display: none !important;
+  }
+  ion-modal.doc-modal::part(content) {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    contain: none !important;
+    overflow: visible !important;
+  }
+
+  /* El cuerpo del documento: sin scroll ni offsets de ion-content. */
+  ion-modal.doc-modal ion-content {
+    --background: #fff;
+    --offset-top: 0;
+    --offset-bottom: 0;
+    position: static !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Chrome del modal que no va al papel: cabecera con acciones, pie y botón de cerrar. */
+  ion-modal.doc-modal ion-header,
+  ion-modal.doc-modal ion-footer,
+  ion-modal.doc-modal ion-button.doc-close {
+    display: none !important;
+  }
+
+  ion-modal.doc-modal .doc-wrap {
+    min-height: 0 !important;
+    padding-top: 0 !important;
+  }
+}

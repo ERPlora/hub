@@ -11,6 +11,7 @@
 //                            van a `kitchen` por defecto; estación `receipt` = no comanda.
 // Todo defensivo: si falta el módulo printing, los ajustes, o el Bridge → no-op silencioso.
 import type { BridgeDevice, ErploraClient } from '@erplora/module-sdk';
+import { printerIdForRole } from './print';
 
 interface PrintingSettings {
   receipt_header?: string;
@@ -70,10 +71,9 @@ async function onSaleCompleted(client: ErploraClient, payload: unknown): Promise
   } catch {
     return; // Bridge no disponible
   }
-  const printerByRole = (role: string): string | undefined => {
-    const d = devices.find((x) => x.role === role);
-    return d ? `network:${d.ip}:${d.port}` : undefined;
-  };
+  // Resolución rol→impresora COMPARTIDA con la puerta global `erplora.print` (lib/print.ts):
+  // una sola definición de "qué impresora es el rol receipt/kitchen/bar".
+  const printerByRole = (role: string): string | undefined => printerIdForRole(devices, role);
 
   // Datos autoritativos de la venta (el payload del evento es un resumen, no la fuente).
   const sale = first(
