@@ -292,6 +292,26 @@ async fn open_order_persists_open_order_with_lines() {
 }
 
 #[tokio::test]
+async fn command_response_returns_created_ids() {
+    // ADR-0141 Gate 6: la UI necesita el id de lo que acaba de crear — el POS abre un pedido y debe
+    // saber su `order_id` para añadirle líneas. El runtime es la AUTORIDAD de ids (context.new_ids),
+    // pero la respuesta solo traía {ok, operations} y el id se perdía: el cliente no podía
+    // correlacionar. Se devuelven los ids del lote; por convención new_ids[0] es la entidad principal.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 1 }]
+    })), &ctx).await.unwrap();
+
+    let ids = res["new_ids"].as_array().expect("la respuesta debe traer los ids creados");
+    let order_id = ids.first().and_then(|v| v.as_str()).expect("new_ids[0] = entidad principal");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": order_id})), &ctx).await.unwrap();
+    assert_eq!(ord.len(), 1, "el id devuelto identifica el pedido recién creado");
+    assert_eq!(ord[0]["status"], json!("open"));
+}
+
+#[tokio::test]
 async fn mutate_open_order_recomputes_provisional_total() {
     // ADR-0141 Gate 3: un pedido abierto es MUTABLE. add/update/remove línea recomputan el total
     // provisional; void lo cancela. Reemplaza el blob `sales_active_cart` por filas reales.

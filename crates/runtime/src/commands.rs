@@ -270,7 +270,7 @@ async fn execute_wasm(
             "hub_id": ctx.hub_id,
             "current_user_id": ctx.user_id,
             "now": crate::registry::now_rfc3339(),
-            "new_ids": new_ids,
+            "new_ids": new_ids.clone(),
             // Identidad fiscal del hub: con esto + `reads`, el handler resuelve el impuesto contra
             // el catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
             "country_code": ctx.country_code,
@@ -284,7 +284,7 @@ async fn execute_wasm(
         .call(&handler.function, &input)
         .map_err(|e| RuntimeError::Wasm(e.to_string()))?;
 
-    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output).await
+    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids).await
 }
 
 /// Ejecuta un command de **plugin nativo first-party** (ADR-0009): mismo contrato de
@@ -321,14 +321,14 @@ async fn execute_native(
             "hub_id": ctx.hub_id,
             "current_user_id": ctx.user_id,
             "now": crate::registry::now_rfc3339(),
-            "new_ids": new_ids,
+            "new_ids": new_ids.clone(),
         },
     });
 
     let host = crate::native::DbHost { db };
     let output = engine.call(&handler.function, &input, &host).await?;
 
-    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output).await
+    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids).await
 }
 
 /// Persiste el [`Output`] de un handler (WASM o nativo): valida cada intención contra los
@@ -344,6 +344,10 @@ async fn persist_handler_output(
     depth: u32,
     extra_ops: &[(String, Params)],
     output: &Output,
+    // Lote de ids que el host generó y entregó al handler. Se devuelven al llamante para que la
+    // UI pueda correlacionar lo que acaba de crear (el POS abre un pedido y necesita su `order_id`
+    // para añadirle líneas). Por convención `new_ids[0]` es la entidad principal (§5.3).
+    new_ids: &[Json],
 ) -> Result<Json> {
     // Valida + resuelve cada operación a su(s) SQL contra los commands del MISMO módulo.
     let mut tx_ops: Vec<(String, Params)> = Vec::new();
@@ -390,7 +394,7 @@ async fn persist_handler_output(
         events::notify_sink(registry, name, payload);
     }
 
-    Ok(json!({ "ok": true, "operations": output.operations.len() }))
+    Ok(json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids }))
 }
 
 /// Valida una intención del handler y la resuelve a su(s) SQL.
