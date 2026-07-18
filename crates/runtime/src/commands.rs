@@ -157,7 +157,12 @@ pub(crate) async fn execute_at(
         events::notify_sink(registry, event, &bound);
     }
 
-    Ok(json!({ "ok": true }))
+    // El id que este command acaba de crear, igual que en el camino WASM (§5.3): `system_params`
+    // ya inyecta `:new_id` en el SQL, pero la respuesta se lo callaba. Sin él, quien crea una fila
+    // no puede volver a tocarla — el POS se quedaba sin `line_id` al añadir un artículo y las
+    // subidas de cantidad se perdían EN SILENCIO (5 tortillas en pantalla, 1 en la BD).
+    let new_id = bound.get("new_id").cloned().unwrap_or(Json::Null);
+    Ok(json!({ "ok": true, "new_ids": [new_id] }))
 }
 
 /// Ejecuta un command Tier 2: invoca el handler WASM, valida cada intención y

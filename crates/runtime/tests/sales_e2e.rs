@@ -472,3 +472,42 @@ async fn el_pedido_no_sabe_de_clientes_la_junction_la_owna_customers() {
         .await.unwrap();
     assert_eq!(otra_vez.len(), 1, "re-asignar sustituye, no duplica");
 }
+
+#[tokio::test]
+async fn un_command_tier0_tambien_devuelve_el_id_que_acaba_de_crear() {
+    // Encontrado en el navegador (ADR-0141/0144): el camarero toca 5 veces la tortilla, la pantalla
+    // marca 5 y la BD guarda 1. Causa: `sales.order.add_line` es Tier-0 (SQL puro) y ese camino
+    // respondía `{ok:true}` a secas, sin el id de la fila. El POS se queda sin `line_id`, y cada
+    // toque posterior sube la cantidad EN PANTALLA sin persistirla — en silencio. Si la comanda se
+    // retoma en otra tablet o tras recargar, se sirven 5 y se cobra 1.
+    //
+    // El runtime ya generaba el id (`:new_id` de system_params); solo faltaba devolverlo, igual que
+    // hace el camino WASM.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Caña", "price": 250, "quantity": 1 }]
+    })), &ctx).await.unwrap();
+    let oid = res["new_ids"][0].as_str().unwrap().to_string();
+
+    let res = rt.execute_command("sales.order.add_line", &params(json!({
+        "order_id": oid, "product_id": null, "product_name": "Tortilla", "product_sku": "",
+        "quantity": 1.0, "unit_price": 750, "is_gift": false, "gift_reason": "",
+        "tax_category_key": "", "cost": 0, "line_total": 750
+    })), &ctx).await.expect("añadir línea");
+
+    let line_id = res["new_ids"][0].as_str().expect("un Tier-0 también devuelve el id creado");
+    let lineas = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    let tortilla = lineas.iter().find(|l| l["product_name"] == json!("Tortilla")).expect("la línea existe");
+    assert_eq!(tortilla["id"], json!(line_id), "el id devuelto es EL de la fila recién creada");
+
+    // Y con ese id se puede subir la cantidad: es justo lo que el POS no podía hacer.
+    rt.execute_command("sales.order.update_line", &params(json!({
+        "order_id": oid, "line_id": line_id, "quantity": 5.0, "unit_price": 750,
+        "is_gift": false, "gift_reason": "", "line_total": 3750
+    })), &ctx).await.expect("actualizar la cantidad");
+    let lineas = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    let tortilla = lineas.iter().find(|l| l["product_name"] == json!("Tortilla")).unwrap();
+    assert_eq!(tortilla["quantity"], json!(5.0), "5 toques, 5 tortillas");
+}
