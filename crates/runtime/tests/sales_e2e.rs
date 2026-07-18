@@ -290,3 +290,50 @@ async fn open_order_persists_open_order_with_lines() {
     assert_eq!(cafe["line_total"].as_i64().unwrap(), 242); // 121*2, provisional
     assert_eq!(cafe["order_id"], json!(oid), "la línea cuelga del order");
 }
+
+#[tokio::test]
+async fn mutate_open_order_recomputes_provisional_total() {
+    // ADR-0141 Gate 3: un pedido abierto es MUTABLE. add/update/remove línea recomputan el total
+    // provisional; void lo cancela. Reemplaza el blob `sales_active_cart` por filas reales.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    // abre un pedido con 1 línea (Café 121×2 = 242).
+    rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 2 }]
+    })), &ctx).await.unwrap();
+    let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    // add_line: Agua 110×1 → provisional 242 + 110 = 352.
+    rt.execute_command("sales.order.add_line", &params(json!({
+        "order_id": oid, "product_name": "Agua", "unit_price": 110, "quantity": 1.0, "line_total": 110
+    })), &ctx).await.expect("add_line");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["provisional_total"].as_i64().unwrap(), 352, "add_line recomputa el total");
+
+    // update_line: Café a qty 3 → line_total 363; total 363 + 110 = 473.
+    let lines = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    let cafe_id = lines.iter().find(|l| l["product_name"] == json!("Café")).unwrap()["id"]
+        .as_str().unwrap().to_string();
+    let agua_id = lines.iter().find(|l| l["product_name"] == json!("Agua")).unwrap()["id"]
+        .as_str().unwrap().to_string();
+    rt.execute_command("sales.order.update_line", &params(json!({
+        "order_id": oid, "line_id": cafe_id, "quantity": 3.0, "line_total": 363
+    })), &ctx).await.expect("update_line");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["provisional_total"].as_i64().unwrap(), 473, "update_line recomputa el total");
+
+    // remove_line: quita el Agua → total 363, queda 1 línea.
+    rt.execute_command("sales.order.remove_line", &params(json!({
+        "order_id": oid, "line_id": agua_id
+    })), &ctx).await.expect("remove_line");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["provisional_total"].as_i64().unwrap(), 363, "remove_line recomputa el total");
+    assert_eq!(rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap().len(), 1);
+
+    // void: el pedido abierto se cancela → status 'voided'.
+    rt.execute_command("sales.order.void", &params(json!({"order_id": oid})), &ctx).await.expect("void");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["status"], json!("voided"), "el pedido queda anulado");
+}
