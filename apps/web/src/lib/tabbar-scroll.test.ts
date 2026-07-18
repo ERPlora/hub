@@ -8,9 +8,15 @@
 // jsdom no calcula layout: offsetLeft/offsetWidth/clientWidth/scrollWidth son 0 y son getters de
 // solo lectura, así que se fijan por instancia con defineProperty. Por eso la función trabaja con
 // scrollLeft (medible) y no con scrollIntoView (no implementado en jsdom).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { scrollActiveTabIntoView } from './tabbar-scroll';
+import {
+  hintScroll,
+  scrollActiveTabIntoView,
+  shouldHintScroll,
+  syncTabbarOverflow,
+  tabbarOverflow,
+} from './tabbar-scroll';
 
 /** Fija las métricas de layout que jsdom no calcula. */
 function metricas(el: HTMLElement, m: Partial<Record<'offsetLeft' | 'offsetWidth' | 'clientWidth' | 'scrollWidth', number>>): void {
@@ -20,8 +26,9 @@ function metricas(el: HTMLElement, m: Partial<Record<'offsetLeft' | 'offsetWidth
 }
 
 /**
- * Monta un segment de `n` pestañas de 84px (el mínimo táctil de polish.css) dentro de una barra
- * visible de `clientWidth`, con la pestaña `activa` marcada como la marca Ionic.
+ * Monta un segment de `n` pestañas de 84px dentro de una barra visible de `clientWidth`, con la
+ * pestaña `activa` marcada como la marca Ionic. El 84 es solo el ancho del fixture (números
+ * redondos para las cuentas de abajo); el mínimo real vive en polish.css y se mide aparte.
  */
 function segmentCon(n: number, activa: number, clientWidth: number): HTMLElement {
   const seg = document.createElement('ion-segment');
@@ -80,5 +87,111 @@ describe('scrollActiveTabIntoView', () => {
     const sinActiva = segmentCon(5, -1, 382);
     expect(() => scrollActiveTabIntoView(sinActiva)).not.toThrow();
     expect(sinActiva.scrollLeft).toBe(0);
+  });
+});
+
+// El degradado de borde señala que hay más pestañas fuera de vista. Tiene que ser DINÁMICO: un
+// degradado fijo a la derecha seguiría oscureciendo la última pestaña una vez llegas al final, y
+// eso se lee como un fallo, no como "hay más". De ahí los cuatro estados.
+describe('tabbarOverflow', () => {
+  it('sin desbordamiento no marca ningún borde', () => {
+    const seg = segmentCon(3, 0, 382);
+    metricas(seg, { scrollWidth: 252 }); // 3*84 = 252 < 382
+
+    expect(tabbarOverflow(seg)).toBe('none');
+  });
+
+  it('al principio de una barra que desborda solo marca el borde derecho', () => {
+    const seg = segmentCon(6, 0, 382); // 6*84 = 504 > 382
+    seg.scrollLeft = 0;
+
+    expect(tabbarOverflow(seg)).toBe('end');
+  });
+
+  it('a mitad de scroll marca los dos bordes', () => {
+    const seg = segmentCon(6, 0, 382);
+    seg.scrollLeft = 60;
+
+    expect(tabbarOverflow(seg)).toBe('both');
+  });
+
+  it('al final solo marca el borde izquierdo (no deja el degradado colgando)', () => {
+    const seg = segmentCon(6, 0, 382);
+    seg.scrollLeft = 504 - 382; // tope
+
+    expect(tabbarOverflow(seg)).toBe('start');
+  });
+
+  it('tolera el subpíxel: a 0.5px del tope cuenta como final', () => {
+    const seg = segmentCon(6, 0, 382);
+    seg.scrollLeft = 504 - 382 - 0.5;
+
+    expect(tabbarOverflow(seg)).toBe('start');
+  });
+
+  it('sin segment devuelve none', () => {
+    expect(tabbarOverflow(null)).toBe('none');
+  });
+});
+
+describe('syncTabbarOverflow', () => {
+  it('escribe el estado en data-overflow para que lo lea el CSS', () => {
+    const seg = segmentCon(6, 0, 382);
+    seg.scrollLeft = 0;
+
+    syncTabbarOverflow(seg);
+
+    expect(seg.dataset.overflow).toBe('end');
+  });
+
+  it('no revienta sin segment', () => {
+    expect(() => syncTabbarOverflow(null)).not.toThrow();
+  });
+});
+
+// El degradado dice "hay más"; el movimiento enseña el GESTO. Al entrar, la barra se asoma un poco
+// y vuelve. Es una pista, no una animación decorativa, así que se gobierna con guardarraíles.
+describe('shouldHintScroll', () => {
+  it('da la pista cuando quedan pestañas a la derecha', () => {
+    expect(shouldHintScroll({ overflow: 'end', reducedMotion: false, yaScrolleado: false })).toBe(true);
+    expect(shouldHintScroll({ overflow: 'both', reducedMotion: false, yaScrolleado: false })).toBe(true);
+  });
+
+  it('NO da la pista si caben todas: no hay nada que descubrir', () => {
+    expect(shouldHintScroll({ overflow: 'none', reducedMotion: false, yaScrolleado: false })).toBe(false);
+  });
+
+  it('NO da la pista si ya estás al final: no queda nada a la derecha', () => {
+    expect(shouldHintScroll({ overflow: 'start', reducedMotion: false, yaScrolleado: false })).toBe(false);
+  });
+
+  it('NO da la pista con prefers-reduced-motion: movimiento no pedido', () => {
+    expect(shouldHintScroll({ overflow: 'end', reducedMotion: true, yaScrolleado: false })).toBe(false);
+  });
+
+  it('NO da la pista si la barra YA se movió sola para revelar la pestaña activa', () => {
+    // scrollActiveTabIntoView ya produjo movimiento: repetirlo sería un tirón raro, y además el
+    // usuario ya ha visto que la barra se mueve.
+    expect(shouldHintScroll({ overflow: 'both', reducedMotion: false, yaScrolleado: true })).toBe(false);
+  });
+});
+
+describe('hintScroll', () => {
+  it('se asoma y vuelve al origen', () => {
+    vi.useFakeTimers();
+    const seg = segmentCon(6, 0, 382);
+    const movimientos: number[] = [];
+    seg.scrollTo = ((opts: { left: number }) => movimientos.push(opts.left)) as unknown as typeof seg.scrollTo;
+
+    hintScroll(seg);
+    expect(movimientos).toEqual([28]); // se asoma
+
+    vi.runAllTimers();
+    expect(movimientos).toEqual([28, 0]); // y vuelve
+    vi.useRealTimers();
+  });
+
+  it('no revienta sin segment', () => {
+    expect(() => hintScroll(null)).not.toThrow();
   });
 });
