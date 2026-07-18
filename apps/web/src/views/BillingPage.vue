@@ -59,7 +59,7 @@
     <template #footer>
       <ion-footer class="ion-no-border">
       <ion-toolbar>
-        <ion-segment :value="tab" @ion-change="onTabChange">
+        <ion-segment class="ok-tabbar" :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="invoices">
             <HubIcon name="receipt-outline" />
             <ion-label>{{ t('billing.invoices') }}</ion-label>

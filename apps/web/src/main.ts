@@ -75,6 +75,9 @@ import './theme/variables.css';
 // ganar la cascada; el atributo lo pone lib/theme.ts (override local u hub_settings global).
 import '@erplora/outfitkit/palettes.css';
 import './theme/erplora-logo.css';
+// Tabbar de footer (ion-segment como barra de navegación): ancho, scroll y degradado de borde.
+// Comportamiento compartido con el SaaS — lo cablea AppPage con bindTabbar (outfitkit#29).
+import '@erplora/outfitkit/tabbar.css';
 import './theme/polish.css';
 import './theme/global.css';
 

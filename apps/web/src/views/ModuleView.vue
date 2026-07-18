@@ -49,7 +49,7 @@
     <template #footer>
       <ion-footer v-if="segmentTabs.length > 1" class="ion-no-border">
       <ion-toolbar>
-        <ion-segment
+        <ion-segment class="ok-tabbar"
           ref="tabbar"
           :value="activeNavId"
           @ion-change="onTabChange($event as CustomEvent<{ value: string }>)"
@@ -78,7 +78,7 @@ import AppPage from '../components/AppPage.vue';
 import ModulePlanPanel from '../components/ModulePlanPanel.vue';
 import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
-import { scrollActiveTabIntoView } from '../lib/tabbar-scroll';
+import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
 import { clientInjectionKey, getClient } from '../lib/runtime';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { openExternal } from '../lib/open-external';
