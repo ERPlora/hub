@@ -91,8 +91,15 @@ bootActionFeedback();
 // mode: 'ios' FIJO. Sin esto Ionic autodetecta plataforma (md en desktop/Android, ios en
 // Safari/iPad), así que el mismo Hub se veía distinto según el dispositivo. Debe coincidir con
 // el SaaS (templates/base.html y public_base.html: window.Ionic.config.mode) — paridad SaaS↔Hub.
-// Nota: en modo ios el router activa swipe-back; si molesta en el TPV táctil → swipeBackEnabled: false.
-const app = createApp(App).use(IonicVue, { mode: 'ios' }).use(router).use(i18n);
+//
+// swipeBackEnabled: false NO es opcional, es lo que hace usable el TPV. @ionic/vue lo activa SOLO
+// al poner mode 'ios' (`config.get("swipeBackEnabled", outlet.mode === "ios")`), y verificado con
+// gesto táctil real: con una comanda abierta, arrastrar desde el borde izquierdo navega
+// /m/sales/pos → /dashboard y DESMONTA el POS a media comanda (las líneas sobreviven en
+// sales_active_cart, pero al operario lo expulsa). Solo pasa por debajo de 992px — a partir de ahí
+// el ion-menu fijo del split-pane (App.vue, when="lg") tapa el borde y el gesto no puede empezar —
+// o sea que afecta justo al tablet en vertical (768/834), el formato de sala. ADR-0143.
+const app = createApp(App).use(IonicVue, { mode: 'ios', swipeBackEnabled: false }).use(router).use(i18n);
 
 // Captura AUTOMÁTICA de errores del frontend (sin modal ni acción del usuario): errores globales,
 // promesas rechazadas y errorHandler de Vue → POST best-effort al runtime local (lib/error-report).
