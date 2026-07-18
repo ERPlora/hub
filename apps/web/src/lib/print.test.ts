@@ -106,3 +106,46 @@ describe('servicio global de impresión', () => {
     expect(r.error).toContain('papel');
   });
 });
+
+// ── Respaldo del navegador: documento AISLADO, no el DOM de la app ────────────────────────────
+// Imprimir el DOM de la app resultó imposible de domar: el documento vive en un ion-modal que
+// Ionic reparenta, lleno de shadow DOM y con contain/transform de por medio. Cinco intentos de
+// CSS después, la impresión seguía sacando la app entera. La vía robusta es no imprimir la app:
+// se escribe el tiquet como HTML plano en un iframe aislado y se imprime ESE documento.
+describe('impresión aislada en iframe', () => {
+  it('escribe el HTML en un iframe propio y manda imprimir ESE documento', async () => {
+    const client = fakeClient({ peripherals: { getDevices: vi.fn(async () => { throw new Error('sin bridge'); }) } });
+    const impresos: string[] = [];
+    const iframePrint = vi.fn((html: string) => { impresos.push(html); });
+    const print = createPrintService(client, { iframePrint });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', html: '<article>TIQUET 3,50 €</article>' });
+
+    expect(r.via).toBe('browser');
+    expect(impresos).toHaveLength(1);
+    expect(impresos[0]).toContain('TIQUET 3,50 €');
+  });
+
+  it('sin HTML del documento cae al print del navegador (comportamiento anterior)', async () => {
+    const client = fakeClient({ peripherals: { getDevices: vi.fn(async () => { throw new Error('sin bridge'); }) } });
+    const browserPrint = vi.fn();
+    const iframePrint = vi.fn();
+    const print = createPrintService(client, { browserPrint, iframePrint });
+
+    await print({ role: 'receipt', documentType: 'receipt' });
+
+    expect(iframePrint).not.toHaveBeenCalled();
+    expect(browserPrint).toHaveBeenCalledTimes(1);
+  });
+
+  it('con Bridge NO se usa el iframe: el papel sale por la impresora térmica', async () => {
+    const client = fakeClient();
+    const iframePrint = vi.fn();
+    const print = createPrintService(client, { iframePrint });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', html: '<article>x</article>' });
+
+    expect(r.via).toBe('bridge');
+    expect(iframePrint).not.toHaveBeenCalled();
+  });
+});

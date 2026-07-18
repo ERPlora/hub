@@ -45,6 +45,17 @@ export interface PrintRequest {
   /** Si no hay Bridge, ¿abrir el diálogo del navegador? Por defecto sí. Ponlo a `false` para
    *  impresión desatendida (comandas de cocina: nadie está delante para darle a Imprimir). */
   fallbackToBrowser?: boolean;
+  /**
+   * HTML **plano y autocontenido** del documento (sin web components ni CSS de la app), para el
+   * respaldo del navegador. Lo aporta quien imprime, que es quien conoce su documento.
+   *
+   * Por qué existe: imprimir el DOM de la app es indomable —el papel vive dentro de un `ion-modal`
+   * que Ionic reparenta, con shadow DOM y `contain`/`transform` por medio— y por mucho `@media
+   * print` seguía saliendo la app entera. Con esto el papel se escribe en un **iframe aislado** y
+   * lo que se imprime es ESE documento, nada más. Es además el mismo HTML que servirá para
+   * generar el PDF cuando se imprima desde Rust.
+   */
+  html?: string;
 }
 
 export interface PrintResult {
@@ -66,18 +77,45 @@ export function printerIdForRole(devices: PrintDevice[], role: string): string |
  * Construye la función `print` global. El shell la cuelga del cliente (`erplora.print`) para que
  * cualquier módulo imprima sin saber si hay Bridge, cuántas impresoras hay ni cómo se enrutan.
  */
+/**
+ * Imprime un HTML autocontenido en un **iframe aislado**: ni la app ni sus estilos entran en el
+ * papel. Se limpia solo tras imprimir.
+ */
+export function printHtmlInIframe(html: string, doc: Document = document): void {
+  const frame = doc.createElement('iframe');
+  // Fuera de pantalla pero con tamaño: un iframe de 0x0 no pagina bien en algunos navegadores.
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:80mm;height:1px;border:0;visibility:hidden;';
+  doc.body.appendChild(frame);
+  const w = frame.contentWindow;
+  const d = frame.contentDocument;
+  if (!w || !d) { frame.remove(); return; }
+  d.open();
+  d.write(html);
+  d.close();
+  const lanzar = () => {
+    try { w.focus(); w.print(); } finally { setTimeout(() => frame.remove(), 1000); }
+  };
+  // Esperar a que el iframe tenga su contenido maquetado (si no, se imprime en blanco).
+  if (d.readyState === 'complete') setTimeout(lanzar, 50);
+  else w.addEventListener('load', () => setTimeout(lanzar, 50), { once: true });
+}
+
 export function createPrintService(
   client: PrintCapableClient,
-  opts: { browserPrint?: () => void } = {},
+  opts: { browserPrint?: () => void; iframePrint?: (html: string) => void } = {},
 ): (req: PrintRequest) => Promise<PrintResult> {
   const browserPrint = opts.browserPrint ?? (() => globalThis.print?.());
+  const iframePrint = opts.iframePrint ?? ((html: string) => printHtmlInIframe(html));
 
   return async function print(req: PrintRequest): Promise<PrintResult> {
     const role = req.role || 'receipt';
     const allowBrowser = req.fallbackToBrowser !== false;
     const toBrowser = (error?: string): PrintResult => {
       if (!allowBrowser) return { via: 'none', role, error };
-      browserPrint();
+      // Con HTML del documento se imprime AISLADO (lo correcto). Sin él queda el print del
+      // navegador, que saca lo que haya en pantalla — solo como último recurso.
+      if (req.html) iframePrint(req.html); else browserPrint();
       return { via: 'browser', role, error };
     };
 
