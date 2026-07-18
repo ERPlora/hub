@@ -209,3 +209,245 @@ async fn el_backfill_da_historial_a_las_sesiones_que_YA_existian() {
         "la cerrada queda con su tramo cerrado a la hora en que se cerró"
     );
 }
+
+// ── Etapa 2: los COMANDOS escriben historial y proyección en la misma transacción ─────────────
+//
+// El historial no puede depender de que alguien se acuerde de escribirlo aparte: si la sesión y su
+// tramo no se escriben juntos, se desincronizan y el historial deja de ser fuente de verdad.
+
+fn admin() -> erplora_runtime::RequestContext {
+    erplora_runtime::RequestContext::new("h1", "u1", ["*".to_string()])
+}
+
+async fn tramos(rt: &Runtime, session_id: &str) -> Vec<(String, String, bool)> {
+    let res = rt
+        .db_for_test()
+        .query(
+            "SELECT table_id, assignment_reason, release_reason, released_at
+             FROM tables_session_assignment WHERE session_id = :sid ORDER BY assigned_at, rowid",
+            &params(json!({ "sid": session_id })),
+        )
+        .await
+        .expect("tramos");
+    res.rows
+        .iter()
+        .map(|r| {
+            let o = r.as_object().unwrap();
+            (
+                o["table_id"].as_str().unwrap_or("").to_string(),
+                o["assignment_reason"].as_str().unwrap_or("").to_string(),
+                o["released_at"].is_null(),
+            )
+        })
+        .collect()
+}
+
+/// Abre una sesión en una mesa y devuelve su id.
+async fn abrir(rt: &mut Runtime, table_id: &str) -> String {
+    rt.execute_command("tables.sessions.open", &params(json!({ "table_id": table_id })), &admin())
+        .await
+        .expect("abrir sesión");
+    let res = rt
+        .db_for_test()
+        .query(
+            "SELECT id FROM tables_session WHERE table_id = :t AND status = 'active'",
+            &params(json!({ "t": table_id })),
+        )
+        .await
+        .unwrap();
+    res.rows[0].as_object().unwrap()["id"].as_str().unwrap().to_string()
+}
+
+#[tokio::test]
+async fn abrir_una_sesion_estrena_su_tramo() {
+    let mut rt = fresh().await;
+    let sid = abrir(&mut rt, "m12").await;
+    assert_eq!(
+        tramos(&rt, &sid).await,
+        vec![("m12".to_string(), "opened".to_string(), true)],
+        "la apertura deja UN tramo vivo, con motivo `opened`"
+    );
+}
+
+#[tokio::test]
+async fn cerrar_la_sesion_cierra_su_tramo() {
+    // Al cobrar se cierra la sesión: el tramo tiene que cerrarse CON ella, o la mesa quedaría
+    // ocupada para siempre en las estadísticas.
+    let mut rt = fresh().await;
+    let sid = abrir(&mut rt, "m12").await;
+    rt.execute_command("tables.sessions.close", &params(json!({ "session_id": sid })), &admin())
+        .await
+        .expect("cerrar");
+
+    let t = tramos(&rt, &sid).await;
+    assert_eq!(t.len(), 1);
+    assert!(!t[0].2, "el tramo queda CERRADO");
+    let res = rt
+        .db_for_test()
+        .query(
+            "SELECT release_reason FROM tables_session_assignment WHERE session_id = :sid",
+            &params(json!({ "sid": sid })),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.rows[0].as_object().unwrap()["release_reason"], json!("closed"));
+}
+
+#[tokio::test]
+async fn transferir_cierra_un_tramo_y_abre_el_siguiente() {
+    // Mover una cuenta de la 12 a la 8 es exactamente esto: el historial conserva AMBOS tramos, que
+    // es lo que una columna `table_id` sola no puede dar.
+    let mut rt = fresh().await;
+    let sid = abrir(&mut rt, "m12").await;
+    rt.execute_command(
+        "tables.sessions.transfer",
+        &params(json!({ "session_id": sid, "target_table_id": "m8" })),
+        &admin(),
+    )
+    .await
+    .expect("transferir");
+
+    // La sesión nueva es otra fila; el historial se sigue por la mesa, no por la sesión.
+    let res = rt
+        .db_for_test()
+        .query(
+            "SELECT table_id, assignment_reason, release_reason, released_at IS NULL AS vivo
+             FROM tables_session_assignment ORDER BY assigned_at, rowid",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+    let filas: Vec<(String, String, String)> = res
+        .rows
+        .iter()
+        .map(|r| {
+            let o = r.as_object().unwrap();
+            (
+                o["table_id"].as_str().unwrap_or("").to_string(),
+                o["assignment_reason"].as_str().unwrap_or("").to_string(),
+                o["release_reason"].as_str().unwrap_or("").to_string(),
+            )
+        })
+        .collect();
+    assert_eq!(filas.len(), 2, "quedan los dos tramos: {filas:?}");
+    assert_eq!(filas[0], ("m12".into(), "opened".into(), "transferred".into()));
+    assert_eq!(filas[1].0, "m8");
+    assert_eq!(filas[1].1, "transferred");
+}
+
+// ── Etapa 3: la mesa se libera SOLA cuando el pedido termina ──────────────────────────────────
+//
+// Hasta ahora alguien tenía que acordarse de cerrar la sesión, y cuando no lo hacía la mesa se
+// quedaba ocupada para siempre (el fallo que motivó el ADR). Ahora lo dispara el propio pedido.
+//
+// Ojo al split-bill: `sale.completed` se emite TAMBIÉN en un cobro parcial, donde el pedido sigue
+// abierto y la mesa NO debe liberarse. Por eso `tables` escucha el fin del PEDIDO, no el de la venta.
+
+async fn con_pos() -> Runtime {
+    let db = SqliteAdapter::open_in_memory().await.unwrap();
+    let mut rt = Runtime::new(Box::new(db));
+    for m in ["taxes", "inventory", "sales", "tables"] {
+        rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));
+    }
+    rt.db_for_test()
+        .execute(
+            "INSERT INTO tables_table (id, hub_id, number, name, capacity, is_deleted, created_at)
+             VALUES ('m12', 'h1', '12', 'Mesa 12', 4, 0, '2026-07-19T00:00:00+00:00')",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+    rt
+}
+
+async fn estado_mesa(rt: &Runtime, id: &str) -> String {
+    let res = rt
+        .db_for_test()
+        .query("SELECT status FROM tables_table WHERE id = :id", &params(json!({ "id": id })))
+        .await
+        .unwrap();
+    res.rows[0].as_object().unwrap()["status"].as_str().unwrap_or("").to_string()
+}
+
+#[tokio::test]
+async fn cobrar_el_pedido_libera_la_mesa_y_cierra_su_tramo() {
+    if !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
+    let mut rt = con_pos().await;
+    let ctx = admin();
+
+    let sid = abrir(&mut rt, "m12").await;
+    let res = rt
+        .execute_command(
+            "sales.order.open",
+            &params(json!({ "items": [{ "product_name": "Caña", "price": 250, "quantity": 1 }] })),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    let oid = res["new_ids"][0].as_str().unwrap().to_string();
+    rt.execute_command(
+        "tables.sessions.link_order",
+        &params(json!({ "table_id": "m12", "order_id": oid })),
+        &ctx,
+    )
+    .await
+    .unwrap();
+    assert_eq!(estado_mesa(&rt, "m12").await, "occupied");
+
+    rt.execute_command(
+        "sales.complete_sale",
+        &params(json!({
+            "order_id": oid, "amount_tendered": 250, "tax_included": true,
+            "items": [{ "product_name": "Caña", "price": 250, "quantity": 1, "tax_rate": 21.0 }]
+        })),
+        &ctx,
+    )
+    .await
+    .expect("cobrar");
+    rt.drain_outbox().await.unwrap();
+
+    assert_eq!(estado_mesa(&rt, "m12").await, "available", "cobrar libera la mesa, sin que nadie la cierre a mano");
+    let t = tramos(&rt, &sid).await;
+    assert!(!t[0].2, "y su tramo queda cerrado: {t:?}");
+}
+
+#[tokio::test]
+async fn un_cobro_PARCIAL_no_libera_la_mesa() {
+    // Split-bill: uno de la mesa paga lo suyo y los demás siguen sentados. Si esto liberase la mesa,
+    // el resto de la cuenta se quedaría huérfana.
+    if !mdir("sales").join("dist/handler.wasm").exists() { eprintln!("SKIP"); return; }
+    let mut rt = con_pos().await;
+    let ctx = admin();
+
+    abrir(&mut rt, "m12").await;
+    let res = rt
+        .execute_command(
+            "sales.order.open",
+            &params(json!({ "items": [{ "product_name": "Caña", "price": 250, "quantity": 2 }] })),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    let oid = res["new_ids"][0].as_str().unwrap().to_string();
+    rt.execute_command(
+        "tables.sessions.link_order",
+        &params(json!({ "table_id": "m12", "order_id": oid })),
+        &ctx,
+    )
+    .await
+    .unwrap();
+
+    rt.execute_command(
+        "sales.complete_sale",
+        &params(json!({
+            "order_id": oid, "keep_order_open": true, "amount_tendered": 250, "tax_included": true,
+            "items": [{ "product_name": "Caña", "price": 250, "quantity": 1, "tax_rate": 21.0 }]
+        })),
+        &ctx,
+    )
+    .await
+    .expect("cobro parcial");
+    rt.drain_outbox().await.unwrap();
+
+    assert_eq!(estado_mesa(&rt, "m12").await, "occupied", "la mesa sigue ocupada: aún queda cuenta");
+}

@@ -236,6 +236,131 @@ async fn cada_estacion_dice_a_donde_sale_su_comanda() {
 }
 
 #[tokio::test]
+async fn media_racion_llega_a_cocina_como_media_racion() {
+    if !wasm_present() {
+        eprintln!("SKIP: falta handler.wasm");
+        return;
+    }
+    // `sales_order_item.quantity` es REAL —"cantidad fraccionable"— porque medio kilo de gambas o
+    // media ración son cantidades reales de un bar. Pero cocina la guardaba en un INTEGER y el
+    // handler la convertía con `as_i64`, que para 0.5 hace `0.5 as i64` = 0: al cocinero le
+    // llegaba «0 × Gambas». En Postgres la columna INTEGER lo rompe del todo.
+    //
+    // Y esto es prerequisito del envío incremental: el delta es `quantity - dispatched`, así que
+    // si cocina trunca, `sales` cree que comunicó 0.5 y cocina recibió 0 — la línea se reenviaría
+    // en cada disparo, para siempre.
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    let oid = open_order(&rt, &ctx, "Gambas").await;
+
+    rt.execute_command(
+        "sales.order.fire",
+        &params(json!({
+            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
+            "items": [{ "product_name": "Gambas", "quantity": 0.5, "unit_price": 2400 }]
+        })),
+        &ctx,
+    )
+    .await
+    .expect("disparar media ración");
+    rt.drain_outbox().await.unwrap();
+
+    let comandas = rt.execute_query("kitchen.orders.list", &Params::new(), &ctx).await.unwrap();
+    let comanda_id = comandas[0]["id"].as_str().unwrap();
+    let items = rt
+        .execute_query("kitchen.orders.items", &params(json!({ "order_id": comanda_id })), &ctx)
+        .await
+        .unwrap();
+
+    assert_eq!(items.len(), 1, "la línea baja a cocina: {items:?}");
+    assert_eq!(
+        items[0]["quantity"].as_f64(),
+        Some(0.5),
+        "media ración es 0.5, ni 0 ni 1: {:?}",
+        items[0]["quantity"]
+    );
+}
+
+#[tokio::test]
+async fn una_ronda_vieja_se_reimprime_por_donde_salio_de_verdad() {
+    if !wasm_present() {
+        eprintln!("SKIP: falta handler.wasm");
+        return;
+    }
+    // El destino de una comanda YA DISPARADA es un hecho histórico, no una consulta a la
+    // configuración de hoy. Si mañana mueven las croquetas de la plancha a la freidora, la ronda
+    // que salió ayer SALIÓ por la plancha — y al reimprimirla tiene que volver a salir por ahí.
+    //
+    // Lo mismo vale para la anulación: el vale de «quita las croquetas» tiene que llegar a la
+    // estación que las está cocinando, no a la que las cocinaría si se pidieran ahora.
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    let plancha = rt
+        .execute_command(
+            "kitchen.stations.create",
+            &params(json!({ "name": "Plancha", "destination": "printer", "printer_role": "kitchen" })),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    let plancha_id = plancha["new_ids"][0].as_str().unwrap().to_string();
+
+    rt.execute_command(
+        "kitchen.stations.set_routing",
+        &params(json!({ "station_id": plancha_id, "product_id": "prod-croquetas" })),
+        &ctx,
+    )
+    .await
+    .unwrap();
+
+    let oid = open_order(&rt, &ctx, "Croquetas").await;
+    rt.execute_command(
+        "sales.order.fire",
+        &params(json!({
+            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
+            "items": [{ "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2, "unit_price": 350 }]
+        })),
+        &ctx,
+    )
+    .await
+    .unwrap();
+    rt.drain_outbox().await.unwrap();
+
+    // El jefe reconfigura la estación DESPUÉS de que la ronda saliera: la plancha pasa a ser
+    // solo-pantalla y cambia de rol de impresora. (Cambiar el ENRUTADO no basta para destapar
+    // esto: `station_id` ya se congela al insertar la línea. Lo que sale del JOIN vivo, y por
+    // tanto viaja en el tiempo, es la configuración de la estación.)
+    rt.execute_command(
+        "kitchen.stations.update",
+        &params(json!({
+            "station_id": plancha_id, "name": "Plancha (retirada)",
+            "destination": "display", "printer_role": "bar"
+        })),
+        &ctx,
+    )
+    .await
+    .unwrap();
+
+    let comandas = rt.execute_query("kitchen.orders.list", &Params::new(), &ctx).await.unwrap();
+    let comanda_id = comandas[0]["id"].as_str().unwrap();
+    let items = rt
+        .execute_query("kitchen.orders.items", &params(json!({ "order_id": comanda_id })), &ctx)
+        .await
+        .unwrap();
+
+    assert_eq!(items[0]["station_id"], json!(plancha_id), "la ronda salió por la plancha");
+    assert_eq!(
+        items[0]["destination"],
+        json!("printer"),
+        "y por PAPEL, como salió — no por la pantalla de la freidora de hoy: {:?}",
+        items[0]
+    );
+    assert_eq!(items[0]["printer_role"], json!("kitchen"), "por la impresora que la recibió");
+    assert_eq!(items[0]["station_name"], json!("Plancha"), "con el nombre que tenía entonces");
+}
+
+#[tokio::test]
 async fn la_cabecera_de_la_comanda_trae_lo_que_hay_que_imprimir() {
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
