@@ -14,6 +14,7 @@
 import type { InjectionKey } from 'vue';
 import { ref } from 'vue';
 import { ErploraClient, HttpWsTransport, BridgeClient } from '@erplora/module-sdk';
+import { toast, type ToastColor } from './toast';
 import { config } from './config';
 import { getAccessToken } from './cloud';
 import { getBridgeToken } from './bridge-client';
@@ -120,7 +121,22 @@ export function getClient(): ErploraClient {
     // introduce en Ajustes → Bridge sin recrear el cliente. En Tauri el shell inyectará su propio
     // BridgeTransport (IpcBridgeTransport); aquí es siempre el WS a localhost:12321.
     const bridge = new BridgeClient(undefined, { token: getBridgeToken });
-    _client = new ErploraClient(transport, { currency: hubCurrency }, bridge);
+    // `notifier`: el canal de AVISOS de los módulos. El SDK ya exponía `erplora.notify()`, pero
+    // nadie le pasaba a dónde llevarlo, así que era un **no-op silencioso** — y cada módulo acababa
+    // colando sus mensajes de éxito por su hueco de ERROR (rojo). El Hub ya tiene toast global:
+    // se conecta aquí, una vez, para todos.
+    _client = new ErploraClient(
+      transport,
+      {
+        currency: hubCurrency,
+        notifier: (n) => {
+          const color: ToastColor =
+            n.type === 'success' ? 'success' : n.type === 'error' ? 'danger' : n.type === 'warning' ? 'warning' : 'primary';
+          void toast(n.message, color);
+        },
+      },
+      bridge,
+    );
   }
   return _client;
 }
