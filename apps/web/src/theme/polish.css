@@ -163,6 +163,27 @@ ion-badge {
 ion-footer { box-shadow: none; }
 ion-footer ion-toolbar { --border-width: 0; }
 ion-segment { --background: transparent; padding: 4px; gap: 4px; }
+/* El tabbar de footer (ADR-0022: `navigation[]` → ion-segment) debe LLENAR el ancho disponible.
+   En modo `ios` —el que fijamos en main.ts— Ionic trata el segment como el "segmented control"
+   compacto de iOS y le pone `:host(.in-toolbar){ width: auto; margin-inline: auto }`, así que el
+   host se encoge a su contenido (medido: 289px dentro de una toolbar de 1560px) sin importar cómo
+   dimensiones las columnas. Aquí el segment hace de barra de NAVEGACIÓN, no de pill de filtro, así
+   que fijamos la geometría nosotros y dejamos de depender del modo:
+     · width:100% + margin-inline:0 → el host ocupa la toolbar (esto es lo que arregla el bug).
+     · minmax(84px, 1fr) → con pocas pestañas manda el `1fr` y llenan el ancho; con muchas manda
+       el mínimo táctil de 84px y NO se aplastan.
+     · start + overflow-x → a partir de ~5 pestañas la barra scrollea en horizontal.
+   (`ion-tab-bar` daría el ancho gratis, pero no tiene ninguna estrategia de desbordamiento.) */
+ion-footer ion-segment {
+  width: 100%;
+  margin-inline: 0;
+  box-sizing: border-box;
+  grid-auto-columns: minmax(84px, 1fr);
+  justify-content: start;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+ion-footer ion-segment::-webkit-scrollbar { display: none; }
 ion-segment-button {
   --indicator-color: transparent;
   --color: var(--ion-color-medium);
