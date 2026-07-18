@@ -511,3 +511,52 @@ async fn un_command_tier0_tambien_devuelve_el_id_que_acaba_de_crear() {
     let tortilla = lineas.iter().find(|l| l["product_name"] == json!("Tortilla")).unwrap();
     assert_eq!(tortilla["quantity"], json!(5.0), "5 toques, 5 tortillas");
 }
+
+#[tokio::test]
+async fn split_bill_cada_uno_paga_lo_suyo() {
+    // ADR-0146 etapa 5: dos comensales, una cuenta. El primero paga SU línea; la otra sigue
+    // pendiente y el pedido abierto. Al cobrar la segunda, el pedido se cierra.
+    //
+    // Lo que este test protege: que lo ya pagado NO vuelva a la pantalla al reanudar el pedido —
+    // si volviera, se cobraría dos veces.
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [
+            { "product_name": "Menú A", "price": 1200, "quantity": 1 },
+            { "product_name": "Menú B", "price": 1500, "quantity": 1 }
+        ]
+    })), &ctx).await.unwrap();
+    let oid = res["new_ids"][0].as_str().unwrap().to_string();
+    let lineas = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(lineas.len(), 2);
+    let linea_a = lineas.iter().find(|l| l["product_name"] == json!("Menú A")).unwrap()["id"]
+        .as_str().unwrap().to_string();
+
+    // El primero paga lo suyo: cobro PARCIAL con su línea.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "keep_order_open": true, "line_ids": [linea_a],
+        "amount_tendered": 1200, "tax_included": true,
+        "items": [{ "product_name": "Menú A", "price": 1200, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("cobro del primero");
+
+    // El pedido sigue abierto y solo queda LA OTRA línea.
+    let pendientes = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(pendientes.len(), 1, "lo ya pagado no vuelve: {pendientes:?}");
+    assert_eq!(pendientes[0]["product_name"], json!("Menú B"));
+    let pedido = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(pedido[0]["status"], json!("open"), "aún queda quien pague");
+
+    // El segundo paga: cobro final, el pedido se cierra.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "amount_tendered": 1500, "tax_included": true,
+        "items": [{ "product_name": "Menú B", "price": 1500, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("cobro del segundo");
+
+    let pedido = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(pedido[0]["status"], json!("completed"));
+    let ventas = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(ventas.len(), 2, "una cuenta → DOS ventas, cada una con lo suyo");
+}
