@@ -20,11 +20,9 @@ ver más abajo):
   billing, marketplace, ajustes, sistema, **vista de módulo (WC Lit en runtime)** y
   **asistente AI** (drawer). Tema claro/oscuro. **0 violaciones de CSP de script**. Capturas
   en `apps/web/snapshots/`.
-- **AUTH** ([apps/web/src/pages/auth](apps/web/src/pages/auth) + `src/lib/auth.tsx`):
-  email+password (1er login) → dispositivo de confianza → PIN + setup. Degrada a modo demo
-  si el SaaS no es accesible.
-- **Piezas propias mínimas** ([apps/web/src/ui](apps/web/src/ui)): `Logo` (SVG inline) y
-  `PinPad` — lo único que Ionic no trae. El resto es **Ionic + Tailwind**.
+- **AUTH** ([apps/web/src/views/LoginPage.vue](apps/web/src/views/LoginPage.vue) +
+  `src/lib/session.ts`): email+password (1er login) → dispositivo de confianza → PIN + setup.
+  Degrada a modo demo si el SaaS no es accesible.
   (`packages/ui` queda solo como **ejemplo**, no es dependencia.)
 - **CLI de módulos** ([packages/module-cli](packages/module-cli)): `build`/`validate`
   (compila el WC a ESM y verifica CSP-safe).
@@ -49,7 +47,7 @@ apps/
 packages/
   ui/            (ejemplo, NO usado por apps/web) componentes React+Tailwind         [ejemplo]
   module-cli/    erplora module build|validate                                       [deprecado, ver DEPRECATED.md — usa @erplora/module-toolkit]
-  module-sdk/    SDK TS frontend (transport IPC/HTTP+WS)                             [interfaz]
+  module-sdk/    SDK TS frontend (transport HttpWsTransport, ambos productos)         [interfaz]
   module-types/  tipos del contrato (manifest/envelope)                             [parcial]
 modules/         módulos instalados en runtime (vacío de source; el source vive en
                  modules-workspace/modules/ en la raíz del monorepo)
@@ -111,7 +109,7 @@ pnpm -F @erplora/web typecheck                  # TS estricto
 - **TypeScript** en todo · **Vue 3 + Ionic 8.8 + Tailwind + Iconify** (sin Capacitor; nativo = Tauri).
 - **Lit** para los Web Components de módulos · **pnpm** + Cargo workspaces (raíz compartida).
 - **Dos productos** (§1; ADR-0080): **Hub Local** (backend `single`/SQLite + shell `tauri`) y **Hub Cloud** (backend `cloud`/Aurora + shell `web-pwa`). `single ⟺ Hub Local`, `cloud ⟺ Hub Cloud`.
-- Transporte de datos **HTTP (RPC) + WS (eventos)** en **Hub Cloud** (`cloud`) / **IPC** en **Hub Local** (`single`).
+- Transporte de datos **HTTP (RPC) + WS (eventos)** en **AMBOS productos** (ADR-0050); en Hub Local el runtime Axum corre embebido en loopback `127.0.0.1:8787`. `invoke` queda solo para lo nativo (keychain, hardware) — no para datos.
 - Multi-tenant **`hub_id` por fila**, BD por organización. Hardware vía **shell Tauri** (Bridge como sidecar) en **Hub Local**, o **Bridge standalone opcional** en **Hub Cloud** (§2.7).
 - Red de módulos: **`http.fetch` mediado** (Opción A). Migración **POS-first**, gradual.
 - Auth: email (1er login) → dispositivo de confianza → PIN; usuarios cloud y solo-locales.

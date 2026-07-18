@@ -46,12 +46,14 @@ curl -s -X POST localhost:8799/api/modules/notes/deactivate
 node demos/hotplug/run.mjs
 ```
 
+## Hecho
+
+- **Tier 2 en el runtime**: `execute_command` (`crates/runtime/src/commands.rs::execute_wasm`)
+  ya invoca `erplora-wasm-host` (`WasmHost::from_bytes` + `call`) para commands con
+  `handler: { type: "wasm", ... }`.
+
 ## Pendiente
 
-- **Wire Tier 2 en el runtime**: que `execute_command` invoque `erplora-wasm-host` cuando el
-  manifest declare `handler: { type: "wasm", ... }` (hoy el runtime devuelve `NotImplemented`
-  para commands sin SQL). El host y el contrato ya existen; falta el cableado + el campo
-  `handler` en el manifest y validar las *intenciones* contra commands permitidos.
 - **`apps/tauri`**: `invoke` → el mismo `runtime` (modo local).
 - **Transportes reales**: inyectar reqwest en `cloud-client`/`source`/`installer`; cliente WS
   real (tungstenite) en `erplora-sync`.

@@ -122,7 +122,7 @@ Toda modificacion visual debe revisarse con Playwright. Flujo recomendado:
 
 - Sustituir selects, toggles, tabs, listas y acciones custom por componentes Ionic.
 - Mantener marketplace alineado con el hub actual: el Hub expone/proxy
-  `/api/v1/modules/marketplace/catalog/`, que a su vez consulta el SaaS en
+  `/api/marketplace/catalog`, que a su vez consulta el SaaS en
   `/api/v1/marketplace/modules/`.
 - Reducir HTML/CSS artesanal repetido creando pocas clases semanticas en
   `styles.css`.
