@@ -1632,6 +1632,7 @@ name = "erplora-bridge"
 version = "0.0.0"
 dependencies = [
  "axum",
+ "dirs",
  "erplora-peripherals",
  "jsonwebtoken",
  "notify-rust",

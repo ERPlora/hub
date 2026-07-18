@@ -50,6 +50,8 @@ import '@erplora/outfitkit/ok-status-pill';
 import '@erplora/outfitkit/ok-empty-state';
 // Usuarios → API keys: aviso "el secreto no se volverá a mostrar" en el modal del token.
 import '@erplora/outfitkit/ok-inline-feedback';
+// Ajustes → selector de tema compartido Cloud↔Hub (paleta + modo, ADR-0138).
+import '@erplora/outfitkit/ok-theme-picker';
 // Dashboard de inicio (DashboardPage): tablero de widgets de módulos (ADR-0054) + los kinds del
 // render genérico que aún no estaban registrados (bar-list, timeline, chart). ok-kpi/ok-stat/
 // ok-sparkline/ok-empty-state ya se importan arriba.
@@ -69,6 +71,9 @@ registerOutfitkitIonicDeps();
 
 // Tema de marca (--ion-*) + logo de marca (rejilla CSS) + pulido visual + globales (Tailwind).
 import './theme/variables.css';
+// Paletas de tema opcionales (data-ok-palette, ADR-0138) — DESPUÉS de variables.css para
+// ganar la cascada; el atributo lo pone lib/theme.ts (override local u hub_settings global).
+import '@erplora/outfitkit/palettes.css';
 import './theme/erplora-logo.css';
 import './theme/polish.css';
 import './theme/global.css';

@@ -14,6 +14,7 @@
 // `isAdmin` solo para mostrar/ocultar, la autoridad es el runtime).
 import { ref } from 'vue';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
+import { setHubPalette } from './theme';
 
 /** Forma del store de settings del hub. Todos los campos llegan siempre en el GET/PUT completos. */
 export interface HubSettings {
@@ -35,6 +36,10 @@ export interface HubSettings {
   business_legal_name: string;
   /** Dirección fiscal (texto libre, una o varias líneas). */
   business_address: string;
+  /** Paleta de tema GLOBAL del hub (ADR-0138): valor de `data-ok-palette` de OutfitKit
+   *  palettes.css; 'erplora' = marca por defecto. El override POR USUARIO vive en
+   *  localStorage (`erplora.palette`, ver lib/theme.ts) y gana a esta. */
+  theme_palette: string;
 }
 
 /**
@@ -54,8 +59,11 @@ function setHubSettings(raw: unknown): HubSettings {
     business_tax_id: typeof r.business_tax_id === 'string' ? r.business_tax_id : '',
     business_legal_name: typeof r.business_legal_name === 'string' ? r.business_legal_name : '',
     business_address: typeof r.business_address === 'string' ? r.business_address : '',
+    theme_palette: typeof r.theme_palette === 'string' && r.theme_palette.trim() ? r.theme_palette.trim() : 'erplora',
   };
   hubSettings.value = next;
+  // La paleta global se refleja en el shell al momento (theme.ts decide si hay override local).
+  setHubPalette(next.theme_palette);
   return next;
 }
 
