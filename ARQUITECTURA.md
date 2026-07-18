@@ -551,12 +551,16 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
 > **Modelo decidido ([ADR-0050](../architecture/00-overview/decision-log.md)):** ambos productos
 > usan **HTTP+WS** contra el runtime Axum (embebido en loopback en Hub Local). El SDK ya **no** tiene
 > `IpcTransport`. *(estado código 2026-06-30: data-IPC eliminado —SDK `IpcTransport` + handlers `invoke` de datos del shell `erplora_query`/`erplora_command`—; pendiente, columna core: en Hub Local el front y el runtime embebido deben compartir ORIGEN —el runtime sirve el `dist/` y la ventana Tauri carga de `127.0.0.1:8787`— para que `HttpWsTransport` alcance el loopback sin CORS.)*
-- 🟡 **Runtime Rust implementado (code-complete, sin compilar aún)**: `crates/db` (SQLite vía
+- ✅ **Runtime Rust implementado, compila y pasa tests**: `crates/db` (SQLite vía
   rusqlite) + `crates/runtime` (manifest → migraciones idempotentes → registry → permisos →
   queries/commands en transacción → bus de eventos), con **scope `hub_id`** e inyección de
   `:hub_id/:current_user_id/:now/:new_id`. Módulo `modules/inventory` con SQL real (migración,
-  query, 2 commands, listener). Ejemplo `walking_skeleton` + tests de integración. **Falta
-  compilar/ejecutar** (no hay toolchain Rust en el entorno; el sandbox bloquea rustup).
+  query, 2 commands, listener). Ejemplo `walking_skeleton` + tests de integración. `cargo check
+  --workspace` está en verde y `cargo test --workspace` pasa en el grueso de las crates
+  (`cargo test -p <crate>` para el conteo vigente) — excepción conocida: `erplora-db`'s
+  `tests/parity.rs::taxes_rate_real_and_active_filter_parity` falla hoy (el payload del test no
+  lleva `key`, que `taxes/commands/category_create.sql` exige desde ADR-0085); tratar "sin
+  toolchain Rust en el entorno" como histórico, no como estado actual.
 - Pendiente de la fase: `apps/tauri` (Axum embebido en loopback → mismo `runtime`, sin `invoke` para
   datos; ADR-0050) y `crates/server` (Axum).
 
