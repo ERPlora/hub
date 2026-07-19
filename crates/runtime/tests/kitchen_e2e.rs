@@ -273,10 +273,13 @@ async fn media_racion_llega_a_cocina_como_media_racion() {
         .unwrap();
 
     assert_eq!(items.len(), 1, "la línea baja a cocina: {items:?}");
+    // ADR-0147 §2.1: la FILA también habla µ (kitchen 005): media ración se persiste como
+    // 500000, nunca 0.5 en f64 (aquello era el residuo transitorio) ni 0 ni 1. El lógico
+    // solo existe al pintar (print-comanda divide).
     assert_eq!(
-        items[0]["quantity"].as_f64(),
-        Some(0.5),
-        "media ración es 0.5, ni 0 ni 1: {:?}",
+        items[0]["quantity"].as_i64(),
+        Some(500_000),
+        "media ración es 500000 µ, ni 0 ni 1000000: {:?}",
         items[0]["quantity"]
     );
 }

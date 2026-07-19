@@ -56,8 +56,8 @@ async fn factura_mixta_produce_un_desglose_por_tipo_para_verifactu() {
             "series_code": "FACT", "issuer_nif": "B12345678", "issuer_name": "Bar Paco SL",
             "customer_name": "Cliente", "customer_tax_id": "B99",
             "items": [
-                { "description": "Caña", "quantity": 1, "unit_price": 1000, "tax_rate": 21.0 },
-                { "description": "Tapa", "quantity": 1, "unit_price": 500, "tax_rate": 10.0 }
+                { "description": "Caña", "quantity": 1_000_000, "unit_price": 1000, "tax_rate": 21.0 },
+                { "description": "Tapa", "quantity": 1_000_000, "unit_price": 500, "tax_rate": 10.0 }
             ]
         })),
         &ctx,
