@@ -207,6 +207,56 @@ async fn una_cantidad_fuera_de_la_rejilla_se_rechaza() {
     assert_eq!(stock_de(&rt, &ctx, &gambas).await, 1_000_000, "y el stock NO se ha tocado");
 }
 
+// ── La unidad maestra se puede cambiar (y no se pierde) por update ──────────────────────
+#[tokio::test]
+async fn la_unidad_maestra_se_puede_cambiar_por_update() {
+    if !wasm_present() {
+        eprintln!("SKIP: falta handler.wasm");
+        return;
+    }
+    // Incidencia: el schema de `products.update` llevaba `additionalProperties: false` y
+    // rechazaba `unit_code` — la unidad maestra quedaba grabada a fuego en el alta.
+    let rt = fresh().await;
+    let ctx = admin();
+    let gambas = producto(&rt, &ctx, "Gambas", Some("kg")).await;
+
+    // update es un REEMPLAZO completo (#178) para lo obligatorio… pero la unidad es
+    // ADITIVA a propósito: un caller pre-0147 que no la envíe NO la borra.
+    rt.execute_command(
+        "inventory.products.update",
+        &params(json!({
+            "product_id": gambas, "name": "Gambas", "price": 1200, "cost": 0,
+            "low_stock_threshold": 5, "is_active": 1, "ean13": null, "description": ""
+        })),
+        &ctx,
+    )
+    .await
+    .expect("update sin unit_code");
+    let g = rt
+        .execute_query("inventory.products.get", &params(json!({ "product_id": gambas })), &ctx)
+        .await
+        .unwrap();
+    assert_eq!(g[0]["unit_code"], json!("kg"), "sin enviarla, la unidad se CONSERVA");
+
+    // Cambiarla es un acto explícito: enviar `unit_code` en el update.
+    rt.execute_command(
+        "inventory.products.update",
+        &params(json!({
+            "product_id": gambas, "name": "Gambas", "price": 1200, "cost": 0,
+            "low_stock_threshold": 5, "is_active": 1, "ean13": null, "description": "",
+            "unit_code": "ud"
+        })),
+        &ctx,
+    )
+    .await
+    .expect("update con unit_code: la unidad maestra se puede cambiar");
+    let g = rt
+        .execute_query("inventory.products.get", &params(json!({ "product_id": gambas })), &ctx)
+        .await
+        .unwrap();
+    assert_eq!(g[0]["unit_code"], json!("ud"), "la unidad maestra cambió a ud");
+}
+
 // ── Precio: importe entero por cantidad de precio (KPEIN) ───────────────────────────────
 #[tokio::test]
 async fn un_precio_sub_centimo_se_guarda_como_importe_por_cien_unidades() {
