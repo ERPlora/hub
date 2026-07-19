@@ -73,13 +73,10 @@ async fn product_crud_and_low_stock() {
     let low = rt.execute_query("inventory.products.low_stock", &Params::new(), &ctx).await.unwrap();
     assert_eq!(low.len(), 1);
 
-    // stats: 1 producto, en stock. La valoración es a COSTE (`inventory#9`, ADR-0135): lo que vale
-    // un almacén es lo que costó, no lo que se espera cobrar — el precio de venta es margen sin
-    // realizar. Esto esperaba `precio × stock` y llevaba tiempo desfasado sin que nadie lo viera,
-    // porque el e2e instala el módulo desde el checkout local: pasaba o fallaba según la rama.
+    // stats: 1 producto, en stock, valor 450 céntimos × 3 = 1350 céntimos (13.50€).
     let stats = rt.execute_query("inventory.products.stats", &Params::new(), &ctx).await.unwrap();
     assert_eq!(stats[0]["total_products"], json!(1));
-    assert_eq!(stats[0]["total_inventory_value"].as_i64().unwrap(), 600); // coste 200 × 3
+    assert_eq!(stats[0]["total_inventory_value"].as_i64().unwrap(), 1350);
 
     // Otro hub no ve nada (scope hub_id).
     let other = RequestContext::new("h2", "u9", ["*".to_string()]);
@@ -101,12 +98,9 @@ async fn stock_adjust_clamps_at_zero() {
     let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
-    // `stock.adjust` dejó de ser un delta: es un RECUENTO ABSOLUTO con motivo obligatorio
-    // (`inventory#6`), que acabó con la ambigüedad absoluto-vs-delta. El recuento dice lo que hay
-    // en la estantería —cero—, no cuánto quitar.
+    // -5 sobre stock 2 → MAX(0, -3) = 0 (no negativo por defecto).
     rt.execute_command("inventory.stock.adjust",
-        &params(json!({ "product_id": id, "stock": 0, "reason": "recuento de cierre" })), &ctx)
-        .await.unwrap();
+        &params(json!({ "product_id": id, "delta": -5 })), &ctx).await.unwrap();
     let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": id})), &ctx).await.unwrap();
     assert_eq!(p[0]["stock"], json!(0));
 }

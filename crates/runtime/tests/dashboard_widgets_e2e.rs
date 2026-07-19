@@ -99,14 +99,7 @@ async fn inventory_stats_kpis_show_real_numbers() {
     rt.install_from_dir(&mdir("inventory")).await.expect("inventory");
     let ctx = admin();
 
-    // Un producto REAL con stock 3 y umbral 5 → en stock bajo; valor = COSTE 200 × stock 3 = 600.
-    //
-    // Ojo, esto esperaba `precio × stock` = 1350 y llevaba tiempo desfasado: `inventory#9`
-    // (ADR-0135) cambió la valoración a **coste**, que es lo que vale de verdad un almacén — el
-    // precio de venta es margen sin realizar. El test no se actualizó y nadie lo vio porque cada
-    // repo corre su suite por separado: el e2e instala el módulo desde
-    // `modules-workspace/modules/inventory`, así que pasaba o fallaba según en qué rama estuviera
-    // ESE checkout. Es la fragilidad de tener 27 repos sueltos y una suite que los cruza.
+    // Un producto REAL con stock 3 y umbral 5 → en stock bajo; valor = precio 450 × stock 3 = 1350.
     rt.execute_command(
         "inventory.products.create",
         &params(json!({
@@ -122,7 +115,7 @@ async fn inventory_stats_kpis_show_real_numbers() {
     let stats = kpi_row(&rt, "inventory.products.stats", &ctx).await;
     assert_eq!(stats["products_low_stock"].as_i64().unwrap(), 1, "1 producto en stock bajo (real)");
     assert_eq!(stats["products_in_stock"].as_i64().unwrap(), 1, "1 producto con existencias (real)");
-    assert_eq!(stats["total_inventory_value"].as_i64().unwrap(), 600, "valor real = COSTE × stock (inventory#9)");
+    assert_eq!(stats["total_inventory_value"].as_i64().unwrap(), 1350, "valor real = precio × stock");
 }
 
 // ── staff: `staff.members.stats` → empleados activos ─────────────────────────────────────────────
