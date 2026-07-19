@@ -440,6 +440,17 @@ pub(crate) fn validate_operation(
         )));
     }
 
+    if target.sql.is_empty() {
+        // Un comando sin sentencias declarativas (p.ej. WASM) NO es un destino válido de una
+        // intención: devolver una lista vacía convertía la op en un no-op SILENCIOSO (así se
+        // perdió el descuento de stock por evento en ADR-0147). §5.3: se rechaza con ruido.
+        return Err(RuntimeError::Wasm(format!(
+            "la operación `{}` no resuelve a SQL declarativo (¿comando WASM?): una intención \
+             solo puede referenciar comandos SQL del propio módulo (§5.3)",
+            op.command
+        )));
+    }
+
     Ok(target.sql.clone())
 }
 
@@ -512,5 +523,30 @@ mod tests {
         o.kind = "http".to_string();
         let err = validate_operation(&reg, "notes", &o).unwrap_err();
         assert!(matches!(err, RuntimeError::Wasm(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn validate_operation_rejects_command_without_sql() {
+        // Encontrado con ADR-0147: el listener de inventory apuntaba una op a su comando WASM
+        // `inventory.stock.decrease` y esto resolvía a una lista VACÍA de sentencias — la op se
+        // "aplicaba" sin hacer nada y el descuento de stock no ocurría, en silencio. §5.3 dice
+        // que una intención debe resolver a un comando SQL del propio módulo; lo que no cumpla
+        // eso se RECHAZA con ruido, no se convierte en un no-op.
+        let mut reg = Registry::new();
+        reg.status.insert("inventory".to_string(), ModuleStatus::Active);
+        let mut def = cmd_def();
+        def.sql = vec![]; // comando WASM: sin sentencias declarativas
+        reg.commands.insert(
+            "inventory.stock.decrease".to_string(),
+            RegisteredCommand {
+                module_id: "inventory".to_string(),
+                def,
+                sql: vec![],
+                wasm: None,
+                schema: None,
+            },
+        );
+        let err = validate_operation(&reg, "inventory", &op("inventory.stock.decrease")).unwrap_err();
+        assert!(matches!(err, RuntimeError::Wasm(_)), "debe rechazar, no aplicar 0 sentencias: {err:?}");
     }
 }

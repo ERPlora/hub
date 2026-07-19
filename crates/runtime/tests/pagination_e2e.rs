@@ -144,7 +144,10 @@ async fn eq_filter_on_is_active() {
         "inventory.products.update",
         &params(json!({
             "product_id": id_b, "name": "B", "price": 2.0, "cost": 0,
-            "low_stock_threshold": 5, "is_active": 0
+            "low_stock_threshold": 5, "is_active": 0,
+            // products.update es un REEMPLAZO completo (#178): lo no enviado se borraría en
+            // silencio, así que el contrato exige ean13/description explícitos.
+            "ean13": null, "description": ""
         })),
         &ctx(),
     )

@@ -135,7 +135,7 @@ async fn sale_completed_records_cash_movement() {
     // venta de 30 → cash_register.record_sale añade un movimiento 'sale' de 30 a la sesión.
     rt.execute_command("sales.complete_sale", &params(json!({
         "tax_included": false,
-        "items": [{ "product_name": "X", "price": 3000, "quantity": 1, "tax_rate": 0.0 }]
+        "items": [{ "product_name": "X", "price": 3000, "quantity": 1_000_000, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
     // Entrega asíncrona: el relay procesa sale.completed → cash_register.record_sale.
     rt.drain_outbox().await.unwrap();
@@ -196,7 +196,7 @@ async fn record_sale_emits_movement_added_after_relay() {
 
     rt.execute_command("sales.complete_sale", &params(json!({
         "tax_included": false,
-        "items": [{ "product_name": "X", "price": 3000, "quantity": 1, "tax_rate": 0.0 }]
+        "items": [{ "product_name": "X", "price": 3000, "quantity": 1_000_000, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
     rt.drain_outbox().await.unwrap(); // el relay corre record_sale (escribe el movimiento + emite)
 

@@ -144,7 +144,7 @@ async fn seed_sale(rt: &Runtime, sale_id: &str, lines: &[(&str, i64, f64)]) {
 
 /// Ejecuta el listener real de `sale.completed` (command WASM del módulo) como lo haría
 /// el relay del Outbox al entregar el evento: payload = el del evento de `sales`.
-async fn deliver_sale_completed(rt: &Runtime, ctx: &RequestContext, sale_id: &str, pid: &str, qty: f64) {
+async fn deliver_sale_completed(rt: &Runtime, ctx: &RequestContext, sale_id: &str, pid: &str, qty: i64) {
     rt.execute_command(
         "inventory.stock.decrease_on_sale",
         &params(json!({
@@ -236,8 +236,8 @@ async fn track_off_sale_makes_no_movements_and_void_does_not_restock() {
     set_settings(&rt, &ctx, 0, 0, 10).await;
     let pid = create_product(&rt, &ctx, "Vino", "VIN", 8, Some(5)).await;
 
-    seed_sale(&rt, "sm-off", &[(&pid, 0, 2.0)]).await;
-    deliver_sale_completed(&rt, &ctx, "sm-off", &pid, 2.0).await;
+    seed_sale(&rt, "sm-off", &[(&pid, 0, 2_000_000.0)]).await;
+    deliver_sale_completed(&rt, &ctx, "sm-off", &pid, 2_000_000).await;
     assert_eq!(stock_of(&rt, &ctx, &pid).await, 8.0, "la venta con tracking OFF no mueve stock");
 
     void_sale(&rt, &ctx, "sm-off").await;
@@ -259,14 +259,14 @@ async fn track_on_sale_decreases_and_void_restocks() {
     let rt = stack().await;
     let ctx = admin();
     set_settings(&rt, &ctx, 1, 0, 10).await;
-    let pid = create_product(&rt, &ctx, "Queso", "QUE", 8, Some(5)).await;
+    let pid = create_product(&rt, &ctx, "Queso", "QUE", 8_000_000, Some(5_000_000)).await;
 
-    seed_sale(&rt, "sm-on", &[(&pid, 0, 2.0)]).await;
-    deliver_sale_completed(&rt, &ctx, "sm-on", &pid, 2.0).await;
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 6.0, "tracking ON: la venta descuenta");
+    seed_sale(&rt, "sm-on", &[(&pid, 0, 2_000_000.0)]).await;
+    deliver_sale_completed(&rt, &ctx, "sm-on", &pid, 2_000_000).await;
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 6_000_000.0, "tracking ON: la venta descuenta");
 
     void_sale(&rt, &ctx, "sm-on").await;
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 8.0, "el void restituye el descuento real");
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 8_000_000.0, "el void restituye el descuento real");
 }
 
 // ── Precedencia del umbral de stock bajo ────────────────────────────────────────────────

@@ -58,7 +58,7 @@ async fn product_crud_and_low_stock() {
         "inventory.products.create",
         &params(json!({
             "name": "Café", "sku": "CAF", "price": 450, "cost": 200,
-            "stock": 3, "low_stock_threshold": 5, "product_type": "physical",
+            "stock": 3_000_000, "low_stock_threshold": 5_000_000, "product_type": "physical",
             "ean13": null, "description": "", "tax_category_key": null, "image": ""
         })),
         &ctx,

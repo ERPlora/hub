@@ -155,35 +155,35 @@ async fn sale_with_decimal_quantity_moves_ledger_and_void_reverses_it() {
     if !wasm_present() { eprintln!("⚠ sin handler.wasm — saltado"); return; }
     let rt = stack().await;
     let ctx = admin();
-    let pid = create_product(&rt, &ctx, "KG", 10).await;
+    let pid = create_product(&rt, &ctx, "KG", 10_000_000).await;
 
-    // Venta de 2,5 kg: el truncado float→i64 habría descontado 2.
-    seed_sale(&rt, "sl-1", &[(&pid, 0, 2.5)]).await;
+    // Venta de 2,5 kg = 2500000 (punto fijo 10⁶, ADR-0147): el truncado float→i64 habría descontado 2.
+    seed_sale(&rt, "sl-1", &[(&pid, 0, 2_500_000.0)]).await;
     rt.execute_command("inventory.stock.decrease_on_sale", &params(json!({
         "sale_id": "sl-1",
-        "items": [ { "product_id": pid, "quantity": 2.5, "is_service": false } ]
+        "items": [ { "product_id": pid, "quantity": 2_500_000, "is_service": false } ]
     })), &ctx).await.unwrap();
 
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 7.5, "2,5 descontados EXACTOS (#10)");
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 7_500_000.0, "2,5 kg descontados EXACTOS (10⁶)");
     let movs = movements(&rt, &ctx, &pid).await;
     let sale = movs.iter().find(|m| m["movement_type"] == json!("sale")).expect("falta el movimiento sale");
-    assert_eq!(sale["qty"].as_f64().unwrap(), -2.5);
-    assert_eq!(sale["stock_after"].as_f64().unwrap(), 7.5);
+    assert_eq!(sale["qty"].as_f64().unwrap(), -2_500_000.0);
+    assert_eq!(sale["stock_after"].as_f64().unwrap(), 7_500_000.0);
     assert_eq!(sale["reference"], json!("sl-1"), "referencia al documento origen");
 
     // Anular: restituye 2,5 y deja movimiento `void` con la misma referencia.
     rt.execute_command("sales.void", &params(json!({ "sale_id": "sl-1", "reason": "x" })), &ctx)
         .await.unwrap();
     rt.drain_outbox().await.unwrap();
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10.0);
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10_000_000.0);
     let movs = movements(&rt, &ctx, &pid).await;
     let v = movs.iter().find(|m| m["movement_type"] == json!("void")).expect("falta el movimiento void");
-    assert_eq!(v["qty"].as_f64().unwrap(), 2.5);
+    assert_eq!(v["qty"].as_f64().unwrap(), 2_500_000.0);
     assert_eq!(v["reference"], json!("sl-1"));
 
     // Reentrega del evento: ni stock ni ledger se duplican.
     rt.drain_outbox().await.unwrap();
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10.0);
+    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10_000_000.0);
     let voids = movements(&rt, &ctx, &pid).await.iter()
         .filter(|m| m["movement_type"] == json!("void")).count();
     assert_eq!(voids, 1, "la reentrega no duplica movimientos");
