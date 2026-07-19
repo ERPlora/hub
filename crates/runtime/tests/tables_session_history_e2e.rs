@@ -487,13 +487,15 @@ async fn aparcar_suelta_la_mesa_y_cierra_el_tramo_sin_cerrar_la_sesion() {
         0,
         "aparcada = sin tramo vivo = sin ocupar ninguna mesa"
     );
+    // `table_id` = mesa ACTUAL. Aparcada no está en ninguna, y la columna lo dice: NULL. Así no hay
+    // que recordar para siempre que «significa la última mesa, no donde está».
     let res2 = rt
         .db_for_test()
         .query("SELECT table_id FROM tables_session WHERE id = :sid", &params(json!({ "sid": sid })))
         .await
         .unwrap();
-    assert_eq!(res2.rows[0].as_object().unwrap()["table_id"], json!("m12"),
-               "conserva la última mesa como referencia (de dónde viene la cuenta)");
+    assert!(res2.rows[0].as_object().unwrap()["table_id"].is_null(),
+            "una cuenta aparcada no está en ninguna mesa");
     assert_eq!(o["motivo"], json!("parked"));
     assert_eq!(tramos(&rt, &sid).await.len(), 1, "aparcar no inventa un tramo nuevo");
 }
@@ -540,3 +542,36 @@ async fn una_cuenta_aparcada_no_ocupa_ninguna_mesa() {
     let _ = sid;
 }
 
+
+#[tokio::test]
+async fn la_reconstruccion_de_la_tabla_no_se_lleva_el_historial() {
+    // La migración 006 reconstruye `tables_session` para que `table_id` admita NULL. La trampa: el
+    // historial colgaba de ella con una FK ON DELETE CASCADE, así que el DROP implícito del rebuild
+    // habría BORRADO el historial entero — la fuente de verdad que este ADR acaba de construir.
+    //
+    // Por eso la migración reconstruye PRIMERO el historial sin esa FK. Este test lo fija: los
+    // tramos sobreviven, y borrar una sesión ya no se lleva su historia por delante.
+    let mut rt = fresh().await;
+    let sid = abrir(&mut rt, "m12").await;
+    rt.execute_command("tables.sessions.park", &params(json!({ "session_id": sid })), &admin())
+        .await
+        .unwrap();
+    rt.execute_command(
+        "tables.sessions.restore",
+        &params(json!({ "session_id": sid, "table_id": "m8" })),
+        &admin(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(tramos(&rt, &sid).await.len(), 2, "los dos tramos sobreviven a la reconstrucción");
+
+    rt.db_for_test()
+        .execute("DELETE FROM tables_session WHERE id = :sid", &params(json!({ "sid": sid })))
+        .await
+        .unwrap();
+    assert_eq!(
+        contar(&rt, "SELECT COUNT(*) FROM tables_session_assignment").await,
+        2,
+        "el historial no se borra en cascada con la sesión"
+    );
+}
