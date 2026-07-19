@@ -37,10 +37,10 @@ ver más abajo):
   (manifest → migraciones → queries/commands/eventos con scope `hub_id`) + adaptador SQLite.
   Módulos de ejemplo viven hoy en `modules-workspace/modules/` (fuente), no en `hub/modules/`.
   **Compila y pasa tests**: `cargo check --workspace` en verde y `cargo test --workspace` corre
-  cientos de tests en verde en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri` — salvo un
-  fallo conocido y aislado en `erplora-db` (`tests/parity.rs::taxes_rate_real_and_active_filter_parity`,
-  desactualizado tras ADR-0085: falta `key` en el payload del test). Ver
-  cientos de tests en verde en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri`. Ver
+  cientos de tests en verde en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri` — salvo dos
+  fallos conocidos y aislados en `erplora-db` (`tests/parity.rs`): `taxes_rate_real_and_active_filter_parity`
+  (desactualizado tras ADR-0085: falta `key` en el payload del test) e
+  `inventory_stock_decrease_clamp_parity` (el clamp de stock no se aplica). Ver
   [crates/README.md](crates/README.md) y [REPASO-MOTOR-RUST.md](REPASO-MOTOR-RUST.md).
 
 `apps/tauri` es funcional (gate de entitlement + hardware sidecar), no un stub — ver
