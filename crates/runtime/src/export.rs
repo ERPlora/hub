@@ -393,15 +393,19 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
         // aplica en bloque), así que 19 categorías + 280 productos se quedaban en nada.
         let col_list = cols.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ");
         let val_list = vals.join(", ");
-        // Guard NOT EXISTS por (id, hub_id) cuando hay `id` (contrato de fila): re-importar el
-        // mismo bundle no duplica. Sin `id` (p.ej. hub_settings, PK compuesta) → guard por PK real.
+        // Guard NOT EXISTS por `id` SOLO cuando hay `id` (contrato de fila): re-importar el mismo
+        // bundle no duplica. Sin `id` (p.ej. hub_settings, PK compuesta) → guard por PK real.
+        //
+        // El guard NO puede llevar `AND hub_id = destino`, aunque parezca lo natural: `id` es la
+        // CLAVE PRIMARIA y no sabe de hubs. Con el hub_id en la condición, una fila cuyo id ya
+        // existe bajo OTRO hub pasaba el guard y el INSERT chocaba contra la PK — perdiendo la
+        // SECCIÓN ENTERA (el módulo se aplica en bloque): 19 categorías fiscales a la basura por
+        // una fila. Salió al cablear el bloque `seed` (ADR-0147), porque los datos de referencia
+        // llevan el hub_id DENTRO del id por convención (`h1|taxcat|restaurant.food`) y el export
+        // excluye `id` del placeholder a propósito (ver el guardarraíl anti-fuga de arriba).
         let guard = if obj.contains_key("id") {
             let id_lit = sql_literal(&obj["id"]);
-            if obj.contains_key("hub_id") {
-                format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE id = {id_lit} AND hub_id = '{HUB_ID_PLACEHOLDER}')")
-            } else {
-                format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE id = {id_lit})")
-            }
+            format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE id = {id_lit})")
         } else if table == "hub_settings" && obj.contains_key("key") {
             // `key` también es palabra reservada en algunos dialectos → entrecomillada.
             let key_lit = sql_literal(&obj["key"]);
