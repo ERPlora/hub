@@ -1,11 +1,13 @@
 # JS/TS
 node_modules/
+node_modules
 dist/
 *.tsbuildinfo
 package-lock.json
 
 # Rust
 target/
+target
 
 # OS / tmp
 .DS_Store
