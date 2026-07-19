@@ -79,7 +79,7 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
 6. **El asistente AI es una CAPACIDAD CORE del Hub, no un módulo de marketplace** (ADR-0033,
    2026-06-13; supera la decisión 2026-06-09 de "módulo instalable"). Está **siempre presente** por
    defecto (✨ del topbar): el proxy está **horneado en el binario** (`crates/server/src/assistant.rs`)
-   y el RAG en `apps/ai/knowledge/` — no hay `module.zip`, ni install, ni fila `Module` en el catálogo.
+   y el RAG en la tabla `knowledge_chunk` (`crates/vector/src/lib.rs`) — no hay `module.zip`, ni install, ni fila `Module` en el catálogo.
    Su billing es **propio** (`AssistantTier`/`AssistantUsage`, capa gratis con tope + upgrade), fuera de
    `ModulePurchase`/`is_module_entitled`. Su WC alcanza el LLM del SaaS por una **capacidad de host**:
    `POST /api/assistant/chat/stream` del runtime, que hace de **proxy SSE** hacia el SaaS
@@ -299,7 +299,8 @@ inventory-1.2.0.module.zip
   "queries": {
     "inventory.products.list": {
       "permission": "inventory.products.read",
-      "sql": "queries/products_list.sql", "schema": "schemas/products_list.json"
+      "sql": "queries/products_list.sql", "schema": "schemas/products_list.json",
+      "ai": { "description": "Lists inventory products with their current stock." }
     }
   },
   "commands": {
@@ -307,24 +308,23 @@ inventory-1.2.0.module.zip
       "permission": "inventory.stock.update", "transaction": true,
       "sql": ["commands/stock_decrease.sql"],          // declarativo …
       // "handler": { "type": "wasm", "file": "logic/stock_rules.wasm", "function": "decrease_stock" },
-      "emit": ["inventory.stock.updated"]
+      "emit": ["inventory.stock.updated"],
+      "ai": { "description": "Adjust stock for a product" }
     }
   },
   "events": { "listen": { "pos.sale.completed": { "command": "inventory.stock.decrease" } } },
-  "ai_tools": {
-    "inventory_adjust_stock": {
-      "permission": "inventory.stock.update", "description": "Adjust stock for a product",
-      "command": "inventory.stock.decrease", "schema": "schemas/stock_decrease.json"
-    }
-  },
   "scheduled_tasks": []
 }
 ```
 
+`ai: { description }` es un bloque **inline** por `query`/`command` (no un `ai_tools` top-level: esa
+sección se eliminó — permission/schema/sql se heredan, nunca se redeclaran, §9.2).
+
 **Equivalencias con `module.py`**: `MODULE_ID`→`id`, `MODULE_VERSION`→`version`,
 `DEPENDENCIES`→`depends_on`, `PERMISSIONS`→`permissions`, `ROLE_PERMISSIONS`→`role_permissions`,
 `NAVIGATION`/`MENU`→`navigation`, `SCHEDULED_TASKS`→`scheduled_tasks`. Lo nuevo:
-`queries`/`commands`/`events`/`ai_tools` declarativos (hoy son código Python).
+`queries`/`commands`/`events` declarativos (hoy son código Python), con `ai: { description }` inline
+por operación para el asistente.
 
 ### 5.3 Niveles de potencia (paga complejidad solo cuando la necesitas)
 
@@ -565,10 +565,12 @@ el rendimiento **no decide**; deciden resiliencia y simplicidad:
   `:hub_id/:current_user_id/:now/:new_id`. Módulo `modules/inventory` con SQL real (migración,
   query, 2 commands, listener). Ejemplo `walking_skeleton` + tests de integración. `cargo check
   --workspace` está en verde y `cargo test --workspace` pasa en el grueso de las crates
-  (`cargo test -p <crate>` para el conteo vigente) — excepción conocida: `erplora-db`'s
-  `tests/parity.rs::taxes_rate_real_and_active_filter_parity` falla hoy (el payload del test no
-  lleva `key`, que `taxes/commands/category_create.sql` exige desde ADR-0085); tratar "sin
-  toolchain Rust en el entorno" como histórico, no como estado actual.
+  (`cargo test -p <crate>` para el conteo vigente) — dos excepciones conocidas en `erplora-db`'s
+  `tests/parity.rs`: `taxes_rate_real_and_active_filter_parity` falla hoy (el payload del test no
+  lleva `key`, que `taxes/commands/category_create.sql` exige desde ADR-0085) e
+  `inventory_stock_decrease_clamp_parity` falla también (el clamp de stock no se aplica: la celda
+  `stock` queda en 3 en vez de 0); tratar "sin toolchain Rust en el entorno" como histórico, no
+  como estado actual.
 - Pendiente de la fase: `apps/tauri` (Axum embebido en loopback → mismo `runtime`, sin `invoke` para
   datos; ADR-0050) y `crates/server` (Axum).
 

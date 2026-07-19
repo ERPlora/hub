@@ -9,9 +9,11 @@ import type { PrintRequest, PrintResult } from './print';
 // Lo que NUNCA puede pasar: que un fallo de impresora pare al camarero. En un bar lleno, bloquear
 // es peor que imprimir dos veces — la comanda ya está en la BD y el KDS es la fuente de verdad.
 
+// Las filas de `kitchen.orders.items` traen la cantidad en PUNTO FIJO 10⁶ (ADR-0147, kitchen
+// >= 2.3 con la migración 005): 2 raciones = 2000000. El papel habla lógico.
 const CROQUETAS = {
   product_name: 'Croquetas',
-  quantity: 2,
+  quantity: 2_000_000,
   notes: 'sin gluten',
   station_id: 's-cocina',
   station_name: 'Cocina caliente',
@@ -20,7 +22,7 @@ const CROQUETAS = {
 };
 const CANAS = {
   product_name: 'Cañas',
-  quantity: 2,
+  quantity: 2_000_000,
   notes: '',
   station_id: 's-barra',
   station_name: 'Barra',
@@ -29,7 +31,7 @@ const CANAS = {
 };
 const FLAN = {
   product_name: 'Flan',
-  quantity: 1,
+  quantity: 1_000_000,
   notes: '',
   station_id: 's-postres',
   station_name: 'Postres',
@@ -57,7 +59,7 @@ describe('qué se manda a papel y a qué impresora', () => {
     // Producto nuevo que nadie ha enrutado todavía: si lo descartáramos, la comida no se cocina y
     // nadie se entera. Sale por la impresora de cocina, que es donde alguien lo verá.
     const groups = buildComandaGroups([
-      { product_name: 'Alcachofas', quantity: 1, station_id: null, destination: 'both', printer_role: 'kitchen' },
+      { product_name: 'Alcachofas', quantity: 1_000_000, station_id: null, destination: 'both', printer_role: 'kitchen' },
     ]);
     expect(groups).toHaveLength(1);
     expect(groups[0].role).toBe('kitchen');
@@ -133,5 +135,19 @@ describe('impresión de la comanda al dispararla', () => {
     const print = vi.fn();
     await onKitchenOrderCreated(fakeClient(), {}, { print });
     expect(print).not.toHaveBeenCalled();
+  });
+});
+
+describe('la cantidad del papel habla lógico, el cable habla µ (ADR-0147)', () => {
+  it('2000000 µ se imprimen como «2» y media ración (500000 µ) como «0.5»', () => {
+    const groups = buildComandaGroups([
+      { ...CROQUETAS },
+      { ...CROQUETAS, product_name: 'Gambas', quantity: 500_000, notes: '' },
+    ]);
+    const kitchen = groups.find((g) => g.role === 'kitchen')!;
+    expect(kitchen.items.map((i) => [i.name, i.quantity])).toEqual([
+      ['Croquetas', 2],
+      ['Gambas', 0.5],
+    ]);
   });
 });

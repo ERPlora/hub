@@ -16,6 +16,9 @@
 import type { ErploraClient } from '@erplora/module-sdk';
 import type { PrintRequest, PrintResult } from './print';
 
+/** Escala global de cantidades (ADR-0147): `lógico = raw / 10⁶`. La fila y el evento hablan µ. */
+const QUANTITY_SCALE = 1_000_000;
+
 /** Línea de comanda tal y como la proyecta `kitchen.orders.items` (con el destino de su estación). */
 export interface ComandaItem {
   product_name?: string;
@@ -63,7 +66,9 @@ export function buildComandaGroups(items: ComandaItem[]): ComandaGroup[] {
     const role = item.printer_role || 'kitchen';
     const line = {
       name: item.product_name ?? '',
-      quantity: num(item.quantity ?? 1),
+      // La fila trae la cantidad en punto fijo 10⁶ (ADR-0147; kitchen ≥ 2.3, migración 005):
+      // el papel habla lógico. 500000 µ → «0.5», nunca «500000 × Gambas».
+      quantity: num(item.quantity ?? QUANTITY_SCALE) / QUANTITY_SCALE,
       ...(item.notes ? { notes: item.notes } : {}),
     };
     const group = groups.get(role);

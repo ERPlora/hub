@@ -38,8 +38,8 @@ async fn create_invoice_with_lines_and_numbering() {
         "series_code": "FACT", "issuer_nif": "B12345678", "issuer_name": "Mi Empresa SL",
         "customer_name": "ACME", "customer_tax_id": "B99",
         "items": [
-            { "description": "Consultoría", "quantity": 1, "unit_price": 10000, "tax_rate": 21.0 },
-            { "description": "Soporte", "quantity": 2, "unit_price": 5000, "tax_rate": 10.0 }
+            { "description": "Consultoría", "quantity": 1_000_000, "unit_price": 10000, "tax_rate": 21.0 },
+            { "description": "Soporte", "quantity": 2_000_000, "unit_price": 5000, "tax_rate": 10.0 }
         ]
     })), &ctx).await.expect("create_invoice WASM");
     assert_eq!(res["operations"], json!(5)); // ensure + bump + invoice + 2 líneas
@@ -64,7 +64,7 @@ async fn second_invoice_increments_series() {
     let rt = rt_invoice().await;
     let ctx = admin();
     let p = params(json!({ "series_code": "FACT",
-        "items": [{ "description": "X", "quantity": 1, "unit_price": 1000, "tax_rate": 21.0 }] }));
+        "items": [{ "description": "X", "quantity": 1_000_000, "unit_price": 1000, "tax_rate": 21.0 }] }));
     rt.execute_command("invoice.create", &p, &ctx).await.unwrap();
     rt.execute_command("invoice.create", &p, &ctx).await.unwrap();
     let mut nums: Vec<String> = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap()
@@ -79,7 +79,7 @@ async fn rectify_creates_negated_and_cancels_original() {
     let rt = rt_invoice().await;
     let ctx = admin();
     rt.execute_command("invoice.create", &params(json!({ "series_code": "FACT", "customer_name": "ACME",
-        "items": [{ "description": "X", "quantity": 1, "unit_price": 10000, "tax_rate": 21.0 }] })), &ctx).await.unwrap();
+        "items": [{ "description": "X", "quantity": 1_000_000, "unit_price": 10000, "tax_rate": 21.0 }] })), &ctx).await.unwrap();
     let orig = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap()[0].clone();
     let orig_id = orig["id"].as_str().unwrap().to_string();
     assert_eq!(orig["total_amount"].as_i64().unwrap(), 12100);
