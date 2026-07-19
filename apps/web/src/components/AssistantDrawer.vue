@@ -82,10 +82,13 @@ import { IonButton, IonTextarea, IonSpinner } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { assistantOpen, closeAssistant } from '../lib/shell';
 import { streamAssistant, type ChatMessage } from '../lib/assistant';
+import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
 
 const { t } = useI18n();
 
-const messages = ref<ChatMessage[]>([]);
+// Hilo con alcance de SESIÓN (ADR-0149): vive en lib/assistant-history (sessionStorage),
+// sobrevive un reload y lo vacía logout(). El Cloud no guarda copia.
+const messages = assistantMessages;
 const draft = ref('');
 const streaming = ref(false);
 const threadEl = ref<HTMLElement | null>(null);
@@ -113,8 +116,11 @@ async function send(): Promise<void> {
   const assistantMsg = ref<ChatMessage>({ role: 'assistant', content: '' });
   messages.value.push(assistantMsg.value);
   streaming.value = true;
+  saveAssistantHistory();
   await scrollToBottom();
 
+  // El array COMPLETO menos la burbuja viva: el Cloud es un bridge sin estado (ADR-0149),
+  // el contexto multi-turno lo aporta el cliente en cada turno.
   const history = messages.value.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
 
   abort = streamAssistant(history, {
@@ -126,11 +132,13 @@ async function send(): Promise<void> {
       streaming.value = false;
       abort = null;
       if (!assistantMsg.value.content) assistantMsg.value.content = t('assistant.noReply');
+      saveAssistantHistory();
     },
     onError: () => {
       streaming.value = false;
       abort = null;
       assistantMsg.value.content = assistantMsg.value.content || t('assistant.error');
+      saveAssistantHistory();
     },
   });
 }
@@ -139,6 +147,7 @@ function stop(): void {
   abort?.();
   abort = null;
   streaming.value = false;
+  saveAssistantHistory();
 }
 
 // Al abrir el panel, lleva el foco al fondo del hilo + togglea la clase global `assistant-open`
