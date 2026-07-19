@@ -86,4 +86,6 @@ export function logout(): void {
   setHubSession(null);
   // Olvida el entitlement resuelto: el próximo login lo recalcula para el hub activo.
   void import('./entitlement').then((m) => m.resetEntitlement());
+  // El historial del AED muere con la sesión (ADR-0149): el Cloud ya no guarda copia.
+  void import('./assistant-history').then((m) => m.clearAssistantHistory());
 }
