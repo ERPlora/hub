@@ -478,6 +478,22 @@ async fn aparcar_suelta_la_mesa_y_cierra_el_tramo_sin_cerrar_la_sesion() {
         .unwrap();
     let o = res.rows[0].as_object().unwrap().clone();
     assert_eq!(o["sesion"], json!("parked"), "la CUENTA sigue viva, solo sin mesa");
+
+    // La ocupación NO se lee de `tables_session.table_id` —que conserva la última mesa como
+    // referencia para recuperar la cuenta— sino de si hay TRAMO VIVO. Esa es la invariante que
+    // importa, y es la que hace innecesario volver la columna anulable.
+    assert_eq!(
+        contar(&rt, "SELECT COUNT(*) FROM tables_session_assignment WHERE released_at IS NULL AND is_deleted = 0").await,
+        0,
+        "aparcada = sin tramo vivo = sin ocupar ninguna mesa"
+    );
+    let res2 = rt
+        .db_for_test()
+        .query("SELECT table_id FROM tables_session WHERE id = :sid", &params(json!({ "sid": sid })))
+        .await
+        .unwrap();
+    assert_eq!(res2.rows[0].as_object().unwrap()["table_id"], json!("m12"),
+               "conserva la última mesa como referencia (de dónde viene la cuenta)");
     assert_eq!(o["motivo"], json!("parked"));
     assert_eq!(tramos(&rt, &sid).await.len(), 1, "aparcar no inventa un tramo nuevo");
 }
@@ -523,3 +539,4 @@ async fn una_cuenta_aparcada_no_ocupa_ninguna_mesa() {
     assert_eq!(ocupadas, 0, "sin tramo vivo = sin mesa ocupada");
     let _ = sid;
 }
+
