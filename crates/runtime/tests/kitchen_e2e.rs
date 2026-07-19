@@ -59,7 +59,7 @@ async fn open_order(rt: &Runtime, ctx: &RequestContext, product: &str) -> String
     let res = rt
         .execute_command(
             "sales.order.open",
-            &params(json!({ "items": [{ "product_name": product, "price": 350, "quantity": 2 }] })),
+            &params(json!({ "items": [{ "product_name": product, "price": 350, "quantity": 2_000_000 }] })),
             ctx,
         )
         .await
@@ -202,8 +202,8 @@ async fn cada_estacion_dice_a_donde_sale_su_comanda() {
         &params(json!({
             "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
             "items": [
-                { "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2, "unit_price": 350 },
-                { "product_id": "prod-canas", "product_name": "Cañas", "quantity": 2, "unit_price": 250 }
+                { "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2_000_000, "unit_price": 350 },
+                { "product_id": "prod-canas", "product_name": "Cañas", "quantity": 2_000_000, "unit_price": 250 }
             ]
         })),
         &ctx,
@@ -257,7 +257,7 @@ async fn media_racion_llega_a_cocina_como_media_racion() {
         "sales.order.fire",
         &params(json!({
             "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
-            "items": [{ "product_name": "Gambas", "quantity": 0.5, "unit_price": 2400 }]
+            "items": [{ "product_name": "Gambas", "quantity": 500_000, "unit_price": 2400 }]
         })),
         &ctx,
     )
@@ -319,7 +319,7 @@ async fn una_ronda_vieja_se_reimprime_por_donde_salio_de_verdad() {
         "sales.order.fire",
         &params(json!({
             "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
-            "items": [{ "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2, "unit_price": 350 }]
+            "items": [{ "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2_000_000, "unit_price": 350 }]
         })),
         &ctx,
     )
@@ -377,7 +377,7 @@ async fn la_cabecera_de_la_comanda_trae_lo_que_hay_que_imprimir() {
         "sales.order.fire",
         &params(json!({
             "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
-            "items": [{ "product_name": "Croquetas", "quantity": 2, "unit_price": 350 }]
+            "items": [{ "product_name": "Croquetas", "quantity": 2_000_000, "unit_price": 350 }]
         })),
         &ctx,
     )

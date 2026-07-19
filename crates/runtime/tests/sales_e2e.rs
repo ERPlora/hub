@@ -75,8 +75,8 @@ async fn complete_sale_creates_header_and_lines() {
     let res = rt.execute_command("sales.complete_sale", &params(json!({
         "tax_included": true, "amount_tendered": 2000, "customer_name": "Bar Manolo",
         "items": [
-            { "product_name": "Café", "price": 121, "quantity": 2, "tax_rate": 21.0 },
-            { "product_name": "Agua", "price": 110, "quantity": 1, "tax_rate": 10.0 }
+            { "product_name": "Café", "price": 121, "quantity": 2_000_000, "tax_rate": 21.0 },
+            { "product_name": "Agua", "price": 110, "quantity": 1_000_000, "tax_rate": 10.0 }
         ]
     })), &ctx).await.expect("complete_sale WASM");
     assert_eq!(res["operations"], json!(4)); // counter + sale + 2 líneas
@@ -103,7 +103,7 @@ async fn second_sale_increments_number() {
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
     let ctx = admin();
-    let p = params(json!({ "items": [{ "product_name": "X", "price": 1000, "quantity": 1, "tax_rate": 21.0 }] }));
+    let p = params(json!({ "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }] }));
     rt.execute_command("sales.complete_sale", &p, &ctx).await.unwrap();
     rt.execute_command("sales.complete_sale", &p, &ctx).await.unwrap();
     let mut nums: Vec<String> = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap()
@@ -119,7 +119,7 @@ async fn sale_decrements_stock_via_event() {
     let ctx = admin();
     // producto con stock 10.
     rt.execute_command("inventory.products.create", &params(json!({
-        "name": "Café", "sku": "CAF", "price": 121, "cost": 50, "stock": 10,
+        "name": "Café", "sku": "CAF", "price": 121, "cost": 50, "stock": 10_000_000,
         "low_stock_threshold": 5, "product_type": "physical",
         "ean13": null, "description": "", "tax_category_key": null, "image": ""
     })), &ctx).await.unwrap();
@@ -128,13 +128,13 @@ async fn sale_decrements_stock_via_event() {
 
     // venta de 3 unidades de ese producto → evento descuenta stock a 7.
     rt.execute_command("sales.complete_sale", &params(json!({
-        "items": [{ "product_id": pid, "product_name": "Café", "price": 121, "quantity": 3, "tax_rate": 21.0 }]
+        "items": [{ "product_id": pid, "product_name": "Café", "price": 121, "quantity": 3_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
     // Entrega asíncrona: el relay procesa sale.completed → inventory.stock.decrease.
     rt.drain_outbox().await.unwrap();
 
     let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": pid})), &ctx).await.unwrap();
-    assert_eq!(p[0]["stock"].as_f64().unwrap(), 7.0, "el evento sale.completed debe descontar stock");
+    assert_eq!(p[0]["stock"].as_i64().unwrap(), 7_000_000, "el evento sale.completed debe descontar stock");
 }
 
 #[tokio::test]
@@ -147,7 +147,7 @@ async fn sale_persists_staff_id_and_breaks_down_by_staff() {
     // dos ventas atribuidas a staff-A, una a staff-B.
     let mk = |staff: &str, price: i64| params(json!({
         "tax_included": true, "amount_tendered": 0, "staff_id": staff,
-        "items": [{ "product_name": "Corte", "price": price, "quantity": 1, "tax_rate": 21.0, "is_service": true }]
+        "items": [{ "product_name": "Corte", "price": price, "quantity": 1_000_000, "tax_rate": 21.0, "is_service": true }]
     }));
     rt.execute_command("sales.complete_sale", &mk("staff-A", 2000), &ctx).await.unwrap();
     rt.execute_command("sales.complete_sale", &mk("staff-A", 3000), &ctx).await.unwrap();
@@ -178,11 +178,11 @@ async fn by_staff_respects_date_range_and_excludes_unattributed() {
     let ctx = admin();
     // venta SIN staff (TPV normal) + venta CON staff.
     rt.execute_command("sales.complete_sale", &params(json!({
-        "items": [{ "product_name": "Café", "price": 121, "quantity": 1, "tax_rate": 21.0 }]
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
     rt.execute_command("sales.complete_sale", &params(json!({
         "staff_id": "staff-X",
-        "items": [{ "product_name": "Corte", "price": 2000, "quantity": 1, "tax_rate": 21.0 }]
+        "items": [{ "product_name": "Corte", "price": 2000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
 
     // rango amplio: solo la atribuida.
@@ -212,7 +212,7 @@ async fn create_from_appointment_tags_sale_and_emits_conversion() {
         "tax_included": true, "amount_tendered": 0,
         "staff_id": "stylist-1", "appointment_id": "appt-42",
         "customer_id": "cust-9", "customer_name": "Ana",
-        "items": [{ "product_name": "Tinte", "price": 4500, "quantity": 1, "tax_rate": 21.0, "is_service": true }]
+        "items": [{ "product_name": "Tinte", "price": 4500, "quantity": 1_000_000, "tax_rate": 21.0, "is_service": true }]
     })), &ctx).await.expect("create_from_appointment via complete_sale");
 
     let sale = &rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap()[0];
@@ -246,7 +246,7 @@ async fn sale_records_customer_purchase_via_event() {
     // venta a ese cliente → record_purchase: lead → first_purchase, total_spent sube.
     rt.execute_command("sales.complete_sale", &params(json!({
         "customer_id": cid, "customer_name": "Cliente",
-        "items": [{ "product_name": "X", "price": 5000, "quantity": 1, "tax_rate": 0.0 }]
+        "items": [{ "product_name": "X", "price": 5000, "quantity": 1_000_000, "tax_rate": 0.0 }]
     })), &ctx).await.unwrap();
     // Entrega asíncrona: el relay procesa sale.completed → customers.record_purchase.
     rt.drain_outbox().await.unwrap();
@@ -270,8 +270,8 @@ async fn open_order_persists_open_order_with_lines() {
     // Dinero en CÉNTIMOS (ADR-0007): 121=1.21€, 110=1.10€.
     let res = rt.execute_command("sales.order.open", &params(json!({
         "items": [
-            { "product_name": "Café", "price": 121, "quantity": 2 },
-            { "product_name": "Agua", "price": 110, "quantity": 1 }
+            { "product_name": "Café", "price": 121, "quantity": 2_000_000 },
+            { "product_name": "Agua", "price": 110, "quantity": 1_000_000 }
         ]
     })), &ctx).await.expect("sales.order.open WASM");
     assert_eq!(res["operations"], json!(3)); // 1 cabecera + 2 líneas materializadas
@@ -286,7 +286,7 @@ async fn open_order_persists_open_order_with_lines() {
     let lines = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     assert_eq!(lines.len(), 2, "una línea real por artículo (materialización temprana)");
     let cafe = lines.iter().find(|l| l["product_name"] == json!("Café")).unwrap();
-    assert_eq!(cafe["quantity"].as_f64().unwrap(), 2.0);
+    assert_eq!(cafe["quantity"].as_i64().unwrap(), 2_000_000, "punto fijo 10⁶ (ADR-0147)");
     assert_eq!(cafe["line_total"].as_i64().unwrap(), 242); // 121*2, provisional
     assert_eq!(cafe["order_id"], json!(oid), "la línea cuelga del order");
 }
@@ -301,7 +301,7 @@ async fn command_response_returns_created_ids() {
     let (rt, _) = fresh().await;
     let ctx = admin();
     let res = rt.execute_command("sales.order.open", &params(json!({
-        "items": [{ "product_name": "Café", "price": 121, "quantity": 1 }]
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 1_000_000 }]
     })), &ctx).await.unwrap();
 
     let ids = res["new_ids"].as_array().expect("la respuesta debe traer los ids creados");
@@ -320,14 +320,14 @@ async fn mutate_open_order_recomputes_provisional_total() {
     let ctx = admin();
     // abre un pedido con 1 línea (Café 121×2 = 242).
     rt.execute_command("sales.order.open", &params(json!({
-        "items": [{ "product_name": "Café", "price": 121, "quantity": 2 }]
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 2_000_000 }]
     })), &ctx).await.unwrap();
     let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
     // add_line: Agua 110×1 → provisional 242 + 110 = 352.
     rt.execute_command("sales.order.add_line", &params(json!({
-        "order_id": oid, "product_name": "Agua", "unit_price": 110, "quantity": 1.0, "line_total": 110
+        "order_id": oid, "product_name": "Agua", "unit_price": 110, "quantity": 1_000_000, "line_total": 110
     })), &ctx).await.expect("add_line");
     let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     assert_eq!(ord[0]["provisional_total"].as_i64().unwrap(), 352, "add_line recomputa el total");
@@ -339,7 +339,7 @@ async fn mutate_open_order_recomputes_provisional_total() {
     let agua_id = lines.iter().find(|l| l["product_name"] == json!("Agua")).unwrap()["id"]
         .as_str().unwrap().to_string();
     rt.execute_command("sales.order.update_line", &params(json!({
-        "order_id": oid, "line_id": cafe_id, "quantity": 3.0, "line_total": 363
+        "order_id": oid, "line_id": cafe_id, "quantity": 3_000_000, "line_total": 363
     })), &ctx).await.expect("update_line");
     let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     assert_eq!(ord[0]["provisional_total"].as_i64().unwrap(), 473, "update_line recomputa el total");
@@ -366,14 +366,14 @@ async fn checkout_order_marks_it_completed_and_links_sale() {
     let (rt, _) = fresh().await;
     let ctx = admin();
     rt.execute_command("sales.order.open", &params(json!({
-        "items": [{ "product_name": "Café", "price": 121, "quantity": 2 }]
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 2_000_000 }]
     })), &ctx).await.unwrap();
     let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
         .as_str().unwrap().to_string();
 
     rt.execute_command("sales.complete_sale", &params(json!({
         "order_id": oid, "amount_tendered": 300,
-        "items": [{ "product_name": "Café", "price": 121, "quantity": 2, "tax_rate": 21.0 }]
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 2_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("checkout");
 
     // el pedido queda completado.
@@ -396,8 +396,8 @@ async fn split_bill_one_order_produces_two_sales() {
     let ctx = admin();
     rt.execute_command("sales.order.open", &params(json!({
         "items": [
-            { "product_name": "Plato A", "price": 1000, "quantity": 1 },
-            { "product_name": "Plato B", "price": 500, "quantity": 1 }
+            { "product_name": "Plato A", "price": 1000, "quantity": 1_000_000 },
+            { "product_name": "Plato B", "price": 500, "quantity": 1_000_000 }
         ]
     })), &ctx).await.unwrap();
     let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
@@ -406,7 +406,7 @@ async fn split_bill_one_order_produces_two_sales() {
     // split 1: cobra el Plato A, deja el pedido ABIERTO.
     rt.execute_command("sales.complete_sale", &params(json!({
         "order_id": oid, "keep_order_open": true, "amount_tendered": 1000,
-        "items": [{ "product_name": "Plato A", "price": 1000, "quantity": 1, "tax_rate": 21.0 }]
+        "items": [{ "product_name": "Plato A", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("split 1");
     let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     assert_eq!(ord[0]["status"], json!("open"), "un split parcial deja el pedido abierto");
@@ -414,7 +414,7 @@ async fn split_bill_one_order_produces_two_sales() {
     // split 2 (final): cobra el Plato B → completa el pedido.
     rt.execute_command("sales.complete_sale", &params(json!({
         "order_id": oid, "amount_tendered": 500,
-        "items": [{ "product_name": "Plato B", "price": 500, "quantity": 1, "tax_rate": 21.0 }]
+        "items": [{ "product_name": "Plato B", "price": 500, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("split 2");
     let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     assert_eq!(ord[0]["status"], json!("completed"), "el cobro final completa el pedido");
@@ -446,7 +446,7 @@ async fn el_pedido_no_sabe_de_clientes_la_junction_la_owna_customers() {
         .as_str().unwrap().to_string();
 
     let res = rt.execute_command("sales.order.open", &params(json!({
-        "items": [{ "product_name": "Café", "price": 121, "quantity": 1 }]
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 1_000_000 }]
     })), &ctx).await.unwrap();
     let oid = res["new_ids"][0].as_str().unwrap().to_string();
 
@@ -487,13 +487,13 @@ async fn un_command_tier0_tambien_devuelve_el_id_que_acaba_de_crear() {
     let (rt, _) = fresh().await;
     let ctx = admin();
     let res = rt.execute_command("sales.order.open", &params(json!({
-        "items": [{ "product_name": "Caña", "price": 250, "quantity": 1 }]
+        "items": [{ "product_name": "Caña", "price": 250, "quantity": 1_000_000 }]
     })), &ctx).await.unwrap();
     let oid = res["new_ids"][0].as_str().unwrap().to_string();
 
     let res = rt.execute_command("sales.order.add_line", &params(json!({
         "order_id": oid, "product_id": null, "product_name": "Tortilla", "product_sku": "",
-        "quantity": 1.0, "unit_price": 750, "is_gift": false, "gift_reason": "",
+        "quantity": 1_000_000, "unit_price": 750, "is_gift": false, "gift_reason": "",
         "tax_category_key": "", "cost": 0, "line_total": 750
     })), &ctx).await.expect("añadir línea");
 
@@ -504,12 +504,12 @@ async fn un_command_tier0_tambien_devuelve_el_id_que_acaba_de_crear() {
 
     // Y con ese id se puede subir la cantidad: es justo lo que el POS no podía hacer.
     rt.execute_command("sales.order.update_line", &params(json!({
-        "order_id": oid, "line_id": line_id, "quantity": 5.0, "unit_price": 750,
+        "order_id": oid, "line_id": line_id, "quantity": 5_000_000, "unit_price": 750,
         "is_gift": false, "gift_reason": "", "line_total": 3750
     })), &ctx).await.expect("actualizar la cantidad");
     let lineas = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     let tortilla = lineas.iter().find(|l| l["product_name"] == json!("Tortilla")).unwrap();
-    assert_eq!(tortilla["quantity"], json!(5.0), "5 toques, 5 tortillas");
+    assert_eq!(tortilla["quantity"], json!(5_000_000), "5 toques, 5 tortillas (punto fijo 10⁶)");
 }
 
 #[tokio::test]
@@ -525,8 +525,8 @@ async fn split_bill_cada_uno_paga_lo_suyo() {
 
     let res = rt.execute_command("sales.order.open", &params(json!({
         "items": [
-            { "product_name": "Menú A", "price": 1200, "quantity": 1 },
-            { "product_name": "Menú B", "price": 1500, "quantity": 1 }
+            { "product_name": "Menú A", "price": 1200, "quantity": 1_000_000 },
+            { "product_name": "Menú B", "price": 1500, "quantity": 1_000_000 }
         ]
     })), &ctx).await.unwrap();
     let oid = res["new_ids"][0].as_str().unwrap().to_string();
@@ -539,7 +539,7 @@ async fn split_bill_cada_uno_paga_lo_suyo() {
     rt.execute_command("sales.complete_sale", &params(json!({
         "order_id": oid, "keep_order_open": true, "line_ids": [linea_a],
         "amount_tendered": 1200, "tax_included": true,
-        "items": [{ "product_name": "Menú A", "price": 1200, "quantity": 1, "tax_rate": 21.0 }]
+        "items": [{ "product_name": "Menú A", "price": 1200, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("cobro del primero");
 
     // El pedido sigue abierto y solo queda LA OTRA línea.
@@ -552,11 +552,89 @@ async fn split_bill_cada_uno_paga_lo_suyo() {
     // El segundo paga: cobro final, el pedido se cierra.
     rt.execute_command("sales.complete_sale", &params(json!({
         "order_id": oid, "amount_tendered": 1500, "tax_included": true,
-        "items": [{ "product_name": "Menú B", "price": 1500, "quantity": 1, "tax_rate": 21.0 }]
+        "items": [{ "product_name": "Menú B", "price": 1500, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.expect("cobro del segundo");
 
     let pedido = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
     assert_eq!(pedido[0]["status"], json!("completed"));
     let ventas = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
     assert_eq!(ventas.len(), 2, "una cuenta → DOS ventas, cada una con lo suyo");
+}
+
+#[tokio::test]
+async fn media_racion_de_gambas_descuenta_medio_kilo_y_cobra_la_mitad() {
+    // ADR-0147 de punta a punta por el PAR sales↔inventory: el caso que abrió todo esto.
+    // Antes: `quantity: 0.5` viajaba como f64 → inventory `as_i64(0.5)` = 0 → `qty <= 0 →
+    // continue` → vender al peso NO descontaba stock, en silencio. Ahora la cantidad es punto
+    // fijo 10⁶ en el comando, la línea, el evento y el movimiento de stock — el mismo número.
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, sink) = fresh().await;
+    let ctx = admin();
+
+    // Gambas al peso: unidad kg (escalón 1 g), 12,00 €/kg, 2,5 kg en cámara.
+    rt.execute_command("inventory.products.create", &params(json!({
+        "name": "Gambas", "sku": "GAM", "price": 1200, "cost": 800, "stock": 2_500_000,
+        "unit_code": "kg", "low_stock_threshold": 0, "product_type": "physical",
+        "ean13": null, "description": "", "tax_category_key": null, "image": ""
+    })), &ctx).await.unwrap();
+    let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    // Media ración: 0,5 kg con su contexto de unidades CONGELADO (§2.4).
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "tax_included": true, "amount_tendered": 600,
+        "items": [{
+            "product_id": pid, "product_name": "Gambas", "price": 1200, "quantity": 500_000,
+            "unit_code": "kg", "unit_name": "Kilogram", "increment_value": 1_000,
+            "tax_rate": 21.0
+        }]
+    })), &ctx).await.expect("vender 0,5 kg");
+    rt.drain_outbox().await.unwrap();
+
+    // El dinero: 1200 × 0,5 = 600 céntimos — un solo HALF_UP, por línea (ADR-0123 intacto).
+    let sale = &rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap()[0];
+    assert_eq!(sale["total"].as_i64().unwrap(), 600, "medio kilo cuesta la mitad");
+    let lines = rt.execute_query("sales.lines", &params(json!({"sale_id": sale["id"]})), &ctx).await.unwrap();
+    assert_eq!(lines[0]["quantity"].as_i64(), Some(500_000), "la línea persiste el punto fijo");
+    assert_eq!(lines[0]["unit_code"], json!("kg"), "y su unidad congelada");
+
+    // El evento habló el mismo idioma: entero 10⁶, nunca float.
+    let evs = sink.events.lock().unwrap();
+    let (_, ev) = evs.iter().find(|(n, _)| n == "sale.completed").expect("sale.completed");
+    assert_eq!(ev["items"][0]["quantity"].as_i64(), Some(500_000), "{:?}", ev["items"][0]["quantity"]);
+    drop(evs);
+
+    // Y el stock bajó MEDIO KILO: quedan 2 kg. (El bug era que quedaban 2,5 y nadie se enteraba.)
+    let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": pid})), &ctx).await.unwrap();
+    assert_eq!(p[0]["stock"].as_i64().unwrap(), 2_000_000, "0,5 kg SÍ descuenta 0,5 kg");
+}
+
+#[tokio::test]
+async fn una_cantidad_fuera_de_la_rejilla_no_crea_venta_ni_toca_stock() {
+    // ADR-0147 §2.2: el incremento VALIDA, no redondea. Medio gramo con escalón de gramo →
+    // el comando se RECHAZA entero: ni venta, ni líneas, ni evento, ni stock movido.
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    rt.execute_command("inventory.products.create", &params(json!({
+        "name": "Azafrán", "sku": "AZA", "price": 900_000, "cost": 0, "stock": 1_000_000,
+        "unit_code": "kg", "low_stock_threshold": 0, "product_type": "physical",
+        "ean13": null, "description": "", "tax_category_key": null, "image": ""
+    })), &ctx).await.unwrap();
+    let pid = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    let r = rt.execute_command("sales.complete_sale", &params(json!({
+        "items": [{
+            "product_id": pid, "product_name": "Azafrán", "price": 900_000, "quantity": 500,
+            "unit_code": "kg", "increment_value": 1_000, "tax_rate": 21.0
+        }]
+    })), &ctx).await;
+    assert!(r.is_err(), "medio gramo no cae en la rejilla de gramos: {r:?}");
+
+    assert_eq!(rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap().len(), 0,
+               "el rechazo no deja media venta escrita");
+    rt.drain_outbox().await.unwrap();
+    let p = rt.execute_query("inventory.products.get", &params(json!({"product_id": pid})), &ctx).await.unwrap();
+    assert_eq!(p[0]["stock"].as_i64().unwrap(), 1_000_000, "y el stock ni se ha rozado");
 }

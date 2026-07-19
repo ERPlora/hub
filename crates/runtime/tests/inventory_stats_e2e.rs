@@ -47,19 +47,19 @@ async fn create(rt: &Runtime, ctx: &RequestContext, v: serde_json::Value) {
 ///   D físico: stock -3, umbral 5, coste 400  → agotado (sobreventa); NO resta valor
 ///   S servicio: stock 3, coste 100           → fuera de todo (ni valora ni cuenta)
 async fn seed_catalog(rt: &Runtime, ctx: &RequestContext) {
-    create(rt, ctx, json!({ "name": "A", "sku": "A", "price": 500,  "cost": 200, "stock": 10, "low_stock_threshold": 5, "product_type": "physical" })).await;
-    create(rt, ctx, json!({ "name": "B", "sku": "B", "price": 900,  "cost": 300, "stock": 0,  "low_stock_threshold": 5, "product_type": "physical" })).await;
-    create(rt, ctx, json!({ "name": "C", "sku": "C", "price": 700,  "cost": 0,   "stock": 2,  "low_stock_threshold": 5, "product_type": "physical" })).await;
-    create(rt, ctx, json!({ "name": "D", "sku": "D", "price": 800,  "cost": 400, "stock": 5,  "low_stock_threshold": 5, "product_type": "physical" })).await;
-    create(rt, ctx, json!({ "name": "S", "sku": "S", "price": 1500, "cost": 100, "stock": 3,  "low_stock_threshold": 5, "product_type": "service" })).await;
+    create(rt, ctx, json!({ "name": "A", "sku": "A", "price": 500,  "cost": 200, "stock": 10_000_000, "low_stock_threshold": 5_000_000, "product_type": "physical" })).await;
+    create(rt, ctx, json!({ "name": "B", "sku": "B", "price": 900,  "cost": 300, "stock": 0,  "low_stock_threshold": 5_000_000, "product_type": "physical" })).await;
+    create(rt, ctx, json!({ "name": "C", "sku": "C", "price": 700,  "cost": 0,   "stock": 2_000_000,  "low_stock_threshold": 5_000_000, "product_type": "physical" })).await;
+    create(rt, ctx, json!({ "name": "D", "sku": "D", "price": 800,  "cost": 400, "stock": 5_000_000,  "low_stock_threshold": 5_000_000, "product_type": "physical" })).await;
+    create(rt, ctx, json!({ "name": "S", "sku": "S", "price": 1500, "cost": 100, "stock": 3_000_000,  "low_stock_threshold": 5_000_000, "product_type": "service" })).await;
     // D pasa a stock -3 vía sobreventa permitida (inventory#6): venta real, no seed a mano.
     rt.execute_command("inventory.settings.update", &params(json!({
-        "track_stock": 1, "allow_sell_without_stock": 1, "low_stock_threshold": 10
+        "track_stock": 1, "allow_sell_without_stock": 1, "low_stock_threshold": 10_000_000
     })), ctx).await.unwrap();
     let d_id = rt
         .execute_query("inventory.products.list", &params(json!({"search": "D"})), ctx)
         .await.unwrap()[0]["id"].as_str().unwrap().to_string();
-    rt.execute_command("inventory.stock.decrease", &params(json!({ "product_id": d_id, "qty": 8 })), ctx)
+    rt.execute_command("inventory.stock.decrease", &params(json!({ "product_id": d_id, "qty": 8_000_000 })), ctx)
         .await.unwrap();
 }
 

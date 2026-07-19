@@ -76,8 +76,8 @@ async fn sales_today_kpi_shows_real_total_and_tickets() {
         &params(json!({
             "tax_included": true, "amount_tendered": 2000, "customer_name": "Bar Manolo",
             "items": [
-                { "product_name": "Café", "price": 121, "quantity": 2, "tax_rate": 21.0 },
-                { "product_name": "Agua", "price": 110, "quantity": 1, "tax_rate": 10.0 }
+                { "product_name": "Café", "price": 121, "quantity": 2_000_000, "tax_rate": 21.0 },
+                { "product_name": "Agua", "price": 110, "quantity": 1_000_000, "tax_rate": 10.0 }
             ]
         })),
         &ctx,
@@ -99,12 +99,13 @@ async fn inventory_stats_kpis_show_real_numbers() {
     rt.install_from_dir(&mdir("inventory")).await.expect("inventory");
     let ctx = admin();
 
-    // Un producto REAL con stock 3 y umbral 5 → en stock bajo; valor = precio 450 × stock 3 = 1350.
+    // Un producto REAL con stock 3 y umbral 5 (escala 10⁶) → en stock bajo; valoración A COSTE
+    // (inventory#9): 200 × 3 = 600 céntimos — cantidad × dinero SÍ divide por la escala.
     rt.execute_command(
         "inventory.products.create",
         &params(json!({
             "name": "Café", "sku": "CAF", "price": 450, "cost": 200,
-            "stock": 3, "low_stock_threshold": 5, "product_type": "physical",
+            "stock": 3_000_000, "low_stock_threshold": 5_000_000, "product_type": "physical",
             "ean13": null, "description": "", "tax_category_key": null, "image": ""
         })),
         &ctx,
@@ -115,7 +116,7 @@ async fn inventory_stats_kpis_show_real_numbers() {
     let stats = kpi_row(&rt, "inventory.products.stats", &ctx).await;
     assert_eq!(stats["products_low_stock"].as_i64().unwrap(), 1, "1 producto en stock bajo (real)");
     assert_eq!(stats["products_in_stock"].as_i64().unwrap(), 1, "1 producto con existencias (real)");
-    assert_eq!(stats["total_inventory_value"].as_i64().unwrap(), 1350, "valor real = precio × stock");
+    assert_eq!(stats["total_inventory_value"].as_i64().unwrap(), 600, "valoración a COSTE: 200 × 3");
 }
 
 // ── staff: `staff.members.stats` → empleados activos ─────────────────────────────────────────────

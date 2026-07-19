@@ -115,7 +115,7 @@ async fn auto_f2_on_sale_completed() {
 
     rt.execute_command("sales.complete_sale", &params(json!({
         "customer_name": "Bar Manolo", "tax_included": false,
-        "items": [{ "product_name": "Café", "price": 200, "quantity": 3, "tax_rate": 21.0 }]
+        "items": [{ "product_name": "Café", "price": 200, "quantity": 3_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
     // Entrega asíncrona: el relay procesa sale.completed → invoice.create_from_sale.
     rt.drain_outbox().await.unwrap();
@@ -158,7 +158,7 @@ async fn auto_f2_propagates_business_issuer_via_outbox() {
 
     rt.execute_command("sales.complete_sale", &params(json!({
         "customer_name": "Cliente", "tax_included": true,
-        "items": [{ "product_name": "Corte", "price": 2500, "quantity": 1, "tax_rate": 21.0 }]
+        "items": [{ "product_name": "Corte", "price": 2500, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
     rt.drain_outbox().await.unwrap();
 

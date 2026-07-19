@@ -110,7 +110,7 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
             "items": [{
                 "product_name": "Menú del día",
                 "price": 1100,
-                "quantity": 1,
+                "quantity": 1_000_000,
                 "tax_category_key": "restaurant.food",
                 "tax_rate": 0.0            // ← LA MENTIRA DEL CLIENTE
             }],
@@ -166,7 +166,7 @@ async fn una_read_que_falla_no_impide_cobrar() {
     rt.execute_command(
         "sales.complete_sale",
         &params(json!({
-            "items": [{ "product_name": "X", "price": 1000, "quantity": 1, "tax_rate": 21.0 }],
+            "items": [{ "product_name": "X", "price": 1000, "quantity": 1_000_000, "tax_rate": 21.0 }],
             "tax_included": true,
             "amount_tendered": 1000,
             "payment_method_name": "Efectivo"
