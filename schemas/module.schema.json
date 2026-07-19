@@ -204,6 +204,32 @@
           "schema": {
             "type": "string"
           },
+          "reads": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "La query entera, sin filtrar. Para catálogos pequeños de confianza (p. ej. `taxes.rules.list`)."
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["query"],
+                  "properties": {
+                    "query": { "type": "string" },
+                    "params": {
+                      "type": "object",
+                      "additionalProperties": { "type": "string" },
+                      "description": "Parámetros de la query. Cada valor referencia un campo del payload del command (`payload.<campo>`); cualquier otra cosa se pasa como literal. Solo eso: nada de expresiones ni de leer otras reads, para que el manifest siga siendo declarativo y auditable de un vistazo."
+                    }
+                  },
+                  "description": "Query FILTRADA por campos del payload."
+                }
+              ]
+            },
+            "description": "Lecturas PRE-CARGADAS (ADR-0069): queries (del propio módulo o de sus depends_on) cuyas filas el runtime entrega al handler en `context.reads[\"<query>\"]` antes de invocarlo, con contexto de sistema (mismo hub_id). Existe porque el handler WASM corre en un sandbox y no puede leer la BD: sin esto, solo sabe lo que le cuenta el cliente — y así es como el navegador acababa decidiendo el IVA que se declara a la AEAT. Admite dos formas: un string (la query entera) o `{query, params}` (filtrada por el payload). Un parámetro ausente resuelve a NULL y la query devuelve cero filas; una read que falla se OMITE — cobrar es lo último que puede romperse en un TPV."
+          },
           "expose_api": {
             "type": "boolean",
             "default": false,

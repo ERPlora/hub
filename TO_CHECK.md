@@ -12,7 +12,7 @@
 > `ImportPanel.vue` + `ExportPanel.vue`). Y el widget de la home ya NO es una tarjeta fija encima
 > del board: es un **widget DEL `ok-widget-board`** (`id: core.blueprint`), en el catálogo y
 > antepuesto a todos los presets, ocultable desde el picker como cualquier otro. Los specs
-> (`DashboardPage.spec.ts`, `ExportPanel.spec.ts`, `ImportPanel.spec.ts`, `FirstRunPage.spec.ts`)
+> (`DashboardPage.spec.ts`, `ExportPanel.spec.ts`, `ImportPanel.spec.ts`)
 > ya expresan este contrato — se reescribieron ANTES del cambio (TDD) y quedan por CORRER
 > (Playwright no está instalado en el workspace; typecheck + build prod verificados).
 
@@ -36,8 +36,8 @@
       widget nuevo hasta activarlo en el picker (inherente a «igual que los demás» — confirmar
       que es el comportamiento aceptado, no un bug).
 - [ ] First-run: el CTA de puesta en marcha navega a `/settings?tab=data` y muestra el panel de
-      import (spec actualizado); el guard de first-run mantiene como escapes solo
-      first-run/marketplace/settings.
+      import (spec actualizado); la ruta `/first-run` ya no existe (retirada) — cualquier URL
+      vieja cae por el catch-all a `/dashboard`.
 - [ ] Cambio de idioma del shell: el título/cuerpo/botones del widget core se renderizan una vez
       (render imperativo) — verificar si tras cambiar idioma el board re-pinta o queda el texto
       anterior (limitación conocida de los render() imperativos; decidir si molesta).
@@ -102,7 +102,6 @@
 - Distribución: registro `Blueprint` en el SaaS (Django admin + API) + galería «Desde la nube».
 - Resurrección de `/solutions/` (Solución = BusinessType + blueprint + bundle de módulos).
 - Reutilización del motor por el módulo `backup`.
-- Retirada física de `FirstRunPage`/guard si se decide (hoy solo redirige a Ajustes → Datos).
 
 ## ⚠️ Nota de reconciliación con hub#94 (install-progress)
 

@@ -56,6 +56,8 @@ import '@erplora/outfitkit/ok-status-pill';
 import '@erplora/outfitkit/ok-empty-state';
 // Usuarios → API keys: aviso "el secreto no se volverá a mostrar" en el modal del token.
 import '@erplora/outfitkit/ok-inline-feedback';
+// Ajustes → selector de tema compartido Cloud↔Hub (paleta + modo, ADR-0138).
+import '@erplora/outfitkit/ok-theme-picker';
 // Dashboard de inicio (DashboardPage): tablero de widgets de módulos (ADR-0054) + los kinds del
 // render genérico que aún no estaban registrados (bar-list, timeline, chart). ok-kpi/ok-stat/
 // ok-sparkline/ok-empty-state ya se importan arriba.
@@ -75,6 +77,9 @@ registerOutfitkitIonicDeps();
 
 // Tema de marca (--ion-*) + logo de marca (rejilla CSS) + pulido visual + globales (Tailwind).
 import './theme/variables.css';
+// Paletas de tema opcionales (data-ok-palette, ADR-0138) — DESPUÉS de variables.css para
+// ganar la cascada; el atributo lo pone lib/theme.ts (override local u hub_settings global).
+import '@erplora/outfitkit/palettes.css';
 import './theme/erplora-logo.css';
 // Tabbar de footer (ion-segment como barra de navegación): ancho, scroll y degradado de borde.
 // Comportamiento compartido con el SaaS — lo cablea AppPage con bindTabbar (outfitkit#29).
@@ -95,8 +100,15 @@ bootActionFeedback();
 // mode: 'ios' FIJO. Sin esto Ionic autodetecta plataforma (md en desktop/Android, ios en
 // Safari/iPad), así que el mismo Hub se veía distinto según el dispositivo. Debe coincidir con
 // el SaaS (templates/base.html y public_base.html: window.Ionic.config.mode) — paridad SaaS↔Hub.
-// Nota: en modo ios el router activa swipe-back; si molesta en el TPV táctil → swipeBackEnabled: false.
-const app = createApp(App).use(IonicVue, { mode: 'ios' }).use(router).use(i18n);
+//
+// swipeBackEnabled: false NO es opcional, es lo que hace usable el TPV. @ionic/vue lo activa SOLO
+// al poner mode 'ios' (`config.get("swipeBackEnabled", outlet.mode === "ios")`), y verificado con
+// gesto táctil real: con una comanda abierta, arrastrar desde el borde izquierdo navega
+// /m/sales/pos → /dashboard y DESMONTA el POS a media comanda (las líneas sobreviven en
+// sales_active_cart, pero al operario lo expulsa). Solo pasa por debajo de 992px — a partir de ahí
+// el ion-menu fijo del split-pane (App.vue, when="lg") tapa el borde y el gesto no puede empezar —
+// o sea que afecta justo al tablet en vertical (768/834), el formato de sala. ADR-0143.
+const app = createApp(App).use(IonicVue, { mode: 'ios', swipeBackEnabled: false }).use(router).use(i18n);
 
 // Captura AUTOMÁTICA de errores del frontend (sin modal ni acción del usuario): errores globales,
 // promesas rechazadas y errorHandler de Vue → POST best-effort al runtime local (lib/error-report).
