@@ -195,6 +195,7 @@ async fn preload_reads(
     registry: &Registry,
     cmd: &RegisteredCommand,
     ctx: &RequestContext,
+    payload: &erplora_db::Params,
 ) -> Json {
     if cmd.def.reads.is_empty() {
         return Json::Object(Default::default());
@@ -215,7 +216,8 @@ async fn preload_reads(
     let sys = RequestContext::new(&ctx.hub_id, &ctx.user_id, ["*".to_string()]);
 
     let mut out = serde_json::Map::new();
-    for name in &cmd.def.reads {
+    for read in &cmd.def.reads {
+        let name = read.query();
         let owner = name.split('.').next().unwrap_or("");
         if !allowed.contains(&owner) {
             // No es un error del caller: es un manifest mal declarado. Se avisa y se omite —
@@ -226,10 +228,15 @@ async fn preload_reads(
             );
             continue;
         }
+        // Regla 4 — parámetros desde el PAYLOAD (ADR-0069 fase 2). Sin esto, un handler podía
+        // pedir «todas las reglas de IVA» pero no «la unidad de ESTE producto», y toda validación
+        // contra la fila concreta se quedaba sin sitio donde vivir.
+        let params = read.resolve_params_from_map(payload);
+
         // Regla 3 — graceful: si la query falla (no existe, SQL roto, tabla ausente), se omite.
-        match crate::queries::execute(db, registry, name, &Params::new(), &sys).await {
+        match crate::queries::execute(db, registry, name, &params, &sys).await {
             Ok(rows) => {
-                out.insert(name.clone(), Json::Array(rows));
+                out.insert(name.to_string(), Json::Array(rows));
             }
             Err(e) => {
                 eprintln!("⚠ reads: `{name}` falló ({e}) → se omite; el handler degradará");
@@ -268,7 +275,7 @@ async fn execute_wasm(
     // LECTURAS PRE-CARGADAS (ADR-0069). El handler corre en un sandbox y NO puede leer la BD, así
     // que sin esto solo sabe lo que le cuenta el cliente. Aquí el host le entrega el **catálogo de
     // confianza del hub**.
-    let reads = preload_reads(db, registry, cmd, ctx).await;
+    let reads = preload_reads(db, registry, cmd, ctx, payload).await;
     let input = json!({
         "payload": Json::Object(bound_payload),
         "context": {
