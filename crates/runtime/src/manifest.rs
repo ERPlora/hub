@@ -20,6 +20,15 @@ pub struct Manifest {
     pub navigation: Vec<Nav>,
     #[serde(default)]
     pub migrations: Migrations,
+    /// **Datos de referencia** que el módulo siembra al instalarse (ADR-0147; `taxes` lo usa desde
+    /// ADR-0085 para las categorías fiscales canónicas). DML **idempotente por hub** —
+    /// `WHERE NOT EXISTS` por la clave natural—, aplicado DESPUÉS de migrar, con `:hub_id`, `:now`
+    /// y `:current_user_id` inyectados. Reinstalar no duplica.
+    ///
+    /// Es para datos que **todo hub necesita** y que no puede aportar el usuario: unidades de
+    /// medida, categorías fiscales. No para datos de ejemplo — eso son las blueprints.
+    #[serde(default)]
+    pub seed: Migrations,
     #[serde(default)]
     pub queries: HashMap<String, QueryDef>,
     #[serde(default)]
@@ -242,6 +251,63 @@ pub struct Agent {
     pub description: String,
     #[serde(default)]
     pub keywords: Vec<String>,
+}
+
+/// Una lectura pre-cargada (ADR-0069). Dos formas, y la primera es la de siempre:
+///
+/// ```json
+/// "reads": [
+///   "taxes.rules.list",
+///   { "query": "inventory.products.unit_of", "params": { "product_id": "payload.product_id" } }
+/// ]
+/// ```
+///
+/// **Sin parámetros** (string) el handler recibe la query entera — sirve para catálogos pequeños
+/// como las reglas de IVA. **Con parámetros** recibe solo la fila que le importa, que es lo que
+/// hacía falta para validar contra el dato concreto: sin esto, un handler podía pedir «todas las
+/// reglas» pero no «la unidad de ESTE producto», y cualquier validación por fila se quedaba sin
+/// sitio — en el SQL no vale (un `WHERE` que no casa responde `ok`, no error) y pedírselo al
+/// cliente rompe que el servidor sea la autoridad.
+///
+/// Los valores de `params` referencian el **payload del command** (`payload.<campo>`). Solo eso:
+/// nada de expresiones ni de leer otras reads, para que el manifest siga siendo declarativo y
+/// auditable de un vistazo.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(untagged)]
+pub enum ReadDef {
+    /// `"taxes.rules.list"` — la query entera, sin filtrar.
+    Query(String),
+    /// `{ "query": …, "params": { … } }` — filtrada por campos del payload.
+    Parameterized {
+        query: String,
+        #[serde(default)]
+        params: HashMap<String, String>,
+    },
+}
+
+impl ReadDef {
+    /// El nombre de la query, sea cual sea la forma.
+    pub fn query(&self) -> &str {
+        match self {
+            ReadDef::Query(q) => q,
+            ReadDef::Parameterized { query, .. } => query,
+        }
+    }
+    /// Resuelve los parámetros contra el payload del command. `payload.<campo>` toma un campo de
+    /// primer nivel; cualquier otra cosa se pasa como literal (útil para constantes).
+    pub fn resolve_params_from_map(&self, payload: &erplora_db::Params) -> erplora_db::Params {
+        let mut out = erplora_db::Params::new();
+        if let ReadDef::Parameterized { params, .. } = self {
+            for (name, expr) in params {
+                let value = match expr.strip_prefix("payload.") {
+                    Some(field) => payload.get(field).cloned().unwrap_or(serde_json::Value::Null),
+                    None => serde_json::Value::String(expr.clone()),
+                };
+                out.insert(name.clone(), value);
+            }
+        }
+        out
+    }
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -482,7 +548,7 @@ pub struct CommandDef {
     /// necesita los tipos para cobrar). Una read que falle se **omite**: cobrar es lo último que
     /// puede romperse en un TPV.
     #[serde(default)]
-    pub reads: Vec<String>,
+    pub reads: Vec<ReadDef>,
     #[serde(default)]
     pub emit: Vec<String>,
     /// Handler de lógica: Tier 2 (WASM sandbox) o **plugin nativo first-party**
