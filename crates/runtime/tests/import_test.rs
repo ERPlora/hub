@@ -273,3 +273,45 @@ async fn module_data_for_uninstalled_module_fails_its_section_only() {
     let taxes = report.sections.iter().find(|s| s.section == "modules/taxes").expect("taxes en informe");
     assert!(matches!(taxes.status, SectionStatus::Applied));
 }
+
+/// Importar un bundle cuyo `id` YA existe en el destino no puede reventar la sección.
+///
+/// Apareció al cablear el bloque `seed` del manifest (ADR-0147): los datos de referencia que un
+/// módulo siembra al instalarse llevan el `hub_id` DENTRO del id por convención
+/// (`h1|taxcat|restaurant.food`), y el export **no reescribe `id` a propósito** — lo excluye del
+/// placeholder porque en Dev `hub_id` vale lo mismo que `created_by` y un replace ciego los
+/// arrastraba.
+///
+/// Resultado: el guard `WHERE NOT EXISTS (id = … AND hub_id = destino)` daba TRUE —no hay fila de
+/// ese id en ESE hub— y el INSERT chocaba contra la PK, que no sabe de hubs. La sección entera se
+/// perdía: 19 categorías fiscales a la basura por una fila.
+///
+/// El guard tiene que ir por `id` SOLO: es la clave primaria, y si existe, existe.
+#[tokio::test]
+async fn una_fila_cuyo_id_ya_existe_no_rompe_la_seccion() {
+    let bundle = exported_bundle().await;
+
+    // Destino con los módulos instalados — y por tanto con su semilla ya aplicada.
+    let mut b = fresh().await;
+
+    // Se importa DOS veces: la segunda tiene garantizado que cada id ya está.
+    import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("primer import");
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("segundo import: re-aplicar el bundle es idempotente por contrato");
+
+    for section in ["modules/taxes", "modules/inventory"] {
+        let r = report
+            .sections
+            .iter()
+            .find(|s| s.section == section)
+            .unwrap_or_else(|| panic!("sin resultado para {section}"));
+        assert!(
+            matches!(r.status, SectionStatus::Applied),
+            "{section} debe aplicarse aunque las filas ya estén: {:?}",
+            r.status
+        );
+    }
+}

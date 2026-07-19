@@ -68,6 +68,7 @@ use serde_json::{Map, Value};
 /// distinción entre dinero, tasa y cantidad. Antes vivía copiada en 7 handlers.
 pub mod currency;
 pub mod money;
+pub mod units;
 
 /// Entrada arbitraria que el host pasa al handler WASM.
 ///

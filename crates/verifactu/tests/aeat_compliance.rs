@@ -351,6 +351,53 @@ fn xml_alta_con_destinatario_emite_bloque_destinatarios() {
     assert!(pos_dest < pos_desglose, "Destinatarios debe ir antes de Desglose: {xml}");
 }
 
+// ── FacturasSustituidas (F3): tiquet→factura completa declara la F2 sustituida (ADR-0140) ──
+
+#[test]
+fn xml_alta_f3_emite_bloque_facturas_sustituidas() {
+    // Una F3 (factura completa en SUSTITUCIÓN de una simplificada F2 ya declarada) debe declarar la
+    // F2 sustituida con su nº+serie, fecha de expedición y NIF del emisor, en el bloque
+    // FacturasSustituidas/IDFacturaSustituida. Los datos vienen snapshoteados en el registro (los
+    // pobla `ingest_invoice` con el LEFT JOIN a la F2 por `substitutes_invoice_id`).
+    let hash = chain::alta_hash(NIF, NUM1, FECHA_ISO, "F3", 231.0, 1331.0, "", TS1);
+    let mut record = record_alta_centimos(&hash);
+    record["invoice_type"] = json!("F3");
+    record["substitutes_number"] = json!("T-2026-000145");
+    record["substitutes_date"] = json!("2026-06-08"); // ISO → build_soap la formatea a AEAT
+    record["substitutes_nif"] = json!(NIF);
+    // Una F3 exige destinatario (como F1) — el cliente que pide la factura.
+    record["recipient_nif"] = json!("B87654321");
+    record["recipient_name"] = json!("Cliente S.L.");
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+
+    assert!(xml.contains("<sum1:FacturasSustituidas><sum1:IDFacturaSustituida>"), "{xml}");
+    assert!(
+        xml.contains("<sum1:NumSerieFactura>T-2026-000145</sum1:NumSerieFactura>"),
+        "declara el nº de la F2 sustituida: {xml}"
+    );
+    assert!(
+        xml.contains("<sum1:FechaExpedicionFactura>08-06-2026</sum1:FechaExpedicionFactura>"),
+        "fecha de la F2 en formato AEAT DD-MM-YYYY: {xml}"
+    );
+    // Posición XSD: FacturasSustituidas va tras TipoFactura y antes de DescripcionOperacion.
+    let pos_tipo = xml.find("<sum1:TipoFactura>").expect("TipoFactura presente");
+    let pos_sust = xml.find("<sum1:FacturasSustituidas>").expect("FacturasSustituidas presente");
+    let pos_desc = xml.find("<sum1:DescripcionOperacion>").expect("DescripcionOperacion presente");
+    assert!(
+        pos_tipo < pos_sust && pos_sust < pos_desc,
+        "orden XSD: TipoFactura < FacturasSustituidas < DescripcionOperacion: {xml}"
+    );
+}
+
+#[test]
+fn xml_alta_sin_sustitucion_no_emite_bloque() {
+    // Guardarraíl: un alta normal (F1/F2, sin datos de sustitución) NO lleva FacturasSustituidas.
+    let hash = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
+    let record = record_alta_centimos(&hash);
+    let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test");
+    assert!(!xml.contains("<sum1:FacturasSustituidas>"), "sin sustitución no debe emitir el bloque: {xml}");
+}
+
 #[test]
 fn xml_alta_sin_destinatario_omite_bloque() {
     // Sin recipient_nif (p.ej. F2 simplificada / ticket de POS) NO se emite Destinatarios.

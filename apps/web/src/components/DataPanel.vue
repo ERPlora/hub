@@ -3,11 +3,8 @@
     <!-- Sub-segment Importar/Exportar (decisión humano 2026-07-17): antes los dos paneles iban
          apilados; ahora se elige uno. Importar es la vista por defecto — es lo que se necesita casi
          siempre; exportar se descubre aquí, detrás del segment. -->
-    <!-- mode="md": indicador nativo de Ionic = LÍNEA bajo el seleccionado (el tema global apaga el
-         indicador de los tabs del footer con --indicator-color:transparent; aquí lo restauramos).
-         Sin max-width, los dos botones reparten el ancho completo. -->
+    <!-- Hereda el modo iOS global. Sin max-width, los dos botones reparten el ancho completo. -->
     <ion-segment
-      mode="md"
       :value="view"
       data-testid="data-view-segment"
       class="data-view-segment"
@@ -46,16 +43,8 @@ function onSegChange(e: CustomEvent): void {
 </script>
 
 <style scoped>
-/* Ancho completo (los dos botones reparten el espacio) + línea bajo el seleccionado. Vence al
-   tema global (polish.css) que apaga el indicador y redondea como pastilla para los tabs del pie. */
+/* Ancho completo: los dos botones reparten el espacio y conservan la apariencia iOS global. */
 .data-view-segment {
   margin: 0 0 1rem;
-  --background: transparent;
-  border-bottom: 1px solid var(--ion-border-color);
-}
-.data-view-segment ion-segment-button {
-  --indicator-color: var(--ion-color-primary);
-  --border-radius: 0;
-  min-height: 44px;
 }
 </style>

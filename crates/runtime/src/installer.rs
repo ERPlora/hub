@@ -58,6 +58,26 @@ pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: 
 
     migrations::apply(db, dir, &manifest).await?;
 
+    // Datos de REFERENCIA del módulo (ADR-0147): unidades de medida, categorías fiscales… lo que
+    // todo hub necesita y el usuario no puede aportar. Va DESPUÉS de migrar porque escribe en las
+    // tablas que las migraciones acaban de crear, y es idempotente por contrato (`WHERE NOT
+    // EXISTS`), así que reinstalar no duplica.
+    //
+    // Esto llevaba declarado en `taxes` desde ADR-0085 sin que lo ejecutara nadie: el bloque no
+    // estaba en `module.schema.json` ni había una línea de Rust que lo leyera, así que las
+    // categorías fiscales canónicas y las reglas de IVA de España NO se sembraban al instalar.
+    let seed_files = match db.dialect() {
+        erplora_db::Dialect::Sqlite => &manifest.seed.sqlite,
+        erplora_db::Dialect::Postgres => &manifest.seed.postgres,
+    };
+    if !seed_files.is_empty() {
+        let now = crate::registry::now_rfc3339();
+        for file in seed_files {
+            let sql = loader::read_text(dir, file)?;
+            crate::seed::apply_module_seed(db, &sql, hub_id, &now).await?;
+        }
+    }
+
     for perm in &manifest.permissions {
         registry.permissions.insert(perm.clone());
     }

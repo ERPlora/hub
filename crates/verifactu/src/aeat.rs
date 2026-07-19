@@ -107,6 +107,31 @@ fn destinatarios(record: &Json) -> String {
     )
 }
 
+/// Bloque `FacturasSustituidas` (XSD: tras `TipoFactura`, antes de `DescripcionOperacion`).
+/// Solo en facturas **F3** (factura completa emitida en SUSTITUCIÓN de una simplificada F2 ya
+/// declarada — "el cliente pide factura de un tiquet", ADR-0140): declara la F2 sustituida con su
+/// nº+serie, fecha de expedición y NIF del emisor (`IDFacturaARType`, el mismo shape que las
+/// rectificadas). Vacío si el registro no trae datos de sustitución (todo lo que no sea F3). No es
+/// rectificación: la AEAT no lo trata como tal (el tiquet era correcto), evita el doble cómputo del IVA.
+fn facturas_sustituidas(record: &Json) -> String {
+    let num = s(record, "substitutes_number");
+    if num.is_empty() {
+        return String::new();
+    }
+    let nif = s(record, "substitutes_nif");
+    let fecha = format_date(&s(record, "substitutes_date"));
+    format!(
+        "<sum1:FacturasSustituidas><sum1:IDFacturaSustituida>\
+         <sum1:IDEmisorFactura>{nif}</sum1:IDEmisorFactura>\
+         <sum1:NumSerieFactura>{num}</sum1:NumSerieFactura>\
+         <sum1:FechaExpedicionFactura>{fecha}</sum1:FechaExpedicionFactura>\
+         </sum1:IDFacturaSustituida></sum1:FacturasSustituidas>",
+        nif = esc(&nif),
+        num = esc(&num),
+        fecha = esc(&fecha),
+    )
+}
+
 /// Bloque `SistemaInformatico` (identificación del software, config del hub).
 fn sistema_informatico(config: &Json, hub_id: &str) -> String {
     format!(
@@ -218,6 +243,7 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
              </sum1:IDFactura>\
              <sum1:NombreRazonEmisor>{issuer_name}</sum1:NombreRazonEmisor>\
              <sum1:TipoFactura>{tipo}</sum1:TipoFactura>\
+             {sustituidas}\
              <sum1:DescripcionOperacion>{desc}</sum1:DescripcionOperacion>\
              {destinatarios}\
              <sum1:Desglose>{desglose}</sum1:Desglose>\
@@ -233,6 +259,7 @@ pub fn build_soap(record: &Json, config: &Json, prev: Option<&Json>, hub_id: &st
             fecha = esc(&format_date(&s(record, "invoice_date"))),
             issuer_name = esc(&s(record, "issuer_name")),
             tipo = esc(&s(record, "invoice_type")),
+            sustituidas = facturas_sustituidas(record),
             desc = esc(&s(record, "description")),
             destinatarios = destinatarios(record),
             // Una línea de desglose por tipo REAL de la factura (ver `desglose`). Los importes están

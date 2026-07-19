@@ -39,6 +39,42 @@ pub async fn apply(db: &dyn DatabaseAdapter, sql: &str) -> Result<usize> {
     Ok(applied)
 }
 
+/// Aplica el bloque `seed` de un MÓDULO (ADR-0147): datos de referencia que todo hub necesita y
+/// que el usuario no puede aportar — unidades de medida, categorías fiscales.
+///
+/// Se diferencia de [`apply`] en que **liga parámetros**: la semilla de un módulo se escribe por
+/// hub (`:hub_id`) y con auditoría (`:now`, `:current_user_id`), así que no puede ir por
+/// `execute_batch`. La idempotencia la garantiza el propio SQL (`WHERE NOT EXISTS` por la clave
+/// natural), no este código: reinstalar un módulo vuelve a ejecutarlo y no debe duplicar.
+///
+/// Se aplica DESPUÉS de las migraciones — la semilla escribe en tablas que acaban de crearse.
+pub async fn apply_module_seed(
+    db: &dyn DatabaseAdapter,
+    sql: &str,
+    hub_id: &str,
+    now: &str,
+) -> Result<usize> {
+    let mut params = erplora_db::Params::new();
+    params.insert("hub_id".into(), serde_json::json!(hub_id));
+    params.insert("now".into(), serde_json::json!(now));
+    // La semilla la escribe el sistema, no un usuario: la auditoría queda a nombre del instalador.
+    params.insert("current_user_id".into(), serde_json::json!("system"));
+
+    let stmts = split_statements(sql);
+    let mut applied = 0usize;
+    for (i, stmt) in stmts.iter().enumerate() {
+        db.execute(stmt, &params).await.map_err(|e| {
+            RuntimeError::Other(format!(
+                "seed de módulo: fallo en la sentencia #{} de {}: {e}\n  SQL: {stmt}",
+                i + 1,
+                stmts.len()
+            ))
+        })?;
+        applied += 1;
+    }
+    Ok(applied)
+}
+
 /// Parte un batch SQL en sentencias individuales (separa por `;`, descarta vacías). A diferencia de
 /// [`crate::system_migrations`] (SQL horneado sin comentarios), un fichero de seed lo escribe un
 /// humano y suele llevar comentarios `--`, que pueden contener `;` y romperían el split ingenuo;

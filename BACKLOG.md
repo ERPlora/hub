@@ -23,6 +23,7 @@ este fichero se actualiza desde él. Plan completo en `ARQUITECTURA.md` + el pla
 ## Workstream C — Acabar el hub (núcleo)
 - [x] `P0` `[TÚ·IA guía]` **Frontend↔backend**: `apps/web` inicializa `module-sdk` → `globalThis.erplora`
       (`apps/web/src/main.ts`), con `loadSlot` ya cableado a los WC de módulo. Hecho.
+- [ ] `P1` `[TÚ·IA guía]` Wire **Tier-2 WASM** en `execute_command` (`runtime` ↔ `wasm-host`).
 - [x] `P1` `[TÚ·IA guía]` Wire **Tier-2 WASM** en `execute_command` (`runtime` ↔ `wasm-host`). Hecho — `crates/runtime/src/commands.rs::execute_wasm` invoca `erplora_wasm_host::WasmHost`.
 - [x] `P1` `[IA]` Axum **sirve el frontend** (static `dist/`) + `/healthz` + shutdown SIGTERM. Hecho.
 - [ ] `P1` `[TÚ]` **Auth** usuario/rol/PIN (Argon2) + device-trust + `/api/auth/refresh`.

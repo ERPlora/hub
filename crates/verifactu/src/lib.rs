@@ -312,6 +312,10 @@ async fn create_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             invoice_id: payload.get("invoice_id").cloned().unwrap_or(Json::Null),
             recipient_nif: str_field(&payload, "recipient_nif"),
             recipient_name: str_field(&payload, "recipient_name"),
+            // Sustitución (F3): el caller manual puede pasarlos; normalmente vacíos.
+            substitutes_number: str_field(&payload, "substitutes_number"),
+            substitutes_date: str_field(&payload, "substitutes_date"),
+            substitutes_nif: str_field(&payload, "substitutes_nif"),
         },
     )
     .await
@@ -347,13 +351,22 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
         return Ok(Output::new()); // nada que ingerir
     }
 
-    // Lectura acotada por id de la factura (snapshot fiscal: número oficial + importes).
+    // Lectura acotada por id de la factura (snapshot fiscal: número oficial + importes). El
+    // LEFT JOIN a sí misma por `substitutes_invoice_id` trae, EN LA MISMA lectura (respeta la
+    // "única lectura acotada" de ADR-0058), los datos de la F2 sustituida cuando esta factura es
+    // una F3 — para el bloque XML FacturasSustituidas. NULL/'' si no es sustitución.
     let rows = host
         .read(
-            "SELECT invoice_type, number, issue_date, issuer_nif, issuer_name, \
-             customer_tax_id, customer_name, description, \
-             base_amount, tax_amount, total_amount, tax_breakdown FROM invoice_invoice \
-             WHERE id = :invoice_id AND hub_id = :hub_id AND is_deleted = 0 LIMIT 1",
+            "SELECT i.invoice_type, i.number, i.issue_date, i.issuer_nif, i.issuer_name, \
+             i.customer_tax_id, i.customer_name, i.description, \
+             i.base_amount, i.tax_amount, i.total_amount, i.tax_breakdown, \
+             COALESCE(sub.number, '') AS substitutes_number, \
+             COALESCE(sub.issue_date, '') AS substitutes_date, \
+             COALESCE(sub.issuer_nif, '') AS substitutes_nif \
+             FROM invoice_invoice i \
+             LEFT JOIN invoice_invoice sub \
+               ON sub.id = i.substitutes_invoice_id AND sub.hub_id = i.hub_id AND sub.is_deleted = 0 \
+             WHERE i.id = :invoice_id AND i.hub_id = :hub_id AND i.is_deleted = 0 LIMIT 1",
             &params(json!({ "invoice_id": invoice_id, "hub_id": ctx.hub_id })),
         )
         .await?;
@@ -415,6 +428,10 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             // → vacío → sin Destinatarios. Evita el error AEAT 1189 en facturas completas.
             recipient_nif: str_field(&inv, "customer_tax_id"),
             recipient_name: str_field(&inv, "customer_name"),
+            // F3 → FacturasSustituidas: datos de la F2 sustituida (del LEFT JOIN). Vacíos si no es F3.
+            substitutes_number: str_field(&inv, "substitutes_number"),
+            substitutes_date: str_field(&inv, "substitutes_date"),
+            substitutes_nif: str_field(&inv, "substitutes_nif"),
         },
     )
     .await
@@ -446,6 +463,12 @@ struct RecordInput {
     /// para tiquets simplificados (F2). Se usa al construir el SOAP en la transmisión inline.
     recipient_nif: String,
     recipient_name: String,
+    /// Factura SUSTITUIDA (F3 → F2, ADR-0140): nº+serie, fecha de expedición y NIF del emisor de la
+    /// simplificada que esta factura completa sustituye. Alimentan el bloque XML `FacturasSustituidas`
+    /// (XSD IDFacturaARType). Vacíos si el registro no es una sustitución (todo lo que no sea F3).
+    substitutes_number: String,
+    substitutes_date: String,
+    substitutes_nif: String,
 }
 
 /// Núcleo de encadenado: lee el ancla `(hub_id, issuer_nif)`, calcula la huella SHA-256 (formatos
@@ -538,6 +561,11 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "is_first_record": if is_first { 1 } else { 0 },
                 "generation_timestamp": generation_timestamp,
                 "qr_url": qr_url,
+                // F3 → FacturasSustituidas (ADR-0140): snapshot de la F2 sustituida para reconstruir
+                // el XML en contingencia/reintento sin releer la factura. Vacíos si no es sustitución.
+                "substitutes_number": r.substitutes_number,
+                "substitutes_date": r.substitutes_date,
+                "substitutes_nif": r.substitutes_nif,
             }),
         ))
         .with_operation(op(
@@ -599,6 +627,9 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "generation_timestamp": generation_timestamp,
                 "recipient_nif": r.recipient_nif,
                 "recipient_name": r.recipient_name,
+                "substitutes_number": r.substitutes_number,
+                "substitutes_date": r.substitutes_date,
+                "substitutes_nif": r.substitutes_nif,
             });
             if let Ok((ops, _success)) =
                 transmit_one(host, ctx, &record_json, cfg, &ids[3], &ids[4]).await

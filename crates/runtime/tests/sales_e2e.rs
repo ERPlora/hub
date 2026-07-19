@@ -59,7 +59,7 @@ async fn install_with_deps() {
 
 #[tokio::test]
 async fn missing_dep_fails() {
-    // sales sin sus deps debe fallar (orden topológico es responsabilidad del instalador).
+    // sales sin sus deps (inventory/taxes) debe fallar: el orden topológico es del instalador.
     let db = SqliteAdapter::open_in_memory().await.unwrap();
     let mut rt = Runtime::new(Box::new(db));
     let err = rt.install_from_dir(&mdir("sales")).await;
@@ -255,4 +255,308 @@ async fn sale_records_customer_purchase_via_event() {
     assert_eq!(c[0]["lifecycle_stage"], json!("first_purchase"));
     assert_eq!(c[0]["total_purchases"], json!(1));
     assert_eq!(c[0]["total_spent"].as_i64().unwrap(), 5000); // 50.00€ en céntimos
+}
+
+#[tokio::test]
+async fn open_order_persists_open_order_with_lines() {
+    // ADR-0141 Gate 2: `sales.order.open` abre un `order` MUTABLE (status=open) con sus líneas
+    // materializadas TEMPRANO (filas reales sales_order/sales_order_item). Invariante del ADR:
+    // `sales` es AGNÓSTICO de la mesa — el payload no lleva table_id (la asociación mesa↔pedido la
+    // OWNea `tables` en table_session.order_id). Importes PROVISIONALES; la cuota fiscal se congela
+    // al cobrar (complete_sale).
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _sink) = fresh().await;
+    let ctx = admin();
+    // Dinero en CÉNTIMOS (ADR-0007): 121=1.21€, 110=1.10€.
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [
+            { "product_name": "Café", "price": 121, "quantity": 2 },
+            { "product_name": "Agua", "price": 110, "quantity": 1 }
+        ]
+    })), &ctx).await.expect("sales.order.open WASM");
+    assert_eq!(res["operations"], json!(3)); // 1 cabecera + 2 líneas materializadas
+
+    let orders = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(orders.len(), 1);
+    assert_eq!(orders[0]["status"], json!("open"), "el pedido nace abierto (mutable)");
+    // provisional_total = 121*2 + 110 = 352 céntimos (display, no fiscal).
+    assert_eq!(orders[0]["provisional_total"].as_i64().unwrap(), 352);
+    let oid = orders[0]["id"].as_str().unwrap().to_string();
+
+    let lines = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(lines.len(), 2, "una línea real por artículo (materialización temprana)");
+    let cafe = lines.iter().find(|l| l["product_name"] == json!("Café")).unwrap();
+    assert_eq!(cafe["quantity"].as_f64().unwrap(), 2.0);
+    assert_eq!(cafe["line_total"].as_i64().unwrap(), 242); // 121*2, provisional
+    assert_eq!(cafe["order_id"], json!(oid), "la línea cuelga del order");
+}
+
+#[tokio::test]
+async fn command_response_returns_created_ids() {
+    // ADR-0141 Gate 6: la UI necesita el id de lo que acaba de crear — el POS abre un pedido y debe
+    // saber su `order_id` para añadirle líneas. El runtime es la AUTORIDAD de ids (context.new_ids),
+    // pero la respuesta solo traía {ok, operations} y el id se perdía: el cliente no podía
+    // correlacionar. Se devuelven los ids del lote; por convención new_ids[0] es la entidad principal.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 1 }]
+    })), &ctx).await.unwrap();
+
+    let ids = res["new_ids"].as_array().expect("la respuesta debe traer los ids creados");
+    let order_id = ids.first().and_then(|v| v.as_str()).expect("new_ids[0] = entidad principal");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": order_id})), &ctx).await.unwrap();
+    assert_eq!(ord.len(), 1, "el id devuelto identifica el pedido recién creado");
+    assert_eq!(ord[0]["status"], json!("open"));
+}
+
+#[tokio::test]
+async fn mutate_open_order_recomputes_provisional_total() {
+    // ADR-0141 Gate 3: un pedido abierto es MUTABLE. add/update/remove línea recomputan el total
+    // provisional; void lo cancela. Reemplaza el blob `sales_active_cart` por filas reales.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    // abre un pedido con 1 línea (Café 121×2 = 242).
+    rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 2 }]
+    })), &ctx).await.unwrap();
+    let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    // add_line: Agua 110×1 → provisional 242 + 110 = 352.
+    rt.execute_command("sales.order.add_line", &params(json!({
+        "order_id": oid, "product_name": "Agua", "unit_price": 110, "quantity": 1.0, "line_total": 110
+    })), &ctx).await.expect("add_line");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["provisional_total"].as_i64().unwrap(), 352, "add_line recomputa el total");
+
+    // update_line: Café a qty 3 → line_total 363; total 363 + 110 = 473.
+    let lines = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    let cafe_id = lines.iter().find(|l| l["product_name"] == json!("Café")).unwrap()["id"]
+        .as_str().unwrap().to_string();
+    let agua_id = lines.iter().find(|l| l["product_name"] == json!("Agua")).unwrap()["id"]
+        .as_str().unwrap().to_string();
+    rt.execute_command("sales.order.update_line", &params(json!({
+        "order_id": oid, "line_id": cafe_id, "quantity": 3.0, "line_total": 363
+    })), &ctx).await.expect("update_line");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["provisional_total"].as_i64().unwrap(), 473, "update_line recomputa el total");
+
+    // remove_line: quita el Agua → total 363, queda 1 línea.
+    rt.execute_command("sales.order.remove_line", &params(json!({
+        "order_id": oid, "line_id": agua_id
+    })), &ctx).await.expect("remove_line");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["provisional_total"].as_i64().unwrap(), 363, "remove_line recomputa el total");
+    assert_eq!(rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap().len(), 1);
+
+    // void: el pedido abierto se cancela → status 'voided'.
+    rt.execute_command("sales.order.void", &params(json!({"order_id": oid})), &ctx).await.expect("void");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["status"], json!("voided"), "el pedido queda anulado");
+}
+
+#[tokio::test]
+async fn checkout_order_marks_it_completed_and_links_sale() {
+    // ADR-0141 Gate 4: cobrar un pedido (complete_sale con order_id) congela una venta INMUTABLE
+    // ligada al pedido y lo marca completado (open → completed). El POS envía los items del pedido.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 2 }]
+    })), &ctx).await.unwrap();
+    let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "amount_tendered": 300,
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 2, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("checkout");
+
+    // el pedido queda completado.
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["status"], json!("completed"), "el pedido se completa al cobrar");
+
+    // existe UNA venta inmutable ligada al pedido.
+    let sales = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(sales.len(), 1);
+    let sale = rt.execute_query("sales.get", &params(json!({"sale_id": sales[0]["id"]})), &ctx).await.unwrap();
+    assert_eq!(sale[0]["order_id"], json!(oid), "la venta apunta al pedido");
+}
+
+#[tokio::test]
+async fn split_bill_one_order_produces_two_sales() {
+    // ADR-0141 Gate 4: split-bill = 1 order → N sale. Dos cobros parciales (keep_order_open) del
+    // mismo pedido producen dos ventas inmutables; el pedido se completa en el cobro FINAL.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    rt.execute_command("sales.order.open", &params(json!({
+        "items": [
+            { "product_name": "Plato A", "price": 1000, "quantity": 1 },
+            { "product_name": "Plato B", "price": 500, "quantity": 1 }
+        ]
+    })), &ctx).await.unwrap();
+    let oid = rt.execute_query("sales.orders.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    // split 1: cobra el Plato A, deja el pedido ABIERTO.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "keep_order_open": true, "amount_tendered": 1000,
+        "items": [{ "product_name": "Plato A", "price": 1000, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("split 1");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["status"], json!("open"), "un split parcial deja el pedido abierto");
+
+    // split 2 (final): cobra el Plato B → completa el pedido.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "amount_tendered": 500,
+        "items": [{ "product_name": "Plato B", "price": 500, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("split 2");
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(ord[0]["status"], json!("completed"), "el cobro final completa el pedido");
+
+    // dos ventas, ambas ligadas al MISMO pedido (1 order → N sale).
+    let sales = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(sales.len(), 2, "1 order → 2 sale (split-bill)");
+    for s in &sales {
+        let g = rt.execute_query("sales.get", &params(json!({"sale_id": s["id"]})), &ctx).await.unwrap();
+        assert_eq!(g[0]["order_id"], json!(oid), "cada venta apunta al pedido");
+    }
+}
+
+#[tokio::test]
+async fn el_pedido_no_sabe_de_clientes_la_junction_la_owna_customers() {
+    // ADR-0141: el pedido NO guarda `customer_id` —una tienda de alimentación vende sin cliente—.
+    // La asociación cliente↔pedido la OWNea `customers` en su junction. El pedido es ajeno a ella.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    rt.execute_command("customers.create", &params(json!({
+        "name": "Ana", "email": "", "phone": "", "tax_id": "", "address": "", "city": "",
+        "postal_code": "", "country": "", "avatar": "", "notes": "", "lifecycle_stage": "lead",
+        "source": "walk_in", "company_name": "", "birthday": null, "anniversary": null,
+        "preferred_channel": "none", "marketing_consent": 0, "consent_date": null
+    })), &ctx).await.unwrap();
+    let cid = rt.execute_query("customers.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+        .as_str().unwrap().to_string();
+
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Café", "price": 121, "quantity": 1 }]
+    })), &ctx).await.unwrap();
+    let oid = res["new_ids"][0].as_str().unwrap().to_string();
+
+    // 1) el pedido NO expone cliente por ningún lado.
+    let ord = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert!(ord[0].get("customer_id").is_none(), "el pedido no debe saber de clientes: {:?}", ord[0]);
+
+    // 2) la asociación la escribe CUSTOMERS, en su junction.
+    rt.execute_command("customers.orders.link", &params(json!({
+        "customer_id": cid, "order_id": oid
+    })), &ctx).await.expect("customers.orders.link");
+
+    let pedidos = rt.execute_query("customers.orders.by_customer", &params(json!({"customer_id": cid})), &ctx)
+        .await.unwrap();
+    assert_eq!(pedidos.len(), 1, "el cliente tiene su pedido enlazado");
+    assert_eq!(pedidos[0]["order_id"], json!(oid));
+
+    // 3) re-asignar NO duplica: un pedido tiene como mucho un cliente.
+    rt.execute_command("customers.orders.link", &params(json!({
+        "customer_id": cid, "order_id": oid
+    })), &ctx).await.unwrap();
+    let otra_vez = rt.execute_query("customers.orders.by_customer", &params(json!({"customer_id": cid})), &ctx)
+        .await.unwrap();
+    assert_eq!(otra_vez.len(), 1, "re-asignar sustituye, no duplica");
+}
+
+#[tokio::test]
+async fn un_command_tier0_tambien_devuelve_el_id_que_acaba_de_crear() {
+    // Encontrado en el navegador (ADR-0141/0144): el camarero toca 5 veces la tortilla, la pantalla
+    // marca 5 y la BD guarda 1. Causa: `sales.order.add_line` es Tier-0 (SQL puro) y ese camino
+    // respondía `{ok:true}` a secas, sin el id de la fila. El POS se queda sin `line_id`, y cada
+    // toque posterior sube la cantidad EN PANTALLA sin persistirla — en silencio. Si la comanda se
+    // retoma en otra tablet o tras recargar, se sirven 5 y se cobra 1.
+    //
+    // El runtime ya generaba el id (`:new_id` de system_params); solo faltaba devolverlo, igual que
+    // hace el camino WASM.
+    if !wasm_present() { eprintln!("SKIP: sales/dist/handler.wasm ausente"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [{ "product_name": "Caña", "price": 250, "quantity": 1 }]
+    })), &ctx).await.unwrap();
+    let oid = res["new_ids"][0].as_str().unwrap().to_string();
+
+    let res = rt.execute_command("sales.order.add_line", &params(json!({
+        "order_id": oid, "product_id": null, "product_name": "Tortilla", "product_sku": "",
+        "quantity": 1.0, "unit_price": 750, "is_gift": false, "gift_reason": "",
+        "tax_category_key": "", "cost": 0, "line_total": 750
+    })), &ctx).await.expect("añadir línea");
+
+    let line_id = res["new_ids"][0].as_str().expect("un Tier-0 también devuelve el id creado");
+    let lineas = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    let tortilla = lineas.iter().find(|l| l["product_name"] == json!("Tortilla")).expect("la línea existe");
+    assert_eq!(tortilla["id"], json!(line_id), "el id devuelto es EL de la fila recién creada");
+
+    // Y con ese id se puede subir la cantidad: es justo lo que el POS no podía hacer.
+    rt.execute_command("sales.order.update_line", &params(json!({
+        "order_id": oid, "line_id": line_id, "quantity": 5.0, "unit_price": 750,
+        "is_gift": false, "gift_reason": "", "line_total": 3750
+    })), &ctx).await.expect("actualizar la cantidad");
+    let lineas = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    let tortilla = lineas.iter().find(|l| l["product_name"] == json!("Tortilla")).unwrap();
+    assert_eq!(tortilla["quantity"], json!(5.0), "5 toques, 5 tortillas");
+}
+
+#[tokio::test]
+async fn split_bill_cada_uno_paga_lo_suyo() {
+    // ADR-0146 etapa 5: dos comensales, una cuenta. El primero paga SU línea; la otra sigue
+    // pendiente y el pedido abierto. Al cobrar la segunda, el pedido se cierra.
+    //
+    // Lo que este test protege: que lo ya pagado NO vuelva a la pantalla al reanudar el pedido —
+    // si volviera, se cobraría dos veces.
+    if !wasm_present() { eprintln!("SKIP"); return; }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    let res = rt.execute_command("sales.order.open", &params(json!({
+        "items": [
+            { "product_name": "Menú A", "price": 1200, "quantity": 1 },
+            { "product_name": "Menú B", "price": 1500, "quantity": 1 }
+        ]
+    })), &ctx).await.unwrap();
+    let oid = res["new_ids"][0].as_str().unwrap().to_string();
+    let lineas = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(lineas.len(), 2);
+    let linea_a = lineas.iter().find(|l| l["product_name"] == json!("Menú A")).unwrap()["id"]
+        .as_str().unwrap().to_string();
+
+    // El primero paga lo suyo: cobro PARCIAL con su línea.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "keep_order_open": true, "line_ids": [linea_a],
+        "amount_tendered": 1200, "tax_included": true,
+        "items": [{ "product_name": "Menú A", "price": 1200, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("cobro del primero");
+
+    // El pedido sigue abierto y solo queda LA OTRA línea.
+    let pendientes = rt.execute_query("sales.order.lines", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(pendientes.len(), 1, "lo ya pagado no vuelve: {pendientes:?}");
+    assert_eq!(pendientes[0]["product_name"], json!("Menú B"));
+    let pedido = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(pedido[0]["status"], json!("open"), "aún queda quien pague");
+
+    // El segundo paga: cobro final, el pedido se cierra.
+    rt.execute_command("sales.complete_sale", &params(json!({
+        "order_id": oid, "amount_tendered": 1500, "tax_included": true,
+        "items": [{ "product_name": "Menú B", "price": 1500, "quantity": 1, "tax_rate": 21.0 }]
+    })), &ctx).await.expect("cobro del segundo");
+
+    let pedido = rt.execute_query("sales.order.get", &params(json!({"order_id": oid})), &ctx).await.unwrap();
+    assert_eq!(pedido[0]["status"], json!("completed"));
+    let ventas = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(ventas.len(), 2, "una cuenta → DOS ventas, cada una con lo suyo");
 }

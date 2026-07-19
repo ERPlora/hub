@@ -20,6 +20,11 @@ ver más abajo):
   billing, marketplace, ajustes, sistema, **vista de módulo (WC Lit en runtime)** y
   **asistente AI** (drawer). Tema claro/oscuro. **0 violaciones de CSP de script**. Capturas
   en `apps/web/snapshots/`.
+- **AUTH** ([apps/web/src/views/LoginPage.vue](apps/web/src/views/LoginPage.vue) + `src/lib/session.ts`):
+  email+password (1er login) → dispositivo de confianza → PIN + setup. Degrada a modo demo
+  si el SaaS no es accesible.
+- **Piezas propias mínimas**: logo (imagen inline con fallback al logo local de ERPlora) y el
+  PIN vía `ok-pinpad` (OutfitKit) — lo único que Ionic no trae. El resto es **Ionic + Tailwind**.
 - **AUTH** ([apps/web/src/views/LoginPage.vue](apps/web/src/views/LoginPage.vue) +
   `src/lib/session.ts`): email+password (1er login) → dispositivo de confianza → PIN + setup.
   Degrada a modo demo si el SaaS no es accesible.
@@ -32,6 +37,9 @@ ver más abajo):
   (manifest → migraciones → queries/commands/eventos con scope `hub_id`) + adaptador SQLite.
   Módulos de ejemplo viven hoy en `modules-workspace/modules/` (fuente), no en `hub/modules/`.
   **Compila y pasa tests**: `cargo check --workspace` en verde y `cargo test --workspace` corre
+  cientos de tests en verde en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri` — salvo un
+  fallo conocido y aislado en `erplora-db` (`tests/parity.rs::taxes_rate_real_and_active_filter_parity`,
+  desactualizado tras ADR-0085: falta `key` en el payload del test). Ver
   cientos de tests en verde en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri`. Ver
   [crates/README.md](crates/README.md) y [REPASO-MOTOR-RUST.md](REPASO-MOTOR-RUST.md).
 
@@ -47,6 +55,7 @@ apps/
 packages/
   ui/            (ejemplo, NO usado por apps/web) componentes React+Tailwind         [ejemplo]
   module-cli/    erplora module build|validate                                       [deprecado, ver DEPRECATED.md — usa @erplora/module-toolkit]
+  module-sdk/    SDK TS frontend (transport IPC/HTTP+WS)                             [interfaz]
   module-sdk/    SDK TS frontend (transport HttpWsTransport, ambos productos)         [interfaz]
   module-types/  tipos del contrato (manifest/envelope)                             [parcial]
 modules/         módulos instalados en runtime (vacío de source; el source vive en
@@ -109,6 +118,7 @@ pnpm -F @erplora/web typecheck                  # TS estricto
 - **TypeScript** en todo · **Vue 3 + Ionic 8.8 + Tailwind + Iconify** (sin Capacitor; nativo = Tauri).
 - **Lit** para los Web Components de módulos · **pnpm** + Cargo workspaces (raíz compartida).
 - **Dos productos** (§1; ADR-0080): **Hub Local** (backend `single`/SQLite + shell `tauri`) y **Hub Cloud** (backend `cloud`/Aurora + shell `web-pwa`). `single ⟺ Hub Local`, `cloud ⟺ Hub Cloud`.
+- Transporte de datos **HTTP (RPC) + WS (eventos)** en **AMBOS productos** (ADR-0050; `invoke` solo para lo nativo/hardware, no para datos).
 - Transporte de datos **HTTP (RPC) + WS (eventos)** en **AMBOS productos** (ADR-0050); en Hub Local el runtime Axum corre embebido en loopback `127.0.0.1:8787`. `invoke` queda solo para lo nativo (keychain, hardware) — no para datos.
 - Multi-tenant **`hub_id` por fila**, BD por organización. Hardware vía **shell Tauri** (Bridge como sidecar) en **Hub Local**, o **Bridge standalone opcional** en **Hub Cloud** (§2.7).
 - Red de módulos: **`http.fetch` mediado** (Opción A). Migración **POS-first**, gradual.

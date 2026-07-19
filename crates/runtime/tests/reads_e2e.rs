@@ -180,3 +180,56 @@ async fn una_read_que_falla_no_impide_cobrar() {
     assert_eq!(ventas.len(), 1, "el TPV cobró");
     assert_eq!(ventas[0]["total"].as_i64().unwrap(), 1000);
 }
+
+// ── `reads` CON PARÁMETROS (ADR-0069 fase 2) ────────────────────────────────────────────────────
+//
+// El límite que quedaba: las reads se ejecutaban con `Params::new()` — vacíos. Un handler podía
+// pedir «todas las reglas de IVA» pero NO «la unidad de ESTE producto», así que cualquier
+// validación que dependa de la fila concreta se quedaba sin sitio donde vivir:
+//
+//   * en el SQL no vale — un `WHERE` que no casa ninguna fila responde `ok`, no error;
+//   * en el handler no valía — no podía leer la fila;
+//   * pedírselo al cliente rompe que el servidor sea la autoridad.
+//
+// Es el mismo límite que ya había decidido tres diseños: por él las líneas de venta viajan en el
+// payload, por él la comanda resuelve la estación en SQL, y por él ADR-0147 se quedaba sin poder
+// rechazar una cantidad fuera de rejilla.
+//
+// Forma declarativa, retrocompatible: una read es un string (sin parámetros, como hasta ahora) o
+// un objeto `{ query, params }` donde cada valor referencia un campo del payload del command.
+
+#[test]
+fn una_read_sin_parametros_sigue_siendo_un_string() {
+    // Retrocompatibilidad: los manifests existentes declaran `reads: ["taxes.rules.list"]`.
+    let def: erplora_runtime::manifest::ReadDef =
+        serde_json::from_str(r#""taxes.rules.list""#).expect("string suelto");
+    assert_eq!(def.query(), "taxes.rules.list");
+    assert!(def.resolve_params_from_map(&Params::new()).is_empty(), "sin parámetros");
+}
+
+#[test]
+fn una_read_parametrizada_toma_el_valor_del_payload() {
+    // La forma nueva: `{ query, params }`, con los valores referenciando el payload del command.
+    let def: erplora_runtime::manifest::ReadDef = serde_json::from_str(
+        r#"{ "query": "inventory.products.get", "params": { "product_id": "payload.product_id" } }"#,
+    )
+    .expect("forma con parámetros");
+    assert_eq!(def.query(), "inventory.products.get");
+
+    let payload = params(serde_json::json!({ "product_id": "prod-1", "qty": 500 }));
+    let resueltos = def.resolve_params_from_map(&payload);
+    assert_eq!(resueltos.get("product_id"), Some(&serde_json::json!("prod-1")));
+    assert_eq!(resueltos.len(), 1, "solo lo declarado, no el payload entero");
+}
+
+#[test]
+fn un_campo_ausente_del_payload_resuelve_a_null_no_revienta() {
+    // Regla 3 de ADR-0069: fallo graceful. Un parámetro que no está no puede abortar un cobro;
+    // la query recibirá NULL y devolverá cero filas, y el handler degrada a su fallback.
+    let def: erplora_runtime::manifest::ReadDef = serde_json::from_str(
+        r#"{ "query": "inventory.products.get", "params": { "product_id": "payload.no_existe" } }"#,
+    )
+    .unwrap();
+    let resueltos = def.resolve_params_from_map(&params(serde_json::json!({ "otro": 1 })));
+    assert_eq!(resueltos.get("product_id"), Some(&serde_json::Value::Null));
+}

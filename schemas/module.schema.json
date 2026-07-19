@@ -207,9 +207,28 @@
           "reads": {
             "type": "array",
             "items": {
-              "type": "string"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "La query entera, sin filtrar. Para catálogos pequeños de confianza (p. ej. `taxes.rules.list`)."
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["query"],
+                  "properties": {
+                    "query": { "type": "string" },
+                    "params": {
+                      "type": "object",
+                      "additionalProperties": { "type": "string" },
+                      "description": "Parámetros de la query. Cada valor referencia un campo del payload del command (`payload.<campo>`); cualquier otra cosa se pasa como literal. Solo eso: nada de expresiones ni de leer otras reads, para que el manifest siga siendo declarativo y auditable de un vistazo."
+                    }
+                  },
+                  "description": "Query FILTRADA por campos del payload."
+                }
+              ]
             },
-            "description": "Lecturas PRE-CARGADAS (ADR-0069): nombres de query (del propio módulo o de sus depends_on) cuyas filas el runtime entrega al handler en `context.reads[\"<query>\"]` antes de invocarlo. Se ejecutan SIN parámetros del payload, con contexto de sistema (mismo hub_id). El campo existía en el CommandDef Rust; este schema lo sincroniza."
+            "description": "Lecturas PRE-CARGADAS (ADR-0069): queries (del propio módulo o de sus depends_on) cuyas filas el runtime entrega al handler en `context.reads[\"<query>\"]` antes de invocarlo, con contexto de sistema (mismo hub_id). Existe porque el handler WASM corre en un sandbox y no puede leer la BD: sin esto, solo sabe lo que le cuenta el cliente — y así es como el navegador acababa decidiendo el IVA que se declara a la AEAT. Admite dos formas: un string (la query entera) o `{query, params}` (filtrada por el payload). Un parámetro ausente resuelve a NULL y la query devuelve cero filas; una read que falla se OMITE — cobrar es lo último que puede romperse en un TPV."
           },
           "expose_api": {
             "type": "boolean",
@@ -639,6 +658,25 @@
           }
         }
       }
+    },
+    "seed": {
+      "description": "Datos de REFERENCIA que el módulo siembra al instalarse (ADR-0147). DML idempotente por hub (WHERE NOT EXISTS por la clave natural), aplicado tras migrar con :hub_id/:now/:current_user_id inyectados. Para lo que todo hub necesita y el usuario no puede aportar — unidades de medida, categorías fiscales—, no para datos de ejemplo.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sqlite": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "postgres": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "$defs": {
@@ -757,7 +795,9 @@
         },
         "refresh_on": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Refresco EN VIVO (ADR-0054 T1): nombres de eventos de dominio (p. ej. `sale.completed`) cuya emisión debe re-ejecutar la `query` de este widget. El shell se suscribe al canal push ya existente (Outbox→broadcast, SDK `subscribe`) y re-consulta con debounce; un refresco fallido cae a estado muted (nunca dato viejo como fresco). Ausente/vacío = el widget se monta UNA sola vez (comportamiento por defecto)."
         },
         "kind": {

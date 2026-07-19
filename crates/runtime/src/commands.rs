@@ -157,7 +157,12 @@ pub(crate) async fn execute_at(
         events::notify_sink(registry, event, &bound);
     }
 
-    Ok(json!({ "ok": true }))
+    // El id que este command acaba de crear, igual que en el camino WASM (§5.3): `system_params`
+    // ya inyecta `:new_id` en el SQL, pero la respuesta se lo callaba. Sin él, quien crea una fila
+    // no puede volver a tocarla — el POS se quedaba sin `line_id` al añadir un artículo y las
+    // subidas de cantidad se perdían EN SILENCIO (5 tortillas en pantalla, 1 en la BD).
+    let new_id = bound.get("new_id").cloned().unwrap_or(Json::Null);
+    Ok(json!({ "ok": true, "new_ids": [new_id] }))
 }
 
 /// Ejecuta un command Tier 2: invoca el handler WASM, valida cada intención y
@@ -190,6 +195,7 @@ async fn preload_reads(
     registry: &Registry,
     cmd: &RegisteredCommand,
     ctx: &RequestContext,
+    payload: &erplora_db::Params,
 ) -> Json {
     if cmd.def.reads.is_empty() {
         return Json::Object(Default::default());
@@ -210,7 +216,8 @@ async fn preload_reads(
     let sys = RequestContext::new(&ctx.hub_id, &ctx.user_id, ["*".to_string()]);
 
     let mut out = serde_json::Map::new();
-    for name in &cmd.def.reads {
+    for read in &cmd.def.reads {
+        let name = read.query();
         let owner = name.split('.').next().unwrap_or("");
         if !allowed.contains(&owner) {
             // No es un error del caller: es un manifest mal declarado. Se avisa y se omite —
@@ -221,10 +228,15 @@ async fn preload_reads(
             );
             continue;
         }
+        // Regla 4 — parámetros desde el PAYLOAD (ADR-0069 fase 2). Sin esto, un handler podía
+        // pedir «todas las reglas de IVA» pero no «la unidad de ESTE producto», y toda validación
+        // contra la fila concreta se quedaba sin sitio donde vivir.
+        let params = read.resolve_params_from_map(payload);
+
         // Regla 3 — graceful: si la query falla (no existe, SQL roto, tabla ausente), se omite.
-        match crate::queries::execute(db, registry, name, &Params::new(), &sys).await {
+        match crate::queries::execute(db, registry, name, &params, &sys).await {
             Ok(rows) => {
-                out.insert(name.clone(), Json::Array(rows));
+                out.insert(name.to_string(), Json::Array(rows));
             }
             Err(e) => {
                 eprintln!("⚠ reads: `{name}` falló ({e}) → se omite; el handler degradará");
@@ -263,14 +275,14 @@ async fn execute_wasm(
     // LECTURAS PRE-CARGADAS (ADR-0069). El handler corre en un sandbox y NO puede leer la BD, así
     // que sin esto solo sabe lo que le cuenta el cliente. Aquí el host le entrega el **catálogo de
     // confianza del hub**.
-    let reads = preload_reads(db, registry, cmd, ctx).await;
+    let reads = preload_reads(db, registry, cmd, ctx, payload).await;
     let input = json!({
         "payload": Json::Object(bound_payload),
         "context": {
             "hub_id": ctx.hub_id,
             "current_user_id": ctx.user_id,
             "now": crate::registry::now_rfc3339(),
-            "new_ids": new_ids,
+            "new_ids": new_ids.clone(),
             // Identidad fiscal del hub: con esto + `reads`, el handler resuelve el impuesto contra
             // el catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
             "country_code": ctx.country_code,
@@ -284,7 +296,7 @@ async fn execute_wasm(
         .call(&handler.function, &input)
         .map_err(|e| RuntimeError::Wasm(e.to_string()))?;
 
-    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output).await
+    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids).await
 }
 
 /// Ejecuta un command de **plugin nativo first-party** (ADR-0009): mismo contrato de
@@ -321,14 +333,14 @@ async fn execute_native(
             "hub_id": ctx.hub_id,
             "current_user_id": ctx.user_id,
             "now": crate::registry::now_rfc3339(),
-            "new_ids": new_ids,
+            "new_ids": new_ids.clone(),
         },
     });
 
     let host = crate::native::DbHost { db };
     let output = engine.call(&handler.function, &input, &host).await?;
 
-    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output).await
+    persist_handler_output(db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids).await
 }
 
 /// Persiste el [`Output`] de un handler (WASM o nativo): valida cada intención contra los
@@ -344,6 +356,10 @@ async fn persist_handler_output(
     depth: u32,
     extra_ops: &[(String, Params)],
     output: &Output,
+    // Lote de ids que el host generó y entregó al handler. Se devuelven al llamante para que la
+    // UI pueda correlacionar lo que acaba de crear (el POS abre un pedido y necesita su `order_id`
+    // para añadirle líneas). Por convención `new_ids[0]` es la entidad principal (§5.3).
+    new_ids: &[Json],
 ) -> Result<Json> {
     // Valida + resuelve cada operación a su(s) SQL contra los commands del MISMO módulo.
     let mut tx_ops: Vec<(String, Params)> = Vec::new();
@@ -390,7 +406,7 @@ async fn persist_handler_output(
         events::notify_sink(registry, name, payload);
     }
 
-    Ok(json!({ "ok": true, "operations": output.operations.len() }))
+    Ok(json!({ "ok": true, "operations": output.operations.len(), "new_ids": new_ids }))
 }
 
 /// Valida una intención del handler y la resuelve a su(s) SQL.
