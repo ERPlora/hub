@@ -42,7 +42,7 @@ pub type Result<T> = std::result::Result<T, VectorError>;
 
 /// A single knowledge chunk with its embedding.
 ///
-/// Mirrors the `hub_knowledge_chunk` table of the current hub: scoped per-hub and
+/// Mirrors the `knowledge_chunk` table of the current hub: scoped per-hub and
 /// per-version (§9.4).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chunk {
