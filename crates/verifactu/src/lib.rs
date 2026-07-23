@@ -62,7 +62,6 @@ impl NativeHandler for VerifactuEngine {
             "recover_manual" => recover_manual(input, host).await,
             "process_contingency_queue" => process_contingency_queue(input, host).await,
             "run_diagnostics" => run_diagnostics(input, host).await,
-            "inspect_certificate" => inspect_certificate(input, host).await,
             other => Err(RuntimeError::Native(format!(
                 "función desconocida del plugin verifactu: `{other}`"
             ))),
@@ -153,12 +152,11 @@ fn op(command: &str, p: Json) -> Operation {
 ///
 /// **Certificado (ADR-0079/0081):** el PKCS#12 del negocio vive en el core (`_hub_certificate`,
 /// subido en Ajustes → Negocio), NO en `verifactu_config`. Si existe, aquí solo se marca su
-/// presencia (`certificate_source = "core"`) — **los bytes del `.p12` y la contraseña NO se copian
-/// a la config del módulo**; la firma/transmisión usa la capability opaca
-/// `certificate_identity(hub_id)` (el core hace la cripto; ver `build_identity`). Fallback legacy:
-/// las columnas `certificate_pkcs12`/`certificate_password`/`certificate_path` de `verifactu_config`
-/// para instalaciones antiguas. El acceso está gateado por la capability `certificate` (el
-/// dispatcher la exige antes del handler nativo), así que llegar aquí implica que el usuario la concedió.
+/// presencia (`certificate_source = "core"`) — **los bytes del `.p12` y la contraseña NUNCA se
+/// copian a la config del módulo**; la firma/transmisión usa la capability opaca
+/// `certificate_identity(hub_id)` (el core hace la cripto; ver `build_identity`). El acceso está
+/// gateado por la capability `certificate` (el dispatcher la exige antes del handler nativo),
+/// así que llegar aquí implica que el usuario la concedió.
 async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>> {
     let rows = host
         .read(
@@ -168,7 +166,8 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
         .await?;
     let mut config = rows.into_iter().next();
 
-    // Certificado del core (precedencia). Tolerante: si la tabla/columna falta, mantiene el legacy.
+    // Certificado del core: sondea _hub_certificate (el único origen válido desde ADR-0081).
+    // Tolerante: si la tabla no existe (hub sin la migración del sistema), se queda sin marcador.
     if let Ok(cert_rows) = host
         .read(
             "SELECT pkcs12_b64, password FROM _hub_certificate WHERE hub_id = :hub_id LIMIT 1",
@@ -193,62 +192,32 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
     Ok(config)
 }
 
-/// Carga los bytes del contenedor PKCS#12: **primero de la BD** (`certificate_pkcs12`, base64
-/// — robusto en cloud, el FS de ECS es efímero), con **fallback a `certificate_path`** en disco
-/// (compatibilidad con instalaciones que ya apuntaban a un fichero local).
-///
-/// TODO(runtime): hoy los bytes (y la contraseña) viven en claro; falta el cifrado at-rest de
-/// secretos de módulo (ADR-0016, master key/Fernet) — decisión de seguridad pendiente.
-fn load_pkcs12(config: &Json) -> Result<Vec<u8>> {
-    use base64::Engine as _;
-    let b64 = str_field(config, "certificate_pkcs12");
-    if !b64.is_empty() {
-        return base64::engine::general_purpose::STANDARD
-            .decode(b64.trim())
-            .map_err(|e| {
-                VerifactuError::Certificate(format!("certificate_pkcs12 base64 inválido: {e}"))
-                    .into()
-            });
-    }
-    let path = str_field(config, "certificate_path");
-    if path.is_empty() {
-        return Err(VerifactuError::Certificate(
-            "certificado PKCS#12 no configurado (sube el .p12 en Ajustes o define certificate_path)"
-                .into(),
-        )
-        .into());
-    }
-    std::fs::read(&path)
-        .map_err(|e| VerifactuError::Certificate(format!("no se pudo leer `{path}`: {e}")).into())
-}
-
 /// Construye la **Identity mTLS** para firmar/transmitir a la AEAT.
 ///
-/// - **Certificado del core** (`certificate_source == "core"`, ADR-0079/0081): usa la capability
-///   opaca `host.certificate_identity(hub_id)` — el core lee `_hub_certificate` y hace TODA la
-///   cripto PKCS#12; **los bytes del `.p12` y la contraseña NUNCA entran al módulo**.
-/// - **Fallback legacy** (cert en `verifactu_config`/fichero, deprecado por ADR-0081): el módulo
-///   carga los bytes de SU propia config y el core solo hace el parseo (`certificate_identity_from`).
+/// El certificado fiscal (.p12) es un recurso del NEGOCIO/hub (ADR-0079/0081): vive en
+/// `_hub_certificate` (se sube en Ajustes → Negocio). La capability opaca
+/// `host.certificate_identity(hub_id)` lee la tabla del core y hace TODA la cripto PKCS#12;
+/// **los bytes del `.p12` y la contraseña NUNCA entran al módulo**. Si no hay certificado del
+/// core, se devuelve un error claro (el usuario debe subirlo en Ajustes → Negocio).
 async fn build_identity(
     host: &dyn NativeHost,
     hub_id: &str,
     config: &Json,
 ) -> Result<reqwest::Identity> {
-    if str_field(config, "certificate_source") == "core" {
-        host.certificate_identity(hub_id).await
-    } else {
-        let der = load_pkcs12(config)?;
-        let password = str_field(config, "certificate_password");
-        host.certificate_identity_from(&der, &password).await
+    if !has_certificate(config) {
+        return Err(VerifactuError::Certificate(
+            "certificado del negocio no configurado: súbelo en Ajustes → Negocio".into(),
+        )
+        .into());
     }
+    host.certificate_identity(hub_id).await
 }
 
-/// ¿Hay un certificado disponible (del core o legacy) para transmitir? Gate barato que NO carga
-/// los bytes del `.p12` (para el cert del core basta el marcador `certificate_source`).
+/// ¿Hay un certificado del core disponible para transmitir? Gate barato que NO carga los bytes
+/// del `.p12`: basta el marcador `certificate_source` que `read_config` pone al detectar
+/// `_hub_certificate`.
 fn has_certificate(config: &Json) -> bool {
     str_field(config, "certificate_source") == "core"
-        || !str_field(config, "certificate_pkcs12").is_empty()
-        || !str_field(config, "certificate_path").is_empty()
 }
 
 // ── create_record (issue verifactu#2) ────────────────────────────────────────
@@ -943,31 +912,6 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
     Ok(out)
 }
 
-// ── inspect_certificate: extrae y persiste la caducidad del certificado ────────
-
-/// Lee el certificado almacenado, extrae su caducidad (notAfter) y la persiste en la config
-/// (`certificate_expiry`, ISO `YYYY-MM-DD`). La UI lo llama tras guardar la configuración; es
-/// idempotente y no toca la cadena. Si no hay certificado o no se puede parsear, no hace nada.
-async fn inspect_certificate(input: &Json, host: &dyn NativeHost) -> Result<Output> {
-    let (_payload, ctx) = split_input(input)?;
-    let config = match read_config(host, &ctx.hub_id).await? {
-        Some(c) => c,
-        None => return Ok(Output::new()),
-    };
-    let der = match load_pkcs12(&config) {
-        Ok(d) => d,
-        Err(_) => return Ok(Output::new()), // sin cert almacenado: nada que inspeccionar
-    };
-    let password = str_field(&config, "certificate_password");
-    match host.certificate_expiry_from(&der, &password).await.ok().flatten() {
-        Some(iso) => Ok(Output::new().with_operation(op(
-            "verifactu._set_certificate_expiry",
-            json!({ "certificate_expiry": iso }),
-        ))),
-        None => Ok(Output::new()),
-    }
-}
-
 // ── run_diagnostics: prueba en vivo (cert + huella + QR + envío AEAT) ──────────
 
 /// Prueba de extremo a extremo SIN tocar la cadena: verifica que el certificado carga con su
@@ -1557,8 +1501,6 @@ mod cert_source_tests {
     /// (`certificate_source = "core"`) pero NUNCA copiar los bytes del `.p12` ni la contraseña a la
     /// config del módulo — se quedan en el core; la firma usa la capability opaca
     /// `certificate_identity(hub_id)` (ver `build_identity`), no `certificate_identity_from`.
-    /// (Antes del fix, `read_config` inyectaba `certificate_pkcs12`/`certificate_password`: este test
-    /// habría fallado — es la prueba de que los bytes ya no entran al módulo.)
     #[tokio::test]
     async fn read_config_marks_core_cert_without_leaking_bytes() {
         let cfg = read_config(&CoreCertHost, "h1").await.unwrap().unwrap();

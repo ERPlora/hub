@@ -2,11 +2,20 @@
   <AppPage :title="t('nav.home')">
       <!-- ── Resumen ── -->
       <template v-if="tab === 'resumen'">
-        <!-- Alerta de módulos instalados SIN configurar (ADR-0063, lib/setup-status). Solo admin;
-             cada módulo declara su chequeo `setup` en module.json. CTA → ajustes del módulo. -->
+        <!-- Zona 1 — Cabecera contextual: saludo por franja horaria + fecha del día. Da contexto al
+             entrar (qué día es, quién soy) sin duplicar el título de la topbar. Sin_estado (loading)
+             muestra el saludo en cuanto hay sesión; el nombre degrada a '—' si falta. -->
+        <header class="dash-hero">
+          <h1 class="dash-hero-title">{{ greeting }}</h1>
+          <p class="dash-hero-date">{{ todayLabel }}</p>
+        </header>
+
+        <!-- Zona 2 — Tareas pendientes: módulos instalados SIN configurar (ADR-0063, lib/setup-status).
+             Solo admin; cada módulo declara su chequeo `setup` en module.json. CTA → ajustes del
+             módulo. Tono WARNING (tarea pendiente), no danger (no es un error). -->
         <ion-list v-if="pendingSetups.length" inset class="setup-banner">
           <ion-list-header>
-            <ion-label color="danger">{{ t('dashboard.setupTitle', { n: pendingSetups.length }) }}</ion-label>
+            <ion-label color="warning">{{ t('dashboard.setupTitle', { n: pendingSetups.length }) }}</ion-label>
           </ion-list-header>
           <ion-item v-for="s in pendingSetups" :key="s.moduleId" lines="full">
             <HubIcon slot="start" :name="s.icon" />
@@ -18,12 +27,30 @@
           </ion-item>
         </ion-list>
 
-        <!-- Superficie principal: tablero de widgets que los MÓDULOS instalados declaran en su
+        <!-- Zona 3 — Superficie principal: tablero de widgets que los MÓDULOS instalados declaran en su
              module.json (campo `widgets`, ADR-0054) + el widget CORE de export/import (ADR-0113;
              decisión humano 2026-07-12: entra en el CATÁLOGO del board como uno más — en todos los
              presets y ocultable desde el picker — en vez de tarjeta fija encima). Con el widget
              core siempre en catálogo, el board se pinta también en un hub sin módulos. Datos
              REALES de las queries declaradas; degrada a vacío/muted (nunca datos inventados). -->
+
+        <!-- Onboarding para hub vacío: si NO hay módulos instalados que aporten widgets, mostramos
+             un estado guiado (instala tu primer módulo) ENCIMA del board. El board sigue en el DOM
+             (visible con su widget core) para cumplir el contrato del test e2e y porque el CTA de
+             configuración del hub vive ahí. No se reemplaza, se complementa. -->
+        <section v-if="!loadingWidgets && !hasModuleWidgets" class="dash-onboarding">
+          <ok-empty-state
+            icon="grid-outline"
+            :heading="t('dashboard.onboardingTitle')"
+            :message="t('dashboard.onboardingBody')"
+          >
+            <ion-button slot="action" router-link="/apps" router-direction="forward">
+              <HubIcon slot="start" name="storefront-outline" />
+              {{ t('dashboard.onboardingCta') }}
+            </ion-button>
+          </ok-empty-state>
+        </section>
+
         <ion-list v-if="loadingWidgets" inset>
           <ion-item lines="none">
             <ion-spinner slot="start" name="crescent" />
@@ -39,59 +66,26 @@
           storage-key="dashboard-hub"
         />
 
-        <ion-list inset class="ion-padding">
-          <ion-list-header>{{ t('dashboard.thisTerminal') }}</ion-list-header>
-          <ion-item>
-            <ion-label>{{ t('dashboard.plan') }}</ion-label>
-            <ion-note slot="end">{{ plan }}</ion-note>
-          </ion-item>
-          <ion-item>
-            <ion-label>{{ t('dashboard.status') }}</ion-label>
-            <ion-badge slot="end" :color="estadoActivo ? 'success' : 'medium'">
-              {{ estadoActivo === null ? '—' : estadoActivo ? t('dashboard.active') : t('dashboard.inactive') }}
-            </ion-badge>
-          </ion-item>
-          <ion-item>
-            <ion-label>{{ t('dashboard.nextInvoice') }}</ion-label>
-            <ion-note slot="end">{{ nextInvoice }}</ion-note>
-          </ion-item>
-          <ion-item lines="none">
-            <ion-label>{{ t('dashboard.bridge') }}</ion-label>
-            <ion-badge slot="end" :color="bridgeOnline ? 'success' : 'medium'">
-              {{ bridgeOnline === null ? '—' : bridgeOnline ? t('dashboard.connected') : t('dashboard.disconnected') }}
-            </ion-badge>
-          </ion-item>
-        </ion-list>
-        <ion-button expand="block" fill="outline" router-link="/system" router-direction="forward">
-          <HubIcon name="hardware-chip-outline" slot="start" /> {{ t('dashboard.openSystem') }}
-        </ion-button>
-      </template>
-
-      <!-- ── Aplicaciones ── -->
-      <template v-else-if="tab === 'apps'">
-        <ion-list v-if="loading" inset>
-          <ion-item lines="none">
-            <ion-spinner slot="start" name="crescent" />
-            <ion-label>{{ t('dashboard.loadingModules') }}</ion-label>
-          </ion-item>
-        </ion-list>
-        <!-- Apps al estilo "Google apps"/ok-app-launcher: icono en caja + label (no cards). -->
-        <div v-else class="app-grid">
-          <button
-            v-for="entry in modules"
-            :key="entry.moduleId"
-            type="button"
-            class="app"
-            @click="router.push(`/m/${entry.moduleId}`)"
+        <!-- Zona 4 — Salud del sistema: pill discreta con el estado del Bridge (hardware local).
+             La info completa (versión, reinstalación, recheck) vive en /system; aquí solo la señal
+             always-visible. El bridge es el único "health" que existe hoy (sin agregado runtime/DB). -->
+        <div class="dash-health">
+          <ok-status-pill
+            class="dash-health-pill"
+            :tone="systemOnline ? 'success' : 'neutral'"
+            dot
+            :label="systemOnline ? t('dashboard.systemOk') : t('dashboard.systemOff')"
+          />
+          <ion-button
+            fill="clear"
+            size="small"
+            router-link="/system"
+            router-direction="forward"
+            class="dash-health-link"
           >
-            <span class="box"><HubIcon :name="entry.iconSvg ?? entry.nav.icon" /></span>
-            <span class="label">{{ entry.moduleName }}</span>
-          </button>
-          <!-- Añadir módulo: misma rejilla, caja "fantasma" para distinguirlo de las apps reales. -->
-          <button type="button" class="app" @click="router.push('/apps')">
-            <span class="box box-add"><HubIcon name="add-outline" /></span>
-            <span class="label">{{ t('dashboard.addModule') }}</span>
-          </button>
+            {{ t('dashboard.openSystem') }}
+            <HubIcon slot="end" name="chevron-forward-outline" />
+          </ion-button>
         </div>
       </template>
 
@@ -118,7 +112,8 @@
           ></ok-data-table>
         </div>
       </template>
-    <!-- Tabs en footer -->
+    <!-- Tabs en footer: Resumen + Actividad. La rejilla de apps (antes pestaña "Instaladas") vive
+         SOLO en el launcher de la topbar (acceso rápido) y en /apps (gestión completa), sin duplicar. -->
     <template #footer>
       <ion-footer class="ion-no-border">
       <ion-toolbar>
@@ -129,10 +124,6 @@
           <ion-segment-button value="resumen">
             <HubIcon name="speedometer-outline" />
             <ion-label>{{ t('dashboard.tabSummary') }}</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="apps">
-            <HubIcon name="grid-outline" />
-            <ion-label>{{ t('dashboard.tabApps') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="actividad">
             <HubIcon name="pulse-outline" />
@@ -146,30 +137,33 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
   IonSegment, IonSegmentButton, IonLabel,
-  IonBadge, IonButton, IonSpinner,
-  IonList, IonListHeader, IonItem, IonNote, IonToolbar,
+  IonButton, IonSpinner,
+  IonList, IonListHeader, IonItem, IonToolbar,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import { DT_LABELS_ES } from '../lib/data-table-labels';
-import { loadMenu, type MenuEntry } from '../lib/module-loader';
 import { getClient, getHubSector } from '../lib/runtime';
-import { cloudSubscriptions, cloudInvoices, getAccessToken } from '../lib/cloud';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
 import { pendingSetups, refreshSetupStatus } from '../lib/setup-status';
+import { detectBridge } from '../lib/bridge-client';
+import { user } from '../lib/session';
 import { formatAmount } from '../lib/money';
 import type { WidgetDef, WidgetPreset, OkWidgetBoardLabels } from '@erplora/outfitkit';
 
 const { t } = useI18n();
+const router = useRouter();
 
-type Tab = 'resumen' | 'apps' | 'actividad';
+// Solo dos pestañas: la rejilla de apps (antes "Instaladas") vive en el launcher de la topbar
+// (acceso rápido) y en /apps (gestión completa), sin duplicar en el Inicio.
+type Tab = 'resumen' | 'actividad';
 type Tone = 'success' | 'warning' | 'primary' | 'medium';
 
 // ok-data-table (OutfitKit) registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
@@ -185,9 +179,6 @@ interface DataTableColumn {
 }
 
 const tab = ref<Tab>('resumen');
-const modules = ref<MenuEntry[]>([]);
-const loading = ref<boolean>(true);
-const router = useRouter();
 const client = getClient();
 
 // ── Tablero de widgets de módulos (ADR-0054) ────────────────────────────────────────────────
@@ -201,6 +192,9 @@ type WidgetBoardEl = HTMLElement & {
 };
 const board = ref<WidgetBoardEl | null>(null);
 const loadingWidgets = ref<boolean>(true);
+// ¿Hay MÓDULOS instalados que aporten widgets? Si solo queda el widget core (blueprint), el hub
+// está vacío → mostramos un onboarding guiado en vez del board con un único widget solitario.
+const hasModuleWidgets = ref<boolean>(false);
 
 // ── Widget CORE de export/import (ADR-0113 §4; decisión humano 2026-07-12) ──────────────────
 // Es un widget DEL BOARD como los de módulo: entra en el catálogo y en TODOS los presets (sin
@@ -243,6 +237,8 @@ async function loadWidgets(): Promise<void> {
     });
     widgets = [...widgets, ...collected.widgets];
     presets = collected.presets.map((p) => ({ ...p, widgets: [CORE_BLUEPRINT_ID, ...p.widgets] }));
+    // Marcamos si hay widgets DE MÓDULOS (no solo el core) para mostrar el board o el onboarding.
+    hasModuleWidgets.value = collected.widgets.length > 0;
   } catch {
     /* degrada: solo el widget core */
   }
@@ -265,38 +261,36 @@ async function loadWidgets(): Promise<void> {
 // Formateador de dinero con la MONEDA DEL HUB (money.ts; no más 'EUR' hardcodeado). Datos en
 // unidades mayores. Sin decimales para los KPI, con 2 para el feed.
 const eur = (n: number, dec = 0): string => formatAmount(n, { maximumFractionDigits: dec });
-const fmtDate = (iso: string): string =>
-  new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
 
-// ── "Este terminal" (Plan/Estado/Próxima factura del Cloud + estado del Bridge local) ────────
-const plan = ref<string>('—');
-const estadoActivo = ref<boolean | null>(null);
-const nextInvoice = ref<string>('—');
-const bridgeOnline = ref<boolean | null>(null);
+// ── Zona 1 — Cabecera contextual: saludo por franja horaria + fecha del día ───────────────────
+// El saludo interpola el nombre del usuario en sesión; si no hay nombre, degrada a '—'. La fecha
+// se formatea con el locale del navegador (es-ES / en-EN…) para respetar el idioma del usuario.
+const greeting = computed<string>(() => {
+  const h = new Date().getHours();
+  const name = user.value?.name?.trim() || '—';
+  const key = h < 12 ? 'dashboard.greetingMorning' : h < 20 ? 'dashboard.greetingAfternoon' : 'dashboard.greetingEvening';
+  return t(key, { name });
+});
+const todayLabel = computed<string>(() => {
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  return `${t('dashboard.todayLabel')}, ${today}`;
+});
 
-async function loadTerminal(): Promise<void> {
-  // Plan / Estado / Próxima factura son conceptos del Cloud (billing). Solo se piden si hay
-  // sesión cloud (JWT de usuario). En sesión local por PIN NO se llama al Cloud: su 401
-  // dispararía el logout global (onSessionExpired) y rebotaría a /login. Sin JWT → '—'.
-  if (getAccessToken()) {
-    try {
-      const subs = await cloudSubscriptions();
-      plan.value = subs[0]?.planName ?? '—';
-      estadoActivo.value = subs.some((s) => s.status === 'paid' || s.status === 'open');
-    } catch { /* degrada */ }
-    try {
-      const invoices = await cloudInvoices();
-      const open = invoices
-        .filter((i) => i.status === 'open')
-        .sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate))[0];
-      nextInvoice.value = open ? fmtDate(open.dueDate) : '—';
-    } catch { /* degrada */ }
-  }
-  // Estado del Bridge (hardware local) — detect con timeout corto.
+// ── Zona 4 — Salud del sistema: estado del Bridge (hardware local) ────────────────────────────
+// El detalle completo (versión, reinstalación, recheck manual) vive en /system; aquí solo la
+// señal always-visible. null = aún no sondado → se trata como "desconocido" (neutral, no error).
+const systemOnline = ref<boolean | null>(null);
+
+async function loadSystemHealth(): Promise<void> {
+  // detectBridge hace GET http://localhost:12321/status con timeout corto (800 ms): el Bridge
+  // responde al instante; si no hay nadie escuchando, aborta rápido para no bloquear la UI.
   try {
-    const b = await client.peripherals.detect(800);
-    bridgeOnline.value = b.online;
-  } catch { bridgeOnline.value = false; }
+    systemOnline.value = (await detectBridge()).online;
+  } catch {
+    systemOnline.value = false;
+  }
 }
 
 // ── Actividad reciente = últimas ventas (datos reales; sin histórico de eventos aún) ─────────
@@ -373,89 +367,78 @@ function goConfigure(route: string): void {
 }
 
 onMounted(async () => {
-  // Tablero de widgets (módulos), terminal y actividad en paralelo (cada uno degrada por su
+  // Widgets (KPIs de módulos), salud del sistema y actividad en paralelo (cada uno degrada por su
   // cuenta). El board está en el DOM por v-show, así que el ref ya existe en onMounted.
   await nextTick();
   void loadWidgets();
-  void loadTerminal();
+  void loadSystemHealth();
   void loadActivity();
-  void refreshSetupStatus(client); // módulos sin configurar (ADR-0063): banner + campana
-  try {
-    // Una tarjeta por MÓDULO (loadMenu devuelve una entrada por cada navigation[] del manifest).
-    const entries = await loadMenu();
-    const byModule = new Map<string, MenuEntry>();
-    for (const e of entries) if (!byModule.has(e.moduleId)) byModule.set(e.moduleId, e);
-    modules.value = [...byModule.values()];
-  } finally {
-    loading.value = false;
-  }
+  void refreshSetupStatus(client); // módulos sin configurar (ADR-0063): banner (solo admin)
 });
 </script>
 
 <style scoped>
 /* La pestaña Actividad usa ok-data-table en modo `fill`: fija el alto al área de ion-content
-   (cabecera/filtros/pager fijos, scroll solo en el cuerpo) — mismo patrón que Apps. */
+   (cabecera/filtros/pager fijos, scroll solo en el cuerpo). */
 .fill {
   height: 100%;
 }
 
-/* Apps tab: rejilla estilo "Google apps"/ok-app-launcher (icono en caja + label), no cards.
-   auto-fill → más columnas en pantallas anchas. Mismo look que el launcher de la topbar. */
-.app-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
-  gap: 0.5rem;
+/* Zona 1 — Cabecera contextual. Da contexto al entrar (saludo + fecha) sin duplicar la topbar.
+   Tipografía sobre tokens Ionic (mismo lienzo que el resto del shell); margen inferior de
+   respiración antes del banner/tablero. clamp() para que el saludo escale en móvil sin quedar
+   ni gigante (390px) ni tímido en desktop. */
+.dash-hero {
+  margin: 0.25rem 0 1rem;
 }
-.app {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.75rem 0.3rem;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  border-radius: 12px;
-  text-align: center;
-  transition: background-color 150ms ease, transform 120ms ease;
-}
-@media (hover: hover) {
-  .app:hover {
-    background: var(--ion-color-step-50, #f3f4f6);
-    transform: translateY(-1px);
-  }
-}
-.app:active {
-  transform: scale(0.97);
-}
-/* Caja del icono: tile redondeado con color de marca; el icono (HubIcon=ion-icon) hereda
-   color (contraste) y tamaño (font-size). */
-.app .box {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  background: var(--ion-color-primary);
-  color: var(--ion-color-primary-contrast);
-  font-size: 1.7rem;
-}
-/* "Añadir módulo": caja fantasma (borde discontinuo, sin relleno) para distinguirla de las apps. */
-.app .box-add {
-  background: transparent;
-  color: var(--ion-color-medium);
-  border: 1.5px dashed var(--ion-border-color, #d8dbe1);
-}
-.app .label {
-  font-size: 0.78rem;
+.dash-hero-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 5vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1.2;
-  color: var(--ion-color-medium);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--ion-text-color, #1a1a1a);
+}
+.dash-hero-date {
+  margin: 0.2rem 0 0;
+  font-size: 0.875rem;
+  color: var(--ion-color-medium, #92949c);
+}
+
+/* Zona 4 — Salud del sistema. Fila discreta al pie del Resumen: pill de estado (always-visible)
+   + enlace a /system. No compite con los KPIs: usa texto pequeño y color muted. En móvil la pill
+   y el enlace pueden quedar pegados → un poco más de gap y touch-friendly. */
+.dash-health {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
+}
+.dash-health-pill {
+  /* ok-status-pill hereda el font-size del contenedor; lo fijamos pequeño para leerse como nota. */
+  font-size: 0.8125rem;
+}
+.dash-health-link {
+  --color: var(--ion-color-medium, #92949c);
+  text-transform: none;
+  font-weight: 500;
+}
+.dash-health-link ion-icon {
+  font-size: 1rem;
+  margin-inline-start: 0.1rem;
+}
+
+/* Onboarding del hub vacío: superficie destacada (no un card más) que invita a instalar el
+   primer módulo. ok-empty-state aporta el layout centrado (icono + título + mensaje); aquí le
+   damos aire y un fondo suave para que se distinga del tablero. */
+.dash-onboarding {
+  margin: 0.5rem 0 1.25rem;
+  padding: 1.5rem 1rem;
+  border-radius: var(--ok-radius, 12px);
+  background: var(--ion-color-step-50, rgba(var(--ion-color-primary-rgb, 0,145,206), 0.04));
+  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
 }
 </style>

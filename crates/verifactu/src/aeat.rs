@@ -133,7 +133,25 @@ fn facturas_sustituidas(record: &Json) -> String {
 }
 
 /// Bloque `SistemaInformatico` (identificación del software, config del hub).
+///
+/// La identidad del PRODUCTOR del software (ERPlora) es FIJA — la misma para todos los hubs, lo
+/// declara la AEAT. Si la config del módulo no la trae (fila vacía/stale), usamos el fallback
+/// hardcodeado en vez de emitir un NIF vacío (que la AEAT rechaza con error 1100).
 fn sistema_informatico(config: &Json, hub_id: &str) -> String {
+    // Fallback del productor: identidad legal de ERPlora como fabricante del software.
+    const PRODUCER_NAME: &str = "ERPLORA CLOUD SL";
+    const PRODUCER_NIF: &str = "B27593136";
+    const PRODUCER_ID: &str = "EC";
+    const PRODUCER_VERSION: &str = "1.0.0";
+
+    let name = nonempty(s(config, "software_name"), PRODUCER_NAME);
+    let nif = nonempty(s(config, "software_nif"), PRODUCER_NIF);
+    // IdSistemaInformatico: la AEAT lo limita a 2 caracteres y es un valor FIJO asignado al
+    // software ERPlora. No se lee de la BD (que puede tener valores legacy inválidos como
+    // "ERPLORA-001" de 11 chars → la AEAT rechaza con error 1100).
+    let id = PRODUCER_ID.to_string();
+    let version = nonempty(s(config, "software_version"), PRODUCER_VERSION);
+
     format!(
         "<sum1:SistemaInformatico>\
          <sum1:NombreRazon>{name}</sum1:NombreRazon>\
@@ -146,15 +164,18 @@ fn sistema_informatico(config: &Json, hub_id: &str) -> String {
          <sum1:TipoUsoPosibleMultiOT>S</sum1:TipoUsoPosibleMultiOT>\
          <sum1:IndicadorMultiplesOT>N</sum1:IndicadorMultiplesOT>\
          </sum1:SistemaInformatico>",
-        name = esc(&s(config, "software_name")),
-        nif = esc(&s(config, "software_nif")),
-        id = esc(&s(config, "software_id")),
-        version = esc(&s(config, "software_version")),
+        name = esc(&name),
+        nif = esc(&nif),
+        id = esc(&id),
+        version = esc(&version),
         hub = esc(hub_id),
     )
 }
 
-/// Una línea `<DetalleDesglose>` por tipo impositivo REAL de la factura.
+/// Devuelve `val` si no está vacío, si no `fallback`.
+fn nonempty(val: String, fallback: &str) -> String {
+    if val.is_empty() { fallback.to_string() } else { val }
+}
 ///
 /// La AEAT admite varias líneas de desglose. Antes se emitía **una sola**, con el tipo **efectivo**
 /// (`cuota/base`) cuando la factura era mixta: un ticket con una caña al 21% y una tapa al 10%
