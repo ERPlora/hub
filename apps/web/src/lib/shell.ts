@@ -49,6 +49,19 @@ export function closeAssistant(): void {
   assistantOpen.value = false;
 }
 
+// ── Semilla de contexto del asistente ──────────────────────────────────────
+// Cuando el asistente se abre DESDE el botón "Revisar configuración" del dashboard, se siembra con
+// un contexto determinista (estado de configuración del hub) para que el LLM arranque informado.
+// AssistantDrawer lo consume como mensaje `system` en el primer turno y lo limpia tras usarlo.
+export const assistantSeed = ref<string | null>(null);
+
+/** Abre el asistente sembrado con un contexto (p. ej. el estado de configuración del hub). */
+export function openAssistantWithContext(context: string): void {
+  assistantSeed.value = context;
+  assistantOpen.value = true;
+}
+
+
 // Capacidad del asistente: en ERPlora el asistente es una capacidad CORE del Hub (proxy al Cloud,
 // ADR-0033), así que por defecto está disponible mientras haya sesión. Si en el futuro se quiere
 // gatear por tier/config (`GET /api/v1/hub/device/assistant/config/`), basta con resolverlo aquí.

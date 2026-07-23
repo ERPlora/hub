@@ -55,6 +55,9 @@ export default {
   assistant: {
     title: 'Assistant',
     empty: 'Ask me about your sales, your inventory or anything about your business.',
+    emptySetup: 'Review the hub configuration. Pick an option or type your question.',
+    suggestWhatsMissing: 'What needs configuring?',
+    suggestHowTo: 'How do I set up',
     placeholder: 'Type a message…',
     send: 'Send',
     stop: 'Stop',
@@ -79,6 +82,8 @@ export default {
   dashboard: {
     setupTitle: '{n} module(s) need configuration',
     configure: 'Configure',
+    setupHint: 'Review what is missing and the assistant will guide you step by step to get it ready.',
+    reviewConfig: 'Review configuration',
     // Contextual greeting by time of day (zone 1 — header). Name is interpolated.
     greetingMorning: 'Good morning, {name}',
     greetingAfternoon: 'Good afternoon, {name}',
@@ -272,6 +277,8 @@ export default {
     actionDelete: 'Delete',
     newEmployee: 'New employee',
     newRole: 'New role',
+    active: 'Active',
+    inactive: 'Inactive',
   },
   apiKeys: {
     // List

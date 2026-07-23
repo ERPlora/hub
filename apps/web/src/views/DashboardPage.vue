@@ -13,19 +13,23 @@
         <!-- Zona 2 — Tareas pendientes: módulos instalados SIN configurar (ADR-0063, lib/setup-status).
              Solo admin; cada módulo declara su chequeo `setup` en module.json. CTA → ajustes del
              módulo. Tono WARNING (tarea pendiente), no danger (no es un error). -->
-        <ion-list v-if="pendingSetups.length" inset class="setup-banner">
-          <ion-list-header>
-            <ion-label color="warning">{{ t('dashboard.setupTitle', { n: pendingSetups.length }) }}</ion-label>
-          </ion-list-header>
-          <ion-item v-for="s in pendingSetups" :key="s.moduleId" lines="full">
-            <HubIcon slot="start" :name="s.icon" />
-            <ion-label class="ion-text-wrap">
-              <h3>{{ s.title }}</h3>
-              <p v-if="s.description">{{ s.description }}</p>
-            </ion-label>
-            <ion-button slot="end" size="small" @click="goConfigure(s.route)">{{ t('dashboard.configure') }}</ion-button>
-          </ion-item>
-        </ion-list>
+        <section v-if="pendingSetups.length" class="setup-banner">
+          <div class="setup-banner-text">
+            <h2 class="setup-banner-title">{{ t('dashboard.setupTitle', { n: pendingSetups.length }) }}</h2>
+            <p class="setup-banner-hint">{{ t('dashboard.setupHint') }}</p>
+            <!-- Resumen de qué falta: título de cada módulo pendiente (el detalle lo da el asistente). -->
+            <div class="setup-banner-chips">
+              <span v-for="s in pendingSetups" :key="s.moduleId" class="setup-chip">
+                <HubIcon :name="s.icon" />
+                {{ s.title.replace(/^Configura\s+/i, '') }}
+              </span>
+            </div>
+          </div>
+          <ion-button class="setup-banner-cta" @click="reviewSetup">
+            <HubIcon slot="start" name="sparkles-outline" />
+            {{ t('dashboard.reviewConfig') }}
+          </ion-button>
+        </section>
 
         <!-- Zona 3 — Superficie principal: tablero de widgets que los MÓDULOS instalados declaran en su
              module.json (campo `widgets`, ADR-0054) + el widget CORE de export/import (ADR-0113;
@@ -138,13 +142,13 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
   IonSegment, IonSegmentButton, IonLabel,
   IonButton, IonSpinner,
-  IonList, IonListHeader, IonItem, IonToolbar,
+  IonList, IonItem, IonToolbar,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -152,7 +156,8 @@ import { DT_LABELS_ES } from '../lib/data-table-labels';
 import { getClient, getHubSector } from '../lib/runtime';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
-import { pendingSetups, refreshSetupStatus } from '../lib/setup-status';
+import { pendingSetups, refreshSetupStatus, seedSetupContext } from '../lib/setup-status';
+import { openAssistantWithContext } from '../lib/shell';
 import { detectBridge } from '../lib/bridge-client';
 import { user } from '../lib/session';
 import { formatAmount } from '../lib/money';
@@ -160,13 +165,15 @@ import type { WidgetDef, WidgetPreset, OkWidgetBoardLabels } from '@erplora/outf
 
 const { t } = useI18n();
 const router = useRouter();
+const route = useRoute();
 
 // Solo dos pestañas: la rejilla de apps (antes "Instaladas") vive en el launcher de la topbar
 // (acceso rápido) y en /apps (gestión completa), sin duplicar en el Inicio.
 type Tab = 'resumen' | 'actividad';
+const TABS: readonly Tab[] = ['resumen', 'actividad'];
 type Tone = 'success' | 'warning' | 'primary' | 'medium';
 
-// ok-data-table (OutfitKit) registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
+// ok-data-table (OutFitKit) registrado en main.ts. Tipos locales: OutFitKit no emite .d.ts.
 type Row = Record<string, unknown>;
 interface DataTableColumn {
   key: string;
@@ -178,7 +185,17 @@ interface DataTableColumn {
   render?: (row: Row) => Node | string;
 }
 
-const tab = ref<Tab>('resumen');
+// Deep-link por HASH (#actividad) — la ruta base (/dashboard) NO cambia, así Ionic no la trata
+// como página secundaria (no se desmonta el tabbar ni aparece el botón back). Sincroniza tab ↔ hash.
+const tab = ref<Tab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'resumen');
+watch(tab, (value) => {
+  if (value !== (route.hash.slice(1) || 'resumen')) void router.replace({ hash: `#${value}` });
+});
+watch(() => route.hash, (h) => {
+  const next = TABS.find((v) => v === h.slice(1)) ?? 'resumen';
+  if (next !== tab.value) tab.value = next;
+});
+
 const client = getClient();
 
 // ── Tablero de widgets de módulos (ADR-0054) ────────────────────────────────────────────────
@@ -361,9 +378,11 @@ async function loadActivity(): Promise<void> {
   }
 }
 
-// Navega a los ajustes del módulo pendiente de configurar (ADR-0063).
-function goConfigure(route: string): void {
-  void router.push(route);
+// Abre el asistente sembrado con el estado de configuración real (setup-status). El LLM explica
+// qué falta, cómo configurar cada módulo y ofrece navegar a su pantalla. Antes cada fila del banner
+// iba directo a la ruta del módulo; ahora el asistente guía el proceso completo.
+function reviewSetup(): void {
+  openAssistantWithContext(seedSetupContext());
 }
 
 onMounted(async () => {
@@ -440,5 +459,70 @@ onMounted(async () => {
   border-radius: var(--ok-radius, 12px);
   background: var(--ion-color-step-50, rgba(var(--ion-color-primary-rgb, 0,145,206), 0.04));
   border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
+}
+
+/* Banner de configuración pendiente (Zona 2). Antes era un ion-list con un botón por módulo;
+   ahora es un CTA único "Revisar configuración" que abre el asistente con contexto. Tono WARNING
+   (tarea pendiente, no error). En desktop el CTA va a la derecha; en móvil se apila. */
+.setup-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.25rem 0 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--ok-radius, 12px);
+  background: color-mix(in srgb, var(--ion-color-warning, #ffc409) 9%, var(--ion-card-background, #fff));
+  border: 1px solid color-mix(in srgb, var(--ion-color-warning, #ffc409) 40%, transparent);
+}
+.setup-banner-text {
+  flex: 1;
+  min-width: 16rem;
+}
+.setup-banner-title {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ion-text-color);
+}
+.setup-banner-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--ion-color-medium);
+}
+.setup-banner-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.setup-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--ok-radius-pill, 999px);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--ion-card-background, #fff);
+  border: 1px solid var(--ion-border-color, #ececec);
+  color: var(--ion-text-color);
+}
+.setup-chip ion-icon {
+  font-size: 0.95rem;
+  color: var(--ion-color-warning, #ffc409);
+}
+.setup-banner-cta {
+  flex: none;
+  white-space: nowrap;
+}
+@media (max-width: 540px) {
+  .setup-banner-cta { width: 100%; }
+}
+@media (max-width: 540px) {
+  /* Móvil: el CTA ocupa todo el ancho debajo del texto. */
+  .setup-banner-cta {
+    width: 100%;
+  }
 }
 </style>

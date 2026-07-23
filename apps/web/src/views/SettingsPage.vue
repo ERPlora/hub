@@ -346,7 +346,7 @@
               ref="certFileInput"
               type="file"
               accept=".p12,.pfx"
-              style="display: none"
+              class="cert-file-input"
               @change="onCertFileChange"
             />
 
@@ -434,9 +434,10 @@
 
         <ion-card v-else-if="modulesWithCaps.length === 0">
           <ion-card-content>
-            <ion-label>
-              <p>{{ t('settings.permissionsNoModules') }}</p>
-            </ion-label>
+            <ok-empty-state
+              icon="shield-checkmark-outline"
+              :message="t('settings.permissionsNoModules')"
+            />
           </ion-card-content>
         </ion-card>
 
@@ -508,7 +509,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
@@ -564,11 +565,22 @@ const { t, locale } = useI18n();
 type Tab = 'hub' | 'store' | 'tax' | 'tickets' | 'permissions' | 'data';
 const TABS: readonly Tab[] = ['hub', 'store', 'tax', 'tickets', 'permissions', 'data'];
 
-// Deep-link a una pestaña concreta: /settings?tab=data (lo usa el widget de la home para
-// aterrizar en Datos). Query inválida/ausente → pestaña por defecto.
+// Deep-link a una pestaña por HASH (/settings#permisos) — la ruta base no cambia, así Ionic
+// no trata el cambio de pestaña como página secundaria (no se desmonta el tabbar ni hay botón back).
+// Compat: el query ?tab= legacy lo redirige el guard del router al hash.
 const route = useRoute();
-const initialTab = TABS.find((v) => v === String(route.query.tab ?? '')) ?? 'hub';
+const router = useRouter();
+const initialTab = TABS.find((v) => v === route.hash.slice(1)) ?? 'hub';
 const tab = ref<Tab>(initialTab);
+// Al cambiar de pestaña, sincroniza el hash (replace = no apila historial; "atrás" sale de Ajustes).
+watch(tab, (value) => {
+  if (value !== (route.hash.slice(1) || 'hub')) void router.replace({ hash: `#${value}` });
+});
+// Back/forward y deep-links: si el hash cambia, actualiza el tab local.
+watch(() => route.hash, (h) => {
+  const next = TABS.find((v) => v === h.slice(1)) ?? 'hub';
+  if (next !== tab.value) tab.value = next;
+});
 
 // Vista inicial del sub-segment de Datos: importar por defecto (lo habitual); ?data=export permite
 // aterrizar en exportar desde un deep-link.
@@ -932,3 +944,10 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
   }
 }
 </script>
+
+<style scoped>
+/* Input de fichero oculto (lo dispara un ion-button). Antes iba por inline style. */
+.cert-file-input {
+  display: none;
+}
+</style>

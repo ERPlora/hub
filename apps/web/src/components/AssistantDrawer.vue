@@ -30,9 +30,18 @@
       </header>
 
       <div ref="threadEl" class="assistant-body">
-        <div v-if="messages.length === 0" class="chat-empty">
+        <div v-if="messages.length === 0 && !streaming" class="chat-empty">
           <HubIcon name="sparkles-outline" class="chat-empty-icon" />
-          <p>{{ t('assistant.empty') }}</p>
+          <p>{{ assistantSeed ? t('assistant.emptySetup') : t('assistant.empty') }}</p>
+          <!-- Sugerencias rápidas cuando hay contexto de configuración sembrado. -->
+          <div v-if="assistantSeed" class="chat-suggestions">
+            <button
+              v-for="s in setupSuggestions"
+              :key="s"
+              class="chat-suggestion"
+              @click="sendSuggestion(s)"
+            >{{ s }}</button>
+          </div>
         </div>
 
         <div
@@ -76,15 +85,25 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IonButton, IonTextarea, IonSpinner } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
-import { assistantOpen, closeAssistant } from '../lib/shell';
+import { assistantOpen, closeAssistant, assistantSeed } from '../lib/shell';
 import { streamAssistant, type ChatMessage } from '../lib/assistant';
 import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
+import { pendingSetups } from '../lib/setup-status';
 
 const { t } = useI18n();
+
+// Sugerencias rápidas cuando el asistente abre sembrado con contexto de configuración: una por
+// módulo pendiente ("¿Cómo configuro VeriFactu?") + una global ("¿Qué falta por configurar?").
+const setupSuggestions = computed<string[]>(() => {
+  const mods = pendingSetups.value.map((s) => s.title.replace(/^Configura\s+/i, ''));
+  const out = mods.slice(0, 4).map((m) => `${t('assistant.suggestHowTo')} ${m}?`);
+  out.unshift(t('assistant.suggestWhatsMissing'));
+  return out;
+});
 
 // Hilo con alcance de SESIÓN (ADR-0149): vive en lib/assistant-history (sessionStorage),
 // sobrevive un reload y lo vacía logout(). El Cloud no guarda copia.
@@ -121,7 +140,13 @@ async function send(): Promise<void> {
 
   // El array COMPLETO menos la burbuja viva: el Cloud es un bridge sin estado (ADR-0149),
   // el contexto multi-turno lo aporta el cliente en cada turno.
-  const history = messages.value.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
+  // Si hay un SEED de contexto (apertura desde "Revisar configuración"), se acopla como primer
+  // mensaje `system` — el backend lo reenvía al LLM. Solo en el primer turno; tras usarlo se limpia.
+  let history = messages.value.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
+  if (assistantSeed.value) {
+    history = [{ role: 'system', content: assistantSeed.value }, ...history];
+    assistantSeed.value = null;
+  }
 
   abort = streamAssistant(history, {
     onToken: (tok) => {
@@ -141,6 +166,12 @@ async function send(): Promise<void> {
       saveAssistantHistory();
     },
   });
+}
+
+/** Rellena el draft con una sugerencia y la envía (chips de configuración). */
+function sendSuggestion(text: string): void {
+  draft.value = text;
+  void send();
 }
 
 function stop(): void {
@@ -256,6 +287,30 @@ onBeforeUnmount(() => {
 .chat-empty-icon {
   font-size: 2.25rem;
   color: var(--ion-color-primary);
+}
+/* Sugerencias rápidas (chips clicables) cuando el asistente abre con contexto de configuración. */
+.chat-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+.chat-suggestion {
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--ok-radius-sm, 10px);
+  border: 1px solid var(--ion-border-color, #ececec);
+  background: var(--ion-card-background, #fff);
+  color: var(--ion-text-color);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.chat-suggestion:hover {
+  border-color: var(--ion-color-primary);
+  background: color-mix(in srgb, var(--ion-color-primary) 7%, transparent);
 }
 .chat-row {
   display: flex;

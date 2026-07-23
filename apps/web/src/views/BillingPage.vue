@@ -3,7 +3,7 @@
     <!-- Facturas -->
     <div v-show="tab === 'invoices'" class="fill">
       <div v-if="loadingInvoices" class="flex justify-center py-10">
-        <ion-spinner name="dots" />
+        <ion-spinner name="crescent" />
       </div>
       <!-- `fill` fija el alto al área de ion-content (cabecera/pager fijos, scroll solo en el
            cuerpo) — mismo patrón que AppsPage/EmployeesPage. -->
@@ -35,7 +35,7 @@
         </ion-card-content>
       </ion-card>
       <div v-if="loadingSubs" class="flex justify-center py-10">
-        <ion-spinner name="dots" />
+        <ion-spinner name="crescent" />
       </div>
       <ok-data-table
         v-show="!loadingSubs"
@@ -50,9 +50,12 @@
       ></ok-data-table>
     </div>
 
-    <!-- Pagos -->
-    <div v-show="tab === 'payments'" class="flex items-center justify-center py-16 text-center opacity-60">
-      <p>{{ t('billing.paymentsPortalNotice') }}</p>
+    <!-- Pagos: aviso (no es un vacío de datos, sino unportal externo) → ok-empty-state. -->
+    <div v-show="tab === 'payments'" class="payments-notice">
+      <ok-empty-state
+        icon="card-outline"
+        :message="t('billing.paymentsPortalNotice')"
+      />
     </div>
 
     <!-- Tabs en footer -->
@@ -80,8 +83,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar, IonCard, IonCardContent, IonButton,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonSpinner
@@ -100,6 +104,20 @@ import { config } from '../lib/config';
 import { formatAmount } from '../lib/money';
 
 type BillingTab = 'invoices' | 'subscriptions' | 'payments';
+const TABS: readonly BillingTab[] = ['invoices', 'subscriptions', 'payments'];
+
+const route = useRoute();
+const router = useRouter();
+// Deep-link por HASH (/billing#pagos) — la ruta base no cambia, así Ionic no la trata como
+// página secundaria. Sincroniza tab ↔ hash.
+const tab = ref<BillingTab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'invoices');
+watch(tab, (value) => {
+  if (value !== (route.hash.slice(1) || 'invoices')) void router.replace({ hash: `#${value}` });
+});
+watch(() => route.hash, (h) => {
+  const next = TABS.find((v) => v === h.slice(1)) ?? 'invoices';
+  if (next !== tab.value) tab.value = next;
+});
 
 // ok-data-table (OutfitKit) está registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
 type Row = Record<string, unknown>;
@@ -114,7 +132,6 @@ interface DataTableColumn {
 }
 interface DataTableAction { id: string; label: string; icon?: string; color?: string }
 
-const tab = ref<BillingTab>('invoices');
 const invoices = ref<CloudInvoice[]>([]);
 const subscriptions = ref<CloudSubscription[]>([]);
 const loadingInvoices = ref(true);
@@ -339,5 +356,10 @@ async function downloadInvoice(id: number): Promise<void> {
   margin: 0;
   font-size: 13px;
   opacity: 0.75;
+}
+
+/* Pestaña Pagos: aviso de portal externo centrado. Antes era un placeholder Tailwind. */
+.payments-notice {
+  padding: 2rem 0;
 }
 </style>

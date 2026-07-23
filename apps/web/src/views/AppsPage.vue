@@ -1,7 +1,7 @@
 <template>
   <AppPage :title="t('nav.apps')">
     <div v-if="loading" class="flex justify-center py-10">
-      <ion-spinner name="dots" />
+      <ion-spinner name="crescent" />
     </div>
 
     <!-- `.fill` fija el alto al área de ion-content para que cabecera/pager de la tabla queden
