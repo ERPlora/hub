@@ -21,6 +21,7 @@
         :searchKeys="['name']"
         :actions="mineActions"
         :search-placeholder="t('apps.searchInstalled')"
+        :empty-message="t('apps.emptyInstalled')"
         page-size="10"
         column-picker
       ></ok-data-table>
@@ -37,6 +38,7 @@
         :searchKeys="['name', 'desc', 'cat']"
         :actions="catalogActions"
         :search-placeholder="t('apps.searchCatalog')"
+        :empty-message="t('apps.emptyCatalog')"
         page-size="10"
         column-picker
       ></ok-data-table>
@@ -111,6 +113,7 @@
 
 <script setup lang="ts">
 import { inject, ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
@@ -150,6 +153,20 @@ interface Mod {
 }
 
 type AppsTab = 'mine' | 'all' | 'paid';
+const TABS: readonly AppsTab[] = ['mine', 'all', 'paid'];
+
+const route = useRoute();
+const router = useRouter();
+// Deep-link por HASH (/apps#paid) — la ruta base no cambia, así Ionic no la trata como página
+// secundaria (mismo patrón que Settings/System/etc.). Sincroniza tab ↔ hash.
+const tab = ref<AppsTab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'mine');
+watch(tab, (value) => {
+  if (value !== (route.hash.slice(1) || 'mine')) void router.replace({ hash: `#${value}` });
+});
+watch(() => route.hash, (h) => {
+  const next = TABS.find((v) => v === h.slice(1)) ?? 'mine';
+  if (next !== tab.value) tab.value = next;
+});
 
 // ok-data-table (OutfitKit) está registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
 type Row = Record<string, unknown>;
@@ -186,7 +203,6 @@ const MODULES_DEMO: Mod[] = [
 ];
 
 // --- Estado ---
-const tab = ref<AppsTab>('mine');
 const modules = ref<Mod[]>([]);
 const installedModules = ref<InstalledModule[]>([]);
 const loading = ref(true);
@@ -339,10 +355,10 @@ const catalogActions = computed<DataTableAction[]>(() => [
 
 // --- Handlers ---
 function onTabChange(ev: Event): void {
+  // El watch(tab) sincroniza el hash; aquí solo validamos y asignamos.
   const detail = (ev as CustomEvent<{ value: string }>).detail;
-  if (detail.value === 'mine' || detail.value === 'all' || detail.value === 'paid') {
-    tab.value = detail.value;
-  }
+  const next = TABS.find((v) => v === detail.value);
+  if (next) tab.value = next;
 }
 
 function notify(msg: string, color: 'primary' | 'success' | 'danger', duration = 2500): void {

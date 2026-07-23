@@ -106,7 +106,7 @@
                 <ion-button
                   v-for="os in BRIDGE_OS"
                   :key="os.label"
-                  fill="outline"
+                  :fill="os.fill"
                   @click="handleBridgeDownload(os)"
                 >
                   <HubIcon slot="start" :name="os.icon" />
@@ -301,6 +301,8 @@ interface BridgeOs {
   label: string;
   icon: string;
   platform: BridgePlatform;
+  /** Igual que en erplora.com/download/: el primero (Windows) resalta en `solid`, el resto `outline`. */
+  fill: 'solid' | 'outline';
 }
 
 // ok-data-table (OutfitKit): tipos locales mínimos (OutfitKit no emite .d.ts de la tabla).
@@ -348,10 +350,11 @@ const bridgeSteps = computed<string[]>(() => [
 ]);
 
 // macOS fuera (solo desarrollo local). El Cloud sirve Windows/Linux/Android.
+// Logos de marca por SO + primero en `solid`, igual que los botones de erplora.com/download/.
 const BRIDGE_OS: BridgeOs[] = [
-  { label: 'Windows', icon: 'desktop-outline',        platform: 'windows' },
-  { label: 'Linux',   icon: 'terminal-outline',       platform: 'linux'   },
-  { label: 'Android', icon: 'phone-portrait-outline', platform: 'android' },
+  { label: 'Windows', icon: 'logo-windows', platform: 'windows', fill: 'solid'   },
+  { label: 'Linux',   icon: 'logo-tux',     platform: 'linux',   fill: 'outline' },
+  { label: 'Android', icon: 'logo-android', platform: 'android', fill: 'outline' },
 ];
 
 // ── Derivados (axis-aware) ───────────────────────────────────────
