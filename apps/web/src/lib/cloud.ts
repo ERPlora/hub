@@ -2,7 +2,7 @@
 // billing van por aquí (ARQUITECTURA.md §2.1–2.3). Si el Cloud no es accesible (sandbox),
 // las llamadas lanzan y la capa de auth degrada a modo demo.
 import { config, isLocalHub } from './config';
-import { loginHeaders } from './device';
+import { isTauri, loginHeaders } from './device';
 import { beginRequest, endRequest } from './shell';
 
 export interface CloudUser {
@@ -57,10 +57,20 @@ function getRefreshToken(): string | null {
   try { return localStorage.getItem(TOKENS.refresh); } catch { return null; }
 }
 
+/**
+ * El Hub Local mantiene una sesión Runtime/PIN independiente del JWT Cloud. Incluye Tauri
+ * enrolado (hub_id real) y el runtime local/dev sin enrolar (hub_id vacío o DEV_HUB_ID).
+ */
+export function hasIndependentLocalSession(): boolean {
+  return isLocalHub() || isTauri();
+}
+
 // --- Refresh-on-401 (rotación de tokens del usuario activo) ------------------
 // Contrato Cloud: POST /api/v1/auth/refresh/ {refresh} → {access, refresh}. En un 401
 // refrescamos UNA vez, rotamos AMBOS tokens y reintentamos la llamada original. Si el
-// refresh falla, limpiamos la sesión y mandamos a /login (sesión expirada de verdad).
+// refresh falla en Hub Cloud, limpiamos la sesión y mandamos a /login (sesión expirada de
+// verdad). En Hub Local, la sesión del runtime/PIN es independiente: se limpian únicamente
+// las credenciales Cloud caducadas y la vista consumidora muestra su estado recuperable.
 
 /** Hook de fin de sesión. El shell lo registra para limpiar estado reactivo + redirigir. */
 let onSessionExpired: (() => void) | null = null;
@@ -156,6 +166,12 @@ async function authedFetch(path: string, init: RequestInit, timeoutMs = 8000): P
       const fresh = await refreshTokens();
       if (fresh) {
         res = await doFetch(fresh); // reintento único con el token rotado
+      } else if (hasIndependentLocalSession()) {
+        // Un JWT Cloud ausente/caducado NO invalida la sesión local del runtime. Billing y otras
+        // superficies atribuidas al usuario degradan a su estado "cuenta Cloud requerida", pero el
+        // usuario conserva el shell, sus permisos locales y el contexto de trabajo. `isTauri`
+        // cubre Hub Local ya enrolado, cuyo hub_id es un UUID Cloud real (no el DEV_HUB_ID).
+        clearTokens();
       } else {
         expireSession();
       }

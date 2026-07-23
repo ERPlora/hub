@@ -2,13 +2,39 @@
   <AppPage :title="t('nav.billing')">
     <!-- Facturas -->
     <div v-show="tab === 'invoices'" class="fill">
-      <div v-if="loadingInvoices" class="flex justify-center py-10">
+      <div v-if="invoiceState === 'loading'" class="flex justify-center py-10">
         <ion-spinner name="crescent" />
       </div>
+      <ok-inline-feedback
+        v-else-if="invoiceState === 'auth-required'"
+        class="billing-feedback"
+        tone="warning"
+        icon="person-circle-outline"
+        :heading="t('billing.cloudAuthTitle')"
+      >
+        {{ t('billing.cloudAuthBody') }}
+        <ion-button slot="actions" size="small" @click="onOpenBillingPortal">
+          <HubIcon name="open-outline" slot="start" />
+          {{ t('billing.openBillingPortal') }}
+        </ion-button>
+      </ok-inline-feedback>
+      <ok-inline-feedback
+        v-else-if="invoiceState === 'error'"
+        class="billing-feedback"
+        tone="danger"
+        icon="cloud-offline-outline"
+        :heading="t('billing.loadErrorTitle')"
+      >
+        {{ t('billing.loadErrorBody') }}
+        <ion-button slot="actions" size="small" fill="outline" @click="loadInvoices">
+          <HubIcon name="refresh-outline" slot="start" />
+          {{ t('billing.retry') }}
+        </ion-button>
+      </ok-inline-feedback>
       <!-- `fill` fija el alto al área de ion-content (cabecera/pager fijos, scroll solo en el
            cuerpo) — mismo patrón que AppsPage/EmployeesPage. -->
       <ok-data-table
-        v-show="!loadingInvoices"
+        v-show="invoiceState === 'ready'"
         ref="invoicesTable"
         fill
         :columns="invoiceColumns"
@@ -25,7 +51,7 @@
     <div v-show="tab === 'subscriptions'" class="fill subs-fill">
       <!-- El Hub NO vende (ADR-0114): el upgrade/cambio de plan vive en el marketplace del
            SaaS; aquí solo un CTA que abre el navegador externo + recheck al recuperar el foco. -->
-      <ion-card class="plan-cta m-0">
+      <ion-card v-if="subscriptionState === 'ready'" class="plan-cta m-0">
         <ion-card-content class="plan-cta-content">
           <p class="plan-cta-hint">{{ t('billing.managePlanHint') }}</p>
           <ion-button size="small" fill="outline" @click="onManagePlan">
@@ -34,11 +60,37 @@
           </ion-button>
         </ion-card-content>
       </ion-card>
-      <div v-if="loadingSubs" class="flex justify-center py-10">
+      <div v-if="subscriptionState === 'loading'" class="flex justify-center py-10">
         <ion-spinner name="crescent" />
       </div>
+      <ok-inline-feedback
+        v-else-if="subscriptionState === 'auth-required'"
+        class="billing-feedback"
+        tone="warning"
+        icon="person-circle-outline"
+        :heading="t('billing.cloudAuthTitle')"
+      >
+        {{ t('billing.cloudAuthBody') }}
+        <ion-button slot="actions" size="small" @click="onOpenBillingPortal">
+          <HubIcon name="open-outline" slot="start" />
+          {{ t('billing.openBillingPortal') }}
+        </ion-button>
+      </ok-inline-feedback>
+      <ok-inline-feedback
+        v-else-if="subscriptionState === 'error'"
+        class="billing-feedback"
+        tone="danger"
+        icon="cloud-offline-outline"
+        :heading="t('billing.loadErrorTitle')"
+      >
+        {{ t('billing.loadErrorBody') }}
+        <ion-button slot="actions" size="small" fill="outline" @click="refreshSubscriptions">
+          <HubIcon name="refresh-outline" slot="start" />
+          {{ t('billing.retry') }}
+        </ion-button>
+      </ok-inline-feedback>
       <ok-data-table
-        v-show="!loadingSubs"
+        v-show="subscriptionState === 'ready'"
         ref="subsTable"
         fill
         :columns="subColumns"
@@ -97,13 +149,14 @@ import { DT_LABELS_ES } from '../lib/data-table-labels';
 
 const { t } = useI18n();
 import {
-  cloudInvoices, cloudSubscriptions, getAccessToken,
+  cloudInvoices, cloudSubscriptions, getAccessToken, hasIndependentLocalSession,
   type CloudInvoice, type CloudSubscription
 } from '../lib/cloud';
 import { config } from '../lib/config';
 import { formatAmount } from '../lib/money';
 
 type BillingTab = 'invoices' | 'subscriptions' | 'payments';
+type BillingLoadState = 'loading' | 'ready' | 'auth-required' | 'error';
 const TABS: readonly BillingTab[] = ['invoices', 'subscriptions', 'payments'];
 
 const route = useRoute();
@@ -134,14 +187,16 @@ interface DataTableAction { id: string; label: string; icon?: string; color?: st
 
 const invoices = ref<CloudInvoice[]>([]);
 const subscriptions = ref<CloudSubscription[]>([]);
-const loadingInvoices = ref(true);
-const loadingSubs = ref(true);
+const invoiceState = ref<BillingLoadState>('loading');
+const subscriptionState = ref<BillingLoadState>('loading');
 
 // --- Plan del hub: deep-link al marketplace del SaaS + recheck-on-focus ---
 // (patrón ModulePlanPanel: el Hub nunca compra; abre el navegador y, al volver
 // el foco, re-consulta las suscripciones para reflejar el cambio).
 const plansDeepLink = (): string =>
   `${config.cloudApiUrl}/dashboard/marketplace/plans/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
+const billingPortalLink = (): string =>
+  `${config.cloudApiUrl}/dashboard/billing/?hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
 
 async function onManagePlan(): Promise<void> {
   try {
@@ -151,19 +206,54 @@ async function onManagePlan(): Promise<void> {
   }
 }
 
-function refreshSubscriptions(): void {
-  cloudSubscriptions()
-    .then((data) => { subscriptions.value = data; })
-    .catch(() => { /* mantiene los datos previos */ })
-    .finally(() => { loadingSubs.value = false; });
+async function onOpenBillingPortal(): Promise<void> {
+  try {
+    await openExternal(billingPortalLink());
+  } catch {
+    console.error('No se pudo abrir la facturación de ERPlora');
+  }
+}
+
+function unavailableCloudState(): BillingLoadState {
+  return getAccessToken() ? 'error' : 'auth-required';
+}
+
+async function loadInvoices(): Promise<void> {
+  if (!getAccessToken() && hasIndependentLocalSession()) {
+    invoices.value = [];
+    invoiceState.value = 'auth-required';
+    return;
+  }
+  invoiceState.value = 'loading';
+  try {
+    invoices.value = await cloudInvoices();
+    invoiceState.value = 'ready';
+  } catch {
+    invoiceState.value = unavailableCloudState();
+  }
+}
+
+async function refreshSubscriptions(): Promise<void> {
+  if (!getAccessToken() && hasIndependentLocalSession()) {
+    subscriptions.value = [];
+    subscriptionState.value = 'auth-required';
+    return;
+  }
+  subscriptionState.value = 'loading';
+  try {
+    subscriptions.value = await cloudSubscriptions();
+    subscriptionState.value = 'ready';
+  } catch {
+    subscriptionState.value = unavailableCloudState();
+  }
 }
 
 function onWindowFocus(): void {
-  refreshSubscriptions();
+  void refreshSubscriptions();
 }
 
 function onVisibilityChange(): void {
-  if (document.visibilityState === 'visible') refreshSubscriptions();
+  if (document.visibilityState === 'visible') void refreshSubscriptions();
 }
 
 // --- Handlers ---
@@ -259,15 +349,8 @@ function handleInvoiceAction(e: Event): void {
 
 // --- Fetch + labels ES al montar (refs vivos por v-show, aunque la tabla esté oculta) ---
 onMounted(() => {
-  cloudInvoices()
-    .then((data) => { invoices.value = data; })
-    .catch(() => { invoices.value = []; })
-    .finally(() => { loadingInvoices.value = false; });
-
-  cloudSubscriptions()
-    .then((data) => { subscriptions.value = data; })
-    .catch(() => { subscriptions.value = []; })
-    .finally(() => { loadingSubs.value = false; });
+  void loadInvoices();
+  void refreshSubscriptions();
 
   // Recheck-on-focus: tras gestionar el plan en el SaaS (navegador externo),
   // el estado se refresca al volver a esta ventana.
@@ -361,5 +444,10 @@ async function downloadInvoice(id: number): Promise<void> {
 /* Pestaña Pagos: aviso de portal externo centrado. Antes era un placeholder Tailwind. */
 .payments-notice {
   padding: 2rem 0;
+}
+
+.billing-feedback {
+  max-width: 48rem;
+  margin: 1rem auto;
 }
 </style>
