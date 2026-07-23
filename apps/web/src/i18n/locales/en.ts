@@ -211,6 +211,8 @@ export default {
     tabMine: 'My modules',
     tabCatalog: 'Catalog',
     tabPaid: 'Paid',
+    emptyInstalled: 'You have no modules installed yet. Browse the catalog to add your first one.',
+    emptyCatalog: 'No modules match your search.',
     colModule: 'Module',
     colVersion: 'Version',
     colStatus: 'Status',

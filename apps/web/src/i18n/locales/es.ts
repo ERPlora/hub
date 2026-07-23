@@ -212,6 +212,8 @@ export default {
     tabMine: 'Mis módulos',
     tabCatalog: 'Catálogo',
     tabPaid: 'Pago',
+    emptyInstalled: 'Aún no tienes módulos instalados. Explora el catálogo para añadir el primero.',
+    emptyCatalog: 'No hay módulos que coincidan con tu búsqueda.',
     colModule: 'Módulo',
     colVersion: 'Versión',
     colStatus: 'Estado',
