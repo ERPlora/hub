@@ -565,19 +565,20 @@ const { t, locale } = useI18n();
 type Tab = 'hub' | 'store' | 'tax' | 'tickets' | 'permissions' | 'data';
 const TABS: readonly Tab[] = ['hub', 'store', 'tax', 'tickets', 'permissions', 'data'];
 
-// Deep-link a una pestaña por PATH (/settings/permisos) — navegable, compartible, back/forward.
-// Compat: el query ?tab= legacy lo redirige el guard del router al path.
+// Deep-link a una pestaña por HASH (/settings#permisos) — la ruta base no cambia, así Ionic
+// no trata el cambio de pestaña como página secundaria (no se desmonta el tabbar ni hay botón back).
+// Compat: el query ?tab= legacy lo redirige el guard del router al hash.
 const route = useRoute();
 const router = useRouter();
-const initialTab = TABS.find((v) => v === String(route.params.tab ?? '')) ?? 'hub';
+const initialTab = TABS.find((v) => v === route.hash.slice(1)) ?? 'hub';
 const tab = ref<Tab>(initialTab);
-// Al cambiar de pestaña, sincroniza la URL (replace = no apila historial; "atrás" sale de Ajustes).
+// Al cambiar de pestaña, sincroniza el hash (replace = no apila historial; "atrás" sale de Ajustes).
 watch(tab, (value) => {
-  if (value !== (route.params.tab ?? 'hub')) void router.replace(`/settings/${value}`);
+  if (value !== (route.hash.slice(1) || 'hub')) void router.replace({ hash: `#${value}` });
 });
-// Back/forward y deep-links: si el path cambia (sin tocar el segment), actualiza el tab local.
-watch(() => String(route.params.tab ?? ''), (p) => {
-  const next = TABS.find((v) => v === p) ?? 'hub';
+// Back/forward y deep-links: si el hash cambia, actualiza el tab local.
+watch(() => route.hash, (h) => {
+  const next = TABS.find((v) => v === h.slice(1)) ?? 'hub';
   if (next !== tab.value) tab.value = next;
 });
 

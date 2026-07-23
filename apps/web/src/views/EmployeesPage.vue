@@ -133,15 +133,15 @@ const TABS: readonly EmployeeTab[] = ['staff', 'users', 'roles', 'apikeys'];
 
 const route = useRoute();
 const router = useRouter();
-// Deep-link por PATH (/employees/roles). 'apikeys' solo es válido para admins (lo valida el gate
-// de abajo); un no-admin con ese path cae a 'staff' por el watch de isAdmin.
-const tab = ref<EmployeeTab>(TABS.find((v) => v === String(route.params.tab ?? '')) ?? 'staff');
-// Sincroniza tab ↔ URL (replace = no apila historial).
+// Deep-link por HASH (/employees#roles). 'apikeys' solo es válido para admins (lo valida el gate
+// de abajo); un no-admin con ese hash cae a 'staff' por el watch de isAdmin.
+const tab = ref<EmployeeTab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'staff');
+// Sincroniza tab ↔ hash (replace = no apila historial).
 watch(tab, (value) => {
-  if (value !== (route.params.tab ?? 'staff')) void router.replace(`/employees/${value}`);
+  if (value !== (route.hash.slice(1) || 'staff')) void router.replace({ hash: `#${value}` });
 });
-watch(() => String(route.params.tab ?? ''), (p) => {
-  const next = TABS.find((v) => v === p) ?? 'staff';
+watch(() => route.hash, (h) => {
+  const next = TABS.find((v) => v === h.slice(1)) ?? 'staff';
   if (next !== tab.value) tab.value = next;
 });
 

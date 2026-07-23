@@ -318,17 +318,16 @@ interface DataTableAction { id: string; label: string; icon?: string; color?: st
 
 // ── State ────────────────────────────────────────────────────────
 
-// Deep-link a una pestaña por PATH (/system/copias) — navegable, compartible, back/forward.
+// Deep-link a una pestaña por HASH (/system#copias) — la ruta base no cambia, así Ionic no la
+// trata como página secundaria. Sincroniza tab ↔ hash.
 const route = useRoute();
 const router = useRouter();
-const tab = ref<Tab>(TABS.find((v) => v === String(route.params.tab ?? '')) ?? 'resources');
-// Sincroniza tab ↔ URL: al cambiar de pestaña, escribe el path; si el path cambia (back/forward),
-// actualiza el tab local. replace = no apila historial.
+const tab = ref<Tab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'resources');
 watch(tab, (value) => {
-  if (value !== (route.params.tab ?? 'resources')) void router.replace(`/system/${value}`);
+  if (value !== (route.hash.slice(1) || 'resources')) void router.replace({ hash: `#${value}` });
 });
-watch(() => String(route.params.tab ?? ''), (p) => {
-  const next = TABS.find((v) => v === p) ?? 'resources';
+watch(() => route.hash, (h) => {
+  const next = TABS.find((v) => v === h.slice(1)) ?? 'resources';
   if (next !== tab.value) tab.value = next;
 });
 

@@ -173,7 +173,7 @@ type Tab = 'resumen' | 'actividad';
 const TABS: readonly Tab[] = ['resumen', 'actividad'];
 type Tone = 'success' | 'warning' | 'primary' | 'medium';
 
-// ok-data-table (OutfitKit) registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
+// ok-data-table (OutFitKit) registrado en main.ts. Tipos locales: OutFitKit no emite .d.ts.
 type Row = Record<string, unknown>;
 interface DataTableColumn {
   key: string;
@@ -185,14 +185,14 @@ interface DataTableColumn {
   render?: (row: Row) => Node | string;
 }
 
-// Deep-link por PATH (/dashboard/actividad) — navegable, compartible, back/forward.
-const tab = ref<Tab>(TABS.find((v) => v === String(route.params.tab ?? '')) ?? 'resumen');
-// Sincroniza tab ↔ URL (replace = no apila historial).
+// Deep-link por HASH (#actividad) — la ruta base (/dashboard) NO cambia, así Ionic no la trata
+// como página secundaria (no se desmonta el tabbar ni aparece el botón back). Sincroniza tab ↔ hash.
+const tab = ref<Tab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'resumen');
 watch(tab, (value) => {
-  if (value !== (route.params.tab ?? 'resumen')) void router.replace(`/dashboard/${value}`);
+  if (value !== (route.hash.slice(1) || 'resumen')) void router.replace({ hash: `#${value}` });
 });
-watch(() => String(route.params.tab ?? ''), (p) => {
-  const next = TABS.find((v) => v === p) ?? 'resumen';
+watch(() => route.hash, (h) => {
+  const next = TABS.find((v) => v === h.slice(1)) ?? 'resumen';
   if (next !== tab.value) tab.value = next;
 });
 
@@ -515,6 +515,9 @@ onMounted(async () => {
 .setup-banner-cta {
   flex: none;
   white-space: nowrap;
+}
+@media (max-width: 540px) {
+  .setup-banner-cta { width: 100%; }
 }
 @media (max-width: 540px) {
   /* Móvil: el CTA ocupa todo el ancho debajo del texto. */

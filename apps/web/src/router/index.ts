@@ -9,24 +9,23 @@ import { apiDocsEnabled } from '../lib/api-docs';
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'login', component: () => import('../views/LoginPage.vue') },
-  // `:tab?` = pestaña del tabbar secundario, navegable por URL (deep-link compartible, back/forward).
-  // Sin tab → la vista abre su pestaña por defecto. Cada vista valida el valor contra su lista.
-  { path: '/dashboard/:tab?', name: 'dashboard', component: () => import('../views/DashboardPage.vue'), meta: { auth: true } },
-  // /employees/new y /employees/:id van ANTES que /employees/:tab? para que las atrape primero
-  // (los literales ganan a los params; :tab? solo matchea valores de tab válidos: staff/users/roles/apikeys).
+  // La pestaña activa del tabbar secundario va en el HASH (#permisos) en vez de en el path:
+  // así la ruta base NO cambia → Ionic no trata el cambio de pestaña como navegación a una
+  // página secundaria (no se desmonta el tabbar ni aparece el botón back). Deep-link: /settings#permisos.
+  { path: '/dashboard', name: 'dashboard', component: () => import('../views/DashboardPage.vue'), meta: { auth: true } },
   { path: '/employees/new', name: 'employee-new', component: () => import('../views/EmployeeFormPage.vue'), meta: { auth: true } },
   { path: '/employees/:id', name: 'employee-edit', component: () => import('../views/EmployeeFormPage.vue'), meta: { auth: true } },
-  { path: '/employees/:tab?', name: 'employees', component: () => import('../views/EmployeesPage.vue'), meta: { auth: true } },
+  { path: '/employees', name: 'employees', component: () => import('../views/EmployeesPage.vue'), meta: { auth: true } },
   { path: '/files', name: 'files', component: () => import('../views/FilesPage.vue'), meta: { auth: true } },
-  { path: '/billing/:tab?', name: 'billing', component: () => import('../views/BillingPage.vue'), meta: { auth: true } },
+  { path: '/billing', name: 'billing', component: () => import('../views/BillingPage.vue'), meta: { auth: true } },
   { path: '/apps', name: 'apps', component: () => import('../views/AppsPage.vue'), meta: { auth: true } },
   // Compat: la tienda se llamaba "Marketplace"; los enlaces/bookmarks viejos siguen funcionando.
   { path: '/marketplace', redirect: '/apps' },
-  { path: '/system/:tab?', name: 'system', component: () => import('../views/SystemPage.vue'), meta: { auth: true } },
+  { path: '/system', name: 'system', component: () => import('../views/SystemPage.vue'), meta: { auth: true } },
   // Export/Import del hub (ADR-0113): viven JUNTOS en la pestaña Datos de Ajustes
-  // (/settings/datos, decisión del humano 2026-07-12 — antes eran las páginas /export y /import).
+  // (/settings#datos, decisión del humano 2026-07-12 — antes eran las páginas /export y /import).
   // El gate admin REAL es del runtime (require_admin_session, como PUT /api/settings).
-  { path: '/settings/:tab?', name: 'settings', component: () => import('../views/SettingsPage.vue'), meta: { auth: true } },
+  { path: '/settings', name: 'settings', component: () => import('../views/SettingsPage.vue'), meta: { auth: true } },
   // Documentación de la API pública (ADR-0057 §4): vista Vue interna que renderiza Swagger sobre el
   // spec del runtime. Visible a cualquier usuario logueado; la entrada de menú/página la habilita
   // el toggle de Ajustes (apiDocsEnabled). Acceso por URL directa también gateado abajo.
@@ -49,11 +48,11 @@ export const router = createRouter({
 
 // Auth-gate: rutas con meta.auth requieren sesión; si no, a /login. (Vue-router nativo, sin React.)
 router.beforeEach((to) => {
-  // Compat legacy: las tabs antes iban en query (?tab=) y ahora van en path (/settings/permisos).
-  // Redirige el query viejo al path para no romper bookmarks/enlaces antiguos.
+  // Compat legacy: las tabs antes iban en query (?tab=) y ahora van en el HASH (#permisos).
+  // Redirige el query viejo al hash para no romper bookmarks/enlaces antiguos.
   const legacyTab = to.query.tab;
-  if (typeof legacyTab === 'string' && legacyTab && to.params.tab === undefined) {
-    return { path: `/${String(to.name)}/${legacyTab}`, query: {} };
+  if (typeof legacyTab === 'string' && legacyTab && !to.hash) {
+    return { path: to.path, query: {}, hash: `#${legacyTab}` };
   }
   if (to.meta.auth && !isAuthed.value) {
     return { name: 'login', query: { redirect: to.fullPath } };

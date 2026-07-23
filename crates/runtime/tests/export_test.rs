@@ -119,6 +119,39 @@ async fn full_export_produces_manifest_and_data_files() {
 }
 
 #[tokio::test]
+async fn export_omits_module_owned_seed_rows_that_collide_on_restore() {
+    // La demo del SaaS fallaba en `taxes` al restaurar un blueprint (duplicate key
+    // ix_tax_cat_hub_key): el módulo AUTO-SIEMBRA al instalarse sus categorías canónicas
+    // (is_system=1) y sus alias de fábrica (source='shipped'); si el bundle ADEMÁS los trae como
+    // datos, chocan con la auto-siembra en las claves únicas (hub_id,key)/(hub_id,alias). El export
+    // NO debe capturar filas propiedad del módulo — las re-siembra el módulo (ADR-0085/0113, opción A).
+    let rt = fresh().await; // instala taxes → siembra categorías is_system=1 + alias 'shipped'
+    // Categoría de USUARIO (is_system=0) → SÍ debe viajar (no over-exclusión).
+    rt.execute_command(
+        "taxes.categories.create",
+        &params(json!({ "key": "user.custom", "name": "Categoría del usuario" })),
+        &ctx("h1"),
+    )
+    .await
+    .expect("crear categoría de usuario");
+
+    let bundle = export_hub(&rt, "h1", &full_selection(), "t", "es", CREATED_AT).await.expect("export");
+    let tax_sql = String::from_utf8(bundle.files["data/taxes.sql"].clone()).unwrap();
+
+    // La de USUARIO viaja; las canónicas is_system NO → solo 1 INSERT en taxes_category (tabla con
+    // unique (hub_id,key) que crasheaba). "taxes_category (" (espacio+paréntesis) NO casa con
+    // "taxes_category_alias (".
+    assert!(tax_sql.contains("user.custom"), "la categoría de usuario (is_system=0) debe viajar:\n{tax_sql}");
+    let cat_inserts = tax_sql.matches("INSERT INTO taxes_category (").count();
+    assert_eq!(cat_inserts, 1, "solo la categoría de usuario debe viajar (las is_system no):\n{tax_sql}");
+    // Ningún alias de fábrica ('shipped') viaja (tabla con unique (hub_id,alias) que crasheaba).
+    assert!(
+        !tax_sql.contains("INSERT INTO taxes_category_alias"),
+        "los alias 'shipped' NO deben viajar (los re-siembra el módulo):\n{tax_sql}"
+    );
+}
+
+#[tokio::test]
 async fn exported_sql_uses_hub_id_placeholder_never_the_literal() {
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;

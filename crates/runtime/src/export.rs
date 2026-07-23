@@ -343,8 +343,19 @@ async fn fetch_rows(
         None => (format!("SELECT * FROM {table}"), erplora_db::Params::new()),
     };
     let res = db.query(&sql, &params).await?;
-    // El filtro de soft-delete va en Rust (no todas las tablas tienen la columna).
-    Ok(res.rows.into_iter().filter(|r| !truthy(r.get("is_deleted"))).collect())
+    // Filtros en Rust (no todas las tablas tienen estas columnas): fuera las soft-deleted y fuera
+    // los datos PROPIEDAD DEL MÓDULO (los re-siembra al instalarse) — ver `is_module_seeded`.
+    Ok(res.rows.into_iter().filter(|r| !truthy(r.get("is_deleted")) && !is_module_seeded(r)).collect())
+}
+
+/// Fila de referencia PROPIEDAD DEL MÓDULO: la crea el propio módulo al instalarse (migración/
+/// bloque `seed`) y la RE-SIEMBRA en cada hub — categorías fiscales canónicas (`is_system=1`) y
+/// alias de fábrica (`source='shipped'`), ADR-0085. NO debe viajar en el bundle: al restaurar
+/// chocaría con la auto-siembra del módulo en sus claves únicas (`(hub_id,key)`/`(hub_id,alias)`)
+/// — es el `duplicate key ix_tax_cat_hub_key` que tumbaba la demo del SaaS (opción A). Los datos de
+/// USUARIO (categorías propias `is_system=0`, sin `source='shipped'`) sí viajan.
+fn is_module_seeded(row: &serde_json::Value) -> bool {
+    truthy(row.get("is_system")) || row.get("source").and_then(|v| v.as_str()) == Some("shipped")
 }
 
 fn truthy(v: Option<&serde_json::Value>) -> bool {

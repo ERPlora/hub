@@ -108,14 +108,14 @@ const TABS: readonly BillingTab[] = ['invoices', 'subscriptions', 'payments'];
 
 const route = useRoute();
 const router = useRouter();
-// Deep-link por PATH (/billing/pagos) — navegable, compartible, back/forward.
-const tab = ref<BillingTab>(TABS.find((v) => v === String(route.params.tab ?? '')) ?? 'invoices');
-// Sincroniza tab ↔ URL (replace = no apila historial).
+// Deep-link por HASH (/billing#pagos) — la ruta base no cambia, así Ionic no la trata como
+// página secundaria. Sincroniza tab ↔ hash.
+const tab = ref<BillingTab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'invoices');
 watch(tab, (value) => {
-  if (value !== (route.params.tab ?? 'invoices')) void router.replace(`/billing/${value}`);
+  if (value !== (route.hash.slice(1) || 'invoices')) void router.replace({ hash: `#${value}` });
 });
-watch(() => String(route.params.tab ?? ''), (p) => {
-  const next = TABS.find((v) => v === p) ?? 'invoices';
+watch(() => route.hash, (h) => {
+  const next = TABS.find((v) => v === h.slice(1)) ?? 'invoices';
   if (next !== tab.value) tab.value = next;
 });
 
