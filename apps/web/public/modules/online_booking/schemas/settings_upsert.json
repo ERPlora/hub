@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "online_booking.settings.upsert",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "is_enabled": { "type": "boolean", "default": false, "title": "Reserva online activa" },
+    "page_title": { "type": "string", "default": "Book an Appointment", "maxLength": 255, "title": "Título de la página" },
+    "welcome_message": { "type": "string", "default": "", "title": "Mensaje de bienvenida" },
+    "primary_color": { "type": "string", "default": "#6366f1", "maxLength": 20, "title": "Color principal" },
+    "logo_url": { "type": "string", "default": "", "maxLength": 500, "title": "URL del logo" },
+    "require_phone": { "type": "boolean", "default": true, "title": "Exigir teléfono" },
+    "require_email": { "type": "boolean", "default": true, "title": "Exigir email" },
+    "allow_staff_selection": { "type": "boolean", "default": true, "title": "Permitir elegir profesional" },
+    "allow_notes": { "type": "boolean", "default": true, "title": "Permitir notas del cliente" },
+    "min_advance_hours": { "type": "integer", "minimum": 0, "maximum": 168, "default": 2, "title": "Antelación mínima (horas)" },
+    "max_advance_days": { "type": "integer", "minimum": 1, "maximum": 365, "default": 30, "title": "Antelación máxima (días)" },
+    "slot_duration_minutes": { "type": "integer", "minimum": 5, "maximum": 480, "default": 30, "title": "Duración de franja (min)" },
+    "buffer_minutes": { "type": "integer", "minimum": 0, "maximum": 120, "default": 0, "title": "Margen entre citas (min)" },
+    "confirmation_message": { "type": "string", "default": "", "title": "Mensaje de confirmación" },
+    "cancellation_policy": { "type": "string", "default": "", "title": "Política de cancelación" }
+  }
+}

@@ -1,0 +1,619 @@
+{
+  "id": "customers",
+  "name": "Customers",
+  "version": "2.3.6",
+  "agent": {
+    "description": "Manages customers, groups, tags, custom fields, notes, and activity history: create, update, delete customers and look up their purchase records.",
+    "keywords": [
+      "customer",
+      "clients",
+      "contact",
+      "group",
+      "tag",
+      "activity",
+      "note",
+      "crm"
+    ]
+  },
+  "depends_on": [],
+  "permissions": [
+    "customers.view_customer",
+    "customers.add_customer",
+    "customers.change_customer",
+    "customers.delete_customer",
+    "customers.export_customer",
+    "customers.view_customergroup",
+    "customers.add_customergroup",
+    "customers.change_customergroup",
+    "customers.delete_customergroup",
+    "customers.view_customertag",
+    "customers.add_customertag",
+    "customers.change_customertag",
+    "customers.delete_customertag",
+    "customers.view_activity",
+    "customers.add_note",
+    "customers.manage_custom_fields",
+    "customers.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "customers.add_customer",
+      "customers.add_customergroup",
+      "customers.add_customertag",
+      "customers.add_note",
+      "customers.change_customer",
+      "customers.change_customergroup",
+      "customers.change_customertag",
+      "customers.export_customer",
+      "customers.manage_custom_fields",
+      "customers.view_activity",
+      "customers.view_customer",
+      "customers.view_customergroup",
+      "customers.view_customertag"
+    ],
+    "employee": [
+      "customers.add_customer",
+      "customers.add_note",
+      "customers.view_activity",
+      "customers.view_customer",
+      "customers.view_customergroup",
+      "customers.view_customertag"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "customers",
+      "label": "Customers",
+      "icon": "people-outline",
+      "component": "erp-customers-list"
+    },
+    {
+      "id": "groups",
+      "label": "Groups",
+      "icon": "people-outline",
+      "component": "erp-customers-groups"
+    },
+    {
+      "id": "tags",
+      "label": "Tags",
+      "icon": "pricetags",
+      "component": "erp-customers-tags"
+    },
+    {
+      "id": "fields",
+      "label": "Fields",
+      "icon": "layers-outline",
+      "component": "erp-customers-fields"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_customer_order.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql",
+      "migrations/postgres/002_customer_order.sql"
+    ]
+  },
+  "queries": {
+    "customers.list": {
+      "permission": "customers.view_customer",
+      "sql": "queries/list.sql",
+      "list": {
+        "search": [
+          "name",
+          "email",
+          "phone",
+          "tax_id",
+          "company_name"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "email",
+          "phone",
+          "tax_id",
+          "company_name",
+          "lifecycle_stage",
+          "source",
+          "is_active",
+          "total_purchases",
+          "total_spent",
+          "last_purchase_date"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "like"
+          },
+          "email": {
+            "op": "like"
+          },
+          "phone": {
+            "op": "like"
+          },
+          "tax_id": {
+            "op": "range"
+          },
+          "company_name": {
+            "op": "like"
+          },
+          "lifecycle_stage": {
+            "op": "eq"
+          },
+          "source": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          },
+          "total_purchases": {
+            "op": "range"
+          },
+          "total_spent": {
+            "op": "range"
+          },
+          "last_purchase_date": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists all customers for the tenant"
+      }
+    },
+    "customers.get": {
+      "permission": "customers.view_customer",
+      "sql": "queries/get.sql",
+      "schema": "schemas/get.json",
+      "ai": {
+        "description": "Retrieves a customer's details by their identifier"
+      }
+    },
+    "customers.stats": {
+      "permission": "customers.view_customer",
+      "sql": "queries/stats.sql",
+      "ai": {
+        "description": "Returns aggregated customer statistics (totals, new customers, etc.)"
+      }
+    },
+    "customers.groups.list": {
+      "permission": "customers.view_customergroup",
+      "sql": "queries/groups_list.sql",
+      "list": {
+        "search": [
+          "name",
+          "description",
+          "customer_count"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "description",
+          "discount_percent",
+          "color",
+          "sort_order",
+          "is_active",
+          "customer_count"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "like"
+          },
+          "description": {
+            "op": "like"
+          },
+          "discount_percent": {
+            "op": "range"
+          },
+          "color": {
+            "op": "eq"
+          },
+          "sort_order": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          },
+          "customer_count": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the available customer groups"
+      }
+    },
+    "customers.tags.list": {
+      "permission": "customers.view_customertag",
+      "sql": "queries/tags_list.sql",
+      "list": {
+        "search": [
+          "name"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "color",
+          "is_active"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "like"
+          },
+          "color": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the available customer tags"
+      }
+    },
+    "customers.fields.list": {
+      "permission": "customers.view_customer",
+      "sql": "queries/fields_list.sql",
+      "list": {
+        "search": [
+          "name"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "field_type",
+          "options",
+          "is_required",
+          "sort_order",
+          "is_active"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "like"
+          },
+          "field_type": {
+            "op": "eq"
+          },
+          "options": {
+            "op": "eq"
+          },
+          "is_required": {
+            "op": "eq"
+          },
+          "sort_order": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the custom fields defined for customers"
+      }
+    },
+    "customers.fields.values": {
+      "permission": "customers.view_customer",
+      "sql": "queries/field_values.sql",
+      "ai": {
+        "description": "Custom field definitions with this customer's values (empty string when unset)"
+      }
+    },
+    "customers.activities": {
+      "permission": "customers.view_activity",
+      "sql": "queries/activities.sql",
+      "schema": "schemas/activities.json",
+      "ai": {
+        "description": "Lists the activity history of a customer"
+      }
+    },
+    "customers.group_ids": {
+      "permission": "customers.view_customer",
+      "sql": "queries/group_ids.sql",
+      "schema": "schemas/group_ids.json",
+      "ai": {
+        "description": "Lists the group ids assigned to a customer"
+      }
+    },
+    "customers.tag_ids": {
+      "permission": "customers.view_customer",
+      "sql": "queries/tag_ids.sql",
+      "schema": "schemas/tag_ids.json",
+      "ai": {
+        "description": "Lists the tag ids assigned to a customer"
+      }
+    },
+    "customers.orders.by_customer": {
+      "permission": "customers.view_customer",
+      "expose_api": true,
+      "sql": "queries/orders_by_customer.sql",
+      "ai": {
+        "description": "Lists the order ids linked to a customer (ADR-0141). Amounts come from sales via its declared query; customers stores only the FK."
+      }
+    }
+  },
+  "commands": {
+    "customers.create": {
+      "permission": "customers.add_customer",
+      "transaction": true,
+      "sql": [
+        "commands/create.sql"
+      ],
+      "schema": "schemas/create.json",
+      "emit": [
+        "customer.created"
+      ],
+      "ai": {
+        "description": "Creates a new customer"
+      }
+    },
+    "customers.update": {
+      "permission": "customers.change_customer",
+      "transaction": true,
+      "sql": [
+        "commands/update.sql"
+      ],
+      "schema": "schemas/update.json",
+      "emit": [
+        "customer.updated"
+      ],
+      "ai": {
+        "description": "Updates an existing customer's data"
+      }
+    },
+    "customers.delete": {
+      "permission": "customers.delete_customer",
+      "transaction": true,
+      "sql": [
+        "commands/delete.sql"
+      ],
+      "emit": [
+        "customer.deleted"
+      ],
+      "ai": {
+        "description": "Deletes a customer (destructive)"
+      }
+    },
+    "customers.record_purchase": {
+      "permission": "customers.change_customer",
+      "transaction": true,
+      "sql": [
+        "commands/record_purchase.sql"
+      ],
+      "schema": "schemas/record_purchase.json",
+      "ai": {
+        "description": "Records a purchase in the customer's history"
+      }
+    },
+    "customers.bulk_create": {
+      "permission": "customers.add_customer",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "bulk_create"
+      },
+      "schema": "schemas/bulk_create.json",
+      "ai": {
+        "description": "Creates multiple customers in bulk"
+      }
+    },
+    "customers.set_groups": {
+      "permission": "customers.change_customer",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "set_groups"
+      },
+      "schema": "schemas/set_groups.json",
+      "ai": {
+        "description": "Assigns a customer's groups, replacing the previous selection"
+      }
+    },
+    "customers.set_tags": {
+      "permission": "customers.change_customer",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "set_tags"
+      },
+      "schema": "schemas/set_tags.json",
+      "ai": {
+        "description": "Assigns a customer's tags, replacing the previous selection"
+      }
+    },
+    "customers.groups.create": {
+      "permission": "customers.add_customergroup",
+      "transaction": true,
+      "sql": [
+        "commands/group_create.sql"
+      ],
+      "schema": "schemas/group_create.json",
+      "ai": {
+        "description": "Creates a new customer group"
+      }
+    },
+    "customers.groups.update": {
+      "permission": "customers.change_customergroup",
+      "transaction": true,
+      "sql": [
+        "commands/group_update.sql"
+      ],
+      "schema": "schemas/group_update.json",
+      "ai": {
+        "description": "Updates an existing customer group"
+      }
+    },
+    "customers.groups.delete": {
+      "permission": "customers.delete_customergroup",
+      "transaction": true,
+      "sql": [
+        "commands/group_delete.sql"
+      ],
+      "ai": {
+        "description": "Deletes a customer group (destructive)"
+      }
+    },
+    "customers.tags.create": {
+      "permission": "customers.add_customertag",
+      "transaction": true,
+      "sql": [
+        "commands/tag_create.sql"
+      ],
+      "schema": "schemas/tag_create.json",
+      "ai": {
+        "description": "Creates a new customer tag"
+      }
+    },
+    "customers.tags.update": {
+      "permission": "customers.change_customertag",
+      "transaction": true,
+      "sql": [
+        "commands/tag_update.sql"
+      ],
+      "schema": "schemas/tag_update.json",
+      "ai": {
+        "description": "Updates an existing customer tag"
+      }
+    },
+    "customers.tags.delete": {
+      "permission": "customers.delete_customertag",
+      "transaction": true,
+      "sql": [
+        "commands/tag_delete.sql"
+      ],
+      "ai": {
+        "description": "Deletes a customer tag (destructive)"
+      }
+    },
+    "customers.fields.create": {
+      "permission": "customers.manage_custom_fields",
+      "transaction": true,
+      "sql": [
+        "commands/field_create.sql"
+      ],
+      "schema": "schemas/field_create.json",
+      "ai": {
+        "description": "Creates a new custom field for customers"
+      }
+    },
+    "customers.fields.update": {
+      "permission": "customers.manage_custom_fields",
+      "transaction": true,
+      "sql": [
+        "commands/field_update.sql"
+      ],
+      "schema": "schemas/field_update.json",
+      "ai": {
+        "description": "Updates a customer custom field"
+      }
+    },
+    "customers.fields.delete": {
+      "permission": "customers.manage_custom_fields",
+      "transaction": true,
+      "sql": [
+        "commands/field_delete.sql"
+      ],
+      "ai": {
+        "description": "Deletes a customer custom field (destructive)"
+      }
+    },
+    "customers.notes.add": {
+      "permission": "customers.add_note",
+      "transaction": true,
+      "sql": [
+        "commands/note_create.sql"
+      ],
+      "schema": "schemas/note_create.json",
+      "ai": {
+        "description": "Adds a note to a customer's history"
+      }
+    },
+    "customers.activity.add": {
+      "permission": "customers.view_activity",
+      "transaction": true,
+      "sql": [
+        "commands/activity_add.sql"
+      ],
+      "schema": "schemas/activity_add.json",
+      "ai": {
+        "description": "Records a new activity in a customer's history"
+      }
+    },
+    "customers._group_clear": {
+      "permission": "customers.change_customer",
+      "sql": [
+        "commands/_group_clear.sql"
+      ]
+    },
+    "customers._group_add": {
+      "permission": "customers.change_customer",
+      "sql": [
+        "commands/_group_add.sql"
+      ]
+    },
+    "customers._tag_clear": {
+      "permission": "customers.change_customer",
+      "sql": [
+        "commands/_tag_clear.sql"
+      ]
+    },
+    "customers._tag_add": {
+      "permission": "customers.change_customer",
+      "sql": [
+        "commands/_tag_add.sql"
+      ]
+    },
+    "customers._field_value_set": {
+      "permission": "customers.change_customer",
+      "sql": [
+        "commands/_field_value_set.sql"
+      ]
+    },
+    "customers.orders.link": {
+      "permission": "customers.change_customer",
+      "transaction": true,
+      "sql": [
+        "commands/customer_link_order.sql",
+        "commands/customer_link_order_insert.sql"
+      ],
+      "ai": {
+        "description": "Links a customer to an open order (ADR-0141 customer-order junction). Owned by customers: the order itself knows nothing about customers."
+      }
+    }
+  },
+  "events": {
+    "listen": {
+      "sale.completed": {
+        "command": "customers.record_purchase"
+      }
+    }
+  },
+  "provides_slots": [
+    {
+      "slot": "sales.pos.assign",
+      "component": "erp-customers-pos-search",
+      "permission": "customers.view_customer",
+      "priority": 200
+    }
+  ],
+  "ui": {
+    "entry": "dist/customers.esm.js"
+  }
+}

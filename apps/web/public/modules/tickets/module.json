@@ -1,0 +1,420 @@
+{
+  "id": "tickets",
+  "name": "Tickets",
+  "version": "1.0.3",
+  "agent": {
+    "description": "Manages customer support tickets: create, assign, update status, resolve, close, reopen tickets, manage SLA policies, and add comments.",
+    "keywords": [
+      "ticket",
+      "support",
+      "helpdesk",
+      "sla",
+      "issue",
+      "customer",
+      "resolve",
+      "assign"
+    ]
+  },
+  "depends_on": [],
+  "permissions": [
+    "tickets.view_ticket",
+    "tickets.add_ticket",
+    "tickets.manage_ticket",
+    "tickets.close_ticket"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "tickets.view_ticket",
+      "tickets.add_ticket",
+      "tickets.manage_ticket",
+      "tickets.close_ticket"
+    ],
+    "employee": [
+      "tickets.view_ticket",
+      "tickets.add_ticket",
+      "tickets.manage_ticket"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "All",
+      "icon": "headset-outline",
+      "component": "erp-tickets-list"
+    },
+    {
+      "id": "sla",
+      "label": "SLA",
+      "icon": "timer-outline",
+      "component": "erp-tickets-sla"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "tickets.tickets.list": {
+      "permission": "tickets.view_ticket",
+      "sql": "queries/tickets_list.sql",
+      "list": {
+        "search": [
+          "ticket_number",
+          "subject",
+          "description",
+          "customer_name",
+          "customer_email",
+          "customer_phone",
+          "assigned_to_ref",
+          "created_by_ref"
+        ],
+        "sort": [
+          "id",
+          "ticket_number",
+          "subject",
+          "description",
+          "customer_name",
+          "customer_email",
+          "customer_phone",
+          "status",
+          "priority",
+          "category",
+          "assigned_to_ref",
+          "created_by_ref",
+          "sla_id",
+          "opened_at",
+          "first_response_at",
+          "resolved_at",
+          "closed_at",
+          "satisfaction_rating",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "ticket_number": {
+            "op": "eq"
+          },
+          "subject": {
+            "op": "like"
+          },
+          "description": {
+            "op": "like"
+          },
+          "customer_name": {
+            "op": "like"
+          },
+          "customer_email": {
+            "op": "like"
+          },
+          "customer_phone": {
+            "op": "like"
+          },
+          "status": {
+            "op": "eq"
+          },
+          "priority": {
+            "op": "eq"
+          },
+          "category": {
+            "op": "eq"
+          },
+          "assigned_to_ref": {
+            "op": "eq"
+          },
+          "created_by_ref": {
+            "op": "eq"
+          },
+          "sla_id": {
+            "op": "eq"
+          },
+          "opened_at": {
+            "op": "range"
+          },
+          "first_response_at": {
+            "op": "range"
+          },
+          "resolved_at": {
+            "op": "range"
+          },
+          "closed_at": {
+            "op": "range"
+          },
+          "satisfaction_rating": {
+            "op": "eq"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists all support tickets with their status and priority"
+      }
+    },
+    "tickets.tickets.get": {
+      "permission": "tickets.view_ticket",
+      "sql": "queries/ticket_get.sql",
+      "schema": "schemas/ticket_get.json",
+      "ai": {
+        "description": "Gets the full details of a support ticket by its identifier"
+      }
+    },
+    "tickets.comments.list": {
+      "permission": "tickets.view_ticket",
+      "sql": "queries/comments_list.sql",
+      "list": {
+        "search": [
+          "author_ref"
+        ],
+        "sort": [
+          "id",
+          "ticket_id",
+          "author_ref",
+          "comment_text",
+          "is_internal",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "ticket_id": {
+            "op": "eq"
+          },
+          "author_ref": {
+            "op": "eq"
+          },
+          "comment_text": {
+            "op": "like"
+          },
+          "is_internal": {
+            "op": "eq"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the comments on a support ticket"
+      }
+    },
+    "tickets.slas.list": {
+      "permission": "tickets.view_ticket",
+      "sql": "queries/slas_list.sql",
+      "list": {
+        "search": [
+          "name",
+          "description"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "description",
+          "priority",
+          "response_time_hours",
+          "resolution_time_hours",
+          "is_active"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "like"
+          },
+          "description": {
+            "op": "like"
+          },
+          "priority": {
+            "op": "eq"
+          },
+          "response_time_hours": {
+            "op": "range"
+          },
+          "resolution_time_hours": {
+            "op": "range"
+          },
+          "is_active": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the SLA policies configured for tickets"
+      }
+    }
+  },
+  "commands": {
+    "tickets.slas.create": {
+      "permission": "tickets.manage_ticket",
+      "transaction": true,
+      "sql": [
+        "commands/sla_create.sql"
+      ],
+      "schema": "schemas/sla_create.json",
+      "emit": [
+        "tickets.sla.created"
+      ],
+      "ai": {
+        "description": "Creates a new SLA policy for support tickets"
+      }
+    },
+    "tickets.tickets.create": {
+      "permission": "tickets.add_ticket",
+      "schema": "schemas/ticket_create.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_ticket"
+      },
+      "emit": [
+        "tickets.ticket.created"
+      ],
+      "ai": {
+        "description": "Creates a new customer support ticket"
+      }
+    },
+    "tickets.tickets.assign": {
+      "permission": "tickets.manage_ticket",
+      "schema": "schemas/ticket_assign.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "assign_ticket"
+      },
+      "emit": [
+        "tickets.ticket.assigned"
+      ],
+      "ai": {
+        "description": "Assigns a ticket to a support agent"
+      }
+    },
+    "tickets.tickets.update_status": {
+      "permission": "tickets.manage_ticket",
+      "schema": "schemas/ticket_update_status.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "update_status"
+      },
+      "emit": [
+        "tickets.ticket.status_changed"
+      ],
+      "ai": {
+        "description": "Updates the status of a support ticket"
+      }
+    },
+    "tickets.comments.add": {
+      "permission": "tickets.manage_ticket",
+      "schema": "schemas/comment_add.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "add_comment"
+      },
+      "emit": [
+        "tickets.comment.added"
+      ],
+      "ai": {
+        "description": "Adds a comment or reply to a support ticket"
+      }
+    },
+    "tickets.tickets.resolve": {
+      "permission": "tickets.close_ticket",
+      "schema": "schemas/ticket_resolve.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "resolve_ticket"
+      },
+      "emit": [
+        "tickets.ticket.resolved"
+      ],
+      "ai": {
+        "description": "Marks a ticket as resolved once the issue has been fixed"
+      }
+    },
+    "tickets.tickets.close": {
+      "permission": "tickets.close_ticket",
+      "schema": "schemas/ticket_close.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "close_ticket"
+      },
+      "emit": [
+        "tickets.ticket.closed"
+      ],
+      "ai": {
+        "description": "Permanently closes a support ticket (destructive)"
+      }
+    },
+    "tickets.tickets.reopen": {
+      "permission": "tickets.manage_ticket",
+      "schema": "schemas/ticket_reopen.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "reopen_ticket"
+      },
+      "emit": [
+        "tickets.ticket.reopened"
+      ],
+      "ai": {
+        "description": "Reopens a closed or resolved ticket to continue handling it"
+      }
+    },
+    "tickets.slas.check_breach": {
+      "permission": "tickets.view_ticket",
+      "schema": "schemas/sla_check_breach.json",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "check_sla_breach"
+      },
+      "ai": {
+        "description": "Checks whether a ticket has breached its SLA and records the violation"
+      }
+    },
+    "tickets._insert_ticket": {
+      "permission": "tickets.add_ticket",
+      "sql": [
+        "commands/_insert_ticket.sql"
+      ]
+    },
+    "tickets._assign": {
+      "permission": "tickets.manage_ticket",
+      "sql": [
+        "commands/_assign.sql"
+      ]
+    },
+    "tickets._set_status": {
+      "permission": "tickets.manage_ticket",
+      "sql": [
+        "commands/_set_status.sql"
+      ]
+    },
+    "tickets._insert_comment": {
+      "permission": "tickets.manage_ticket",
+      "sql": [
+        "commands/_insert_comment.sql"
+      ]
+    },
+    "tickets._touch_first_response": {
+      "permission": "tickets.manage_ticket",
+      "sql": [
+        "commands/_touch_first_response.sql"
+      ]
+    }
+  },
+  "ui": {
+    "entry": "dist/tickets.esm.js"
+  }
+}

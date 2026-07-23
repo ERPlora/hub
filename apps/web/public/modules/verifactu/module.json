@@ -1,0 +1,736 @@
+{
+  "id": "verifactu",
+  "name": "VeriFactu",
+  "version": "1.2.2",
+  "agent": {
+    "description": "Handles Spanish VeriFactu fiscal compliance: generate, sign, and transmit invoice records to the AEAT, manage the contingency queue, and validate the billing chain integrity.",
+    "keywords": [
+      "verifactu",
+      "fiscal",
+      "spain",
+      "aeat",
+      "invoice",
+      "tax compliance",
+      "billing chain",
+      "contingency"
+    ]
+  },
+  "depends_on": [
+    "invoice"
+  ],
+  "permissions": [
+    "verifactu.view_verifactu",
+    "verifactu.manage_verifactu",
+    "verifactu.configure_verifactu",
+    "verifactu.transmit_verifactu"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "verifactu.view_verifactu",
+      "verifactu.manage_verifactu",
+      "verifactu.transmit_verifactu"
+    ],
+    "employee": [
+      "verifactu.view_verifactu"
+    ]
+  },
+  "capabilities": {
+    "certificate": {
+      "purpose": "fiscal-sign"
+    }
+  },
+  "navigation": [
+    {
+      "id": "records",
+      "label": "Records",
+      "icon": "document-text-outline",
+      "component": "erp-verifactu-records"
+    },
+    {
+      "id": "contingency",
+      "label": "Contingency",
+      "icon": "warning-outline",
+      "component": "erp-verifactu-contingency"
+    },
+    {
+      "id": "events",
+      "label": "Events",
+      "icon": "time-outline",
+      "component": "erp-verifactu-events"
+    },
+    {
+      "id": "recovery",
+      "label": "Recovery",
+      "icon": "shield-checkmark-outline",
+      "component": "erp-verifactu-recovery"
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "settings-outline",
+      "component": "erp-verifactu-settings"
+    }
+  ],
+  "setup": {
+    "required": true,
+    "query": "verifactu.config.get",
+    "configured_when": [
+      {
+        "field": "enabled",
+        "truthy": true
+      },
+      {
+        "field": "has_certificate",
+        "truthy": true
+      }
+    ],
+    "title": "Configura VeriFactu",
+    "description": "Activa VeriFactu y sube el certificado del negocio en Ajustes para enviar facturas a la AEAT.",
+    "icon": "shield-checkmark-outline",
+    "route": "/settings",
+    "permission": "verifactu.configure_verifactu"
+  },
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_cert_and_recovery.sql",
+      "migrations/sqlite/003_obligado.sql",
+      "migrations/sqlite/004_tax_breakdown.sql",
+      "migrations/sqlite/005_substitution.sql",
+      "migrations/sqlite/006_drop_cert_columns.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql",
+      "migrations/postgres/002_cert_and_recovery.sql",
+      "migrations/postgres/003_obligado.sql",
+      "migrations/postgres/004_tax_breakdown.sql",
+      "migrations/postgres/005_substitution.sql",
+      "migrations/postgres/006_drop_cert_columns.sql"
+    ]
+  },
+  "queries": {
+    "verifactu.config.get": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/config_get.sql",
+      "schema": "schemas/config_get.json",
+      "ai": {
+        "description": "Retrieves the VeriFactu configuration for the hub (certificate, environment, issuer NIF)."
+      }
+    },
+    "verifactu.records.list": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/records_list.sql",
+      "list": {
+        "search": [
+          "sequence_number",
+          "invoice_number",
+          "issuer_name"
+        ],
+        "sort": [
+          "id",
+          "sequence_number",
+          "invoice_number",
+          "invoice_date",
+          "record_type",
+          "invoice_type",
+          "issuer_nif",
+          "issuer_name",
+          "base_amount",
+          "tax_amount",
+          "total_amount",
+          "status",
+          "transmission_timestamp",
+          "retry_count",
+          "aeat_csv",
+          "generation_timestamp"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "sequence_number": {
+            "op": "eq"
+          },
+          "invoice_number": {
+            "op": "eq"
+          },
+          "invoice_date": {
+            "op": "range"
+          },
+          "record_type": {
+            "op": "eq"
+          },
+          "invoice_type": {
+            "op": "eq"
+          },
+          "issuer_nif": {
+            "op": "eq"
+          },
+          "issuer_name": {
+            "op": "like"
+          },
+          "base_amount": {
+            "op": "range"
+          },
+          "tax_amount": {
+            "op": "range"
+          },
+          "total_amount": {
+            "op": "range"
+          },
+          "status": {
+            "op": "eq"
+          },
+          "transmission_timestamp": {
+            "op": "eq"
+          },
+          "retry_count": {
+            "op": "range"
+          },
+          "aeat_csv": {
+            "op": "eq"
+          },
+          "generation_timestamp": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists billing records submitted to VeriFactu with their transmission status."
+      }
+    },
+    "verifactu.records.get": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/record_get.sql",
+      "schema": "schemas/record_get.json",
+      "ai": {
+        "description": "Retrieves the full detail of a specific VeriFactu billing record."
+      }
+    },
+    "verifactu.records.by_invoice": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/record_by_invoice.sql",
+      "schema": "schemas/record_by_invoice.json",
+      "ai": {
+        "description": "Returns the VeriFactu record (QR URL, AEAT CSV, status) for a given invoice id, to render the validation QR on a sales document."
+      }
+    },
+    "verifactu.contingency.list": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/contingency_list.sql",
+      "list": {
+        "sort": [
+          "id",
+          "record_id",
+          "priority",
+          "queued_at",
+          "attempts",
+          "last_attempt_at",
+          "last_error",
+          "next_attempt_at",
+          "status"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "record_id": {
+            "op": "eq"
+          },
+          "priority": {
+            "op": "eq"
+          },
+          "queued_at": {
+            "op": "range"
+          },
+          "attempts": {
+            "op": "eq"
+          },
+          "last_attempt_at": {
+            "op": "range"
+          },
+          "last_error": {
+            "op": "eq"
+          },
+          "next_attempt_at": {
+            "op": "range"
+          },
+          "status": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists VeriFactu records held in the contingency queue pending retransmission."
+      }
+    },
+    "verifactu.events.list": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/events_list.sql",
+      "list": {
+        "sort": [
+          "id",
+          "record_id",
+          "event_type",
+          "severity",
+          "message",
+          "details",
+          "timestamp"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "record_id": {
+            "op": "eq"
+          },
+          "event_type": {
+            "op": "eq"
+          },
+          "severity": {
+            "op": "eq"
+          },
+          "message": {
+            "op": "like"
+          },
+          "details": {
+            "op": "eq"
+          },
+          "timestamp": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the history of communication events with the AEAT via VeriFactu."
+      }
+    },
+    "verifactu.stats.compliance_summary": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/compliance_summary.sql",
+      "ai": {
+        "description": "Counts VeriFactu records still pending transmission/confirmation with the AEAT (pending, retry, error, rejected)."
+      }
+    },
+    "verifactu.stats.records_by_status": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/records_by_status.sql",
+      "ai": {
+        "description": "Distribution of VeriFactu records grouped by transmission status."
+      }
+    },
+    "verifactu.stats.contingency_summary": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/contingency_summary.sql",
+      "ai": {
+        "description": "Counts VeriFactu records still queued in the contingency queue (pending or retrying)."
+      }
+    },
+    "verifactu.stats.events_recent": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/events_recent.sql",
+      "ai": {
+        "description": "Most recent VeriFactu communication events with the AEAT (latest first)."
+      }
+    },
+    "verifactu.aeat.records.list": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/aeat_records_list.sql",
+      "list": {
+        "search": [
+          "invoice_number",
+          "record_hash",
+          "aeat_csv"
+        ],
+        "sort": [
+          "id",
+          "invoice_number",
+          "invoice_date",
+          "record_type",
+          "record_hash",
+          "aeat_csv",
+          "estado",
+          "query_timestamp"
+        ],
+        "default_sort": "query_timestamp",
+        "default_dir": "desc",
+        "filters": {
+          "invoice_number": {
+            "op": "eq"
+          },
+          "record_type": {
+            "op": "eq"
+          },
+          "estado": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the records the AEAT holds for this hub, fetched via the consultation web service (used for chain recovery and reconciliation)."
+      }
+    },
+    "verifactu.chain.status": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/chain_status.sql",
+      "ai": {
+        "description": "Latest result of the VeriFactu billing chain integrity check (valid or broken)."
+      }
+    },
+    "verifactu.diagnostics.last": {
+      "permission": "verifactu.view_verifactu",
+      "sql": "queries/diagnostics_last.sql",
+      "ai": {
+        "description": "Latest VeriFactu live self-test result (certificate validity + sample fingerprint/QR + AEAT response)."
+      }
+    }
+  },
+  "commands": {
+    "verifactu.config.save": {
+      "permission": "verifactu.configure_verifactu",
+      "transaction": true,
+      "sql": [
+        "commands/config_save.sql"
+      ],
+      "schema": "schemas/config_save.json",
+      "emit": [
+        "verifactu.config.changed"
+      ],
+      "ai": {
+        "description": "Saves the VeriFactu configuration (certificate, environment, issuer NIF)."
+      }
+    },
+    "verifactu.contingency.retry": {
+      "permission": "verifactu.manage_verifactu",
+      "transaction": true,
+      "sql": [
+        "commands/contingency_retry.sql"
+      ],
+      "schema": "schemas/contingency_retry.json",
+      "emit": [
+        "verifactu.contingency.retried"
+      ],
+      "ai": {
+        "description": "Retries transmission of a contingency record to the AEAT."
+      }
+    },
+    "verifactu.contingency.cancel": {
+      "permission": "verifactu.manage_verifactu",
+      "transaction": true,
+      "sql": [
+        "commands/contingency_cancel.sql"
+      ],
+      "schema": "schemas/contingency_cancel.json",
+      "emit": [
+        "verifactu.contingency.cancelled"
+      ],
+      "ai": {
+        "description": "Cancels a contingency record, discarding its retransmission (destructive)."
+      }
+    },
+    "verifactu.records.create": {
+      "permission": "verifactu.manage_verifactu",
+      "schema": "schemas/record_create.json",
+      "handler": {
+        "type": "native",
+        "function": "create_record"
+      },
+      "emit": [
+        "verifactu.record.created"
+      ],
+      "ai": {
+        "description": "Generates and signs a new VeriFactu billing record from an invoice."
+      }
+    },
+    "verifactu.records.ingest_invoice": {
+      "permission": "verifactu.manage_verifactu",
+      "schema": "schemas/ingest_invoice.json",
+      "handler": {
+        "type": "native",
+        "function": "ingest_invoice"
+      },
+      "emit": [
+        "verifactu.record.created"
+      ],
+      "ai": {
+        "description": "Creates a VeriFactu RegistroAlta automatically from an issued or rectifying invoice (listener for invoice.created / invoice.rectified)."
+      }
+    },
+    "verifactu.records.transmit": {
+      "permission": "verifactu.transmit_verifactu",
+      "schema": "schemas/record_transmit.json",
+      "handler": {
+        "type": "native",
+        "function": "transmit_record"
+      },
+      "emit": [
+        "verifactu.record.transmitted"
+      ],
+      "ai": {
+        "description": "Transmits a signed billing record to the AEAT via VeriFactu."
+      }
+    },
+    "verifactu.contingency.process": {
+      "permission": "verifactu.manage_verifactu",
+      "schema": "schemas/contingency_process.json",
+      "handler": {
+        "type": "native",
+        "function": "process_contingency_queue"
+      },
+      "emit": [
+        "verifactu.contingency.processed"
+      ],
+      "ai": {
+        "description": "Processes the contingency queue by retransmitting all pending records to the AEAT."
+      }
+    },
+    "verifactu.diagnostics.run": {
+      "permission": "verifactu.transmit_verifactu",
+      "schema": "schemas/diagnostics_run.json",
+      "handler": {
+        "type": "native",
+        "function": "run_diagnostics"
+      },
+      "emit": [
+        "verifactu.diagnostic.run"
+      ],
+      "ai": {
+        "description": "Runs a VeriFactu live self-test: validates the certificate/password, builds a sample fingerprint + QR and sends a test record to the AEAT, without touching the real chain."
+      }
+    },
+    "verifactu.chain.validate": {
+      "permission": "verifactu.view_verifactu",
+      "schema": "schemas/chain_validate.json",
+      "handler": {
+        "type": "native",
+        "function": "validate_chain"
+      },
+      "emit": [
+        "verifactu.chain.validated"
+      ],
+      "ai": {
+        "description": "Validates the integrity of the VeriFactu billing chain."
+      }
+    },
+    "verifactu.aeat.query_recent": {
+      "permission": "verifactu.transmit_verifactu",
+      "schema": "schemas/aeat_query_recent.json",
+      "handler": {
+        "type": "native",
+        "function": "query_aeat_records"
+      },
+      "emit": [
+        "verifactu.aeat.queried"
+      ],
+      "ai": {
+        "description": "Fetches the latest records the AEAT holds for the issuer via its consultation web service."
+      }
+    },
+    "verifactu.recovery.from_aeat": {
+      "permission": "verifactu.configure_verifactu",
+      "schema": "schemas/recovery_from_aeat.json",
+      "handler": {
+        "type": "native",
+        "function": "recover_from_aeat"
+      },
+      "emit": [
+        "verifactu.chain.recovered"
+      ],
+      "ai": {
+        "description": "Recovers the billing chain anchor by querying the AEAT for the last confirmed record (use after a database restore)."
+      }
+    },
+    "verifactu.recovery.manual": {
+      "permission": "verifactu.configure_verifactu",
+      "schema": "schemas/recovery_manual.json",
+      "handler": {
+        "type": "native",
+        "function": "recover_manual"
+      },
+      "emit": [
+        "verifactu.chain.recovered"
+      ],
+      "ai": {
+        "description": "Continues the billing chain from a hash provided manually (migration from another application)."
+      }
+    },
+    "verifactu._insert_record": {
+      "permission": "verifactu.manage_verifactu",
+      "sql": [
+        "commands/_insert_record.sql"
+      ]
+    },
+    "verifactu._insert_event": {
+      "permission": "verifactu.manage_verifactu",
+      "sql": [
+        "commands/_insert_event.sql"
+      ]
+    },
+    "verifactu._enqueue_contingency": {
+      "permission": "verifactu.manage_verifactu",
+      "sql": [
+        "commands/_enqueue_contingency.sql"
+      ]
+    },
+    "verifactu._apply_transmission": {
+      "permission": "verifactu.transmit_verifactu",
+      "sql": [
+        "commands/_apply_transmission.sql"
+      ]
+    },
+    "verifactu._insert_recovery": {
+      "permission": "verifactu.configure_verifactu",
+      "sql": [
+        "commands/_insert_recovery.sql"
+      ]
+    },
+    "verifactu._insert_aeat_record": {
+      "permission": "verifactu.transmit_verifactu",
+      "sql": [
+        "commands/_insert_aeat_record.sql"
+      ]
+    },
+    "verifactu._clear_aeat_records": {
+      "permission": "verifactu.transmit_verifactu",
+      "sql": [
+        "commands/_clear_aeat_records.sql"
+      ]
+    },
+    "verifactu._resolve_contingency": {
+      "permission": "verifactu.transmit_verifactu",
+      "sql": [
+        "commands/_resolve_contingency.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": {
+      "invoice.created": {
+        "command": "verifactu.records.ingest_invoice"
+      },
+      "invoice.rectified": {
+        "command": "verifactu.records.ingest_invoice"
+      }
+    }
+  },
+  "widgets": {
+    "verifactu.pending": {
+      "title": "VeriFactu pending",
+      "icon": "shield-checkmark-outline",
+      "category": "Cumplimiento",
+      "size": "sm",
+      "permission": "verifactu.view_verifactu",
+      "sectors": [
+        "hosteleria",
+        "retail",
+        "gestoria",
+        "general"
+      ],
+      "default": true,
+      "kind": "kpi",
+      "query": "verifactu.stats.compliance_summary",
+      "refresh_on": ["verifactu.record.created", "verifactu.record.transmitted"],
+      "map": {
+        "value": "pending_count",
+        "trend": "trend"
+      },
+      "options": {
+        "label": "Records pending submission to the AEAT",
+        "icon": "shield-checkmark-outline",
+        "format": "number"
+      }
+    },
+    "verifactu.contingency": {
+      "title": "Contingency queue",
+      "icon": "warning-outline",
+      "category": "Cumplimiento",
+      "size": "sm",
+      "permission": "verifactu.view_verifactu",
+      "sectors": [
+        "hosteleria",
+        "retail",
+        "gestoria",
+        "general"
+      ],
+      "default": false,
+      "kind": "stat",
+      "query": "verifactu.stats.contingency_summary",
+      "refresh_on": ["verifactu.contingency.retried", "verifactu.contingency.cancelled", "verifactu.contingency.processed"],
+      "map": {
+        "value": "queued_count",
+        "severity": "severity"
+      },
+      "options": {
+        "label": "In contingency queue",
+        "icon": "warning-outline",
+        "format": "number"
+      }
+    },
+    "verifactu.by_status": {
+      "title": "Records by status",
+      "icon": "stats-chart-outline",
+      "category": "Cumplimiento",
+      "size": "md",
+      "permission": "verifactu.view_verifactu",
+      "sectors": [
+        "hosteleria",
+        "retail",
+        "gestoria",
+        "general"
+      ],
+      "default": false,
+      "kind": "bar-list",
+      "query": "verifactu.stats.records_by_status",
+      "refresh_on": ["verifactu.record.created", "verifactu.record.transmitted", "verifactu.contingency.processed"],
+      "map": {
+        "label": "label",
+        "value": "total"
+      },
+      "options": {
+        "valueFormat": "number"
+      }
+    },
+    "verifactu.events": {
+      "title": "Recent AEAT events",
+      "icon": "time-outline",
+      "category": "Cumplimiento",
+      "size": "md",
+      "permission": "verifactu.view_verifactu",
+      "sectors": [
+        "hosteleria",
+        "retail",
+        "gestoria",
+        "general"
+      ],
+      "default": false,
+      "kind": "timeline",
+      "query": "verifactu.stats.events_recent",
+      "refresh_on": ["verifactu.record.created", "verifactu.record.transmitted", "verifactu.contingency.processed"],
+      "map": {
+        "id": "id",
+        "title": "title",
+        "description": "description",
+        "time": "timestamp",
+        "status": "status"
+      },
+      "options": {
+        "align": "left"
+      }
+    }
+  },
+  "scheduled_tasks": [
+    {
+      "name": "process_contingency",
+      "command": "verifactu.contingency.process",
+      "cron": "*/5 * * * *",
+      "catch_up": "collapse"
+    }
+  ],
+  "ui": {
+    "entry": "dist/verifactu.esm.js"
+  }
+}

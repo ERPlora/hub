@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reservations.settings.upsert",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "time_slot_duration": { "type": ["integer", "null"], "minimum": 5, "maximum": 120, "default": 30, "title": "Duración de franja horaria (minutos)" },
+    "min_party_size": { "type": ["integer", "null"], "minimum": 1, "default": 1, "title": "Comensales mínimos" },
+    "max_party_size": { "type": ["integer", "null"], "minimum": 1, "default": 20, "title": "Comensales máximos" },
+    "min_advance_hours": { "type": ["integer", "null"], "minimum": 0, "default": 1, "title": "Antelación mínima (horas)" },
+    "max_advance_days": { "type": ["integer", "null"], "minimum": 1, "default": 30, "title": "Antelación máxima (días)" },
+    "auto_confirm": { "type": ["boolean", "null"], "default": false, "title": "Confirmar reservas automáticamente" },
+    "require_phone": { "type": ["boolean", "null"], "default": true, "title": "Teléfono obligatorio" },
+    "require_email": { "type": ["boolean", "null"], "default": false, "title": "Email obligatorio" },
+    "no_show_window_minutes": { "type": ["integer", "null"], "minimum": 5, "default": 15, "title": "Margen para no-show (minutos)" },
+    "default_duration_minutes": { "type": ["integer", "null"], "minimum": 15, "default": 120, "title": "Duración por defecto (minutos)" },
+    "send_confirmation_email": { "type": ["boolean", "null"], "default": false, "title": "Enviar email de confirmación" },
+    "send_reminder_email": { "type": ["boolean", "null"], "default": false, "title": "Enviar email recordatorio" },
+    "reminder_hours_before": { "type": ["integer", "null"], "minimum": 1, "default": 24, "title": "Recordatorio (horas antes)" }
+  }
+}

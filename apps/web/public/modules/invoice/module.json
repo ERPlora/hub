@@ -1,0 +1,338 @@
+{
+  "id": "invoice",
+  "name": "Invoicing",
+  "version": "1.1.3",
+  "agent": {
+    "description": "Manages invoicing: create invoices from sales, issue rectifying invoices, mark invoices as paid, and manage invoice series.",
+    "keywords": [
+      "invoice",
+      "billing",
+      "receipt",
+      "payment",
+      "rectify",
+      "series",
+      "tax"
+    ]
+  },
+  "depends_on": [],
+  "permissions": [
+    "invoice.view_invoice",
+    "invoice.add_invoice",
+    "invoice.rectify_invoice",
+    "invoice.manage_series",
+    "invoice.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "invoice.view_invoice",
+      "invoice.add_invoice",
+      "invoice.rectify_invoice",
+      "invoice.manage_series"
+    ],
+    "employee": [
+      "invoice.view_invoice",
+      "invoice.add_invoice"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "invoice",
+      "label": "Invoices",
+      "icon": "document-text-outline",
+      "component": "erp-invoice-list"
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "settings-outline",
+      "component": "erp-invoice-settings",
+      "permission": "invoice.view_invoice"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_tax_category_key.sql",
+      "migrations/sqlite/003_substitution.sql",
+      "migrations/sqlite/004_quantity_fixed_point.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql",
+      "migrations/postgres/002_tax_category_key.sql",
+      "migrations/postgres/003_substitution.sql",
+      "migrations/postgres/004_quantity_fixed_point.sql"
+    ]
+  },
+  "queries": {
+    "invoice.list": {
+      "permission": "invoice.view_invoice",
+      "expose_api": true,
+      "sql": "queries/list.sql",
+      "list": {
+        "search": [
+          "number",
+          "customer_name",
+          "customer_tax_id"
+        ],
+        "sort": [
+          "id",
+          "invoice_type",
+          "series",
+          "number",
+          "issue_date",
+          "customer_name",
+          "customer_tax_id",
+          "base_amount",
+          "tax_amount",
+          "total_amount",
+          "status",
+          "source_type"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "invoice_type": {
+            "op": "eq"
+          },
+          "series": {
+            "op": "eq"
+          },
+          "number": {
+            "op": "eq"
+          },
+          "issue_date": {
+            "op": "range"
+          },
+          "customer_name": {
+            "op": "like"
+          },
+          "customer_tax_id": {
+            "op": "range"
+          },
+          "base_amount": {
+            "op": "range"
+          },
+          "tax_amount": {
+            "op": "range"
+          },
+          "total_amount": {
+            "op": "range"
+          },
+          "status": {
+            "op": "eq"
+          },
+          "source_type": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists issued invoices with their main details."
+      }
+    },
+    "invoice.get": {
+      "permission": "invoice.view_invoice",
+      "expose_api": true,
+      "sql": "queries/get.sql",
+      "ai": {
+        "description": "Retrieves the full detail of an invoice by its identifier."
+      }
+    },
+    "invoice.by_source": {
+      "permission": "invoice.view_invoice",
+      "expose_api": true,
+      "sql": "queries/by_source.sql",
+      "schema": "schemas/by_source.json",
+      "ai": {
+        "description": "Returns the invoice generated from a given source (e.g. a POS sale) by its source id."
+      }
+    },
+    "invoice.lines": {
+      "permission": "invoice.view_invoice",
+      "expose_api": true,
+      "sql": "queries/lines.sql",
+      "ai": {
+        "description": "Lists the line items (products/services) of an invoice."
+      }
+    },
+    "invoice.series.list": {
+      "permission": "invoice.view_invoice",
+      "sql": "queries/series_list.sql",
+      "list": {
+        "search": [
+          "code",
+          "name",
+          "current_number"
+        ],
+        "sort": [
+          "id",
+          "code",
+          "name",
+          "invoice_type",
+          "year",
+          "current_number",
+          "prefix",
+          "is_active",
+          "is_default"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "code": {
+            "op": "eq"
+          },
+          "name": {
+            "op": "like"
+          },
+          "invoice_type": {
+            "op": "eq"
+          },
+          "year": {
+            "op": "eq"
+          },
+          "current_number": {
+            "op": "eq"
+          },
+          "prefix": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          },
+          "is_default": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the available invoice series."
+      }
+    }
+  },
+  "commands": {
+    "invoice.create": {
+      "permission": "invoice.add_invoice",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_invoice"
+      },
+      "schema": "schemas/create_invoice.json",
+      "ai": {
+        "description": "Creates a new invoice with its detail lines."
+      }
+    },
+    "invoice.create_from_sale": {
+      "permission": "invoice.add_invoice",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_from_sale"
+      },
+      "ai": {
+        "description": "Automatically generates an invoice from a completed sale."
+      }
+    },
+    "invoice.substitute": {
+      "permission": "invoice.add_invoice",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "substitute_from_invoice"
+      },
+      "schema": "schemas/substitute.json",
+      "ai": {
+        "description": "Issues a complete invoice (F3) that substitutes a previously issued simplified invoice/ticket (F2) — the 'customer asks for an invoice for their ticket' case. The original ticket stays immutable; the new F3 links to it and carries the customer's tax details. Not a rectification (the ticket was correct)."
+      }
+    },
+    "invoice.rectify": {
+      "permission": "invoice.rectify_invoice",
+      "transaction": true,
+      "sql": [
+        "commands/rectify_ensure.sql",
+        "commands/rectify_bump.sql",
+        "commands/rectify_insert.sql",
+        "commands/rectify_cancel.sql"
+      ],
+      "emit": [
+        "invoice.rectified"
+      ],
+      "ai": {
+        "description": "Issues a rectifying invoice that cancels or corrects an existing invoice."
+      }
+    },
+    "invoice.mark_paid": {
+      "permission": "invoice.add_invoice",
+      "transaction": true,
+      "sql": [
+        "commands/mark_paid.sql"
+      ],
+      "ai": {
+        "description": "Marks an issued invoice as paid, recording the payment date. Amounts are immutable and no payment method is stored."
+      }
+    },
+    "invoice.series.create": {
+      "permission": "invoice.manage_series",
+      "transaction": true,
+      "sql": [
+        "commands/series_create_clear_default.sql",
+        "commands/series_create.sql"
+      ],
+      "schema": "schemas/series_create.json",
+      "ai": {
+        "description": "Creates a new invoice numbering series (code, name, invoice type, year, prefix). Marking it as default demotes the previous default series of the same year."
+      }
+    },
+    "invoice.series.update": {
+      "permission": "invoice.manage_series",
+      "transaction": true,
+      "sql": [
+        "commands/series_update_clear_default.sql",
+        "commands/series_update.sql"
+      ],
+      "schema": "schemas/series_update.json",
+      "ai": {
+        "description": "Updates the mutable fields of an invoice series (name, prefix, is_active, is_default). Code, year and the counter are immutable for fiscal integrity."
+      }
+    },
+    "invoice._ensure_series": {
+      "permission": "invoice.add_invoice",
+      "sql": [
+        "commands/_ensure_series.sql"
+      ]
+    },
+    "invoice._bump_series": {
+      "permission": "invoice.add_invoice",
+      "sql": [
+        "commands/_bump_series.sql"
+      ]
+    },
+    "invoice._insert_invoice": {
+      "permission": "invoice.add_invoice",
+      "sql": [
+        "commands/_insert_invoice.sql"
+      ]
+    },
+    "invoice._insert_line": {
+      "permission": "invoice.add_invoice",
+      "sql": [
+        "commands/_insert_line.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": {
+      "sale.completed": {
+        "command": "invoice.create_from_sale"
+      }
+    }
+  },
+  "ui": {
+    "entry": "dist/invoice.esm.js"
+  }
+}

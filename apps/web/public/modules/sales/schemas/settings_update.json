@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sales.settings.update",
+  "description": "Configuración del TPV (singleton por hub). La UI envía el snapshot completo (upsert).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "allow_cash": {
+      "type": "boolean",
+      "default": true,
+      "title": "Permitir efectivo"
+    },
+    "allow_card": {
+      "type": "boolean",
+      "default": true,
+      "title": "Permitir tarjeta"
+    },
+    "allow_transfer": {
+      "type": "boolean",
+      "default": false,
+      "title": "Permitir transferencia"
+    },
+    "sync_products": {
+      "type": "boolean",
+      "default": true,
+      "title": "Mostrar productos en el TPV"
+    },
+    "sync_services": {
+      "type": "boolean",
+      "default": false,
+      "title": "Mostrar servicios en el TPV"
+    },
+    "require_customer": {
+      "type": "boolean",
+      "default": false,
+      "title": "Exigir cliente en cada venta"
+    },
+    "allow_discounts": {
+      "type": "boolean",
+      "default": true,
+      "title": "Permitir descuentos"
+    },
+    "enable_parked_tickets": {
+      "type": "boolean",
+      "default": true,
+      "title": "Permitir tiques aparcados"
+    },
+    "default_tax_included": {
+      "type": "boolean",
+      "default": true,
+      "title": "Precios con IVA incluido por defecto"
+    },
+    "auto_invoice_with_tax_id": {
+      "type": "boolean",
+      "default": false,
+      "title": "Emitir factura si el cliente tiene NIF"
+    },
+    "default_document_format": {
+      "type": "string",
+      "enum": [
+        "ticket",
+        "invoice"
+      ],
+      "default": "ticket",
+      "title": "Documento por defecto"
+    },
+    "receipt_header": {
+      "type": "string",
+      "default": "",
+      "title": "Cabecera del recibo",
+      "description": "Primera línea = nombre; resto = dirección."
+    },
+    "receipt_footer": {
+      "type": "string",
+      "default": "",
+      "title": "Pie del recibo"
+    },
+    "receipt_footer_image": {
+      "type": "string",
+      "default": "",
+      "title": "Imagen de pie (URL/base64)"
+    },
+    "receipt_marketing_url": {
+      "type": "string",
+      "default": "",
+      "title": "URL del QR promocional",
+      "description": "Reseñas de Google, redes sociales, web… Vacío = sin QR promocional."
+    },
+    "receipt_marketing_text": {
+      "type": "string",
+      "default": "",
+      "title": "Texto del QR promocional",
+      "description": "P.ej. «Escanea y déjanos una reseña»."
+    }
+  }
+}

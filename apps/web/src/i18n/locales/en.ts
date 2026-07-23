@@ -58,6 +58,7 @@ export default {
     emptySetup: 'Review the hub configuration. Pick an option or type your question.',
     suggestWhatsMissing: 'What needs configuring?',
     suggestHowTo: 'How do I set up',
+    goTo: 'Go to',
     placeholder: 'Type a message…',
     send: 'Send',
     stop: 'Stop',

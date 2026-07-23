@@ -1,0 +1,535 @@
+{
+  "id": "services",
+  "name": "Services",
+  "version": "1.5.2",
+  "agent": {
+    "description": "Manages the service catalogue: create, update and delete services, categories, and service packages; list available services and packages; configure module settings.",
+    "keywords": [
+      "service",
+      "catalogue",
+      "category",
+      "package",
+      "booking",
+      "offering",
+      "price"
+    ]
+  },
+  "depends_on": [
+    "taxes"
+  ],
+  "permissions": [
+    "services.view_service",
+    "services.add_service",
+    "services.change_service",
+    "services.delete_service",
+    "services.view_category",
+    "services.add_category",
+    "services.change_category",
+    "services.delete_category",
+    "services.view_package",
+    "services.add_package",
+    "services.change_package",
+    "services.delete_package",
+    "services.redeem_package",
+    "services.view_package_balance",
+    "services.manage_settings"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "services.view_service",
+      "services.add_service",
+      "services.change_service",
+      "services.view_category",
+      "services.add_category",
+      "services.change_category",
+      "services.view_package",
+      "services.add_package",
+      "services.change_package",
+      "services.redeem_package",
+      "services.view_package_balance"
+    ],
+    "employee": [
+      "services.view_service",
+      "services.add_service",
+      "services.view_category",
+      "services.view_package",
+      "services.redeem_package",
+      "services.view_package_balance"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "services",
+      "label": "Services",
+      "icon": "briefcase",
+      "component": "erp-services-list"
+    }
+  ],
+  "settings": {
+    "title": "Servicios",
+    "icon": "briefcase-outline",
+    "schema": "schemas/settings_update.json",
+    "get": "services.settings.get",
+    "set": "services.settings.update"
+  },
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql",
+      "migrations/sqlite/002_tax_rate_id.sql",
+      "migrations/sqlite/003_package_redemption.sql",
+      "migrations/sqlite/004_discount_split.sql",
+      "migrations/sqlite/005_tax_category_key.sql",
+      "migrations/sqlite/006_quantity_fixed_point.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql",
+      "migrations/postgres/002_tax_rate_id.sql",
+      "migrations/postgres/003_package_redemption.sql",
+      "migrations/postgres/004_discount_split.sql",
+      "migrations/postgres/005_tax_category_key.sql",
+      "migrations/postgres/006_quantity_fixed_point.sql"
+    ]
+  },
+  "queries": {
+    "services.services.list": {
+      "permission": "services.view_service",
+      "sql": "queries/services_list.sql",
+      "list": {
+        "search": [
+          "name"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "price",
+          "pricing_type",
+          "duration_minutes",
+          "is_bookable",
+          "category_id",
+          "category"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "like"
+          },
+          "price": {
+            "op": "range"
+          },
+          "pricing_type": {
+            "op": "eq"
+          },
+          "duration_minutes": {
+            "op": "eq"
+          },
+          "is_bookable": {
+            "op": "eq"
+          },
+          "category_id": {
+            "op": "eq"
+          },
+          "category": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the services available in the catalogue"
+      },
+      "expose_api": true
+    },
+    "services.services.get": {
+      "permission": "services.view_service",
+      "sql": "queries/service_get.sql",
+      "schema": "schemas/service_get.json",
+      "ai": {
+        "description": "Retrieves the full detail of a service by its identifier"
+      },
+      "expose_api": true
+    },
+    "services.categories.list": {
+      "permission": "services.view_category",
+      "sql": "queries/categories_list.sql",
+      "list": {
+        "search": [
+          "name",
+          "slug"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "slug",
+          "icon",
+          "color",
+          "parent_id",
+          "sort_order",
+          "service_count"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "like"
+          },
+          "slug": {
+            "op": "eq"
+          },
+          "icon": {
+            "op": "eq"
+          },
+          "color": {
+            "op": "eq"
+          },
+          "parent_id": {
+            "op": "eq"
+          },
+          "sort_order": {
+            "op": "eq"
+          },
+          "service_count": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the defined service categories"
+      },
+      "expose_api": true
+    },
+    "services.packages.list": {
+      "permission": "services.view_package",
+      "sql": "queries/packages_list.sql",
+      "list": {
+        "search": [
+          "name",
+          "slug"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "slug",
+          "discount_type",
+          "discount_percent",
+          "discount_amount_cents",
+          "fixed_price",
+          "is_active",
+          "items"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "like"
+          },
+          "slug": {
+            "op": "eq"
+          },
+          "discount_type": {
+            "op": "range"
+          },
+          "discount_percent": {
+            "op": "range"
+          },
+          "discount_amount_cents": {
+            "op": "range"
+          },
+          "fixed_price": {
+            "op": "range"
+          },
+          "is_active": {
+            "op": "eq"
+          },
+          "items": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the available service packages"
+      },
+      "expose_api": true
+    },
+    "services.packages.get": {
+      "permission": "services.view_package",
+      "sql": "queries/package_get.sql",
+      "schema": "schemas/package_get.json",
+      "ai": {
+        "description": "Retrieves the full detail of a service package by its identifier"
+      },
+      "expose_api": true
+    },
+    "services.packages.balance": {
+      "permission": "services.view_package_balance",
+      "sql": "queries/package_balance.sql",
+      "schema": "schemas/package_balance.json",
+      "ai": {
+        "description": "Returns the remaining uses and validity of a customer's service packages (bonos)"
+      },
+      "expose_api": true
+    },
+    "services.packages.redeem_check": {
+      "permission": "services.redeem_package",
+      "sql": "queries/package_redeem_check.sql",
+      "schema": "schemas/package_redeem_check.json",
+      "ai": {
+        "description": "Checks whether one use of a customer's package (bono) could be redeemed and, if not, returns the business reason (package_not_found, no_uses_left or expired) instead of the raw gate error."
+      },
+      "expose_api": true
+    },
+    "services.package_items.list": {
+      "permission": "services.view_package",
+      "sql": "queries/package_items_list.sql",
+      "list": {
+        "search": [
+          "service_name"
+        ],
+        "sort": [
+          "service_id",
+          "quantity",
+          "sort_order",
+          "service_name",
+          "service_price"
+        ],
+        "default_sort": "service_id",
+        "default_dir": "asc",
+        "filters": {
+          "service_id": {
+            "op": "eq"
+          },
+          "quantity": {
+            "op": "range"
+          },
+          "sort_order": {
+            "op": "eq"
+          },
+          "service_name": {
+            "op": "like"
+          },
+          "service_price": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the individual services included in a package"
+      },
+      "expose_api": true
+    },
+    "services.settings.get": {
+      "permission": "services.view_service",
+      "sql": "queries/settings_get.sql",
+      "ai": {
+        "description": "Retrieves the general settings of the services module"
+      }
+    }
+  },
+  "commands": {
+    "services.services.create": {
+      "permission": "services.add_service",
+      "transaction": true,
+      "sql": [
+        "commands/service_create.sql"
+      ],
+      "emit": [
+        "services.service.created"
+      ],
+      "ai": {
+        "description": "Creates a new service in the catalogue"
+      },
+      "expose_api": true,
+      "validates": [
+        {
+          "field": "tax_category_key",
+          "query": "taxes.categories.get",
+          "param": "key",
+          "optional": true
+        }
+      ]
+    },
+    "services.services.update": {
+      "permission": "services.change_service",
+      "transaction": true,
+      "sql": [
+        "commands/service_update.sql"
+      ],
+      "emit": [
+        "services.service.updated"
+      ],
+      "ai": {
+        "description": "Updates the details of an existing service"
+      },
+      "expose_api": true,
+      "validates": [
+        {
+          "field": "tax_category_key",
+          "query": "taxes.categories.get",
+          "param": "key",
+          "optional": true
+        }
+      ]
+    },
+    "services.services.delete": {
+      "permission": "services.delete_service",
+      "transaction": true,
+      "sql": [
+        "commands/service_delete.sql"
+      ],
+      "emit": [
+        "services.service.deleted"
+      ],
+      "ai": {
+        "description": "Deletes a service from the catalogue (destructive)"
+      }
+    },
+    "services.services.bulk_create": {
+      "permission": "services.change_service",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "bulk_create_services"
+      },
+      "ai": {
+        "description": "Creates multiple services in a single bulk operation"
+      }
+    },
+    "services._insert_service": {
+      "permission": "services.add_service",
+      "sql": [
+        "commands/_insert_service.sql"
+      ]
+    },
+    "services.categories.create": {
+      "permission": "services.add_category",
+      "transaction": true,
+      "sql": [
+        "commands/category_create.sql"
+      ],
+      "ai": {
+        "description": "Creates a new service category"
+      },
+      "expose_api": true
+    },
+    "services.categories.update": {
+      "permission": "services.change_category",
+      "transaction": true,
+      "sql": [
+        "commands/category_update.sql"
+      ],
+      "ai": {
+        "description": "Updates the details of an existing service category"
+      },
+      "expose_api": true
+    },
+    "services.categories.delete": {
+      "permission": "services.delete_category",
+      "transaction": true,
+      "sql": [
+        "commands/category_delete.sql"
+      ],
+      "ai": {
+        "description": "Deletes a service category (destructive)"
+      }
+    },
+    "services.packages.create": {
+      "permission": "services.add_package",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_package"
+      },
+      "emit": [
+        "services.package.created"
+      ],
+      "ai": {
+        "description": "Creates a new package grouping multiple services together"
+      },
+      "expose_api": true
+    },
+    "services.packages.update": {
+      "permission": "services.change_package",
+      "transaction": true,
+      "sql": [
+        "commands/package_update.sql"
+      ],
+      "emit": [
+        "services.package.updated"
+      ],
+      "ai": {
+        "description": "Updates the details of an existing service package"
+      },
+      "expose_api": true
+    },
+    "services.packages.delete": {
+      "permission": "services.delete_package",
+      "transaction": true,
+      "sql": [
+        "commands/package_delete.sql"
+      ],
+      "emit": [
+        "services.package.deleted"
+      ],
+      "ai": {
+        "description": "Deletes a service package (destructive)"
+      }
+    },
+    "services.packages.redeem": {
+      "permission": "services.redeem_package",
+      "transaction": true,
+      "sql": [
+        "commands/_redeem_insert.sql",
+        "commands/_redeem_assert.sql",
+        "commands/_gate_clear.sql"
+      ],
+      "schema": "schemas/package_redeem.json",
+      "emit": [
+        "services.package.redeemed"
+      ],
+      "ai": {
+        "description": "Consumes one use of a customer's service package (bono); rejects if no uses remain or it has expired"
+      },
+      "expose_api": true
+    },
+    "services._insert_package": {
+      "permission": "services.add_package",
+      "sql": [
+        "commands/_insert_package.sql"
+      ]
+    },
+    "services._insert_package_item": {
+      "permission": "services.add_package",
+      "sql": [
+        "commands/_insert_package_item.sql"
+      ]
+    },
+    "services.settings.update": {
+      "permission": "services.manage_settings",
+      "transaction": true,
+      "sql": [
+        "commands/settings_upsert.sql"
+      ],
+      "schema": "schemas/settings_update.json",
+      "ai": {
+        "description": "Updates the general settings of the services module"
+      },
+      "validates": [
+        {
+          "field": "default_tax_category_key",
+          "query": "taxes.categories.get",
+          "param": "key",
+          "optional": true
+        }
+      ]
+    }
+  },
+  "ui": {
+    "entry": "dist/services.esm.js"
+  }
+}

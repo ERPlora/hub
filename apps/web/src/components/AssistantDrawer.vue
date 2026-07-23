@@ -50,9 +50,28 @@
           class="chat-row"
           :class="m.role === 'user' ? 'is-user' : 'is-assistant'"
         >
-          <div class="chat-bubble" :class="m.role === 'user' ? 'bubble-user' : 'bubble-assistant'">
-            <span v-if="m.content">{{ m.content }}</span>
-            <ion-spinner v-else name="dots" class="chat-typing" />
+          <div class="chat-msg">
+            <div class="chat-bubble" :class="m.role === 'user' ? 'bubble-user' : 'bubble-assistant'">
+              <span v-if="m.content">{{ m.content }}</span>
+              <ion-spinner v-else name="dots" class="chat-typing" />
+            </div>
+            <!-- Botones de navegación: si la respuesta del asistente menciona rutas internas del
+                 shell (/m/…, /settings#…, /apps#…, …), se extraen y se ofrecen como CTAs clicables
+                 que navegan vía router.push. Así el asistente puede llevar al usuario a la pantalla
+                 exacta sin depender de markdown/links embebidos (las burbujas son texto plano). -->
+            <div v-if="m.role === 'assistant' && m.content" class="chat-actions">
+              <ion-button
+                v-for="r in extractRoutes(m.content)"
+                :key="r.url"
+                size="small"
+                fill="outline"
+                class="chat-nav-btn"
+                @click="navigateTo(r.url)"
+              >
+                <HubIcon slot="start" name="arrow-forward-circle-outline" />
+                {{ t('assistant.goTo') }} {{ r.label }}
+              </ion-button>
+            </div>
           </div>
         </div>
       </div>
@@ -87,6 +106,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { IonButton, IonTextarea, IonSpinner } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { assistantOpen, closeAssistant, assistantSeed } from '../lib/shell';
@@ -95,6 +115,44 @@ import { assistantMessages, saveAssistantHistory } from '../lib/assistant-histor
 import { pendingSetups } from '../lib/setup-status';
 
 const { t } = useI18n();
+const router = useRouter();
+
+/**
+ * Extrae rutas internas del shell del texto de la respuesta del asistente. Detecta las formas
+ * en las que el LLM puede mencionar una pantalla (gracias al seed conoce /m/…, /settings#…,
+ * /apps#…, /dashboard#…, /system#…, /billing#…, /employees#…). Devuelve {url,label} únicas.
+ */
+const ROUTE_RE = /(\/(?:m\/[\w-]+(?:\/[\w-]+)?|settings|apps|dashboard|system|billing|employees)(?:#[\w-]+)?)/g;
+interface ExtractedRoute { url: string; label: string }
+function extractRoutes(text: string): ExtractedRoute[] {
+  const matches = text.match(ROUTE_RE);
+  if (!matches) return [];
+  const seen = new Set<string>();
+  const out: ExtractedRoute[] = [];
+  for (const url of matches) {
+    if (seen.has(url)) continue;
+    seen.add(url);
+    // Etiqueta legible: "VeriFactu › Ajustes" para /m/verifactu/settings; el nombre del tab para los #hash.
+    let label = url;
+    const m = url.match(/^\/m\/([\w-]+)(?:\/([\w-]+))?/);
+    if (m) {
+      label = m[1].replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      if (m[2]) label += ` › ${m[2]}`;
+    } else {
+      const h = url.match(/^\/([\w-]+)#([\w-]+)/);
+      if (h) label = `${h[1]} › ${h[2]}`;
+      else label = url.replace(/^\//, '');
+    }
+    out.push({ url, label });
+  }
+  return out.slice(0, 4); // máximo 4 CTAs por mensaje
+}
+
+/** Navega a una ruta interna del shell (router.push) y cierra el drawer para que vea la pantalla. */
+function navigateTo(url: string): void {
+  void router.push(url);
+  closeAssistant();
+}
 
 // Sugerencias rápidas cuando el asistente abre sembrado con contexto de configuración: una por
 // módulo pendiente ("¿Cómo configuro VeriFactu?") + una global ("¿Qué falta por configurar?").
@@ -321,8 +379,24 @@ onBeforeUnmount(() => {
 .chat-row.is-assistant {
   justify-content: flex-start;
 }
-.chat-bubble {
+/* Envoltorio de burbuja + CTAs de navegación: apila la burbuja y los botones verticalmente. */
+.chat-msg {
   max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+/* Botones "Ir a …" extraídos de la respuesta del asistente (rutas internas del shell). */
+.chat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.chat-nav-btn {
+  text-transform: none;
+  font-weight: 500;
+}
+.chat-bubble {
   padding: 0.6rem 0.85rem;
   border-radius: 14px;
   line-height: 1.45;
