@@ -1,0 +1,133 @@
+//! GATE pm#16 — instalación + list-queries + blueprint seed de los packs sectoriales
+//! (restaurante / beauty) sobre **Postgres** real (Hub Cloud / demo del SaaS).
+//!
+//! Reproduce el "no se despliega en prod": la demo del SaaS corre sobre Postgres; si un
+//! módulo trae un patrón que SQLite tolera y Postgres rechaza (boolean→INTEGER, EXISTS→INTEGER,
+//! columnas sin cualificar en ON CONFLICT, multi-statement en un sql[]), su install/migración
+//! o su query revientan en la demo aunque en SQLite (CI de módulos) todo esté verde.
+//!
+//! No paniquea al primer fallo: acumula TODOS los reds (módulo + fase + error) y falla al final
+//! con el informe completo, para arreglar/mergear el lote de una pasada.
+//!
+//! Requiere un Postgres real (ignorado por defecto):
+//! ```sh
+//! DATABASE_URL=postgres://erplora:PASS@localhost:5433/erplora_hubtest \
+//!   cargo test -p erplora-runtime --test sector_packs_pg_e2e -- --ignored --test-threads=1 --nocapture
+//! ```
+use std::path::PathBuf;
+
+use erplora_db::{DatabaseAdapter, Params, PgAdapter};
+use erplora_runtime::{RequestContext, Runtime};
+
+fn module_dir(id: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules").join(id)
+}
+
+fn blueprint_seed(sector: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../blueprints/starter_catalogs/es").join(sector).join("seed.sql")
+}
+
+/// Unión de módulos POS relevantes a los 3 sectores (barbería/peluquería = beauty, restaurante),
+/// en orden topológico de `depends_on` (una dependencia siempre antes que su dependiente).
+const POS_MODULES_ORDERED: &[&str] = &[
+    "taxes",
+    "pricing",
+    "tables",
+    "cash_register",
+    "invoice",
+    "printing",
+    "staff",
+    "customers",
+    "schedules",
+    "inventory",   // dep: taxes
+    "services",    // dep: taxes
+    "sales",       // dep: inventory, taxes
+    "kitchen",     // dep: sales, inventory
+    "appointments",// dep: customers, services
+    "reservations",// dep: tables, customers
+    "verifactu",   // dep: invoice
+    "online_booking", // dep: customers
+];
+
+/// Reset total del esquema: parte de un "hub nuevo" repetible. El runtime recrea sus tablas
+/// de sistema en la primera instalación.
+async fn reset_schema(db: &dyn DatabaseAdapter) {
+    db.execute_batch("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+        .await
+        .expect("reset schema public");
+}
+
+/// Instala el pack en orden de deps; devuelve la lista de fallos (INSTALL <id>: <err>).
+async fn install_pack(rt: &mut Runtime, failures: &mut Vec<String>) {
+    for id in POS_MODULES_ORDERED {
+        if let Err(e) = rt.install_from_dir(&module_dir(id)).await {
+            failures.push(format!("INSTALL {id}: {e}"));
+        }
+    }
+}
+
+/// Ejercita cada query `*.list` declarada por los módulos instalados con params vacíos
+/// (el motor de listado funciona sin filtros — es la ruta que carga la UI al abrir cada módulo).
+/// Un red aquí = tabla no creada (migración no aplicada) o SQL que Postgres rechaza.
+async fn exercise_list_queries(rt: &Runtime, ctx: &RequestContext, failures: &mut Vec<String>) {
+    for id in POS_MODULES_ORDERED {
+        let mj = module_dir(id).join("module.json");
+        let Ok(txt) = std::fs::read_to_string(&mj) else { continue };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&txt) else { continue };
+        let Some(queries) = json.get("queries").and_then(|q| q.as_object()) else { continue };
+        for name in queries.keys().filter(|n| n.ends_with(".list")) {
+            if let Err(e) = rt.execute_query(name, &Params::new(), ctx).await {
+                failures.push(format!("QUERY {name}: {e}"));
+            }
+        }
+    }
+}
+
+/// Aplica el blueprint del sector (INSERTs directos en las tablas de módulo) sobre Postgres.
+/// Un red aquí = el seed no casa con el esquema Postgres (columna/tipo/sintaxis).
+async fn apply_blueprint(rt: &Runtime, sector: &str, failures: &mut Vec<String>) {
+    let path = blueprint_seed(sector);
+    let Ok(sql) = std::fs::read_to_string(&path) else {
+        failures.push(format!("SEED {sector}: no se pudo leer {}", path.display()));
+        return;
+    };
+    if let Err(e) = rt.db_for_test().execute_batch(&sql).await {
+        failures.push(format!("SEED {sector}: {e}"));
+    }
+}
+
+async fn run_sector(sector: &str) {
+    let url = std::env::var("DATABASE_URL").expect("set DATABASE_URL");
+    let db = PgAdapter::connect(&url).await.expect("connect to postgres");
+    reset_schema(&db).await;
+
+    let mut rt = Runtime::new(Box::new(db));
+    // El server llama esto al arrancar: crea las tablas de sistema (incl. identidad `hub_user`)
+    // que el blueprint necesita para sembrar los cajeros. Sin esto el seed fallaría por hub_user.
+    rt.ensure_system_tables().await.expect("ensure_system_tables");
+    let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+    let mut failures: Vec<String> = Vec::new();
+
+    install_pack(&mut rt, &mut failures).await;
+    exercise_list_queries(&rt, &ctx, &mut failures).await;
+    apply_blueprint(&rt, sector, &mut failures).await;
+
+    assert!(
+        failures.is_empty(),
+        "\n=== {} reds en el pack '{sector}' sobre Postgres ===\n{}\n",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires a real Postgres via DATABASE_URL"]
+async fn restaurant_pack_installs_and_seeds_on_postgres() {
+    run_sector("restaurant").await;
+}
+
+#[tokio::test]
+#[ignore = "requires a real Postgres via DATABASE_URL"]
+async fn beauty_pack_installs_and_seeds_on_postgres() {
+    run_sector("beauty").await;
+}
