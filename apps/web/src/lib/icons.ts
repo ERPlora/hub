@@ -98,6 +98,11 @@ import closeOutline from "~icons/ion/close-outline?raw";
 import stopCircleOutline from "~icons/ion/stop-circle-outline?raw";
 import copyOutline from "~icons/ion/copy-outline?raw";
 import codeSlashOutline from "~icons/ion/code-slash-outline?raw";
+// Logos de marca de SO — los botones "Descargar Bridge" (SystemPage) pintan uno por sistema,
+// en paridad con los de erplora.com/download/. `logo-tux` es el pingüino de Linux.
+import logoWindows from "~icons/ion/logo-windows?raw";
+import logoTux from "~icons/ion/logo-tux?raw";
+import logoAndroid from "~icons/ion/logo-android?raw";
 
 // Iconos que se pintan POR NOMBRE (`<ion-icon name="…">`) desde los ok-* de OutfitKit y desde los
 // Web Components de los módulos. Antes vivían en un `addIcons()` aparte, en main.ts, importados de
@@ -105,6 +110,7 @@ import codeSlashOutline from "~icons/ion/code-slash-outline?raw";
 // salía VACÍO. Ahora hay uno solo, y `src/lib/icons.test.ts` verifica que no falte ninguno.
 import add from "~icons/ion/add?raw";
 import alertCircleOutline from "~icons/ion/alert-circle-outline?raw";
+import arrowForwardCircleOutline from "~icons/ion/arrow-forward-circle-outline?raw";
 import appsOutline from "~icons/ion/apps-outline?raw";
 import archiveOutline from "~icons/ion/archive-outline?raw";
 import arrowRedoOutline from "~icons/ion/arrow-redo-outline?raw";
@@ -241,12 +247,16 @@ const SVGS: Record<string, string> = {
   "stop-circle-outline": stopCircleOutline,
   "copy-outline": copyOutline,
   "code-slash-outline": codeSlashOutline,
+  "logo-windows": logoWindows,
+  "logo-tux": logoTux,
+  "logo-android": logoAndroid,
   "panel-left": panelLeft,
 
   // Pintados por nombre desde los ok-* (OutfitKit) y los WC de los módulos — ver el bloque de
   // imports de arriba.
   add,
   "alert-circle-outline": alertCircleOutline,
+  "arrow-forward-circle-outline": arrowForwardCircleOutline,
   "apps-outline": appsOutline,
   "archive-outline": archiveOutline,
   "arrow-redo-outline": arrowRedoOutline,

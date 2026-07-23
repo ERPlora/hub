@@ -104,6 +104,16 @@ describe('registro único de iconos', () => {
     expect(missing, 'iconos del shell que NO están en el registro → se pintan VACÍOS').toEqual([]);
   });
 
+  it('los logos de SO de los botones "Descargar Bridge" están en el registro', () => {
+    // Los botones de descarga del Bridge (SystemPage.vue) pintan el logo de marca de cada SO con
+    // <HubIcon :name="os.icon">. El nombre es DINÁMICO (viene del array BRIDGE_OS), así que el
+    // escaneo estático de arriba no lo ve: sin este guard, un logo sin registrar caería al fallback
+    // (cube-outline) sin error. Paridad con los botones de erplora.com/download/.
+    for (const name of ['logo-windows', 'logo-tux', 'logo-android']) {
+      expect(resolveIcon(name), `${name} no está en el registro → se pinta como cube-outline`).not.toEqual(FALLBACK);
+    }
+  });
+
   it('los módulos instalados traen su sidecar de iconos (no dependen de este registro)', () => {
     // Que el sidecar de cada módulo esté COMPLETO se verifica donde se ve el fuente del módulo:
     // en `module-toolkit` (test/icons.test.mjs), que es quien lo hornea. Aquí no se puede: el
