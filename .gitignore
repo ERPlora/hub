@@ -34,4 +34,8 @@ modules/*
 # existe (el runtime Rust sirve /modules/** descargados del marketplace, ver sync-modules.mjs).
 # Los bundles ya caían por `dist/`; los module.json estaban trackeados por error → ruido en git
 # + se horneaban en el dist de la imagen (contra el principio de imagen módulo-less).
-apps/web/public/modules/erplora-inspect.mjs
+apps/web/public/modules/*
+!apps/web/public/modules/.gitkeep
+
+# Script de inspección temporal con Playwright (no versionar).
+erplora-inspect.mjs
