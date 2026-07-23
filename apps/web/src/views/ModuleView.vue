@@ -1,9 +1,9 @@
 <template>
   <AppPage :title="moduleName">
-    <div v-if="status === 'loading'" class="flex items-center gap-2 py-8 opacity-70">
+    <div v-if="status === 'loading'" class="state-loading">
       <ion-spinner name="crescent" /> {{ t('moduleView.loading') }}
     </div>
-    <p v-else-if="status === 'error'" class="text-[color:var(--ion-color-danger)]">
+    <p v-else-if="status === 'error'" class="state-error">
       {{ t('moduleView.loadError') }}
     </p>
     <!-- Pestaña sintética "Plan" (auto-inyectada para módulos con `billing`): panel del SHELL,
@@ -191,7 +191,7 @@ async function mount(): Promise<void> {
     if (navId === PLAN_TAB_ID && billing.value) {
       moduleName.value = manifest?.name ?? tabs.value[0]?.moduleName ?? moduleId;
       activeNavId.value = PLAN_TAB_ID;
-      if (outlet.value) outlet.value.innerHTML = ''; // el WC previo no debe quedar montado
+      if (outlet.value) outlet.value.replaceChildren(); // el WC previo no debe quedar montado
       status.value = 'ready';
       return;
     }
@@ -206,13 +206,13 @@ async function mount(): Promise<void> {
       if (settings.value.component) {
         if (tabs.value[0]) await loadComponent(tabs.value[0]); // registra el custom element del bundle
         if (outlet.value) {
-          outlet.value.innerHTML = '';
+          outlet.value.replaceChildren();
           const el = document.createElement(settings.value.component) as HTMLElement & { client?: unknown };
           el.client = client;
           outlet.value.appendChild(el);
         }
       } else if (outlet.value) {
-        outlet.value.innerHTML = '';
+        outlet.value.replaceChildren();
       }
       status.value = 'ready';
       return;
@@ -229,7 +229,7 @@ async function mount(): Promise<void> {
 
     const tag = await loadComponent(entry);
     if (outlet.value) {
-      outlet.value.innerHTML = '';
+      outlet.value.replaceChildren();
       const el = document.createElement(tag) as HTMLElement & { client?: unknown };
       // Inyecta el cliente del runtime ANTES de append: el WC (Lit) lo recibe en su
       // primer render y lo usa para query/command/eventos. WC → SDK → Rust (ARQUITECTURA.md §7.5).
@@ -287,6 +287,20 @@ watch(
      el outlet y sigue scrolleando vía `ion-content` (que es el scroller por defecto). */
 .outlet {
   height: 100%;
+}
+
+/* Estados de carga/error al montar el WC del módulo. Antes usaban utilidades Tailwind
+   (flex/opacity) y un valor arbitrario text-[color:...]; ahora scoped con tokens Ionic,
+   misma línea que el dashboard. */
+.state-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 0;
+  opacity: 0.7;
+}
+.state-error {
+  color: var(--ion-color-danger);
 }
 
 .blocked-card {

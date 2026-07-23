@@ -2,7 +2,7 @@
   <AppPage :title="t('nav.system')">
 
     <!-- ── Cargando: una sola vez en el boot ─────────────────────────── -->
-    <div v-if="loading" style="display: grid; place-items: center; padding: 64px 0">
+    <div v-if="loading" class="boot-loading">
       <ion-spinner name="crescent" />
     </div>
 
@@ -19,7 +19,7 @@
           <h3 class="block-header__title">{{ resourcesTitle }}</h3>
           <ok-status-pill v-if="resourcesSource" tone="info">{{ resourcesSource }}</ok-status-pill>
         </div>
-        <ion-grid class="ion-no-padding" style="margin-bottom: 16px">
+        <ion-grid class="ion-no-padding resources-grid">
           <ion-row>
             <ion-col size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
@@ -69,9 +69,9 @@
              y el arranque sin contrato muestran el bloque, con CTA de instalación si está offline. -->
         <ion-card v-if="showBridgeBlock" class="ion-no-margin">
           <ion-card-content>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
-              <h3 style="margin: 0; font-weight: 600">{{ t('system.bridgeConnection') }}</h3>
-              <div style="display: flex; align-items: center; gap: 8px">
+            <div class="bridge-head">
+              <h3 class="bridge-title">{{ t('system.bridgeConnection') }}</h3>
+              <div class="bridge-head-actions">
                 <ok-status-pill :tone="bridge.online ? 'success' : 'neutral'" dot>
                   {{ bridge.online ? t('system.connected') : t('system.disconnected') }}
                 </ok-status-pill>
@@ -80,29 +80,29 @@
                 </ion-button>
               </div>
             </div>
-            <p v-if="bridge.online" style="margin: 0 0 12px; font-size: 13px; opacity: 0.65">
+            <p v-if="bridge.online" class="muted-note">
               {{ t('system.bridgeRunning') }}<span v-if="bridge.version"> · v{{ bridge.version }}</span>.
               {{ t('system.bridgeRunningHint') }}
             </p>
-            <p v-else style="margin: 0 0 12px; font-size: 13px; opacity: 0.65">
+            <p v-else class="muted-note">
               {{ t('system.bridgeOffline') }}
             </p>
 
-            <ol v-if="!bridge.online" style="margin: 0 0 16px; padding-left: 0; list-style: none; display: flex; gap: 12px; flex-wrap: wrap">
-              <li v-for="(s, i) in bridgeSteps" :key="s" style="display: flex; align-items: center; gap: 6px">
-                <ion-badge :color="i === 0 ? 'primary' : 'medium'" style="min-width: 22px; text-align: center">
+            <ol v-if="!bridge.online" class="bridge-steps">
+              <li v-for="(s, i) in bridgeSteps" :key="s" class="bridge-step">
+                <ion-badge :color="i === 0 ? 'primary' : 'medium'" class="step-badge">
                   {{ i + 1 }}
                 </ion-badge>
-                <span style="font-size: 13px">{{ s }}</span>
+                <span class="step-text">{{ s }}</span>
               </li>
             </ol>
 
             <div v-if="!bridge.online">
-              <div style="font-weight: 600; margin-bottom: 4px">{{ t('system.downloadBridge') }}</div>
-              <p style="margin: 0 0 12px; font-size: 13px; opacity: 0.65">
+              <div class="download-label">{{ t('system.downloadBridge') }}</div>
+              <p class="muted-note">
                 {{ t('system.downloadBridgeHint') }}
               </p>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+              <div class="bridge-os-row">
                 <ion-button
                   v-for="os in BRIDGE_OS"
                   :key="os.label"
@@ -121,10 +121,10 @@
       <!-- ── Tab: Actualizaciones ───────────────────────────────── -->
       <template v-else-if="tab === 'updates'">
         <ion-card class="ion-no-margin">
-          <ion-card-content style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 24px; text-align: center">
-            <HubIcon name="checkmark-circle-outline" style="font-size: 48px; color: var(--ion-color-success)" />
-            <strong style="font-size: 18px">{{ t('system.upToDate') }}</strong>
-            <p style="margin: 0; opacity: 0.6; font-family: monospace; font-size: 13px">
+          <ion-card-content class="updates-center">
+            <HubIcon name="checkmark-circle-outline" class="updates-icon" />
+            <strong class="updates-title">{{ t('system.upToDate') }}</strong>
+            <p class="updates-meta">
               Hub {{ info?.hubVersion ?? '—' }} · {{ t('system.checkedNow') }}
             </p>
             <ion-button fill="outline" @click="handleCheckUpdates">
@@ -139,8 +139,8 @@
       <template v-else-if="tab === 'documents'">
         <ion-card class="ion-no-margin">
           <ion-card-content>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
-              <h3 style="margin: 0; font-weight: 600">{{ t('system.documents') }}</h3>
+            <div class="block-header">
+              <h3 class="block-header__title">{{ t('system.documents') }}</h3>
               <ok-status-pill tone="info">{{ storageSourceLabel }}</ok-status-pill>
             </div>
             <ok-empty-state
@@ -169,8 +169,8 @@
       <template v-else-if="tab === 'backups'">
         <ion-card class="ion-no-margin">
           <ion-card-content>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px">
-              <h3 style="margin: 0; font-weight: 600">{{ t('system.autoBackups') }}</h3>
+            <div class="block-header">
+              <h3 class="block-header__title">{{ t('system.autoBackups') }}</h3>
               <ion-button size="small" @click="handleBackupNow">
                 <HubIcon slot="start" name="cloud-upload-outline" />
                 {{ t('system.backupNow') }}
@@ -178,10 +178,10 @@
             </div>
 
             <template v-if="info?.storageUsed">
-              <p style="margin: 0 0 4px; font-size: 13px; opacity: 0.65">
+              <p class="muted-note storage-note">
                 {{ t('system.storageUsed') }} · {{ info.storageUsed.usedLabel }}<span v-if="info.storageUsed.limitLabel"> / {{ info.storageUsed.limitLabel }}</span>
               </p>
-              <ion-progress-bar v-if="info.storageUsed.fraction != null" :value="info.storageUsed.fraction" style="margin-bottom: 16px" />
+              <ion-progress-bar v-if="info.storageUsed.fraction != null" :value="info.storageUsed.fraction" class="storage-bar" />
             </template>
 
             <ok-empty-state
@@ -198,8 +198,8 @@
               >
                 <HubIcon slot="start" name="server-outline" color="medium" />
                 <ion-label>
-                  <h2 style="font-weight: 600">{{ t('system.backup') }}</h2>
-                  <ion-note style="font-family: monospace; font-size: 12px">{{ fmtDateTime(backup.when) }} · {{ backup.sizeLabel }}</ion-note>
+                  <h2 class="backup-title">{{ t('system.backup') }}</h2>
+                  <ion-note class="backup-meta">{{ fmtDateTime(backup.when) }} · {{ backup.sizeLabel }}</ion-note>
                 </ion-label>
                 <ion-button v-if="backup.url" slot="end" fill="clear" :aria-label="t('system.download')" @click="openUrl(backup.url)">
                   <HubIcon slot="icon-only" name="download-outline" />
@@ -214,7 +214,7 @@
       <template v-else-if="tab === 'logs'">
         <ion-card class="ion-no-margin">
           <ion-card-content>
-            <h3 style="margin: 0 0 12px; font-weight: 600">{{ t('system.eventLog') }}</h3>
+            <h3 class="logs-title">{{ t('system.eventLog') }}</h3>
             <ok-empty-state
               v-if="!logs.length"
               icon="document-text-outline"
@@ -278,6 +278,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
@@ -294,6 +295,7 @@ const { t } = useI18n();
 // ── Types ────────────────────────────────────────────────────────
 
 type Tab = 'resources' | 'updates' | 'documents' | 'backups' | 'logs';
+const TABS: readonly Tab[] = ['resources', 'updates', 'documents', 'backups', 'logs'];
 
 interface BridgeOs {
   label: string;
@@ -316,7 +318,20 @@ interface DataTableAction { id: string; label: string; icon?: string; color?: st
 
 // ── State ────────────────────────────────────────────────────────
 
-const tab = ref<Tab>('resources');
+// Deep-link a una pestaña por PATH (/system/copias) — navegable, compartible, back/forward.
+const route = useRoute();
+const router = useRouter();
+const tab = ref<Tab>(TABS.find((v) => v === String(route.params.tab ?? '')) ?? 'resources');
+// Sincroniza tab ↔ URL: al cambiar de pestaña, escribe el path; si el path cambia (back/forward),
+// actualiza el tab local. replace = no apila historial.
+watch(tab, (value) => {
+  if (value !== (route.params.tab ?? 'resources')) void router.replace(`/system/${value}`);
+});
+watch(() => String(route.params.tab ?? ''), (p) => {
+  const next = TABS.find((v) => v === p) ?? 'resources';
+  if (next !== tab.value) tab.value = next;
+});
+
 const toastMessage = ref('');
 const toastOpen = ref(false);
 const loading = ref(true);
@@ -375,11 +390,12 @@ const memory = computed(() => info.value?.memory ?? null);
 // Gauges: SOLO el % de uso (sin valores absolutos de vCPU/RAM — el cliente ve % de capacidad).
 const cpuPct = computed<number>(() => Math.round((cpu.value?.fraction ?? 0) * 100));
 const memPct = computed<number>(() => Math.round((memory.value?.fraction ?? 0) * 100));
-// Zonas de color del gauge de uso (verde→ámbar→rojo). Hex Ionic para que el SVG las pinte fiable.
+// Zonas de color del gauge de uso (verde→ámbar→rojo). Tokens de Ionic: conmutan en dark y
+// el SVG resuelve el `var()` al pintar el fill. Antes eran hex sueltos (#2dd36f/#ffc409/#eb445a).
 const usageThresholds = [
-  { to: 70, color: '#2dd36f' },
-  { to: 90, color: '#ffc409' },
-  { to: 100, color: '#eb445a' },
+  { to: 70, color: 'var(--ion-color-success)' },
+  { to: 90, color: 'var(--ion-color-warning)' },
+  { to: 100, color: 'var(--ion-color-danger)' },
 ];
 
 // Tamaño = headline. Solo existe en local (SQLite); en cloud (Aurora) no hay tamaño local → "N/A".
@@ -544,6 +560,117 @@ onBeforeUnmount(() => {
 }
 .block-header__title {
   margin: 0;
+  font-weight: 600;
+}
+
+/* Rejilla de métricas de Recursos: respiración inferior antes del bloque Bridge. */
+.resources-grid {
+  margin-bottom: 16px;
+}
+
+/* Estado de carga único del boot (centrado, aire). */
+.boot-loading {
+  display: grid;
+  place-items: center;
+  padding: 64px 0;
+}
+
+/* Nota de texto muted (versiones de bridge, hints de descarga, storage). Antes iba por
+   inline style="font-size:13px;opacity:.65" en cada sitio. */
+.muted-note {
+  margin: 0 0 12px;
+  font-size: 0.8125rem;
+  opacity: 0.65;
+}
+
+/* ── Bloque Bridge ── */
+.bridge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.bridge-title {
+  margin: 0;
+  font-weight: 600;
+}
+.bridge-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Pasos de instalación del Bridge: lista horizontal numerada. */
+.bridge-steps {
+  margin: 0 0 16px;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bridge-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.step-badge {
+  min-width: 22px;
+  text-align: center;
+}
+.step-text {
+  font-size: 0.8125rem;
+}
+.download-label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.bridge-os-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Pestaña Actualizaciones ── */
+.updates-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+.updates-icon {
+  font-size: 48px;
+  color: var(--ion-color-success);
+}
+.updates-title {
+  font-size: 1.125rem;
+}
+.updates-meta {
+  margin: 0;
+  opacity: 0.6;
+  font-family: monospace;
+  font-size: 0.8125rem;
+}
+
+/* ── Pestaña Copias ── */
+.storage-note {
+  margin-bottom: 4px;
+}
+.storage-bar {
+  margin-bottom: 16px;
+}
+.backup-title {
+  font-weight: 600;
+}
+.backup-meta {
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+/* ── Pestaña Registros ── */
+.logs-title {
+  margin: 0 0 12px;
   font-weight: 600;
 }
 </style>

@@ -4,15 +4,21 @@
          `:host{height:100%}` contra él → cabecera y pager fijos, scroll SOLO en el cuerpo, y se
          adapta a la altura del dispositivo (mismo patrón que ModuleView). -->
     <div class="fill">
-      <!-- Staff: tabla con ok-data-table (OutfitKit) — toda la chrome (búsqueda, alta, selector de
-           columnas, filas/página, vistas, CSV) vive DENTRO de la tabla, no en la topbar. -->
+      <!-- Carga: miembros + roles en paralelo (cada uno degrada a vacío). -->
+      <div v-if="loading" class="table-loading">
+        <ion-spinner name="crescent" />
+      </div>
+      <template v-else>
+      <!-- Staff: tabla con ok-data-table (OutFitKit) — toda la chrome (búsqueda, alta, selector de
+           columnas, filas/página, vistas, CSV) vive DENTRO de la tabla, no en la topbar.
+           Datos REALES del módulo staff (query staff.members_list). Sin módulo → empty-state. -->
       <ok-data-table
         v-show="tab === 'staff'"
         ref="staffTable"
         fill
         :columns="employeeColumns"
         :rows="employees"
-        :searchKeys="['name', 'email', 'role']"
+        :searchKeys="['full_name', 'email', 'role_name']"
         :actions="rowActions"
         :primaryAction="newEmployeeAction"
         :search-placeholder="t('employees.searchEmployee')"
@@ -23,19 +29,23 @@
         column-picker
       ></ok-data-table>
 
-      <!-- Usuarios: placeholder (igual que el original) -->
-      <div v-show="tab === 'users'" class="grid place-items-center h-full text-center opacity-60">
-        {{ t('employees.usersPlaceholder') }}
+      <!-- Usuarios: aún sin backend de usuarios del hub → estado guiado. -->
+      <div v-show="tab === 'users'" class="users-empty">
+        <ok-empty-state
+          icon="person-circle-outline"
+          :heading="t('employees.tabUsers')"
+          :message="t('employees.usersPlaceholder')"
+        />
       </div>
 
-      <!-- Roles: segunda tabla -->
+      <!-- Roles: datos REALES del módulo staff (query staff.roles_list). -->
       <ok-data-table
         v-show="tab === 'roles'"
         ref="rolesTable"
         fill
         :columns="roleColumns"
         :rows="roles"
-        :searchKeys="['name', 'scope']"
+        :searchKeys="['name']"
         :actions="rowActions"
         :primaryAction="newRoleAction"
         :search-placeholder="t('employees.searchRole')"
@@ -45,6 +55,7 @@
         csv-name="roles"
         column-picker
       ></ok-data-table>
+      </template>
 
       <!-- API keys: credenciales de máquina del Hub (ADR-0057), gestionadas junto a los usuarios.
            Panel propio (lista + crear + rotar + revocar); v-show conserva su estado al cambiar de
@@ -87,16 +98,17 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
-  IonFooter, IonSegment, IonSegmentButton, IonLabel
+  IonFooter, IonSegment, IonSegmentButton, IonLabel, IonSpinner
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import ApiKeysPanel from './ApiKeysPanel.vue';
 import { DT_LABELS_ES } from '../lib/data-table-labels';
+import { getClient } from '../lib/runtime';
 // `isAdmin` (owner/admin) gatea la pestaña «API keys» — mismo criterio que el backend.
 import { isAdmin } from '../lib/session';
 
@@ -117,9 +129,21 @@ interface DataTableAction { id: string; label: string; icon?: string; color?: st
 interface DataTablePrimaryAction { label: string; icon?: string }
 
 type EmployeeTab = 'staff' | 'users' | 'roles' | 'apikeys';
+const TABS: readonly EmployeeTab[] = ['staff', 'users', 'roles', 'apikeys'];
 
+const route = useRoute();
 const router = useRouter();
-const tab = ref<EmployeeTab>('staff');
+// Deep-link por PATH (/employees/roles). 'apikeys' solo es válido para admins (lo valida el gate
+// de abajo); un no-admin con ese path cae a 'staff' por el watch de isAdmin.
+const tab = ref<EmployeeTab>(TABS.find((v) => v === String(route.params.tab ?? '')) ?? 'staff');
+// Sincroniza tab ↔ URL (replace = no apila historial).
+watch(tab, (value) => {
+  if (value !== (route.params.tab ?? 'staff')) void router.replace(`/employees/${value}`);
+});
+watch(() => String(route.params.tab ?? ''), (p) => {
+  const next = TABS.find((v) => v === p) ?? 'staff';
+  if (next !== tab.value) tab.value = next;
+});
 
 // Defensa: si el usuario deja de ser admin (logout/cambio de sesión) estando en «API keys»,
 // volvemos a «staff» para no dejar una pestaña vacía seleccionada. La autoridad real es el backend.
@@ -136,82 +160,79 @@ function nameCell(row: Row): Node {
   const wrap = document.createElement('span');
   wrap.style.cssText = 'display:flex;align-items:center;gap:.6rem';
   const avatar = document.createElement('span');
-  avatar.textContent = (String(row.name ?? '?')[0] ?? '?').toUpperCase();
+  avatar.textContent = (String(row.full_name ?? '?')[0] ?? '?').toUpperCase();
   avatar.style.cssText =
     'display:grid;place-items:center;width:2rem;height:2rem;border-radius:999px;font-size:12px;font-weight:700;' +
     'background:color-mix(in srgb,var(--ion-color-primary) 15%,transparent);color:var(--ion-color-primary)';
   const name = document.createElement('span');
-  name.textContent = String(row.name ?? '');
+  name.textContent = String(row.full_name ?? '');
   name.style.fontWeight = '500';
   wrap.append(avatar, name);
   return wrap;
 }
 // Pill de tinte suave (look moderno) con los tokens de color de Ionic. Las CSS vars (--ion-*)
 // cruzan el shadow de ok-data-table, así que el color es fiable dentro de la tabla.
-function badgeCell(text: string, tone: 'success' | 'medium' | 'primary' | 'danger'): Node {
+function badgeCell(text: string, tone: 'success' | 'neutral' | 'primary' | 'danger'): Node {
+  // 'neutral' mapea al color Ionic medium (no existe --ion-color-neutral).
+  const ion = tone === 'neutral' ? 'medium' : tone;
   const span = document.createElement('span');
   span.textContent = text;
   span.style.cssText =
     'display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;' +
-    `background:rgba(var(--ion-color-${tone}-rgb), 0.14);` +
-    `color:var(--ion-color-${tone}-shade, var(--ion-color-${tone}))`;
+    `background:rgba(var(--ion-color-${ion}-rgb), 0.14);` +
+    `color:var(--ion-color-${ion}-shade, var(--ion-color-${ion}))`;
   return span;
 }
 
-// ── Datos demo (mismos que el original React) ───────────────────────────────────────────────
-const employees: Row[] = [
-  { id: '1', name: 'Demo Admin', email: 'demo@erplora.com', role: 'Administrador', status: 'Activo', createdAt: '2025-01-12' },
-  { id: '2', name: 'María López', email: 'maria@erplora.com', role: 'Encargado', status: 'Activo', createdAt: '2025-02-03' },
-  { id: '3', name: 'Juan Pérez', email: 'juan@erplora.com', role: 'Cajero', status: 'Activo', createdAt: '2025-02-20' },
-  { id: '4', name: 'Ana Ruiz', email: 'ana@erplora.com', role: 'Almacén', status: 'Inactivo', createdAt: '2025-03-15' },
-  { id: '5', name: 'Luis Gómez', email: 'luis@erplora.com', role: 'Camarero', status: 'Activo', createdAt: '2025-04-09' },
-  { id: '6', name: 'Sara Díaz', email: null, role: 'Cocina', status: 'Activo', createdAt: '2025-05-01' },
-];
+// ── Datos REALES del módulo staff ───────────────────────────────────────────────────────────
+// La query staff.members_list devuelve: id, full_name, email, role_name, status, hire_date…
+// (campos de members_list.sql). El runtime es la autoridad; si el módulo no está instalado,
+// degrada a vacío (ok-data-table pinta su empty interno). Cero mocks.
+const client = getClient();
+const loading = ref<boolean>(true);
+const employees = ref<Row[]>([]);
+const roles = ref<Row[]>([]);
+
+async function loadStaff(): Promise<void> {
+  loading.value = true;
+  try {
+    const [memPage, rolePage] = await Promise.all([
+      client.queryPage<Row>('staff.members_list', { limit: 200 }).catch(() => ({ rows: [] as Row[] })),
+      client.queryPage<Row>('staff.roles_list', { limit: 200 }).catch(() => ({ rows: [] as Row[] })),
+    ]);
+    employees.value = memPage.rows;
+    roles.value = rolePage.rows;
+  } catch {
+    employees.value = [];
+    roles.value = [];
+  } finally {
+    loading.value = false;
+  }
+}
 
 // `computed` para que las cabeceras se recalculen al cambiar de idioma en caliente.
 const employeeColumns = computed<DataTableColumn[]>(() => [
-  { key: 'name', header: t('employees.colEmployee'), render: nameCell },
+  { key: 'full_name', header: t('employees.colEmployee'), render: nameCell },
   { key: 'email', header: t('employees.colEmail'), format: (r) => String(r.email ?? '—') },
-  { key: 'role', header: t('employees.colRole'), filterable: true, filterType: 'select' },
+  { key: 'role_name', header: t('employees.colRole'), filterable: true, filterType: 'select' },
   {
     key: 'status', header: t('employees.colStatus'), filterable: true, filterType: 'select',
-    render: (r) => badgeCell(String(r.status), r.status === 'Activo' ? 'success' : 'medium')
+    render: (r) => badgeCell(String(r.status), r.status === 'active' ? 'success' : 'neutral')
   },
-  { key: 'createdAt', header: t('employees.colCreatedAt'), filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.createdAt)) },
+  { key: 'hire_date', header: t('employees.colCreatedAt'), filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.hire_date ?? '')) },
 ]);
 
-// ── Roles (dataset mayor para ver paginación) ───────────────────────────────────────────────
-interface RoleBase { id: string; name: string; scope: 'Sistema' | 'Personalizado'; members: number; permissions: number; createdAt: string }
-const BASE_ROLES: RoleBase[] = [
-  { id: 'admin', name: 'Administrador', scope: 'Sistema', members: 1, permissions: 48, createdAt: '2025-01-12' },
-  { id: 'manager', name: 'Encargado', scope: 'Sistema', members: 2, permissions: 31, createdAt: '2025-01-12' },
-  { id: 'cashier', name: 'Cajero', scope: 'Personalizado', members: 4, permissions: 9, createdAt: '2025-03-04' },
-  { id: 'stock', name: 'Almacén', scope: 'Personalizado', members: 1, permissions: 12, createdAt: '2025-04-21' },
-  { id: 'waiter', name: 'Camarero', scope: 'Personalizado', members: 6, permissions: 7, createdAt: '2025-05-18' },
-  { id: 'kitchen', name: 'Cocina', scope: 'Personalizado', members: 3, permissions: 5, createdAt: '2025-02-09' },
-  { id: 'host', name: 'Recepción', scope: 'Personalizado', members: 2, permissions: 6, createdAt: '2025-03-22' },
-  { id: 'accountant', name: 'Contabilidad', scope: 'Sistema', members: 1, permissions: 22, createdAt: '2025-01-30' },
-  { id: 'buyer', name: 'Compras', scope: 'Personalizado', members: 2, permissions: 14, createdAt: '2025-04-02' },
-  { id: 'marketing', name: 'Marketing', scope: 'Personalizado', members: 1, permissions: 8, createdAt: '2025-05-05' },
-  { id: 'support', name: 'Soporte', scope: 'Personalizado', members: 3, permissions: 11, createdAt: '2025-02-18' },
-  { id: 'auditor', name: 'Auditor', scope: 'Sistema', members: 1, permissions: 19, createdAt: '2025-01-22' },
-];
-const roles: Row[] = Array.from({ length: 58 }, (_, i) => {
-  const base = BASE_ROLES[i % BASE_ROLES.length];
-  return i < BASE_ROLES.length
-    ? { ...base }
-    : { ...base, id: `${base.id}-${i}`, name: `${base.name} ${Math.floor(i / BASE_ROLES.length) + 1}` };
-});
-
+// ── Roles (datos REALES de staff.roles_list) ────────────────────────────────────────────────
+// Schema: name, description, member_count, is_active. Sin scope/permissions (no existen en el
+// modelo real de staff_role). La cuenta de miembros viene precalculada en la propia query.
 const roleColumns = computed<DataTableColumn[]>(() => [
   { key: 'name', header: t('employees.colRole') },
   {
-    key: 'scope', header: t('employees.colScope'), filterable: true, filterType: 'select',
-    render: (r) => badgeCell(String(r.scope), r.scope === 'Sistema' ? 'primary' : 'medium')
+    key: 'is_active', header: t('employees.colScope'), filterable: true, filterType: 'select',
+    render: (r) => badgeCell(r.is_active ? t('employees.active') : t('employees.inactive'), r.is_active ? 'primary' : 'neutral')
   },
-  { key: 'members', header: t('employees.colMembers'), align: 'center' },
-  { key: 'permissions', header: t('employees.colPermissions'), align: 'center' },
-  { key: 'createdAt', header: t('employees.colCreated'), filterable: true, filterType: 'daterange', format: (r) => fmtDate(String(r.createdAt)) },
+  { key: 'member_count', header: t('employees.colMembers'), align: 'center' },
+  { key: 'description', header: t('employees.colPermissions'), format: (r) => String(r.description ?? '—') },
 ]);
 
 // Acciones de fila (editar / borrar) → evento `rowAction`. `computed` para que las etiquetas
@@ -251,20 +272,33 @@ function handleRowAction(e: Event): void {
 function handleStaffPrimary(): void { onNew(); }
 function handleRolesPrimary(): void { onNewRole(); }
 
+// Las tablas solo están en el DOM tras la carga (v-else del spinner). Enganchamos labels +
+// listeners cuando aparecen (watch del ref, patrón del Dashboard con activityTable).
+function bindTable(
+  el: HTMLElement | null,
+  onRow: (e: Event) => void,
+  onPrimary: () => void,
+): void {
+  if (!el) return;
+  (el as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+  el.addEventListener('rowAction', onRow);
+  el.addEventListener('primaryAction', onPrimary);
+}
+function unbindTable(el: HTMLElement | null, onRow: (e: Event) => void, onPrimary: () => void): void {
+  if (!el) return;
+  el.removeEventListener('rowAction', onRow);
+  el.removeEventListener('primaryAction', onPrimary);
+}
+
+watch(staffTable, (el) => bindTable(el, handleRowAction, handleStaffPrimary));
+watch(rolesTable, (el) => bindTable(el, handleRowAction, handleRolesPrimary));
+
 onMounted(() => {
-  // Etiquetas en español para las tablas del shell (ok-data-table usa inglés por defecto).
-  if (staffTable.value) (staffTable.value as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
-  if (rolesTable.value) (rolesTable.value as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
-  staffTable.value?.addEventListener('rowAction', handleRowAction);
-  rolesTable.value?.addEventListener('rowAction', handleRowAction);
-  staffTable.value?.addEventListener('primaryAction', handleStaffPrimary);
-  rolesTable.value?.addEventListener('primaryAction', handleRolesPrimary);
+  void loadStaff();
 });
 onBeforeUnmount(() => {
-  staffTable.value?.removeEventListener('rowAction', handleRowAction);
-  rolesTable.value?.removeEventListener('rowAction', handleRowAction);
-  staffTable.value?.removeEventListener('primaryAction', handleStaffPrimary);
-  rolesTable.value?.removeEventListener('primaryAction', handleRolesPrimary);
+  unbindTable(staffTable.value, handleRowAction, handleStaffPrimary);
+  unbindTable(rolesTable.value, handleRowAction, handleRolesPrimary);
 });
 </script>
 
@@ -275,5 +309,19 @@ onBeforeUnmount(() => {
    ModuleView. */
 .fill {
   height: 100%;
+}
+
+/* Estado de carga de las tablas (miembros + roles en paralelo). Centrado, mismo lenguaje
+   que el resto del shell (ion-spinner crescent sobre el lienzo). */
+.table-loading {
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem 0;
+}
+
+/* Pestaña Usuarios: estado guiado (sin backend de usuarios del hub todavía). ok-empty-state
+   aporta el layout centrado; aquí le damos aire para no competir con el tabbar. */
+.users-empty {
+  padding: 2rem 0;
 }
 </style>

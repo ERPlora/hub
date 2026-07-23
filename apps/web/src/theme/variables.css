@@ -50,6 +50,28 @@
   --ok-shadow-sm: 0 1px 3px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(17, 24, 39, 0.04);
   --ok-shadow-md: 0 6px 20px rgba(17, 24, 39, 0.08), 0 2px 6px rgba(17, 24, 39, 0.04);
   --ok-surface-muted: var(--ion-color-step-50);
+
+  /* ── Tokens de elevación para superficies flotantes (dropdowns, sheets, diálogos) ──
+     Los --ok-shadow-sm/md de arriba son elevación SUTIL de tarjetas; estos son para
+     overlays que tapan contenido y necesitan más peso. Los usa el POS (.pdrop/.sheet),
+     diálogos y modales de módulos. */
+  --ok-shadow-pop: 0 12px 32px rgba(17, 24, 39, 0.14);
+  --ok-shadow-modal: 0 18px 50px rgba(17, 24, 39, 0.18);
+
+  /* Radios extra: cards grandes (POS) y forma especial de sheet móvil (solo esquinas sup.). */
+  --ok-radius-lg: 16px;
+  --ok-radius-sheet-top: 18px 18px 0 0;
+
+  /* Targets táctiles: mínimo cómodo y grande (botones de pago del POS). Apuntar aquí
+     declara la intención; los módulos touch no normalizan a la baja. */
+  --ok-touch-min: 48px;
+  --ok-touch-lg: 56px;
+
+  /* Ring de selección con el acento de marca (cat-segment, pm-btn). Scrim unificado
+     para backdrops (antes había .45/.5/.6 sueltos). On-accent = texto sobre color de marca. */
+  --ok-ring-accent: inset 0 0 0 1px var(--ion-color-primary);
+  --ok-scrim: rgba(0, 0, 0, 0.5);
+  --ok-on-accent: var(--ion-color-primary-contrast);
 }
 
 /* Dark neutro (zinc), coherente con el light. */
@@ -86,4 +108,9 @@
   --ok-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
   --ok-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
   --ok-surface-muted: #101216;
+
+  /* Contrapartes dark de los tokens flotantes/táctiles (más peso sobre lienzo oscuro). */
+  --ok-shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --ok-shadow-modal: 0 18px 50px rgba(0, 0, 0, 0.65);
+  --ok-scrim: rgba(0, 0, 0, 0.6);
 }

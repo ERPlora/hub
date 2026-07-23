@@ -56,6 +56,9 @@ export default {
   assistant: {
     title: 'Asistente',
     empty: 'Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.',
+    emptySetup: 'Revisa la configuración del hub. Elige una opción o escribe tu duda.',
+    suggestWhatsMissing: '¿Qué falta por configurar?',
+    suggestHowTo: '¿Cómo configuro',
     placeholder: 'Escribe un mensaje…',
     send: 'Enviar',
     stop: 'Detener',
@@ -80,6 +83,8 @@ export default {
   dashboard: {
     setupTitle: '{n} módulo(s) requieren configuración',
     configure: 'Configurar',
+    setupHint: 'Revisa qué falta y el asistente te guiará paso a paso para dejarlo listo.',
+    reviewConfig: 'Revisar configuración',
     // Saludo contextual por franja horaria (zona 1 — cabecera). El nombre se interpola.
     greetingMorning: 'Buenos días, {name}',
     greetingAfternoon: 'Buenas tardes, {name}',
@@ -273,6 +278,8 @@ export default {
     actionDelete: 'Borrar',
     newEmployee: 'Nuevo empleado',
     newRole: 'Nuevo rol',
+    active: 'Activo',
+    inactive: 'Inactivo',
   },
   apiKeys: {
     // Lista

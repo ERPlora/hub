@@ -114,3 +114,29 @@ export async function refreshSetupStatus(client: ErploraClient): Promise<void> {
 function hasSetupPermission(_perm: string): boolean {
   return isAdmin.value;
 }
+
+/**
+ * Contexto determinista para el asistente: resume el estado de configuración del hub a partir de
+ * `pendingSetups` (DATOS REALES de setup-status, cero invenciones). Se siembra como mensaje `system`
+ * al abrir el asistente desde el botón "Revisar configuración" del dashboard, para que el LLM arranque
+ * sabiendo qué falta y a qué pantalla llevar al usuario. Escala solo: cualquier módulo nuevo con
+ * bloque `setup` en su module.json aparece aquí automáticamente.
+ */
+export function seedSetupContext(): string {
+  const list = pendingSetups.value;
+  const header = 'Eres el asistente de configuración del hub ERPlora. Ayuda al usuario a dejar todo configurado.';
+  if (!list.length) {
+    return `${header}\n\nEstado: todos los módulos instalados están configurados correctamente. Si el usuario pregunta por algún módulo concreto, explícale cómo funciona y ofrécele ir a su pantalla.`;
+  }
+  const items = list
+    .map((s) => {
+      const desc = s.description ? ` — "${s.description}"` : '';
+      return `• ${s.title}${desc}\n  Pantalla: ${s.route}`;
+    })
+    .join('\n');
+  const n = list.length;
+  return `${header}\n\nFaltan ${n} módulo(s) por configurar:\n${items}\n\n` +
+    'Cuando el usuario pregunte cómo configurar algo, explica los pasos con la descripción de arriba y dile a qué pantalla ir (la ruta). ' +
+    'Puedes usar las tools disponibles para consultar el estado real de los módulos. Ofrece ayudar a configurar cada uno.';
+}
+
