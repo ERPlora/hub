@@ -28,6 +28,7 @@ pub mod installer;
 pub mod loader;
 pub mod manifest;
 pub mod migrations;
+pub mod module_storage;
 pub mod money_backfill;
 pub mod native;
 pub mod outbox;
@@ -39,6 +40,7 @@ pub mod seed;
 pub mod settings;
 pub mod system_migrations;
 pub mod ui;
+pub mod user_profile;
 pub mod wasm;
 
 pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
@@ -73,18 +75,40 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn new(db: Box<dyn DatabaseAdapter>) -> Self {
-        Self { db, registry: Registry::new(), hub_id: DEV_HUB_ID.to_string() }
+        Self {
+            db,
+            registry: Registry::new(),
+            hub_id: DEV_HUB_ID.to_string(),
+        }
     }
 
     /// Igual que [`Runtime::new`] pero fijando el `hub_id` del despliegue (lo usa el host real;
     /// el `hub_id` viene de `HubConfig.hub_id`, inyectado por el despliegue y no spoofable).
     pub fn with_hub_id(db: Box<dyn DatabaseAdapter>, hub_id: impl Into<String>) -> Self {
-        Self { db, registry: Registry::new(), hub_id: hub_id.into() }
+        Self {
+            db,
+            registry: Registry::new(),
+            hub_id: hub_id.into(),
+        }
     }
 
     /// `hub_id` del despliegue de este runtime.
     pub fn hub_id(&self) -> &str {
         &self.hub_id
+    }
+
+    /// Adopta el `hub_id` real devuelto por el Cloud durante el bootstrap de la máquina.
+    ///
+    /// El shell Tauri arranca antes de que exista una vinculación y, por tanto, construye el
+    /// runtime con [`DEV_HUB_ID`]. En cuanto el login Cloud registra el dispositivo, el host
+    /// actualiza la identidad viva y llama a este método **antes de abrir la sesión local**. Desde
+    /// ese instante instalaciones, ajustes, perfiles y comandos quedan scopeados por el UUID real
+    /// sin exigir un reinicio de la aplicación.
+    ///
+    /// Esta operación pertenece exclusivamente al bootstrap: una máquina ya vinculada carga el
+    /// UUID persistido antes de construir el runtime y no vuelve a cambiarlo durante su vida útil.
+    pub fn adopt_hub_id(&mut self, hub_id: impl Into<String>) {
+        self.hub_id = hub_id.into();
     }
 
     /// Acceso al adaptador de BD subyacente. Pensado para que el **gateway multi-tenant**
@@ -165,8 +189,10 @@ impl Runtime {
         let persisted = installer::installed_status(self.db.as_ref(), &self.hub_id).await?;
 
         // 3) Orden topológico por depends_on (un ciclo sí aborta: error de diseño del conjunto).
-        let pairs: Vec<(String, Vec<String>)> =
-            found.iter().map(|(_, m)| (m.id.clone(), m.depends_on.clone())).collect();
+        let pairs: Vec<(String, Vec<String>)> = found
+            .iter()
+            .map(|(_, m)| (m.id.clone(), m.depends_on.clone()))
+            .collect();
         let order = installer::install_order(&pairs)?;
         // 4) Instala en orden; un módulo que falle se omite (log) sin tumbar a los demás.
         let mut installed = Vec::with_capacity(order.len());
@@ -205,7 +231,8 @@ impl Runtime {
     /// reaplica migraciones sin efecto (registradas en `_hub_migrations`). Respeta el estado inactivo
     /// persistido. Devuelve los ids re-hidratados.
     pub async fn rehydrate_installed(&mut self, cache_root: &Path) -> Result<Vec<String>> {
-        let persisted = installer::installed_status_versioned(self.db.as_ref(), &self.hub_id).await?;
+        let persisted =
+            installer::installed_status_versioned(self.db.as_ref(), &self.hub_id).await?;
         let mut out = Vec::new();
         for (id, version, status) in persisted {
             if self.registry.is_installed(&id) {
@@ -213,7 +240,10 @@ impl Runtime {
             }
             let dir = cache_root.join(&id).join(&version);
             if !dir.join("module.json").exists() {
-                eprintln!("✗ rehidratación {id}@{version}: sin module.json en caché ({})", dir.display());
+                eprintln!(
+                    "✗ rehidratación {id}@{version}: sin module.json en caché ({})",
+                    dir.display()
+                );
                 continue;
             }
             match self.install_from_dir(&dir).await {
@@ -237,7 +267,8 @@ impl Runtime {
     /// marketplace (`server::install::install_from_cloud`) y el hub se auto-cure tras un reinicio
     /// sin depender de un volumen persistente. No modifica estado.
     pub async fn installed_but_unregistered(&self) -> Result<Vec<(String, String)>> {
-        let persisted = installer::installed_status_versioned(self.db.as_ref(), &self.hub_id).await?;
+        let persisted =
+            installer::installed_status_versioned(self.db.as_ref(), &self.hub_id).await?;
         Ok(persisted
             .into_iter()
             .filter(|(id, _version, _status)| !self.registry.is_installed(id))
@@ -265,7 +296,14 @@ impl Runtime {
             }
         }
         for id in &to_enable {
-            installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, id, ModuleStatus::Active).await?;
+            installer::set_status(
+                self.db.as_ref(),
+                &mut self.registry,
+                &self.hub_id,
+                id,
+                ModuleStatus::Active,
+            )
+            .await?;
         }
         // Barrido a punto fijo: lo caído en cascada vuelve en cuanto puede.
         loop {
@@ -274,8 +312,10 @@ impl Runtime {
                 .installed
                 .iter()
                 .filter(|m| {
-                    matches!(self.registry.status.get(&m.id), Some(ModuleStatus::InactiveAuto))
-                        && m.depends_on.iter().all(|d| self.registry.is_active(d))
+                    matches!(
+                        self.registry.status.get(&m.id),
+                        Some(ModuleStatus::InactiveAuto)
+                    ) && m.depends_on.iter().all(|d| self.registry.is_active(d))
                 })
                 .map(|m| m.id.clone())
                 .collect();
@@ -283,7 +323,14 @@ impl Runtime {
                 break;
             }
             for id in revivable {
-                installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, &id, ModuleStatus::Active).await?;
+                installer::set_status(
+                    self.db.as_ref(),
+                    &mut self.registry,
+                    &self.hub_id,
+                    &id,
+                    ModuleStatus::Active,
+                )
+                .await?;
             }
         }
         Ok(())
@@ -295,7 +342,14 @@ impl Runtime {
     /// vuelta). Los arrastrados caen como `InactiveAuto`: volverán solos en cuanto sus
     /// dependencias vuelvan a estar activas.
     pub async fn deactivate(&mut self, module_id: &str) -> Result<()> {
-        installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id, ModuleStatus::Inactive).await?;
+        installer::set_status(
+            self.db.as_ref(),
+            &mut self.registry,
+            &self.hub_id,
+            module_id,
+            ModuleStatus::Inactive,
+        )
+        .await?;
         // Cascada hacia ABAJO por el grafo inverso de depends_on, en oleadas.
         let mut fallen = vec![module_id.to_string()];
         loop {
@@ -313,7 +367,14 @@ impl Runtime {
                 break;
             }
             for id in wave {
-                installer::set_status(self.db.as_ref(), &mut self.registry, &self.hub_id, &id, ModuleStatus::InactiveAuto).await?;
+                installer::set_status(
+                    self.db.as_ref(),
+                    &mut self.registry,
+                    &self.hub_id,
+                    &id,
+                    ModuleStatus::InactiveAuto,
+                )
+                .await?;
                 fallen.push(id);
             }
         }
@@ -322,7 +383,13 @@ impl Runtime {
 
     /// Desinstala un módulo (quita sus capacidades; no borra sus datos).
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
-        installer::uninstall(self.db.as_ref(), &mut self.registry, &self.hub_id, module_id).await
+        installer::uninstall(
+            self.db.as_ref(),
+            &mut self.registry,
+            &self.hub_id,
+            module_id,
+        )
+        .await
     }
 
     /// Lista de módulos instalados con su estado (para el dashboard / `/api/modules`).
@@ -334,7 +401,11 @@ impl Runtime {
                 id: m.id.clone(),
                 name: m.name.clone(),
                 version: m.version.clone(),
-                status: *self.registry.status.get(&m.id).unwrap_or(&ModuleStatus::Inactive),
+                status: *self
+                    .registry
+                    .status
+                    .get(&m.id)
+                    .unwrap_or(&ModuleStatus::Inactive),
                 depends_on: m.depends_on.clone(),
             })
             .collect()
@@ -360,10 +431,18 @@ impl Runtime {
         self.registry.backup_transport = Some(transport);
     }
 
+    /// Registra el backend persistente de módulos. El server lo resuelve a disco (Local) o al
+    /// proxy Cloud→S3 (Cloud); el runtime y los módulos solo ven rutas bajo `media/modules/`.
+    pub fn set_module_storage(&mut self, storage: Arc<dyn module_storage::ModuleStorage>) {
+        self.registry.module_storage = Some(storage);
+    }
+
     /// Marca un módulo como **WhatsApp premium de ERPlora** (su canal WhatsApp sale por el proxy
     /// de Cloud con `check_quota`, ADR-0006/ADR-0012). El `tier` vive en Cloud; el host lo siembra.
     pub fn mark_premium_whatsapp(&mut self, module_id: &str) {
-        self.registry.premium_whatsapp_modules.insert(module_id.to_string());
+        self.registry
+            .premium_whatsapp_modules
+            .insert(module_id.to_string());
     }
 
     /// Registra un **plugin nativo first-party** (ADR-0009) para `module_id`. Los commands
@@ -376,7 +455,12 @@ impl Runtime {
     /// Ejecuta una query declarativa (solo si su módulo está activo) y devuelve filas JSON.
     /// Para queries de lista devuelve solo las filas de la página (compat); usa
     /// [`Runtime::execute_query_page`] si necesitas el total para paginar.
-    pub async fn execute_query(&self, name: &str, params: &Params, ctx: &RequestContext) -> Result<Vec<Json>> {
+    pub async fn execute_query(
+        &self,
+        name: &str,
+        params: &Params,
+        ctx: &RequestContext,
+    ) -> Result<Vec<Json>> {
         let r = queries::execute(self.db.as_ref(), &self.registry, name, params, ctx).await;
         if let Err(e) = &r {
             self.report_dispatch_error(e, "query", name, params);
@@ -402,12 +486,20 @@ impl Runtime {
     /// ¿La query (de un módulo activo) declara bloque `list` (es paginada)? Lo usa el server
     /// para decidir la forma del `data` que devuelve por el wire.
     pub fn is_list_query(&self, name: &str) -> bool {
-        self.registry.get_query(name).map(|q| q.def.list.is_some()).unwrap_or(false)
+        self.registry
+            .get_query(name)
+            .map(|q| q.def.list.is_some())
+            .unwrap_or(false)
     }
 
     /// Ejecuta un command declarativo (solo si su módulo está activo). Los eventos emitidos se
     /// persisten en el outbox en la misma transacción; sus listeners los entrega el relay (§5.4).
-    pub async fn execute_command(&self, name: &str, payload: &Params, ctx: &RequestContext) -> Result<Json> {
+    pub async fn execute_command(
+        &self,
+        name: &str,
+        payload: &Params,
+        ctx: &RequestContext,
+    ) -> Result<Json> {
         let r = commands::execute(self.db.as_ref(), &self.registry, name, payload, ctx).await;
         if let Err(e) = &r {
             self.report_dispatch_error(e, "command", name, payload);
@@ -485,8 +577,19 @@ impl Runtime {
     // ── Identidad local (usuarios/PIN/sesiones; §2.9). La autoridad de permisos es local. ──
 
     /// Crea un usuario local (`pin` vacío = sin PIN). Devuelve su id.
-    pub async fn create_user(&self, name: &str, pin: &str, role: &str, cloud_user_id: Option<&str>) -> Result<String> {
+    pub async fn create_user(
+        &self,
+        name: &str,
+        pin: &str,
+        role: &str,
+        cloud_user_id: Option<&str>,
+    ) -> Result<String> {
         identity::create_user(self.db.as_ref(), name, pin, role, cloud_user_id).await
+    }
+
+    #[doc(hidden)]
+    pub async fn ensure_dev_user(&self, id: &str, name: &str, role: &str) -> Result<()> {
+        identity::ensure_dev_user(self.db.as_ref(), id, name, role).await
     }
 
     /// Verifica el PIN de un usuario por nombre. `Some(user)` si encaja.
@@ -500,8 +603,19 @@ impl Runtime {
     }
 
     /// Resuelve (o provisiona) el `hub_user` vinculado a una identidad cloud (mapeo del JWT).
-    pub async fn get_or_link_cloud_user(&self, cloud_user_id: &str, default_name: &str, default_role: &str) -> Result<identity::HubUser> {
-        identity::get_or_link_cloud_user(self.db.as_ref(), cloud_user_id, default_name, default_role).await
+    pub async fn get_or_link_cloud_user(
+        &self,
+        cloud_user_id: &str,
+        default_name: &str,
+        default_role: &str,
+    ) -> Result<identity::HubUser> {
+        identity::get_or_link_cloud_user(
+            self.db.as_ref(),
+            cloud_user_id,
+            default_name,
+            default_role,
+        )
+        .await
     }
 
     /// Fija (o cambia) el PIN de un usuario existente por id (alta de PIN tras login cloud).
@@ -522,6 +636,29 @@ impl Runtime {
     /// Cierra una sesión (logout).
     pub async fn delete_session(&self, token: &str) -> Result<()> {
         identity::delete_session(self.db.as_ref(), token).await
+    }
+
+    /// Perfil y preferencias del usuario actual, aislados por `(hub_id, user_id)`.
+    pub async fn user_profile(&self, user_id: &str) -> Result<user_profile::UserProfile> {
+        user_profile::get(self.db.as_ref(), &self.hub_id, user_id).await
+    }
+
+    /// Actualiza únicamente el perfil del propio `user_id` resuelto por la sesión HTTP.
+    pub async fn update_user_profile(
+        &self,
+        user_id: &str,
+        input: &user_profile::UpdateUserProfile,
+    ) -> Result<user_profile::UserProfile> {
+        user_profile::update(self.db.as_ref(), &self.hub_id, user_id, input).await
+    }
+
+    /// Guarda la ruta relativa de la foto del usuario dentro de `media_dir`.
+    pub async fn set_user_avatar(
+        &self,
+        user_id: &str,
+        avatar_path: &str,
+    ) -> Result<user_profile::UserProfile> {
+        user_profile::set_avatar(self.db.as_ref(), &self.hub_id, user_id, avatar_path).await
     }
 
     /// Marca un dispositivo como de confianza (tras el primer login online). Idempotente (§2.9).
@@ -601,7 +738,8 @@ impl Runtime {
     /// Capabilities DECLARADAS por un módulo con su estado de grant (ADR-0079). Para
     /// `GET /api/modules/:id/capabilities`. Lista vacía = el módulo no pide permisos.
     pub async fn module_capabilities(&self, module_id: &str) -> Result<Vec<(String, bool)>> {
-        capabilities::list_for_module(self.db.as_ref(), &self.registry, &self.hub_id, module_id).await
+        capabilities::list_for_module(self.db.as_ref(), &self.registry, &self.hub_id, module_id)
+            .await
     }
 
     /// Concede/revoca una capability de un módulo (ADR-0079). `by` = `hub_user:<id>` admin.
@@ -612,11 +750,25 @@ impl Runtime {
         granted: bool,
         by: &str,
     ) -> Result<()> {
-        capabilities::set_grant(self.db.as_ref(), &self.registry, &self.hub_id, module_id, capability, granted, by).await
+        capabilities::set_grant(
+            self.db.as_ref(),
+            &self.registry,
+            &self.hub_id,
+            module_id,
+            capability,
+            granted,
+            by,
+        )
+        .await
     }
 
     /// Sube/reemplaza el certificado fiscal del negocio (ADR-0079). `by` = `hub_user:<id>` admin.
-    pub async fn set_business_certificate(&self, pkcs12_b64: &str, password: &str, by: &str) -> Result<()> {
+    pub async fn set_business_certificate(
+        &self,
+        pkcs12_b64: &str,
+        password: &str,
+        by: &str,
+    ) -> Result<()> {
         certificate::set(self.db.as_ref(), &self.hub_id, pkcs12_b64, password, by).await
     }
 
@@ -656,7 +808,11 @@ impl Runtime {
 
     /// Menú dinámico de los módulos **activos** (lo consume el shell). ARQUITECTURA.md §7.7.
     pub fn navigation(&self) -> Vec<NavEntry> {
-        self.registry.active_navigation().into_iter().cloned().collect()
+        self.registry
+            .active_navigation()
+            .into_iter()
+            .cloned()
+            .collect()
     }
 
     /// Acceso de solo lectura al registro (introspección / tests).
@@ -678,12 +834,24 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
     // disponible como `:business_tax_id`/`:business_legal_name`/`:business_address` en TODO el SQL de
     // comandos (incl. operaciones de handlers WASM/nativos), para que los módulos resuelvan el emisor
     // sin que el caller lo pase.
-    p.insert("business_tax_id".into(), Json::String(ctx.business_tax_id.clone()));
-    p.insert("business_legal_name".into(), Json::String(ctx.business_legal_name.clone()));
-    p.insert("business_address".into(), Json::String(ctx.business_address.clone()));
+    p.insert(
+        "business_tax_id".into(),
+        Json::String(ctx.business_tax_id.clone()),
+    );
+    p.insert(
+        "business_legal_name".into(),
+        Json::String(ctx.business_legal_name.clone()),
+    );
+    p.insert(
+        "business_address".into(),
+        Json::String(ctx.business_address.clone()),
+    );
     // Presencia del certificado fiscal del negocio (`_hub_certificate`, core — ADR-0081), como 0/1
     // para que el SQL del módulo lo use sin leer la tabla de sistema (p.ej. verifactu.config.get →
     // has_certificate / gate de "Probar" / setup.configured_when).
-    p.insert("has_certificate".into(), Json::from(if ctx.has_certificate { 1 } else { 0 }));
+    p.insert(
+        "has_certificate".into(),
+        Json::from(if ctx.has_certificate { 1 } else { 0 }),
+    );
     p
 }

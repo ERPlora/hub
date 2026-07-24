@@ -41,6 +41,9 @@
         icon="alert-circle-outline"
       >
         {{ error }}
+        <ion-button slot="actions" size="small" fill="outline" @click="loadSpec">
+          {{ t('apiDocs.retry') }}
+        </ion-button>
       </ok-inline-feedback>
 
       <!-- Host de Swagger UI: se monta imperativamente sobre `swaggerEl`. -->
@@ -52,7 +55,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IonSpinner } from '@ionic/vue';
+import { IonButton, IonSpinner } from '@ionic/vue';
 import AppPage from '../components/AppPage.vue';
 import { fetchOpenApiSpec } from '../lib/api-docs';
 // CSS global de Swagger UI (prefijado bajo `.swagger-ui`). Importado por su efecto secundario.
@@ -67,7 +70,16 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 let instance: { unmount?: () => void } | null = null;
 
-onMounted(async () => {
+async function loadSpec(): Promise<void> {
+  loading.value = true;
+  error.value = null;
+  try {
+    instance?.unmount?.();
+  } catch {
+    /* noop */
+  }
+  instance = null;
+  swaggerEl.value?.replaceChildren();
   try {
     // 1) Pedimos el spec con el fetch autenticado (X-Hub-Session). Swagger NO lo descarga: se lo
     //    damos ya resuelto por `spec:` para no perder la auth (no hay `url:`).
@@ -86,9 +98,12 @@ onMounted(async () => {
     }
   } catch (e) {
     loading.value = false;
-    error.value = e instanceof Error ? e.message : t('apiDocs.errorBody');
+    console.warn('OpenAPI spec could not be loaded', e);
+    error.value = t('apiDocs.errorBody');
   }
-});
+}
+
+onMounted(loadSpec);
 
 onBeforeUnmount(() => {
   // Swagger UI no siempre expone unmount; si existe, lo llamamos para soltar listeners.

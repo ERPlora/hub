@@ -33,7 +33,10 @@ impl Default for RouterConfig {
     fn default() -> Self {
         // Umbral conservador: con <8 módulos el coste del embedding por petición no compensa
         // (§9.2b "el vector gana a escala"). top_k holgado para no perder un módulo relevante.
-        Self { top_k: 24, min_modules_to_route: 8 }
+        Self {
+            top_k: 24,
+            min_modules_to_route: 8,
+        }
     }
 }
 
@@ -63,7 +66,9 @@ pub async fn route_modules<S: VectorStore + ?Sized>(
         return Ok(None);
     }
 
-    let mut vectors = embedder.embed(std::slice::from_ref(&query.to_string())).await?;
+    let mut vectors = embedder
+        .embed(std::slice::from_ref(&query.to_string()))
+        .await?;
     let query_vec = match vectors.pop() {
         Some(v) if !v.is_empty() => v,
         _ => return Ok(None), // el Cloud no devolvió embedding → degradar a "todos".
@@ -104,7 +109,11 @@ pub fn filter_tools_by_modules(tools: Vec<Value>, allowed: Option<&[String]>) ->
     let set: std::collections::HashSet<&str> = allowed.iter().map(String::as_str).collect();
     tools
         .into_iter()
-        .filter(|t| t.get("module_id").and_then(Value::as_str).is_some_and(|m| set.contains(m)))
+        .filter(|t| {
+            t.get("module_id")
+                .and_then(Value::as_str)
+                .is_some_and(|m| set.contains(m))
+        })
         .collect()
 }
 
@@ -164,7 +173,10 @@ mod tests {
         s.ensure_schema().await.unwrap();
         let modules = [
             ("inventory", "Manage products and stock levels"),
-            ("sales", "Create sales and sell products at the point of sale"),
+            (
+                "sales",
+                "Create sales and sell products at the point of sale",
+            ),
             ("customers", "Manage customers and clients"),
         ];
         for (id, desc) in modules {
@@ -173,7 +185,9 @@ mod tests {
                 source: "agent".into(),
                 content: desc.into(),
             }];
-            index_chunks(&KeywordEmbedder, &s, "h1", "1.0.0", &chunks).await.unwrap();
+            index_chunks(&KeywordEmbedder, &s, "h1", "1.0.0", &chunks)
+                .await
+                .unwrap();
         }
         s
     }
@@ -181,11 +195,21 @@ mod tests {
     #[tokio::test]
     async fn routes_to_relevant_module() {
         let s = indexed_store().await;
-        let cfg = RouterConfig { top_k: 1, min_modules_to_route: 1 };
-        let modules = route_modules(&KeywordEmbedder, &s, "h1", "how much stock of this product?", 3, cfg)
-            .await
-            .unwrap()
-            .unwrap();
+        let cfg = RouterConfig {
+            top_k: 1,
+            min_modules_to_route: 1,
+        };
+        let modules = route_modules(
+            &KeywordEmbedder,
+            &s,
+            "h1",
+            "how much stock of this product?",
+            3,
+            cfg,
+        )
+        .await
+        .unwrap()
+        .unwrap();
         assert_eq!(modules.first().map(String::as_str), Some("inventory"));
     }
 
@@ -194,15 +218,23 @@ mod tests {
         let s = indexed_store().await;
         // 3 módulos < umbral 8 → None (mandar todos, no enrutar).
         let cfg = RouterConfig::default();
-        let r = route_modules(&KeywordEmbedder, &s, "h1", "stock?", 3, cfg).await.unwrap();
+        let r = route_modules(&KeywordEmbedder, &s, "h1", "stock?", 3, cfg)
+            .await
+            .unwrap();
         assert!(r.is_none());
     }
 
     #[tokio::test]
     async fn empty_query_does_not_route() {
         let s = indexed_store().await;
-        let cfg = RouterConfig { top_k: 5, min_modules_to_route: 1 };
-        assert!(route_modules(&KeywordEmbedder, &s, "h1", "   ", 99, cfg).await.unwrap().is_none());
+        let cfg = RouterConfig {
+            top_k: 5,
+            min_modules_to_route: 1,
+        };
+        assert!(route_modules(&KeywordEmbedder, &s, "h1", "   ", 99, cfg)
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
@@ -210,9 +242,15 @@ mod tests {
         let db = SqliteAdapter::open_in_memory().await.unwrap();
         let s = SqliteVectorStore::new(db);
         s.ensure_schema().await.unwrap();
-        let cfg = RouterConfig { top_k: 5, min_modules_to_route: 1 };
+        let cfg = RouterConfig {
+            top_k: 5,
+            min_modules_to_route: 1,
+        };
         // Muchos módulos "instalados" pero índice vacío → None (degrada a todos), no [].
-        assert!(route_modules(&KeywordEmbedder, &s, "h1", "stock?", 50, cfg).await.unwrap().is_none());
+        assert!(route_modules(&KeywordEmbedder, &s, "h1", "stock?", 50, cfg)
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -241,8 +279,13 @@ mod tests {
             json!({"name": "sales.sale.create", "module_id": "sales"}),
             json!({"name": "customers.customer.list", "module_id": "customers"}),
         ];
-        let cfg = RouterConfig { top_k: 1, min_modules_to_route: 1 };
-        let routed = assemble_routed_tools(&KeywordEmbedder, &s, "h1", "stock of product", all, 3, cfg).await;
+        let cfg = RouterConfig {
+            top_k: 1,
+            min_modules_to_route: 1,
+        };
+        let routed =
+            assemble_routed_tools(&KeywordEmbedder, &s, "h1", "stock of product", all, 3, cfg)
+                .await;
         assert_eq!(routed.len(), 1);
         assert_eq!(routed[0]["module_id"], "inventory");
     }

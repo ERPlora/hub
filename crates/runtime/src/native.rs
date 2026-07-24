@@ -58,6 +58,20 @@ pub trait NativeHost: Send + Sync {
     ) -> Result<Option<String>> {
         crate::certificate::expiry_from_der(pkcs12_der, password)
     }
+
+    /// Escribe dentro de la carpeta `static_files` declarada por el módulo. La implementación real
+    /// conoce el módulo que está ejecutándose y media el backend Local/Cloud; el plugin solo aporta
+    /// una ruta relativa segura.
+    async fn write_static_file(
+        &self,
+        _relative_path: &str,
+        _bytes: &[u8],
+        _content_type: &str,
+    ) -> Result<String> {
+        Err(RuntimeError::Storage(
+            "la capacidad `static_files` no está disponible en este host".to_string(),
+        ))
+    }
 }
 
 /// Un plugin nativo first-party: el motor de un módulo, horneado en el runtime y
@@ -72,6 +86,10 @@ pub trait NativeHandler: Send + Sync + std::fmt::Debug {
 /// [`NativeHost`] real sobre el adaptador de BD del runtime.
 pub(crate) struct DbHost<'a> {
     pub db: &'a dyn DatabaseAdapter,
+    pub storage: Option<&'a dyn crate::module_storage::ModuleStorage>,
+    pub hub_id: &'a str,
+    pub module_id: &'a str,
+    pub static_folder: Option<&'a str>,
 }
 
 #[async_trait::async_trait]
@@ -91,5 +109,31 @@ impl NativeHost for DbHost<'_> {
 
     async fn certificate_expiry(&self, hub_id: &str) -> Result<Option<String>> {
         crate::certificate::expiry(self.db, hub_id).await
+    }
+
+    async fn write_static_file(
+        &self,
+        relative_path: &str,
+        bytes: &[u8],
+        content_type: &str,
+    ) -> Result<String> {
+        if !crate::module_storage::valid_relative_file_path(relative_path) {
+            return Err(RuntimeError::Storage(format!(
+                "ruta de fichero inválida para `{}`",
+                self.module_id
+            )));
+        }
+        let folder = self.static_folder.ok_or_else(|| {
+            RuntimeError::Storage(format!(
+                "el módulo `{}` no declara `static_files.folder`",
+                self.module_id
+            ))
+        })?;
+        let storage = self.storage.ok_or_else(|| {
+            RuntimeError::Storage("el host no configuró un backend de módulos".to_string())
+        })?;
+        storage
+            .write_module_file(self.hub_id, folder, relative_path, bytes, content_type)
+            .await
     }
 }

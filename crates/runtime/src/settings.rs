@@ -91,7 +91,7 @@ const KNOWN: &[Setting] = &[
     },
     // Paleta de tema DEFAULT del hub (ADR-0138): valor de `data-ok-palette` (OutfitKit
     // palettes.css, compartido con Cloud). 'erplora' = marca por defecto (sin atributo).
-    // El override POR USUARIO no vive aquí: es localStorage del navegador (`erplora.palette`).
+    // El override POR USUARIO no vive aquí: está en `hub_user_pref`, aislado por hub + usuario.
     Setting {
         key: "theme_palette",
         default: || json!("erplora"),
@@ -136,7 +136,9 @@ fn find(key: &str) -> Option<&'static Setting> {
 /// lo conozca. Lo que el registro aporta son los **decimales** de las monedas que sí conoce; para el
 /// resto, el hub los declara a mano en `currency_decimals`.
 fn validate_currency(v: &Value) -> std::result::Result<String, String> {
-    let s = v.as_str().ok_or("debe ser un string ISO-4217 (p. ej. \"EUR\")")?;
+    let s = v
+        .as_str()
+        .ok_or("debe ser un string ISO-4217 (p. ej. \"EUR\")")?;
     erplora_guest_sdk::currency::normalize_code(s).ok_or_else(|| {
         format!("moneda inválida `{s}`: se espera un código ISO-4217 de 3 letras (p. ej. EUR)")
     })
@@ -147,12 +149,16 @@ fn validate_currency(v: &Value) -> std::result::Result<String, String> {
 /// Es la mitad de la clave con la que se resuelve el impuesto (`country + region + categoría` →
 /// `rate_pct`, ADR-0085). Sin él, ninguna regla fiscal casa.
 fn validate_country(v: &Value) -> std::result::Result<String, String> {
-    let s = v.as_str().ok_or("debe ser un string ISO-3166 de 2 letras (p. ej. \"ES\")")?;
+    let s = v
+        .as_str()
+        .ok_or("debe ser un string ISO-3166 de 2 letras (p. ej. \"ES\")")?;
     let up = s.trim().to_ascii_uppercase();
     if up.len() == 2 && up.chars().all(|c| c.is_ascii_alphabetic()) {
         Ok(up)
     } else {
-        Err(format!("país inválido `{s}`: se espera ISO-3166-1 alpha-2 (p. ej. ES)"))
+        Err(format!(
+            "país inválido `{s}`: se espera ISO-3166-1 alpha-2 (p. ej. ES)"
+        ))
     }
 }
 
@@ -175,7 +181,9 @@ fn validate_region(v: &Value) -> std::result::Result<String, String> {
             if ok {
                 Ok(up)
             } else {
-                Err(format!("región inválida `{s}`: se espera ISO-3166-2 (p. ej. ES-CN) o vacío"))
+                Err(format!(
+                    "región inválida `{s}`: se espera ISO-3166-2 (p. ej. ES-CN) o vacío"
+                ))
             }
         }
         _ => Err("debe ser un string ISO-3166-2 (p. ej. \"ES-CN\") o null".to_string()),
@@ -197,7 +205,9 @@ fn validate_currency_decimals(v: &Value) -> std::result::Result<String, String> 
     if (0..=4).contains(&n) {
         Ok(n.to_string())
     } else {
-        Err(format!("decimales inválidos `{n}`: ISO-4217 va de 0 (JPY) a 4"))
+        Err(format!(
+            "decimales inválidos `{n}`: ISO-4217 va de 0 (JPY) a 4"
+        ))
     }
 }
 
@@ -210,7 +220,9 @@ pub fn decimals_of(currency: &str) -> u32 {
 
 /// `language`: locale soportado (`es`|`en`). Se normaliza a minúsculas al persistir.
 fn validate_language(v: &Value) -> std::result::Result<String, String> {
-    let s = v.as_str().ok_or("debe ser un string de locale (p. ej. \"es\")")?;
+    let s = v
+        .as_str()
+        .ok_or("debe ser un string de locale (p. ej. \"es\")")?;
     let lo = s.trim().to_ascii_lowercase();
     if SUPPORTED_LOCALES.contains(&lo.as_str()) {
         Ok(lo)
@@ -238,7 +250,10 @@ fn validate_text(v: &Value) -> std::result::Result<String, String> {
 /// formato la hace cada módulo fiscal de país al transmitir; aquí solo normalizamos.
 fn validate_tax_id(v: &Value) -> std::result::Result<String, String> {
     let s = v.as_str().ok_or("debe ser un string")?;
-    let up = s.trim().to_ascii_uppercase().replace(char::is_whitespace, "");
+    let up = s
+        .trim()
+        .to_ascii_uppercase()
+        .replace(char::is_whitespace, "");
     if up.chars().count() > 20 {
         return Err("identificador fiscal demasiado largo".into());
     }
@@ -258,7 +273,9 @@ const THEME_PALETTES: &[&str] = &[
 
 /// `theme_palette`: una de las paletas de OutfitKit. Se normaliza a minúsculas al persistir.
 fn validate_theme_palette(v: &Value) -> std::result::Result<String, String> {
-    let s = v.as_str().ok_or("debe ser un string (id de paleta, p. ej. \"ocean\")")?;
+    let s = v
+        .as_str()
+        .ok_or("debe ser un string (id de paleta, p. ej. \"ocean\")")?;
     let lo = s.trim().to_ascii_lowercase();
     if THEME_PALETTES.contains(&lo.as_str()) {
         Ok(lo)
@@ -286,7 +303,10 @@ pub async fn get_all(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Value> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     let res = db
-        .query("SELECT key, value FROM hub_settings WHERE hub_id = :hub_id", &p)
+        .query(
+            "SELECT key, value FROM hub_settings WHERE hub_id = :hub_id",
+            &p,
+        )
         .await?;
 
     // Mapa key→string persistido para una búsqueda rápida.
@@ -464,8 +484,8 @@ mod tests {
     // ── PALETA DE TEMA global del hub (ADR-0138, ERPlora/pm#15) ────────────────────────
     //
     // `theme_palette` es la paleta DEFAULT del hub (data-ok-palette de OutfitKit palettes.css,
-    // compartida con Cloud). El override por usuario vive en el navegador (localStorage
-    // `erplora.palette`); esta clave es lo que ve quien no ha elegido nada.
+    // compartida con Cloud). El override vive en `hub_user_pref`; esta clave es lo que ve quien no
+    // ha elegido nada.
 
     #[tokio::test]
     async fn theme_palette_default_es_la_marca_erplora() {
@@ -481,18 +501,33 @@ mod tests {
         ensure_table(&db).await;
 
         // Las 6 paletas de palettes.css + 'erplora' (default) son válidas.
-        for id in ["erplora", "terracotta", "corporate", "minimal", "forest", "ocean", "violet"] {
+        for id in [
+            "erplora",
+            "terracotta",
+            "corporate",
+            "minimal",
+            "forest",
+            "ocean",
+            "violet",
+        ] {
             let mut updates = serde_json::Map::new();
             updates.insert("theme_palette".into(), json!(id));
-            let result = set_many(&db, "hub-1", &updates, "hub_user:1").await.unwrap();
+            let result = set_many(&db, "hub-1", &updates, "hub_user:1")
+                .await
+                .unwrap();
             assert_eq!(result["theme_palette"], json!(id));
         }
 
         // Un id que no existe en palettes.css se rechaza (p. ej. el set viejo del Cloud).
         let mut updates = serde_json::Map::new();
         updates.insert("theme_palette".into(), json!("glass"));
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1").await.unwrap_err();
-        assert!(matches!(err, RuntimeError::InvalidPayload { .. }), "err = {err:?}");
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "err = {err:?}"
+        );
     }
 
     #[tokio::test]
@@ -504,7 +539,9 @@ mod tests {
         updates.insert("currency".into(), json!("usd")); // se normaliza a USD
         updates.insert("language".into(), json!("en"));
         updates.insert("api_docs_enabled".into(), json!(true));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1").await.unwrap();
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
+            .await
+            .unwrap();
         assert_eq!(result["currency"], json!("USD"));
         assert_eq!(result["language"], json!("en"));
         assert_eq!(result["api_docs_enabled"], json!(true));
@@ -512,9 +549,15 @@ mod tests {
         // Persistido: una nueva lectura lo refleja, y un PUT parcial sólo cambia su clave.
         let mut partial = serde_json::Map::new();
         partial.insert("language".into(), json!("es"));
-        let result = set_many(&db, "hub-1", &partial, "hub_user:1").await.unwrap();
+        let result = set_many(&db, "hub-1", &partial, "hub_user:1")
+            .await
+            .unwrap();
         assert_eq!(result["language"], json!("es"));
-        assert_eq!(result["currency"], json!("USD"), "la moneda previa se conserva");
+        assert_eq!(
+            result["currency"],
+            json!("USD"),
+            "la moneda previa se conserva"
+        );
         assert_eq!(result["api_docs_enabled"], json!(true));
     }
 
@@ -524,8 +567,13 @@ mod tests {
         ensure_table(&db).await;
         let mut updates = serde_json::Map::new();
         updates.insert("not_a_setting".into(), json!("x"));
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1").await.unwrap_err();
-        assert!(matches!(err, RuntimeError::InvalidPayload { .. }), "err = {err:?}");
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "err = {err:?}"
+        );
     }
 
     #[tokio::test]
@@ -538,8 +586,13 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("currency".into(), json!("GBP"));
         updates.insert("language".into(), json!("fr")); // no soportado
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1").await.unwrap_err();
-        assert!(matches!(err, RuntimeError::InvalidPayload { .. }), "err = {err:?}");
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "err = {err:?}"
+        );
 
         // La moneda NO se aplicó (sigue el default) porque el lote completo se rechazó.
         let all = get_all(&db, "hub-1").await.unwrap();

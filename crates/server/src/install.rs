@@ -92,30 +92,55 @@ async fn resolve_version(
             .ok_or_else(|| InstallError::VersionNotFound(requested.to_string()))
     } else {
         // "última activa": el endpoint las devuelve por `-created_at` (más reciente primero).
-        versions.into_iter().next().ok_or_else(|| InstallError::VersionNotFound("latest".into()))
+        versions
+            .into_iter()
+            .next()
+            .ok_or_else(|| InstallError::VersionNotFound("latest".into()))
     }
 }
 
 /// Ejecuta una `PreparedRequest` GET y devuelve el cuerpo como texto.
-async fn send_text(http: &reqwest::Client, req: &cloud_client::PreparedRequest) -> Result<String, InstallError> {
+async fn send_text(
+    http: &reqwest::Client,
+    req: &cloud_client::PreparedRequest,
+) -> Result<String, InstallError> {
     let mut r = http.request(method(req), &req.url);
     for (k, v) in &req.headers {
         r = r.header(*k, v);
     }
-    let resp = r.send().await.map_err(|e| InstallError::Cloud(e.to_string()))?;
-    let resp = resp.error_for_status().map_err(|e| InstallError::Cloud(e.to_string()))?;
-    resp.text().await.map_err(|e| InstallError::Cloud(e.to_string()))
+    let resp = r
+        .send()
+        .await
+        .map_err(|e| InstallError::Cloud(e.to_string()))?;
+    let resp = resp
+        .error_for_status()
+        .map_err(|e| InstallError::Cloud(e.to_string()))?;
+    resp.text()
+        .await
+        .map_err(|e| InstallError::Cloud(e.to_string()))
 }
 
 /// Ejecuta una `PreparedRequest` GET y devuelve el cuerpo binario (descarga del ZIP).
-async fn send_bytes(http: &reqwest::Client, req: &cloud_client::PreparedRequest) -> Result<Vec<u8>, InstallError> {
+async fn send_bytes(
+    http: &reqwest::Client,
+    req: &cloud_client::PreparedRequest,
+) -> Result<Vec<u8>, InstallError> {
     let mut r = http.request(method(req), &req.url);
     for (k, v) in &req.headers {
         r = r.header(*k, v);
     }
-    let resp = r.send().await.map_err(|e| InstallError::Cloud(e.to_string()))?;
-    let resp = resp.error_for_status().map_err(|e| InstallError::Cloud(e.to_string()))?;
-    Ok(resp.bytes().await.map_err(|e| InstallError::Cloud(e.to_string()))?.to_vec())
+    let resp = r
+        .send()
+        .await
+        .map_err(|e| InstallError::Cloud(e.to_string()))?;
+    let resp = resp
+        .error_for_status()
+        .map_err(|e| InstallError::Cloud(e.to_string()))?;
+    Ok(resp
+        .bytes()
+        .await
+        .map_err(|e| InstallError::Cloud(e.to_string()))?
+        .to_vec())
 }
 
 fn method(req: &cloud_client::PreparedRequest) -> reqwest::Method {
@@ -140,7 +165,9 @@ fn acquire(
         sha256: sha.to_string(),
     };
 
-    let fetcher = InMemoryFetcher { bytes: RefCell::new(Some(zip_bytes)) };
+    let fetcher = InMemoryFetcher {
+        bytes: RefCell::new(Some(zip_bytes)),
+    };
     let dir = store.install(&fetcher, &grant)?;
     Ok(dir)
 }
@@ -272,6 +299,10 @@ fn install_recursive<'a>(
             tracing::warn!(module_id = %module_id, error = %e, "mark_installed/ falló (no crítico)");
         }
 
-        Ok(Installed { module_id: installed_id, version: version.version, dir })
+        Ok(Installed {
+            module_id: installed_id,
+            version: version.version,
+            dir,
+        })
     })
 }

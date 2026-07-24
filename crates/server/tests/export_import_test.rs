@@ -28,7 +28,10 @@ fn test_config(auth_mode: AuthMode, tag: &str) -> HubConfig {
         module_cache: base.join("module_cache"),
         auth_mode,
         jwt_public_key: None,
-        cloud_api_token: None,
+        // Estos tests validan export/import y su auth de usuario, no el bootstrap de máquina.
+        // Marcar la máquina como registrada permite atravesar la barrera global y llegar a la
+        // superficie que cada caso pretende comprobar.
+        cloud_api_token: Some("test-machine-token".into()),
         device_trust_enforce: false,
         media_dir: base.join("media"),
         sector: None,

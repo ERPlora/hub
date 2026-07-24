@@ -186,7 +186,7 @@ import {
   IonSpinner,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
-import { DT_LABELS_ES } from '../lib/data-table-labels';
+import { dataTableLabels } from '../lib/data-table-labels';
 import { isAdmin } from '../lib/session';
 import { availableLocales } from '../i18n';
 import { toastSuccess } from '../lib/toast';
@@ -235,9 +235,15 @@ const rows = ref<ModuleRow[]>([]);
 const loadingModules = ref<boolean>(true);
 const modulesTable = ref<HTMLElement | null>(null);
 
-// Labels ES de la tabla por PROPIEDAD (gotcha OutfitKit: default inglés).
+// Labels del locale activo por PROPIEDAD (gotcha OutfitKit: default inglés).
 watch(modulesTable, (el) => {
-  if (el) (el as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+  if (el) (el as HTMLElement & { labels: Record<string, string> }).labels = dataTableLabels(locale.value);
+});
+watch(locale, () => {
+  if (modulesTable.value) {
+    (modulesTable.value as HTMLElement & { labels: Record<string, string> }).labels =
+      dataTableLabels(locale.value);
+  }
 });
 
 /** Sustituye una fila por id (array NUEVO: la prop `rows` de la tabla re-renderiza por asignación). */

@@ -18,6 +18,7 @@ import { svgToIcon, isInlineSvg } from "./iconify";
 import addOutline from "~icons/ion/add-outline?raw";
 import businessOutline from "~icons/ion/business-outline?raw";
 import cardOutline from "~icons/ion/card-outline?raw";
+import cameraOutline from "~icons/ion/camera-outline?raw";
 import checkmarkCircleOutline from "~icons/ion/checkmark-circle-outline?raw";
 import cloudUploadOutline from "~icons/ion/cloud-upload-outline?raw";
 import colorPaletteOutline from "~icons/ion/color-palette-outline?raw";
@@ -167,6 +168,7 @@ const SVGS: Record<string, string> = {
   "add-outline": addOutline,
   "business-outline": businessOutline,
   "card-outline": cardOutline,
+  "camera-outline": cameraOutline,
   "checkmark-circle-outline": checkmarkCircleOutline,
   "cloud-upload-outline": cloudUploadOutline,
   "color-palette-outline": colorPaletteOutline,

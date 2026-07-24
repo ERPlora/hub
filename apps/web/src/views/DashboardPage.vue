@@ -152,7 +152,7 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
-import { DT_LABELS_ES } from '../lib/data-table-labels';
+import { dataTableLabels } from '../lib/data-table-labels';
 import { getClient, getHubSector } from '../lib/runtime';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
@@ -163,7 +163,7 @@ import { user } from '../lib/session';
 import { formatAmount } from '../lib/money';
 import type { WidgetDef, WidgetPreset, OkWidgetBoardLabels } from '@erplora/outfitkit';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const router = useRouter();
 const route = useRoute();
 
@@ -314,7 +314,7 @@ async function loadSystemHealth(): Promise<void> {
 // Vista de data-table: columnas con filtros (método/estado), búsqueda, orden y paginación.
 const fmtDateTime = (iso: string): string =>
   iso
-    ? new Date(iso).toLocaleString('es-ES', {
+    ? new Date(iso).toLocaleString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
       })
     : '—';
@@ -337,22 +337,28 @@ const activity = ref<ActivityRow[]>([]);
 const loadingFeed = ref<boolean>(true);
 const activityTable = ref<HTMLElement | null>(null);
 
-const activityColumns: DataTableColumn[] = [
-  { key: 'date', header: 'Fecha', format: (r) => fmtDateTime(String(r.date ?? '')) },
-  { key: 'sale', header: 'Venta' },
-  { key: 'customer', header: 'Cliente' },
-  { key: 'method', header: 'Método', filterable: true, filterType: 'select' },
-  { key: 'amount', header: 'Importe', align: 'right', format: (r) => eur(Number(r.amount) || 0, 2) },
+const activityColumns = computed<DataTableColumn[]>(() => [
+  { key: 'date', header: t('dashboard.activityDate'), format: (r) => fmtDateTime(String(r.date ?? '')) },
+  { key: 'sale', header: t('dashboard.activitySale') },
+  { key: 'customer', header: t('dashboard.activityCustomer') },
+  { key: 'method', header: t('dashboard.activityMethod'), filterable: true, filterType: 'select' },
+  { key: 'amount', header: t('dashboard.activityAmount'), align: 'right', format: (r) => eur(Number(r.amount) || 0, 2) },
   {
-    key: 'status', header: 'Estado', align: 'center', filterable: true, filterType: 'select',
+    key: 'status', header: t('dashboard.activityStatus'), align: 'center', filterable: true, filterType: 'select',
     render: (r) => badgeCell(String(r.status), (r.tone as Tone) ?? 'medium'),
   },
-];
+]);
 
 // Las labels (filtros/empty/pager) se fijan por PROPIEDAD; el placeholder de búsqueda por atributo.
 // La tabla solo está en el DOM cuando la pestaña Actividad está activa y ya cargó → watch del ref.
 watch(activityTable, (el) => {
-  if (el) (el as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+  if (el) (el as HTMLElement & { labels: Record<string, string> }).labels = dataTableLabels(locale.value);
+});
+watch(locale, () => {
+  if (activityTable.value) {
+    (activityTable.value as HTMLElement & { labels: Record<string, string> }).labels =
+      dataTableLabels(locale.value);
+  }
 });
 
 async function loadActivity(): Promise<void> {

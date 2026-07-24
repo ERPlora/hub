@@ -218,8 +218,13 @@ pub fn report_runtime_error(
     module_id: Option<String>,
     context: serde_json::Value,
 ) {
-    let mut event = ErrorEvent::new(source, error_code_of(err), err.to_string(), severity_of(err))
-        .with_context(context);
+    let mut event = ErrorEvent::new(
+        source,
+        error_code_of(err),
+        err.to_string(),
+        severity_of(err),
+    )
+    .with_context(context);
     if let Some(id) = module_id {
         event = event.with_module(id);
     }
@@ -263,6 +268,7 @@ pub fn error_code_of(err: &RuntimeError) -> &'static str {
         E::Schema { .. } => "schema",
         E::Notify(_) => "notify",
         E::Backup(_) => "backup",
+        E::Storage(_) => "module_storage",
         E::Certificate(_) => "certificate",
         E::Other(_) => "other",
     }
@@ -284,7 +290,10 @@ mod tests {
 
     /// Construye un registro AISLADO (no el global) para testear el throttle sin estado compartido.
     fn isolated(sink: Arc<dyn ErrorSink>) -> ErrorRegistry {
-        let reg = ErrorRegistry { sink: OnceLock::new(), recent: Mutex::new(HashMap::new()) };
+        let reg = ErrorRegistry {
+            sink: OnceLock::new(),
+            recent: Mutex::new(HashMap::new()),
+        };
         let _ = reg.sink.set(sink);
         reg
     }
@@ -302,7 +311,11 @@ mod tests {
         reg.report(event("db", "boom")); // misma huella → throttled
         reg.report(event("db", "boom")); // idem
 
-        assert_eq!(count.load(Ordering::SeqCst), 1, "solo el primero debe llegar al sink");
+        assert_eq!(
+            count.load(Ordering::SeqCst),
+            1,
+            "solo el primero debe llegar al sink"
+        );
     }
 
     #[test]
@@ -319,7 +332,10 @@ mod tests {
 
     #[test]
     fn no_sink_drops_quietly() {
-        let reg = ErrorRegistry { sink: OnceLock::new(), recent: Mutex::new(HashMap::new()) };
+        let reg = ErrorRegistry {
+            sink: OnceLock::new(),
+            recent: Mutex::new(HashMap::new()),
+        };
         assert!(!reg.has_sink());
         // No debe entrar en pánico ni hacer nada observable.
         reg.report(event("db", "boom"));
@@ -341,7 +357,10 @@ mod tests {
             severity::USER
         );
         assert_eq!(
-            severity_of(&RuntimeError::InvalidPayload { name: "n".into(), detail: "d".into() }),
+            severity_of(&RuntimeError::InvalidPayload {
+                name: "n".into(),
+                detail: "d".into()
+            }),
             severity::USER
         );
         assert_eq!(
@@ -349,18 +368,36 @@ mod tests {
             severity::USER
         );
         // Fallos no esperados.
-        assert_eq!(severity_of(&RuntimeError::Wasm("x".into())), severity::UNEXPECTED);
-        assert_eq!(severity_of(&RuntimeError::Other("x".into())), severity::UNEXPECTED);
+        assert_eq!(
+            severity_of(&RuntimeError::Wasm("x".into())),
+            severity::UNEXPECTED
+        );
+        assert_eq!(
+            severity_of(&RuntimeError::Other("x".into())),
+            severity::UNEXPECTED
+        );
         assert_eq!(severity_of(&RuntimeError::EventLoop), severity::UNEXPECTED);
     }
 
     #[test]
     fn error_code_derives_from_variant() {
-        assert_eq!(error_code_of(&RuntimeError::PermissionDenied("x".into())), "permission_denied");
-        assert_eq!(error_code_of(&RuntimeError::CommandNotFound("c".into())), "command_not_found");
-        assert_eq!(error_code_of(&RuntimeError::QueryNotFound("q".into())), "query_not_found");
         assert_eq!(
-            error_code_of(&RuntimeError::InvalidPayload { name: "n".into(), detail: "d".into() }),
+            error_code_of(&RuntimeError::PermissionDenied("x".into())),
+            "permission_denied"
+        );
+        assert_eq!(
+            error_code_of(&RuntimeError::CommandNotFound("c".into())),
+            "command_not_found"
+        );
+        assert_eq!(
+            error_code_of(&RuntimeError::QueryNotFound("q".into())),
+            "query_not_found"
+        );
+        assert_eq!(
+            error_code_of(&RuntimeError::InvalidPayload {
+                name: "n".into(),
+                detail: "d".into()
+            }),
             "invalid_payload"
         );
         assert_eq!(error_code_of(&RuntimeError::Wasm("x".into())), "wasm");

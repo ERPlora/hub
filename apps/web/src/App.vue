@@ -2,17 +2,31 @@
   <ion-app>
     <ion-split-pane content-id="main" when="lg" :class="{ rail: railCollapsed }">
       <!-- Menú lateral (drawer en móvil, fijo en desktop ≥lg). Solo con sesión. -->
-      <ion-menu v-if="isAuthed" content-id="main" type="overlay" class="dash-menu">
+      <ion-menu
+        v-if="isAuthed"
+        :menu-id="SHELL_MENU_ID"
+        content-id="main"
+        type="overlay"
+        class="dash-menu"
+      >
         <!-- Tarjeta de usuario ARRIBA (decisión 2026-07-16: el avatar de la topbar se retiró por
              duplicado; el usuario vive aquí). La tarjeta ENTERA es el trigger de un menú
              desplegable (ion-popover) con Perfil / Cerrar sesión — patrón "user menu" del
              dashboard de Cloud/Untitled UI, en vez de iconos sueltos. -->
         <ion-header class="ion-no-border">
           <ion-toolbar class="brand-toolbar">
-            <button id="sidebar-user-menu" class="sidebar-user" type="button">
-              <!-- TODO(#39): migrar a ok-avatar cuando exista (ERPlora/outfitkit). Hasta entonces,
-                   avatar de iniciales a mano; el CSS vive en polish.css (.sidebar-user-avatar). -->
-              <div class="sidebar-user-avatar">{{ initials }}</div>
+            <button
+              id="sidebar-user-menu"
+              class="sidebar-user"
+              type="button"
+              aria-haspopup="menu"
+              @keydown.enter.prevent="openUserMenuFromKeyboard"
+              @keydown.space.prevent="openUserMenuFromKeyboard"
+            >
+              <div class="sidebar-user-avatar">
+                <img v-if="user?.avatarUrl" :src="user.avatarUrl" alt="" />
+                <span v-else>{{ initials }}</span>
+              </div>
               <div class="sidebar-user-meta nav-label">
                 <div class="sidebar-user-name">{{ user?.name }}</div>
                 <div class="sidebar-user-email">{{ user?.email }}</div>
@@ -111,7 +125,7 @@ import { useI18n } from 'vue-i18n';
 import {
   IonApp, IonSplitPane, IonMenu, IonMenuToggle, IonHeader, IonToolbar,
   IonContent, IonList, IonListHeader, IonItem, IonLabel, IonFooter,
-  IonPopover, IonRouterOutlet, menuController,
+  IonPopover, IonRouterOutlet,
 } from '@ionic/vue';
 import HubIcon from './components/HubIcon.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
@@ -120,11 +134,13 @@ import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav } from './lib/nav';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
 import { railCollapsed } from './lib/shell';
+import { SHELL_MENU_ID, runAfterShellMenuCloses } from './lib/shell-menu';
 import { PROFILE_ROUTE } from './lib/routes';
 import { maybeShowInstallModal } from './lib/pwa';
 import { apiDocsEnabled } from './lib/api-docs';
 import { getHubSettings } from './lib/hub-settings';
 import { bootHubLanguage } from './i18n';
+import { getUserProfile } from './lib/user-profile';
 
 interface NavItem { path: string; labelKey: string; icon: string }
 interface NavSection { titleKey: string; items: NavItem[] }
@@ -191,6 +207,9 @@ async function gateAndRefresh(): Promise<void> {
   } catch {
     /* el hub puede no exponer settings aún; degrada a lo ya sembrado */
   }
+  // Después de intentar resolver los defaults del Hub, carga la fila del usuario y aplica sus
+  // overrides. Si no tiene ninguno, user-profile hereda exactamente los valores disponibles.
+  await getUserProfile().catch(() => null);
 }
 onMounted(() => {
   if (isAuthed.value) void gateAndRefresh();
@@ -218,40 +237,51 @@ function goHome(): void {
   void router.push('/dashboard');
 }
 
-// Las acciones del menú de usuario cierran también el drawer móvil: sin esto, en móvil la
-// navegación ocurre DEBAJO del menú abierto y parece que el botón «no hace nada».
-function goProfile(): void {
-  void menuController.close().catch(() => {});
-  void router.push(PROFILE_ROUTE);
+// Ionic posiciona el popover mediante el click de su trigger. Los botones nativos deberían generar
+// ese click con Enter/Espacio, pero el webview no lo hace de forma consistente: lo normalizamos.
+function openUserMenuFromKeyboard(event: KeyboardEvent): void {
+  if (event.currentTarget instanceof HTMLButtonElement) event.currentTarget.click();
+}
+
+// Las acciones esperan a que el drawer móvil termine de cerrarse antes de navegar. Lanzar el
+// cierre sin await deja la ruta nueva debajo del menú abierto y hace que Perfil parezca inerte.
+async function goProfile(): Promise<void> {
+  await runAfterShellMenuCloses(() => router.push(PROFILE_ROUTE));
 }
 
 async function onLogout(): Promise<void> {
-  void menuController.close().catch(() => {});
-  logout();
-  await router.replace('/login');
+  await runAfterShellMenuCloses(async () => {
+    logout();
+    await router.replace('/login');
+  });
 }
 </script>
 
 <!--
   CSS GLOBAL (no scoped) del "push" del panel del asistente. La clase `assistant-open` la togglea
-  AssistantDrawer.vue en <html> según `assistantOpen` (lib/shell). En desktop (≥992px, el mismo
-  breakpoint que el ion-split-pane when="lg") reservamos 420px a la derecha del shell: el panel
-  (position:fixed; right:0; width:420px) cae en ese hueco y EMPUJA el contenido (sin scrim). En
-  móvil (<992px) no reservamos nada → el panel overlaya con scrim (ver AssistantDrawer.vue).
+  AssistantDrawer.vue en <html> según `assistantOpen`. Desde tablet (≥768px) reservamos a la
+  derecha un ancho adaptable (360–420px): el panel fijo cae en ese hueco y EMPUJA el Hub, de modo
+  que dashboard/asistente siguen siendo interactivos simultáneamente. Solo en móvil (<768px) el
+  panel overlaya con scrim.
   El ion-split-pane es `position:absolute; inset:0` (right:0), así que padear el <ion-app> NO lo
-  encoge (un hijo inset:0 llena el padding-box). Movemos su borde derecho a 420px directamente.
+  encoge (un hijo inset:0 llena el padding-box). Movemos directamente su borde derecho.
 -->
 <style>
-@media (min-width: 992px) {
-  /* Encoge el shell entero (menú fijo + contenido flex) moviendo el borde derecho del split-pane a
-     420px → el contenido (flex:1) absorbe la reducción y el panel fijo cae en el hueco. Verificado en
-     QA con Playwright (main_right pasa de 1280→860 en viewport 1280). */
+/* 33vw escala el asistente en tablet; los límites conservan un chat usable sin comerse el Hub. */
+:root {
+  --assistant-panel-width: 420px;
+}
+@media (min-width: 768px) {
+  :root {
+    --assistant-panel-width: clamp(360px, 33vw, 420px);
+  }
+
   html.assistant-open ion-split-pane {
-    inset-inline-end: 420px;
+    inset-inline-end: var(--assistant-panel-width);
     transition: inset-inline-end 0.2s ease;
   }
 }
-@media (min-width: 992px) and (prefers-reduced-motion: reduce) {
+@media (min-width: 768px) and (prefers-reduced-motion: reduce) {
   html.assistant-open ion-split-pane {
     transition: none;
   }

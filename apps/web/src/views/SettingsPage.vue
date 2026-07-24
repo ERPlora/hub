@@ -2,49 +2,12 @@
   <AppPage :title="t('nav.settings')">
       <!-- ── Tab: Hub ── -->
       <template v-if="tab === 'hub'">
+        <h2 class="text-base font-semibold mb-2 px-1">{{ t('settings.hubWide') }}</h2>
         <ion-card>
           <ion-card-content class="p-0">
             <ion-list lines="none">
-              <!-- Idioma del sistema (PERSONAL del usuario): override local que prevalece sobre el
-                   default del hub. Cambia el shell en caliente y persiste en este dispositivo. -->
-              <ion-item>
-                <HubIcon slot="start" name="language-outline" />
-                <ion-label>
-                  <h2>{{ t('settings.systemLanguage') }}</h2>
-                  <p>{{ t('settings.systemLanguageDesc') }}</p>
-                </ion-label>
-                <ion-select
-                  v-model="userLang"
-                  interface="popover"
-                  :aria-label="t('settings.systemLanguage')"
-                  slot="end"
-                  @ion-change="onUserLangChange($event.detail.value as Locale)"
-                >
-                  <ion-select-option v-for="l in availableLocales" :key="l.code" :value="l.code">
-                    {{ l.name }}
-                  </ion-select-option>
-                </ion-select>
-              </ion-item>
-
-              <!-- Zona horaria -->
-              <ion-item>
-                <HubIcon slot="start" name="globe-outline" />
-                <ion-label>
-                  <h2>{{ t('settings.timezone') }}</h2>
-                  <p>{{ t('settings.timezoneDesc') }}</p>
-                </ion-label>
-                <ion-select
-                  v-model="hubTimezone"
-                  interface="popover"
-                  :aria-label="t('settings.timezone')"
-                  slot="end"
-                >
-                  <ion-select-option value="madrid">Europe/Madrid</ion-select-option>
-                  <ion-select-option value="canary">Atlantic/Canary</ion-select-option>
-                </ion-select>
-              </ion-item>
-
-              <!-- País -->
+              <!-- País fiscal GLOBAL del negocio. Persistido como ISO-3166 en hub_settings; no es
+                   un selector de “tipo de negocio” ni un dato local del navegador. -->
               <ion-item>
                 <HubIcon slot="start" name="business-outline" />
                 <ion-label>
@@ -52,53 +15,25 @@
                   <p>{{ t('settings.countryDesc') }}</p>
                 </ion-label>
                 <ion-select
+                  v-if="isAdmin"
                   v-model="hubCountry"
                   interface="popover"
                   :aria-label="t('settings.country')"
                   slot="end"
+                  @ion-change="onCountryChange($event.detail.value as string)"
                 >
-                  <ion-select-option value="spain">{{ t('settings.countrySpain') }}</ion-select-option>
-                  <ion-select-option value="portugal">{{ t('settings.countryPortugal') }}</ion-select-option>
+                  <ion-select-option value="ES">{{ t('settings.countrySpain') }}</ion-select-option>
+                  <ion-select-option value="PT">{{ t('settings.countryPortugal') }}</ion-select-option>
                 </ion-select>
+                <ion-note v-else slot="end">{{ hubCountry }}</ion-note>
               </ion-item>
-
-              <!-- Tema PERSONAL: modo (system/light/dark) + paleta de marca (ADR-0138).
-                   ok-theme-picker (OutfitKit, compartido con Cloud) solo emite ok-change;
-                   aquí se persiste: modo → lib/theme (localStorage, mismo estado que el
-                   toggle de la topbar) y paleta → override LOCAL por usuario
-                   (erplora.palette; sin override se sigue la paleta global del hub). -->
-              <ion-item lines="none">
-                <HubIcon slot="start" name="color-palette-outline" />
-                <ion-label>
-                  <h2>{{ t('settings.theme') }}</h2>
-                  <p>{{ t('settings.themeDesc') }}</p>
-                </ion-label>
-              </ion-item>
-              <div class="ion-padding-horizontal ion-padding-bottom">
-                <ok-theme-picker
-                  :palette="themePalette"
-                  :mode="hubTheme"
-                  :labels.prop="pickerLabels"
-                  @ok-change="onPickerChange"
-                ></ok-theme-picker>
-                <ion-button
-                  v-if="hasLocalPalette"
-                  size="small"
-                  fill="clear"
-                  class="mt-1"
-                  @click="setLocalPalette('')"
-                >
-                  {{ t('settings.paletteFollowHub') }}
-                </ion-button>
-              </div>
             </ion-list>
           </ion-card-content>
         </ion-card>
 
         <!-- Ajustes GLOBALES del hub (server-side, /api/settings): moneda + idioma DEFAULT + doc API.
              Solo editables por admin (PUT exige owner/admin); para el resto, valores en solo-lectura. -->
-        <h2 class="text-base font-semibold mt-4 mb-2 px-1">{{ t('settings.hubWide') }}</h2>
-        <ion-card>
+        <ion-card class="mt-3">
           <ion-card-content class="p-0">
             <ion-list lines="none">
               <!-- Moneda del hub (GLOBAL, sin override por usuario). -->
@@ -169,25 +104,6 @@
           </ion-card-content>
         </ion-card>
 
-        <ion-button class="mt-3" expand="block" @click="saveHubSettings">
-          <HubIcon slot="start" name="save-outline" />
-          {{ t('settings.saveSettings') }}
-        </ion-button>
-
-        <!-- Mostrar módulos en la barra lateral -->
-        <ion-card class="mt-3">
-          <ion-card-content class="p-0">
-            <ion-item lines="none">
-              <HubIcon slot="start" name="reader-outline" />
-              <ion-label>
-                <h2>{{ t('settings.showModulesInSidebar') }}</h2>
-                <p>{{ t('settings.showModulesInSidebarDesc') }}</p>
-              </ion-label>
-              <ion-toggle v-model="showModulesInSidebar" slot="end" />
-            </ion-item>
-          </ion-card-content>
-        </ion-card>
-
         <!-- Mostrar documentación de la API (ADR-0057 §4): setting GLOBAL del hub (server-side) que
              muestra/oculta la entrada de menú + la página Swagger. Solo lo cambia un admin; la
              seguridad real es el gate de sesión sobre openapi.json en el runtime. -->
@@ -202,6 +118,7 @@
               <ion-toggle
                 :checked="showApiDocs"
                 :disabled="!isAdmin"
+                :aria-label="t('settings.showApiDocs')"
                 @ion-change="onApiDocsToggle($event)"
                 slot="end"
               />
@@ -222,51 +139,6 @@
               </ion-label>
               <ion-note slot="end">{{ t('settings.disabled') }}</ion-note>
             </ion-item>
-          </ion-card-content>
-        </ion-card>
-      </template>
-
-      <!-- ── Tab: Store ── -->
-      <template v-else-if="tab === 'store'">
-        <ion-card>
-          <ion-card-content class="p-0">
-            <ion-list lines="none">
-              <!-- Tipo de negocio -->
-              <ion-item>
-                <HubIcon slot="start" name="storefront-outline" />
-                <ion-label>
-                  <h2>{{ t('settings.businessType') }}</h2>
-                  <p>{{ t('settings.businessTypeDesc') }}</p>
-                </ion-label>
-                <ion-select
-                  v-model="storeType"
-                  interface="popover"
-                  :aria-label="t('settings.businessType')"
-                  slot="end"
-                >
-                  <ion-select-option value="retail">{{ t('settings.businessRetail') }}</ion-select-option>
-                  <ion-select-option value="food">{{ t('settings.businessFood') }}</ion-select-option>
-                </ion-select>
-              </ion-item>
-
-              <!-- Formato regional -->
-              <ion-item>
-                <HubIcon slot="start" name="globe-outline" />
-                <ion-label>
-                  <h2>{{ t('settings.regionalFormat') }}</h2>
-                  <p>{{ t('settings.regionalFormatDesc') }}</p>
-                </ion-label>
-                <ion-select
-                  v-model="storeLocale"
-                  interface="popover"
-                  :aria-label="t('settings.regionalFormat')"
-                  slot="end"
-                >
-                  <ion-select-option value="es">{{ t('settings.countrySpain') }}</ion-select-option>
-                  <ion-select-option value="en">{{ t('settings.countryUk') }}</ion-select-option>
-                </ion-select>
-              </ion-item>
-            </ion-list>
           </ion-card-content>
         </ion-card>
       </template>
@@ -455,6 +327,7 @@
                 <ion-toggle
                   :checked="cap.granted"
                   :disabled="!isAdmin"
+                  :aria-label="`${cap.label} · ${m.name}`"
                   slot="end"
                   @ion-change="onCapabilityToggle(m, cap, $event)"
                 />
@@ -479,10 +352,6 @@
           <ion-segment-button value="hub">
             <HubIcon name="business-outline" />
             <ion-label>{{ t('settings.tabHub') }}</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="store">
-            <HubIcon name="storefront-outline" />
-            <ion-label>{{ t('settings.tabStore') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="tax">
             <HubIcon name="wallet-outline" />
@@ -534,18 +403,10 @@ import {
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import DataPanel from '../components/DataPanel.vue';
-import {
-  themeMode,
-  setThemeMode,
-  themePalette,
-  setLocalPalette,
-  hasLocalPalette,
-  type ThemeMode,
-  type ThemePalette,
-} from '../lib/theme';
-import { setLocale, bootHubLanguage, availableLocales, type Locale } from '../i18n';
+import { bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { isAdmin } from '../lib/session';
+import { resolveSettingsTab, type SettingsTab } from '../lib/settings-tabs';
 import { hubSettings, getHubSettings, updateHubSettings, type HubSettings } from '../lib/hub-settings';
 import { publishHubCurrency } from '../lib/money';
 import { toastSuccess, toastError } from '../lib/toast';
@@ -560,26 +421,29 @@ import {
   type BusinessCertificate,
 } from '../lib/runtime';
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 
-type Tab = 'hub' | 'store' | 'tax' | 'tickets' | 'permissions' | 'data';
-const TABS: readonly Tab[] = ['hub', 'store', 'tax', 'tickets', 'permissions', 'data'];
+type Tab = SettingsTab;
 
 // Deep-link a una pestaña por HASH (/settings#permisos) — la ruta base no cambia, así Ionic
 // no trata el cambio de pestaña como página secundaria (no se desmonta el tabbar ni hay botón back).
-// Compat: el query ?tab= legacy lo redirige el guard del router al hash.
+// Compat: #store (pestaña Tienda retirada por duplicar Hub) se normaliza a #hub.
 const route = useRoute();
 const router = useRouter();
-const initialTab = TABS.find((v) => v === route.hash.slice(1)) ?? 'hub';
+const initialTab = resolveSettingsTab(route.hash);
 const tab = ref<Tab>(initialTab);
+if (route.hash && route.hash !== `#${initialTab}`) {
+  void router.replace({ hash: `#${initialTab}` });
+}
 // Al cambiar de pestaña, sincroniza el hash (replace = no apila historial; "atrás" sale de Ajustes).
 watch(tab, (value) => {
   if (value !== (route.hash.slice(1) || 'hub')) void router.replace({ hash: `#${value}` });
 });
 // Back/forward y deep-links: si el hash cambia, actualiza el tab local.
 watch(() => route.hash, (h) => {
-  const next = TABS.find((v) => v === h.slice(1)) ?? 'hub';
+  const next = resolveSettingsTab(h);
   if (next !== tab.value) tab.value = next;
+  if (h && h !== `#${next}`) void router.replace({ hash: `#${next}` });
 });
 
 // Vista inicial del sub-segment de Datos: importar por defecto (lo habitual); ?data=export permite
@@ -600,14 +464,6 @@ const CURRENCIES: { code: string; name: string }[] = [
   { code: 'BRL', name: 'Brazilian Real' },
 ];
 
-// ── Estado: Hub (local-only por ahora) ──
-// Idioma PERSONAL del usuario (override local): arranca del locale activo del shell.
-const userLang = ref<Locale>(locale.value as Locale);
-const hubTimezone = ref<string>('madrid');
-const hubCountry = ref<string>('spain');
-const hubTheme = ref<ThemeMode>(themeMode.value);
-const showModulesInSidebar = ref<boolean>(false);
-
 // ── Estado: Hub-wide (server-side, /api/settings) ──
 // Moneda GLOBAL del hub e idioma DEFAULT del hub. Se siembran de la cache (boot) y se refrescan en
 // onMounted; persisten al cambiar (solo admin) vía updateHubSettings.
@@ -615,6 +471,7 @@ const hubCurrency = ref<string>(hubSettings.value?.currency ?? 'EUR');
 const hubLanguage = ref<Locale>(hubSettings.value?.language ?? 'es');
 // Paleta GLOBAL del hub (ADR-0138): la default para usuarios sin override local.
 const hubPalette = ref<string>(hubSettings.value?.theme_palette ?? 'erplora');
+const hubCountry = ref<string>(hubSettings.value?.country_code ?? 'ES');
 // Doc de la API: deriva del setting server-side (lib/api-docs → hubSettings.api_docs_enabled).
 const showApiDocs = apiDocsEnabled;
 
@@ -629,6 +486,7 @@ watch(hubSettings, (s) => {
   hubCurrency.value = s.currency;
   hubLanguage.value = s.language;
   hubPalette.value = s.theme_palette;
+  hubCountry.value = s.country_code;
   businessTaxId.value = s.business_tax_id;
   businessLegalName.value = s.business_legal_name;
   businessAddress.value = s.business_address;
@@ -639,10 +497,6 @@ onMounted(() => {
   void getHubSettings().catch(() => null);
 });
 
-// ── Estado: Store ──
-const storeType = ref<string>('retail');
-const storeLocale = ref<string>('es');
-
 // ── Estado: Negocio (identidad fiscal genérica, server-side /api/settings — ADR-0061) ──
 // FUENTE ÚNICA país-agnóstica que usan invoice (emisor) y los módulos fiscales por país. Se siembra
 // de la cache y se sincroniza con el watch de abajo. (IVA/régimen/VeriFactu salieron del core: el
@@ -650,13 +504,6 @@ const storeLocale = ref<string>('es');
 const businessTaxId = ref<string>(hubSettings.value?.business_tax_id ?? '');
 const businessLegalName = ref<string>(hubSettings.value?.business_legal_name ?? '');
 const businessAddress = ref<string>(hubSettings.value?.business_address ?? '');
-
-// Tema: delega en lib/theme (persiste + aplica al <html>). Comparte estado con el toggle de la
-// topbar — cambiar aquí se refleja allí y viceversa.
-function onThemeChange(value: ThemeMode): void {
-  hubTheme.value = value;
-  setThemeMode(value);
-}
 
 // Textos i18n del ok-theme-picker (defaults en inglés dentro del componente, ADR-0055).
 const pickerLabels = computed(() => ({
@@ -666,14 +513,6 @@ const pickerLabels = computed(() => ({
   light: t('settings.themeLight'),
   dark: t('settings.themeDark'),
 }));
-
-// ok-theme-picker PERSONAL: el componente solo emite; el host (aquí) persiste cada eje.
-// Modo → lib/theme (localStorage compartido con la topbar). Paleta → override LOCAL.
-function onPickerChange(e: Event): void {
-  const { palette, mode } = (e as CustomEvent<{ palette: ThemePalette; mode: ThemeMode }>).detail;
-  if (mode !== themeMode.value) onThemeChange(mode);
-  if (palette !== themePalette.value) setLocalPalette(palette);
-}
 
 // ok-theme-picker GLOBAL (solo admin): persiste al instante en hub_settings, como la moneda.
 // theme.ts refleja la nueva global en el shell salvo que este navegador tenga override.
@@ -685,13 +524,6 @@ function onHubPaletteChange(e: Event): void {
   void persistHubSettings({ theme_palette: next }, () => {
     hubPalette.value = prev;
   });
-}
-
-// Idioma PERSONAL del usuario: cambia el locale i18n en caliente y lo persiste como OVERRIDE local
-// (localStorage). Prevalece sobre el default del hub. NO toca el server.
-function onUserLangChange(value: Locale): void {
-  userLang.value = value;
-  setLocale(value);
 }
 
 // Persiste un cambio parcial en los settings del hub (server). Solo admin (el runtime revalida).
@@ -734,6 +566,16 @@ function onHubLanguageChange(value: Locale): void {
   bootHubLanguage(value);
 }
 
+// País fiscal del Hub (GLOBAL): driver para impuestos y módulos de cumplimiento. Se persiste con
+// código ISO; nunca se deriva del catálogo de tipos de negocio del SaaS.
+function onCountryChange(value: string): void {
+  const prev = hubSettings.value?.country_code ?? 'ES';
+  hubCountry.value = value;
+  void persistHubSettings({ country_code: value }, () => {
+    hubCountry.value = prev;
+  });
+}
+
 // Toggle "Mostrar documentación de la API": setting GLOBAL del hub (solo admin). Persiste vía
 // updateHubSettings; reactivo en la nav (App.vue) y el gate de la ruta (router) sin recargar.
 function onApiDocsToggle(e: Event): void {
@@ -743,12 +585,6 @@ function onApiDocsToggle(e: Event): void {
   void persistHubSettings({ api_docs_enabled: checked }, () => {
     /* la cache no se tocó: el :checked vuelve solo al valor server */
   });
-}
-
-function saveHubSettings(): void {
-  // Los ajustes server-side (moneda/idioma/doc-API) ya persisten al cambiar. Este botón confirma los
-  // que aún son local-only (zona horaria, país, "mostrar módulos") — pendientes de cablear server.
-  void toastSuccess(t('settings.saved'));
 }
 
 async function saveTaxSettings(): Promise<void> {

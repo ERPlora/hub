@@ -11,7 +11,20 @@
 -->
 <template>
   <AppPage :title="t('files.title')">
-    <ok-file-manager ref="fmEl" searchable uploadable></ok-file-manager>
+    <ok-inline-feedback
+      v-if="loadFailed"
+      class="files-feedback"
+      tone="danger"
+      icon="cloud-offline-outline"
+      :heading="t('files.loadErrorTitle')"
+    >
+      {{ t('files.loadErrorBody') }}
+      <ion-button slot="actions" size="small" fill="outline" @click="load(selected)">
+        {{ t('files.retry') }}
+      </ion-button>
+    </ok-inline-feedback>
+
+    <ok-file-manager ref="fmEl" searchable :uploadable="isAdmin"></ok-file-manager>
 
     <ion-toast
       :is-open="toastOpen"
@@ -26,9 +39,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IonToast } from '@ionic/vue';
+import { IonButton, IonToast, alertController } from '@ionic/vue';
 import AppPage from '../components/AppPage.vue';
-import { RUNTIME_URL } from '../lib/runtime';
+import { RUNTIME_URL, runtimeHeaders } from '../lib/runtime';
+import { isAdmin } from '../lib/session';
 import {
   fetchMedia,
   uploadMedia,
@@ -65,6 +79,7 @@ let query = '';
 
 const toastOpen = ref(false);
 const toastMessage = ref('');
+const loadFailed = ref(false);
 function toast(msg: string): void {
   toastMessage.value = msg;
   toastOpen.value = true;
@@ -104,6 +119,7 @@ async function load(folder = ''): Promise<void> {
   const el = fmEl.value;
   if (el) el.loading = true;
   const data = await fetchMedia(folder);
+  loadFailed.value = !data;
   if (data) {
     folders = data.folders ?? [];
     allFiles = data.files ?? [];
@@ -111,7 +127,7 @@ async function load(folder = ''): Promise<void> {
     quota = data.quota;
     selected = folder;
   } else {
-    // Sin endpoint todavía: estado vacío honesto (no mock).
+    // El feedback explica el error; el gestor queda vacío y permite reintentar sin inventar datos.
     folders = [];
     allFiles = [];
     path = [];
@@ -123,17 +139,37 @@ async function load(folder = ''): Promise<void> {
   applyState();
 }
 
-// Abre/descarga un fichero por su URL (raw del runtime en local, S3 firmada en cloud).
-function openFile(id: string): void {
+// Abre/descarga un fichero por su URL (raw autenticado del runtime en local, URL firmada en cloud).
+async function openFile(id: string, download = false): Promise<void> {
   const file = allFiles.find((f) => f.id === id);
   if (!file?.url) {
     toast(t('files.empty'));
     return;
   }
-  // El runtime devuelve una URL relativa (`/api/media/raw?…`); la absolutizamos contra el runtime
-  // para que funcione aunque la web no use el proxy de dev. Las URLs S3 ya vienen absolutas.
-  const href = /^https?:\/\//.test(file.url) ? file.url : `${RUNTIME_URL}${file.url}`;
-  window.open(href, '_blank', 'noopener');
+  if (/^https?:\/\//.test(file.url)) {
+    window.open(file.url, '_blank', 'noopener');
+    return;
+  }
+  try {
+    // `window.open` no puede adjuntar `X-Hub-Session`: el fichero local protegido se obtiene como
+    // blob con el fetch autenticado y solo ese object URL temporal llega al navegador.
+    const response = await fetch(`${RUNTIME_URL}${file.url}`, { headers: runtimeHeaders() });
+    if (!response.ok) throw new Error(String(response.status));
+    const objectUrl = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    if (download) anchor.download = file.name;
+    else {
+      anchor.target = '_blank';
+      anchor.rel = 'noopener';
+    }
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+  } catch {
+    toast(t('files.openError'));
+  }
 }
 
 // ---- Listeners de los eventos `ok-*` del componente ----
@@ -145,32 +181,72 @@ function onSearch(e: Event): void {
   applyState();
 }
 function onOpen(e: Event): void {
-  openFile((e as CustomEvent<{ id: string }>).detail.id);
+  void openFile((e as CustomEvent<{ id: string }>).detail.id);
 }
 function onDownload(e: Event): void {
-  openFile((e as CustomEvent<{ id: string }>).detail.id);
+  void openFile((e as CustomEvent<{ id: string }>).detail.id, true);
 }
 async function onUpload(e: Event): Promise<void> {
+  if (!isAdmin.value) {
+    toast(t('files.permissionDenied'));
+    return;
+  }
   const files = (e as CustomEvent<{ files: File[] }>).detail.files ?? [];
   if (!files.length) return;
   const ok = await uploadMedia(selected, files);
-  toast(ok ? t('files.upload') + ' ✓' : t('files.empty'));
+  toast(ok ? t('files.uploadSuccess') : t('files.uploadError'));
   if (ok) await load(selected);
 }
 async function onDelete(e: Event): Promise<void> {
+  if (!isAdmin.value) {
+    toast(t('files.permissionDenied'));
+    return;
+  }
   const id = (e as CustomEvent<{ id: string }>).detail.id;
   const file = allFiles.find((f) => f.id === id);
-  if (!window.confirm(`${t('files.delete')}: ${file?.name ?? id}?`)) return;
+  const alert = await alertController.create({
+    header: t('files.deleteTitle'),
+    message: t('files.deleteBody', { name: file?.name ?? id }),
+    buttons: [
+      { text: t('files.cancel'), role: 'cancel' },
+      { text: t('files.delete'), role: 'confirm', cssClass: 'alert-button-danger' },
+    ],
+  });
+  await alert.present();
+  const result = await alert.onDidDismiss();
+  if (result.role !== 'confirm') return;
   const ok = await deleteMedia(id);
-  toast(ok ? t('files.delete') + ' ✓' : t('files.empty'));
+  toast(ok ? t('files.deleteSuccess') : t('files.deleteError'));
   if (ok) await load(selected);
 }
 async function onCreateFolder(e: Event): Promise<void> {
+  if (!isAdmin.value) {
+    toast(t('files.permissionDenied'));
+    return;
+  }
   const parent = (e as CustomEvent<{ parent: string }>).detail.parent ?? selected;
-  const name = window.prompt(t('files.newFolder'));
+  const alert = await alertController.create({
+    header: t('files.newFolder'),
+    inputs: [
+      {
+        name: 'folderName',
+        type: 'text',
+        placeholder: t('files.folderName'),
+        attributes: { maxlength: 100, autocomplete: 'off' },
+      },
+    ],
+    buttons: [
+      { text: t('files.cancel'), role: 'cancel' },
+      { text: t('files.createFolder'), role: 'confirm' },
+    ],
+  });
+  await alert.present();
+  const result = await alert.onDidDismiss<{ values?: { folderName?: string } }>();
+  if (result.role !== 'confirm') return;
+  const name = result.data?.values?.folderName?.trim();
   if (!name) return;
   const ok = await createMediaFolder(parent, name);
-  toast(ok ? t('files.newFolder') + ' ✓' : t('files.empty'));
+  toast(ok ? t('files.folderCreated') : t('files.folderError'));
   if (ok) await load(selected);
 }
 
@@ -200,3 +276,9 @@ onBeforeUnmount(() => {
   el.removeEventListener('ok-create-folder', onCreateFolder as EventListener);
 });
 </script>
+
+<style scoped>
+.files-feedback {
+  margin-bottom: 0.75rem;
+}
+</style>

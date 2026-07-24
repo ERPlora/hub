@@ -82,6 +82,23 @@
       },
       "default": {}
     },
+    "static_files": {
+      "type": "object",
+      "description": "Carpeta persistente privada del módulo dentro del árbol común `media/modules/`. El manifest declara solo un nombre seguro; el Hub resuelve el backend: disco local en Hub Local y almacenamiento de objetos vía Cloud/S3 en Hub Cloud. Ausente = el módulo no guarda ficheros persistentes.",
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "folder": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "Nombre de un único segmento bajo `media/modules/` (p. ej. `verifactu`), nunca una ruta."
+        }
+      }
+    },
     "navigation": {
       "type": "array",
       "default": [],

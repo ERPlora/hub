@@ -3,9 +3,17 @@
     <div v-if="status === 'loading'" class="state-loading">
       <ion-spinner name="crescent" /> {{ t('moduleView.loading') }}
     </div>
-    <p v-else-if="status === 'error'" class="state-error">
-      {{ t('moduleView.loadError') }}
-    </p>
+    <ok-inline-feedback
+      v-else-if="status === 'error'"
+      tone="danger"
+      icon="alert-circle-outline"
+      :heading="t('moduleView.loadError')"
+    >
+      {{ t('moduleView.loadErrorHint') }}
+      <ion-button slot="actions" size="small" fill="outline" @click="mount">
+        {{ t('moduleView.retry') }}
+      </ion-button>
+    </ok-inline-feedback>
     <!-- Pestaña sintética "Plan" (auto-inyectada para módulos con `billing`): panel del SHELL,
          no un WC del módulo. Se muestra en vez del outlet del WC cuando está activa. -->
     <ModulePlanPanel
@@ -66,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
@@ -83,6 +91,7 @@ import { clientInjectionKey, getClient } from '../lib/runtime';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { openExternal } from '../lib/open-external';
 import { config } from '../lib/config';
+import { toastError } from '../lib/toast';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
@@ -136,6 +145,7 @@ async function onManageSubscription(): Promise<void> {
     await openExternal(url);
   } catch {
     window.removeEventListener('focus', recheck);
+    await toastError(t('moduleView.manageSubscriptionError'));
   }
 }
 /**
@@ -175,15 +185,20 @@ function params(): { moduleId: string; navId: string } {
   };
 }
 
+let mountGeneration = 0;
+
 async function mount(): Promise<void> {
+  const generation = ++mountGeneration;
   const { moduleId, navId } = params();
   status.value = 'loading';
   try {
     const menu = await loadMenu();
+    if (generation !== mountGeneration) return;
     tabs.value = menu.filter((m) => m.moduleId === moduleId);
     // El bloque `billing` del manifest decide si auto-inyectamos la pestaña "Plan" (sin tocar el
     // module.json de cada módulo). El manifest se sirve completo desde `/modules/<id>/module.json`.
     const manifest = await loadManifest(moduleId);
+    if (generation !== mountGeneration) return;
     billing.value = manifest?.billing ?? null;
     settings.value = manifest?.settings ?? null;
 
@@ -205,6 +220,7 @@ async function mount(): Promise<void> {
       activeNavId.value = 'settings';
       if (settings.value.component) {
         if (tabs.value[0]) await loadComponent(tabs.value[0]); // registra el custom element del bundle
+        if (generation !== mountGeneration) return;
         if (outlet.value) {
           outlet.value.replaceChildren();
           const el = document.createElement(settings.value.component) as HTMLElement & { client?: unknown };
@@ -228,6 +244,7 @@ async function mount(): Promise<void> {
     activeNavId.value = entry.nav.id;
 
     const tag = await loadComponent(entry);
+    if (generation !== mountGeneration) return;
     if (outlet.value) {
       outlet.value.replaceChildren();
       const el = document.createElement(tag) as HTMLElement & { client?: unknown };
@@ -237,7 +254,13 @@ async function mount(): Promise<void> {
       outlet.value.appendChild(el);
     }
     status.value = 'ready';
+    // Un navId retirado o mal escrito no puede dejar la URL afirmando una pestaña mientras se
+    // muestra otra. Canonizamos al primer tab real (también cubre bookmarks de versiones viejas).
+    if (navId !== entry.nav.id) {
+      void router.replace(`/m/${moduleId}/${entry.nav.id}`);
+    }
   } catch {
+    if (generation !== mountGeneration) return;
     status.value = 'error';
   }
 }
@@ -273,6 +296,11 @@ watch(
     if (route.name === 'module' && params().moduleId) void mount().then(revealActiveTab);
   },
 );
+
+onBeforeUnmount(() => {
+  mountGeneration += 1;
+  outlet.value?.replaceChildren();
+});
 </script>
 
 <style scoped>
@@ -299,10 +327,6 @@ watch(
   padding: 2rem 0;
   opacity: 0.7;
 }
-.state-error {
-  color: var(--ion-color-danger);
-}
-
 .blocked-card {
   margin: 12px 0;
 }

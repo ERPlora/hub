@@ -3,7 +3,9 @@
 // las llamadas lanzan y la capa de auth degrada a modo demo.
 import { config, isLocalHub } from './config';
 import { isTauri, loginHeaders } from './device';
+import { getLocale } from '../i18n';
 import { beginRequest, endRequest } from './shell';
+import { getHubSession } from './session';
 
 export interface CloudUser {
   id: string;
@@ -29,8 +31,14 @@ export interface CloudMarketplaceModule {
   name: string;
   description: string;
   priceLabel: string;
+  priceAmount: string | null;
+  priceInterval: 'month' | 'year' | null;
+  isFree: boolean;
+  moduleType: 'free' | 'one_time' | 'subscription' | string;
   category: string;
   installed: boolean;
+  available: boolean;
+  version?: string;
 }
 
 // --- Token store (JWT del usuario activo) -----------------------------------
@@ -205,10 +213,20 @@ async function runtimeGet<T>(path: string, timeoutMs = 8000): Promise<T> {
   const call = (token: string | null): Promise<Response> => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-    return fetch(`${RUNTIME_URL}${path}`, { headers, signal: ctrl.signal }).finally(() =>
-      clearTimeout(t),
-    );
+    const headers: Record<string, string> = {
+      'Accept-Language': getLocale(),
+    };
+    const session = getHubSession();
+    if (session) headers['X-Hub-Session'] = session;
+    if (config.hubId) headers['X-Hub-Id'] = config.hubId;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return fetch(`${RUNTIME_URL}${path}`, {
+      headers,
+      signal: ctrl.signal,
+      // Los estados 410/401 de un Hub revocado son cacheables por algunos navegadores. Una
+      // identidad recién registrada o un catálogo recién publicado debe revalidarse de verdad.
+      cache: 'no-store',
+    }).finally(() => clearTimeout(t));
   };
   beginRequest();
   try {
@@ -238,6 +256,7 @@ async function runtimeGet<T>(path: string, timeoutMs = 8000): Promise<T> {
 export interface HubSessionResult {
   token: string;
   user: { id: string; name: string; role: string };
+  permissions: string[];
 }
 
 async function runtimePost<T>(path: string, body: unknown, headers: Record<string, string>): Promise<T> {
@@ -264,8 +283,16 @@ async function runtimePost<T>(path: string, body: unknown, headers: Record<strin
 
 /** Abre una sesión local en el runtime a partir del JWT del usuario (login cloud). `name` se usa
  *  para el `hub_user` local (y para el posterior login por PIN, que resuelve por nombre). */
-export async function runtimeCloudSession(access: string, name: string): Promise<HubSessionResult> {
-  return runtimePost<HubSessionResult>('/api/auth/cloud', { name }, { Authorization: `Bearer ${access}` });
+export async function runtimeCloudSession(
+  access: string,
+  name: string,
+  email?: string,
+): Promise<HubSessionResult> {
+  return runtimePost<HubSessionResult>(
+    '/api/auth/cloud',
+    { name, email },
+    { Authorization: `Bearer ${access}` },
+  );
 }
 
 /** Login local por PIN contra el runtime → sesión server-side. */
@@ -419,24 +446,61 @@ export async function cloudLogin(email: string, password: string): Promise<Login
   return { access: tokens.access, refresh: tokens.refresh, user: me, hubId: tokens.hub_id };
 }
 
-function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudMarketplaceModule {
+function positiveDecimal(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0 ? String(value) : null;
+}
+
+export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudMarketplaceModule {
   // El id DEBE ser el slug del módulo (`module_id`, p.ej. "inventory"), no el id numérico del
   // catálogo Cloud (`raw.id`, p.ej. 362): es lo que el runtime usa como clave de instalación,
   // caché y desinstalación. Preferimos module_id/slug y caemos a id numérico solo como último.
   const id = String(raw.module_id ?? raw.slug ?? raw.id ?? raw.name);
-  const price = raw.price_label ?? raw.price ?? raw.monthly_price ?? raw.pricing;
+  const moduleType = String(raw.module_type ?? (raw.is_free ? 'free' : ''));
+  const isFree = raw.is_free === true || moduleType === 'free';
+  const priceAmount = isFree
+    ? null
+    : positiveDecimal(
+        raw.price_from
+        ?? (moduleType === 'subscription'
+          ? raw.subscription_price_monthly ?? raw.monthly_price
+          : raw.price),
+      );
+  const interval =
+    raw.subscription_interval === 'year'
+      ? 'year'
+      : raw.subscription_interval === 'month'
+        ? 'month'
+        : moduleType === 'subscription'
+          ? 'month'
+          : null;
+  const subcategory = raw.primary_subcategory as Record<string, unknown> | null | undefined;
   return {
     id,
     name: String(raw.name ?? raw.title ?? id),
     description: String(raw.description ?? raw.short_description ?? raw.summary ?? ''),
-    priceLabel: price === 0 || price === '0' || price === 'Gratis' ? 'Gratis' : String(price ?? ''),
-    category: String(raw.category ?? raw.functional_unit ?? raw.unit ?? 'Marketplace'),
+    priceLabel: typeof raw.price_label === 'string' ? raw.price_label : '',
+    priceAmount,
+    priceInterval: interval,
+    isFree,
+    moduleType,
+    category: String(
+      raw.category
+      ?? subcategory?.category_name
+      ?? raw.functional_unit_name
+      ?? raw.functional_unit
+      ?? raw.unit
+      ?? 'Marketplace',
+    ),
     installed: Boolean(raw.installed ?? raw.is_installed ?? raw.active),
+    available: Boolean(raw.can_install ?? raw.is_active ?? true) && raw.is_coming_soon !== true,
+    version: raw.version ? String(raw.version) : undefined,
   };
 }
 
-/** Catálogo del Marketplace vía el runtime local (firma con el token de máquina del hub, que
- *  proxea a Cloud `/api/v1/marketplace/modules/`). En demo degrada a datos locales. */
+/** Catálogo real del Marketplace vía el runtime local. Un Hub real firma con su token de máquina;
+ *  Demo usa el endpoint público de metadatos del SaaS. Nunca hay una lista local alternativa. */
 export async function cloudMarketplaceModules(): Promise<CloudMarketplaceModule[]> {
   const data = await runtimeGet<unknown>('/api/marketplace/catalog');
   const items = Array.isArray(data)

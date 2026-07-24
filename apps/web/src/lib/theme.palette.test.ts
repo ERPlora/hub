@@ -1,7 +1,7 @@
 // Tests de la PALETA de tema (ADR-0138, ERPlora/pm#15) — dos capas:
 //
 //   - hub_settings.theme_palette  → paleta GLOBAL del hub (la fija un admin en /settings)
-//   - localStorage `erplora.palette` → override POR USUARIO en este navegador
+//   - hub_user_pref → override POR USUARIO y Hub
 //
 // Sin override local se aplica la global; con override, gana el override. Aplicar =
 // atributo `data-ok-palette` en el <html> ('erplora' = default → SIN atributo), el
@@ -64,13 +64,13 @@ describe('paleta: default', () => {
   });
 });
 
-describe('paleta: override local (por usuario)', () => {
-  it('setLocalPalette aplica el atributo y persiste en erplora.palette', async () => {
+describe('paleta: override personal (por usuario)', () => {
+  it('setLocalPalette aplica el atributo sin crear una autoridad global en localStorage', async () => {
     const t = await loadTheme();
     t.bootTheme();
     t.setLocalPalette('ocean');
     expect(dom.root.attrs.get('data-ok-palette')).toBe('ocean');
-    expect(dom.store.get('erplora.palette')).toBe('ocean');
+    expect(dom.store.has('erplora.palette')).toBe(false);
     expect(t.themePalette.value).toBe('ocean');
   });
 
@@ -82,11 +82,12 @@ describe('paleta: override local (por usuario)', () => {
     expect(dom.root.attrs.has('data-ok-palette')).toBe(false);
   });
 
-  it('el override guardado se aplica en el boot', async () => {
+  it('el valor legacy guardado NO se aplica en el boot y se elimina', async () => {
     dom.store.set('erplora.palette', 'violet');
     const t = await loadTheme();
     t.bootTheme();
-    expect(dom.root.attrs.get('data-ok-palette')).toBe('violet');
+    expect(dom.root.attrs.has('data-ok-palette')).toBe(false);
+    expect(dom.store.has('erplora.palette')).toBe(false);
   });
 
   it('un valor corrupto en localStorage se ignora (sin atributo)', async () => {
@@ -106,10 +107,10 @@ describe('paleta: global del hub (hub_settings)', () => {
     expect(t.themePalette.value).toBe('forest');
   });
 
-  it('el override local GANA a la global', async () => {
-    dom.store.set('erplora.palette', 'ocean');
+  it('el override personal GANA a la global', async () => {
     const t = await loadTheme();
     t.bootTheme();
+    t.applyUserThemePreferences('dark', 'ocean', 'forest');
     t.setHubPalette('forest');
     expect(dom.root.attrs.get('data-ok-palette')).toBe('ocean');
   });
@@ -122,6 +123,18 @@ describe('paleta: global del hub (hub_settings)', () => {
     t.setLocalPalette('');
     expect(dom.root.attrs.get('data-ok-palette')).toBe('forest');
     expect(dom.store.has('erplora.palette')).toBe(false);
+  });
+
+  it('al cambiar de usuario se aplica su fila o se hereda el Hub sin fugas', async () => {
+    const t = await loadTheme();
+    t.bootTheme();
+    t.applyUserThemePreferences('dark', 'violet', 'forest');
+    expect(t.themePalette.value).toBe('violet');
+    expect(t.themeMode.value).toBe('dark');
+
+    t.applyUserThemePreferences(null, null, 'forest');
+    expect(t.themePalette.value).toBe('forest');
+    expect(t.themeMode.value).toBe('system');
   });
 
   it('una global desconocida degrada al default (sin atributo)', async () => {

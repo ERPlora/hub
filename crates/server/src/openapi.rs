@@ -53,7 +53,7 @@ pub async fn openapi_json(State(st): State<AppState>, headers: HeaderMap) -> Res
         )
             .into_response();
     }
-    let spec = build_spec(rt.registry(), &st.config.hub_id);
+    let spec = build_spec(rt.registry(), &st.hub_id());
     (
         StatusCode::OK,
         [(header::CONTENT_TYPE, "application/json")],
@@ -88,7 +88,10 @@ pub fn build_spec(reg: &Registry, hub_id: &str) -> Value {
         for (name, q) in queries {
             let op = name.strip_prefix(&format!("{module}.")).unwrap_or(name);
             let route = format!("/api/v1/{module}/q/{op}");
-            paths.insert(route, json!({ "post": query_operation(&module, name, q.def.list.as_ref()) }));
+            paths.insert(
+                route,
+                json!({ "post": query_operation(&module, name, q.def.list.as_ref()) }),
+            );
         }
 
         // Commands expuestos → POST /api/v1/{module}/c/{command} (escritura; payload en el body).
@@ -98,7 +101,10 @@ pub fn build_spec(reg: &Registry, hub_id: &str) -> Value {
             let op = name.strip_prefix(&format!("{module}.")).unwrap_or(name);
             let route = format!("/api/v1/{module}/c/{op}");
             let body_schema = c.schema.as_ref().map(|s| (*s.raw).clone());
-            paths.insert(route, json!({ "post": command_operation(&module, name, body_schema) }));
+            paths.insert(
+                route,
+                json!({ "post": command_operation(&module, name, body_schema) }),
+            );
         }
     }
 
@@ -136,7 +142,9 @@ pub fn build_spec(reg: &Registry, hub_id: &str) -> Value {
 /// filtro/orden/paginación; el body lleva los mismos como objeto `params` (la ruta del Hub recibe
 /// `{params}` en el body, no query-string, así que también se documentan en el requestBody).
 fn query_operation(module: &str, name: &str, list: Option<&ListSpec>) -> Value {
-    let params_schema = list.map(list_params_schema).unwrap_or_else(|| json!({ "type": "object" }));
+    let params_schema = list
+        .map(list_params_schema)
+        .unwrap_or_else(|| json!({ "type": "object" }));
     json!({
         "tags": [module],
         "operationId": name,
@@ -219,11 +227,20 @@ fn list_params_schema(spec: &ListSpec) -> Value {
     for (col, filter) in &spec.filters {
         match filter.op {
             FilterOp::Eq | FilterOp::Like => {
-                props.insert(format!("f_{col}"), json!({ "description": format!("Filtro `{:?}` por `{col}`.", filter.op) }));
+                props.insert(
+                    format!("f_{col}"),
+                    json!({ "description": format!("Filtro `{:?}` por `{col}`.", filter.op) }),
+                );
             }
             FilterOp::Range => {
-                props.insert(format!("f_{col}_from"), json!({ "description": format!("Inicio del rango de `{col}`.") }));
-                props.insert(format!("f_{col}_to"), json!({ "description": format!("Fin del rango de `{col}`.") }));
+                props.insert(
+                    format!("f_{col}_from"),
+                    json!({ "description": format!("Inicio del rango de `{col}`.") }),
+                );
+                props.insert(
+                    format!("f_{col}_to"),
+                    json!({ "description": format!("Fin del rango de `{col}`.") }),
+                );
             }
         }
     }
@@ -231,7 +248,10 @@ fn list_params_schema(spec: &ListSpec) -> Value {
         "limit".into(),
         json!({ "type": "integer", "minimum": 1, "maximum": 500, "default": spec.page_size, "description": "Tamaño de página (clamp [1,500])." }),
     );
-    props.insert("offset".into(), json!({ "type": "integer", "minimum": 0, "default": 0 }));
+    props.insert(
+        "offset".into(),
+        json!({ "type": "integer", "minimum": 0, "default": 0 }),
+    );
     json!({ "type": "object", "properties": props, "additionalProperties": false })
 }
 

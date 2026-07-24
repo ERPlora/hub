@@ -35,8 +35,30 @@ pub async fn ensure_hub_module_table(db: &dyn DatabaseAdapter) -> Result<()> {
 
 /// Instala el módulo de `dir` en el registro, aplica migraciones y lo deja **activo**.
 /// Persiste el estado en `hub_module` **scoped por `hub_id`** (§2.5). Devuelve el id del módulo.
-pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: &str, dir: &Path) -> Result<String> {
+pub async fn install(
+    db: &dyn DatabaseAdapter,
+    registry: &mut Registry,
+    hub_id: &str,
+    dir: &Path,
+) -> Result<String> {
     let manifest = Manifest::load(dir)?;
+
+    // `static_files.folder` es un nombre, nunca una ruta. Se vuelve a validar en runtime aunque el
+    // toolkit ya lo haga: un ZIP descargado es una frontera hostil. Si el host ha inyectado el
+    // backend, materializamos la carpeta ANTES de activar el módulo.
+    if let Some(static_files) = &manifest.static_files {
+        if !static_files.is_valid_folder() {
+            return Err(RuntimeError::Storage(format!(
+                "carpeta inválida en `static_files.folder`: `{}`",
+                static_files.folder
+            )));
+        }
+        if let Some(storage) = registry.module_storage.clone() {
+            storage
+                .ensure_module_folder(hub_id, &static_files.folder)
+                .await?;
+        }
+    }
 
     // Tablas de sistema del runtime (outbox de eventos): necesarias en cuanto un command emita.
     crate::outbox::ensure_tables(db).await?;
@@ -86,7 +108,12 @@ pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: 
         let schema = load_schema(dir, name, def.schema.as_deref())?;
         registry.queries.insert(
             name.clone(),
-            RegisteredQuery { module_id: manifest.id.clone(), def: def.clone(), sql, schema },
+            RegisteredQuery {
+                module_id: manifest.id.clone(),
+                def: def.clone(),
+                sql,
+                schema,
+            },
         );
     }
     for (name, def) in &manifest.commands {
@@ -118,14 +145,27 @@ pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: 
         let schema = load_schema(dir, name, def.schema.as_deref())?;
         registry.commands.insert(
             name.clone(),
-            RegisteredCommand { module_id: manifest.id.clone(), def: def.clone(), sql, wasm, schema },
+            RegisteredCommand {
+                module_id: manifest.id.clone(),
+                def: def.clone(),
+                sql,
+                wasm,
+                schema,
+            },
         );
     }
     for (event, listener) in &manifest.events.listen {
-        registry.listeners.entry(event.clone()).or_default().push(listener.command.clone());
+        registry
+            .listeners
+            .entry(event.clone())
+            .or_default()
+            .push(listener.command.clone());
     }
     for nav in &manifest.navigation {
-        registry.navigation.push(NavEntry { module_id: manifest.id.clone(), nav: nav.clone() });
+        registry.navigation.push(NavEntry {
+            module_id: manifest.id.clone(),
+            nav: nav.clone(),
+        });
     }
     // Traducciones del módulo (ADR-0055): `locales/*.json` del paquete → registry. Best-effort;
     // si el módulo no trae i18n, el runtime sirve los valores del manifest (inglés canónico).
@@ -151,19 +191,30 @@ pub async fn install(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: 
 fn load_schema(dir: &Path, name: &str, rel: Option<&str>) -> Result<Option<CompiledSchema>> {
     let Some(rel) = rel else { return Ok(None) };
     let text = loader::read_text(dir, rel)?;
-    let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
-        RuntimeError::Schema { name: name.to_string(), detail: format!("{rel}: JSON inválido: {e}") }
-    })?;
-    let compiled = CompiledSchema::compile(&value).map_err(|detail| {
-        RuntimeError::Schema { name: name.to_string(), detail: format!("{rel}: {detail}") }
+    let value: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| RuntimeError::Schema {
+            name: name.to_string(),
+            detail: format!("{rel}: JSON inválido: {e}"),
+        })?;
+    let compiled = CompiledSchema::compile(&value).map_err(|detail| RuntimeError::Schema {
+        name: name.to_string(),
+        detail: format!("{rel}: {detail}"),
     })?;
     Ok(Some(compiled))
 }
 
 /// Cambia el estado (activar/desactivar) de un módulo instalado y lo persiste para `hub_id`.
-pub async fn set_status(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: &str, module_id: &str, status: ModuleStatus) -> Result<()> {
+pub async fn set_status(
+    db: &dyn DatabaseAdapter,
+    registry: &mut Registry,
+    hub_id: &str,
+    module_id: &str,
+    status: ModuleStatus,
+) -> Result<()> {
     if !registry.set_status(module_id, status) {
-        return Err(RuntimeError::CommandNotFound(format!("módulo no instalado: {module_id}")));
+        return Err(RuntimeError::CommandNotFound(format!(
+            "módulo no instalado: {module_id}"
+        )));
     }
     let version = registry
         .installed
@@ -177,16 +228,27 @@ pub async fn set_status(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_i
 
 /// Desinstala: quita capacidades del registro y borra la fila de `hub_module` **de este hub**
 /// (no toca el mismo módulo en otros hubs de la BD compartida). No borra datos.
-pub async fn uninstall(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id: &str, module_id: &str) -> Result<()> {
+pub async fn uninstall(
+    db: &dyn DatabaseAdapter,
+    registry: &mut Registry,
+    hub_id: &str,
+    module_id: &str,
+) -> Result<()> {
     if !registry.remove_module(module_id) {
-        return Err(RuntimeError::CommandNotFound(format!("módulo no instalado: {module_id}")));
+        return Err(RuntimeError::CommandNotFound(format!(
+            "módulo no instalado: {module_id}"
+        )));
     }
     // Quita las scheduled tasks del módulo (ADR-0011): sus capacidades dejan de existir.
     crate::scheduler::remove_module_tasks(db, module_id).await?;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("module_id".into(), json!(module_id));
-    db.execute("DELETE FROM hub_module WHERE hub_id = :hub_id AND module_id = :module_id", &p).await?;
+    db.execute(
+        "DELETE FROM hub_module WHERE hub_id = :hub_id AND module_id = :module_id",
+        &p,
+    )
+    .await?;
     Ok(())
 }
 
@@ -195,7 +257,10 @@ pub async fn uninstall(db: &dyn DatabaseAdapter, registry: &mut Registry, hub_id
 /// distintos y este SELECT solo devuelve los del hub que pregunta. Lo usa la reconstrucción del
 /// `Registry` para respetar el estado activo/inactivo por hub tras un reinicio. Idempotente: si la
 /// tabla aún no tiene la forma hub-scoped, asegura+migra primero.
-pub async fn installed_status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<(String, ModuleStatus)>> {
+pub async fn installed_status(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<Vec<(String, ModuleStatus)>> {
     ensure_hub_module_table(db).await?;
     crate::system_migrations::apply(db, hub_id).await?;
     let mut p = Params::new();
@@ -259,8 +324,11 @@ pub async fn installed_status_versioned(
 pub fn install_order(modules: &[(String, Vec<String>)]) -> Result<Vec<usize>> {
     use std::collections::HashMap;
     // 0 = sin visitar · 1 = en pila (si se reentra ⇒ ciclo) · 2 = terminado.
-    let index: HashMap<&str, usize> =
-        modules.iter().enumerate().map(|(i, (id, _))| (id.as_str(), i)).collect();
+    let index: HashMap<&str, usize> = modules
+        .iter()
+        .enumerate()
+        .map(|(i, (id, _))| (id.as_str(), i))
+        .collect();
     let mut state = vec![0u8; modules.len()];
     let mut order = Vec::with_capacity(modules.len());
     for i in 0..modules.len() {
@@ -278,7 +346,11 @@ fn visit(
 ) -> Result<()> {
     match state[i] {
         2 => return Ok(()),
-        1 => return Err(RuntimeError::DependencyCycle { module: modules[i].0.clone() }),
+        1 => {
+            return Err(RuntimeError::DependencyCycle {
+                module: modules[i].0.clone(),
+            })
+        }
         _ => {}
     }
     state[i] = 1;
@@ -296,7 +368,13 @@ fn visit(
 /// que el esquema hub-scoped existe: baseline (v0) + migración de sistema v1 (que recompone la PK
 /// a `(hub_id, module_id)`). Es idempotente y barato (las migraciones ya aplicadas se saltan), y
 /// cubre el caso de instalar un módulo en un hub vacío antes de que `ensure_system_tables` corra.
-async fn persist_status(db: &dyn DatabaseAdapter, hub_id: &str, id: &str, version: &str, status: ModuleStatus) -> Result<()> {
+async fn persist_status(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    id: &str,
+    version: &str,
+    status: ModuleStatus,
+) -> Result<()> {
     ensure_hub_module_table(db).await?;
     crate::system_migrations::apply(db, hub_id).await?;
     let status_str = match status {
@@ -333,8 +411,11 @@ mod tests {
 
     /// Comprueba que en el orden devuelto cada dependencia (dentro del lote) precede al módulo.
     fn assert_deps_before(modules: &[(String, Vec<String>)], order: &[usize]) {
-        let pos: std::collections::HashMap<&str, usize> =
-            order.iter().enumerate().map(|(p, &i)| (modules[i].0.as_str(), p)).collect();
+        let pos: std::collections::HashMap<&str, usize> = order
+            .iter()
+            .enumerate()
+            .map(|(p, &i)| (modules[i].0.as_str(), p))
+            .collect();
         for (id, deps) in modules {
             for dep in deps {
                 if let (Some(&pd), Some(&pi)) = (pos.get(dep.as_str()), pos.get(id.as_str())) {

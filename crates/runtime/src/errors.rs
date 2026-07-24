@@ -6,7 +6,10 @@ pub enum RuntimeError {
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("manifest inválido ({path}): {source}")]
-    Manifest { path: String, source: serde_json::Error },
+    Manifest {
+        path: String,
+        source: serde_json::Error,
+    },
     #[error("db: {0}")]
     Db(#[from] DbError),
     #[error("query no encontrada: {0}")]
@@ -61,6 +64,9 @@ pub enum RuntimeError {
     /// dead-letter — exactamente como `host.notify`.
     #[error("host.backup: {0}")]
     Backup(String),
+    /// Fallo al materializar o escribir la carpeta persistente declarada por un módulo.
+    #[error("host.module_storage: {0}")]
+    Storage(String),
     /// Fallo de la capacidad de host `host.certificate` (ADR-0079): el primitivo de firma/identidad
     /// con el certificado del negocio (`_hub_certificate`, parse PKCS#12 + identidad mTLS) no pudo
     /// completar — certificado ausente, contraseña incorrecta, PKCS#12 inválido. La clave nunca sale

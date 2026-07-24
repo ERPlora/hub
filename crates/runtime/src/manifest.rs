@@ -33,6 +33,13 @@ pub struct Manifest {
     pub queries: HashMap<String, QueryDef>,
     #[serde(default)]
     pub commands: HashMap<String, CommandDef>,
+    /// Carpeta persistente del módulo dentro del árbol común `media/modules/`.
+    ///
+    /// El valor del manifest es solo un nombre de carpeta (nunca una ruta). El host decide el
+    /// backend físico: disco en Hub Local y almacenamiento de objetos vía Cloud en Hub Cloud.
+    /// Ausente = el módulo no puede escribir ficheros persistentes.
+    #[serde(default)]
+    pub static_files: Option<StaticFilesDef>,
     /// Widgets de dashboard que aporta el módulo (ADR-0054). Mapa `id.completo → WidgetDef`,
     /// misma convención que `queries`/`commands`. El shell del Hub los recolecta de TODOS los
     /// manifests instalados y los pinta en `<ok-widget-board>`. Vía declarativa (`kind`+`query`,
@@ -76,6 +83,25 @@ pub struct Manifest {
     /// concede explícitamente; el host media. Consolida los `network`/`notify` de ADR-0012.
     #[serde(default)]
     pub capabilities: Capabilities,
+}
+
+/// Almacenamiento persistente declarado por un módulo.
+///
+/// El nombre se valida también en el toolkit y en el runtime porque el manifest instalado es una
+/// frontera de seguridad. Se resuelve siempre como `media/modules/<folder>/`.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct StaticFilesDef {
+    pub folder: String,
+}
+
+impl StaticFilesDef {
+    /// Un solo segmento portable: minúsculas ASCII, dígitos, `_` y `-`; sin separadores ni `..`.
+    pub fn is_valid_folder(&self) -> bool {
+        let mut chars = self.folder.chars();
+        matches!(chars.next(), Some(c) if c.is_ascii_lowercase())
+            && self.folder.len() <= 64
+            && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+    }
 }
 
 /// Una tarea programada declarada en el manifest (ADR-0011). Espejo de `$defs/scheduledTask`
@@ -300,7 +326,10 @@ impl ReadDef {
         if let ReadDef::Parameterized { params, .. } = self {
             for (name, expr) in params {
                 let value = match expr.strip_prefix("payload.") {
-                    Some(field) => payload.get(field).cloned().unwrap_or(serde_json::Value::Null),
+                    Some(field) => payload
+                        .get(field)
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
                     None => serde_json::Value::String(expr.clone()),
                 };
                 out.insert(name.clone(), value);
@@ -656,6 +685,20 @@ pub struct NavLocale {
 mod tests {
     use super::*;
 
+    #[test]
+    fn parses_module_static_files_folder() {
+        let json = r#"{
+            "id": "verifactu",
+            "name": "VeriFactu",
+            "version": "1.2.3",
+            "static_files": { "folder": "verifactu" }
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
+        let storage = manifest.static_files.expect("static_files present");
+        assert_eq!(storage.folder, "verifactu");
+    }
+
     /// Parsea un manifest con un bloque `widgets` (uno por la vía declarativa `kind`+`query` y
     /// uno por el escape hatch `component`) y verifica que se deserializa y RE-SERIALIZA sin
     /// perder campos (ADR-0054).
@@ -695,13 +738,19 @@ mod tests {
         let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
         assert_eq!(manifest.widgets.len(), 2);
 
-        let kpi = manifest.widgets.get("sales.today").expect("kpi widget present");
+        let kpi = manifest
+            .widgets
+            .get("sales.today")
+            .expect("kpi widget present");
         assert_eq!(kpi.title, "Ventas de hoy");
         assert_eq!(kpi.size, WidgetSize::Md);
         assert_eq!(kpi.kind, Some(WidgetKind::Kpi));
         assert_eq!(kpi.query.as_deref(), Some("sales.metrics.today"));
         assert!(kpi.default);
-        assert_eq!(kpi.sectors, vec!["hosteleria".to_string(), "retail".to_string()]);
+        assert_eq!(
+            kpi.sectors,
+            vec!["hosteleria".to_string(), "retail".to_string()]
+        );
         assert_eq!(
             kpi.refresh_on,
             vec!["sale.completed".to_string(), "sale.voided".to_string()]
@@ -710,7 +759,10 @@ mod tests {
         assert!(kpi.options.is_some());
         assert!(kpi.map.is_some());
 
-        let custom = manifest.widgets.get("sales.live_feed").expect("component widget present");
+        let custom = manifest
+            .widgets
+            .get("sales.live_feed")
+            .expect("component widget present");
         assert_eq!(custom.size, WidgetSize::Lg);
         assert_eq!(custom.component.as_deref(), Some("erp-sales-live-feed"));
         assert!(custom.kind.is_none());

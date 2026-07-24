@@ -12,6 +12,9 @@
           {{ t('activation.lead') }}
         </p>
         <p v-if="reason" class="activation-reason">{{ reason }}</p>
+        <p v-if="errorMessage" class="activation-error" role="alert" aria-live="polite">
+          {{ errorMessage }}
+        </p>
 
         <ion-button expand="block" :disabled="loading" @click="retry">
           <ion-spinner v-if="loading" name="crescent" slot="start" />
@@ -31,19 +34,33 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { IonPage, IonContent, IonButton, IonSpinner } from '@ionic/vue';
 
-import { entitlementReason, needsActivation, resolveEntitlement } from '../lib/entitlement';
+import {
+  entitlementReason,
+  entitlementStatus,
+  resolveEntitlement,
+} from '../lib/entitlement';
 import { logout } from '../lib/session';
 
 const { t } = useI18n();
 const router = useRouter();
 const loading = ref<boolean>(false);
 const reason = entitlementReason;
+const errorMessage = ref('');
 
 async function retry(): Promise<void> {
+  errorMessage.value = '';
   loading.value = true;
   try {
     await resolveEntitlement();
-    if (!needsActivation.value) await router.replace('/');
+    // `unknown` no equivale a una licencia válida. Un fallo de red o una sesión PIN sin token
+    // Cloud nunca debe permitir saltarse la pantalla de activación.
+    if (entitlementStatus.value === 'unlocked') {
+      await router.replace('/');
+    } else {
+      errorMessage.value = t('activation.retryError');
+    }
+  } catch {
+    errorMessage.value = t('activation.retryError');
   } finally {
     loading.value = false;
   }
@@ -82,6 +99,11 @@ async function onLogout(): Promise<void> {
   color: var(--ion-color-medium);
   opacity: 0.8;
   word-break: break-word;
+}
+.activation-error {
+  margin: 0;
+  color: var(--ion-color-danger);
+  font-size: 0.9rem;
 }
 .activation-card ion-button {
   width: 100%;

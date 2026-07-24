@@ -53,13 +53,18 @@ pub async fn get(db: &dyn DatabaseAdapter, id: &str) -> Result<Option<Session>, 
         )
         .await?;
     // Deserialize the first row (if any) into `Session`; malformed rows fall back to `None`.
-    Ok(res.rows.into_iter().next().and_then(|row| serde_json::from_value(row).ok()))
+    Ok(res
+        .rows
+        .into_iter()
+        .next()
+        .and_then(|row| serde_json::from_value(row).ok()))
 }
 
 /// Borra la sesión por id (idempotente).
 pub async fn delete(db: &dyn DatabaseAdapter, id: &str) -> Result<(), DbError> {
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
-    db.execute("DELETE FROM hub_session WHERE id = :id", &p).await?;
+    db.execute("DELETE FROM hub_session WHERE id = :id", &p)
+        .await?;
     Ok(())
 }

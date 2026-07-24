@@ -11,8 +11,8 @@
 //! El `hub_id` viene del despliegue (config, no spoofable); el runtime de la petición se resuelve
 //! por org vía `runtime_for` (ADR-0005), igual que `api_keys.rs`. La validación de claves conocidas
 //! la hace el runtime; aquí solo se mapea auth + errores a HTTP.
-use axum::extract::State;
 use axum::extract::Path;
+use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -23,14 +23,18 @@ use crate::state::AppState;
 
 /// `401` para fallo de auth (sin sesión / sesión inválida / rol insuficiente).
 fn unauthorized(e: auth::AuthError) -> Response {
-    (StatusCode::UNAUTHORIZED, Json(json!({ "ok": false, "error": e.message() }))).into_response()
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({ "ok": false, "error": e.message() })),
+    )
+        .into_response()
 }
 
 /// GET /api/settings — objeto con todas las claves conocidas (fila ∪ defaults). Auth = sesión de
 /// usuario válida (cualquier rol). Devuelve `{ currency, language, api_docs_enabled, … }` **plano**
 /// (no envuelto en `{ok,data}`): es el contrato directo que consume el frontend.
 pub async fn get_settings(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
@@ -53,7 +57,7 @@ pub async fn put_settings(
     body: Option<Json<Map<String, Value>>>,
 ) -> Response {
     let updates = body.map(|b| b.0).unwrap_or_default();
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
@@ -115,7 +119,7 @@ pub async fn get_module_capabilities(
     headers: HeaderMap,
     Path(module_id): Path<String>,
 ) -> Response {
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
@@ -144,7 +148,7 @@ pub async fn put_module_capabilities(
         .and_then(|v| v.as_object())
         .cloned()
         .unwrap_or_default();
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
@@ -156,7 +160,10 @@ pub async fn put_module_capabilities(
     let by = format!("hub_user:{}", admin.id);
     for (cap, val) in &grants {
         let granted = val.as_bool().unwrap_or(false);
-        if let Err(e) = rt.set_module_capability(&module_id, cap, granted, &by).await {
+        if let Err(e) = rt
+            .set_module_capability(&module_id, cap, granted, &by)
+            .await
+        {
             return crate::err_response(e);
         }
     }
@@ -171,7 +178,7 @@ pub async fn put_module_capabilities(
 /// GET /api/business/certificate — estado del certificado del negocio (presente/ausente + metadatos,
 /// SIN bytes ni contraseña). Auth = sesión de usuario (cualquier rol).
 pub async fn get_business_certificate(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
@@ -193,8 +200,16 @@ pub async fn put_business_certificate(
     body: Option<Json<Map<String, Value>>>,
 ) -> Response {
     let updates = body.map(|b| b.0).unwrap_or_default();
-    let b64 = updates.get("pkcs12_b64").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let password = updates.get("password").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let b64 = updates
+        .get("pkcs12_b64")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let password = updates
+        .get("password")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     if b64.trim().is_empty() {
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -202,7 +217,7 @@ pub async fn put_business_certificate(
         )
             .into_response();
     }
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
@@ -222,8 +237,11 @@ pub async fn put_business_certificate(
 }
 
 /// DELETE /api/business/certificate — elimina el certificado del negocio. Auth = sesión admin.
-pub async fn delete_business_certificate(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let arc = match st.runtime_for(&st.config.hub_id).await {
+pub async fn delete_business_certificate(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };

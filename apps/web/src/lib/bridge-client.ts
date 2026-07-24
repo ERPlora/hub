@@ -9,6 +9,7 @@
 // comandos/eventos (print/open_drawer/…) se añadirá con el transporte de hardware del module-sdk.
 
 import { config } from './config';
+import { getHubSession } from './session';
 
 /** Host del Bridge local. Puerto fijo `BRIDGE_WS_PORT` (crates/peripherals/src/lib.rs). */
 export const BRIDGE_HOST = 'http://localhost:12321';
@@ -62,7 +63,13 @@ export function bridgeWsUrl(): string {
  */
 export async function refreshBridgeToken(): Promise<boolean> {
   try {
-    const res = await fetch('/api/bridge/token', { headers: { accept: 'application/json' } });
+    const session = getHubSession();
+    const res = await fetch('/api/bridge/token', {
+      headers: {
+        accept: 'application/json',
+        ...(session ? { 'X-Hub-Session': session } : {}),
+      },
+    });
     if (!res.ok) return false;
     const body = (await res.json()) as { token?: string };
     if (body.token && body.token.trim()) {

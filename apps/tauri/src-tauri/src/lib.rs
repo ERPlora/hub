@@ -84,7 +84,10 @@ pub struct EntitlementGate {
 
 impl EntitlementGate {
     pub fn new(base_url: impl Into<String>, cache_dir: impl Into<PathBuf>) -> Self {
-        Self { client: CloudClient::new(base_url), cache_dir: cache_dir.into() }
+        Self {
+            client: CloudClient::new(base_url),
+            cache_dir: cache_dir.into(),
+        }
     }
 
     fn token_path(&self) -> PathBuf {
@@ -123,7 +126,10 @@ impl EntitlementGate {
             serde_json::from_str(&pk_body).map_err(|e| GateError::Parse(e.to_string()))?;
 
         // 2) Entitlement firmado (con el JWT del usuario + X-Hub-Id).
-        let auth = Auth::UserJwt { hub_id: hub_id.to_string(), access: access_jwt.to_string() };
+        let auth = Auth::UserJwt {
+            hub_id: hub_id.to_string(),
+            access: access_jwt.to_string(),
+        };
         let ent_body = exec(self.client.entitlement(&auth)).await?;
         let ent =
             EntitlementResponse::parse(&ent_body).map_err(|e| GateError::Parse(e.to_string()))?;
@@ -156,7 +162,9 @@ impl EntitlementGate {
                         deployment_mode: claims.deployment_mode,
                         offline: true,
                     },
-                    None => GateOutcome::NeedsActivation { reason: online_err.to_string() },
+                    None => GateOutcome::NeedsActivation {
+                        reason: online_err.to_string(),
+                    },
                 }
             }
         }
@@ -173,7 +181,10 @@ async fn exec(req: PreparedRequest) -> Result<String, GateError> {
     for (k, v) in req.headers {
         builder = builder.header(k, v);
     }
-    let resp = builder.send().await.map_err(|e| GateError::Http(e.to_string()))?;
+    let resp = builder
+        .send()
+        .await
+        .map_err(|e| GateError::Http(e.to_string()))?;
     let status = resp.status();
     if !status.is_success() {
         // 410 Gone = el Cloud responde `hub_not_found` (hub borrado/revocado): señal inequívoca
@@ -183,11 +194,16 @@ async fn exec(req: PreparedRequest) -> Result<String, GateError> {
         }
         return Err(GateError::Http(format!("status {status}")));
     }
-    resp.text().await.map_err(|e| GateError::Http(e.to_string()))
+    resp.text()
+        .await
+        .map_err(|e| GateError::Http(e.to_string()))
 }
 
 fn now_unix() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 fn base_url() -> String {
@@ -236,6 +252,9 @@ const DEVICE_ID_FILE: &str = "device.id";
 pub struct DeviceContext {
     pub id: String,
     pub client_type: String,
+    /// Plataforma física, separada del contrato legacy de `client_type`. El SaaS puede registrar
+    /// Android/Windows explícitamente sin romper clientes que aún mapean ambos a `hub-desktop`.
+    pub platform: String,
 }
 
 /// Lee (o crea y persiste) un id de dispositivo estable por instalación en `app_data_dir`.
@@ -258,10 +277,34 @@ fn ensure_device_id(cache_dir: &std::path::Path) -> Result<String, GateError> {
 #[tauri::command]
 fn device_context(app: tauri::AppHandle) -> Result<DeviceContext, GateError> {
     use tauri::Manager;
-    let cache_dir: PathBuf =
-        app.path().app_data_dir().map_err(|e| GateError::Io(e.to_string()))?;
+    let cache_dir: PathBuf = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| GateError::Io(e.to_string()))?;
     let id = ensure_device_id(&cache_dir)?;
-    Ok(DeviceContext { id, client_type: "hub-desktop".to_string() })
+    // Compatibilidad: el endpoint Cloud vigente registra `hub-desktop` y `hub-local`. La
+    // plataforma real viaja además en X-Device-Platform; cuando el SaaS amplíe su taxonomía no
+    // habrá que regenerar el id de esta instalación. Desarrollo local puede forzar hub-local.
+    let client_type = std::env::var("HUB_CLIENT_TYPE")
+        .ok()
+        .filter(|v| matches!(v.as_str(), "hub-desktop" | "hub-local"))
+        .unwrap_or_else(|| "hub-desktop".to_string());
+    let platform = if cfg!(target_os = "android") {
+        "android"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else {
+        "desktop"
+    };
+    Ok(DeviceContext {
+        id,
+        client_type,
+        platform: platform.to_string(),
+    })
 }
 
 const MACHINE_TOKEN_FILE: &str = "machine.token";
@@ -328,7 +371,8 @@ fn persist_token_file(cache_dir: &std::path::Path, token: &str) -> Result<(), Ga
             .mode(0o600)
             .open(&path)
             .map_err(|e| GateError::Io(e.to_string()))?;
-        f.write_all(token.as_bytes()).map_err(|e| GateError::Io(e.to_string()))?;
+        f.write_all(token.as_bytes())
+            .map_err(|e| GateError::Io(e.to_string()))?;
     }
     #[cfg(not(unix))]
     {
@@ -381,8 +425,15 @@ async fn fetch_and_persist_token(
     rotate: bool,
 ) -> Result<String, GateError> {
     let client = CloudClient::new(base_url());
-    let auth = Auth::UserJwt { hub_id, access: access_token };
-    let req = if rotate { client.enroll_rotate(&auth) } else { client.enroll(&auth) };
+    let auth = Auth::UserJwt {
+        hub_id,
+        access: access_token,
+    };
+    let req = if rotate {
+        client.enroll_rotate(&auth)
+    } else {
+        client.enroll(&auth)
+    };
     let body = exec(req).await?;
     let grant = EnrollGrant::parse(&body).map_err(|e| GateError::Parse(e.to_string()))?;
     persist_machine_token(cache_dir, &grant.cloud_api_token)?;
@@ -403,10 +454,12 @@ async fn enroll_device(
     access_token: String,
 ) -> Result<String, GateError> {
     use tauri::Manager;
-    let cache_dir: PathBuf =
-        app.path().app_data_dir().map_err(|e| GateError::Io(e.to_string()))?;
+    let cache_dir: PathBuf = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| GateError::Io(e.to_string()))?;
     let out = fetch_and_persist_token(&cache_dir, hub_id, access_token, false).await?;
-    apply_persisted_token(&app, &cache_dir); // hot-reload: el runtime usa el token ya, sin reiniciar
+    apply_persisted_identity(&app, &cache_dir);
     Ok(out)
 }
 
@@ -419,10 +472,12 @@ async fn rotate_machine_token(
     access_token: String,
 ) -> Result<String, GateError> {
     use tauri::Manager;
-    let cache_dir: PathBuf =
-        app.path().app_data_dir().map_err(|e| GateError::Io(e.to_string()))?;
+    let cache_dir: PathBuf = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| GateError::Io(e.to_string()))?;
     let out = fetch_and_persist_token(&cache_dir, hub_id, access_token, true).await?;
-    apply_persisted_token(&app, &cache_dir); // hot-reload del token rotado
+    apply_persisted_identity(&app, &cache_dir);
     Ok(out)
 }
 
@@ -435,33 +490,46 @@ async fn rotate_machine_token(
 #[tauri::command]
 fn forget_hub(app: tauri::AppHandle) -> Result<(), GateError> {
     use tauri::Manager;
-    let cache_dir: PathBuf =
-        app.path().app_data_dir().map_err(|e| GateError::Io(e.to_string()))?;
+    let cache_dir: PathBuf = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| GateError::Io(e.to_string()))?;
     let _ = keyring_delete();
     let _ = std::fs::remove_file(machine_token_path(&cache_dir));
     let _ = std::fs::remove_file(cache_dir.join(HUB_ID_FILE));
     let _ = std::fs::remove_file(cache_dir.join(TOKEN_FILE));
     let _ = std::fs::remove_file(cache_dir.join(PUBKEY_FILE));
-    if let Some(h) = app.try_state::<MachineTokenHandle>() {
-        if let Ok(mut g) = h.0.write() {
+    if let Some(h) = app.try_state::<MachineIdentityHandle>() {
+        if let Ok(mut g) = h.token.write() {
             *g = None;
+        }
+        if let Ok(mut g) = h.hub_id.write() {
+            *g = erplora_server::DEV_HUB_ID.to_string();
         }
     }
     Ok(())
 }
 
-/// Celda del token de máquina compartida entre el shell Tauri y el runtime embebido (**hot-reload**,
-/// #22). Tras enrolar/rotar, el comando actualiza esta celda y el runtime toma el token nuevo en la
-/// siguiente petición **sin reiniciar la app**. Vive en el estado gestionado de Tauri.
+/// Identidad de máquina compartida entre el shell Tauri y el runtime embebido. Token y `hub_id`
+/// cambian juntos al completar el alta; así nunca se firma con una credencial nueva y el UUID
+/// placeholder anterior.
 #[derive(Clone)]
-struct MachineTokenHandle(erplora_server::MachineToken);
+struct MachineIdentityHandle {
+    token: erplora_server::MachineToken,
+    hub_id: erplora_server::HubId,
+}
 
-/// Actualiza la celda viva con el token recién persistido (keychain→fichero) tras enrolar/rotar.
-fn apply_persisted_token(app: &tauri::AppHandle, cache_dir: &std::path::Path) {
+/// Actualiza la identidad viva con lo recién persistido tras enrolar/rotar.
+fn apply_persisted_identity(app: &tauri::AppHandle, cache_dir: &std::path::Path) {
     use tauri::Manager;
-    if let Some(h) = app.try_state::<MachineTokenHandle>() {
-        if let Ok(mut g) = h.0.write() {
+    if let Some(h) = app.try_state::<MachineIdentityHandle>() {
+        if let Ok(mut g) = h.token.write() {
             *g = load_machine_token(cache_dir);
+        }
+        if let Some(persisted_hub_id) = load_hub_id(cache_dir) {
+            if let Ok(mut g) = h.hub_id.write() {
+                *g = persisted_hub_id;
+            }
         }
     }
 }
@@ -480,6 +548,7 @@ const LOOPBACK_CSP: &str = "default-src 'self'; script-src 'self'; style-src 'se
 fn embedded_serve_config(
     cache_dir: &std::path::Path,
     machine_token_cell: erplora_server::MachineToken,
+    hub_id_cell: erplora_server::HubId,
     web_dir: Option<String>,
 ) -> erplora_server::ServeConfig {
     erplora_server::ServeConfig {
@@ -488,7 +557,8 @@ fn embedded_serve_config(
         bind: "127.0.0.1:8787".to_string(),
         modules_dir: None, // los módulos se descargan en runtime desde el marketplace (no horneados)
         hub: erplora_server::HubConfig {
-            hub_id: load_hub_id(cache_dir).unwrap_or_else(|| erplora_server::DEV_HUB_ID.to_string()),
+            hub_id: load_hub_id(cache_dir)
+                .unwrap_or_else(|| erplora_server::DEV_HUB_ID.to_string()),
             cloud_base_url: base_url(),
             module_cache: cache_dir.join("modules"),
             auth_mode: erplora_server::AuthMode::Session,
@@ -499,6 +569,7 @@ fn embedded_serve_config(
             sector: None, // sector/tipo de negocio (ADR-0054): no cableado en local/Tauri → preset de widgets degrada
         },
         machine_token_cell: Some(machine_token_cell),
+        hub_id_cell: Some(hub_id_cell),
         // ADR-0050 (mismo origen): el runtime embebido sirve el `dist/` empaquetado (desktop prod) para
         // que el webview cargue front + datos del mismo origen. `None` en dev (Vite sirve) y móvil.
         web_dir,
@@ -513,10 +584,14 @@ fn embedded_serve_config(
 fn spawn_embedded_runtime(
     cache_dir: PathBuf,
     machine_token_cell: erplora_server::MachineToken,
+    hub_id_cell: erplora_server::HubId,
     web_dir: Option<String>,
 ) {
     std::thread::spawn(move || {
-        let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+        let rt = match tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+        {
             Ok(rt) => rt,
             Err(e) => {
                 eprintln!("runtime embebido: no se pudo crear tokio: {e}");
@@ -524,9 +599,13 @@ fn spawn_embedded_runtime(
             }
         };
         rt.block_on(async move {
-            if let Err(e) =
-                erplora_server::serve(embedded_serve_config(&cache_dir, machine_token_cell, web_dir))
-                    .await
+            if let Err(e) = erplora_server::serve(embedded_serve_config(
+                &cache_dir,
+                machine_token_cell,
+                hub_id_cell,
+                web_dir,
+            ))
+            .await
             {
                 eprintln!("runtime embebido terminó: {e}");
             }
@@ -574,7 +653,8 @@ fn wait_for_runtime(addr: &str, timeout: std::time::Duration) -> bool {
     };
     let deadline = std::time::Instant::now() + timeout;
     while std::time::Instant::now() < deadline {
-        if std::net::TcpStream::connect_timeout(&sock, std::time::Duration::from_millis(300)).is_ok()
+        if std::net::TcpStream::connect_timeout(&sock, std::time::Duration::from_millis(300))
+            .is_ok()
         {
             return true;
         }
@@ -595,7 +675,11 @@ fn wait_for_runtime(addr: &str, timeout: std::time::Duration) -> bool {
 /// no está empaquetado, NO se navega al loopback (daría `ERR_CONNECTION_REFUSED` o 404 + cuelgue de
 /// 15s + ventana muerta): se carga el SPA por el protocolo de assets (se ve el shell aunque no
 /// alcance los datos) y se loguea el fallo de empaquetado/arranque.
-fn open_main_window(app: &tauri::App, runtime_started: bool, web_dir_present: bool) -> tauri::Result<()> {
+fn open_main_window(
+    app: &tauri::App,
+    runtime_started: bool,
+    web_dir_present: bool,
+) -> tauri::Result<()> {
     use tauri::{WebviewUrl, WebviewWindowBuilder};
 
     #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -698,8 +782,7 @@ fn build_peripherals_state(devices_path: PathBuf) -> PeripheralsState {
     let watchdog_registry = registry.clone();
     tauri::async_runtime::spawn(async move {
         use erplora_peripherals::registry::{Watchdog, WatchdogConfig, WatchdogEvent};
-        let (events_tx, mut events_rx) =
-            tokio::sync::mpsc::unbounded_channel::<WatchdogEvent>();
+        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<WatchdogEvent>();
         tauri::async_runtime::spawn(async move {
             while let Some(ev) = events_rx.recv().await {
                 match ev {
@@ -768,7 +851,12 @@ fn erplora_print(
 ) -> Result<(), HardwareError> {
     let target = parse_printer_id(&printer_id)?;
     let payload = escpos::render_document(DocumentType::from_wire(&document_type), &data)?;
-    state.queue.enqueue(PrintJob { job_id, target, payload, attempts: 0 })?;
+    state.queue.enqueue(PrintJob {
+        job_id,
+        target,
+        payload,
+        attempts: 0,
+    })?;
     Ok(())
 }
 
@@ -780,16 +868,18 @@ fn erplora_test_print(
 ) -> Result<(), HardwareError> {
     let target = parse_printer_id(&printer_id)?;
     let payload = escpos::render_test_page(&printer_id);
-    state.queue.enqueue(PrintJob { job_id: None, target, payload, attempts: 0 })?;
+    state.queue.enqueue(PrintJob {
+        job_id: None,
+        target,
+        payload,
+        attempts: 0,
+    })?;
     Ok(())
 }
 
 /// `erplora_open_drawer` — abre el cajón vía kick ESC/POS por el socket de la impresora.
 #[tauri::command]
-async fn erplora_open_drawer(
-    printer_id: String,
-    pin: Option<u8>,
-) -> Result<(), HardwareError> {
+async fn erplora_open_drawer(printer_id: String, pin: Option<u8>) -> Result<(), HardwareError> {
     let target = parse_printer_id(&printer_id)?;
     drawer::open_drawer(&target, pin.unwrap_or(2)).await?;
     Ok(())
@@ -847,18 +937,29 @@ pub fn run() {
                 // tocarlo (SQLite/módulos/media/token cuelgan de aquí), o el runtime embebido muere
                 // al abrir `erplora.db` (sqlx code 14: unable to open database file).
                 if let Err(e) = std::fs::create_dir_all(&cache_dir) {
-                    eprintln!("runtime embebido: no se pudo crear app_data_dir ({}): {e}", cache_dir.display());
+                    eprintln!(
+                        "runtime embebido: no se pudo crear app_data_dir ({}): {e}",
+                        cache_dir.display()
+                    );
                 }
                 // Celda compartida del token de máquina: la siembra el keychain/fichero y se
                 // conserva en el estado de Tauri para actualizarla en caliente tras enrolar/rotar.
                 let cell: erplora_server::MachineToken =
                     std::sync::Arc::new(std::sync::RwLock::new(load_machine_token(&cache_dir)));
-                app.manage(MachineTokenHandle(cell.clone()));
+                let hub_id_cell: erplora_server::HubId =
+                    std::sync::Arc::new(std::sync::RwLock::new(
+                        load_hub_id(&cache_dir)
+                            .unwrap_or_else(|| erplora_server::DEV_HUB_ID.to_string()),
+                    ));
+                app.manage(MachineIdentityHandle {
+                    token: cell.clone(),
+                    hub_id: hub_id_cell.clone(),
+                });
                 // Estado de hardware (issue #29): registro de dispositivos + cola de impresión, y
                 // lanza el watchdog + el worker de la cola como tareas async del shell. `devices.json`
                 // se persiste en `app_data_dir` (misma raíz por-instalación que el resto de datos).
                 app.manage(build_peripherals_state(cache_dir.join(DEVICES_FILE)));
-                spawn_embedded_runtime(cache_dir, cell, web_dir.clone());
+                spawn_embedded_runtime(cache_dir, cell, hub_id_cell, web_dir.clone());
                 runtime_started = true;
             } else {
                 eprintln!("runtime embebido: no se pudo resolver app_data_dir; no se arranca");

@@ -240,10 +240,9 @@ function stop(): void {
 }
 
 // Al abrir el panel, lleva el foco al fondo del hilo + togglea la clase global `assistant-open`
-// en <html>. Esa clase la consume el CSS global de App.vue para EMPUJAR el contenido (push) en
-// desktop (≥992px) reservando 420px a la derecha del shell. En móvil el panel overlaya (no empuja),
-// el CSS no padea nada por debajo del breakpoint. `immediate` para reflejar el estado inicial
-// restaurado desde localStorage en el primer render (si quedó abierto tras recargar).
+// en <html>. Esa clase la consume el CSS global de App.vue para EMPUJAR el contenido (push) desde
+// tablet (≥768px), reservando a la derecha el ancho adaptable del panel. Solo en móvil el panel
+// overlaya (no empuja). `immediate` refleja el estado restaurado desde localStorage al arrancar.
 watch(
   assistantOpen,
   (open) => {
@@ -261,25 +260,23 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* Scrim: SOLO en móvil (<992px). El panel es overlay y el scrim oscuro clicable cierra. En desktop
-   el panel es push (columna fija que reserva 420px, sin scrim) → se oculta vía media query abajo. */
+/* Scrim: SOLO en móvil (<768px). Desde tablet el panel es push y ambos lados siguen interactivos. */
 .assistant-scrim {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
   z-index: 40;
 }
-/* Panel persistente: columna fija de 420px pegada a la derecha (100% si la pantalla es más estrecha).
-   - Desktop (≥992px): vive dentro del hueco de 420px que el shell reserva (ver App.vue, push), sin scrim.
-   - Móvil (<992px): overlaya sobre el contenido con scrim.
+/* Panel persistente pegado a la derecha (100% si la pantalla es más estrecha).
+   - Tablet/desktop (≥768px): vive dentro del hueco adaptable que reserva App.vue, sin scrim.
+   - Móvil (<768px): overlaya sobre el contenido con scrim.
    En ambos casos: open → translateX(0); cerrado → translateX(100%) (fuera de pantalla). */
 .assistant-drawer {
   position: fixed;
   top: 0;
   right: 0;
   height: 100%;
-  width: 100%;
-  max-width: 420px;
+  width: min(100%, var(--assistant-panel-width, 420px));
   background: var(--ion-card-background, #fff);
   z-index: 50;
   display: flex;
@@ -292,8 +289,8 @@ onBeforeUnmount(() => {
 .assistant-drawer[data-open='true'] {
   transform: translateX(0);
 }
-/* Desktop: ocultar el scrim (el panel empuja, no overlaya). */
-@media (min-width: 992px) {
+/* Tablet/desktop: ocultar el scrim (el panel empuja, no overlaya). */
+@media (min-width: 768px) {
   .assistant-scrim {
     display: none;
   }

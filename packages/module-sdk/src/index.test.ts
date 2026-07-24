@@ -12,7 +12,20 @@ import {
   centsToEuros,
   majorToMinor,
   minorToMajor,
+  dataTableLabels,
 } from './index.ts';
+
+test('dataTableLabels traduce todo el chrome compartido de las tablas', () => {
+  const es = dataTableLabels('es-ES');
+  const en = dataTableLabels('en-GB');
+  const fallback = dataTableLabels();
+  assert.equal(es.columns, 'Columnas');
+  assert.equal(es.rowsPerPage, 'Filas por página');
+  assert.equal(es.recordPlural, 'registros');
+  assert.equal(fallback.columns, 'Columnas');
+  assert.equal(en.columns, 'Columns');
+  assert.deepEqual(Object.keys(es), Object.keys(en));
+});
 
 // ── HttpWsTransport: query/command desenvuelven el sobre {ok,data} ───────────
 

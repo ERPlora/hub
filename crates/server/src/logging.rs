@@ -28,9 +28,14 @@ pub fn init(_media_dir: &Path) -> Option<WorkerGuard> {
 
     // Nivel por `RUST_LOG` (default "info").
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let console_layer = fmt::layer().with_writer(std::io::stderr).with_filter(filter);
+    let console_layer = fmt::layer()
+        .with_writer(std::io::stderr)
+        .with_filter(filter);
 
-    let initialized = tracing_subscriber::registry().with(console_layer).try_init().is_ok();
+    let initialized = tracing_subscriber::registry()
+        .with(console_layer)
+        .try_init()
+        .is_ok();
     if initialized {
         eprintln!("logging: logs → consola (stderr); en AWS los recoge CloudWatch");
     } else {

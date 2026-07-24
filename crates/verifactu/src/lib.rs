@@ -72,7 +72,10 @@ impl NativeHandler for VerifactuEngine {
 // ── helpers de input ─────────────────────────────────────────────────────────
 
 fn str_field(v: &Json, k: &str) -> String {
-    v.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string()
+    v.get(k)
+        .and_then(|x| x.as_str())
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn num_field(v: &Json, k: &str, default: f64) -> f64 {
@@ -134,10 +137,21 @@ fn split_input(input: &Json) -> Result<(Json, Ctx)> {
     let new_ids = context
         .get("new_ids")
         .and_then(|v| v.as_array())
-        .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(str::to_string))
+                .collect()
+        })
         .unwrap_or_default();
     let now = chain::format_timestamp(&str_field(&context, "now"));
-    Ok((payload, Ctx { hub_id, now, new_ids }))
+    Ok((
+        payload,
+        Ctx {
+            hub_id,
+            now,
+            new_ids,
+        },
+    ))
 }
 
 fn params(pairs: Json) -> Params {
@@ -314,7 +328,10 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             str_field(&payload, "new_id"),
             str_field(&payload, "id"),
         ];
-        candidates.into_iter().find(|s| !s.is_empty()).unwrap_or_default()
+        candidates
+            .into_iter()
+            .find(|s| !s.is_empty())
+            .unwrap_or_default()
     };
     if invoice_id.is_empty() {
         return Ok(Output::new()); // nada que ingerir
@@ -355,7 +372,11 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
 
     let invoice_type = {
         let t = str_field(&inv, "invoice_type");
-        if INVOICE_TYPES.contains(&t.as_str()) { t } else { "F1".to_string() }
+        if INVOICE_TYPES.contains(&t.as_str()) {
+            t
+        } else {
+            "F1".to_string()
+        }
     };
 
     // DescripcionOperacion: la AEAT la exige NO vacía (rechaza con código 1100). Usa la descripción
@@ -363,7 +384,11 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let invoice_number = str_field(&inv, "number");
     let description = {
         let d = str_field(&inv, "description");
-        if d.trim().is_empty() { format!("Venta {invoice_number}") } else { d }
+        if d.trim().is_empty() {
+            format!("Venta {invoice_number}")
+        } else {
+            d
+        }
     };
 
     build_record_output(
@@ -459,7 +484,11 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
         )
         .await?;
     let (previous_hash, sequence_number, is_first) = match anchor.first() {
-        Some(row) => (str_field(row, "record_hash"), int_field(row, "sequence_number", 0) + 1, false),
+        Some(row) => (
+            str_field(row, "record_hash"),
+            int_field(row, "sequence_number", 0) + 1,
+            false,
+        ),
         None => (String::new(), 1, true),
     };
 
@@ -492,9 +521,17 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
     };
     let config = read_config(host, &ctx.hub_id).await?;
     // El host del QR depende del entorno (testing vs producción) → leer la config antes de generarlo.
-    let environment = config.as_ref().map(environment_of).unwrap_or_else(|| "testing".to_string());
-    let qr_url =
-        chain::qr_url(&r.issuer_nif, &r.invoice_number, &r.invoice_date, total_amount_eur, &environment);
+    let environment = config
+        .as_ref()
+        .map(environment_of)
+        .unwrap_or_else(|| "testing".to_string());
+    let qr_url = chain::qr_url(
+        &r.issuer_nif,
+        &r.invoice_number,
+        &r.invoice_date,
+        total_amount_eur,
+        &environment,
+    );
     let auto_transmit = config
         .as_ref()
         .map(|c| int_field(c, "auto_transmit", 1) != 0)
@@ -642,12 +679,14 @@ async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Result<Output> 
         .next()
         .ok_or_else(|| RuntimeError::Native(format!("registro `{record_id}` no encontrado")))?;
     if str_field(&record, "status") == "accepted" {
-        return Err(RuntimeError::Native("el registro ya fue aceptado por la AEAT".into()));
+        return Err(RuntimeError::Native(
+            "el registro ya fue aceptado por la AEAT".into(),
+        ));
     }
 
-    let config = read_config(host, &ctx.hub_id)
-        .await?
-        .ok_or_else(|| RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into()))?;
+    let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
+        RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
+    })?;
     // Gate: sin certificado (ni core ni legacy) no se puede transmitir.
     if !has_certificate(&config) {
         return Err(VerifactuError::Certificate(
@@ -656,8 +695,15 @@ async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Result<Output> 
         .into());
     }
 
-    let (ops, _success) =
-        transmit_one(host, &ctx, &record, &config, &ctx.new_ids[0], &ctx.new_ids[1]).await?;
+    let (ops, _success) = transmit_one(
+        host,
+        &ctx,
+        &record,
+        &config,
+        &ctx.new_ids[0],
+        &ctx.new_ids[1],
+    )
+    .await?;
     let mut out = Output::new();
     for o in ops {
         out = out.with_operation(o);
@@ -699,7 +745,17 @@ async fn transmit_one(
         .next()
     };
 
-    let xml = aeat::build_soap(record, config, prev.as_ref(), &ctx.hub_id);
+    // En un reintento se usa EXACTAMENTE el XML del intento anterior (si ya quedó en BD), no se
+    // regenera con una configuración que podría haber cambiado mientras la AEAT estaba caída.
+    let xml = record
+        .get("xml_content")
+        .and_then(Json::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .map(ToString::to_string)
+        .unwrap_or_else(|| aeat::build_soap(record, config, prev.as_ref(), &ctx.hub_id));
+    // Archivo duradero ANTES de tocar la red. Si el backend Local/S3 no confirma la escritura, no
+    // se envía: nunca aceptamos una transmisión fiscal sin conservar su XML para auditoría/reenvío.
+    let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
     let environment = environment_of(config);
     // Identity mTLS: cert del core (opaca, bytes en el core) o legacy. Ver `build_identity`.
     let identity = build_identity(host, &ctx.hub_id, config).await?;
@@ -719,10 +775,23 @@ async fn transmit_one(
             } else {
                 (resp.codigo_error.clone(), resp.descripcion_error.clone())
             };
-            let event_type = if success { "transmission_success" } else { "transmission_failure" };
+            let event_type = if success {
+                "transmission_success"
+            } else {
+                "transmission_failure"
+            };
             let severity = if success { "info" } else { "error" };
             let mut ops = vec![
-                apply_transmission(&record_id, status, &code, &message, &resp.csv, &xml, 0),
+                apply_transmission(
+                    &record_id,
+                    status,
+                    &code,
+                    &message,
+                    &resp.csv,
+                    &xml,
+                    &xml_storage_path,
+                    0,
+                ),
                 op(
                     "verifactu._insert_event",
                     json!({
@@ -744,7 +813,10 @@ async fn transmit_one(
             ];
             if success {
                 // Si el registro estaba en la cola de contingencia, sale de ella.
-                ops.push(op("verifactu._resolve_contingency", json!({ "record_id": record_id })));
+                ops.push(op(
+                    "verifactu._resolve_contingency",
+                    json!({ "record_id": record_id }),
+                ));
             }
             Ok((ops, success))
         }
@@ -757,7 +829,11 @@ async fn transmit_one(
                     &params(json!({ "record_id": record_id })),
                 )
                 .await?;
-            let attempts = queue.first().map(|q| int_field(q, "attempts", 0)).unwrap_or(0) + 1;
+            let attempts = queue
+                .first()
+                .map(|q| int_field(q, "attempts", 0))
+                .unwrap_or(0)
+                + 1;
             let interval = config
                 .get("retry_interval_minutes")
                 .and_then(|v| v.as_i64())
@@ -772,7 +848,16 @@ async fn transmit_one(
                 .unwrap_or_else(|_| ctx.now.clone());
             let reason = err.to_string();
             let ops = vec![
-                apply_transmission(&record_id, "error", "", &reason, "", &xml, 1),
+                apply_transmission(
+                    &record_id,
+                    "error",
+                    "",
+                    &reason,
+                    "",
+                    &xml,
+                    &xml_storage_path,
+                    1,
+                ),
                 op(
                     "verifactu._insert_event",
                     json!({
@@ -804,6 +889,30 @@ async fn transmit_one(
     }
 }
 
+/// Guarda el XML con una clave estable por registro. Los reintentos sobrescriben atómicamente el
+/// mismo objeto con el mismo contenido; el estado/contador de intentos vive en la BD.
+async fn archive_transmission_xml(
+    host: &dyn NativeHost,
+    record_id: &str,
+    xml: &str,
+) -> Result<String> {
+    if record_id.is_empty()
+        || !record_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(RuntimeError::Storage(
+            "id de registro no válido para archivar XML".to_string(),
+        ));
+    }
+    host.write_static_file(
+        &format!("xml/{record_id}.xml"),
+        xml.as_bytes(),
+        "application/xml",
+    )
+    .await
+}
+
 /// Intención UPDATE del registro tras un intento de transmisión.
 fn apply_transmission(
     record_id: &str,
@@ -812,6 +921,7 @@ fn apply_transmission(
     message: &str,
     csv: &str,
     xml: &str,
+    xml_storage_path: &str,
     retry_increment: i64,
 ) -> Operation {
     op(
@@ -823,6 +933,7 @@ fn apply_transmission(
             "aeat_response_message": message,
             "aeat_csv": csv,
             "xml_content": xml,
+            "xml_storage_path": xml_storage_path,
             "retry_increment": retry_increment,
         }),
     )
@@ -838,9 +949,9 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
     let (payload, ctx) = split_input(input)?;
     let limit = int_field(&payload, "limit", 100).clamp(1, 500);
 
-    let config = read_config(host, &ctx.hub_id)
-        .await?
-        .ok_or_else(|| RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into()))?;
+    let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
+        RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
+    })?;
     // Gate: sin certificado no hay nada que transmitir; deja la cola como está.
     if !has_certificate(&config) {
         return Ok(Output::new());
@@ -878,14 +989,16 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
         };
         if str_field(&rec, "status") == "accepted" {
             // Ya aceptado: limpiar la entrada de cola obsoleta.
-            out = out.with_operation(op("verifactu._resolve_contingency", json!({ "record_id": rid })));
+            out = out.with_operation(op(
+                "verifactu._resolve_contingency",
+                json!({ "record_id": rid }),
+            ));
             continue;
         }
         let event_id = ctx.new_ids[id_idx].clone();
         let queue_id = ctx.new_ids[id_idx + 1].clone();
         id_idx += 2;
-        let (ops, success) =
-            transmit_one(host, &ctx, &rec, &config, &event_id, &queue_id).await?;
+        let (ops, success) = transmit_one(host, &ctx, &rec, &config, &event_id, &queue_id).await?;
         for o in ops {
             out = out.with_operation(o);
         }
@@ -920,16 +1033,20 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
 /// (no inserta ningún `verifactu_record`); la UI lo lee con `verifactu.diagnostics.last`.
 async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let (payload, ctx) = split_input(input)?;
-    let config = read_config(host, &ctx.hub_id)
-        .await?
-        .ok_or_else(|| RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into()))?;
+    let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
+        RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
+    })?;
 
     // OBLIGADO tributario (emisor) = el NIF que la AEAT valida y que representa el certificado.
     // NO es el productor del software (software_*). Para la prueba viene de la config (issuer_*).
     let issuer_nif = str_field(&config, "issuer_nif");
     let issuer_name = {
         let n = str_field(&config, "issuer_name");
-        if n.is_empty() { issuer_nif.clone() } else { n }
+        if n.is_empty() {
+            issuer_nif.clone()
+        } else {
+            n
+        }
     };
     let environment = environment_of(&config);
     let gen_ts = chain::format_timestamp(&ctx.now);
@@ -941,21 +1058,55 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
     // esos tipos se usa un cliente de muestra si la UI no manda uno.
     let invoice_type = {
         let t = str_field(&payload, "invoice_type");
-        if INVOICE_TYPES.contains(&t.as_str()) { t } else { "F2".to_string() }
+        if INVOICE_TYPES.contains(&t.as_str()) {
+            t
+        } else {
+            "F2".to_string()
+        }
     };
-    let needs_recipient = matches!(invoice_type.as_str(), "F1" | "F3" | "R1" | "R2" | "R3" | "R4");
+    let needs_recipient = matches!(
+        invoice_type.as_str(),
+        "F1" | "F3" | "R1" | "R2" | "R3" | "R4"
+    );
     let recipient_nif = {
         let n = str_field(&payload, "recipient_nif");
-        if !n.is_empty() { n } else if needs_recipient { "12345678Z".to_string() } else { String::new() }
+        if !n.is_empty() {
+            n
+        } else if needs_recipient {
+            "12345678Z".to_string()
+        } else {
+            String::new()
+        }
     };
     let recipient_name = {
         let n = str_field(&payload, "recipient_name");
-        if !n.is_empty() { n } else if needs_recipient { "Cliente de Prueba".to_string() } else { String::new() }
+        if !n.is_empty() {
+            n
+        } else if needs_recipient {
+            "Cliente de Prueba".to_string()
+        } else {
+            String::new()
+        }
     };
 
     // Importes de muestra (céntimos): base 100,00 € · IVA 21% · total 121,00 €.
-    let huella = chain::alta_hash(&issuer_nif, &sample_number, &sample_date, &invoice_type, 21.0, 121.0, "", &gen_ts);
-    let qr_url = chain::qr_url(&issuer_nif, &sample_number, &sample_date, 121.0, &environment);
+    let huella = chain::alta_hash(
+        &issuer_nif,
+        &sample_number,
+        &sample_date,
+        &invoice_type,
+        21.0,
+        121.0,
+        "",
+        &gen_ts,
+    );
+    let qr_url = chain::qr_url(
+        &issuer_nif,
+        &sample_number,
+        &sample_date,
+        121.0,
+        &environment,
+    );
 
     let mut cert_ok = false;
     let cert_message;
@@ -1060,7 +1211,11 @@ fn resolve_nif(payload: &Json, config: Option<&Json>) -> String {
     match config {
         Some(c) => {
             let iss = str_field(c, "issuer_nif");
-            if iss.is_empty() { str_field(c, "software_nif") } else { iss }
+            if iss.is_empty() {
+                str_field(c, "software_nif")
+            } else {
+                iss
+            }
         }
         None => String::new(),
     }
@@ -1109,7 +1264,11 @@ async fn next_sequence(host: &dyn NativeHost, hub_id: &str, issuer_nif: &str) ->
             &params(json!({ "hub_id": hub_id, "issuer_nif": issuer_nif })),
         )
         .await?;
-    Ok(rows.first().map(|r| int_field(r, "sequence_number", 0)).unwrap_or(0) + 1)
+    Ok(rows
+        .first()
+        .map(|r| int_field(r, "sequence_number", 0))
+        .unwrap_or(0)
+        + 1)
 }
 
 /// Consulta a la AEAT (TLS mutua con el cert de la config) los registros del emisor en el
@@ -1126,20 +1285,33 @@ async fn run_consult(
     let issuer_name = str_field(config, "software_name");
     let (ejercicio, periodo) = year_month(now);
     let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo);
-    let body = aeat::post_soap(aeat::consult_endpoint(&environment_of(config)), identity, &xml).await?;
+    let body = aeat::post_soap(
+        aeat::consult_endpoint(&environment_of(config)),
+        identity,
+        &xml,
+    )
+    .await?;
     Ok(aeat::parse_consult_response(&body))
 }
 
 /// Intenciones para volcar el snapshot de consulta AEAT: limpia el anterior de este emisor +
 /// inserta hasta 10 registros (usa `ctx.new_ids[0..N]`). Devuelve (ops, nº insertados).
-fn aeat_snapshot_ops(ctx: &Ctx, issuer_nif: &str, records: &[aeat::ConsultRecord]) -> (Vec<Operation>, usize) {
+fn aeat_snapshot_ops(
+    ctx: &Ctx,
+    issuer_nif: &str,
+    records: &[aeat::ConsultRecord],
+) -> (Vec<Operation>, usize) {
     let mut ops = vec![op(
         "verifactu._clear_aeat_records",
         json!({ "issuer_nif": issuer_nif.to_string() }),
     )];
     let limit = records.len().min(10);
     for (i, r) in records.iter().take(limit).enumerate() {
-        let nif_val = if r.issuer_nif.is_empty() { issuer_nif.to_string() } else { r.issuer_nif.clone() };
+        let nif_val = if r.issuer_nif.is_empty() {
+            issuer_nif.to_string()
+        } else {
+            r.issuer_nif.clone()
+        };
         ops.push(op(
             "verifactu._insert_aeat_record",
             json!({
@@ -1169,7 +1341,9 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let config = read_config(host, &ctx.hub_id).await?;
     let issuer_nif = resolve_nif(&payload, config.as_ref());
     if issuer_nif.is_empty() {
-        return Err(VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into());
+        return Err(
+            VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into(),
+        );
     }
 
     let rows = host
@@ -1221,7 +1395,10 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             )
         };
         if (computed != stored || !link_ok) && first_invalid.is_none() {
-            first_invalid = Some((int_field(r, "sequence_number", idx as i64), str_field(r, "id")));
+            first_invalid = Some((
+                int_field(r, "sequence_number", idx as i64),
+                str_field(r, "id"),
+            ));
         }
         prev_hash = stored;
     }
@@ -1271,12 +1448,14 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
 /// No toca la cadena local — solo trae lo que la AEAT tiene confirmado.
 async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let (payload, ctx) = split_input(input)?;
-    let config = read_config(host, &ctx.hub_id)
-        .await?
-        .ok_or_else(|| RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into()))?;
+    let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
+        RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
+    })?;
     let issuer_nif = resolve_nif(&payload, Some(&config));
     if issuer_nif.is_empty() {
-        return Err(VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into());
+        return Err(
+            VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into(),
+        );
     }
     let records = run_consult(host, &ctx.hub_id, &config, &issuer_nif, &ctx.now).await?;
     let (ops, limit) = aeat_snapshot_ops(&ctx, &issuer_nif, &records);
@@ -1306,12 +1485,14 @@ async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> Result<Outpu
 /// `create_record` encadene desde ahí. Operación sensible (admin) — emite `chain_recovered`.
 async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let (payload, ctx) = split_input(input)?;
-    let config = read_config(host, &ctx.hub_id)
-        .await?
-        .ok_or_else(|| RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into()))?;
+    let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
+        RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
+    })?;
     let issuer_nif = resolve_nif(&payload, Some(&config));
     if issuer_nif.is_empty() {
-        return Err(VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into());
+        return Err(
+            VerifactuError::Payload("falta issuer_nif (o software_nif en config)".into()).into(),
+        );
     }
     let records = run_consult(host, &ctx.hub_id, &config, &issuer_nif, &ctx.now).await?;
     if records.is_empty() {
@@ -1391,13 +1572,24 @@ async fn recover_manual(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let seq = next_sequence(host, &ctx.hub_id, &issuer_nif).await?;
     let invoice_number = {
         let n = str_field(&payload, "invoice_number");
-        if n.is_empty() { format!("RECOVERY-{}", short(&record_hash)) } else { n }
+        if n.is_empty() {
+            format!("RECOVERY-{}", short(&record_hash))
+        } else {
+            n
+        }
     };
     let invoice_date = {
         let d = str_field(&payload, "invoice_date");
-        if d.is_empty() { ctx.now.chars().take(10).collect::<String>() } else { d }
+        if d.is_empty() {
+            ctx.now.chars().take(10).collect::<String>()
+        } else {
+            d
+        }
     };
-    let issuer_name = config.as_ref().map(|c| str_field(c, "software_name")).unwrap_or_default();
+    let issuer_name = config
+        .as_ref()
+        .map(|c| str_field(c, "software_name"))
+        .unwrap_or_default();
     let anchor_id = ctx.new_ids.first().cloned().unwrap_or_default();
 
     Ok(Output::new()
@@ -1435,7 +1627,53 @@ async fn recover_manual(input: &Json, host: &dyn NativeHost) -> Result<Output> {
 
 #[cfg(test)]
 mod tests {
-    use super::derive_tax_rate;
+    use super::{archive_transmission_xml, derive_tax_rate, NativeHost, Params, Result};
+    use serde_json::Value as Json;
+    use std::sync::Mutex;
+
+    #[derive(Default)]
+    struct ArchiveHost {
+        writes: Mutex<Vec<(String, Vec<u8>, String)>>,
+    }
+
+    #[async_trait::async_trait]
+    impl NativeHost for ArchiveHost {
+        async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+            Ok(vec![])
+        }
+
+        async fn write_static_file(
+            &self,
+            relative_path: &str,
+            bytes: &[u8],
+            content_type: &str,
+        ) -> Result<String> {
+            self.writes.lock().unwrap().push((
+                relative_path.to_string(),
+                bytes.to_vec(),
+                content_type.to_string(),
+            ));
+            Ok(format!("modules/verifactu/{relative_path}"))
+        }
+    }
+
+    #[tokio::test]
+    async fn xml_is_archived_before_transmission_under_a_stable_record_path() {
+        let host = ArchiveHost::default();
+        let path = archive_transmission_xml(&host, "record-123", "<soap />")
+            .await
+            .unwrap();
+
+        assert_eq!(path, "modules/verifactu/xml/record-123.xml");
+        assert_eq!(
+            host.writes.lock().unwrap().as_slice(),
+            &[(
+                "xml/record-123.xml".to_string(),
+                b"<soap />".to_vec(),
+                "application/xml".to_string()
+            )]
+        );
+    }
 
     #[test]
     fn tipo_unico_se_toma_del_desglose() {

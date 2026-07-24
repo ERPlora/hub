@@ -9,6 +9,19 @@
     <!-- 100% de ancho; el padding lo aporta el `ion-content` de AppPage (un solo ion-padding,
          como todas las vistas). La vista por defecto es GRID (tarjetas) — se fija en onMounted. -->
     <div v-else class="fill">
+      <ok-inline-feedback v-if="!isAdmin" tone="info" class="mb-3">
+        {{ t('apps.adminOnly') }}
+      </ok-inline-feedback>
+      <ok-inline-feedback v-if="config.demo && tab !== 'mine'" tone="info" class="mb-3">
+        {{ t('apps.demoCatalogReadOnly') }}
+      </ok-inline-feedback>
+      <ok-inline-feedback v-if="catalogError && tab !== 'mine'" tone="danger" class="mb-3">
+        <span>{{ t('apps.catalogLoadError') }}</span>
+        <ion-button size="small" fill="clear" @click="loadCatalog">
+          {{ t('apps.retryCatalog') }}
+        </ion-button>
+      </ok-inline-feedback>
+
       <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida. -->
       <ok-data-table
         v-show="tab === 'mine'"
@@ -20,6 +33,7 @@
         default-view="cards"
         :searchKeys="['name']"
         :actions="mineActions"
+        :labels="tableLabels"
         :search-placeholder="t('apps.searchInstalled')"
         :empty-message="t('apps.emptyInstalled')"
         page-size="10"
@@ -37,6 +51,7 @@
         default-view="cards"
         :searchKeys="['name', 'desc', 'cat']"
         :actions="catalogActions"
+        :labels="tableLabels"
         :search-placeholder="t('apps.searchCatalog')"
         :empty-message="t('apps.emptyCatalog')"
         page-size="10"
@@ -124,9 +139,10 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
-import { DT_LABELS_ES } from '../lib/data-table-labels';
+import { dataTableLabels } from '../lib/data-table-labels';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+const tableLabels = computed(() => dataTableLabels(locale.value));
 import { cloudMarketplaceModules, type CloudMarketplaceModule } from '../lib/cloud';
 import { config } from '../lib/config';
 import {
@@ -139,6 +155,7 @@ import { refreshModuleNav } from '../lib/nav';
 import { isModuleInstalled } from '../lib/apps-catalog';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
 import { openExternal } from '../lib/open-external';
+import { isAdmin } from '../lib/session';
 
 // --- Tipos ---
 interface Mod {
@@ -146,7 +163,9 @@ interface Mod {
   name: string;
   desc: string;
   price: string;
+  paid: boolean;
   installed: boolean;
+  available: boolean;
   cat: string;
   /** Versión a instalar; si el Cloud no la expone usamos 'latest' en el request-install. */
   version?: string;
@@ -190,22 +209,12 @@ interface DataTableAction {
   loading?: (row: Row) => boolean;
 }
 
-// --- Datos demo (solo si config.demo y el Cloud no responde) ---
-const MODULES_DEMO: Mod[] = [
-  { id: 'inventory', name: 'Inventario', desc: 'Productos, stock y movimientos', price: 'Gratis', installed: true, cat: 'Operación' },
-  { id: 'pos', name: 'TPV / POS', desc: 'Punto de venta y caja', price: 'Gratis', installed: true, cat: 'Ventas' },
-  { id: 'customers', name: 'Clientes (CRM)', desc: 'Fichas, grupos y actividad', price: 'Gratis', installed: true, cat: 'Ventas' },
-  { id: 'invoice', name: 'Facturación', desc: 'Facturas y rectificativas', price: '9 €/mes', installed: false, cat: 'Finanzas' },
-  { id: 'couriers', name: 'Envíos', desc: 'Integración con transportistas', price: '12 €/mes', installed: false, cat: 'Logística' },
-  { id: 'appointments', name: 'Reservas', desc: 'Agenda y citas online', price: '7 €/mes', installed: false, cat: 'Operación' },
-  { id: 'messaging', name: 'Mensajería', desc: 'WhatsApp y email unificados', price: '15 €/mes', installed: false, cat: 'Comunicación' },
-  { id: 'analytics', name: 'Analítica', desc: 'Cuadros de mando e informes', price: '9 €/mes', installed: false, cat: 'BI' },
-];
-
 // --- Estado ---
 const modules = ref<Mod[]>([]);
 const installedModules = ref<InstalledModule[]>([]);
 const loading = ref(true);
+const catalogError = ref(false);
+let catalogLoadId = 0;
 const toastOpen = ref(false);
 const toastMsg = ref('');
 const toastColor = ref<'primary' | 'success' | 'danger'>('primary');
@@ -277,6 +286,7 @@ function stateCell(row: Row): Node {
     return wrap;
   }
   if (row.state === 'installed') return badgeCell(t('apps.stateInstalled'), 'success');
+  if (row.state === 'unavailable') return badgeCell(t('apps.stateUnavailable'), 'warning');
   return badgeCell(t('apps.stateAvailable'), 'medium');
 }
 
@@ -287,13 +297,19 @@ function stateCell(row: Row): Node {
 const installedIds = computed<Set<string>>(() => new Set(installedModules.value.map((m) => m.id)));
 
 const filteredModules = computed<Row[]>(() => {
-  const base = tab.value === 'paid' ? modules.value.filter((m) => m.price !== 'Gratis') : modules.value;
+  const base = tab.value === 'paid' ? modules.value.filter((m) => m.paid) : modules.value;
   // Inyecta el estado de instalación en cada fila: cambia la identidad del array cuando `installing`
   // cambia → la tabla (Lit) re-renderiza celdas y predicados de acción con el estado fresco.
   return base.map((m) => {
     const prog = installing.value.get(m.id) ?? null;
     const isInstalled = isModuleInstalled(m.installed, m.id, installedIds.value);
-    const state = prog ? 'installing' : isInstalled ? 'installed' : 'available';
+    const state = prog
+      ? 'installing'
+      : isInstalled
+        ? 'installed'
+        : m.available
+          ? 'available'
+          : 'unavailable';
     return {
       ...m,
       state,
@@ -302,7 +318,9 @@ const filteredModules = computed<Row[]>(() => {
           ? t('apps.stateInstalling')
           : state === 'installed'
             ? t('apps.stateInstalled')
-            : t('apps.stateAvailable'),
+            : state === 'unavailable'
+              ? t('apps.stateUnavailable')
+              : t('apps.stateAvailable'),
       progress: prog,
     };
   });
@@ -328,30 +346,35 @@ const mineColumns = computed<DataTableColumn[]>(() => [
     ),
   },
 ]);
-const mineActions = computed<DataTableAction[]>(() => [
-  { id: 'toggle', label: t('apps.actionToggle'), icon: 'power-outline' },
-  { id: 'uninstall', label: t('apps.actionUninstall'), icon: 'trash', color: 'danger' },
-]);
+const mineActions = computed<DataTableAction[]>(() => isAdmin.value
+  ? [
+      { id: 'toggle', label: t('apps.actionToggle'), icon: 'power-outline' },
+      { id: 'uninstall', label: t('apps.actionUninstall'), icon: 'trash', color: 'danger' },
+    ]
+  : []);
 
 const catalogColumns = computed<DataTableColumn[]>(() => [
   { key: 'name', header: t('apps.colModule') },
+  { key: 'version', header: t('apps.colVersion'), format: (r) => String(r.version ?? '—') },
   { key: 'cat', header: t('apps.colCategory'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.cat ?? ''), 'medium') },
   { key: 'desc', header: t('apps.colDescription') },
-  { key: 'price', header: t('apps.colPrice'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price ?? ''), r.price === 'Gratis' ? 'success' : 'medium') },
+  { key: 'price', header: t('apps.colPrice'), filterable: true, filterType: 'select', render: (r) => badgeCell(String(r.price ?? ''), r.paid ? 'medium' : 'success') },
   // Estado visual (Instalado / Instalando… + fase / Disponible). `stateLabel` (traducido) es el
   // valor crudo de la fila → el filtro select y el buscador ven la misma etiqueta que el usuario.
   { key: 'stateLabel', header: t('apps.colStatus'), align: 'center', filterable: true, filterType: 'select', render: (r) => stateCell(r) },
 ]);
-const catalogActions = computed<DataTableAction[]>(() => [
-  {
-    id: 'install',
-    label: t('apps.actionInstall'),
-    icon: 'download-outline',
-    // Instalado o en curso → botón muerto; en curso → spinner en su lugar (pista de actividad).
-    disabled: (row) => row.state !== 'available',
-    loading: (row) => row.state === 'installing',
-  },
-]);
+const catalogActions = computed<DataTableAction[]>(() => isAdmin.value && !config.demo
+  ? [
+      {
+        id: 'install',
+        label: t('apps.actionInstall'),
+        icon: 'download-outline',
+        // Instalado o en curso → botón muerto; en curso → spinner en su lugar (pista de actividad).
+        disabled: (row) => row.state !== 'available',
+        loading: (row) => row.state === 'installing',
+      },
+    ]
+  : []);
 
 // --- Handlers ---
 function onTabChange(ev: Event): void {
@@ -418,6 +441,7 @@ async function openPurchase(mod: Mod): Promise<void> {
 
 /** Punto de entrada de instalación: decide si pedir consentimiento o instalar directo. */
 async function installModule(mod: Mod): Promise<void> {
+  if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
   if (mod.installed) { notify(t('apps.alreadyInstalled', { name: mod.name }), 'primary'); return; }
   // Ya en curso (doble clic o instalación arrancada por otro cliente): no relanzar el request.
   if (installing.value.has(mod.id)) return;
@@ -426,7 +450,7 @@ async function installModule(mod: Mod): Promise<void> {
   // al marketplace del SaaS. El freemium (premium con capa gratis) SÍ viene en el token de
   // entitlement, así que sigue instalándose sin compra (ADR-0032). Solo gateamos con el
   // entitlement RESUELTO (permisivo mientras 'unknown', igual que el resto del shell).
-  if (mod.price !== 'Gratis' && entitlementStatus.value === 'unlocked' && !isModuleEntitled(mod.id)) {
+  if (mod.paid && entitlementStatus.value === 'unlocked' && !isModuleEntitled(mod.id)) {
     await openPurchase(mod);
     return;
   }
@@ -461,6 +485,7 @@ async function confirmConsentInstall(): Promise<void> {
 
 /** Instalación real: pide al runtime instalar y (opcional) concede las capabilities pasadas. */
 async function doInstall(mod: Mod, grantCaps: ModuleCapability[] = []): Promise<void> {
+  if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
   // La card pasa a "Instalando…" al instante (fase genérica hasta que llegue el primer evento WS
   // `module.install.progress` con la fase real). El toast persistente se mantiene como refuerzo.
   setProgress(mod.id, mod.id, '');
@@ -554,6 +579,7 @@ async function confirmCascade(titleKey: string, msgKey: string, m: InstalledModu
 
 /** Activa o desactiva un módulo (hot-plug) y refresca la lista + la nav del shell. */
 async function toggleModule(m: InstalledModule): Promise<void> {
+  if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
   try {
     if (m.status === 'active') {
       if (!(await confirmCascade('apps.cascadeOffTitle', 'apps.cascadeOffMsg', m, activeDependentsOf(m.id)))) return;
@@ -573,6 +599,22 @@ async function toggleModule(m: InstalledModule): Promise<void> {
 
 /** Desinstala un módulo y refresca la lista + la nav del shell. */
 async function removeModule(m: InstalledModule): Promise<void> {
+  if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
+  const alert = await alertController.create({
+    header: t('apps.uninstallTitle', { name: m.name }),
+    message: t('apps.uninstallBody'),
+    buttons: [
+      { text: t('apps.cascadeCancel'), role: 'cancel' },
+      {
+        text: t('apps.uninstallConfirm'),
+        role: 'confirm',
+        cssClass: 'alert-button-danger',
+      },
+    ],
+  });
+  await alert.present();
+  const result = await alert.onDidDismiss();
+  if (result.role !== 'confirm') return;
   try {
     await uninstallModule(m.id);
     notify(t('apps.uninstalled', { name: m.name }), 'primary');
@@ -584,26 +626,45 @@ async function removeModule(m: InstalledModule): Promise<void> {
 }
 
 function toViewModule(m: CloudMarketplaceModule): Mod {
+  const amount = m.priceAmount ?? '';
+  const price = m.isFree
+    ? t('apps.priceFree')
+    : m.priceLabel
+      || (m.priceInterval === 'month'
+        ? t('apps.priceMonthly', { price: amount })
+        : m.priceInterval === 'year'
+          ? t('apps.priceYearly', { price: amount })
+          : amount
+            ? t('apps.priceOneTime', { price: amount })
+            : t('apps.priceOnRequest'));
   return {
     id: m.id,
     name: m.name,
     desc: m.description,
-    price: m.priceLabel || t('apps.priceOnRequest'),
+    price,
+    paid: !m.isFree,
     installed: m.installed,
+    available: m.available,
     cat: m.category,
+    version: m.version,
   };
 }
 
-/** Recarga el catálogo (estados de instalado) desde el Cloud, con fallback demo. */
+/** Recarga exclusivamente el catálogo real de SaaS. No existe fallback con módulos locales. */
 async function loadCatalog(): Promise<void> {
+  const loadId = ++catalogLoadId;
   loading.value = true;
+  catalogError.value = false;
   try {
     const cloudMods = await cloudMarketplaceModules();
+    if (loadId !== catalogLoadId) return;
     modules.value = cloudMods.map(toViewModule);
   } catch {
-    modules.value = config.demo ? MODULES_DEMO : [];
+    if (loadId !== catalogLoadId) return;
+    modules.value = [];
+    catalogError.value = true;
   } finally {
-    loading.value = false;
+    if (loadId === catalogLoadId) loading.value = false;
   }
 }
 
@@ -622,11 +683,11 @@ function handleCatalogAction(e: Event): void {
   if (actionId === 'install') void installModule(row as unknown as Mod);
 }
 
-// Cablea una tabla (labels en ES + listener de rowAction). La vista inicial = tarjetas la fija el
+// Cablea una tabla (labels del locale activo + listener de rowAction). La vista inicial = tarjetas la fija el
 // propio WC vía el atributo `default-view="cards"` (robusto, no depende del ref).
 function wireTable(el: HTMLElement | null, handler: (e: Event) => void): void {
   if (!el) return;
-  (el as HTMLElement & { labels: typeof DT_LABELS_ES }).labels = DT_LABELS_ES;
+  (el as HTMLElement & { labels: Record<string, string> }).labels = dataTableLabels(locale.value);
   // Idempotente: quitar antes de añadir evita listeners duplicados si el mismo elemento persiste
   // entre re-cableados (`handler` es una referencia estable, así que removeEventListener casa).
   el.removeEventListener('rowAction', handler);
@@ -649,6 +710,13 @@ watch(
   },
   { immediate: true },
 );
+watch(locale, () => {
+  wireTable(mineTable.value, handleMineAction);
+  wireTable(catalogTable.value, handleCatalogAction);
+  // La preferencia personal se hidrata después del shell. Recargamos con `Accept-Language`
+  // efectivo para no mezclar cabeceras traducidas con metadatos del catálogo en otro idioma.
+  void loadCatalog();
+});
 
 // --- Fetch + suscripción al evento de instalación al montar ---
 onMounted(() => {

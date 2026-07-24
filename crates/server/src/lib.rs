@@ -19,6 +19,7 @@ use axum::body::Body;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
+use axum::middleware::Next;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -39,7 +40,9 @@ pub mod ingest;
 pub mod install;
 pub mod logging;
 pub mod media;
+pub mod module_storage;
 pub mod openapi;
+pub mod profile;
 pub mod router;
 pub mod session;
 pub mod settings;
@@ -47,7 +50,7 @@ pub mod state;
 pub mod system;
 pub mod tenant;
 
-pub use state::{AppState, AuthMode, HubConfig, MachineToken, DEV_HUB_ID, WsEvent};
+pub use state::{AppState, AuthMode, HubConfig, HubId, MachineToken, WsEvent, DEV_HUB_ID};
 pub use tenant::{
     EnvOrgResolver, OrgDescriptor, OrgId, OrgResolver, RuntimeFactory, TenantError, TenantRouter,
 };
@@ -71,6 +74,9 @@ pub struct ServeConfig {
     /// el shell Tauri, que la actualiza tras enrolar/rotar sin reiniciar la app. Si `None`, el
     /// runtime crea la suya sembrada con `hub.cloud_api_token` (caso binario/ECS).
     pub machine_token_cell: Option<state::MachineToken>,
+    /// Celda externa del `hub_id` vivo. Tauri la actualiza junto con el token tras registrar la
+    /// máquina; Cloud/binario usa una celda interna sembrada desde `HUB_ID`.
+    pub hub_id_cell: Option<state::HubId>,
     /// Ruta del `dist/` de Vite a servir en el **MISMO origen** que `/api` (ADR-0050, Hub Local
     /// mismo-origen). `Some` ⇒ el runtime monta el front con fallback SPA (`with_static_frontend`),
     /// de modo que `HttpWsTransport` (RUNTIME_URL='') alcance el loopback sin CORS; en Tauri lo
@@ -88,11 +94,16 @@ impl ServeConfig {
     pub fn from_env() -> Self {
         Self {
             sqlite_path: std::env::var("HUB_SQLITE_PATH").unwrap_or_else(|_| "erplora.db".into()),
-            database_url: std::env::var("HUB_DATABASE_URL").ok().filter(|s| !s.trim().is_empty()),
+            database_url: std::env::var("HUB_DATABASE_URL")
+                .ok()
+                .filter(|s| !s.trim().is_empty()),
             bind: std::env::var("HUB_BIND").unwrap_or_else(|_| "127.0.0.1:8787".into()),
-            modules_dir: std::env::var("HUB_MODULES_DIR").ok().filter(|s| !s.is_empty()),
+            modules_dir: std::env::var("HUB_MODULES_DIR")
+                .ok()
+                .filter(|s| !s.is_empty()),
             hub: HubConfig::from_env(),
             machine_token_cell: None,
+            hub_id_cell: None,
             // ECS/binario: el `dist/` se sirve de disco por `HUB_WEB_DIR` (paridad Hub Cloud).
             web_dir: std::env::var("HUB_WEB_DIR").ok().filter(|s| !s.is_empty()),
             // CSP opcional vía env (None por defecto = comportamiento previo). En Tauri la fija el shell.
@@ -104,7 +115,10 @@ impl ServeConfig {
 /// Trae la clave pública RSA del Cloud (`GET /api/v1/auth/public-key/`) para verificar los JWT de
 /// usuario offline. `None` si el Cloud no responde o no la trae.
 async fn fetch_jwt_public_key(cloud_base_url: &str) -> Option<String> {
-    let url = format!("{}/api/v1/auth/public-key/", cloud_base_url.trim_end_matches('/'));
+    let url = format!(
+        "{}/api/v1/auth/public-key/",
+        cloud_base_url.trim_end_matches('/')
+    );
     // Timeout ACOTADO: esta llamada corre ANTES de bindear el listener en `serve()`. Sin límite, una
     // red hostil (captive portal / DNS lento / host inalcanzable) retrasaría el arranque del servidor
     // mucho más que el `wait_for_runtime` del shell Tauri → la ventana cargaría un loopback que aún no
@@ -122,7 +136,10 @@ async fn fetch_jwt_public_key(cloud_base_url: &str) -> Option<String> {
         return None;
     }
     let v: Value = resp.json().await.ok()?;
-    v.get("public_key").and_then(|k| k.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string())
+    v.get("public_key")
+        .and_then(|k| k.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
 }
 
 /// Resuelve el SQL de seed de configuración inicial desde el entorno (hub#36):
@@ -132,10 +149,16 @@ async fn fetch_jwt_public_key(cloud_base_url: &str) -> Option<String> {
 /// `Ok(None)` si no se configura ninguno (arranque normal sin seed). Un `HUB_SEED_SQL_PATH` que
 /// no se puede leer es un error de configuración → aborta el arranque con un mensaje claro.
 fn load_seed_sql() -> Result<Option<String>, Box<dyn std::error::Error>> {
-    if let Some(sql) = std::env::var("HUB_SEED_SQL").ok().filter(|s| !s.trim().is_empty()) {
+    if let Some(sql) = std::env::var("HUB_SEED_SQL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+    {
         return Ok(Some(sql));
     }
-    if let Some(path) = std::env::var("HUB_SEED_SQL_PATH").ok().filter(|s| !s.trim().is_empty()) {
+    if let Some(path) = std::env::var("HUB_SEED_SQL_PATH")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+    {
         let sql = std::fs::read_to_string(&path)
             .map_err(|e| format!("HUB_SEED_SQL_PATH={path}: no se pudo leer el seed: {e}"))?;
         return Ok(Some(sql));
@@ -195,9 +218,36 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             Box::new(SqliteAdapter::connect(&sqlite_url).await?)
         }
     };
+    // Identidad viva: en Cloud nace del deployment; en el primer arranque Tauri la aporta el
+    // shell y puede pasar del placeholder al UUID registrado sin reiniciar.
+    let hub_id_cell = cfg
+        .hub_id_cell
+        .take()
+        .unwrap_or_else(|| std::sync::Arc::new(std::sync::RwLock::new(cfg.hub.hub_id.clone())));
+    if let Ok(hub_id) = hub_id_cell.read() {
+        cfg.hub.hub_id = hub_id.clone();
+    }
+
     // El runtime se construye con el `hub_id` del despliegue (config, no spoofable): scope del
     // estado de módulos (`hub_module`) y de las migraciones de sistema (hub#31 / hub#37).
     let mut runtime = Runtime::with_hub_id(db, cfg.hub.hub_id.clone());
+
+    // El mismo backend de ficheros sirve a TODOS los módulos: disco bajo `media/modules/` en
+    // Local y proxy Cloud→S3 en Cloud. Se inyecta antes de instalar para que cada manifest con
+    // `static_files.folder` materialice su carpeta al activarse.
+    let machine_token_cell = cfg.machine_token_cell.take().unwrap_or_else(|| {
+        std::sync::Arc::new(std::sync::RwLock::new(cfg.hub.cloud_api_token.clone()))
+    });
+    let module_storage = if use_postgres {
+        module_storage::ModuleMediaStorage::cloud(
+            cfg.hub.cloud_base_url.clone(),
+            cfg.hub.hub_id.clone(),
+            machine_token_cell.clone(),
+        )
+    } else {
+        module_storage::ModuleMediaStorage::local(cfg.hub.media_dir.clone())
+    };
+    runtime.set_module_storage(std::sync::Arc::new(module_storage));
 
     // Plugins nativos first-party (ADR-0009): motores compliance-crítico horneados en el
     // runtime. Hoy solo `verifactu` (cadena fiscal + transmisión AEAT TLS-mutua).
@@ -211,7 +261,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         // una dependencia se instala antes que quien la declara, sin depender del orden del FS.
         // `install_all_from_dir` es tolerante (loguea ✓/✗ por módulo y salta los rotos); aquí solo
         // registramos un error externo (read_dir fallido o ciclo de dependencias del conjunto).
-        if let Err(e) = runtime.install_all_from_dir(std::path::Path::new(dir)).await {
+        if let Err(e) = runtime
+            .install_all_from_dir(std::path::Path::new(dir))
+            .await
+        {
             eprintln!("✗ instalación de módulos: {e}");
         }
     }
@@ -242,10 +295,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     };
 
     // Celda del token de máquina: externa (compartida con el shell Tauri para hot-reload) o propia.
-    let mut state = match cfg.machine_token_cell.take() {
-        Some(cell) => AppState::with_config_cell(runtime, cfg.hub, cell),
-        None => AppState::with_config(runtime, cfg.hub),
-    };
+    let mut state = AppState::with_config_cells(runtime, cfg.hub, machine_token_cell, hub_id_cell);
     if let Some(vs) = vector_store {
         state = state.with_vector(vs);
     }
@@ -259,7 +309,13 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // "desaparecería" del runtime al reiniciar (no expondría queries/commands/nav). Tolerante.
     {
         let cache_root = state.config.module_cache.clone();
-        match state.runtime.lock().await.rehydrate_installed(&cache_root).await {
+        match state
+            .runtime
+            .lock()
+            .await
+            .rehydrate_installed(&cache_root)
+            .await
+        {
             Ok(ids) if !ids.is_empty() => eprintln!("módulos re-hidratados: {}", ids.join(", ")),
             Ok(_) => {}
             Err(e) => eprintln!("✗ re-hidratación de módulos: {e}"),
@@ -274,7 +330,13 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // que no se pueda re-bajar (red/entitlement) se omite con log, no aborta el arranque.
     // `install_from_cloud` resuelve `depends_on` en orden (nested install).
     {
-        let missing = state.runtime.lock().await.installed_but_unregistered().await.unwrap_or_default();
+        let missing = state
+            .runtime
+            .lock()
+            .await
+            .installed_but_unregistered()
+            .await
+            .unwrap_or_default();
         if !missing.is_empty() {
             match auth::machine_auth(&state) {
                 Some(machine) => {
@@ -316,7 +378,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         .runtime
         .lock()
         .await
-        .set_notify_transport(std::sync::Arc::new(erplora_runtime::host_notify::MockTransport::new()));
+        .set_notify_transport(std::sync::Arc::new(
+            erplora_runtime::host_notify::MockTransport::new(),
+        ));
 
     // Transporte de `host.backup_upload` (ADR-0040/0042, opción B): dump consistente del SQLite
     // (`VACUUM INTO`) + STREAM `POST` al Cloud, que lo guarda en S3 con cifrado de SERVIDOR (SSE).
@@ -330,25 +394,23 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         // el transporte real (`VACUUM INTO` + stream al Cloud) cuando el hub está enrolado.
         let transport: std::sync::Arc<dyn erplora_runtime::host_backup::BackupTransport> =
             if use_postgres {
-                eprintln!("backup: backend Postgres → backups gestionados por el Cloud (sin dump local)");
+                eprintln!(
+                    "backup: backend Postgres → backups gestionados por el Cloud (sin dump local)"
+                );
                 std::sync::Arc::new(erplora_runtime::host_backup::MockTransport::new())
             } else {
-                match backup::build_transport(
+                let transport = backup::build_transport(
                     sqlite_path.clone(),
                     &state.config.cloud_base_url,
-                    state.config.hub_id.clone(),
+                    state.hub_id.clone(),
                     state.machine_token.clone(),
                     state.http.clone(),
-                ) {
-                    Some(t) => {
-                        eprintln!("backup: transporte real (dump + stream al Cloud) activo");
-                        t
-                    }
-                    None => {
-                        eprintln!("backup: hub sin enrolar → transporte MOCK (no sube al Cloud)");
-                        std::sync::Arc::new(erplora_runtime::host_backup::MockTransport::new())
-                    }
-                }
+                );
+                eprintln!(
+                    "backup: transporte real (dump + stream al Cloud) preparado; \
+                     se activa al completar el registro de máquina"
+                );
+                transport
             };
         state.runtime.lock().await.set_backup_transport(transport);
     }
@@ -362,7 +424,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Catch-up del scheduler al arrancar (ADR-0011): un hub que estuvo apagado ejecuta UNA sola
     // vez las tareas con backlog vencido (collapse) y reprograma el resto. Se hace antes del loop.
     {
-        let hub_id = state.config.hub_id.clone();
+        let hub_id = state.hub_id();
         let rt = state.runtime.lock().await;
         match rt.scheduler_catch_up(&hub_id).await {
             Ok(n) if n > 0 => eprintln!("scheduler: catch-up de arranque ejecutó {n} tarea(s)"),
@@ -374,12 +436,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Bucle de background: relay de eventos del outbox (§5.4) + barrido del scheduler (ADR-0011).
     // Ambos comparten el mismo tick de 1s y el mismo lock del runtime (un ECS container por hub).
     {
-        let runtime = state.runtime.clone();
-        let hub_id = state.config.hub_id.clone();
+        let scheduler_state = state.clone();
         tokio::spawn(async move {
             loop {
                 {
-                    let rt = runtime.lock().await;
+                    let hub_id = scheduler_state.hub_id();
+                    let rt = scheduler_state.runtime.lock().await;
                     // Entrega at-least-once asíncrona del outbox a sus listeners (+ listener-host
                     // de host.notify para los eventos `*.reminder.due`).
                     if let Err(e) = rt.process_outbox().await {
@@ -403,17 +465,25 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     {
         let st = state.clone();
         let secs = entitlement::interval_secs(
-            std::env::var("HUB_ENTITLEMENT_REVALIDATE_SECS").ok().as_deref(),
+            std::env::var("HUB_ENTITLEMENT_REVALIDATE_SECS")
+                .ok()
+                .as_deref(),
         );
         tokio::spawn(async move {
             let mut tick = tokio::time::interval(std::time::Duration::from_secs(secs));
             loop {
                 tick.tick().await;
-                let Some(auth) = auth::machine_auth(&st) else { continue };
+                let Some(auth) = auth::machine_auth(&st) else {
+                    continue;
+                };
                 let now = entitlement::now_unix();
-                let outcome =
-                    entitlement::fetch_verified_claims(&st.http, &st.config.cloud_base_url, &auth, now)
-                        .await;
+                let outcome = entitlement::fetch_verified_claims(
+                    &st.http,
+                    &st.config.cloud_base_url,
+                    &auth,
+                    now,
+                )
+                .await;
                 entitlement::record_outcome(&st.entitlement, outcome, now);
             }
         });
@@ -453,7 +523,7 @@ fn install_error_reporting(state: &AppState) {
     // posterior habilita el reporte sin reiniciar. La versión del hub = la del build del server.
     let sink = error_sink::CloudErrorSink::new(
         &state.config.cloud_base_url,
-        state.config.hub_id.clone(),
+        state.hub_id.clone(),
         state.machine_token.clone(),
         state.http.clone(),
         format!("v{}", env!("CARGO_PKG_VERSION")),
@@ -502,7 +572,9 @@ fn install_error_reporting(state: &AppState) {
 /// `axum::serve` deja de aceptar conexiones nuevas y drena las en vuelo antes de cerrar.
 async fn shutdown_signal() {
     let ctrl_c = async {
-        tokio::signal::ctrl_c().await.expect("instalar handler de Ctrl-C");
+        tokio::signal::ctrl_c()
+            .await
+            .expect("instalar handler de Ctrl-C");
     };
     #[cfg(unix)]
     let terminate = async {
@@ -522,13 +594,29 @@ async fn shutdown_signal() {
 
 /// Construye el router con todas las rutas montadas sobre `state`.
 pub fn app(state: AppState) -> Router {
+    let registration_state = state.clone();
     Router::new()
         .route("/healthz", get(healthz))
         .route("/api/hub/context", get(hub_context))
         .route("/api/system", get(system::system_info))
         // Settings del hub (store key/value de sistema, tabla `hub_settings`). GET = cualquier
         // sesión de usuario; PUT = sesión admin (owner/admin). Contrato del frontend.
-        .route("/api/settings", get(settings::get_settings).put(settings::put_settings))
+        .route(
+            "/api/settings",
+            get(settings::get_settings).put(settings::put_settings),
+        )
+        // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
+        .route(
+            "/api/profile",
+            get(profile::get_profile).put(profile::put_profile),
+        )
+        .route(
+            "/api/profile/avatar",
+            get(profile::get_avatar)
+                .post(profile::upload_avatar)
+                .delete(profile::delete_avatar)
+                .layer(axum::extract::DefaultBodyLimit::max(3 * 1024 * 1024)),
+        )
         // Certificado fiscal del negocio (ADR-0079): recurso del hub, subido en Ajustes → Negocio.
         .route(
             "/api/business/certificate",
@@ -542,12 +630,16 @@ pub fn app(state: AppState) -> Router {
         .route("/api/hub/export", post(export_import::export_blueprint))
         .route(
             "/api/hub/import/inspect",
-            post(export_import::import_inspect)
-                .layer(axum::extract::DefaultBodyLimit::max(export_import::MAX_BLUEPRINT_BYTES)),
+            post(export_import::import_inspect).layer(axum::extract::DefaultBodyLimit::max(
+                export_import::MAX_BLUEPRINT_BYTES,
+            )),
         )
         .route("/api/hub/import", post(export_import::import_blueprint))
         // Gestor de la carpeta `media/` (pantalla /files). Browse + raw + upload + delete + mkdir.
-        .route("/api/media", get(media::media_list).delete(media::media_delete))
+        .route(
+            "/api/media",
+            get(media::media_list).delete(media::media_delete),
+        )
         .route("/api/media/raw", get(media::media_raw))
         .route("/api/media/upload", post(media::media_upload))
         .route("/api/media/folder", post(media::media_create_folder))
@@ -579,7 +671,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/command", post(command))
         // ── API pública por módulo (ADR-0057, public-api.md) ────────────────────────────────
         // Gestión de keys (auth = sesión admin owner/admin; NO una api key).
-        .route("/api/keys", get(api_keys::list_keys).post(api_keys::create_key))
+        .route(
+            "/api/keys",
+            get(api_keys::list_keys).post(api_keys::create_key),
+        )
         .route("/api/keys/:id/rotate", post(api_keys::rotate_key))
         .route("/api/keys/:id", axum::routing::delete(api_keys::revoke_key))
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
@@ -617,11 +712,42 @@ pub fn app(state: AppState) -> Router {
                     tower_http::trace::DefaultOnFailure::new().level(tracing::Level::ERROR),
                 ),
         )
+        // Primera barrera del runtime: una máquina real sin UUID+credencial Cloud solo puede
+        // consultar salud/contexto para pintar el login. Demo es la única excepción.
+        .layer(axum::middleware::from_fn_with_state(
+            registration_state,
+            require_machine_registration,
+        ))
         .with_state(state)
 }
 
 async fn healthz() -> &'static str {
     "ok"
+}
+
+/// Bloquea toda la superficie de negocio hasta completar el registro de la máquina. El login
+/// email/password inicial va directamente al SaaS; después Tauri adopta `hub_id + token` y vuelve
+/// a consultar `/api/hub/context`, que ya pasa esta barrera.
+async fn require_machine_registration(
+    State(st): State<AppState>,
+    request: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let path = request.uri().path();
+    if matches!(path, "/healthz" | "/api/hub/context") || st.is_demo() || st.machine_registered() {
+        return next.run(request).await;
+    }
+    (
+        StatusCode::PRECONDITION_REQUIRED,
+        Json(json!({
+            "ok": false,
+            "error": {
+                "code": "machine_registration_required",
+                "message": "este dispositivo debe registrarse con el Cloud antes de usar el Hub"
+            }
+        })),
+    )
+        .into_response()
 }
 
 /// Envuelve el router de API para servir el frontend estático (el `dist/` de Vite) con **fallback
@@ -677,9 +803,20 @@ pub fn build_router(state: AppState, web_dir: Option<&str>) -> Router {
 /// settings del hub (tabla `hub_settings` ∪ defaults), lectura barata en el arranque del SPA para no
 /// pegar a `/api/settings` por separado. Contrato del frontend.
 async fn hub_context(State(st): State<AppState>) -> Response {
+    let hub_id = st.hub_id();
+    // El primer login Tauri puede haber adoptado el UUID real después de arrancar Axum. Antes de
+    // abrir la sesión local reconciliamos el Runtime y aplicamos las migraciones scoped del nuevo
+    // Hub. Es idempotente y convierte este endpoint de boot en la barrera de consistencia.
+    let runtime = match st.runtime_for(&hub_id).await {
+        Ok(runtime) => runtime,
+        Err(error) => return tenant_rejected(error),
+    };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
     let (pin_users, currency, currency_decimals, language) = {
-        let rt = st.runtime.lock().await;
+        let rt = runtime.lock().await;
+        if let Err(error) = rt.ensure_system_tables().await {
+            return err_response(error);
+        }
         let pin_users: Vec<Value> = rt
             .list_pin_users()
             .await
@@ -717,10 +854,18 @@ async fn hub_context(State(st): State<AppState>) -> Response {
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
     // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
     let sector = st.config.sector.clone();
+    // Demo/Dev es la única excepción al registro obligatorio. En cualquier runtime real se exige
+    // tanto UUID Cloud como credencial de máquina; nunca se expone el secreto al navegador.
+    let demo = st.is_demo();
+    let machine_registered = st.machine_registered();
     Json(json!({
-        "hub_id": st.config.hub_id,
+        "hub_id": hub_id,
         "user": Value::Null,
         "pin_users": pin_users,
+        "demo": demo,
+        "machine_registered": machine_registered,
+        "registration_required": !demo && !machine_registered,
+        "public_key_loaded": st.config.jwt_public_key.is_some(),
         "business_type": sector,
         "sector": sector,
         // Settings de arranque (tabla `hub_settings` ∪ defaults). El SPA los usa para formato de
@@ -748,6 +893,15 @@ async fn request_install(
     headers: HeaderMap,
     Json(req): Json<RequestInstallReq>,
 ) -> Response {
+    // La credencial de máquina sirve para que ESTE Hub hable con Cloud, no para autorizar al
+    // navegador. Exigimos primero la sesión local de un owner/admin: de lo contrario cualquier
+    // módulo web same-origin podría disparar instalaciones usando indirectamente el token del Hub.
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
     // Hub-scoped: token de máquina si el hub está enrolado; si no, JWT del usuario.
     let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
         return (
@@ -803,14 +957,18 @@ async fn request_install(
                     match embed::index_chunks(
                         &embedder,
                         store.as_ref(),
-                        &st.config.hub_id,
+                        &st.hub_id(),
                         &installed.version,
                         &chunks,
                     )
                     .await
                     {
-                        Ok(n) => tracing::info!(module_id = %installed.module_id, chunks = n, "embeddings indexados (§9.6)"),
-                        Err(e) => tracing::warn!(module_id = %installed.module_id, error = %e, "ingestión de embeddings falló (no crítico; router degrada)"),
+                        Ok(n) => {
+                            tracing::info!(module_id = %installed.module_id, chunks = n, "embeddings indexados (§9.6)")
+                        }
+                        Err(e) => {
+                            tracing::warn!(module_id = %installed.module_id, error = %e, "ingestión de embeddings falló (no crítico; router degrada)")
+                        }
                     }
                 } else {
                     tracing::info!(module_id = %installed.module_id, chunks = chunks.len(), "sin índice vectorial; ingestión de embeddings omitida (§9.5)");
@@ -868,14 +1026,21 @@ async fn serve_module_asset(
     // Versión instalada del módulo (del registro). Módulo no instalado → 404.
     let version = {
         let rt = st.runtime.lock().await;
-        rt.modules().into_iter().find(|m| m.id == id).map(|m| m.version)
+        rt.modules()
+            .into_iter()
+            .find(|m| m.id == id)
+            .map(|m| m.version)
     };
     let Some(version) = version else {
         return StatusCode::NOT_FOUND.into_response();
     };
     let full = st.config.module_cache.join(&id).join(&version).join(&rel);
     match tokio::fs::read(&full).await {
-        Ok(bytes) => ([(header::CONTENT_TYPE, module_asset_content_type(&rel))], bytes).into_response(),
+        Ok(bytes) => (
+            [(header::CONTENT_TYPE, module_asset_content_type(&rel))],
+            bytes,
+        )
+            .into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
@@ -920,9 +1085,18 @@ async fn cloud_get_raw(
     for (k, v) in auth.headers() {
         r = r.header(k, v);
     }
-    let resp = r.send().await.map_err(|e| CloudGetError::Network(e.to_string()))?;
+    if let Some(language) = headers.get(axum::http::header::ACCEPT_LANGUAGE) {
+        r = r.header(axum::http::header::ACCEPT_LANGUAGE, language);
+    }
+    let resp = r
+        .send()
+        .await
+        .map_err(|e| CloudGetError::Network(e.to_string()))?;
     let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-    let body = resp.bytes().await.map_err(|e| CloudGetError::Network(e.to_string()))?;
+    let body = resp
+        .bytes()
+        .await
+        .map_err(|e| CloudGetError::Network(e.to_string()))?;
     Ok((status, body))
 }
 
@@ -941,12 +1115,66 @@ fn cloud_get_error_response(e: CloudGetError) -> Response {
 }
 
 /// GET hub-scoped al Cloud y devuelve el JSON tal cual (ver [`cloud_get_raw`]).
-async fn proxy_cloud_get(st: &AppState, headers: &HeaderMap, req: cloud_client::PreparedRequest) -> Response {
+async fn proxy_cloud_get(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+) -> Response {
     match cloud_get_raw(st, headers, req).await {
-        Ok((status, body)) => {
-            (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response()
-        }
+        Ok((status, body)) => (
+            status,
+            [
+                (axum::http::header::CONTENT_TYPE, "application/json"),
+                (axum::http::header::CACHE_CONTROL, "no-store"),
+            ],
+            body,
+        )
+            .into_response(),
         Err(e) => cloud_get_error_response(e),
+    }
+}
+
+/// GET público al Cloud. Solo se usa para metadatos publicados del catálogo Demo; nunca para
+/// descargas, entitlement ni operaciones de un Hub. No añade identidad de usuario o máquina.
+async fn proxy_public_cloud_get(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+) -> Response {
+    let mut request = st.http.get(&req.url);
+    for (name, value) in req.headers {
+        request = request.header(name, value);
+    }
+    if let Some(language) = headers.get(axum::http::header::ACCEPT_LANGUAGE) {
+        request = request.header(axum::http::header::ACCEPT_LANGUAGE, language);
+    }
+    let response = match request.send().await {
+        Ok(response) => response,
+        Err(error) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "ok": false, "error": error.to_string() })),
+            )
+                .into_response()
+        }
+    };
+    let status =
+        StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    match response.bytes().await {
+        Ok(body) => (
+            status,
+            [
+                (axum::http::header::CONTENT_TYPE, "application/json"),
+                (axum::http::header::CACHE_CONTROL, "no-store"),
+            ],
+            body,
+        )
+            .into_response(),
+        Err(error) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "ok": false, "error": error.to_string() })),
+        )
+            .into_response(),
     }
 }
 
@@ -958,9 +1186,18 @@ async fn proxy_cloud_get(st: &AppState, headers: &HeaderMap, req: cloud_client::
 /// cuando la UI necesita pintar «funcionará hasta {fecha}». El contrato previo no cambia:
 /// mismo status y mismos campos, solo se AÑADE la clave.
 async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     // `entitlement(auth)` solo usa `auth` para las cabeceras; las reescribe `cloud_get_raw`.
-    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    let placeholder = cloud_client::Auth::HubToken {
+        hub_id: st.hub_id(),
+        token: String::new(),
+    };
 
     // Estado local de revalidación sobre los módulos INSTALADOS de este hub.
     let installed: Vec<String> = {
@@ -981,7 +1218,12 @@ async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Re
                 (status, Json(Value::Object(obj))).into_response()
             }
             // Body no-objeto (raro: HTML de error, vacío) → tal cual, como antes.
-            _ => (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response(),
+            _ => (
+                status,
+                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                body,
+            )
+                .into_response(),
         },
         Err(CloudGetError::Network(msg)) => (
             StatusCode::BAD_GATEWAY,
@@ -996,15 +1238,40 @@ async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Re
 /// `cloud_api_token` firma la llamada aquí (nunca en el navegador); la app pega a esta ruta y recibe
 /// un JWT dedicado (`aud=erplora-bridge` + `hub_id`, exp corto) que presenta al Bridge local. ADR-0050 §2.7.
 async fn proxy_bridge_token(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    let placeholder = cloud_client::Auth::HubToken {
+        hub_id: st.hub_id(),
+        token: String::new(),
+    };
     proxy_cloud_get(&st, &headers, cloud.bridge_token(&placeholder)).await
 }
 
-/// GET /api/marketplace/catalog — catálogo del marketplace (proxy de `/api/v1/marketplace/modules/`).
+/// GET /api/marketplace/catalog — catálogo real del marketplace.
+///
+/// Un Hub registrado usa `/api/v1/marketplace/modules/` con su token de máquina para recibir el
+/// contexto de ese Hub. Demo, única excepción al registro, consume el catálogo público de metadatos
+/// `/api/v1/marketplace/catalog/`; ninguna operación protegida se vuelve pública.
 async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    if st.is_demo() {
+        return proxy_public_cloud_get(&st, &headers, cloud.public_marketplace_modules()).await;
+    }
+    let placeholder = cloud_client::Auth::HubToken {
+        hub_id: st.hub_id(),
+        token: String::new(),
+    };
     proxy_cloud_get(&st, &headers, cloud.marketplace_modules(&placeholder)).await
 }
 
@@ -1012,8 +1279,17 @@ async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMa
 ///
 /// La **«fuente nube»** del panel de import (Ajustes → Datos). [ADR-0121]
 async fn proxy_blueprints_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    let placeholder = cloud_client::Auth::HubToken {
+        hub_id: st.hub_id(),
+        token: String::new(),
+    };
     proxy_cloud_get(&st, &headers, cloud.blueprints_catalog(&placeholder)).await
 }
 
@@ -1031,16 +1307,31 @@ async fn download_blueprint(
     Path(slug): Path<String>,
     headers: HeaderMap,
 ) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    let placeholder = cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token: String::new() };
+    let placeholder = cloud_client::Auth::HubToken {
+        hub_id: st.hub_id(),
+        token: String::new(),
+    };
 
     // 1) El SaaS nos da URL firmada + sha256 (hub-scoped: se autentica el runtime, no el usuario).
-    let (status, body) = match cloud_get_raw(&st, &headers, cloud.blueprint_download(&slug, &placeholder)).await {
-        Ok(pair) => pair,
-        Err(e) => return cloud_get_error_response(e),
-    };
+    let (status, body) =
+        match cloud_get_raw(&st, &headers, cloud.blueprint_download(&slug, &placeholder)).await {
+            Ok(pair) => pair,
+            Err(e) => return cloud_get_error_response(e),
+        };
     if !status.is_success() {
-        return (status, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response();
+        return (
+            status,
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            body,
+        )
+            .into_response();
     }
 
     let info: Value = match serde_json::from_slice(&body) {
@@ -1057,7 +1348,12 @@ async fn download_blueprint(
             Ok(b) => b,
             Err(e) => return bad_gateway(format!("descarga del blueprint interrumpida: {e}")),
         },
-        Ok(r) => return bad_gateway(format!("Object Storage devolvió {} al bajar el blueprint", r.status())),
+        Ok(r) => {
+            return bad_gateway(format!(
+                "Object Storage devolvió {} al bajar el blueprint",
+                r.status()
+            ))
+        }
         Err(e) => return bad_gateway(format!("no se pudo descargar el blueprint: {e}")),
     };
 
@@ -1084,7 +1380,11 @@ async fn download_blueprint(
 
 /// 502 con el motivo en JSON (contrato de error del resto de proxies).
 fn bad_gateway(reason: String) -> Response {
-    (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": reason }))).into_response()
+    (
+        StatusCode::BAD_GATEWAY,
+        Json(json!({ "ok": false, "error": reason })),
+    )
+        .into_response()
 }
 
 /// POST /api/assistant/chat/stream — proxy SSE hacia el Cloud (ARQUITECTURA.md §9.3).
@@ -1124,15 +1424,12 @@ async fn assistant_chat_stream(
     let tools = match &st.vector {
         Some(store) => {
             let query = assistant::last_user_message(&frontend);
-            let embedder = embed::CloudEmbedder::new(
-                st.http.clone(),
-                &st.config.cloud_base_url,
-                auth.clone(),
-            );
+            let embedder =
+                embed::CloudEmbedder::new(st.http.clone(), &st.config.cloud_base_url, auth.clone());
             router::assemble_routed_tools(
                 &embedder,
                 store.as_ref(),
-                &st.config.hub_id,
+                &st.hub_id(),
                 &query,
                 all_tools,
                 active_modules,
@@ -1314,9 +1611,16 @@ struct LocaleQuery {
     locale: Option<String>,
 }
 
-async fn navigation(State(st): State<AppState>, Query(q): Query<LocaleQuery>) -> Response {
+async fn navigation(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<LocaleQuery>,
+) -> Response {
     let locale = q.locale.as_deref().unwrap_or("en");
     let rt = st.runtime.lock().await;
+    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
     let reg = rt.registry();
     let items: Vec<Value> = rt
         .navigation()
@@ -1343,9 +1647,16 @@ async fn navigation(State(st): State<AppState>, Query(q): Query<LocaleQuery>) ->
     Json(json!({ "ok": true, "data": items })).into_response()
 }
 
-async fn list_modules(State(st): State<AppState>, Query(q): Query<LocaleQuery>) -> Response {
+async fn list_modules(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<LocaleQuery>,
+) -> Response {
     let locale = q.locale.as_deref().unwrap_or("en");
     let rt = st.runtime.lock().await;
+    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
     let reg = rt.registry();
     // Ids de módulos (activos) que exponen al menos una op `expose_api` (ADR-0057). Se calcula UNA
     // vez y se consulta por pertenencia → campo aditivo `has_public_api` por módulo, que usa la
@@ -1373,39 +1684,67 @@ async fn list_modules(State(st): State<AppState>, Query(q): Query<LocaleQuery>) 
     Json(json!({ "ok": true, "data": items })).into_response()
 }
 
-async fn install_module(State(st): State<AppState>, Json(req): Json<InstallReq>) -> Response {
+async fn install_module(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<InstallReq>,
+) -> Response {
     let mut rt = st.runtime.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
     match rt.install_from_dir(std::path::Path::new(&req.dir)).await {
         Ok(id) => Json(json!({ "ok": true, "data": { "module_id": id } })).into_response(),
         Err(e) => err_response(e),
     }
 }
 
-async fn activate_module(State(st): State<AppState>, Path(id): Path<String>) -> Response {
+async fn activate_module(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
     let mut rt = st.runtime.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
     match rt.activate(&id).await {
         Ok(()) => Json(json!({ "ok": true })).into_response(),
         Err(e) => err_response(e),
     }
 }
 
-async fn deactivate_module(State(st): State<AppState>, Path(id): Path<String>) -> Response {
+async fn deactivate_module(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
     let mut rt = st.runtime.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
     match rt.deactivate(&id).await {
         Ok(()) => Json(json!({ "ok": true })).into_response(),
         Err(e) => err_response(e),
     }
 }
 
-async fn uninstall_module(State(st): State<AppState>, Path(id): Path<String>) -> Response {
+async fn uninstall_module(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
     let mut rt = st.runtime.lock().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
     match rt.uninstall(&id).await {
         Ok(()) => {
             drop(rt);
             // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.
             // Best-effort: no falla la desinstalación si el store da error.
             if let Some(store) = &st.vector {
-                if let Err(e) = embed::drop_module(store.as_ref(), &st.config.hub_id, &id).await {
+                if let Err(e) = embed::drop_module(store.as_ref(), &st.hub_id(), &id).await {
                     tracing::warn!(module_id = %id, error = %e, "no se pudieron borrar embeddings del módulo (no crítico)");
                 }
             }
@@ -1415,11 +1754,15 @@ async fn uninstall_module(State(st): State<AppState>, Path(id): Path<String>) ->
     }
 }
 
-async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<QueryReq>) -> Response {
+async fn query(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<QueryReq>,
+) -> Response {
     // Tier cloud compartido (ADR-0005): resuelve el runtime de la ORG dueña del `hub_id` de la
     // petición (un pool por org). En single-tenant devuelve el runtime único. El rechazo cross-org
     // (hub_id de org desconocida) ocurre aquí, ANTES de tocar ninguna BD.
-    let arc = match st.runtime_for(&auth::hub_id(&headers, &st.config.hub_id)).await {
+    let arc = match st.runtime_for(&auth::hub_id(&headers, &st.hub_id())).await {
         Ok(rt) => rt,
         Err(e) => return tenant_rejected(e),
     };
@@ -1429,7 +1772,10 @@ async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Q
         Err(e) => return unauthorized(e),
     };
     // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
-    let owner = rt.registry().get_query(&req.name).map(|q| q.module_id.clone());
+    let owner = rt
+        .registry()
+        .get_query(&req.name)
+        .map(|q| q.module_id.clone());
     if let Some(resp) = entitlement_blocked(&st, owner.as_deref()) {
         return resp;
     }
@@ -1448,9 +1794,13 @@ async fn query(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<Q
     }
 }
 
-async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<CommandReq>) -> Response {
+async fn command(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<CommandReq>,
+) -> Response {
     // Mismo enrutado por org que `query` (ADR-0005): el `PgAdapter` de la org corre server-side.
-    let arc = match st.runtime_for(&auth::hub_id(&headers, &st.config.hub_id)).await {
+    let arc = match st.runtime_for(&auth::hub_id(&headers, &st.hub_id())).await {
         Ok(rt) => rt,
         Err(e) => return tenant_rejected(e),
     };
@@ -1460,7 +1810,10 @@ async fn command(State(st): State<AppState>, headers: HeaderMap, Json(req): Json
         Err(e) => return unauthorized(e),
     };
     // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
-    let owner = rt.registry().get_command(&req.name).map(|c| c.module_id.clone());
+    let owner = rt
+        .registry()
+        .get_command(&req.name)
+        .map(|c| c.module_id.clone());
     if let Some(resp) = entitlement_blocked(&st, owner.as_deref()) {
         return resp;
     }
@@ -1503,8 +1856,13 @@ fn default_js_error_type() -> String {
 async fn frontend_error_report(Json(req): Json<FrontendErrorReq>) -> Response {
     use erplora_runtime::error_registry::{severity, source, ErrorEvent, ErrorRegistry};
 
-    let mut event = ErrorEvent::new(source::FRONTEND, req.r#type, req.message, severity::UNEXPECTED)
-        .with_context(json!({ "url": req.url, "component": req.component }));
+    let mut event = ErrorEvent::new(
+        source::FRONTEND,
+        req.r#type,
+        req.message,
+        severity::UNEXPECTED,
+    )
+    .with_context(json!({ "url": req.url, "component": req.component }));
     if let Some(stack) = req.stack {
         event = event.with_stack(stack);
     }
@@ -1530,6 +1888,10 @@ struct PinReq {
 struct CloudLoginReq {
     #[serde(default)]
     name: Option<String>,
+    /// Email inicial de la identidad Cloud. Solo si el perfil local aún no tiene uno: después el
+    /// usuario es dueño de sus datos y un login no pisa una edición hecha en Perfil.
+    #[serde(default)]
+    email: Option<String>,
     /// Id del dispositivo a marcar de confianza tras este login online (§2.9). Opcional.
     #[serde(default)]
     device_id: Option<String>,
@@ -1607,15 +1969,39 @@ async fn auth_cloud(
     let cloud_user_id = claims.user_id_str();
     let body = body.map(|b| b.0);
     let device_id = body.as_ref().and_then(|b| b.device_id.clone());
+    let email = body.as_ref().and_then(|b| b.email.clone());
     let name = body
-        .and_then(|b| b.name)
+        .as_ref()
+        .and_then(|b| b.name.clone())
         .unwrap_or_else(|| format!("user:{cloud_user_id}"));
     // Rol por defecto al provisionar un usuario cloud nuevo (bootstrap). Decisión de política —
     // configurable por entorno; ajustable luego por un admin del hub.
     let default_role = std::env::var("HUB_DEFAULT_ROLE").unwrap_or_else(|_| "admin".into());
     let rt = st.runtime.lock().await;
-    match rt.get_or_link_cloud_user(&cloud_user_id, &name, &default_role).await {
+    match rt
+        .get_or_link_cloud_user(&cloud_user_id, &name, &default_role)
+        .await
+    {
         Ok(user) => {
+            // Si es el primer login, siembra el correo Cloud en el perfil local. Una vez existe,
+            // NO se sobreescribe: las ediciones de `/profile` pertenecen al usuario.
+            if let Some(email) = email.filter(|s| !s.trim().is_empty()) {
+                if let Ok(profile) = rt.user_profile(&user.id).await {
+                    if profile.email.is_empty() {
+                        let _ = rt
+                            .update_user_profile(
+                                &user.id,
+                                &erplora_runtime::user_profile::UpdateUserProfile {
+                                    first_name: profile.first_name,
+                                    last_name: profile.last_name,
+                                    email,
+                                    preferences: profile.preferences,
+                                },
+                            )
+                            .await;
+                    }
+                }
+            }
             // Device-trust (§2.9): este es un login ONLINE correcto → marca el dispositivo de
             // confianza para habilitar luego el login local por PIN. Best-effort (no bloquea el
             // login si falla el marcado).
@@ -1636,14 +2022,22 @@ struct SetPinReq {
 /// Fija el PIN del **usuario de la sesión actual** (`X-Hub-Session`). Lo usa el alta de PIN tras el
 /// primer login cloud (§2.9): el usuario ya está autenticado por su JWT→sesión y elige su PIN en
 /// este dispositivo de confianza. Body `{pin}` (4 dígitos; vacío lo borra). → `{ok}` (401 sin sesión).
-async fn auth_set_pin(State(st): State<AppState>, headers: HeaderMap, Json(req): Json<SetPinReq>) -> Response {
+async fn auth_set_pin(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<SetPinReq>,
+) -> Response {
     let rt = st.runtime.lock().await;
     let Some(token) = auth::session_token(&headers) else {
         return unauthorized(auth::AuthError::MissingSession);
     };
     let user = match rt.resolve_session(&token).await {
         Ok(Some(u)) => u,
-        Ok(None) => return unauthorized(auth::AuthError::Invalid("sesión inválida o caducada".into())),
+        Ok(None) => {
+            return unauthorized(auth::AuthError::Invalid(
+                "sesión inválida o caducada".into(),
+            ))
+        }
         Err(e) => return err_response(e),
     };
     match rt.set_pin(&user.id, &req.pin).await {
@@ -1662,9 +2056,27 @@ async fn auth_logout(State(st): State<AppState>, headers: HeaderMap) -> Response
 }
 
 /// Abre una sesión para `user` y devuelve `{ok, token, user}`.
-async fn mint_session(rt: &erplora_runtime::Runtime, user: erplora_runtime::identity::HubUser) -> Response {
-    match rt.create_session(&user.id, erplora_runtime::identity::DEFAULT_SESSION_TTL_SECS).await {
-        Ok(token) => Json(json!({ "ok": true, "token": token, "user": user })).into_response(),
+async fn mint_session(
+    rt: &erplora_runtime::Runtime,
+    user: erplora_runtime::identity::HubUser,
+) -> Response {
+    match rt
+        .create_session(
+            &user.id,
+            erplora_runtime::identity::DEFAULT_SESSION_TTL_SECS,
+        )
+        .await
+    {
+        Ok(token) => {
+            let permissions = rt.permissions_for_role(&user.role);
+            Json(json!({
+                "ok": true,
+                "token": token,
+                "user": user,
+                "permissions": permissions,
+            }))
+            .into_response()
+        }
         Err(e) => err_response(e),
     }
 }

@@ -12,8 +12,8 @@
 //!
 //! Seguridad: TODA ruta que llega del cliente (`folder`/`path`/`name`) se une al root con
 //! [`safe_join`], que descarta cualquier componente `..`/absoluto/prefijo (anti path-traversal /
-//! zip-slip). El gate de auth lo hereda del router como el resto (mismo patrón que `system.rs`);
-//! endurecerlo es columna del humano.
+//! zip-slip). Listar/abrir exige sesión de usuario; subir, crear carpetas y borrar exige sesión
+//! owner/admin. Una API key nunca accede al gestor de archivos.
 //!
 //! Endpoints (contrato consumido por `lib/media.ts`):
 //!   GET    /api/media?folder=<rel>      → { ok, data: { folders[], files[], path[] } }
@@ -24,7 +24,7 @@
 
 use axum::body::Body;
 use axum::extract::{Multipart, Query, State};
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
@@ -33,10 +33,34 @@ use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use sysinfo::Disks;
 
-use crate::AppState;
+use crate::{auth, AppState};
 
 /// Profundidad máxima del árbol de carpetas que se devuelve al panel lateral (defensivo).
 const MAX_TREE_DEPTH: usize = 8;
+
+fn unauthorized(error: auth::AuthError) -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({ "ok": false, "error": error.message() })),
+    )
+        .into_response()
+}
+
+async fn require_user(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
+    let rt = st.runtime.lock().await;
+    auth::require_user_session(headers, &st.config, &rt)
+        .await
+        .map(|_| ())
+        .map_err(unauthorized)
+}
+
+async fn require_admin(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
+    let rt = st.runtime.lock().await;
+    auth::require_admin_session(headers, &st.config, &rt)
+        .await
+        .map(|_| ())
+        .map_err(unauthorized)
+}
 
 // ─────────────────────────── Eje A: local (disco) vs cloud (S3 vía Cloud) ───────────────────────────
 //
@@ -54,7 +78,13 @@ async fn is_cloud_backend(st: &AppState) -> bool {
 /// `None` si el hub no está enrolado (sin token de máquina) → no se puede proxyar.
 fn cloud_headers(st: &AppState) -> Option<Vec<(&'static str, String)>> {
     let token = st.machine_token()?;
-    Some(cloud_client::Auth::HubToken { hub_id: st.config.hub_id.clone(), token }.headers())
+    Some(
+        cloud_client::Auth::HubToken {
+            hub_id: st.hub_id(),
+            token,
+        }
+        .headers(),
+    )
 }
 
 /// Base del Cloud sin barra final.
@@ -79,7 +109,11 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
     let Some(headers) = cloud_headers(st) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
-    let url = format!("{}/api/v1/hub/device/media/?folder={}", cloud_base(st), pct_encode(folder));
+    let url = format!(
+        "{}/api/v1/hub/device/media/?folder={}",
+        cloud_base(st),
+        pct_encode(folder)
+    );
     let mut r = st.http.get(&url);
     for (k, v) in headers {
         r = r.header(k, v);
@@ -89,7 +123,10 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
         Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
     };
     if !resp.status().is_success() {
-        return err(StatusCode::BAD_GATEWAY, "el Cloud rechazó el listado de media");
+        return err(
+            StatusCode::BAD_GATEWAY,
+            "el Cloud rechazó el listado de media",
+        );
     }
     let raw: Value = match resp.json().await {
         Ok(v) => v,
@@ -103,7 +140,11 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
             arr.iter()
                 .map(|f| {
                     let bytes = f.get("bytes").and_then(Value::as_u64).unwrap_or(0);
-                    let modified = f.get("modified").and_then(Value::as_str).map(fmt_iso).unwrap_or_default();
+                    let modified = f
+                        .get("modified")
+                        .and_then(Value::as_str)
+                        .map(fmt_iso)
+                        .unwrap_or_default();
                     json!({
                         "id": f.get("path").cloned().unwrap_or(Value::Null),
                         "name": f.get("name").cloned().unwrap_or(Value::Null),
@@ -117,7 +158,10 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
         })
         .unwrap_or_default();
 
-    let used = raw.pointer("/usage/used_bytes").and_then(Value::as_u64).unwrap_or(0);
+    let used = raw
+        .pointer("/usage/used_bytes")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
     let data = json!({
         "folders": raw.get("folders").cloned().unwrap_or_else(|| json!([])),
         "files": files,
@@ -141,8 +185,13 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
                 form = form.text("folder", field.text().await.unwrap_or_default());
             }
             Some("files") => {
-                let fname = field.file_name().map(|s| s.to_string()).unwrap_or_else(|| "file".to_string());
-                let Ok(data) = field.bytes().await else { continue };
+                let fname = field
+                    .file_name()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "file".to_string());
+                let Ok(data) = field.bytes().await else {
+                    continue;
+                };
                 let part = reqwest::multipart::Part::bytes(data.to_vec()).file_name(fname);
                 form = form.part("files", part);
                 has_file = true;
@@ -170,7 +219,11 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
     let Some(headers) = cloud_headers(st) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
-    let url = format!("{}/api/v1/hub/device/media/?path={}", cloud_base(st), pct_encode(path));
+    let url = format!(
+        "{}/api/v1/hub/device/media/?path={}",
+        cloud_base(st),
+        pct_encode(path)
+    );
     let mut r = st.http.delete(&url);
     for (k, v) in headers {
         r = r.header(k, v);
@@ -191,7 +244,10 @@ async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Respons
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
     let url = format!("{}/api/v1/hub/device/media/folder/", cloud_base(st));
-    let mut r = st.http.post(&url).json(&json!({ "parent": parent, "name": name }));
+    let mut r = st
+        .http
+        .post(&url)
+        .json(&json!({ "parent": parent, "name": name }));
     for (k, v) in headers {
         r = r.header(k, v);
     }
@@ -211,7 +267,14 @@ pub struct FolderQuery {
 }
 
 /// Lista el árbol de carpetas + los ficheros de la carpeta pedida (raíz si `folder` vacío).
-pub async fn media_list(State(st): State<AppState>, Query(q): Query<FolderQuery>) -> Response {
+pub async fn media_list(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<FolderQuery>,
+) -> Response {
+    if let Err(response) = require_user(&st, &headers).await {
+        return response;
+    }
     if is_cloud_backend(&st).await {
         return cloud_list(&st, &q.folder).await;
     }
@@ -387,7 +450,14 @@ pub struct PathQuery {
 
 /// Sirve el contenido de un fichero de `media/` (inline). Lee a memoria (los ficheros de media son
 /// modestos: logs, PDFs, imágenes); el streaming por trozos para ficheros grandes es follow-up.
-pub async fn media_raw(State(st): State<AppState>, Query(q): Query<PathQuery>) -> Response {
+pub async fn media_raw(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<PathQuery>,
+) -> Response {
+    if let Err(response) = require_user(&st, &headers).await {
+        return response;
+    }
     let root = st.config.media_dir.clone();
     let Some(target) = safe_join(&root, &q.path) else {
         return err(StatusCode::BAD_REQUEST, "ruta no válida");
@@ -419,7 +489,14 @@ pub async fn media_raw(State(st): State<AppState>, Query(q): Query<PathQuery>) -
 
 /// Sube uno o varios ficheros a la carpeta `folder` (campo de texto del multipart). Los nombres se
 /// reducen a su componente final (sin ruta) para que un cliente no escriba fuera de la carpeta.
-pub async fn media_upload(State(st): State<AppState>, mut mp: Multipart) -> Response {
+pub async fn media_upload(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    mut mp: Multipart,
+) -> Response {
+    if let Err(response) = require_admin(&st, &headers).await {
+        return response;
+    }
     if is_cloud_backend(&st).await {
         return cloud_upload(&st, mp).await;
     }
@@ -434,18 +511,25 @@ pub async fn media_upload(State(st): State<AppState>, mut mp: Multipart) -> Resp
             }
             Some("files") => {
                 // Nombre seguro = solo el componente final del nombre declarado por el cliente.
-                let safe_name = field
-                    .file_name()
-                    .and_then(|f| Path::new(f).file_name().map(|s| s.to_string_lossy().into_owned()));
+                let safe_name = field.file_name().and_then(|f| {
+                    Path::new(f)
+                        .file_name()
+                        .map(|s| s.to_string_lossy().into_owned())
+                });
                 let Some(safe_name) = safe_name.filter(|s| !s.is_empty()) else {
                     continue;
                 };
-                let Ok(data) = field.bytes().await else { continue };
+                let Ok(data) = field.bytes().await else {
+                    continue;
+                };
                 let Some(dir) = safe_join(&root, &folder) else {
                     return err(StatusCode::BAD_REQUEST, "carpeta no válida");
                 };
                 if std::fs::create_dir_all(&dir).is_err() {
-                    return err(StatusCode::INTERNAL_SERVER_ERROR, "no se pudo crear la carpeta");
+                    return err(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "no se pudo crear la carpeta",
+                    );
                 }
                 if std::fs::write(dir.join(&safe_name), &data).is_ok() {
                     saved += 1;
@@ -462,7 +546,14 @@ pub async fn media_upload(State(st): State<AppState>, mut mp: Multipart) -> Resp
 
 /// Borra un fichero de `media/`. Solo ficheros (no directorios) para evitar borrados masivos por
 /// accidente; borrar carpetas es follow-up explícito.
-pub async fn media_delete(State(st): State<AppState>, Query(q): Query<PathQuery>) -> Response {
+pub async fn media_delete(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<PathQuery>,
+) -> Response {
+    if let Err(response) = require_admin(&st, &headers).await {
+        return response;
+    }
     if is_cloud_backend(&st).await {
         return cloud_delete(&st, &q.path).await;
     }
@@ -499,8 +590,12 @@ pub struct CreateFolderReq {
 /// Crea una sub-carpeta `name` dentro de `parent`. `name` se valida como UN solo componente.
 pub async fn media_create_folder(
     State(st): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateFolderReq>,
 ) -> Response {
+    if let Err(response) = require_admin(&st, &headers).await {
+        return response;
+    }
     if is_cloud_backend(&st).await {
         return cloud_create_folder(&st, &req.parent, &req.name).await;
     }
@@ -513,9 +608,10 @@ pub async fn media_create_folder(
     let Some(parent) = safe_join(&root, &req.parent) else {
         return err(StatusCode::BAD_REQUEST, "ruta no válida");
     };
-    let ok = tokio::task::spawn_blocking(move || std::fs::create_dir_all(parent.join(&name)).is_ok())
-        .await
-        .unwrap_or(false);
+    let ok =
+        tokio::task::spawn_blocking(move || std::fs::create_dir_all(parent.join(&name)).is_ok())
+            .await
+            .unwrap_or(false);
 
     if ok {
         Json(json!({ "ok": true })).into_response()
@@ -565,12 +661,16 @@ fn rel_id(root: &Path, path: &Path) -> String {
 }
 
 fn file_name_str(path: &Path) -> String {
-    path.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
+    path.file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 /// Nº de entradas directas de un directorio (para el contador de la fila del árbol).
 fn count_entries(dir: &Path) -> usize {
-    std::fs::read_dir(dir).map(|rd| rd.flatten().count()).unwrap_or(0)
+    std::fs::read_dir(dir)
+        .map(|rd| rd.flatten().count())
+        .unwrap_or(0)
 }
 
 /// Icono (ionicon) para carpetas especiales conocidas de `media/`; `None` = icono por defecto.
@@ -656,7 +756,10 @@ fn fmt_decimal(value: f64, decimals: usize) -> String {
 /// `SystemTime` → "YYYY-MM-DD HH:MM" en UTC, sin dependencias de fechas (algoritmo civil de
 /// Howard Hinnant). TZ = UTC (el front solo muestra la cadena).
 fn fmt_mtime(t: SystemTime) -> String {
-    let secs = t.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0) as i64;
+    let secs = t
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0) as i64;
     let days = secs.div_euclid(86_400);
     let rem = secs.rem_euclid(86_400);
     let (hh, mm) = ((rem / 3600), (rem % 3600) / 60);
@@ -678,5 +781,9 @@ fn fmt_mtime(t: SystemTime) -> String {
 
 /// Respuesta de error en el envelope estándar (`{ ok:false, error:{ message } }`).
 fn err(code: StatusCode, msg: &str) -> Response {
-    (code, Json(json!({ "ok": false, "error": { "message": msg } }))).into_response()
+    (
+        code,
+        Json(json!({ "ok": false, "error": { "message": msg } })),
+    )
+        .into_response()
 }

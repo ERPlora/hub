@@ -11,21 +11,36 @@
 //! propio task** (lo que CloudWatch agrega) pero en **tiempo real, sin IAM/coste/SDK** y respeta el
 //! límite del Fargate. Evita el error de leer `/proc` y ver la RAM del host.
 //!
-//! Documentos/copias/almacenamiento: en local desde el disco (`media/`); en cloud vía el Cloud
+//! Documentos/almacenamiento: en local desde el disco (`media/`); en cloud vía el Cloud
 //! (`GET /api/v1/hub/device/storage/`, el Hub no tiene credenciales S3). Logs = outbox de eventos.
+//! Las copias, importaciones y restauraciones pertenecen a Ajustes → Datos y copias, no a Sistema.
 //!
 //! Contrato (camelCase) consumido por `hub/apps/web/src/lib/system.ts`.
 
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use erplora_db::Dialect;
 use serde_json::{json, Map, Value};
 
-use crate::AppState;
+use crate::{auth, AppState};
 
 /// GET /api/system — métricas + base de datos reales, según el despliegue.
-pub async fn system_info(State(st): State<AppState>) -> Response {
+pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    // Sistema expone logs, métricas y detalles del almacenamiento. Es información interna del Hub:
+    // la protección de la ruta Vue no sustituye la autenticación de la API.
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(error) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return (
+                axum::http::StatusCode::UNAUTHORIZED,
+                Json(json!({ "ok": false, "error": error.message() })),
+            )
+                .into_response();
+        }
+    }
+
     // ¿Estamos en ECS? El endpoint de metadata solo existe dentro de un task de ECS/Fargate.
     let ecs_uri = std::env::var("ECS_CONTAINER_METADATA_URI_V4")
         .ok()
@@ -38,7 +53,7 @@ pub async fn system_info(State(st): State<AppState>) -> Response {
         let db = rt.db();
         let dialect = db.dialect();
         let database = collect_database(db, dialect).await;
-        let logs = collect_logs(db, &st.config.hub_id).await;
+        let logs = collect_logs(db, &st.hub_id()).await;
         (dialect, database, logs)
     };
 
@@ -51,7 +66,11 @@ pub async fn system_info(State(st): State<AppState>) -> Response {
     let serves_static = std::env::var("HUB_WEB_DIR")
         .map(|s| !s.is_empty())
         .unwrap_or(false);
-    let shell = if in_ecs || serves_static { "web" } else { "tauri" };
+    let shell = if in_ecs || serves_static {
+        "web"
+    } else {
+        "tauri"
+    };
 
     // CPU / memoria: ECS Task Metadata v4 (cloud) o `sysinfo` (local).
     let (cpu, memory) = match &ecs_uri {
@@ -60,10 +79,16 @@ pub async fn system_info(State(st): State<AppState>) -> Response {
         None => local_metrics().await,
     };
 
-    // Documentos / copias / almacenamiento usado. Se gatea por `in_ecs` (no por el dialecto): en
+    // Documentos / almacenamiento usado. Se gatea por `in_ecs` (no por el dialecto): en
     // cloud va vía Cloud (el Hub no tiene credenciales S3); en local se lee del disco.
-    let (documents, backups, storage_used) = if in_ecs {
-        cloud_storage(&st.http, &st.config.cloud_base_url, &st.config.hub_id, st.machine_token()).await
+    let (documents, storage_used) = if in_ecs {
+        cloud_storage(
+            &st.http,
+            &st.config.cloud_base_url,
+            &st.hub_id(),
+            st.machine_token(),
+        )
+        .await
     } else {
         // Carpeta media del hub, resuelta del entorno (igual que el arranque): HUB_MEDIA_DIR o `media`.
         let media_dir = std::env::var("HUB_MEDIA_DIR")
@@ -84,7 +109,6 @@ pub async fn system_info(State(st): State<AppState>) -> Response {
             "storageSource": if in_ecs { "s3" } else { "disk" },
             "storageUsed": storage_used,
             "documents": documents,
-            "backups": backups,
             "logs": logs,
         }
     }))
@@ -102,7 +126,9 @@ async fn collect_database(db: &dyn erplora_db::DatabaseAdapter, dialect: Dialect
             let pages = scalar_i64(db, "PRAGMA page_count", &no_params).await;
             let page_size = scalar_i64(db, "PRAGMA page_size", &no_params).await;
             let size_label = match (pages, page_size) {
-                (Some(p), Some(s)) if p >= 0 && s >= 0 => Some(human_bytes((p as u64) * (s as u64))),
+                (Some(p), Some(s)) if p >= 0 && s >= 0 => {
+                    Some(human_bytes((p as u64) * (s as u64)))
+                }
                 _ => None,
             };
             json!({
@@ -133,7 +159,12 @@ async fn collect_database(db: &dyn erplora_db::DatabaseAdapter, dialect: Dialect
             let limit = match role_limit {
                 Some(n) => Some(n),
                 None => {
-                    scalar_i64(db, "SELECT current_setting('max_connections')::int AS n", &no_params).await
+                    scalar_i64(
+                        db,
+                        "SELECT current_setting('max_connections')::int AS n",
+                        &no_params,
+                    )
+                    .await
                 }
             };
             json!({
@@ -148,7 +179,11 @@ async fn collect_database(db: &dyn erplora_db::DatabaseAdapter, dialect: Dialect
 
 /// Ejecuta una query escalar y devuelve el primer valor de la primera fila como `i64`
 /// (tolera que venga como número o como texto). `None` si falla o no hay filas.
-async fn scalar_i64(db: &dyn erplora_db::DatabaseAdapter, sql: &str, params: &Map<String, Value>) -> Option<i64> {
+async fn scalar_i64(
+    db: &dyn erplora_db::DatabaseAdapter,
+    sql: &str,
+    params: &Map<String, Value>,
+) -> Option<i64> {
     let res = db.query(sql, params).await.ok()?;
     let row = res.rows.first()?;
     let obj = row.as_object()?;
@@ -200,17 +235,15 @@ async fn collect_logs(db: &dyn erplora_db::DatabaseAdapter, hub_id: &str) -> Val
 
 // ─────────────────────────── Almacenamiento: LOCAL (disco) ───────────────────────────
 
-/// Documentos (raíz de `media/`), copias (`media/backups/`) y uso de disco — todo del disco local.
-async fn local_storage(media_dir: &std::path::Path) -> (Value, Value, Value) {
-    let documents = list_dir(media_dir, true);
-    let backups = list_dir(&media_dir.join("backups"), false);
+/// Documentos (raíz de `media/`) y uso de disco — todo del disco local.
+async fn local_storage(media_dir: &std::path::Path) -> (Value, Value) {
+    let documents = list_dir(media_dir);
     let storage_used = disk_usage(media_dir).await;
-    (documents, backups, storage_used)
+    (documents, storage_used)
 }
 
-/// Lista ficheros (no dirs ni ocultos) de `dir`, recientes primero (máx 100). `as_documents` →
-/// forma de documento (name/sizeLabel/modified/kind/url); si no → forma de copia (when/sizeLabel/url).
-fn list_dir(dir: &std::path::Path, as_documents: bool) -> Value {
+/// Lista ficheros (no dirs ni ocultos) de `dir`, recientes primero (máx 100).
+fn list_dir(dir: &std::path::Path) -> Value {
     let rd = match std::fs::read_dir(dir) {
         Ok(rd) => rd,
         Err(_) => return Value::Array(vec![]),
@@ -237,17 +270,13 @@ fn list_dir(dir: &std::path::Path, as_documents: bool) -> Value {
         .into_iter()
         .map(|(name, size, mtime)| {
             let when = fmt_iso(mtime);
-            if as_documents {
-                json!({
-                    "name": name,
-                    "sizeLabel": human_bytes(size),
-                    "modified": when,
-                    "kind": ext_of(&name),
-                    "url": format!("/api/media/raw?path={}", pct_encode(&name)),
-                })
-            } else {
-                json!({ "when": when, "sizeLabel": human_bytes(size), "url": Value::Null })
-            }
+            json!({
+                "name": name,
+                "sizeLabel": human_bytes(size),
+                "modified": when,
+                "kind": ext_of(&name),
+                "url": format!("/api/media/raw?path={}", pct_encode(&name)),
+            })
         })
         .collect();
     Value::Array(items)
@@ -296,17 +325,20 @@ async fn disk_usage(path: &std::path::Path) -> Value {
 
 // ─────────────────────────── Almacenamiento: CLOUD (proxy a Cloud) ───────────────────────────
 
-/// Documentos/copias/uso vía el Cloud (`GET /api/v1/hub/device/storage/`, `X-Hub-Token`+`X-Hub-Id`).
+/// Documentos/uso vía el Cloud (`GET /api/v1/hub/device/storage/`, `X-Hub-Token`+`X-Hub-Id`).
 /// El Cloud devuelve datos crudos (bytes/ISO) y aquí se formatean al contrato. `[]`/`null` si falla.
 async fn cloud_storage(
     http: &reqwest::Client,
     cloud_base_url: &str,
     hub_id: &str,
     token: Option<String>,
-) -> (Value, Value, Value) {
-    let empty = (Value::Array(vec![]), Value::Array(vec![]), Value::Null);
+) -> (Value, Value) {
+    let empty = (Value::Array(vec![]), Value::Null);
     let Some(token) = token else { return empty };
-    let url = format!("{}/api/v1/hub/device/storage/", cloud_base_url.trim_end_matches('/'));
+    let url = format!(
+        "{}/api/v1/hub/device/storage/",
+        cloud_base_url.trim_end_matches('/')
+    );
     let resp = http
         .get(&url)
         .header("X-Hub-Token", token)
@@ -317,7 +349,9 @@ async fn cloud_storage(
     if !resp.status().is_success() {
         return empty;
     }
-    let Ok(body) = resp.json::<Value>().await else { return empty };
+    let Ok(body) = resp.json::<Value>().await else {
+        return empty;
+    };
 
     let documents: Vec<Value> = body
         .get("documents")
@@ -331,23 +365,6 @@ async fn cloud_storage(
                         "sizeLabel": human_bytes(bytes),
                         "modified": d.get("modified").cloned().unwrap_or(Value::Null),
                         "kind": d.get("kind").cloned().unwrap_or(Value::Null),
-                        "url": Value::Null,
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let backups: Vec<Value> = body
-        .get("backups")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .map(|b| {
-                    let bytes = b.get("bytes").and_then(|v| v.as_u64()).unwrap_or(0);
-                    json!({
-                        "when": b.get("created_at").cloned().unwrap_or(Value::Null),
-                        "sizeLabel": human_bytes(bytes),
                         "url": Value::Null,
                     })
                 })
@@ -371,7 +388,7 @@ async fn cloud_storage(
         })
         .unwrap_or(Value::Null);
 
-    (Value::Array(documents), Value::Array(backups), storage_used)
+    (Value::Array(documents), storage_used)
 }
 
 // ─────────────────────────── Métricas: ECS (cloud) ───────────────────────────
@@ -401,8 +418,16 @@ async fn ecs_metrics(http: &reqwest::Client, base: &str) -> (Value, Value) {
     // Agrega CPU y memoria de todos los contenedores del task (normalmente uno).
     let (mut cpu_delta, mut sys_delta, mut online, mut mem_used) = (0u64, 0u64, 0f64, 0u64);
     for c in stats.values() {
-        cpu_delta += sub_u64(c, "/cpu_stats/cpu_usage/total_usage", "/precpu_stats/cpu_usage/total_usage");
-        let sd = sub_u64(c, "/cpu_stats/system_cpu_usage", "/precpu_stats/system_cpu_usage");
+        cpu_delta += sub_u64(
+            c,
+            "/cpu_stats/cpu_usage/total_usage",
+            "/precpu_stats/cpu_usage/total_usage",
+        );
+        let sd = sub_u64(
+            c,
+            "/cpu_stats/system_cpu_usage",
+            "/precpu_stats/system_cpu_usage",
+        );
         sys_delta = sys_delta.max(sd); // el system usage es del host, igual entre contenedores
         if let Some(n) = c.pointer("/cpu_stats/online_cpus").and_then(|v| v.as_f64()) {
             online = online.max(n);
@@ -452,11 +477,17 @@ async fn ecs_metrics(http: &reqwest::Client, base: &str) -> (Value, Value) {
 /// Memoria usada de un contenedor = `usage` − caché de página (cgroup v1 `stats.cache`, v2
 /// `stats.inactive_file`), como hace `docker stats`.
 fn container_mem_used(c: &Value) -> u64 {
-    let usage = c.pointer("/memory_stats/usage").and_then(|v| v.as_u64()).unwrap_or(0);
+    let usage = c
+        .pointer("/memory_stats/usage")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     let cache = c
         .pointer("/memory_stats/stats/cache")
         .and_then(|v| v.as_u64())
-        .or_else(|| c.pointer("/memory_stats/stats/inactive_file").and_then(|v| v.as_u64()))
+        .or_else(|| {
+            c.pointer("/memory_stats/stats/inactive_file")
+                .and_then(|v| v.as_u64())
+        })
         .unwrap_or(0);
     usage.saturating_sub(cache)
 }
@@ -537,14 +568,19 @@ fn parse_mem_max(s: &str) -> Option<u64> {
 /// `inactive_file` de `memory.stat` = caché de página a restar (como `docker stats` en cgroup v2).
 fn parse_mem_inactive_file(stat: &str) -> u64 {
     stat.lines()
-        .find_map(|l| l.strip_prefix("inactive_file ").and_then(|v| v.trim().parse().ok()))
+        .find_map(|l| {
+            l.strip_prefix("inactive_file ")
+                .and_then(|v| v.trim().parse().ok())
+        })
         .unwrap_or(0)
 }
 
 /// `usage_usec` acumulado de `cpu.stat` (μs de CPU consumidos).
 fn parse_cpu_usage_usec(stat: &str) -> Option<u64> {
-    stat.lines()
-        .find_map(|l| l.strip_prefix("usage_usec ").and_then(|v| v.trim().parse().ok()))
+    stat.lines().find_map(|l| {
+        l.strip_prefix("usage_usec ")
+            .and_then(|v| v.trim().parse().ok())
+    })
 }
 
 /// `cpu.max` = `"<quota> <period>"`; `"max <period>"` = sin límite → None. Devuelve cores (quota/period).
@@ -606,7 +642,9 @@ async fn docker_metrics() -> (Value, Value) {
 
 #[cfg(test)]
 mod cgroup_tests {
-    use super::{parse_cpu_max_cores, parse_cpu_usage_usec, parse_mem_inactive_file, parse_mem_max};
+    use super::{
+        parse_cpu_max_cores, parse_cpu_usage_usec, parse_mem_inactive_file, parse_mem_max,
+    };
 
     #[test]
     fn mem_max_numero_o_max() {
@@ -683,7 +721,9 @@ fn pct_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{b:02X}")),
         }
     }

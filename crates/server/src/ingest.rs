@@ -41,7 +41,11 @@ pub fn collect_chunks(registry: &Registry, module_id: &str) -> Vec<PendingChunk>
         }
     }
 
-    for (name, q) in registry.queries.iter().filter(|(_, q)| q.module_id == module_id) {
+    for (name, q) in registry
+        .queries
+        .iter()
+        .filter(|(_, q)| q.module_id == module_id)
+    {
         if let Some(ai) = &q.def.ai {
             out.push(PendingChunk {
                 module_id: module_id.to_string(),
@@ -51,7 +55,11 @@ pub fn collect_chunks(registry: &Registry, module_id: &str) -> Vec<PendingChunk>
         }
     }
 
-    for (name, c) in registry.commands.iter().filter(|(_, c)| c.module_id == module_id) {
+    for (name, c) in registry
+        .commands
+        .iter()
+        .filter(|(_, c)| c.module_id == module_id)
+    {
         if let Some(ai) = &c.def.ai {
             out.push(PendingChunk {
                 module_id: module_id.to_string(),

@@ -18,11 +18,12 @@ import { toast, type ToastColor } from './toast';
 import { config } from './config';
 import { getAccessToken } from './cloud';
 import { getBridgeToken } from './bridge-client';
-import { getHubSession } from './session';
+import { getHubSession, user } from './session';
 import { beginRequest, endRequest } from './shell';
 import { getLocale, bootHubLanguage } from '../i18n';
 import { hubSettings } from './hub-settings';
 import { hubCurrency, publishHubCurrency } from './money';
+import { setRuntimeDeviceContext } from './device';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -46,6 +47,14 @@ export interface PinUser {
 export interface HubContext {
   hub_id: string;
   user: unknown | null;
+  /** Demo es la única excepción al registro obligatorio de máquina. */
+  demo?: boolean;
+  /** El runtime posee UUID Cloud + credencial de máquina (el secreto nunca llega al navegador). */
+  machine_registered?: boolean;
+  /** `true` en una instalación real que todavía debe completar el primer login/alta. */
+  registration_required?: boolean;
+  /** La clave pública RSA del SaaS está disponible para validar el JWT de usuario. */
+  public_key_loaded?: boolean;
   /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
   pin_users?: PinUser[];
   /**
@@ -85,6 +94,13 @@ export function getHubSector(): string | null {
  * sin depender de un flag en localStorage. `[]` hasta que el boot responde.
  */
 export const pinUsers = ref<PinUser[]>([]);
+/** `true` cuando `/api/hub/context` respondió y `pinUsers` ya es una lista autoritativa. */
+export const hubContextReady = ref(false);
+/** Estado autoritativo del vínculo de la máquina, sin exponer su credencial. */
+export const machineRegistered = ref(false);
+export const machineRegistrationRequired = ref(false);
+/** Permite distinguir un fallo de credenciales de un runtime que no pudo obtener la clave RSA. */
+export const cloudPublicKeyLoaded = ref(false);
 
 let _client: ErploraClient | null = null;
 
@@ -95,6 +111,11 @@ let _client: ErploraClient | null = null;
 export function runtimeHeaders(): Record<string, string> {
   const h: Record<string, string> = {};
   if (config.hubId) h['X-Hub-Id'] = config.hubId;
+  if (user.value) {
+    h['X-User-Id'] = user.value.id;
+    h['X-User-Name'] = user.value.name;
+    if (user.value.role) h['X-User-Role'] = user.value.role;
+  }
   // Sesión local del runtime: autoridad de permisos en modo Session (gate de query/command).
   const session = getHubSession();
   if (session) h['X-Hub-Session'] = session;
@@ -128,6 +149,11 @@ export function getClient(): ErploraClient {
     _client = new ErploraClient(
       transport,
       {
+        permissions: () => {
+          const role = user.value?.role?.toLowerCase();
+          if (role === 'owner' || role === 'admin') return new Set(['*']);
+          return new Set(user.value?.permissions ?? []);
+        },
         currency: hubCurrency,
         notifier: (n) => {
           const color: ToastColor =
@@ -641,6 +667,8 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     currency,
     language,
     api_docs_enabled: hubSettings.value?.api_docs_enabled ?? false,
+    country_code: hubSettings.value?.country_code ?? 'ES',
+    region_code: hubSettings.value?.region_code ?? null,
     // El contexto del hub solo trae moneda/idioma; la identidad de negocio la rellena el GET completo
     // de /api/settings (getHubSettings). Preservamos lo ya cacheado para no pisarlo con vacío.
     business_tax_id: hubSettings.value?.business_tax_id ?? '',
@@ -668,7 +696,20 @@ export async function bootHubContext(): Promise<HubContext | null> {
     });
     if (!res.ok) return null;
     const ctx = (await res.json()) as HubContext;
+    hubContextReady.value = true;
+    machineRegistered.value = Boolean(ctx.machine_registered);
+    machineRegistrationRequired.value = Boolean(ctx.registration_required);
+    cloudPublicKeyLoaded.value = Boolean(ctx.public_key_loaded);
     if (ctx.hub_id) config.hubId = ctx.hub_id;
+    // El runtime es la autoridad del modo demo y del vínculo de máquina. En Cloud el UUID del
+    // deployment funciona como id estable de la máquina lógica; Tauri lo sustituye por su
+    // `device.id` nativo al construir las cabeceras de login.
+    if (ctx.demo) config.demo = true;
+    setRuntimeDeviceContext(
+      ctx.machine_registered && ctx.hub_id
+        ? { id: ctx.hub_id, clientType: 'hub-cloud', platform: 'cloud' }
+        : null,
+    );
     if (Array.isArray(ctx.pin_users)) pinUsers.value = ctx.pin_users;
     // Sector del hub para el preset "Recomendado" del dashboard. Acepta `sector` o el alias
     // `business_type`; ausente → queda null (degradación elegante en la recolección de widgets).

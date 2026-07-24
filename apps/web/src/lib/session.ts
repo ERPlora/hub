@@ -5,6 +5,7 @@ import { computed, ref } from 'vue';
 
 export interface SessionUser {
   id: string;
+  cloudUserId?: string | null;
   name: string;
   email: string;
   avatarUrl?: string | null;
@@ -16,6 +17,8 @@ export interface SessionUser {
    * el fallback demo no lo traen.
    */
   role?: string | null;
+  /** Permisos efectivos del rol, resueltos por el runtime. Solo gobiernan visibilidad de UI. */
+  permissions?: string[];
 }
 
 const LS_KEY = 'erplora.session';
@@ -52,7 +55,15 @@ export const isAdmin = computed(() => {
 export function setUser(u: SessionUser | null): void {
   _user.value = u;
   try {
-    if (u) localStorage.setItem(LS_KEY, JSON.stringify(u));
+    if (u) {
+      // Un object URL (`blob:`) solo vive durante esta carga. Se usa en el estado reactivo, pero
+      // no se persiste como si fuera una URL válida para la próxima sesión.
+      const persisted = {
+        ...u,
+        avatarUrl: u.avatarUrl?.startsWith('blob:') ? null : u.avatarUrl,
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(persisted));
+    }
     else localStorage.removeItem(LS_KEY);
   } catch {
     /* noop */
@@ -84,6 +95,10 @@ export function logout(): void {
   if (token) void import('./cloud').then((m) => m.runtimeLogout(token));
   setUser(null);
   setHubSession(null);
+  void import('./cloud').then((m) => m.clearTokens());
+  void import('./user-profile').then((m) => m.resetUserProfile());
+  void import('./theme').then((m) => m.resetUserThemePreferences());
+  void import('../i18n').then((m) => m.resetUserLocale());
   // Olvida el entitlement resuelto: el próximo login lo recalcula para el hub activo.
   void import('./entitlement').then((m) => m.resetEntitlement());
   // El historial del AED muere con la sesión (ADR-0149): el Cloud ya no guarda copia.

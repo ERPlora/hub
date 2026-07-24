@@ -6,6 +6,7 @@ Reemplazará progresivamente al Hub actual (`../hub`).
 
 > 📖 Diseño completo y decisiones: **[ARQUITECTURA.md](ARQUITECTURA.md)**.
 > Guía para Claude: [CLAUDE.md](CLAUDE.md).
+> Patrones aprobados y regresión: [UI_UX_QA_GUIDE.md](UI_UX_QA_GUIDE.md).
 
 ## Estado
 
@@ -18,7 +19,8 @@ ver más abajo):
   variables `--ion-*` (brand `#1496d6`, crema, dark por `.ion-palette-dark`). **13 pantallas**:
   login (email/**PIN**/setup), dashboard, empleados (+ alta/edición), roles y permisos,
   billing, marketplace, ajustes, sistema, **vista de módulo (WC Lit en runtime)** y
-  **asistente AI** (drawer). Tema claro/oscuro. **0 violaciones de CSP de script**. Capturas
+  **asistente AI** (panel paralelo en escritorio/tablet y superpuesto en móvil). Tema
+  claro/oscuro. **0 violaciones de CSP de script**. Capturas
   en `apps/web/snapshots/`.
 - **AUTH** ([apps/web/src/views/LoginPage.vue](apps/web/src/views/LoginPage.vue) + `src/lib/session.ts`):
   email+password (1er login) → dispositivo de confianza → PIN + setup. Degrada a modo demo
@@ -37,10 +39,8 @@ ver más abajo):
   (manifest → migraciones → queries/commands/eventos con scope `hub_id`) + adaptador SQLite.
   Módulos de ejemplo viven hoy en `modules-workspace/modules/` (fuente), no en `hub/modules/`.
   **Compila y pasa tests**: `cargo check --workspace` en verde y `cargo test --workspace` corre
-  cientos de tests en verde en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri` — salvo dos
-  fallos conocidos y aislados en `erplora-db` (`tests/parity.rs`): `taxes_rate_real_and_active_filter_parity`
-  (desactualizado tras ADR-0085: falta `key` en el payload del test) e
-  `inventory_stock_decrease_clamp_parity` (el clamp de stock no se aplica). Ver
+  cientos de tests en las 12 crates + `apps/bridge` + `apps/tauri/src-tauri`. La suite de paridad
+  mantiene alineados los contratos actuales de Inventory y Taxes entre SQLite y Postgres. Ver
   [crates/README.md](crates/README.md) y [REPASO-MOTOR-RUST.md](REPASO-MOTOR-RUST.md).
 
 `apps/tauri` es funcional (gate de entitlement + hardware sidecar), no un stub — ver
