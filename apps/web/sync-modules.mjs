@@ -21,7 +21,7 @@ const MODULES = [
   'appointments', 'cart_checkout', 'cash_register', 'customers', 'inventory',
   'invoice', 'invoice_series', 'kitchen', 'online_booking',
   'payment_gateways', 'payments', 'pricing', 'reservations',
-  'sales', 'schedules', 'services', 'staff', 'tables',
+  'printing', 'sales', 'schedules', 'services', 'staff', 'tables',
   'tasks', 'taxes', 'tickets', 'verifactu', 'whatsapp_inbox',
 ];
 

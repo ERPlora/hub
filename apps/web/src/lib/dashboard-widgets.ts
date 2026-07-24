@@ -400,10 +400,14 @@ function renderBarList(
   const valueCol = map?.value;
   if (!labelCol || !valueCol) return false;
   const colorCol = map?.color;
+  // Algunas magnitudes viajan en punto fijo entero (cantidades ADR-0147 = escala 10⁶). El módulo
+  // declara la frontera; el shell sigue siendo genérico y entrega al componente el valor lógico.
+  const declaredDivisor = Number(opts.valueDivisor ?? 1);
+  const valueDivisor = Number.isFinite(declaredDivisor) && declaredDivisor > 0 ? declaredDivisor : 1;
   const items = rows
     .map((r) => ({
       label: String(r[labelCol] ?? ''),
-      value: Number(r[valueCol]) || 0,
+      value: (Number(r[valueCol]) || 0) / valueDivisor,
       color: colorCol ? (r[colorCol] as string | undefined) : undefined,
     }))
     .filter((i) => i.label !== '');

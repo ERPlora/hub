@@ -258,11 +258,11 @@ describe('renderers por kind (T2) — formas de fila reales de los 5 módulos', 
       kind: 'bar-list',
       query: 'inventory.products.low_stock',
       map: { label: 'name', value: 'stock' },
-      options: { valueFormat: 'number', max: 10 },
+      options: { valueFormat: 'number', valueDivisor: 1_000_000, max: 10 },
     };
     const rows = [
-      { name: 'Coca-Cola', stock: 3 },
-      { name: 'Agua', stock: 5 },
+      { name: 'Coca-Cola', stock: 3_000_000 },
+      { name: 'Agua', stock: 5_000_000 },
     ];
     const cell = await renderOne(def, clientWith(async () => rows));
     const list = cell.querySelector('ok-bar-list') as

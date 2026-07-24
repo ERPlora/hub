@@ -279,12 +279,12 @@ async fn low_stock_threshold_seeds_from_global_settings() {
     let ctx = admin();
     set_settings(&rt, &ctx, 1, 0, 25).await;
 
-    let pid = create_product(&rt, &ctx, "Aceite", "ACE", 50, None).await;
+    let pid = create_product(&rt, &ctx, "Aceite", "ACE", 50_000_000, None).await;
 
     assert_eq!(
         product(&rt, &ctx, &pid).await["low_stock_threshold"].as_i64().unwrap(),
-        25,
-        "alta sin umbral explícito hereda el global del hub"
+        25_000_000,
+        "alta sin umbral explícito hereda el global y lo convierte a escala 10⁶"
     );
 }
 
@@ -295,7 +295,10 @@ async fn explicit_low_stock_threshold_wins_over_global() {
     let ctx = admin();
     set_settings(&rt, &ctx, 1, 0, 25).await;
 
-    let pid = create_product(&rt, &ctx, "Sal", "SAL", 50, Some(3)).await;
+    let pid = create_product(&rt, &ctx, "Sal", "SAL", 50_000_000, Some(3_000_000)).await;
 
-    assert_eq!(product(&rt, &ctx, &pid).await["low_stock_threshold"].as_i64().unwrap(), 3);
+    assert_eq!(
+        product(&rt, &ctx, &pid).await["low_stock_threshold"].as_i64().unwrap(),
+        3_000_000
+    );
 }
